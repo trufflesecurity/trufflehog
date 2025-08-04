@@ -62,6 +62,20 @@ func TestBrandFetch_Pattern(t *testing.T) {
 			want: []string{"0mWrufake4X1dRfake0mxS+E48ofakesTlyl55raNOs="},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{uSiXZ-NMpDW-ZJQFSN-5wkT7SqQ8-mDbr9K2pl}</id>
+  					<secret>{brandfetch AQAAABAAA 0mWrufake4X1dRfake0mxS+E48ofakesTlyl55rfake=}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"0mWrufake4X1dRfake0mxS+E48ofakesTlyl55rfake="},
+		},
+		{
 			name:  "invalid pattern - wrong length",
 			input: "brandfetch credentials: yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U",
 			want:  nil,
@@ -70,6 +84,30 @@ func TestBrandFetch_Pattern(t *testing.T) {
 			name:  "invalid pattern - invalid characters",
 			input: "brandfetch credentials: yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U[qy]UeIqnFwILOIlEPyBtJ^fakes=",
 			want:  nil,
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				func main() {
+					url := "https://api.example.com/v1/resource"
+
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("GET", url, http.NoBody)
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
+					}
+					
+					brandfetchAPIKey := "yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U[qy]UeIqnFwILOIlEPyBtJ^"
+					req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer resp.Body.Close()
+				}
+				`,
+			want: nil,
 		},
 	}
 

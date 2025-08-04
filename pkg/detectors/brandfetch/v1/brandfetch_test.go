@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -20,33 +21,66 @@ func TestBrandFetch_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: "brandfetch credentials: xxOO4dfGLg1IOp94KIppXayS1LxRyF456a47Cabc",
-			want:  []string{"xxOO4dfGLg1IOp94KIppXayS1LxRyF456a47Cabc"},
-		},
-		{
-			name: "valid pattern - complex",
+			name: "valid pattern",
 			input: `
-			// Create a new request with the secret as a header
-			req, err := http.NewRequest("GET", url, http.NoBody)
-			if err != nil {
-				fmt.Println("Error creating request:", err)
-				return
-			}
-			
-			brandfetchAPIKey := "xx123dfG231IOpaaKIppXayS1LxRyF456a47C123"
-			req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
-			// Perform the request
-			client := &http.Client{}
-			resp, _ := client.Do(req)
-			defer resp.Body.Close()	
-		}`,
-			want: []string{"xx123dfG231IOpaaKIppXayS1LxRyF456a47C123"},
+				func main() {
+					url := "https://api.example.com/v1/resource"
+
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("GET", url, http.NoBody)
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
+					}
+					
+					brandfetchAPIKey := "uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"
+					req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer resp.Body.Close()
+				}
+				`,
+			want: []string{"uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"},
 		},
 		{
-			name:  "invalid pattern",
-			input: "brandfetch credentials: xx123dfG231IOpaa-ppXayS1LxRyF456a47C123_123",
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{uSiXZ-NMpDW-ZJQFSN-5wkT7SqQ8-mDbr9K2pl}</id>
+  					<secret>{brandfetch AQAAABAAA uSiXZNMpDWWhZJQFSNkE5wkT7SqQ8B3mDbr9K2pl}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"uSiXZNMpDWWhZJQFSNkE5wkT7SqQ8B3mDbr9K2pl"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				func main() {
+					url := "https://api.example.com/v1/resource"
+
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("GET", url, http.NoBody)
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
+					}
+					
+					brandfetchAPIKey := "yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U[qy]UeIqnFwILOIlEPyBtJ^"
+					req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer resp.Body.Close()
+				}
+				`,
+			want: nil,
 		},
 	}
 
@@ -54,22 +88,15 @@ func TestBrandFetch_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -81,6 +108,7 @@ func TestBrandFetch_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}
