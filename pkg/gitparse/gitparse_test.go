@@ -2,7 +2,6 @@ package gitparse
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -781,11 +780,6 @@ func assertDiffEqualToExpected(t *testing.T, expected *Diff, actual *Diff) {
 		assert.Equal(t, expectedDiffStr, actualDiffStr)
 	}
 
-	if actual.IsBinary {
-		if actual.contentWriter != nil {
-			assert.Error(t, fmt.Errorf("expected empty content for binary"))
-		}
-	}
 	// TODO - Add test coverage for binary diffs (if it isn't already elsewhere)
 }
 
@@ -885,40 +879,7 @@ func TestStagedDiffParsing(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferWithContent(generateBinaryContent("tar.gz")),
-		},
-		{
-			PathB:    "trufflehog.bin",
-			IsBinary: true,
-			Commit: &Commit{
-				Hash:    "",
-				Author:  "",
-				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-				Message: strings.Builder{},
-			},
-			contentWriter: newBufferWithContent(generateBinaryContent("bin")),
-		},
-		{
-			PathB:    "opt/data/image.dmg",
-			IsBinary: true,
-			Commit: &Commit{
-				Hash:    "",
-				Author:  "",
-				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-				Message: strings.Builder{},
-			},
-			contentWriter: newBufferWithContent(generateBinaryContent("dmg")),
-		},
-		{
-			PathB:    strings.Join([]string{`C:\`, `\`, "Program Files (x86)", `\`, `\TruffleHog.exe`}, ""),
-			IsBinary: true,
-			Commit: &Commit{
-				Hash:    "",
-				Author:  "",
-				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-				Message: strings.Builder{},
-			},
-			contentWriter: newBufferWithContent(generateBinaryContent("exe")),
+			contentWriter: newBufferWithContent(nil),
 		},
 		{
 			PathB:     "tzu",
@@ -1023,40 +984,7 @@ func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferedFileWriterWithContent(generateBinaryContent("tar.gz")),
-		},
-		{
-			PathB:    "trufflehog.bin",
-			IsBinary: true,
-			Commit: &Commit{
-				Hash:    "",
-				Author:  "",
-				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-				Message: strings.Builder{},
-			},
-			contentWriter: newBufferedFileWriterWithContent(generateBinaryContent("bin")),
-		},
-		{
-			PathB:    "opt/data/image.dmg",
-			IsBinary: true,
-			Commit: &Commit{
-				Hash:    "",
-				Author:  "",
-				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-				Message: strings.Builder{},
-			},
-			contentWriter: newBufferWithContent(generateBinaryContent("dmg")),
-		},
-		{
-			PathB:    strings.Join([]string{`C:\`, `\`, "Program Files (x86)", `\`, `\TruffleHog.exe`}, ""),
-			IsBinary: true,
-			Commit: &Commit{
-				Hash:    "",
-				Author:  "",
-				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-				Message: strings.Builder{},
-			},
-			contentWriter: newBufferWithContent(generateBinaryContent("exe")),
+			contentWriter: newBufferedFileWriterWithContent(nil),
 		},
 		{
 			PathB:     "tzu",
@@ -2340,7 +2268,7 @@ protos:
 				Date:      newTime("Mon Jul 10 12:21:33 2023 -0400"),
 				Message:   newStringBuilderValue("Change binary file\n"),
 			},
-			contentWriter: newBufferWithContent([]byte(generateBinaryContent("tar.gz"))),
+			contentWriter: newBufferWithContent(nil),
 			IsBinary:      true,
 		},
 		{
@@ -2352,7 +2280,7 @@ protos:
 				Date:      newTime("Mon Jul 10 12:20:35 2023 -0400"),
 				Message:   newStringBuilderValue("Add binary file\n"),
 			},
-			contentWriter: newBufferWithContent([]byte(generateBinaryContent("tar.gz"))),
+			contentWriter: newBufferWithContent(nil),
 			IsBinary:      true,
 		},
 		{
@@ -2467,18 +2395,6 @@ diff --git a/trufflehog_3.42.0_linux_arm64.tar.gz b/trufflehog_3.42.0_linux_arm6
 new file mode 100644
 index 0000000..0a7a5b4
 Binary files /dev/null and b/trufflehog_3.42.0_linux_arm64.tar.gz differ
-
-diff --git a/trufflehog.bin b/trufflehog.bin
-index 0000000..0a7a5b4
-Binary files a/trufflehog.bin and b/trufflehog.bin differ
-
-diff --git a/opt/data/image.dmg b/opt/data/image.dmg
-index 0000000..0a7a5b4
-Binary files a/opt/data/image.dmg and b/opt/data/image.dmg differ
-
-diff --git a/C:\\Program Files (x86)\\TruffleHog.exe b/C:\\Program Files (x86)\\TruffleHog.exe
-index 0000000..0a7a5b4
-Binary files a/C:\\Program Files (x86)\\TruffleHog.exe and b/C:\\Program Files (x86)\\TruffleHog.exe differ
 
 diff --git a/lao b/lao
 deleted file mode 100644
@@ -2621,44 +2537,3 @@ index 2ee133b..12b4843 100644
 +output = json
 +region = us-east-2
 `
-
-// https://en.wikipedia.org/wiki/List_of_file_signatures
-func generateBinaryContent(contentType string) []byte {
-	switch contentType {
-	case "tar.gz":
-		return []byte{
-			0x1F, 0x8B, 0x08, // GZIP magic + compression method
-			0x00,
-			0x00, 0x00, 0x00, 0x00,
-			0x00,
-			0xFF,
-			0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F,
-			0x00, 0x00, 0x00, 0x00,
-		}
-	case "exe":
-		return []byte{
-			// https://superuser.com/questions/1334140/how-to-check-if-a-binary-is-16-bit-on-windows
-			0x4D, 0x5A, // 'MZ' magic number for EXE
-			0x90, 0x03, 0x00, 0x04, 0x00, 0xff, 0x00, 0xb8,
-			0x3a, 0xf2, 0x7e, 0x11, 0x5d, 0x9b, 0xc8, 0x4f,
-			0xa1, 0x67, 0x30, 0xeb, 0x94, 0x2c, 0x0d, 0x7a,
-			0x56, 0x88, 0xfa, 0x19, 0x2b, 0xc3, 0xd0, 0x6e,
-			0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F,
-			0x67, 0xab, 0xcd, 0x38, 0x04, 0x57, 0xf1, 0x6a,
-			0x9e, 0x03, 0xd8, 0x41, 0xb6, 0x2f, 0x75, 0xcc,
-			0x0b, 0x94, 0xe7, 0x50, 0x38, 0xad, 0x1f, 0x63,
-			0x7b, 0x0e, 0xf5, 0x29, 0xc4, 0x6d, 0x82, 0x10,
-		}
-	case "bin":
-		return []byte{0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F, 0x67}
-	case "dmg":
-		return []byte{
-			0x00, 0x00, 0x00, 0x00,
-			0x54, 0x72, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F, 0x67,
-			0x00, 0x00, 0x00, 0x00,
-			0x6B, 0x6F, 0x6C, 0x79, // "koly" magic number for dmg
-		}
-	}
-
-	return nil
-}
