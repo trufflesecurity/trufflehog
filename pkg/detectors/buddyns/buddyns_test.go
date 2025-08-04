@@ -2,45 +2,13 @@ package buddyns
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "kkmvdiolccw4v0tue4lu7l7kmnnb4ao8z25ezink"
-	complexPattern = `
-	func main() {
-		url := "https://api.example.com/v1/resource"
-
-		// Create a new request with the secret as a header
-		req, err := http.NewRequest("GET", url, http.NoBody)
-		if err != nil {
-			fmt.Println("Error creating request:", err)
-			return
-		}
-		
-		buddynsToken := "kkmvdiolccw4v0tue4lu7l7kmnnb4ao8z25ezink"
-		req.Header.Set("Authorization", "Token " + buddynsToken)
-
-		// Perform the request
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode == http.StatusOK {
-			fmt.Println("Request successful!")
-		} else {
-			fmt.Println("Request failed with status:", resp.Status)
-		}
-	}
-	`
-	invalidPattern = "diolccw4v0tue4lu7l7kmnnb4ao8z25ezink305l95D3gSD%c^"
 )
 
 func TestBuddyNs_Pattern(t *testing.T) {
@@ -53,19 +21,66 @@ func TestBuddyNs_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("buddyns credentials: %s", validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern",
+			input: `
+				func main() {
+					url := "https://api.example.com/v1/resource"
+
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("GET", url, http.NoBody)
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
+					}
+					
+					buddynsToken := "kkmvdiolccw4v0tue4lu7l7kmnnb4ao8z25ezink"
+					req.Header.Set("Authorization", "Token " + buddynsToken)
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer resp.Body.Close()
+				}
+				`,
+			want: []string{"kkmvdiolccw4v0tue4lu7l7kmnnb4ao8z25ezink"},
 		},
 		{
-			name:  "valid pattern - complex",
-			input: complexPattern,
-			want:  []string{validPattern},
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{buddyns}</id>
+  					<secret>{buddyns AQAAABAAA jqcayapqh1soy2zlfdbs1j4ytn0mpgmeffzsu2yt}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"jqcayapqh1soy2zlfdbs1j4ytn0mpgmeffzsu2yt"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("buddyns credentials: %s", invalidPattern),
-			want:  nil,
+			name: "invalid pattern",
+			input: `
+				func main() {
+					url := "https://api.example.com/v1/resource"
+
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("GET", url, http.NoBody)
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
+					}
+					
+					buddynsToken := "diolccw4v0tue4lu7l7kmnnb4ao8z25ezink305l95D3gSD%c^"
+					req.Header.Set("Authorization", "Token " + buddynsToken)
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer resp.Body.Close()
+				}
+				`,
+			want: nil,
 		},
 	}
 
@@ -73,22 +88,15 @@ func TestBuddyNs_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -100,6 +108,7 @@ func TestBuddyNs_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

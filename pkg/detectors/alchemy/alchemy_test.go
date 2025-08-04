@@ -2,10 +2,13 @@ package alchemy
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
 
 func TestAlchemy_Pattern(t *testing.T) {
@@ -17,20 +20,47 @@ func TestAlchemy_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "alchemy_token = '3aBcDFE5678901234567890_1a2b3c4d'",
-			want:  []string{"3aBcDFE5678901234567890_1a2b3c4d"},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the alchemy API
+				[DEBUG] Using Key=alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D"},
+		},
+		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{alchemy}</id>
+  					<secret>{alchemy AQAAABAAA 5iqW7gKQVXvwnykF9xAVfenemmnUJznI}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"5iqW7gKQVXvwnykF9xAVfenemmnUJznI"},
 		},
 		{
 			name: "finds all matches",
-			input: `alchemy_token1 = '3aBcDFE5678901234567890_1a2b3c4d'
-alchemy_token2 = '3aDcDFE56789012245678a0_1a2b3c2d'`,
-			want: []string{"3aBcDFE5678901234567890_1a2b3c4d", "3aDcDFE56789012245678a0_1a2b3c2d"},
+			input: `
+				[INFO] Sending request to the alchemy API
+				[DEBUG] Using Key=alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
+				[ERROR] Response received 401 UnAuthorized
+				[DEBUG] Using alchemy Key=xuQIeWFVEp8k8Uu9FwPx6X5C8IViOe1o
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D", "xuQIeWFVEp8k8Uu9FwPx6X5C8IViOe1o"},
 		},
 		{
-			name:  "invalid pattern",
-			input: "alchemy_token = '1a2b3c4d'",
-			want:  []string{},
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the alchemy API
+				[DEBUG] Using Key=alcht_a2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: []string{},
 		},
 	}
 
@@ -38,22 +68,15 @@ alchemy_token2 = '3aDcDFE56789012245678a0_1a2b3c2d'`,
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -65,6 +88,7 @@ alchemy_token2 = '3aDcDFE56789012245678a0_1a2b3c2d'`,
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

@@ -2,21 +2,13 @@ package bombbomb
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern = `
-		bombbombToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-		req.Header.Set("Authorization", bombbombToken)
-	`
-	invalidPattern = "eyJhbGciOiJIUzI1N^iIsInRkpXVCJ9.ey$JzdWIiOiIxMjM0NTY3ODkwIiwibmFtZwiaWF0IjoxNTE2MjM5MDIyfQ.S&flKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 )
 
 func TestBombBomb_Pattern(t *testing.T) {
@@ -29,14 +21,34 @@ func TestBombBomb_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("bombbomb credentials: %s", validPattern),
-			want:  []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},
+			name: "valid pattern",
+			input: `
+					bombbombToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+					req.Header.Set("Authorization", bombbombToken)
+				`,
+			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("bombbomb credentials: %s", invalidPattern),
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{bombbomb}</id>
+  					<secret>{bombbomb AQAAABAAA eyJioGciOiJIU9I1NiIsInR5cCI6IkpXVCJ9.eyJJdWIiOiIxMjM0NTY3ODkwIiwibmFtZSJ6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5d}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"eyJioGciOiJIU9I1NiIsInR5cCI6IkpXVCJ9.eyJJdWIiOiIxMjM0NTY3ODkwIiwibmFtZSJ6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5d"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+					bombbombToken := "eyJhbGciOiJIUzI1N^iIsInRkpXVCJ9.ey$JzdWIiOiIxMjM0NTY3ODkwIiwibmFtZwiaWF0IjoxNTE2MjM5MDIyfQ.S&flKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+					req.Header.Set("Authorization", bombbombToken)
+				`,
+			want: nil,
 		},
 	}
 
@@ -44,22 +56,15 @@ func TestBombBomb_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -71,6 +76,7 @@ func TestBombBomb_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}
