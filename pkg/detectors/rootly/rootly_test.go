@@ -1,45 +1,38 @@
-package atlassian
+package rootly
 
 import (
 	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAtlassian_Pattern(t *testing.T) {
+func TestRootly_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name: "valid pattern",
-			input: `
-				[INFO] Sending request to the atlassian API
-				[DEBUG] Using Key=aB1cD2eF3gH4iJ5kL6mN7oP8
-				[INFO] Response received: 200 OK
-			`,
-			want: []string{"aB1cD2eF3gH4iJ5kL6mN7oP8"},
+			name:  "valid pattern",
+			input: "rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
-			name: "valid pattern - xml",
-			input: `
-				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
-  					<scope>GLOBAL</scope>
-  					<id>{atlassian}</id>
-  					<secret>{AQAAABAAA r6RkiQao3PgqY9MOKtonpJdU}</secret>
-  					<description>configuration for production</description>
-					<creationDate>2023-05-18T14:32:10Z</creationDate>
-  					<owner>jenkins-admin</owner>
-				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
-			`,
-			want: []string{"r6RkiQao3PgqY9MOKtonpJdU"},
+			name:  "valid pattern - key out of prefix range",
+			input: "rootly keyword is not close to the real key in the data ='rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282'",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
+		},
+		{
+			name:  "invalid pattern",
+			input: "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+			want:  nil,
 		},
 	}
 
@@ -47,15 +40,22 @@ func TestAtlassian_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
 
 			if len(results) != len(test.want) {
-				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
 				return
 			}
 
@@ -67,7 +67,6 @@ func TestAtlassian_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
-
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

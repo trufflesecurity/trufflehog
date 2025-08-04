@@ -5,14 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "artsy_key: rU0K6hwGw9AeANtXrZ8FQJT9jn4sRdlj - artsy_id: hvQ2fMvUPNczDCdmzi0i"
-	invalidPattern = "artsy_key: rU:K6hwGw9AeANtXrZ8F%JT9jn4sR,lj - artsy_id: hvQ2f-vUPNczD+dmzi0i"
 )
 
 func TestArtsy_Pattern(t *testing.T) {
@@ -25,14 +21,38 @@ func TestArtsy_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"rU0K6hwGw9AeANtXrZ8FQJT9jn4sRdljhvQ2fMvUPNczDCdmzi0i"},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the artsy API
+				[DEBUG] Using Key=rU0K6hwGw9AeANtXrZ8FQJT9jn4sRdlj
+				[DEBUG] Using artsy ID=hvQ2fMvUPNczDCdmzi0i
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"rU0K6hwGw9AeANtXrZ8FQJT9jn4sRdljhvQ2fMvUPNczDCdmzi0i"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{artsy Mbw4Tihfv1ttrspD1yXk}</id>
+  					<secret>{artsy AQAAABAAA 3V4gtw8ZmDShAfzq2KKb3w0gZODnzxp7}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"3V4gtw8ZmDShAfzq2KKb3w0gZODnzxp7Mbw4Tihfv1ttrspD1yXk"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the artsy API
+				[DEBUG] Using Key=rU0K6hwGw9AeANtX-Z8FQJT9jn4sRdlj
+				[DEBUG] Using artsy ID=hvQ2fMvUPN_zDCdmzi0i
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: nil,
 		},
 	}
 
@@ -40,22 +60,15 @@ func TestArtsy_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -67,6 +80,7 @@ func TestArtsy_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}
