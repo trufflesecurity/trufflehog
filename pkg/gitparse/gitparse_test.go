@@ -2268,7 +2268,7 @@ protos:
 				Date:      newTime("Mon Jul 10 12:21:33 2023 -0400"),
 				Message:   newStringBuilderValue("Change binary file\n"),
 			},
-			contentWriter: newBufferWithContent(nil),
+			contentWriter: newBufferWithContent([]byte("")),
 			IsBinary:      true,
 		},
 		{
@@ -2280,7 +2280,7 @@ protos:
 				Date:      newTime("Mon Jul 10 12:20:35 2023 -0400"),
 				Message:   newStringBuilderValue("Add binary file\n"),
 			},
-			contentWriter: newBufferWithContent(nil),
+			contentWriter: newBufferWithContent([]byte("")),
 			IsBinary:      true,
 		},
 		{
