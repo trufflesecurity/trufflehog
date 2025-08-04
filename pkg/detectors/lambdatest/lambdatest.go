@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_LambdaTest,
-				Raw:          []byte(fmt.Sprintf("%s:%s", usernameMatch, accessKeyMatch)),
+				Raw:            []byte(accessKeyMatch),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", usernameMatch, accessKeyMatch)),
 			}
 
