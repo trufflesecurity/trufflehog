@@ -88,7 +88,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besnappy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
@@ -946,7 +945,8 @@ func buildDetectorList() []detectors.Detector {
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
 		&beebole.Scanner{},
-		&besnappy.Scanner{},
+		// Besnappy appears to be abandoned. The domain has expired. API returns 200 OK for all secrets causing FPs
+		// &besnappy.Scanner{},
 		&besttime.Scanner{},
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
