@@ -125,30 +125,32 @@ func verifyMatch(ctx context.Context, client *http.Client, roleId, secretId, vau
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Vault-Namespace", "admin")
 
-	res, err := client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
 	}
 
 	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 	}()
 
-	switch res.StatusCode {
+	switch resp.StatusCode {
 	case http.StatusOK:
 		return true, nil
 	case http.StatusBadRequest:
-		if err := json.NewDecoder(res.Body).Decode(&errorResponse); err == nil {
-			if errorResponse.Errors[0] == "invalid role or secret ID" {
-				return false, nil
-			}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+
+		if strings.Contains(string(body), "invalid role or secret ID") {
 			return false, nil
 		} else {
 			return false, fmt.Errorf("bad request: %v", errorResponse.Errors)
 		}
 	default:
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
 	}
 }
 
