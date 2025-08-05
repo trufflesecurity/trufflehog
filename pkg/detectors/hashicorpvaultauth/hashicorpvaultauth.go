@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -34,6 +35,10 @@ var (
 	vaultUrlPat = regexp.MustCompile(`(https?:\/\/[^\s\/]*\.hashicorp\.cloud(?::\d+)?)(?:\/[^\s]*)?`)
 )
 
+var errorResponse struct {
+	Errors []string `json:"errors"`
+}
+
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
 	return []string{"hashicorp"}
@@ -44,31 +49,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	var roleIds []string
-	uniqueRoleIds := make(map[string]struct{})
 	for _, match := range roleIdPat.FindAllStringSubmatch(dataStr, -1) {
 		roleId := strings.TrimSpace(match[1])
-		if _, exists := uniqueRoleIds[roleId]; !exists {
-			uniqueRoleIds[roleId] = struct{}{}
+		if !slices.Contains(roleIds, roleId) {
 			roleIds = append(roleIds, roleId)
 		}
 	}
 
 	var secretIds []string
-	uniqueSecretIds := make(map[string]struct{})
 	for _, match := range secretIdPat.FindAllStringSubmatch(dataStr, -1) {
 		secretId := strings.TrimSpace(match[1])
-		if _, exists := uniqueSecretIds[secretId]; !exists {
-			uniqueSecretIds[secretId] = struct{}{}
+		if !slices.Contains(secretIds, secretId) {
 			secretIds = append(secretIds, secretId)
 		}
 	}
 
 	var vaultUrls []string
-	uniqueUrls := make(map[string]struct{})
 	for _, match := range vaultUrlPat.FindAllString(dataStr, -1) {
 		url := strings.TrimSpace(match)
-		if _, exists := uniqueUrls[url]; !exists {
-			uniqueUrls[url] = struct{}{}
+		if !slices.Contains(vaultUrls, url) {
 			vaultUrls = append(vaultUrls, url)
 		}
 	}
@@ -137,13 +136,17 @@ func verifyMatch(ctx context.Context, client *http.Client, roleId, secretId, vau
 	}()
 
 	switch res.StatusCode {
-	case http.StatusOK, http.StatusNoContent:
+	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized,
-		http.StatusNotFound,
-		http.StatusBadRequest,
-		http.StatusForbidden:
-		return false, nil
+	case http.StatusBadRequest:
+		if err := json.NewDecoder(res.Body).Decode(&errorResponse); err == nil {
+			if errorResponse.Errors[0] == "invalid role or secret ID" {
+				return false, nil
+			}
+			return false, nil
+		} else {
+			return false, fmt.Errorf("bad request: %v", errorResponse.Errors)
+		}
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
