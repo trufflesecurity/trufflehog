@@ -84,7 +84,7 @@ func TestSource_parseSyslogMetadata(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "success - wrong format",
+			name: "fail - wrong format",
 			args: args{
 				format: "rfc5424",
 				input:  []byte("Test message"),
