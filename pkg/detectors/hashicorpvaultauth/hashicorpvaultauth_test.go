@@ -29,8 +29,8 @@ func TestHashiCorpVaultAppRoleAuth_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern - complete set (role_id + secret_id + vault_url)",
-			input: fmt.Sprintf("%s config:\nrole_id = '%s'\nsecret_id = '%s'\nvault_url = '%s'", keyword, validRoleId, validSecretId, validVaultUrl),
-			want:  []string{fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", validRoleId, validSecretId, validVaultUrl)},
+			input: fmt.Sprintf("%s hashicorp:\n role_id = '%s'\nsecret_id = '%s'\nvault_url = '%s'", keyword, validRoleId, validSecretId, validVaultUrl),
+			want:  []string{fmt.Sprintf("%s:%s", validRoleId, validSecretId)},
 		},
 		{
 			name:  "valid pattern - only role_id (incomplete set)",
@@ -50,7 +50,7 @@ func TestHashiCorpVaultAppRoleAuth_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - ignore duplicates in complete set",
 			input: fmt.Sprintf("%s role_id = '%s' | '%s'\nsecret_id = '%s'\nvault_url = '%s'", keyword, validRoleId, validRoleId, validSecretId, validVaultUrl),
-			want:  []string{fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", validRoleId, validSecretId, validVaultUrl)},
+			want:  []string{fmt.Sprintf("%s:%s", validRoleId, validSecretId)},
 		},
 		{
 			name: "valid pattern - multiple credentials with vault_url",
@@ -61,10 +61,10 @@ func TestHashiCorpVaultAppRoleAuth_Pattern(t *testing.T) {
 				"FEDCBA09-8765-4321-FEDC-BA0987654321",
 				validVaultUrl),
 			want: []string{
-				fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", validRoleId, validSecretId, validVaultUrl),
-				fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", validRoleId, "FEDCBA09-8765-4321-FEDC-BA0987654321", validVaultUrl),
-				fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", "abcdef12-3456-7890-abcd-ef1234567890", validSecretId, validVaultUrl),
-				fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", "abcdef12-3456-7890-abcd-ef1234567890", "FEDCBA09-8765-4321-FEDC-BA0987654321", validVaultUrl),
+				fmt.Sprintf("%s:%s", validRoleId, validSecretId),
+				fmt.Sprintf("%s:%s", validRoleId, "FEDCBA09-8765-4321-FEDC-BA0987654321"),
+				fmt.Sprintf("%s:%s", "abcdef12-3456-7890-abcd-ef1234567890", validSecretId),
+				fmt.Sprintf("%s:%s", "abcdef12-3456-7890-abcd-ef1234567890", "FEDCBA09-8765-4321-FEDC-BA0987654321"),
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func TestHashiCorpVaultAppRoleAuth_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - alternative service keyword",
 			input: fmt.Sprintf("hashicorp role_id = '%s'\nsecret_id = '%s'\nvault_url = '%s'", validRoleId, validSecretId, validVaultUrl),
-			want:  []string{fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", validRoleId, validSecretId, validVaultUrl)},
+			want:  []string{fmt.Sprintf("%s:%s", validRoleId, validSecretId)},
 		},
 		{
 			name:  "valid pattern - vault_url without credentials",

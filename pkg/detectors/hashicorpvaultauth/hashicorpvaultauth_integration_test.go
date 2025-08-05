@@ -44,24 +44,22 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified - complete set with valid credentials",
+			name: "found, unverified - complete set with invalid credentials",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("vault config:\nrole_id: %s\nsecret_id: %s\nvault_url: %s", roleId, secretId, vaultUrl)),
+				data:   []byte(fmt.Sprintf("hashicorp config:\nrole_id: %s\nsecret_id: %s\nvault_url: %s", inactiveRoleId, inactiveSecretId, vaultUrl)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType:          detectorspb.DetectorType_HashiCorpVaultAuth,
-					DetectorName:          "",
-					Verified:              true,
+					Verified:              false,
 					VerificationFromCache: false,
-					Raw:                   []byte(secretId),
-					RawV2:                 []byte(fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", roleId, secretId, vaultUrl)),
-					Redacted:              "",
+					Raw:                   []byte(inactiveSecretId),
+					RawV2:                 []byte(fmt.Sprintf("%s:%s", inactiveRoleId, inactiveSecretId)),
 					ExtraData: map[string]string{
-						"endpoint": fmt.Sprintf("%s/v1/auth/approle/login", vaultUrl),
+						"URL": vaultUrl,
 					},
 					StructuredData: nil,
 				},
@@ -70,24 +68,22 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, unverified - complete set with invalid credentials",
+			name: "found, verified - complete set with valid credentials",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("vault config:\nrole_id: %s\nsecret_id: %s\nvault_url: %s", inactiveRoleId, inactiveSecretId, vaultUrl)),
+				data:   []byte(fmt.Sprintf("hashicorp config:\nrole_id: %s\nsecret_id: %s\nvault_url: %s", roleId, secretId, vaultUrl)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType:          detectorspb.DetectorType_HashiCorpVaultAuth,
-					DetectorName:          "",
-					Verified:              false,
+					Verified:              true,
 					VerificationFromCache: false,
-					Raw:                   []byte(inactiveSecretId), // Uses inactive secret
-					RawV2:                 []byte(fmt.Sprintf("role_id:%s,secret_id:%s,vault_url:%s", inactiveRoleId, inactiveSecretId, vaultUrl)),
-					Redacted:              "",
+					Raw:                   []byte(secretId),
+					RawV2:                 []byte(fmt.Sprintf("%s:%s", roleId, secretId)),
 					ExtraData: map[string]string{
-						"endpoint": fmt.Sprintf("%s/v1/auth/approle/login", vaultUrl),
+						"URL": vaultUrl,
 					},
 					StructuredData: nil,
 				},
