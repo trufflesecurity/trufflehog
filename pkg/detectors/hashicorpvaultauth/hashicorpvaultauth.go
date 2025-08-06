@@ -35,10 +35,6 @@ var (
 	vaultUrlPat = regexp.MustCompile(`(https?:\/\/[^\s\/]*\.hashicorp\.cloud(?::\d+)?)(?:\/[^\s]*)?`)
 )
 
-var errorResponse struct {
-	Errors []string `json:"errors"`
-}
-
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
 	return []string{"hashicorp"}
