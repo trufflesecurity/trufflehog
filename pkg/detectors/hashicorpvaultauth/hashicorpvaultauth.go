@@ -147,7 +147,7 @@ func verifyMatch(ctx context.Context, client *http.Client, roleId, secretId, vau
 		if strings.Contains(string(body), "invalid role or secret ID") {
 			return false, nil
 		} else {
-			return false, fmt.Errorf("bad request: %v", errorResponse.Errors)
+			return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
 		}
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
