@@ -2,18 +2,11 @@ package phraseaccesstoken
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"
-	invalidPattern = "7cf4135a4e7f7ac228d36f210f151917a86f5dbd6"
-	keyword        = "phrase"
 )
 
 func TestPhrase_Pattern(t *testing.T) {
@@ -26,47 +19,47 @@ func TestPhrase_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern - with keyword phrase",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			input: "phrase token = 1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890",
+			want:  []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"},
 		},
 		{
 			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
-			want:  []string{validPattern},
+			input: "phrase token = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890' | '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
+			want:  []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			input: "phrase keyword is not close to the real key in the data\n = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
 			want:  []string{},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			input: "phrase = 7cf4135a4e7f7ac228d36f210f151917a86f5dbd6",
 			want:  []string{},
 		},
 		{
 			name:  "finds all valid matches",
-			input: fmt.Sprintf("%s token1 = '%s'\n%s token2 = '%s'", keyword, validPattern, keyword, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
-			want:  []string{validPattern, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"},
+			input: "phrase token1 = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'\n  phrase token2 = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'",
+			want:  []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890", "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"},
 		},
 		{
 			name:  "invalid pattern - too short",
-			input: fmt.Sprintf("%s = '%s'", keyword, "1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef12345678"),
+			input: "phrase = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef12345678'",
 			want:  []string{},
 		},
 		{
 			name:  "invalid pattern - too long",
-			input: fmt.Sprintf("%s = '%s'", keyword, "1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef123456789012"),
+			input: "phrase = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef123456789012'",
 			want:  []string{},
 		},
 		{
 			name:  "invalid pattern - contains uppercase",
-			input: fmt.Sprintf("%s = '%s'", keyword, "1A2B3C4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"),
+			input: "phrase = '1A2B3C4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
 			want:  []string{},
 		},
 		{
 			name:  "invalid pattern - contains special characters",
-			input: fmt.Sprintf("%s = '%s'", keyword, "1a2b3c4d-e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"),
+			input: "phrase = '1a2b3c4d-e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
 			want:  []string{},
 		},
 	}
