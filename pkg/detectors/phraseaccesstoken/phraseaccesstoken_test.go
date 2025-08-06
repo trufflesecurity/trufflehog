@@ -18,49 +18,89 @@ func TestPhrase_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword phrase",
-			input: "phrase token = 1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890",
-			want:  []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"},
+			name: "valid pattern - with keyword phrase",
+			input: `
+			[INFO] Initializing authentication
+			[DEBUG] phrase token = 1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890
+			[Info] Response received: 200 OK
+			`,
+			want: []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"},
 		},
 		{
-			name:  "valid pattern - ignore duplicate",
-			input: "phrase token = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890' | '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
-			want:  []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"},
+			name: "valid pattern - ignore duplicate",
+			input: `
+			[INFO] Processing authentication tokens
+			[DEBUG] phrase token = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'
+			[WARN] Duplicate token found: phrase token = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'
+			[Info] Response received: 200 OK
+			`,
+			want: []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: "phrase keyword is not close to the real key in the data\n = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
-			want:  []string{},
+			name: "valid pattern - key out of prefix range",
+			input: `
+			[INFO] Starting system initialization
+			[DEBUG] phrase keyword is not close to the real key in the data
+			[DEBUG] Configuration loaded successfully
+			[DEBUG] Secret key = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'
+			[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 		{
-			name:  "invalid pattern",
-			input: "phrase = 7cf4135a4e7f7ac228d36f210f151917a86f5dbd6",
-			want:  []string{},
+			name: "invalid pattern",
+			input: `
+			[INFO] Loading configuration
+			[DEBUG] phrase = 7cf4135a4e7f7ac228d36f210f151917a86f5dbd6
+			[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 		{
-			name:  "finds all valid matches",
-			input: "phrase token1 = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'\n  phrase token2 = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'",
-			want:  []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890", "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"},
+			name: "finds all valid matches",
+			input: `
+			[INFO] Multi-token authentication
+			[DEBUG] phrase token1 = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'
+			[DEBUG] phrase token2 = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+			[Info] Response received: 200 OK
+			`,
+			want: []string{"1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890", "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"},
 		},
 		{
-			name:  "invalid pattern - too short",
-			input: "phrase = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef12345678'",
-			want:  []string{},
+			name: "invalid pattern - too short",
+			input: `
+			[INFO] Processing short token
+			[DEBUG] phrase = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef12345678'
+			[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 		{
-			name:  "invalid pattern - too long",
-			input: "phrase = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef123456789012'",
-			want:  []string{},
+			name: "invalid pattern - too long",
+			input: `
+			[INFO] Processing long token
+			[DEBUG] phrase = '1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef123456789012'
+			[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 		{
-			name:  "invalid pattern - contains uppercase",
-			input: "phrase = '1A2B3C4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
-			want:  []string{},
+			name: "invalid pattern - contains uppercase",
+			input: `
+			[INFO] Processing token with uppercase
+			[DEBUG] phrase = '1A2B3C4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'
+			[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 		{
-			name:  "invalid pattern - contains special characters",
-			input: "phrase = '1a2b3c4d-e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'",
-			want:  []string{},
+			name: "invalid pattern - contains special characters",
+			input: `
+			[INFO] Processing token with special chars
+			[DEBUG] phrase = '1a2b3c4d-e6f7890abcdef1234567890abcdef1234567890abcdef1234567890'
+			[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 	}
 
