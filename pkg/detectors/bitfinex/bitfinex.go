@@ -1,14 +1,17 @@
 package bitfinex
 
 import (
+	"bytes"
 	"context"
 	"flag"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -87,17 +90,50 @@ func (s Scanner) Description() string {
 }
 
 // docs: https://docs.bitfinex.com/docs/introduction
-func verifyBitfinex(key, secret string) (bool, error) {
-	// thankfully official golang examples exist but you just need to dig their many repos https://github.com/bitfinexcom/bitfinex-api-go/blob/master/examples/v2/rest-orders/main.go
-	http.DefaultClient = client
-	c := rest.NewClientWithURL(*api).Credentials(key, secret)
-
-	_, err := c.Orders.AllHistory()
+func verifyBitfinex(apiKey, apiSecret string, client *http.Client) (bool, error) {
+	baseURL := "https://api.bitfinex.com"
+	requestPath := "/v2/auth/r/wallets"
+	signaturePath := "/api" + requestPath
+	nonce := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Microsecond))
+	body := "{}"
+	signaturePayload := signaturePath + nonce + body
+	signature, err := sign(signaturePayload, apiSecret)
 	if err != nil {
-		if strings.HasPrefix(err.Error(), "POST https://") { // eg POST https://api-pub.bitfinex.com/v2/auth/r/orders/hist: 500 apikey: digest invalid (10100)
-			return false, nil
-		}
+		return false, err
 	}
 
-	return true, nil
+	req, _ := http.NewRequest(http.MethodPost, baseURL+requestPath, bytes.NewBuffer([]byte(body)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("bfx-apikey", apiKey)
+	req.Header.Set("bfx-signature", signature)
+	req.Header.Set("bfx-nonce", nonce)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusInternalServerError:
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+
+		if strings.Contains(string(body), "apikey: digest invalid") {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("failed to verify Bitfinex API key, error: %s", string(body))
+		}
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
+	}
 }
