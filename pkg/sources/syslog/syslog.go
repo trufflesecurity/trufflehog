@@ -270,8 +270,11 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 		ctx.Logger().V(5).Info(string(input))
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
-			ctx.Logger().V(2).Info("failed to generate metadata", "error", err)
+			// set metadata as empty to avoid panics in case parsing failed
+			metadata = &source_metadatapb.MetaData{}
+			ctx.Logger().V(2).Error(err, "failed to generate metadata")
 		}
+
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
@@ -317,8 +320,11 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 		}
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
+			// set metadata as empty to avoid panics in case parsing failed
+			metadata = &source_metadatapb.MetaData{}
 			ctx.Logger().V(2).Info("failed to parse metadata", "error", err)
 		}
+
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
