@@ -88,7 +88,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besnappy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
@@ -108,7 +107,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
+	brandfetchv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v1"
+	brandfetchv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
@@ -144,7 +144,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checkout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checkvist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cicero"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci"
+	circleciV1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci/v1"
+	circleciV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clarifai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clearbit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clickhelp"
@@ -612,6 +613,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roaring"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/robinhoodcrypto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rootly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
@@ -622,6 +624,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesflare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforceoauth2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforcerefreshtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesmate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterprojectkey"
@@ -723,6 +726,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/survicate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/swell"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/swiftype"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tableau"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tallyfy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tatumio"
@@ -809,6 +813,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weatherstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/web3storage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webex"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webexbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraping"
@@ -940,12 +945,14 @@ func buildDetectorList() []detectors.Detector {
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
 		&beebole.Scanner{},
-		&besnappy.Scanner{},
+		// Besnappy appears to be abandoned. The domain has expired. API returns 200 OK for all secrets causing FPs
+		// &besnappy.Scanner{},
 		&besttime.Scanner{},
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
 		&bingsubscriptionkey.Scanner{},
 		&bitbar.Scanner{},
+		&bitbucketapppassword.Scanner{},
 		&bitcoinaverage.Scanner{},
 		&bitfinex.Scanner{},
 		&bitlyaccesstoken.Scanner{},
@@ -960,7 +967,8 @@ func buildDetectorList() []detectors.Detector {
 		&box.Scanner{},
 		&boxoauth.Scanner{},
 		&braintreepayments.Scanner{},
-		&brandfetch.Scanner{},
+		&brandfetchv1.Scanner{},
+		&brandfetchv2.Scanner{},
 		&browserstack.Scanner{},
 		&browshot.Scanner{},
 		&bscscan.Scanner{},
@@ -996,7 +1004,8 @@ func buildDetectorList() []detectors.Detector {
 		&checkout.Scanner{},
 		&checkvist.Scanner{},
 		&cicero.Scanner{},
-		&circleci.Scanner{},
+		&circleciV1.Scanner{},
+		&circleciV2.Scanner{},
 		&clarifai.Scanner{},
 		&clearbit.Scanner{},
 		&clickhelp.Scanner{},
@@ -1205,6 +1214,7 @@ func buildDetectorList() []detectors.Detector {
 		&happyscribe.Scanner{},
 		&harness.Scanner{},
 		&harvest.Scanner{},
+		&hasura.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
 		&helpscout.Scanner{},
@@ -1479,6 +1489,7 @@ func buildDetectorList() []detectors.Detector {
 		&robinhoodcrypto.Scanner{},
 		&rocketreach.Scanner{},
 		// &rockset.Scanner{},
+		&rootly.Scanner{},
 		&route4me.Scanner{},
 		&rownd.Scanner{},
 		&rubygems.Scanner{},
@@ -1489,6 +1500,7 @@ func buildDetectorList() []detectors.Detector {
 		&salesflare.Scanner{},
 		&salesforce.Scanner{},
 		&salesforceoauth2.Scanner{},
+		&salesforcerefreshtoken.Scanner{},
 		&salesmate.Scanner{},
 		&sanity.Scanner{},
 		&satismeterprojectkey.Scanner{},
@@ -1579,6 +1591,7 @@ func buildDetectorList() []detectors.Detector {
 		&strava.Scanner{},
 		&streak.Scanner{},
 		&stripe.Scanner{},
+		&stripepaymentintent.Scanner{},
 		&stripo.Scanner{},
 		&stytch.Scanner{},
 		&sugester.Scanner{},
@@ -1591,6 +1604,7 @@ func buildDetectorList() []detectors.Detector {
 		&survicate.Scanner{},
 		&swell.Scanner{},
 		&swiftype.Scanner{},
+		&tableau.Scanner{},
 		&tailscale.Scanner{},
 		&tallyfy.Scanner{},
 		&tatumio.Scanner{},
@@ -1678,6 +1692,7 @@ func buildDetectorList() []detectors.Detector {
 		&weatherstack.Scanner{},
 		&web3storage.Scanner{},
 		&webex.Scanner{},
+		&webexbot.Scanner{},
 		&webflow.Scanner{},
 		&webscraper.Scanner{},
 		&webscraping.Scanner{},
@@ -1714,9 +1729,6 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
-		&stripepaymentintent.Scanner{},
-		&bitbucketapppassword.Scanner{},
-		&hasura.Scanner{},
 	}
 }
 

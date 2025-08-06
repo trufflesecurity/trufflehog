@@ -1,10 +1,13 @@
 package docker
 
 import (
+	"io"
 	"strings"
 	"sync"
 	"testing"
 
+	image "github.com/docker/docker/api/types/image"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -132,6 +135,100 @@ func TestDockerImageScanWithDigest(t *testing.T) {
 	assert.Equal(t, 2, chunkCounter)
 	assert.Equal(t, 1, layerCounter)
 	assert.Equal(t, 1, historyCounter)
+}
+
+func TestDockerImageScanFromLocalDaemon(t *testing.T) {
+	dockerDaemonTestCases := []struct {
+		name  string
+		image string
+	}{
+		{
+			name:  "TestDockerImageScanFromLocalDaemon",
+			image: "docker://trufflesecurity/secrets",
+		},
+		{
+			name:  "TestDockerImageScanFromLocalDaemonWithDigest",
+			image: "docker://trufflesecurity/secrets@sha256:864f6d41209462d8e37fc302ba1532656e265f7c361f11e29fed6ca1f4208e11",
+		},
+		{
+			name:  "TestDockerImageScanFromLocalDaemonWithTag",
+			image: "docker://trufflesecurity/secrets:latest",
+		},
+	}
+
+	// pull the image here to ensure it exists locally
+	img := "docker.io/trufflesecurity/secrets:latest"
+
+	client, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv, dockerClient.WithAPIVersionNegotiation())
+	if err != nil {
+		t.Errorf("Failed to create Docker client: %v", err)
+		return
+	}
+
+	resp, err := client.ImagePull(context.TODO(), img, image.PullOptions{})
+	if err != nil {
+		t.Errorf("Failed to load image %s: %v", img, err)
+		return
+	}
+
+	defer resp.Close()
+
+	// if we don't read the response, the image will not be available in the local Docker daemon
+	_, err = io.ReadAll(resp)
+	if err != nil {
+		t.Errorf("Failed to read response body: %v", err)
+	}
+
+	for _, tt := range dockerDaemonTestCases {
+		t.Run(tt.name, func(t *testing.T) {
+			// This test assumes the local Docker daemon is running
+			dockerConn := &sourcespb.Docker{
+				Credential: &sourcespb.Docker_Unauthenticated{
+					Unauthenticated: &credentialspb.Unauthenticated{},
+				},
+				Images: []string{tt.image},
+			}
+
+			conn := &anypb.Any{}
+			err = conn.MarshalFrom(dockerConn)
+			assert.NoError(t, err)
+
+			s := &Source{}
+			err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+			assert.NoError(t, err)
+
+			var wg sync.WaitGroup
+			chunksChan := make(chan *sources.Chunk, 1)
+			chunkCounter := 0
+			layerCounter := 0
+			historyCounter := 0
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for chunk := range chunksChan {
+					assert.NotEmpty(t, chunk)
+					chunkCounter++
+
+					if isHistoryChunk(t, chunk) {
+						historyCounter++
+					} else {
+						layerCounter++
+					}
+				}
+			}()
+
+			err = s.Chunks(context.TODO(), chunksChan)
+			assert.NoError(t, err)
+
+			close(chunksChan)
+			wg.Wait()
+
+			assert.Equal(t, 2, chunkCounter)
+			assert.Equal(t, 1, layerCounter)
+			assert.Equal(t, 1, historyCounter)
+		})
+	}
 }
 
 func TestBaseAndTagFromImage(t *testing.T) {

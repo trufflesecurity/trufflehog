@@ -95,7 +95,7 @@ func TestSource_Scan(t *testing.T) {
 }
 
 func TestScanFile(t *testing.T) {
-	chunkSize := sources.ChunkSize
+	chunkSize := sources.DefaultChunkSize
 	secretPart1 := "SECRET"
 	secretPart2 := "SPLIT"
 	// Split the secret into two parts and pad the rest of the chunk with A's.
@@ -122,6 +122,40 @@ func TestScanFile(t *testing.T) {
 	}
 
 	assert.Contains(t, foundSecret, secretPart1+secretPart2)
+}
+
+func TestScanBinaryFile(t *testing.T) {
+	tmpfile, err := os.CreateTemp("", "example.bin")
+	require.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+
+	// binary data that decodes to "TuffleHog"
+	fileContents := []byte{0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F, 0x67}
+	_, err = tmpfile.Write(fileContents)
+	require.NoError(t, err)
+	require.NoError(t, tmpfile.Close())
+
+	source := &Source{}
+	chunksChan := make(chan *sources.Chunk, 2)
+	errChan := make(chan error, 1)
+
+	ctx := context.WithLogger(context.Background(), logr.Discard())
+
+	go func() {
+		defer close(chunksChan)
+		errChan <- source.scanFile(ctx, tmpfile.Name(), chunksChan)
+	}()
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	var data string
+	for chunk := range chunksChan {
+		require.NotNil(t, chunk)
+		data += string(chunk.Data)
+	}
+
+	assert.Contains(t, data, "TuffleHog")
 }
 
 func TestEnumerate(t *testing.T) {
