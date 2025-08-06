@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package brandfetch
+package rootly
 
 import (
 	"context"
@@ -10,21 +10,21 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestBrandfetch_FromChunk(t *testing.T) {
+func TestRootly_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BRANDFETCH")
-	inactiveSecret := testSecrets.MustGetField("BRANDFETCH_INACTIVE")
+	secret := testSecrets.MustGetField("ROOTLY")
+	inactiveSecret := testSecrets.MustGetField("ROOTLY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +43,12 @@ func TestBrandfetch_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a brandfetch secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a rootly secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Brandfetch,
+					DetectorType: detectorspb.DetectorType_Rootly,
 					Verified:     true,
 				},
 			},
@@ -59,12 +59,12 @@ func TestBrandfetch_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a brandfetch secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a rootly secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Brandfetch,
+					DetectorType: detectorspb.DetectorType_Rootly,
 					Verified:     false,
 				},
 			},
@@ -87,7 +87,7 @@ func TestBrandfetch_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Brandfetch.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Rootly.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +97,7 @@ func TestBrandfetch_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Brandfetch.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Rootly.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

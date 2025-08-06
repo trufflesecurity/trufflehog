@@ -78,14 +78,12 @@ func TestLarksuite_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a larksuite app %s within", appToken)),
 				verify: true,
 			},
-			want: func() []detectors.Result {
-				r := detectors.Result{
+			want: []detectors.Result{
+				{
 					DetectorType: detectorspb.DetectorType_LarkSuite,
 					Verified:     false,
-				}
-				r.SetVerificationError(fmt.Errorf("unexpected verification response code 99991668, message Invalid access token for authorization. Please make a request with token attached."))
-				return []detectors.Result{r}
-			}(),
+				},
+			},
 			wantErr: false,
 		},
 		{

@@ -5,22 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern = `
-	azure batch:
-		url: https://JrxlYxT+0hW.YSA.batch.azure.com
-		secret: BXIMbhBlC3=5hIbqCEKvq7opaV2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/LB0
-	`
-	invalidPattern = `
-	azure batch:
-		url: http://invalid.this.batch.azure.com
-		secret: BXIMbhBlC3=5hIbqCEKvq7op!V2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/
-	`
 )
 
 func TestAzureBatch_Pattern(t *testing.T) {
@@ -33,14 +21,38 @@ func TestAzureBatch_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"https://JrxlYxT+0hW.YSA.batch.azure.comBXIMbhBlC3=5hIbqCEKvq7opaV2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/LB0"},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the ayrshare API
+				[DEBUG] Using Secret = BXIMbhBlC3=5hIbqCEKvq7opaV2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/LB0
+				[INFO] https://JrxlYxT+0hW.YSA.batch.azure.com
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"https://JrxlYxT+0hW.YSA.batch.azure.comBXIMbhBlC3=5hIbqCEKvq7opaV2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/LB0"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{https://pb0bik2a59qznkh87pdd6twjlgzpmxz.pfv9bpr2hujs.batch.azure.com}</id>
+  					<secret>{AQAAABAAA XJc2nGZvqPAXYfHxsiwUDBA4ynHzGc9nQl1Ih16lk19=2+qqeJUDp5eBxWVrE0LQYlnbeu/orbEtblFL218S4Wko}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"https://pb0bik2a59qznkh87pdd6twjlgzpmxz.pfv9bpr2hujs.batch.azure.comXJc2nGZvqPAXYfHxsiwUDBA4ynHzGc9nQl1Ih16lk19=2+qqeJUDp5eBxWVrE0LQYlnbeu/orbEtblFL218S4Wko"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the ayrshare API
+				[DEBUG] Using Secret=BXIMbhBlC3=5hIbqCEKvq7op!V2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/
+				[INFO] http://invalid.this.batch.azure.com
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
 		},
 	}
 
@@ -48,22 +60,15 @@ func TestAzureBatch_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -75,6 +80,7 @@ func TestAzureBatch_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

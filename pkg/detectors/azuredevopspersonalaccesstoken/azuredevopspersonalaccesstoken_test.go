@@ -5,22 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern = `
-	azure:
-		azure_key: uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
-		azure_org_id: WOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG
-	`
-	invalidPattern = `
-	azure:
-		azure_key: uie5tff7m5H5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
-		azure_org_id: LOKi
-	`
 )
 
 func TestAzureDevopsPersonalAccessToken_Pattern(t *testing.T) {
@@ -33,14 +21,39 @@ func TestAzureDevopsPersonalAccessToken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8unWOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG"},
+			name: "valid pattern",
+			input: `
+					azure:
+						azure_key: uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
+						azure_org_id: WOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG
+					`,
+			want: []string{"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8unWOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{azure dlMR9GIBfqCgAPr8qfkBa072OfaP6NbBhCwkPBX0cuHd}</id>
+  					<secret>{azure AQAAABAAA h0wpgbusyba8acyaec1uxxcbxlucgr490c6nvrvd8rylfocwkpg5}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{
+				"h0wpgbusyba8acyaec1uxxcbxlucgr490c6nvrvd8rylfocwkpg5dlMR9GIBfqCgAPr8qfkBa072OfaP6NbBhCwkPBX0cuHd",
+				"h0wpgbusyba8acyaec1uxxcbxlucgr490c6nvrvd8rylfocwkpg5AQAAABAAA",
+			},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+					azure:
+						azure_key: uie5tff7m5H5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
+						azure_org_id: LOKi
+					`,
+			want: nil,
 		},
 	}
 
@@ -48,22 +61,15 @@ func TestAzureDevopsPersonalAccessToken_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -75,6 +81,7 @@ func TestAzureDevopsPersonalAccessToken_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}
