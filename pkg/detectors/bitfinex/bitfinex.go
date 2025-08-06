@@ -3,7 +3,9 @@ package bitfinex
 import (
 	"bytes"
 	"context"
-	"flag"
+	"crypto/hmac"
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +20,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -25,21 +28,33 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// related resource https://medium.com/@Bitfinex/api-development-update-april-65fe52f84124
 	apiKeyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"bitfinex"}) + `\b([A-Za-z0-9_-]{43})\b`)
 	apiSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bitfinex"}) + `\b([A-Za-z0-9_-]{43})\b`)
 )
 
-var (
-	api = flag.String("api", "https://api-pub.bitfinex.com/v2/", "v2 REST API URL")
-)
-
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"bitfinex"}
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Bitfinex
+}
+
+func (s Scanner) Description() string {
+	return "Bitfinex is a cryptocurrency exchange offering various trading options. Bitfinex API keys can be used to access and manage trading accounts."
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+
+	return defaultClient
 }
 
 // FromData will find and optionally verify Bitfinex secrets in a given set of bytes.
@@ -69,7 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyBitfinex(apiKey, apiSecret)
+				isVerified, verificationErr := verifyBitfinex(ctx, s.getClient(), apiKey, apiSecret)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr)
 			}
@@ -81,16 +96,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Bitfinex
-}
-
-func (s Scanner) Description() string {
-	return "Bitfinex is a cryptocurrency exchange offering various trading options. Bitfinex API keys can be used to access and manage trading accounts."
-}
-
 // docs: https://docs.bitfinex.com/docs/introduction
-func verifyBitfinex(apiKey, apiSecret string, client *http.Client) (bool, error) {
+func verifyBitfinex(ctx context.Context, client *http.Client, apiKey, apiSecret string) (bool, error) {
 	baseURL := "https://api.bitfinex.com"
 	requestPath := "/v2/auth/r/wallets"
 	signaturePath := "/api" + requestPath
@@ -102,7 +109,7 @@ func verifyBitfinex(apiKey, apiSecret string, client *http.Client) (bool, error)
 		return false, err
 	}
 
-	req, _ := http.NewRequest(http.MethodPost, baseURL+requestPath, bytes.NewBuffer([]byte(body)))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+requestPath, bytes.NewBuffer([]byte(body)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("bfx-apikey", apiKey)
@@ -128,7 +135,7 @@ func verifyBitfinex(apiKey, apiSecret string, client *http.Client) (bool, error)
 			return false, err
 		}
 
-		if strings.Contains(string(body), "apikey: digest invalid") {
+		if strings.Contains(string(body), "apikey: digest invalid") || strings.Contains(string(body), "apikey: invalid") {
 			return false, nil
 		} else {
 			return false, fmt.Errorf("failed to verify Bitfinex API key, error: %s", string(body))
@@ -136,4 +143,13 @@ func verifyBitfinex(apiKey, apiSecret string, client *http.Client) (bool, error)
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
 	}
+}
+
+func sign(msg, apiSecret string) (string, error) {
+	sig := hmac.New(sha512.New384, []byte(apiSecret))
+	_, err := sig.Write([]byte(msg))
+	if err != nil {
+		return "", nil
+	}
+	return hex.EncodeToString(sig.Sum(nil)), nil
 }
