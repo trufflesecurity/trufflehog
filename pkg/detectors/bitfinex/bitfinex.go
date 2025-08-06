@@ -109,7 +109,10 @@ func verifyBitfinex(ctx context.Context, client *http.Client, apiKey, apiSecret 
 		return false, err
 	}
 
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+requestPath, bytes.NewBuffer([]byte(body)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+requestPath, bytes.NewBuffer([]byte(body)))
+	if err != nil {
+		return false, err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("bfx-apikey", apiKey)
