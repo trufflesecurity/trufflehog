@@ -79,7 +79,7 @@ type DetectorType int32
 
 const (
 	DetectorType_Alibaba                  DetectorType = 0
-	DetectorType_AMQP                     DetectorType = 1
+	DetectorType_AMQP                     DetectorType = 1 // Not yet implemented
 	DetectorType_AWS                      DetectorType = 2
 	DetectorType_Azure                    DetectorType = 3
 	DetectorType_Circle                   DetectorType = 4
@@ -109,12 +109,12 @@ const (
 	DetectorType_SlackWebhook             DetectorType = 30
 	DetectorType_PaypalOauth              DetectorType = 31
 	DetectorType_PagerDutyApiKey          DetectorType = 32
-	DetectorType_Firebase                 DetectorType = 33
+	DetectorType_Firebase                 DetectorType = 33 // Not yet implemented
 	DetectorType_Mailgun                  DetectorType = 34
 	DetectorType_HubSpot                  DetectorType = 35
 	DetectorType_GitHubApp                DetectorType = 36
-	DetectorType_CircleCI                 DetectorType = 37
-	DetectorType_WpEngine                 DetectorType = 38
+	DetectorType_CircleCI                 DetectorType = 37 // Not yet implemented
+	DetectorType_WpEngine                 DetectorType = 38 // Not yet implemented
 	DetectorType_DatadogToken             DetectorType = 39
 	DetectorType_FacebookOAuth            DetectorType = 40
 	DetectorType_AsanaPersonalAccessToken DetectorType = 41
@@ -123,40 +123,40 @@ const (
 	DetectorType_CalendlyApiKey           DetectorType = 44
 	DetectorType_ZapierWebhook            DetectorType = 45
 	DetectorType_YoutubeApiKey            DetectorType = 46
-	DetectorType_SalesforceOauth2         DetectorType = 47
-	DetectorType_TwitterApiSecret         DetectorType = 48
+	DetectorType_SalesforceOauth2         DetectorType = 47 // Not yet implemented
+	DetectorType_TwitterApiSecret         DetectorType = 48 // Not yet implemented
 	DetectorType_NpmToken                 DetectorType = 49
 	DetectorType_NewRelicPersonalApiKey   DetectorType = 50
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_AirtableApiKey         DetectorType = 51
-	DetectorType_AkamaiToken            DetectorType = 52
-	DetectorType_AmazonMWS              DetectorType = 53
-	DetectorType_KubeConfig             DetectorType = 54
+	DetectorType_AkamaiToken            DetectorType = 52 // Not yet implemented
+	DetectorType_AmazonMWS              DetectorType = 53 // Not yet implemented
+	DetectorType_KubeConfig             DetectorType = 54 // Not yet implemented
 	DetectorType_Auth0oauth             DetectorType = 55
 	DetectorType_Bitfinex               DetectorType = 56
 	DetectorType_Clarifai               DetectorType = 57
 	DetectorType_CloudflareGlobalApiKey DetectorType = 58
 	DetectorType_CloudflareCaKey        DetectorType = 59
 	DetectorType_Confluent              DetectorType = 60
-	DetectorType_ContentfulDelivery     DetectorType = 61 // Didn't do
+	DetectorType_ContentfulDelivery     DetectorType = 61 // Not yet implemented
 	DetectorType_DatabricksToken        DetectorType = 62
-	DetectorType_DigitalOceanSpaces     DetectorType = 63 // Didn't do
+	DetectorType_DigitalOceanSpaces     DetectorType = 63 // Not yet implemented
 	DetectorType_DigitalOceanToken      DetectorType = 64
 	DetectorType_DiscordBotToken        DetectorType = 65
 	DetectorType_DiscordWebhook         DetectorType = 66
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_EtsyApiKey                    DetectorType = 67
 	DetectorType_FastlyPersonalToken           DetectorType = 68
-	DetectorType_GoogleOauth2                  DetectorType = 69
-	DetectorType_ReCAPTCHA                     DetectorType = 70 // Didn't do
-	DetectorType_GoogleApiKey                  DetectorType = 71 // Didn't do
+	DetectorType_GoogleOauth2                  DetectorType = 69 // Not yet implemented
+	DetectorType_ReCAPTCHA                     DetectorType = 70 // Not yet implemented
+	DetectorType_GoogleApiKey                  DetectorType = 71 // Not yet implemented
 	DetectorType_Hunter                        DetectorType = 72
 	DetectorType_IbmCloudUserKey               DetectorType = 73
 	DetectorType_Netlify                       DetectorType = 74
-	DetectorType_Vonage                        DetectorType = 75
-	DetectorType_EquinixOauth                  DetectorType = 76
+	DetectorType_Vonage                        DetectorType = 75 // Not yet implemented
+	DetectorType_EquinixOauth                  DetectorType = 76 // Not yet implemented
 	DetectorType_Paystack                      DetectorType = 77
-	DetectorType_PlaidToken                    DetectorType = 78
+	DetectorType_PlaidToken                    DetectorType = 78 // Not yet implemented
 	DetectorType_PlaidKey                      DetectorType = 79
 	DetectorType_Plivo                         DetectorType = 80
 	DetectorType_Postmark                      DetectorType = 81
@@ -170,34 +170,34 @@ const (
 	DetectorType_SnykKey                       DetectorType = 89
 	DetectorType_SpotifyKey                    DetectorType = 90
 	DetectorType_TelegramBotToken              DetectorType = 91
-	DetectorType_TencentCloudKey               DetectorType = 92
+	DetectorType_TencentCloudKey               DetectorType = 92 // Not yet implemented
 	DetectorType_TerraformCloudPersonalToken   DetectorType = 93
 	DetectorType_TrelloApiKey                  DetectorType = 94
 	DetectorType_ZendeskApi                    DetectorType = 95
 	DetectorType_MaxMindLicense                DetectorType = 96
-	DetectorType_AirtableMetadataApiKey        DetectorType = 97
+	DetectorType_AirtableMetadataApiKey        DetectorType = 97 // Not yet implemented
 	DetectorType_AsanaOauth                    DetectorType = 98
 	DetectorType_RapidApi                      DetectorType = 99
 	DetectorType_CloudflareApiToken            DetectorType = 100
 	DetectorType_Webex                         DetectorType = 101
-	DetectorType_FirebaseCloudMessaging        DetectorType = 102
+	DetectorType_FirebaseCloudMessaging        DetectorType = 102 // Not yet implemented
 	DetectorType_ContentfulPersonalAccessToken DetectorType = 103
 	DetectorType_MapBox                        DetectorType = 104
 	DetectorType_MailJetBasicAuth              DetectorType = 105
 	DetectorType_MailJetSMS                    DetectorType = 106
 	DetectorType_HubSpotApiKey                 DetectorType = 107
-	DetectorType_HubSpotOauth                  DetectorType = 108
+	DetectorType_HubSpotOauth                  DetectorType = 108 // Not yet implemented
 	DetectorType_SslMate                       DetectorType = 109
 	DetectorType_Auth0ManagementApiToken       DetectorType = 110
 	DetectorType_MessageBird                   DetectorType = 111
 	DetectorType_ElasticEmail                  DetectorType = 112
 	DetectorType_FigmaPersonalAccessToken      DetectorType = 113
 	DetectorType_MicrosoftTeamsWebhook         DetectorType = 114
-	DetectorType_GitHubOld                     DetectorType = 115
+	DetectorType_GitHubOld                     DetectorType = 115 // Not yet implemented
 	DetectorType_VultrApiKey                   DetectorType = 116
 	DetectorType_Pepipost                      DetectorType = 117
 	DetectorType_Postman                       DetectorType = 118
-	DetectorType_CloudsightKey                 DetectorType = 119
+	DetectorType_CloudsightKey                 DetectorType = 119 // Not yet implemented
 	DetectorType_JiraToken                     DetectorType = 120
 	DetectorType_NexmoApiKey                   DetectorType = 121
 	DetectorType_SegmentApiKey                 DetectorType = 122
@@ -205,7 +205,7 @@ const (
 	DetectorType_PushBulletApiKey              DetectorType = 124
 	DetectorType_AirbrakeProjectKey            DetectorType = 125
 	DetectorType_AirbrakeUserKey               DetectorType = 126
-	DetectorType_PendoIntegrationKey           DetectorType = 127
+	DetectorType_PendoIntegrationKey           DetectorType = 127 // Not yet implemented
 	DetectorType_SplunkOberservabilityToken    DetectorType = 128
 	DetectorType_LokaliseToken                 DetectorType = 129
 	DetectorType_Calendarific                  DetectorType = 130
@@ -218,20 +218,20 @@ const (
 	DetectorType_D7Network                     DetectorType = 138
 	DetectorType_ScrapingBee                   DetectorType = 139
 	DetectorType_KeenIO                        DetectorType = 140
-	DetectorType_Wakatime                      DetectorType = 141
+	DetectorType_Wakatime                      DetectorType = 141 // Not yet implemented
 	DetectorType_Buildkite                     DetectorType = 142
 	DetectorType_Verimail                      DetectorType = 143
 	DetectorType_Zerobounce                    DetectorType = 144
 	DetectorType_Mailboxlayer                  DetectorType = 145
-	DetectorType_Fastspring                    DetectorType = 146
-	DetectorType_Paddle                        DetectorType = 147
-	DetectorType_Sellfy                        DetectorType = 148
+	DetectorType_Fastspring                    DetectorType = 146 // Not yet implemented
+	DetectorType_Paddle                        DetectorType = 147 // Not yet implemented
+	DetectorType_Sellfy                        DetectorType = 148 // Not yet implemented
 	DetectorType_FixerIO                       DetectorType = 149
 	DetectorType_ButterCMS                     DetectorType = 150
 	DetectorType_Taxjar                        DetectorType = 151
-	DetectorType_Avalara                       DetectorType = 152
+	DetectorType_Avalara                       DetectorType = 152 // Not yet implemented
 	DetectorType_Helpscout                     DetectorType = 153
-	DetectorType_ElasticPath                   DetectorType = 154
+	DetectorType_ElasticPath                   DetectorType = 154 // Not yet implemented
 	DetectorType_Zeplin                        DetectorType = 155
 	DetectorType_Intercom                      DetectorType = 156
 	DetectorType_Mailmodo                      DetectorType = 157
@@ -244,38 +244,38 @@ const (
 	DetectorType_HelpCrunch                    DetectorType = 164
 	DetectorType_LiveAgent                     DetectorType = 165
 	DetectorType_Beamer                        DetectorType = 166
-	DetectorType_WeChatAppKey                  DetectorType = 167
+	DetectorType_WeChatAppKey                  DetectorType = 167 // Not yet implemented
 	DetectorType_LineMessaging                 DetectorType = 168
-	DetectorType_UberServerToken               DetectorType = 169
+	DetectorType_UberServerToken               DetectorType = 169 // Not yet implemented
 	DetectorType_AlgoliaAdminKey               DetectorType = 170
-	DetectorType_FullContact                   DetectorType = 171
+	DetectorType_FullContact                   DetectorType = 171 // Not yet implemented
 	DetectorType_Mandrill                      DetectorType = 172
 	DetectorType_Flutterwave                   DetectorType = 173
 	DetectorType_MattermostPersonalToken       DetectorType = 174
-	DetectorType_Cloudant                      DetectorType = 175
+	DetectorType_Cloudant                      DetectorType = 175 // Not yet implemented
 	DetectorType_LineNotify                    DetectorType = 176
 	DetectorType_LinearAPI                     DetectorType = 177
 	DetectorType_Ubidots                       DetectorType = 178
 	DetectorType_Anypoint                      DetectorType = 179
 	DetectorType_Dwolla                        DetectorType = 180
 	DetectorType_ArtifactoryAccessToken        DetectorType = 181
-	DetectorType_Surge                         DetectorType = 182
+	DetectorType_Surge                         DetectorType = 182 // Not yet implemented
 	DetectorType_Sparkpost                     DetectorType = 183
 	DetectorType_GoCardless                    DetectorType = 184
 	DetectorType_Codacy                        DetectorType = 185
 	DetectorType_Kraken                        DetectorType = 186
 	DetectorType_Checkout                      DetectorType = 187
-	DetectorType_Kairos                        DetectorType = 188
+	DetectorType_Kairos                        DetectorType = 188 // Not yet implemented
 	DetectorType_ClockworkSMS                  DetectorType = 189
-	DetectorType_Atlassian                     DetectorType = 190
+	DetectorType_Atlassian                     DetectorType = 190 // Not yet implemented
 	DetectorType_LaunchDarkly                  DetectorType = 191
 	DetectorType_Coveralls                     DetectorType = 192
-	DetectorType_Linode                        DetectorType = 193
+	DetectorType_Linode                        DetectorType = 193 // Not yet implemented
 	DetectorType_WePay                         DetectorType = 194
 	DetectorType_PlanetScale                   DetectorType = 195
 	DetectorType_Doppler                       DetectorType = 196
 	DetectorType_Agora                         DetectorType = 197
-	DetectorType_Samsara                       DetectorType = 198
+	DetectorType_Samsara                       DetectorType = 198 // Not yet implemented
 	DetectorType_FrameIO                       DetectorType = 199
 	DetectorType_RubyGems                      DetectorType = 200
 	DetectorType_OpenAI                        DetectorType = 201
@@ -296,15 +296,15 @@ const (
 	DetectorType_Myfreshworks                  DetectorType = 216
 	DetectorType_Salesflare                    DetectorType = 217
 	DetectorType_Webflow                       DetectorType = 218
-	DetectorType_Duda                          DetectorType = 219
-	DetectorType_Yext                          DetectorType = 220
-	DetectorType_ContentStack                  DetectorType = 221
+	DetectorType_Duda                          DetectorType = 219 // Not yet implemented
+	DetectorType_Yext                          DetectorType = 220 // Not yet implemented
+	DetectorType_ContentStack                  DetectorType = 221 // Not yet implemented
 	DetectorType_StoryblokAccessToken          DetectorType = 222
 	DetectorType_GraphCMS                      DetectorType = 223
-	DetectorType_Checkmarket                   DetectorType = 224
+	DetectorType_Checkmarket                   DetectorType = 224 // Not yet implemented
 	DetectorType_Convertkit                    DetectorType = 225
 	DetectorType_CustomerGuru                  DetectorType = 226
-	DetectorType_Kaleyra                       DetectorType = 227
+	DetectorType_Kaleyra                       DetectorType = 227 // Not yet implemented
 	DetectorType_Mailerlite                    DetectorType = 228
 	DetectorType_Qualaroo                      DetectorType = 229
 	DetectorType_SatismeterProjectkey          DetectorType = 230
@@ -312,7 +312,7 @@ const (
 	DetectorType_Simplesat                     DetectorType = 232
 	DetectorType_SurveyAnyplace                DetectorType = 233
 	DetectorType_SurveyBot                     DetectorType = 234
-	DetectorType_Webengage                     DetectorType = 235
+	DetectorType_Webengage                     DetectorType = 235 // Not yet implemented
 	DetectorType_ZonkaFeedback                 DetectorType = 236
 	DetectorType_Delighted                     DetectorType = 237
 	DetectorType_Feedier                       DetectorType = 238
@@ -333,7 +333,7 @@ const (
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Integromat          DetectorType = 251
 	DetectorType_Salesblink          DetectorType = 252
-	DetectorType_Bored               DetectorType = 253
+	DetectorType_Bored               DetectorType = 253 // Not yet implemented
 	DetectorType_Campayn             DetectorType = 254
 	DetectorType_Clinchpad           DetectorType = 255
 	DetectorType_CompanyHub          DetectorType = 256
@@ -374,7 +374,7 @@ const (
 	DetectorType_Vpnapi              DetectorType = 291
 	DetectorType_Workstack           DetectorType = 292
 	DetectorType_Apollo              DetectorType = 293
-	DetectorType_Eversign            DetectorType = 294
+	DetectorType_Eversign            DetectorType = 294 // Not yet implemented
 	DetectorType_Juro                DetectorType = 295
 	DetectorType_KarmaCRM            DetectorType = 296
 	DetectorType_Metrilo             DetectorType = 297
@@ -387,17 +387,17 @@ const (
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Opengraphr         DetectorType = 304
 	DetectorType_Rawg               DetectorType = 305
-	DetectorType_Riotgames          DetectorType = 306
+	DetectorType_Riotgames          DetectorType = 306 // Not yet implemented
 	DetectorType_Clientary          DetectorType = 307
 	DetectorType_Stormglass         DetectorType = 308
 	DetectorType_Tomtom             DetectorType = 309
 	DetectorType_Twitch             DetectorType = 310
 	DetectorType_Documo             DetectorType = 311
-	DetectorType_Cloudways          DetectorType = 312
-	DetectorType_Veevavault         DetectorType = 313
-	DetectorType_KiteConnect        DetectorType = 314
-	DetectorType_ShopeeOpenPlatform DetectorType = 315
-	DetectorType_TeamViewer         DetectorType = 316
+	DetectorType_Cloudways          DetectorType = 312 // Not yet implemented
+	DetectorType_Veevavault         DetectorType = 313 // Not yet implemented
+	DetectorType_KiteConnect        DetectorType = 314 // Not yet implemented
+	DetectorType_ShopeeOpenPlatform DetectorType = 315 // Not yet implemented
+	DetectorType_TeamViewer         DetectorType = 316 // Not yet implemented
 	DetectorType_Bulbul             DetectorType = 317
 	DetectorType_CentralStationCRM  DetectorType = 318
 	DetectorType_Teamgate           DetectorType = 319
@@ -419,23 +419,23 @@ const (
 	DetectorType_Crowdin            DetectorType = 335
 	DetectorType_Mapquest           DetectorType = 336
 	DetectorType_Noticeable         DetectorType = 337
-	DetectorType_Onbuka             DetectorType = 338
+	DetectorType_Onbuka             DetectorType = 338 // Not yet implemented
 	DetectorType_Todoist            DetectorType = 339
 	DetectorType_Storychief         DetectorType = 340
-	DetectorType_LinkedIn           DetectorType = 341
+	DetectorType_LinkedIn           DetectorType = 341 // Not yet implemented
 	DetectorType_YouSign            DetectorType = 342
 	DetectorType_Docker             DetectorType = 343
-	DetectorType_Telesign           DetectorType = 344
+	DetectorType_Telesign           DetectorType = 344 // Not yet implemented
 	DetectorType_Spoonacular        DetectorType = 345
-	DetectorType_Aerisweather       DetectorType = 346
-	DetectorType_Alphavantage       DetectorType = 347
-	DetectorType_Imgur              DetectorType = 348
+	DetectorType_Aerisweather       DetectorType = 346 // Not yet implemented
+	DetectorType_Alphavantage       DetectorType = 347 // Not yet implemented
+	DetectorType_Imgur              DetectorType = 348 // Not yet implemented
 	DetectorType_Imagga             DetectorType = 349
-	DetectorType_SMSApi             DetectorType = 350
-	DetectorType_Distribusion       DetectorType = 351
+	DetectorType_SMSApi             DetectorType = 350 // Not yet implemented
+	DetectorType_Distribusion       DetectorType = 351 // Not yet implemented
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Blablabus            DetectorType = 352
-	DetectorType_WordsApi             DetectorType = 353
+	DetectorType_WordsApi             DetectorType = 353 // Not yet implemented
 	DetectorType_Currencylayer        DetectorType = 354
 	DetectorType_Html2Pdf             DetectorType = 355
 	DetectorType_IPGeolocation        DetectorType = 356
@@ -475,12 +475,12 @@ const (
 	DetectorType_AssemblyAI            DetectorType = 389
 	DetectorType_AdafruitIO            DetectorType = 390
 	DetectorType_Apify                 DetectorType = 391
-	DetectorType_CoinGecko             DetectorType = 392
+	DetectorType_CoinGecko             DetectorType = 392 // Not yet implemented
 	DetectorType_CryptoCompare         DetectorType = 393
 	DetectorType_Fullstory             DetectorType = 394
 	DetectorType_HelloSign             DetectorType = 395
 	DetectorType_Loyverse              DetectorType = 396
-	DetectorType_NetCore               DetectorType = 397
+	DetectorType_NetCore               DetectorType = 397 // Not yet implemented
 	DetectorType_SauceLabs             DetectorType = 398
 	DetectorType_AlienVault            DetectorType = 399
 	DetectorType_Apiflash              DetectorType = 401
@@ -508,11 +508,11 @@ const (
 	DetectorType_RingCentral    DetectorType = 422
 	DetectorType_Finage         DetectorType = 423
 	DetectorType_Edamam         DetectorType = 424
-	DetectorType_HypeAuditor    DetectorType = 425
+	DetectorType_HypeAuditor    DetectorType = 425 // Not yet implemented
 	DetectorType_Gengo          DetectorType = 426
 	DetectorType_Front          DetectorType = 427
 	DetectorType_Fleetbase      DetectorType = 428
-	DetectorType_Bubble         DetectorType = 429
+	DetectorType_Bubble         DetectorType = 429 // Not yet implemented
 	DetectorType_Bannerbear     DetectorType = 430
 	DetectorType_Adzuna         DetectorType = 431
 	DetectorType_BitcoinAverage DetectorType = 432
@@ -526,15 +526,15 @@ const (
 	DetectorType_Numverify   DetectorType = 439
 	DetectorType_ProxyCrawl  DetectorType = 440
 	DetectorType_ZipCodeAPI  DetectorType = 441
-	DetectorType_Cometchat   DetectorType = 442
-	DetectorType_Keygen      DetectorType = 443
-	DetectorType_Mixcloud    DetectorType = 444
+	DetectorType_Cometchat   DetectorType = 442 // Not yet implemented
+	DetectorType_Keygen      DetectorType = 443 // Not yet implemented
+	DetectorType_Mixcloud    DetectorType = 444 // Not yet implemented
 	DetectorType_TatumIO     DetectorType = 445
 	DetectorType_Tmetric     DetectorType = 446
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Lastfm        DetectorType = 447
 	DetectorType_Browshot      DetectorType = 448
-	DetectorType_JSONbin       DetectorType = 449
+	DetectorType_JSONbin       DetectorType = 449 // Not yet implemented
 	DetectorType_LocationIQ    DetectorType = 450
 	DetectorType_ScreenshotAPI DetectorType = 451
 	DetectorType_WeatherStack  DetectorType = 452
@@ -545,14 +545,14 @@ const (
 	DetectorType_Ambee         DetectorType = 457
 	DetectorType_Api2Cart      DetectorType = 458
 	DetectorType_Hypertrack    DetectorType = 459
-	DetectorType_KakaoTalk     DetectorType = 460
+	DetectorType_KakaoTalk     DetectorType = 460 // Not yet implemented
 	DetectorType_RiteKit       DetectorType = 461
 	DetectorType_Shutterstock  DetectorType = 462
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Text2Data      DetectorType = 463
 	DetectorType_YouNeedABudget DetectorType = 464
-	DetectorType_Cricket        DetectorType = 465
-	DetectorType_Filestack      DetectorType = 466
+	DetectorType_Cricket        DetectorType = 465 // Not yet implemented
+	DetectorType_Filestack      DetectorType = 466 // Not yet implemented
 	DetectorType_Gyazo          DetectorType = 467
 	DetectorType_Mavenlink      DetectorType = 468
 	DetectorType_Sheety         DetectorType = 469
@@ -588,7 +588,7 @@ const (
 	DetectorType_VirusTotal            DetectorType = 497
 	DetectorType_AirVisual             DetectorType = 498
 	DetectorType_Currencyfreaks        DetectorType = 499
-	DetectorType_Duffel                DetectorType = 500
+	DetectorType_Duffel                DetectorType = 500 // Not yet implemented
 	DetectorType_FlatIO                DetectorType = 501
 	DetectorType_M3o                   DetectorType = 502
 	DetectorType_Mesibo                DetectorType = 503
@@ -602,7 +602,7 @@ const (
 	DetectorType_AutoPilot             DetectorType = 511
 	DetectorType_Bitmex                DetectorType = 512
 	DetectorType_ClustDoc              DetectorType = 513
-	DetectorType_Messari               DetectorType = 514
+	DetectorType_Messari               DetectorType = 514 // Not yet implemented
 	DetectorType_PdfShift              DetectorType = 515
 	DetectorType_Poloniex              DetectorType = 516
 	DetectorType_RestpackHtmlToPdfAPI  DetectorType = 517
@@ -636,7 +636,7 @@ const (
 	DetectorType_Partnerstack          DetectorType = 545
 	DetectorType_Route4me              DetectorType = 546
 	DetectorType_Scrapeowl             DetectorType = 547
-	DetectorType_ScrapingDog           DetectorType = 548
+	DetectorType_ScrapingDog           DetectorType = 548 // Not yet implemented
 	DetectorType_Streak                DetectorType = 549
 	DetectorType_Veriphone             DetectorType = 550
 	DetectorType_Webscraping           DetectorType = 551
@@ -675,19 +675,19 @@ const (
 	DetectorType_ScrapeStack          DetectorType = 581
 	DetectorType_TechnicalAnalysisApi DetectorType = 582
 	DetectorType_Urlscan              DetectorType = 583
-	DetectorType_BaseApiIO            DetectorType = 584
+	DetectorType_BaseApiIO            DetectorType = 584 // Not yet implemented
 	DetectorType_DailyCO              DetectorType = 585
 	DetectorType_TLy                  DetectorType = 586
 	DetectorType_Shortcut             DetectorType = 587
 	DetectorType_Appfollow            DetectorType = 588
 	DetectorType_Thinkific            DetectorType = 589
-	DetectorType_Feedly               DetectorType = 590
+	DetectorType_Feedly               DetectorType = 590 // Not yet implemented
 	DetectorType_Stitchdata           DetectorType = 591
 	DetectorType_Fetchrss             DetectorType = 592
 	DetectorType_Signupgenius         DetectorType = 593
 	DetectorType_Signaturit           DetectorType = 594
 	DetectorType_Optimizely           DetectorType = 595
-	DetectorType_OcrSpace             DetectorType = 596
+	DetectorType_OcrSpace             DetectorType = 596 // Not yet implemented
 	DetectorType_WeatherBit           DetectorType = 597
 	DetectorType_BuddyNS              DetectorType = 598
 	DetectorType_ZipAPI               DetectorType = 599
@@ -698,7 +698,7 @@ const (
 	DetectorType_Autodesk             DetectorType = 604
 	DetectorType_Tru                  DetectorType = 605
 	DetectorType_UnifyID              DetectorType = 606
-	DetectorType_Trimble              DetectorType = 607
+	DetectorType_Trimble              DetectorType = 607 // Not yet implemented
 	DetectorType_Smooch               DetectorType = 608
 	DetectorType_Semaphore            DetectorType = 609
 	DetectorType_Telnyx               DetectorType = 610
@@ -706,7 +706,7 @@ const (
 	DetectorType_Textmagic            DetectorType = 612
 	DetectorType_Serphouse            DetectorType = 613
 	DetectorType_Planyo               DetectorType = 614
-	DetectorType_Simplybook           DetectorType = 615
+	DetectorType_Simplybook           DetectorType = 615 // Not yet implemented
 	DetectorType_Vyte                 DetectorType = 616
 	DetectorType_Nylas                DetectorType = 617
 	DetectorType_Squareup             DetectorType = 618
@@ -720,7 +720,7 @@ const (
 	DetectorType_Shipday      DetectorType = 625
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Sentiment           DetectorType = 626
-	DetectorType_StreamChatMessaging DetectorType = 627
+	DetectorType_StreamChatMessaging DetectorType = 627 // Not yet implemented
 	DetectorType_TeamworkCRM         DetectorType = 628
 	DetectorType_TeamworkDesk        DetectorType = 629
 	DetectorType_TeamworkSpaces      DetectorType = 630
@@ -766,7 +766,7 @@ const (
 	DetectorType_Findl         DetectorType = 667
 	DetectorType_Lendflow      DetectorType = 668
 	DetectorType_Moderation    DetectorType = 669
-	DetectorType_Opendatasoft  DetectorType = 670
+	DetectorType_Opendatasoft  DetectorType = 670 // Not yet implemented
 	DetectorType_Podio         DetectorType = 671
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Rockset      DetectorType = 672
@@ -777,7 +777,7 @@ const (
 	DetectorType_Honey        DetectorType = 677
 	DetectorType_Freshdesk    DetectorType = 678
 	DetectorType_Upwave       DetectorType = 679
-	DetectorType_Fountain     DetectorType = 680
+	DetectorType_Fountain     DetectorType = 680 // Not yet implemented
 	DetectorType_Freshbooks   DetectorType = 681
 	DetectorType_Mite         DetectorType = 682
 	DetectorType_Deputy       DetectorType = 683
@@ -791,17 +791,17 @@ const (
 	DetectorType_Mrticktock   DetectorType = 691
 	DetectorType_Chatfule     DetectorType = 692
 	DetectorType_Aeroworkflow DetectorType = 693
-	DetectorType_Emailoctopus DetectorType = 694
+	DetectorType_Emailoctopus DetectorType = 694 // Not yet implemented
 	// Deprecated: Marked as deprecated in detectors.proto.
 	DetectorType_Fusebill                 DetectorType = 695
 	DetectorType_Geckoboard               DetectorType = 696
-	DetectorType_Gosquared                DetectorType = 697
+	DetectorType_Gosquared                DetectorType = 697 // Not yet implemented
 	DetectorType_Moonclerk                DetectorType = 698
 	DetectorType_Paymoapp                 DetectorType = 699
 	DetectorType_Mixmax                   DetectorType = 700
-	DetectorType_Processst                DetectorType = 701
+	DetectorType_Processst                DetectorType = 701 // Not yet implemented
 	DetectorType_Repairshopr              DetectorType = 702
-	DetectorType_Goshippo                 DetectorType = 703
+	DetectorType_Goshippo                 DetectorType = 703 // Not yet implemented
 	DetectorType_Sigopt                   DetectorType = 704
 	DetectorType_Sugester                 DetectorType = 705
 	DetectorType_Viewneo                  DetectorType = 706
@@ -815,7 +815,7 @@ const (
 	DetectorType_GoCanvas                 DetectorType = 714
 	DetectorType_MadKudu                  DetectorType = 715
 	DetectorType_NozbeTeams               DetectorType = 716
-	DetectorType_Papyrs                   DetectorType = 717
+	DetectorType_Papyrs                   DetectorType = 717 // Not yet implemented
 	DetectorType_SuperNotesAPI            DetectorType = 718
 	DetectorType_Tallyfy                  DetectorType = 719
 	DetectorType_ZenkitAPI                DetectorType = 720
@@ -826,9 +826,9 @@ const (
 	DetectorType_Sirv                     DetectorType = 725
 	DetectorType_Diffbot                  DetectorType = 726
 	DetectorType_EightxEight              DetectorType = 727
-	DetectorType_Sendoso                  DetectorType = 728
-	DetectorType_Printfection             DetectorType = 729
-	DetectorType_Authorize                DetectorType = 730
+	DetectorType_Sendoso                  DetectorType = 728 // Not yet implemented
+	DetectorType_Printfection             DetectorType = 729 // Not yet implemented
+	DetectorType_Authorize                DetectorType = 730 // Not yet implemented
 	DetectorType_PandaScore               DetectorType = 731
 	DetectorType_Paymo                    DetectorType = 732
 	DetectorType_AvazaPersonalAccessToken DetectorType = 733
@@ -836,23 +836,23 @@ const (
 	DetectorType_Livestorm                DetectorType = 735
 	DetectorType_KuCoin                   DetectorType = 736
 	DetectorType_MetaAPI                  DetectorType = 737
-	DetectorType_NiceHash                 DetectorType = 738
+	DetectorType_NiceHash                 DetectorType = 738 // Not yet implemented
 	DetectorType_CexIO                    DetectorType = 739
 	DetectorType_Klipfolio                DetectorType = 740
-	DetectorType_Dynatrace                DetectorType = 741
-	DetectorType_MollieAPIKey             DetectorType = 742
-	DetectorType_MollieAccessToken        DetectorType = 743
-	DetectorType_BasisTheory              DetectorType = 744
-	DetectorType_Nordigen                 DetectorType = 745
-	DetectorType_FlagsmithEnvironmentKey  DetectorType = 746
-	DetectorType_FlagsmithToken           DetectorType = 747
+	DetectorType_Dynatrace                DetectorType = 741 // Not yet implemented
+	DetectorType_MollieAPIKey             DetectorType = 742 // Not yet implemented
+	DetectorType_MollieAccessToken        DetectorType = 743 // Not yet implemented
+	DetectorType_BasisTheory              DetectorType = 744 // Not yet implemented
+	DetectorType_Nordigen                 DetectorType = 745 // Not yet implemented
+	DetectorType_FlagsmithEnvironmentKey  DetectorType = 746 // Not yet implemented
+	DetectorType_FlagsmithToken           DetectorType = 747 // Not yet implemented
 	DetectorType_Mux                      DetectorType = 748
 	DetectorType_Column                   DetectorType = 749
 	DetectorType_Sendbird                 DetectorType = 750
 	DetectorType_SendbirdOrganizationAPI  DetectorType = 751
-	DetectorType_Midise                   DetectorType = 752
+	DetectorType_Midise                   DetectorType = 752 // Not yet implemented
 	DetectorType_Mockaroo                 DetectorType = 753
-	DetectorType_Image4                   DetectorType = 754
+	DetectorType_Image4                   DetectorType = 754 // Not yet implemented
 	DetectorType_Pinata                   DetectorType = 755
 	DetectorType_BrowserStack             DetectorType = 756
 	// Deprecated: Marked as deprecated in detectors.proto.
@@ -891,15 +891,15 @@ const (
 	DetectorType_Stormboard    DetectorType = 787
 	DetectorType_Apilayer      DetectorType = 788
 	DetectorType_Disqus        DetectorType = 789
-	DetectorType_Woopra        DetectorType = 790
+	DetectorType_Woopra        DetectorType = 790 // Not yet implemented
 	DetectorType_Paperform     DetectorType = 791
 	DetectorType_Gumroad       DetectorType = 792
 	DetectorType_Paydirtapp    DetectorType = 793
 	DetectorType_Detectify     DetectorType = 794
 	DetectorType_Statuscake    DetectorType = 795
-	DetectorType_Jumpseller    DetectorType = 796
+	DetectorType_Jumpseller    DetectorType = 796 // Not yet implemented
 	DetectorType_LunchMoney    DetectorType = 797
-	DetectorType_Rosette       DetectorType = 798
+	DetectorType_Rosette       DetectorType = 798 // Not yet implemented
 	DetectorType_Yelp          DetectorType = 799
 	DetectorType_Atera         DetectorType = 800
 	DetectorType_EcoStruxureIT DetectorType = 801
@@ -946,7 +946,7 @@ const (
 	DetectorType_Tickettailor      DetectorType = 840
 	DetectorType_Lemlist           DetectorType = 841
 	DetectorType_Prodpad           DetectorType = 842
-	DetectorType_Formstack         DetectorType = 843
+	DetectorType_Formstack         DetectorType = 843 // Not yet implemented
 	DetectorType_Codeclimate       DetectorType = 844
 	DetectorType_Codemagic         DetectorType = 845
 	DetectorType_Vbout             DetectorType = 846
@@ -957,19 +957,19 @@ const (
 	DetectorType_SimFin            DetectorType = 851
 	DetectorType_Scalr             DetectorType = 852
 	DetectorType_Kanbantool        DetectorType = 853
-	DetectorType_Brightlocal       DetectorType = 854
-	DetectorType_Hotwire           DetectorType = 855
+	DetectorType_Brightlocal       DetectorType = 854 // Not yet implemented
+	DetectorType_Hotwire           DetectorType = 855 // Not yet implemented
 	DetectorType_Instabot          DetectorType = 856
-	DetectorType_Timekit           DetectorType = 857
+	DetectorType_Timekit           DetectorType = 857 // Not yet implemented
 	DetectorType_Interseller       DetectorType = 858
-	DetectorType_Mojohelpdesk      DetectorType = 859
-	DetectorType_Createsend        DetectorType = 860
+	DetectorType_Mojohelpdesk      DetectorType = 859 // Not yet implemented
+	DetectorType_Createsend        DetectorType = 860 // Not yet implemented
 	DetectorType_Getresponse       DetectorType = 861
-	DetectorType_Dynadot           DetectorType = 862
+	DetectorType_Dynadot           DetectorType = 862 // Not yet implemented
 	DetectorType_Demio             DetectorType = 863
 	DetectorType_Tokeet            DetectorType = 864
-	DetectorType_Myexperiment      DetectorType = 865
-	DetectorType_Copyscape         DetectorType = 866
+	DetectorType_Myexperiment      DetectorType = 865 // Not yet implemented
+	DetectorType_Copyscape         DetectorType = 866 // Not yet implemented
 	DetectorType_Besnappy          DetectorType = 867
 	DetectorType_Salesmate         DetectorType = 868
 	// Deprecated: Marked as deprecated in detectors.proto.
@@ -977,28 +977,28 @@ const (
 	DetectorType_Websitepulse    DetectorType = 870
 	DetectorType_Uclassify       DetectorType = 871
 	DetectorType_Convert         DetectorType = 872
-	DetectorType_PDFmyURL        DetectorType = 873
-	DetectorType_Api2Convert     DetectorType = 874
+	DetectorType_PDFmyURL        DetectorType = 873 // Not yet implemented
+	DetectorType_Api2Convert     DetectorType = 874 // Not yet implemented
 	DetectorType_Opsgenie        DetectorType = 875
 	DetectorType_Gemini          DetectorType = 876
 	DetectorType_Honeycomb       DetectorType = 877
-	DetectorType_KalturaAppToken DetectorType = 878
-	DetectorType_KalturaSession  DetectorType = 879
-	DetectorType_BitGo           DetectorType = 880
-	DetectorType_Optidash        DetectorType = 881
-	DetectorType_Imgix           DetectorType = 882
-	DetectorType_ImageToText     DetectorType = 883
-	DetectorType_Page2Images     DetectorType = 884
-	DetectorType_Quickbase       DetectorType = 885
-	DetectorType_Redbooth        DetectorType = 886
-	DetectorType_Nubela          DetectorType = 887
-	DetectorType_Infobip         DetectorType = 888
-	DetectorType_Uproc           DetectorType = 889
-	DetectorType_Supportbee      DetectorType = 890
-	DetectorType_Aftership       DetectorType = 891
-	DetectorType_Edusign         DetectorType = 892
-	DetectorType_Teamup          DetectorType = 893
-	DetectorType_Workday         DetectorType = 894
+	DetectorType_KalturaAppToken DetectorType = 878 // Not yet implemented
+	DetectorType_KalturaSession  DetectorType = 879 // Not yet implemented
+	DetectorType_BitGo           DetectorType = 880 // Not yet implemented
+	DetectorType_Optidash        DetectorType = 881 // Not yet implemented
+	DetectorType_Imgix           DetectorType = 882 // Not yet implemented
+	DetectorType_ImageToText     DetectorType = 883 // Not yet implemented
+	DetectorType_Page2Images     DetectorType = 884 // Not yet implemented
+	DetectorType_Quickbase       DetectorType = 885 // Not yet implemented
+	DetectorType_Redbooth        DetectorType = 886 // Not yet implemented
+	DetectorType_Nubela          DetectorType = 887 // Not yet implemented
+	DetectorType_Infobip         DetectorType = 888 // Not yet implemented
+	DetectorType_Uproc           DetectorType = 889 // Not yet implemented
+	DetectorType_Supportbee      DetectorType = 890 // Not yet implemented
+	DetectorType_Aftership       DetectorType = 891 // Not yet implemented
+	DetectorType_Edusign         DetectorType = 892 // Not yet implemented
+	DetectorType_Teamup          DetectorType = 893 // Not yet implemented
+	DetectorType_Workday         DetectorType = 894 // Not yet implemented
 	DetectorType_MongoDB         DetectorType = 895
 	DetectorType_NGC             DetectorType = 896
 	DetectorType_DigitalOceanV2  DetectorType = 897
@@ -1137,6 +1137,11 @@ const (
 	DetectorType_LangSmith                               DetectorType = 1028
 	DetectorType_BitbucketAppPassword                    DetectorType = 1029
 	DetectorType_Hasura                                  DetectorType = 1030
+	DetectorType_SalesforceRefreshToken                  DetectorType = 1031
+	DetectorType_AnypointOAuth2                          DetectorType = 1032
+	DetectorType_WebexBot                                DetectorType = 1033
+	DetectorType_TableauPersonalAccessToken              DetectorType = 1034
+	DetectorType_Rootly                                  DetectorType = 1035
 )
 
 // Enum value maps for DetectorType.
@@ -2169,6 +2174,11 @@ var (
 		1028: "LangSmith",
 		1029: "BitbucketAppPassword",
 		1030: "Hasura",
+		1031: "SalesforceRefreshToken",
+		1032: "AnypointOAuth2",
+		1033: "WebexBot",
+		1034: "TableauPersonalAccessToken",
+		1035: "Rootly",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3198,6 +3208,11 @@ var (
 		"LangSmith":                         1028,
 		"BitbucketAppPassword":              1029,
 		"Hasura":                            1030,
+		"SalesforceRefreshToken":            1031,
+		"AnypointOAuth2":                    1032,
+		"WebexBot":                          1033,
+		"TableauPersonalAccessToken":        1034,
+		"Rootly":                            1035,
 	}
 )
 
@@ -3651,7 +3666,7 @@ var file_detectors_proto_rawDesc = []byte{
 	0x4c, 0x41, 0x49, 0x4e, 0x10, 0x01, 0x12, 0x0a, 0x0a, 0x06, 0x42, 0x41, 0x53, 0x45, 0x36, 0x34,
 	0x10, 0x02, 0x12, 0x09, 0x0a, 0x05, 0x55, 0x54, 0x46, 0x31, 0x36, 0x10, 0x03, 0x12, 0x13, 0x0a,
 	0x0f, 0x45, 0x53, 0x43, 0x41, 0x50, 0x45, 0x44, 0x5f, 0x55, 0x4e, 0x49, 0x43, 0x4f, 0x44, 0x45,
-	0x10, 0x04, 0x2a, 0x8a, 0x85, 0x01, 0x0a, 0x0c, 0x44, 0x65, 0x74, 0x65, 0x63, 0x74, 0x6f, 0x72,
+	0x10, 0x04, 0x2a, 0xf9, 0x85, 0x01, 0x0a, 0x0c, 0x44, 0x65, 0x74, 0x65, 0x63, 0x74, 0x6f, 0x72,
 	0x54, 0x79, 0x70, 0x65, 0x12, 0x0b, 0x0a, 0x07, 0x41, 0x6c, 0x69, 0x62, 0x61, 0x62, 0x61, 0x10,
 	0x00, 0x12, 0x08, 0x0a, 0x04, 0x41, 0x4d, 0x51, 0x50, 0x10, 0x01, 0x12, 0x07, 0x0a, 0x03, 0x41,
 	0x57, 0x53, 0x10, 0x02, 0x12, 0x09, 0x0a, 0x05, 0x41, 0x7a, 0x75, 0x72, 0x65, 0x10, 0x03, 0x12,
@@ -4716,11 +4731,18 @@ var file_detectors_proto_rawDesc = []byte{
 	0x53, 0x6d, 0x69, 0x74, 0x68, 0x10, 0x84, 0x08, 0x12, 0x19, 0x0a, 0x14, 0x42, 0x69, 0x74, 0x62,
 	0x75, 0x63, 0x6b, 0x65, 0x74, 0x41, 0x70, 0x70, 0x50, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64,
 	0x10, 0x85, 0x08, 0x12, 0x0b, 0x0a, 0x06, 0x48, 0x61, 0x73, 0x75, 0x72, 0x61, 0x10, 0x86, 0x08,
-	0x42, 0x3d, 0x5a, 0x3b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74,
-	0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74,
-	0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67,
-	0x2f, 0x70, 0x62, 0x2f, 0x64, 0x65, 0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x70, 0x62, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x12, 0x1b, 0x0a, 0x16, 0x53, 0x61, 0x6c, 0x65, 0x73, 0x66, 0x6f, 0x72, 0x63, 0x65, 0x52, 0x65,
+	0x66, 0x72, 0x65, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x10, 0x87, 0x08, 0x12, 0x13, 0x0a,
+	0x0e, 0x41, 0x6e, 0x79, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x4f, 0x41, 0x75, 0x74, 0x68, 0x32, 0x10,
+	0x88, 0x08, 0x12, 0x0d, 0x0a, 0x08, 0x57, 0x65, 0x62, 0x65, 0x78, 0x42, 0x6f, 0x74, 0x10, 0x89,
+	0x08, 0x12, 0x1f, 0x0a, 0x1a, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x61, 0x75, 0x50, 0x65, 0x72, 0x73,
+	0x6f, 0x6e, 0x61, 0x6c, 0x41, 0x63, 0x63, 0x65, 0x73, 0x73, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x10,
+	0x8a, 0x08, 0x12, 0x0b, 0x0a, 0x06, 0x52, 0x6f, 0x6f, 0x74, 0x6c, 0x79, 0x10, 0x8b, 0x08, 0x42,
+	0x3d, 0x5a, 0x3b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72,
+	0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72,
+	0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f,
+	0x70, 0x62, 0x2f, 0x64, 0x65, 0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x70, 0x62, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (

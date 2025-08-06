@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"errors"
 	"runtime"
 	"sync"
@@ -341,6 +342,8 @@ type GitlabConfig struct {
 	Token string
 	// Repos is the list of repositories to scan.
 	Repos []string
+	// GroupIds is the list of groups to scan.
+	GroupIds []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// SkipBinaries allows skipping binary files from the scan.
@@ -447,12 +450,14 @@ type StdinConfig struct{}
 
 // Progress is used to update job completion progress across sources.
 type Progress struct {
-	mut               sync.Mutex
-	PercentComplete   int64
-	Message           string
-	EncodedResumeInfo string
-	SectionsCompleted int32
-	SectionsRemaining int32
+	mut sync.Mutex
+	// encodedResumeInfoByID is used for sub-unit resumption (see below)
+	encodedResumeInfoByID map[string]string
+	PercentComplete       int64
+	Message               string
+	EncodedResumeInfo     string
+	SectionsCompleted     int32
+	SectionsRemaining     int32
 }
 
 // Validator is an interface for validating a source. Sources can optionally implement this interface to validate
@@ -510,3 +515,71 @@ func (p *Progress) GetProgress() *Progress {
 	defer p.mut.Unlock()
 	return p
 }
+
+// -sub-unit-resumption------------------------------------------------------------
+//
+// The following collection of methods are intended to provide a thread-safe
+// way to access the EncodedResumeInfo for Sources to enable saving and
+// resuming progress mid SourceUnit scan.
+//
+// This level of synchronization is only necessary when multiple concurrent
+// invocations of ChunkUnit consume/mutate the same Progress object. The source
+// manager executes scans this way under certain circumstances.
+//
+// Usage:
+//  - id should be the SourceUnit ID
+//  - value is opaque data each Source uses
+//
+
+// GetEncodedResumeInfoFor gets the encoded resume information for the provided
+// ID, usually a unit ID.
+func (p *Progress) GetEncodedResumeInfoFor(id string) string {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	p.ensureEncodedResumeInfoByID()
+	return p.encodedResumeInfoByID[id]
+}
+
+// SetEncodedResumeInfoFor sets the encoded resume information for the provided
+// ID, usually a unit ID.
+func (p *Progress) SetEncodedResumeInfoFor(id, value string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	p.ensureEncodedResumeInfoByID()
+	p.encodedResumeInfoByID[id] = value
+	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+}
+
+// ClearEncodedResumeInfoFor removes the encoded resume information from being
+// tracked.
+func (p *Progress) ClearEncodedResumeInfoFor(id string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	p.ensureEncodedResumeInfoByID()
+	delete(p.encodedResumeInfoByID, id)
+	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+}
+
+// ensureEncodedResumeInfoByID ensures the encodedResumeInfoByID attribute is a
+// non-nil map. The mutex must be held when calling this function.
+func (p *Progress) ensureEncodedResumeInfoByID() {
+	if p.encodedResumeInfoByID != nil {
+		return
+	}
+	p.encodedResumeInfoByID = unmarshalEncodedResumeInfo(p.EncodedResumeInfo)
+}
+
+// marshalEncodedResumeInfo converts a map of values into a serialized string.
+func marshalEncodedResumeInfo(values map[string]string) string {
+	marshalled, _ := json.Marshal(values)
+	return string(marshalled)
+}
+
+// unmarshalEncodedResumeInfo converts a serialized string into a map of values.
+func unmarshalEncodedResumeInfo(data string) map[string]string {
+	resumeInfo := make(map[string]string)
+	_ = json.Unmarshal([]byte(data), &resumeInfo)
+	return resumeInfo
+}
+
+// -/sub-unit-resumption-----------------------------------------------------------

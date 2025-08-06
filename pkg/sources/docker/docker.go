@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	gzip "github.com/klauspost/pgzip"
@@ -179,8 +180,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 func (s *Source) processImage(ctx context.Context, image string) (imageInfo, error) {
 	var (
 		imgInfo   imageInfo
-		hasDigest bool
 		imageName name.Reference
+		err       error
 	)
 
 	remoteOpts, err := s.remoteOpts()
@@ -189,6 +190,7 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 	}
 
 	const filePrefix = "file://"
+	const dockerPrefix = "docker://"
 	if strings.HasPrefix(image, filePrefix) {
 		image = strings.TrimPrefix(image, filePrefix)
 		imgInfo.base = image
@@ -196,18 +198,21 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 		if err != nil {
 			return imgInfo, err
 		}
-	} else {
-		imgInfo.base, imgInfo.tag, hasDigest = baseAndTagFromImage(image)
-
-		if hasDigest {
-			imageName, err = name.NewDigest(image)
-		} else {
-			imageName, err = name.NewTag(image)
-		}
+	} else if strings.HasPrefix(image, dockerPrefix) {
+		image = strings.TrimPrefix(image, dockerPrefix)
+		imgInfo, imageName, err = s.extractImageNameTagDigest(image)
 		if err != nil {
 			return imgInfo, err
 		}
-
+		imgInfo.image, err = daemon.Image(imageName)
+		if err != nil {
+			return imgInfo, err
+		}
+	} else {
+		imgInfo, imageName, err = s.extractImageNameTagDigest(image)
+		if err != nil {
+			return imgInfo, err
+		}
 		imgInfo.image, err = remote.Image(imageName, remoteOpts...)
 		if err != nil {
 			return imgInfo, err
@@ -217,6 +222,29 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 	ctx.Logger().WithValues("image", imgInfo.base, "tag", imgInfo.tag).V(2).Info("scanning image")
 
 	return imgInfo, nil
+}
+
+// extractImageNameTagDigest parses the provided Docker image string and returns a name.Reference
+// representing either the image's tag or digest, and any error encountered during parsing.
+func (*Source) extractImageNameTagDigest(image string) (imageInfo, name.Reference, error) {
+	var (
+		hasDigest bool
+		imgInfo   imageInfo
+		imgName   name.Reference
+		err       error
+	)
+	imgInfo.base, imgInfo.tag, hasDigest = baseAndTagFromImage(image)
+
+	if hasDigest {
+		imgName, err = name.NewDigest(image)
+	} else {
+		imgName, err = name.NewTag(image)
+	}
+	if err != nil {
+		return imgInfo, imgName, err
+	}
+
+	return imgInfo, imgName, nil
 }
 
 // getHistoryEntries collates an image's configuration history together with the
@@ -366,7 +394,7 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 		return nil
 	}
 
-	chunkReader := sources.NewChunkReader()
+	chunkReader := sources.NewChunkReader(sources.WithFileSize(int(info.size)))
 	chunkResChan := chunkReader(ctx, info.reader)
 
 	for data := range chunkResChan {
