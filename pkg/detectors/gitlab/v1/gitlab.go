@@ -69,17 +69,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 
+		// ignore v2 detectors which have a prefix of `glpat-`
+		if strings.Contains(match[0], "glpat-") {
+			continue
+		}
+
+		// to avoid false positives
+		if detectors.StringShannonEntropy(resMatch) < 3.6 {
+			continue
+		}
+
 		for _, endpoint := range s.Endpoints() {
-			// ignore v2 detectors which have a prefix of `glpat-`
-			if strings.Contains(match[0], "glpat-") {
-				continue
-			}
-
-			// to avoid false positives
-			if detectors.StringShannonEntropy(resMatch) < 3.6 {
-				continue
-			}
-
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Gitlab,
 				Raw:          []byte(resMatch),
