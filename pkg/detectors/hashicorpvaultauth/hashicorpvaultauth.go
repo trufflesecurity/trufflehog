@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -44,39 +43,33 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	var roleIds []string
+	var uniqueRoleIds = make(map[string]struct{})
 	for _, match := range roleIdPat.FindAllStringSubmatch(dataStr, -1) {
 		roleId := strings.TrimSpace(match[1])
-		if !slices.Contains(roleIds, roleId) {
-			roleIds = append(roleIds, roleId)
-		}
+		uniqueRoleIds[roleId] = struct{}{}
 	}
 
-	var secretIds []string
+	var uniqueSecretIds = make(map[string]struct{})
 	for _, match := range secretIdPat.FindAllStringSubmatch(dataStr, -1) {
 		secretId := strings.TrimSpace(match[1])
-		if !slices.Contains(secretIds, secretId) {
-			secretIds = append(secretIds, secretId)
-		}
+		uniqueSecretIds[secretId] = struct{}{}
 	}
 
-	var vaultUrls []string
+	var uniqueVaultUrls = make(map[string]struct{})
 	for _, match := range vaultUrlPat.FindAllString(dataStr, -1) {
 		url := strings.TrimSpace(match)
-		if !slices.Contains(vaultUrls, url) {
-			vaultUrls = append(vaultUrls, url)
-		}
+		uniqueVaultUrls[url] = struct{}{}
 	}
 
 	// If no names or secrets found, return empty results
-	if len(roleIds) == 0 || len(secretIds) == 0 || len(vaultUrls) == 0 {
+	if len(uniqueRoleIds) == 0 || len(uniqueSecretIds) == 0 || len(uniqueVaultUrls) == 0 {
 		return results, nil
 	}
 
 	// create combination results that can be verified
-	for _, roleId := range roleIds {
-		for _, secretId := range secretIds {
-			for _, vaultUrl := range vaultUrls {
+	for roleId := range uniqueRoleIds {
+		for secretId := range uniqueSecretIds {
+			for vaultUrl := range uniqueVaultUrls {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_HashiCorpVaultAuth,
 					Raw:          []byte(secretId),
