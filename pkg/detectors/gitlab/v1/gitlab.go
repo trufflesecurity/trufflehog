@@ -83,11 +83,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Gitlab,
 				Raw:          []byte(resMatch),
-				ExtraData:    map[string]string{},
-			}
-			s1.ExtraData = map[string]string{
-				"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
-				"version":        fmt.Sprintf("%d", s.Version()),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
 			}
 
 			if verify {
