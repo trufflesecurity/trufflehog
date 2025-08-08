@@ -15,6 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -25,14 +26,15 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM
 
 type Source struct {
-	name        string
-	sourceId    sources.SourceID
-	jobId       sources.JobID
-	concurrency int
-	verify      bool
-	paths       []string
-	log         logr.Logger
-	filter      *common.Filter
+	name         string
+	sourceId     sources.SourceID
+	jobId        sources.JobID
+	concurrency  int
+	verify       bool
+	paths        []string
+	log          logr.Logger
+	filter       *common.Filter
+	skipBinaries bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -71,6 +73,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 	s.paths = append(conn.Paths, conn.Directories...)
+	s.skipBinaries = conn.GetSkipBinaries()
 
 	filter, err := common.FilterFromFiles(conn.IncludePathsFile, conn.ExcludePathsFile)
 	if err != nil {
@@ -184,6 +187,12 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	if fileStat.Mode()&os.ModeSymlink != 0 {
 		return skipSymlinkErr
+	}
+
+	// Check if file is binary and should be skipped
+	if (s.skipBinaries || feature.ForceSkipBinaries.Load()) && common.IsBinary(path) {
+		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
+		return nil
 	}
 
 	inputFile, err := os.Open(path)
