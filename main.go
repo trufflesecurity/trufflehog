@@ -179,7 +179,7 @@ var (
 	syslogProtocol = syslogScan.Flag("protocol", "Protocol to listen on. udp or tcp").String()
 	syslogTLSCert  = syslogScan.Flag("cert", "Path to TLS cert.").String()
 	syslogTLSKey   = syslogScan.Flag("key", "Path to TLS key.").String()
-	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").String()
+	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").Required().String()
 
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
@@ -450,7 +450,6 @@ func run(state overseer.State) {
 
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
-
 
 	// OSS Default Use Git Mirror on
 	feature.UseGitMirror.Store(true)

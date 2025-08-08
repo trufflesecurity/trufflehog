@@ -1047,6 +1047,7 @@ enum DetectorType {
   Rootly = 1035;
   MakeApiToken = 1036;
   MakeMcpToken = 1037;
+  HashiCorpVaultAuth = 1038;
 }
 
 message Result {
