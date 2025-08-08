@@ -2,13 +2,14 @@ package gitparse
 
 import (
 	"bytes"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
-	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/process"
@@ -778,8 +779,8 @@ func assertDiffEqualToExpected(t *testing.T, expected *Diff, actual *Diff) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDiffStr, actualDiffStr)
 	}
-	// TODO - Add test coverage for binary diffs (if it isn't already elsewhere)
 
+	// TODO - Add test coverage for binary diffs (if it isn't already elsewhere)
 }
 
 func TestCommitParsing(t *testing.T) {

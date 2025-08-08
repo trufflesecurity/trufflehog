@@ -157,7 +157,13 @@ func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string,
 		ctx := context.WithValues(ctx,
 			"source_manager_worker_id", common.RandomID(5),
 		)
-		defer common.Recover(ctx)
+		defer common.RecoverWithHandler(ctx, func(err error) {
+			progress.ReportError(Fatal{err})
+			select {
+			case s.firstErr <- err:
+			default:
+			}
+		})
 		defer cancel(nil)
 		if err := s.run(ctx, source, progress, targets...); err != nil {
 			select {
@@ -458,10 +464,13 @@ func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUni
 
 	// Produce units.
 	func() {
-		// TODO: Catch panics and add to report.
 		report.StartEnumerating(time.Now())
 		defer func() { report.EndEnumerating(time.Now()) }()
 		ctx.Logger().V(2).Info("enumerating source with units")
+		defer common.RecoverWithHandler(ctx, func(err error) {
+			report.ReportError(Fatal{err})
+			catchFirstFatal(Fatal{err})
+		})
 		if err := source.Enumerate(ctx, reporter); err != nil {
 			report.ReportError(Fatal{err})
 			catchFirstFatal(Fatal{err})
@@ -523,13 +532,17 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 		default:
 		}
 	}
+
 	// Produce units.
 	go func() {
-		// TODO: Catch panics and add to report.
 		report.StartEnumerating(time.Now())
 		defer func() { report.EndEnumerating(time.Now()) }()
 		defer close(unitReporter.unitCh)
 		ctx.Logger().V(2).Info("enumerating source")
+		defer common.RecoverWithHandler(ctx, func(err error) {
+			report.ReportError(Fatal{err})
+			catchFirstFatal(Fatal{err})
+		})
 		if err := source.Enumerate(ctx, unitReporter); err != nil {
 			report.ReportError(Fatal{err})
 			catchFirstFatal(Fatal{err})
@@ -551,11 +564,14 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 		// Consume units and produce chunks.
 		unitPool.Go(func() error {
 			report.StartUnitChunking(unit, time.Now())
-			// TODO: Catch panics and add to report.
 			defer close(chunkReporter.chunkCh)
 			id, kind := unit.SourceUnitID()
 			ctx := context.WithValues(ctx, "unit_kind", kind, "unit", id)
 			ctx.Logger().V(3).Info("chunking unit")
+			defer common.RecoverWithHandler(ctx, func(err error) {
+				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
+				catchFirstFatal(Fatal{err})
+			})
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 				catchFirstFatal(Fatal{err})
@@ -597,11 +613,14 @@ func (s *SourceManager) scanWithUnit(ctx context.Context, source SourceUnitChunk
 	var chunkErr error
 	go func() {
 		report.StartUnitChunking(unit, time.Now())
-		// TODO: Catch panics and add to report.
 		defer close(chunkReporter.chunkCh)
 		id, kind := unit.SourceUnitID()
 		ctx := context.WithValues(ctx, "unit_kind", kind, "unit", id)
 		ctx.Logger().V(3).Info("chunking unit")
+		defer common.RecoverWithHandler(ctx, func(err error) {
+			report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
+			chunkErr = Fatal{err}
+		})
 		if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 			report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 			chunkErr = Fatal{err}

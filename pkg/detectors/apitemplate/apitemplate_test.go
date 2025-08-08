@@ -5,14 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "apitemplatekey: a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8s9T"
-	invalidPattern = "apitemplatekey: sk_0C2c3D4e5F6@7H8i9J$k1L2m3N4o5P6q7R8s9T"
 )
 
 func TestApiTemplate_Pattern(t *testing.T) {
@@ -25,14 +21,40 @@ func TestApiTemplate_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8s9T"},
+			name: "valid pattern",
+			input: `
+				func validateKey() bool {
+					apiTemplate := "EeOPHL7PyBlUk0qkJX72sDtdNL3WLdpxg1czllR"
+
+					// isActive check if the key is active or not
+					return isActive(apiTemplate)
+				}`,
+			want: []string{"EeOPHL7PyBlUk0qkJX72sDtdNL3WLdpxg1czllR"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apitemplate}</id>
+  					<secret>{AQAAABAAA oVqX8yfzlUtzudNnvlWKNI4pNKTKTwlaKmxlcX5}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"oVqX8yfzlUtzudNnvlWKNI4pNKTKTwlaKmxlcX5"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				func validateKey() bool {
+					apiTemplate := "EeOPHL7PyBlUk0qkJAX72sDtdNL3WLdpxg1czllR"
+
+					// isActive check if the key is active or not
+					return isActive(apiTemplate)
+				}`,
+			want: nil,
 		},
 	}
 
@@ -40,22 +62,15 @@ func TestApiTemplate_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -67,6 +82,7 @@ func TestApiTemplate_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

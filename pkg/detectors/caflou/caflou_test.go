@@ -10,27 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			base_url: "https://api.example.com/instances"
-			api_key: $API_KEY
-			caflou_auth_token: "Bearer b8SQoPKLMCBbwIm0XDzbZiDydUk9qNqqBlKnR5Nouwbjs9cv3D1azAXpiFq9WrfNlwxbCwDL2FWCheXmdYKZkMRZklahJh5NQZZY7Zf220hjGJOtKgFbWxy9xQ9hodQqsOOx9Of30qtTrnRxFPa9wxYkSBn"
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secret = "b8SQoPKLMCBbwIm0XDzbZiDydUk9qNqqBlKnR5Nouwbjs9cv3D1azAXpiFq9WrfNlwxbCwDL2FWCheXmdYKZkMRZklahJh5NQZZY7Zf220hjGJOtKgFbWxy9xQ9hodQqsOOx9Of30qtTrnRxFPa9wxYkSBn"
-)
-
 func TestCaflou_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -41,9 +20,25 @@ func TestCaflou_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name: "valid pattern",
+			input: `
+					# Configuration File: config.yaml
+					database:
+						host: $DB_HOST
+						port: $DB_PORT
+						username: $DB_USERNAME
+						password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+					api:
+						base_url: "https://api.example.com/instances"
+						api_key: $API_KEY
+						caflou_auth_token: "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX9lkIjo1OTQ5MCwianCpIjoiOTQwZjBlODkxNPhhZjM4OTQ1OGQwMDIxIiziZXhwIjoxGzU1MTk4MDAwfQ.EMNGCPX7aNIvriX360oLFAgMwHeXxKD7N4kdcJtPqTI"
+
+					# Notes:
+					# - Remember to rotate the secret every 90 days.
+					# - The above credentials should only be used in a secure environment.
+				`,
+			want: []string{"eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX9lkIjo1OTQ5MCwianCpIjoiOTQwZjBlODkxNPhhZjM4OTQ1OGQwMDIxIiziZXhwIjoxGzU1MTk4MDAwfQ.EMNGCPX7aNIvriX360oLFAgMwHeXxKD7N4kdcJtPqTI"},
 		},
 	}
 
