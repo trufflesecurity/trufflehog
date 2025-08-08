@@ -28,7 +28,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"make"}) + `\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b`)
 	// Pattern to match Make.com URLs in the data
-	urlPat = regexp.MustCompile(`\bhttps://(eu[12]|us[12])\.make\.(?:com|celonis\.com)/api/v2/`)
+	urlPat = regexp.MustCompile(`\b(eu|us)[12]\.make\.(com|celonis)\.com`)
 )
 
 func (Scanner) CloudEndpoint() string { return "" }
