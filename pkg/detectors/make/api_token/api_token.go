@@ -28,7 +28,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"make"}) + `\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b`)
 	// Pattern to match Make.com URLs in the data
-	urlPat = regexp.MustCompile(`\b(eu|us)[12]\.make\.(com|celonis)\.com`)
+	urlPat = regexp.MustCompile(`\b(eu|us)[12]\.make\.(com|celonis\.com)`)
 )
 
 func (Scanner) CloudEndpoint() string { return "" }
@@ -36,7 +36,7 @@ func (Scanner) CloudEndpoint() string { return "" }
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"make"}
+	return []string{"make.com", "make.celonis.com"}
 }
 
 // FromData will find and optionally verify Make secrets in a given set of bytes.
@@ -49,43 +49,35 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	// Extract Make URLs from the data
-	var foundURLs []string
-	for _, match := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		foundURLs = append(foundURLs, match[0])
-	}
+	foundURLs := urlPat.FindAllString(dataStr, -1)
 
 	// Get endpoints using EndpointCustomizer
 	endpoints := s.Endpoints(foundURLs...)
 
+	// Skip creating results if no endpoints are available
+	if len(endpoints) == 0 {
+		return
+	}
+
 	for match := range uniqueMatches {
-		if len(endpoints) > 0 {
-			// Create results for each endpoint
-			for _, endpoint := range endpoints {
-				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_MakeApiToken,
-					Raw:          []byte(match),
-					RawV2:        []byte(match + ":" + endpoint),
-				}
-
-				if verify {
-					client := s.client
-					if client == nil {
-						client = defaultClient
-					}
-
-					isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, []string{endpoint})
-					s1.Verified = isVerified
-					s1.ExtraData = extraData
-					s1.SetVerificationError(verificationErr, match)
-				}
-
-				results = append(results, s1)
-			}
-		} else {
-			// No endpoints configured or found, return unverified result
+		// Create results for each endpoint
+		for _, endpoint := range endpoints {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MakeApiToken,
 				Raw:          []byte(match),
+				RawV2:        []byte(match + ":" + endpoint),
+			}
+
+			if verify {
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
+
+				isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, endpoint)
+				s1.Verified = isVerified
+				s1.ExtraData = extraData
+				s1.SetVerificationError(verificationErr, match)
 			}
 
 			results = append(results, s1)
@@ -95,28 +87,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string, endpoints []string) (bool, map[string]string, error) {
-	if len(endpoints) == 0 {
-		return false, nil, nil
+func verifyMatch(ctx context.Context, client *http.Client, token string, endpoint string) (bool, map[string]string, error) {
+	verified, err := tryURL(ctx, client, fmt.Sprintf("https://%s/api/v2/", endpoint), token)
+	if verified {
+		return true, nil, nil
 	}
-
-	var lastErr error
-	for _, endpoint := range endpoints {
-		verified, err := tryURL(ctx, client, endpoint, token)
-		if verified {
-			return true, nil, nil
-		}
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		// Continue to next URL on determinate failures (401)
+	if err != nil {
+		// Indeterminate failure (network error, etc.)
+		return false, nil, err
 	}
-
-	// If we got here, either all endpoints failed or we had errors
-	if lastErr != nil {
-		return false, nil, lastErr
-	}
+	// Determinate failure (401)
 	return false, nil, nil
 }
 

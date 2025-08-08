@@ -31,18 +31,18 @@ func TestMakeApiToken_Pattern(t *testing.T) {
 			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: true,
-			want:             []string{"bbb94d50-239f-4609-9569-63ea15eb0996:https://eu1.make.com/api/v2/"},
+			want:             []string{"bbb94d50-239f-4609-9569-63ea15eb0996:eu1.make.com"},
 		},
 		{
 			name: "valid pattern with configured endpoint",
 			input: `
-				# make api token
+				# make.com api token
 				MAKE_TOKEN: bbb94d50-239f-4609-9569-63ea15eb0996
 			`,
-			cloudEndpoint:    "https://us1.make.com/api/v2/",
+			cloudEndpoint:    "us1.make.com",
 			useCloudEndpoint: true,
 			useFoundEndpoint: false,
-			want:             []string{"bbb94d50-239f-4609-9569-63ea15eb0996:https://us1.make.com/api/v2/"},
+			want:             []string{"bbb94d50-239f-4609-9569-63ea15eb0996:us1.make.com"},
 		},
 		{
 			name: "valid pattern with both found and configured endpoints",
@@ -51,12 +51,12 @@ func TestMakeApiToken_Pattern(t *testing.T) {
 				MAKE_TOKEN: bbb94d50-239f-4609-9569-63ea15eb0996
 				URL: https://eu1.make.com/api/v2/
 			`,
-			cloudEndpoint:    "https://us1.make.com/api/v2/",
+			cloudEndpoint:    "us1.make.com",
 			useCloudEndpoint: true,
 			useFoundEndpoint: true,
 			want: []string{
-				"bbb94d50-239f-4609-9569-63ea15eb0996:https://us1.make.com/api/v2/",
-				"bbb94d50-239f-4609-9569-63ea15eb0996:https://eu1.make.com/api/v2/",
+				"bbb94d50-239f-4609-9569-63ea15eb0996:us1.make.com",
+				"bbb94d50-239f-4609-9569-63ea15eb0996:eu1.make.com",
 			},
 		},
 		{
@@ -66,11 +66,11 @@ func TestMakeApiToken_Pattern(t *testing.T) {
 				MAKE_TOKEN: bbb94d50-239f-4609-9569-63ea15eb0996
 				URL: https://eu1.make.com/api/v2/
 			`,
-			cloudEndpoint:    "https://us1.make.com/api/v2/",
+			cloudEndpoint:    "us1.make.com",
 			useCloudEndpoint: true,
 			useFoundEndpoint: false,
 			want: []string{
-				"bbb94d50-239f-4609-9569-63ea15eb0996:https://us1.make.com/api/v2/",
+				"bbb94d50-239f-4609-9569-63ea15eb0996:us1.make.com",
 			},
 		},
 		{
@@ -78,30 +78,28 @@ func TestMakeApiToken_Pattern(t *testing.T) {
 			input: `
 				# make api token
 				MAKE_TOKEN: bbb94d50-239f-4609-9569-63ea15eb0996
-				URL: https://us1.make.celonis.com/api/v2/
+				URL: us1.make.celonis.com
 			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: true,
 			want: []string{
-				"bbb94d50-239f-4609-9569-63ea15eb0996:https://us1.make.celonis.com/api/v2/",
+				"bbb94d50-239f-4609-9569-63ea15eb0996:us1.make.celonis.com",
 			},
 		},
 		{
 			name: "no endpoints configured or found",
 			input: `
-				# make api token
+				# make.com api token
 				MAKE_TOKEN: bbb94d50-239f-4609-9569-63ea15eb0996
 			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: false,
-			want: []string{
-				"bbb94d50-239f-4609-9569-63ea15eb0996",
-			},
+			want: nil,
 		},
 		{
 			name: "invalid pattern",
 			input: `
-				# make api token
+				# make.com api token
 				MAKE_TOKEN: invalid-token-format
 			`,
 			useFoundEndpoint: true,

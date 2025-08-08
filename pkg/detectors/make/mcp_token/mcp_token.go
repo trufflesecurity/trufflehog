@@ -29,16 +29,17 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"make", "mcp"}
+	return []string{"make.com", "make.celonis.com"}
 }
 
 // FromData will find and optionally verify Makemcptoken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
+	matches := keyPat.FindAllString(dataStr, -1)
 	uniqueMatches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueMatches[match[0]] = struct{}{}
+	for _, match := range matches {
+		uniqueMatches[match] = struct{}{}
 	}
 
 	for match := range uniqueMatches {
@@ -84,7 +85,7 @@ func verifyMatch(ctx context.Context, client *http.Client, url string) (bool, ma
 	case http.StatusOK:
 		return true, nil, nil
 	case http.StatusUnauthorized:
-		// The secret is determinately not verified (invalid token)
+		// Determinate failure (401)
 		return false, nil, nil
 	default:
 		// Any other status code is an indeterminate failure
