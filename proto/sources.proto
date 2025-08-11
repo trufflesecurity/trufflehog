@@ -176,6 +176,7 @@ message Filesystem {
   repeated string paths = 2;
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
+  bool skip_binaries = 5; // allows skipping binary files from the scan
 }
 
 message GCS {

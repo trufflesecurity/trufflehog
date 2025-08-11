@@ -1689,6 +1689,8 @@ func (m *Filesystem) validate(all bool) error {
 
 	// no validation rules for ExcludePathsFile
 
+	// no validation rules for SkipBinaries
+
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
 	}
