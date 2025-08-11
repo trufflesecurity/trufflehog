@@ -46,6 +46,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 		connection.Repositories = c.Repos
 	}
 
+	if len(c.GroupIds) > 0 {
+		connection.GroupIds = c.GroupIds
+	}
+
 	if len(c.IncludeRepos) > 0 {
 		connection.IncludeRepos = c.IncludeRepos
 	}

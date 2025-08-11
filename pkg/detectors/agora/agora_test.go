@@ -2,26 +2,13 @@ package agora
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validKeyPattern    = "asdf0987mnbv1234qsxojb6ygb2wsx0o"
-	validSecretPattern = "beqr7215fr4g6bfjkmnvxrtygb2wsxap"
-	complexPattern     = `agora credentials
-							these are some example credentials for login.
-							use these to login.
-							key: asdf0987mnbv1234qsxojb6ygb2wsx0o
-							secret: beqr7215fr4g6bfjkmnvxrtygb2wsxap
-							loginUrl: https://www.agora.com/example_login
-						`
-	invalidPattern = "asdf0987mNbv1234qsxojb6ygb2w$x0o/beqr7215fr4g6bfjkmnVxrtygb2wsxap"
 )
 
 func TestAgora_Pattern(t *testing.T) {
@@ -34,34 +21,66 @@ func TestAgora_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("agora key='%s' - secret='%s'", validKeyPattern, validSecretPattern),
-			want:  []string{validKeyPattern + validSecretPattern},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the agora API
+				[DEBUG] Using Token=6p77f9gjhxx9mwdj86of7y7820bh49vw
+				[DEBUG] Using Secret=qi6txx6vd0qzn6j01xj9rr6clyejvjw5
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"6p77f9gjhxx9mwdj86of7y7820bh49vwqi6txx6vd0qzn6j01xj9rr6clyejvjw5"},
 		},
 		{
-			name:  "valid complex pattern",
-			input: fmt.Sprintf("agora data='%s'", complexPattern),
-			want:  []string{validKeyPattern + validSecretPattern},
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{agora 3devtbiys8b282kidr9u78kjq8xdtlo1}</id>
+  					<secret>{AQAAABAAA bc7c6tag5jfuhz4y7v6v05dx2wq2z1ua}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"3devtbiys8b282kidr9u78kjq8xdtlo1bc7c6tag5jfuhz4y7v6v05dx2wq2z1ua"},
 		},
 		{
-			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("agora keyword is not close to the real key or secret = '%s|%s'", validKeyPattern, validSecretPattern),
-			want:  nil,
+			name: "valid pattern - out of prefix range",
+			input: `
+				[INFO] Sending request to the agora API
+				[DEBUG] Using 6p77f9gjhxx9mwdj86of7y7820bh49vw
+				[DEBUG] Using qi6txx6vd0qzn6j01xj9rr6clyejvjw5
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
 		},
 		{
-			name:  "valid pattern - only key",
-			input: fmt.Sprintf("agora key%s", validKeyPattern),
-			want:  nil,
+			name: "valid pattern - only key",
+			input: `
+				[INFO] Sending request to the agora API
+				[DEBUG] Using Key=6p77f9gjhxx9mwdj86of7y7820bh49vw
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
 		},
 		{
-			name:  "valid pattern - only secret",
-			input: fmt.Sprintf("agora secret%s", validSecretPattern),
-			want:  nil,
+			name: "valid pattern - only secret",
+			input: `
+				[INFO] Sending request to the agora API
+				[DEBUG] Using Secret=qi6txx6vd0qzn6j01xj9rr6clyejvjw5
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("agora %s", invalidPattern),
-			want:  nil,
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the agora API
+				[DEBUG] Using KEY=qi6txx6vd0qzn6j01xj9rr6clyejvjw
+				[DEBUG] Using ID=qi6txx6vd0qzn6j01xj9rr6clyejvjw5yt
+				[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 	}
 
@@ -69,22 +88,15 @@ func TestAgora_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -96,6 +108,7 @@ func TestAgora_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

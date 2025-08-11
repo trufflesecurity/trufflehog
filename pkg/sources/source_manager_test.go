@@ -83,11 +83,11 @@ func (c *counterChunker) ChunkUnit(ctx context.Context, unit SourceUnit, reporte
 }
 
 // Chunk method that always returns an error.
-type errorChunker struct{ error }
+type errorChunker struct{ cb func() error }
 
-func (c errorChunker) Chunks(context.Context, chan *Chunk, ...ChunkingTarget) error { return c }
-func (c errorChunker) Enumerate(context.Context, UnitReporter) error                { return c }
-func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error   { return c }
+func (c errorChunker) Chunks(context.Context, chan *Chunk, ...ChunkingTarget) error { return c.cb() }
+func (c errorChunker) Enumerate(context.Context, UnitReporter) error                { return c.cb() }
+func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error   { return c.cb() }
 
 // buildDummy is a helper function to enroll a DummySource with a SourceManager.
 func buildDummy(chunkMethod chunker) (Source, error) {
@@ -147,7 +147,18 @@ func TestSourceManagerWait(t *testing.T) {
 
 func TestSourceManagerError(t *testing.T) {
 	mgr := NewManager()
-	source, err := buildDummy(errorChunker{fmt.Errorf("oops")})
+	source, err := buildDummy(errorChunker{func() error { return fmt.Errorf("oops") }})
+	assert.NoError(t, err)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
+	assert.NoError(t, err)
+	<-ref.Done()
+	assert.Error(t, ref.Snapshot().FatalError())
+	assert.Error(t, mgr.Wait())
+}
+
+func TestSourceManagerPanic(t *testing.T) {
+	mgr := NewManager()
+	source, err := buildDummy(errorChunker{func() error { panic("whoops!") }})
 	assert.NoError(t, err)
 	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
@@ -242,6 +253,7 @@ func (c *unitChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...ChunkingT
 	}
 	return nil
 }
+
 func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 	for _, step := range c.steps {
 		if err := rep.UnitOk(ctx, CommonSourceUnit{ID: step.unit}); err != nil {
@@ -250,6 +262,7 @@ func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 	}
 	return nil
 }
+
 func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkReporter) error {
 	for _, step := range c.steps {
 		id, _ := unit.SourceUnitID()
