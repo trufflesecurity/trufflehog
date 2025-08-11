@@ -191,7 +191,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 				}
 				got[i].AnalysisInfo = nil
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
@@ -289,7 +289,7 @@ func TestGitlab_FromChunk_WithV2Secrets(t *testing.T) {
 				}
 				got[i].AnalysisInfo = nil
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
