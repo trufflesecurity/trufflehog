@@ -77,7 +77,7 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey string) (bool,
 	case http.StatusOK:
 		return true, nil
 	case http.StatusPaymentRequired:
-		return true, fmt.Errorf("blocked due to billing issue/quota exceeded: %d", res.StatusCode)
+		return false, fmt.Errorf("blocked: %d", res.StatusCode)
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:

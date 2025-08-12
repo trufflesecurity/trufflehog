@@ -23,7 +23,7 @@ var (
 
 	// YNAB Personal Access Tokens are 64-character hexadecimal strings
 	// Based on documentation: access tokens are used with Bearer authentication
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"youneedabudget", "ynab"}) + `["']?([A-Za-z0-9_-]{43,44})["']?`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"youneedabudget", "ynab"}) + `([A-Za-z0-9_-]{43,44})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -80,8 +80,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized:
-		// 401: Token is invalid or expired
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)

@@ -117,34 +117,16 @@ func executeRequest(client *http.Client, req *http.Request) (bool, error) {
 	}()
 
 	switch res.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusTooManyRequests:
 		return true, nil
 	case http.StatusBadRequest:
-		// 400: Could be invalid API key or other parameter issues
-		body, _ := io.ReadAll(res.Body)
-		if strings.Contains(string(body), "keyInvalid") {
-			return false, fmt.Errorf("invalid API key")
-		}
-		if strings.Contains(string(body), "quotaExceeded") {
-			return true, fmt.Errorf("quota exceeded (valid key): %d", res.StatusCode)
-		}
 		return false, nil
-	case http.StatusUnauthorized:
-		// 401: Missing or invalid authentication credentials
-		return false, fmt.Errorf("unauthorized: %d", res.StatusCode)
 	case http.StatusForbidden:
-		// 403: API key is valid but access is forbidden (quota exceeded, API not enabled, etc.)
 		body, _ := io.ReadAll(res.Body)
 		if strings.Contains(string(body), "quotaExceeded") {
-			return true, fmt.Errorf("quota exceeded (valid key): %d", res.StatusCode)
+			return true, nil
 		}
-		if strings.Contains(string(body), "accessNotConfigured") {
-			return true, fmt.Errorf("valid key but YouTube Data API not enabled: %d", res.StatusCode)
-		}
-		return true, fmt.Errorf("valid key with access restrictions: %d", res.StatusCode)
-	case http.StatusTooManyRequests:
-		// 429: Rate limited - API key is valid but hitting rate limits
-		return true, fmt.Errorf("rate limited (valid key): %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
