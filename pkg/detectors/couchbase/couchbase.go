@@ -3,7 +3,6 @@ package couchbase
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 	"unicode"
 
@@ -23,35 +22,18 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	connectionStringPat = regexp.MustCompile(`\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
-	usernamePat         = `?()/\+=\s\n`
-	passwordPat         = `^<>;.*&|£\n\s`
-	// passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
-	// passwordPat = regexp.MustCompile(`(?im)(?:pass|pwd)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:?()/\+=\s\n]{4,40})\b`)
+	connectionStringPat = regexp.MustCompile(`\b(cb\.[a-z0-9]+\.cloud\.couchbase\.com)\b`)
+	usernamePat         = common.UsernameRegexCheck(`?()/\+=\s\n`)
+	passwordPat         = common.PasswordRegexCheck(`^<>;.*&|£\n\s`)
 )
 
-func meetsCouchbasePasswordRequirements(password string) (string, bool) {
-	var hasLower, hasUpper, hasNumber, hasSpecialChar bool
-	for _, char := range password {
-		switch {
-		case unicode.IsLower(char):
-			hasLower = true
-		case unicode.IsUpper(char):
-			hasUpper = true
-		case unicode.IsNumber(char):
-			hasNumber = true
-		case unicode.IsPunct(char) || unicode.IsSymbol(char):
-			hasSpecialChar = true
-		}
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Couchbase
+}
 
-		if hasLower && hasUpper && hasNumber && hasSpecialChar {
-			return password, true
-		}
-	}
-
-	return "", false
+func (s Scanner) Description() string {
+	return "Couchbase is a distributed NoSQL cloud database. Couchbase credentials can be used to access and modify data within the Couchbase database."
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -64,77 +46,37 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	connectionStringMatches := connectionStringPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueConnStrings, uniqueUsernames, uniquePasswords = make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
 
-	// prepend 'couchbases://' to the connection string as the connection
-	// string format is couchbases://cb.stuff.cloud.couchbase.com but the
-	// cb.stuff.cloud.couchbase.com may be separated from the couchbases:// in codebases.
-	for i, connectionStringMatch := range connectionStringMatches {
-		connectionStringMatches[i][0] = "couchbases://" + connectionStringMatch[0]
+	for _, match := range connectionStringPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueConnStrings["couchbases://"+match[1]] = struct{}{}
 	}
 
-	usernameRegexState := common.UsernameRegexCheck(usernamePat)
-	usernameMatches := usernameRegexState.Matches(data)
+	for _, match := range usernamePat.Matches(data) {
+		uniqueUsernames[match] = struct{}{}
+	}
 
-	passwordRegexState := common.PasswordRegexCheck(passwordPat)
-	passwordMatches := passwordRegexState.Matches(data)
+	for _, match := range passwordPat.Matches(data) {
+		uniquePasswords[match] = struct{}{}
+	}
 
-	for _, connectionStringMatch := range connectionStringMatches {
-		resConnectionStringMatch := strings.TrimSpace(connectionStringMatch[0])
-
-		for _, resUsernameMatch := range usernameMatches {
-
-			for _, resPasswordMatch := range passwordMatches {
-				_, metPasswordRequirements := meetsCouchbasePasswordRequirements(resPasswordMatch)
-
-				if !metPasswordRequirements {
+	for connString := range uniqueConnStrings {
+		for username := range uniqueUsernames {
+			for password := range uniquePasswords {
+				if !isValidCouchbasePassword(password) {
 					continue
 				}
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Couchbase,
-					Raw:          []byte(fmt.Sprintf("%s:%s@%s", resUsernameMatch, resPasswordMatch, resConnectionStringMatch)),
+					Raw:          fmt.Appendf([]byte(""), "%s:%s@%s", username, password, connString),
 				}
 
 				if verify {
-
-					options := gocb.ClusterOptions{
-						Authenticator: gocb.PasswordAuthenticator{
-							Username: resUsernameMatch,
-							Password: resPasswordMatch,
-						},
-					}
-
-					// Sets a pre-configured profile called "wan-development" to help avoid latency issues
-					// when accessing Capella from a different Wide Area Network
-					// or Availability Zone (e.g. your laptop).
-					if err := options.ApplyProfile(gocb.ClusterConfigProfileWanDevelopment); err != nil {
-						continue
-					}
-
-					// Initialize the Connection
-					cluster, err := gocb.Connect(resConnectionStringMatch, options)
-					if err != nil {
-						continue
-					}
-
-					// We'll ping the KV nodes in our cluster.
-					pings, err := cluster.Ping(&gocb.PingOptions{
-						Timeout: time.Second * 5,
-					})
-
-					if err != nil {
-						continue
-					}
-
-					for _, ping := range pings.Services {
-						for _, pingEndpoint := range ping {
-							if pingEndpoint.State == gocb.PingStateOk {
-								s1.Verified = true
-								break
-							}
-						}
-					}
+					isVerified, verificationErr := verifyCouchBase(username, password, connString)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr)
+					s1.SetPrimarySecretValue(connString)
 				}
 
 				results = append(results, s1)
@@ -144,10 +86,62 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Couchbase
+func verifyCouchBase(username, password, connString string) (bool, error) {
+	options := gocb.ClusterOptions{
+		Authenticator: gocb.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		},
+	}
+
+	// Sets a pre-configured profile called "wan-development" to help avoid latency issues
+	// when accessing Capella from a different Wide Area Network
+	// or Availability Zone (e.g. your laptop).
+	if err := options.ApplyProfile(gocb.ClusterConfigProfileWanDevelopment); err != nil {
+		return false, err
+	}
+
+	// Initialize the Connection
+	cluster, err := gocb.Connect(connString, options)
+	if err != nil {
+		return false, err
+	}
+
+	// We'll ping the KV nodes in our cluster.
+	pings, err := cluster.Ping(&gocb.PingOptions{
+		Timeout: time.Second * 5,
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	for _, ping := range pings.Services {
+		for _, pingEndpoint := range ping {
+			if pingEndpoint.State == gocb.PingStateOk {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
-func (s Scanner) Description() string {
-	return "Couchbase is a distributed NoSQL cloud database. Couchbase credentials can be used to access and modify data within the Couchbase database."
+func isValidCouchbasePassword(password string) bool {
+	var hasLower, hasUpper, hasNumber, hasSpecialChar bool
+
+	for _, r := range password {
+		switch {
+		case unicode.IsLower(r):
+			hasLower = true
+		case unicode.IsUpper(r):
+			hasUpper = true
+		case unicode.IsNumber(r):
+			hasNumber = true
+		case unicode.IsPunct(r), unicode.IsSymbol(r):
+			hasSpecialChar = true
+		}
+	}
+
+	return hasLower && hasUpper && hasNumber && hasSpecialChar
 }
