@@ -1306,6 +1306,8 @@ func (m *Gitlab) validate(all bool) error {
 
 	// no validation rules for ProjectOwner
 
+	// no validation rules for RepositoryLocalPath
+
 	if len(errors) > 0 {
 		return GitlabMultiError(errors)
 	}

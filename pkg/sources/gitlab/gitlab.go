@@ -211,17 +211,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{
 					Gitlab: &source_metadatapb.Gitlab{
-						Commit:     sanitizer.UTF8(commit),
-						File:       sanitizer.UTF8(file),
-						Email:      sanitizer.UTF8(email),
-						Repository: sanitizer.UTF8(repository),
-						Link:       giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:  sanitizer.UTF8(timestamp),
-						Line:       line,
+						Commit:              sanitizer.UTF8(commit),
+						File:                sanitizer.UTF8(file),
+						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+						Email:               sanitizer.UTF8(email),
+						Repository:          sanitizer.UTF8(repository),
+						Link:                giturl.GenerateLink(repository, commit, file, line),
+						Timestamp:           sanitizer.UTF8(timestamp),
+						Line:                line,
 					},
 				},
 			}
@@ -1091,11 +1092,6 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 	if err != nil {
 		return err
-	}
-
-	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-		defer os.RemoveAll(path)
 	}
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
