@@ -10,33 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			auth_type: "Password"
-			in: "Configuration"
-			couchbase_domain: "cb.testing.cloud.couchbase.com" // couchbase://
-			couchbase_username: "usrpS@d>p"
-			couchbase_password: "passwordU+2028 rf\@V[4,L/?2}"
-			base_url: "https://$couchbase_domain/v1/user"
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secrets = []string{
-		`usrpS@d>p:passwordU+2028@couchbases://cb.testing.cloud.couchbase.com`,
-		`$DB_USERNAME:passwordU+2028@couchbases://cb.testing.cloud.couchbase.com`,
-	}
-)
-
 func TestCouchBase_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -47,9 +20,31 @@ func TestCouchBase_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  secrets,
+			name: "valid pattern",
+			input: `
+				# Configuration File: config.yaml
+				database:
+					host: $DB_HOST
+					port: $DB_PORT
+					username: $DB_USERNAME
+					password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+				api:
+					auth_type: "Password"
+					in: "Configuration"
+					couchbase_domain: "couchbases://cb.testing.cloud.couchbase.com"
+					couchbase_username: "usrpS@d>p"
+					couchbase_password: "passwordU+2028 rf\@V[4,L/?2}"
+					base_url: "https://$couchbase_domain/v1/user"
+
+				# Notes:
+				# - Remember to rotate the secret every 90 days.
+				# - The above credentials should only be used in a secure environment.
+			`,
+			want: []string{
+				"usrpS@d>p:passwordU+2028@couchbases://cb.testing.cloud.couchbase.com",
+				"$DB_USERNAME:passwordU+2028@couchbases://cb.testing.cloud.couchbase.com",
+			},
 		},
 	}
 
