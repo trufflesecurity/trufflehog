@@ -2,6 +2,7 @@ package yelp
 
 import (
 	"context"
+	"io"
 	"fmt"
 	"net/http"
 	"strings"
@@ -54,24 +55,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.yelp.com/v3/businesses/search?term=delis&latitude=37.786882&longitude=-122.399972", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode == 401 || res.StatusCode == 403 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					s1.SetVerificationError(fmt.Errorf("unexpected HTTP response status %d", res.StatusCode), resMatch)
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
+			isVerified, verificationErr := verifyYelp(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -86,4 +72,32 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Yelp API keys allow access to Yelp's business data and services. Unauthorized access can lead to data breaches and misuse of Yelp's services."
+}
+
+func verifyYelp(ctx context.Context, client *http.Client, resMatch string) (bool, error){
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.yelp.com/v3/businesses/search?term=delis&latitude=37.786882&longitude=-122.399972", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, nil
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
