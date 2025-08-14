@@ -2,19 +2,13 @@ package aeroworkflow
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "qscVgy!WdvG;^#O:*?TG/806445634"
-	invalidPattern = "qscVg&!WdvG;^#O:*?TG/8064456A4"
 )
 
 func TestAeroWorkflow_Pattern(t *testing.T) {
@@ -27,29 +21,66 @@ func TestAeroWorkflow_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("aeroworkflow = '%s'", validPattern),
-			want:  []string{"qscVgy!WdvG;^#O:*?TG806445634"},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the aeroworkflow API
+				[DEBUG] Using aeroworkflow KEY=VmFYK7WG3CkgVmTl:c*X
+				[DEBUG] Using aeroworkflow ID=678436
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"VmFYK7WG3CkgVmTl:c*X678436"},
 		},
 		{
-			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("aeroworkflow keyword is not close to the real id and secret = '%s'", validPattern),
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{aeroworkflow 6}</id>
+  					<secret>{aeroworkflow AQAAABAAA XjPSUOhREIN:4HX2#akH}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"XjPSUOhREIN:4HX2#akH6"},
 		},
 		{
-			name:  "valid pattern - only key",
-			input: fmt.Sprintf("aeroworkflow %s", strings.Split(validPattern, "/")[0]),
-			want:  nil,
+			name: "valid pattern - out of prefix range",
+			input: `
+				[INFO] Sending request to the aeroworkflow API
+				[DEBUG] Using KEY=VmFYK7WG3CkgVmTl:c*X
+				[DEBUG] Using ID=678436
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
 		},
 		{
-			name:  "valid pattern - only id",
-			input: fmt.Sprintf("aeroworkflow %s", strings.Split(validPattern, "/")[1]),
-			want:  nil,
+			name: "valid pattern - only key",
+			input: `
+				[INFO] Sending request to the aeroworkflow API
+				[DEBUG] Using KEY=VmFYK7WG3CkgVmTl:c*X
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("aeroworkflow %s", invalidPattern),
-			want:  nil,
+			name: "valid pattern - only id",
+			input: `
+				[INFO] Sending request to the aeroworkflow API
+				[DEBUG] Using ID=678436
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the aeroworkflow API
+				[DEBUG] Using KEY=VmFYK7WG3CkgVmTl:c*X
+				[DEBUG] Using ID=cxu9w2g6
+				[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 	}
 
@@ -57,22 +88,15 @@ func TestAeroWorkflow_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -84,6 +108,7 @@ func TestAeroWorkflow_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

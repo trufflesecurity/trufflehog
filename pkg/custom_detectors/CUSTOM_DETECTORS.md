@@ -1,6 +1,6 @@
 # TruffleHog Custom Detector Setup Guide
 
-This guide will walk you through setting up a custom detector in TruffleHog to identify specific patterns unique to your project.
+This guide will walk you through setting up a custom detector in TruffleHog to identify specific patterns unique to your project. For users of Trufflehog Enterprise, this guide applies to that environment as well.
 
 ## Steps to Set Up a Custom Detector
 
@@ -40,9 +40,9 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    **Other allowed parameters:**
    - **`primary_regex_name`**: This parameter allows you designate the primary regex pattern when multiple regex patterns are defined in the regex section. If a match is found, the match for the designated primary regex will be used to determine the line number. The value must be one of the names specified in the regex section.
    - **`exclude_regexes_capture`**: This parameter allows you to define regex patterns to exclude specific parts of a detected secret. If a match is found within the detected secret, the portion matching this regex is excluded from the result.
-   - **`exclude_regexes_match`**: This parameter enables you to define regex patterns to exclude entire matches from being reported as secrets.
+   - **`exclude_regexes_match`**: This parameter enables you to define regex patterns to exclude entire matches from being reported as secrets. This applies to the entire matched string, not just the token.
    - **`entropy`**: This parameter is used to assess the randomness of detected strings. High entropy often indicates that a string is a potential secret, such as an API key or password, due to its complexity and unpredictability. It helps in filtering false-positives. While an entropy threshold of `3` can be a starting point, it's essential to adjust this value based on your project's specific requirements and the nature of the data you have.
-   - **`exclude_words`**: This parameter allows you to specify a list of words that, if present in a detected string, will cause TruffleHog to ignore that string.
+   - **`exclude_words`**: This parameter allows you to specify a list of words that, if present in a detected string, will cause TruffleHog to ignore that string. This is a substring match and does not enforce word boundaries. It applies only to the token.
 
     [Here](/examples/generic_with_filters.yml) is an example of a custom detector using these parameters. 
 

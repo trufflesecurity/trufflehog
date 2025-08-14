@@ -71,7 +71,9 @@ func TestNewGcsManager(t *testing.T) {
 			projID: testProjectID,
 			opts: []gcsManagerOption{withJSONServiceAccount(ctx, []byte(`{
 				"type": "service_account",
-				"project_id": "test-project"}`,
+				"project_id": "test-project",
+				"client_email": "test@test-project.iam.gserviceaccount.com",
+				"private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKB\nT1aFVMgL36LJVCGPGM7ke2dY67XR9/ln3tOXmNtHfZUGCLQRv3B0yTI/0mB4+DXu\n-----END PRIVATE KEY-----\n"}`,
 			))},
 			want: &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
 		},

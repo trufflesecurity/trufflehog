@@ -1,8 +1,7 @@
-package roninapp
+package rootly
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,31 +10,29 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validKey   = "tmvSxOOxP32WgoPfF2tWEmtsq8"
-	invalidKey = "tmvSxOOxP32Wg?PfF2tWEmtsq8"
-	validId    = "XEZOhulA1oP7vPSc4K"
-	invalidId  = "?EZOhulA1oP7vPSc4?"
-	keyword    = "roninapp"
-)
-
-func TestRoninApp_Pattern(t *testing.T) {
+func TestRootly_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword roninapp",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId),
-			want:  []string{validKey, validKey},
+			name:  "valid pattern",
+			input: "rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
+		},
+		{
+			name:  "valid pattern - key out of prefix range",
+			input: "rootly keyword is not close to the real key in the data ='rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282'",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidKey, keyword, invalidId),
-			want:  []string{},
+			input: "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+			want:  nil,
 		},
 	}
 
