@@ -635,6 +635,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for File
 
+	// no validation rules for User
+
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}

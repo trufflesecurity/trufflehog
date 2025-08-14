@@ -17,22 +17,16 @@ var (
 		"type": "Detector",
 		"api": true,
 		"authentication_type": "",
-		"verification_url": "https://%s.fibery.io/example",
+		"verification_url": "https://detector.fibery.io/example",
 		"domain": "nonprod",
 		"test_secrets": {
-			"fibery_secret": "42b2eda8{3fe6b086bb21be7e3548368626d01aaf2cd"
+			"fibery_secret": "42b2eda8.3fe6b086bb21be7e3548368626d01aaf2cd"
 		},
 		"expected_response": "200",
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secrets = []string{
-		// TODO: Domain pattern matches more than expected and the current logic create result for each secret&domain combination
-		"42b2eda8{3fe6b086bb21be7e3548368626d01aaf2cd",
-		"42b2eda8{3fe6b086bb21be7e3548368626d01aaf2cd",
-		"42b2eda8{3fe6b086bb21be7e3548368626d01aaf2cd",
-		"42b2eda8{3fe6b086bb21be7e3548368626d01aaf2cd",
-	}
+	secret = "42b2eda8.3fe6b086bb21be7e3548368626d01aaf2cd"
 )
 
 func TestFibery_Pattern(t *testing.T) {
@@ -47,7 +41,7 @@ func TestFibery_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  secrets,
+			want:  []string{secret},
 		},
 	}
 

@@ -2,8 +2,9 @@ package currentsapi
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -21,8 +22,16 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"currentsapi"}) + `\b([a-zA-Z0-9\S]{48})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"currentsapi"}) + `([a-zA-Z0-9_-]{48})`)
 )
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_CurrentsAPI
+}
+
+func (s Scanner) Description() string {
+	return "CurrentsAPI provides access to the latest news and trends. CurrentsAPI keys can be used to authenticate requests and retrieve news data."
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -34,29 +43,22 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueTokens = make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueTokens[match[1]] = struct{}{}
+	}
 
+	for token := range uniqueTokens {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CurrentsAPI,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(token),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.currentsapi.services/v1/latest-news", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyCurrentsAPI(ctx, client, token)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, token)
 		}
 
 		results = append(results, s1)
@@ -65,10 +67,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_CurrentsAPI
-}
+func verifyCurrentsAPI(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.currentsapi.services/v1/latest-news", http.NoBody)
+	if err != nil {
+		return false, err
+	}
 
-func (s Scanner) Description() string {
-	return "CurrentsAPI provides access to the latest news and trends. CurrentsAPI keys can be used to authenticate requests and retrieve news data."
+	req.Header.Add("Authorization", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

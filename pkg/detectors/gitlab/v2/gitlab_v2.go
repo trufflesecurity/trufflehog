@@ -59,20 +59,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
-
 		resMatch := strings.TrimSpace(match[1])
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Gitlab,
-			Raw:          []byte(resMatch),
-			ExtraData:    map[string]string{},
-		}
-		s1.ExtraData = map[string]string{
-			"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
-			"version":        fmt.Sprintf("%d", s.Version()),
-		}
 
-		if verify {
-			for _, endpoint := range s.Endpoints() {
+		for _, endpoint := range s.Endpoints() {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Gitlab,
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + endpoint),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
+			}
+
+			if verify {
+
 				isVerified, extraData, verificationErr := v1.VerifyGitlab(ctx, s.getClient(), endpoint, resMatch)
 				s1.Verified = isVerified
 				maps.Copy(s1.ExtraData, extraData)
@@ -85,11 +86,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						"key":  resMatch,
 						"host": endpoint,
 					}
+
+					// if secret is verified with one endpoint, break the loop to continue to next secret
+					results = append(results, s1)
+					break
 				}
 			}
-		}
 
-		results = append(results, s1)
+			results = append(results, s1)
+		}
 	}
 
 	return results, nil
