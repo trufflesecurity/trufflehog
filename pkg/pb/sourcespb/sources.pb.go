@@ -647,9 +647,9 @@ type Bitbucket struct {
 	SkipBinaries               bool                      `protobuf:"varint,7,opt,name=skip_binaries,json=skipBinaries,proto3" json:"skip_binaries,omitempty"`
 	SkipArchives               bool                      `protobuf:"varint,8,opt,name=skip_archives,json=skipArchives,proto3" json:"skip_archives,omitempty"`
 	InstallationType           BitbucketInstallationType `protobuf:"varint,9,opt,name=installation_type,json=installationType,proto3,enum=sources.BitbucketInstallationType" json:"installation_type,omitempty"`
-	OauthAuthorizationEndpoint string                    `protobuf:"bytes,10,opt,name=oauth_authorization_endpoint,json=oauthAuthorizationEndpoint,proto3" json:"oauth_authorization_endpoint,omitempty"`
-	OauthTokenEndpoint         string                    `protobuf:"bytes,11,opt,name=oauth_token_endpoint,json=oauthTokenEndpoint,proto3" json:"oauth_token_endpoint,omitempty"`
-	OauthScopes                []string                  `protobuf:"bytes,12,rep,name=oauth_scopes,json=oauthScopes,proto3" json:"oauth_scopes,omitempty"`
+	OauthAuthorizationEndpoint string                    `protobuf:"bytes,10,opt,name=oauth_authorization_endpoint,json=oauthAuthorizationEndpoint,proto3" json:"oauth_authorization_endpoint,omitempty"` // endpoint for OAuth authorization flow in Bitbucket Data Center application links
+	OauthTokenEndpoint         string                    `protobuf:"bytes,11,opt,name=oauth_token_endpoint,json=oauthTokenEndpoint,proto3" json:"oauth_token_endpoint,omitempty"`                         // endpoint for getting OAuth access/refresh tokens in Bitbucket Data Center application links
+	OauthScopes                []string                  `protobuf:"bytes,12,rep,name=oauth_scopes,json=oauthScopes,proto3" json:"oauth_scopes,omitempty"`                                                // list of OAuth scopes that the access token is provided
 }
 
 func (x *Bitbucket) Reset() {
