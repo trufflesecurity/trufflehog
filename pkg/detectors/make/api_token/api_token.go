@@ -51,17 +51,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	// Extract Make URLs from the data
 	foundURLs := urlPat.FindAllString(dataStr, -1)
 
-	// Get endpoints using EndpointCustomizer
-	endpoints := s.Endpoints(foundURLs...)
+	// Get endpoints using EndpointCustomizer and deduplicate them
+	uniqueURLs := make(map[string]struct{})
+	for _, endpoint := range s.Endpoints(foundURLs...) {
+		uniqueURLs[endpoint] = struct{}{}
+	}
 
 	// Skip creating results if no endpoints are available
-	if len(endpoints) == 0 {
+	if len(uniqueURLs) == 0 {
 		return
 	}
 
 	for match := range uniqueMatches {
 		// Create results for each endpoint
-		for _, endpoint := range endpoints {
+		for endpoint := range uniqueURLs {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MakeApiToken,
 				Raw:          []byte(match),
@@ -74,9 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, endpoint)
+				isVerified, verificationErr := verifyMatch(ctx, client, match, endpoint)
 				s1.Verified = isVerified
-				s1.ExtraData = extraData
 				s1.SetVerificationError(verificationErr, match)
 			}
 
@@ -87,23 +89,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string, endpoint string) (bool, map[string]string, error) {
-	verified, err := tryURL(ctx, client, fmt.Sprintf("https://%s/api/v2/", endpoint), token)
-	if verified {
-		return true, nil, nil
-	}
-	if err != nil {
-		// Indeterminate failure (network error, etc.)
-		return false, nil, err
-	}
-	// Determinate failure (401)
-	return false, nil, nil
-}
-
-func tryURL(ctx context.Context, client *http.Client, baseURL, token string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string, endpoint string) (bool, error) {
 	// This endpoint returns 200 OK if the token is valid and the correct FQDN for the API is used.
 	// https://developers.make.com/api-documentation/api-reference/users-greater-than-me#get-users-me-current-authorization
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"users/me/current-authorization", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v2/users/me/current-authorization", endpoint), nil)
 	if err != nil {
 		return false, err
 	}

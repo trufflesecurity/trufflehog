@@ -94,7 +94,22 @@ func TestMakeApiToken_Pattern(t *testing.T) {
 			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: false,
-			want: nil,
+			want:             nil,
+		},
+		{
+			name: "duplicate endpoints deduplicated",
+			input: `
+				# make api token with duplicate endpoints
+				MAKE_TOKEN: bbb94d50-239f-4609-9569-63ea15eb0996
+				URL: us1.make.com
+				URL: us1.make.com
+				URL: us1.make.com
+			`,
+			useCloudEndpoint: false,
+			useFoundEndpoint: true,
+			want: []string{
+				"bbb94d50-239f-4609-9569-63ea15eb0996:us1.make.com",
+			},
 		},
 		{
 			name: "invalid pattern",
