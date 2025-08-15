@@ -124,6 +124,40 @@ func TestScanFile(t *testing.T) {
 	assert.Contains(t, foundSecret, secretPart1+secretPart2)
 }
 
+func TestScanBinaryFile(t *testing.T) {
+	tmpfile, err := os.CreateTemp("", "example.bin")
+	require.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+
+	// binary data that decodes to "TuffleHog"
+	fileContents := []byte{0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F, 0x67}
+	_, err = tmpfile.Write(fileContents)
+	require.NoError(t, err)
+	require.NoError(t, tmpfile.Close())
+
+	source := &Source{}
+	chunksChan := make(chan *sources.Chunk, 2)
+	errChan := make(chan error, 1)
+
+	ctx := context.WithLogger(context.Background(), logr.Discard())
+
+	go func() {
+		defer close(chunksChan)
+		errChan <- source.scanFile(ctx, tmpfile.Name(), chunksChan)
+	}()
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	var data string
+	for chunk := range chunksChan {
+		require.NotNil(t, chunk)
+		data += string(chunk.Data)
+	}
+
+	assert.Contains(t, data, "TuffleHog")
+}
+
 func TestEnumerate(t *testing.T) {
 	// TODO: refactor to allow a virtual filesystem.
 	t.Parallel()
@@ -376,6 +410,55 @@ func TestScanSubDirFile(t *testing.T) {
 
 	require.Equal(t, 1, len(reporter.Chunks), "Expected chunks from included file")
 	require.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors")
+}
+
+func TestSkipBinaries(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "trufflehog_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a binary file (executable)
+	binaryFile := filepath.Join(tempDir, "test.exe")
+	err = os.WriteFile(binaryFile, []byte{0x4D, 0x5A, 0x90, 0x00}, 0644)
+	require.NoError(t, err)
+
+	// Create a text file
+	textFile := filepath.Join(tempDir, "test.txt")
+	err = os.WriteFile(textFile, []byte("This is a text file"), 0644)
+	require.NoError(t, err)
+
+	// Test with skipBinaries = true
+	source := &Source{
+		paths:        []string{textFile, binaryFile}, // Test individual files
+		skipBinaries: true,
+		log:          logr.Discard(),
+	}
+
+	chunks := make(chan *sources.Chunk, 10)
+	ctx := context.Background()
+
+	// Run the scan
+	go func() {
+		err := source.Chunks(ctx, chunks)
+		require.NoError(t, err)
+		close(chunks)
+	}()
+
+	// Collect chunks
+	var chunkCount int
+	var processedFiles []string
+	for chunk := range chunks {
+		chunkCount++
+		metadata := chunk.SourceMetadata.GetFilesystem()
+		require.NotNil(t, metadata)
+		processedFiles = append(processedFiles, metadata.File)
+	}
+
+	// Should have exactly one chunk from the text file
+	require.Equal(t, 1, chunkCount, "Should have processed exactly one text file")
+	require.Contains(t, processedFiles, textFile, "Should have processed the text file")
+	require.NotContains(t, processedFiles, binaryFile, "Binary file should be skipped")
 }
 
 // createTempFile is a helper function to create a temporary file in the given

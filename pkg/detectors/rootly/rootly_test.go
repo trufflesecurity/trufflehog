@@ -1,8 +1,7 @@
-package brandfetch
+package rootly
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,39 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"
-	complexPattern = `
-	func main() {
-		url := "https://api.example.com/v1/resource"
-
-		// Create a new request with the secret as a header
-		req, err := http.NewRequest("GET", url, http.NoBody)
-		if err != nil {
-			fmt.Println("Error creating request:", err)
-			return
-		}
-		
-		brandfetchAPIKey := "uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"
-		req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
-
-		// Perform the request
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode == http.StatusOK {
-			fmt.Println("Request successful!")
-		} else {
-			fmt.Println("Request failed with status:", resp.Status)
-		}
-	}
-	`
-	invalidPattern = "yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U[qy]UeIqnFwILOIlEPyBtJ^"
-)
-
-func TestBrandFetch_Pattern(t *testing.T) {
+func TestRootly_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -54,17 +21,17 @@ func TestBrandFetch_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("brandfetch credentials: %s", validPattern),
-			want:  []string{validPattern},
+			input: "rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
-			name:  "valid pattern - complex",
-			input: complexPattern,
-			want:  []string{validPattern},
+			name:  "valid pattern - key out of prefix range",
+			input: "rootly keyword is not close to the real key in the data ='rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282'",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("brandfetch credentials: %s", invalidPattern),
+			input: "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
 			want:  nil,
 		},
 	}

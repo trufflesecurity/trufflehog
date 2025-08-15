@@ -660,6 +660,10 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for InstallationType
 
+	// no validation rules for OauthAuthorizationEndpoint
+
+	// no validation rules for OauthTokenEndpoint
+
 	switch v := m.Credential.(type) {
 	case *Bitbucket_Token:
 		if v == nil {
@@ -1688,6 +1692,8 @@ func (m *Filesystem) validate(all bool) error {
 	// no validation rules for IncludePathsFile
 
 	// no validation rules for ExcludePathsFile
+
+	// no validation rules for SkipBinaries
 
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)

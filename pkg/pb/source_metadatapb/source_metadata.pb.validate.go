@@ -635,6 +635,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for File
 
+	// no validation rules for User
+
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}
@@ -4142,6 +4144,8 @@ func (m *SlackContinuous) validate(all bool) error {
 	// no validation rules for Timestamp
 
 	// no validation rules for UserId
+
+	// no validation rules for Link
 
 	// no validation rules for File
 
