@@ -46,6 +46,7 @@ runs:
         ARGS: ${{ inputs.extra_args }}
         COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
         VERSION: ${{ inputs.version }}
+        NO_FAIL: ${{ inputs.no_fail }}
       run: |
         ##########################################
         ## ADVANCED USAGE                       ##
