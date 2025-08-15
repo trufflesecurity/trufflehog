@@ -10,28 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			auth_type: ""
-			in: "Header"
-			currentsapi_key: "thisistheapikey(asaspijf89aa$)lkunjo0#aenoiecnjh"
-			base_url: "https://api.example.com/v1/user"
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secret = "thisistheapikey(asaspijf89aa$)lkunjo0#aenoiecnjh"
-)
-
 func TestCurrentsAPI_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -42,9 +20,40 @@ func TestCurrentsAPI_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name: "valid pattern",
+			input: `
+					# Configuration File: config.yaml
+					database:
+						host: $DB_HOST
+						port: $DB_PORT
+						username: $DB_USERNAME
+						password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+					api:
+						auth_type: ""
+						in: "Header"
+						currentsapi_key: "P1ctBOMKKnSnc43K6z5E1IiPp0Q46BTrf62UHJBTcC2qkCGE"
+						base_url: "https://api.example.com/v1/user"
+
+					# Notes:
+					# - Remember to rotate the secret every 90 days.
+					# - The above credentials should only be used in a secure environment.
+				`,
+			want: []string{"P1ctBOMKKnSnc43K6z5E1IiPp0Q46BTrf62UHJBTcC2qkCGE"},
+		},
+		{
+			name: "valid pattern",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{currentsapi}</id>
+  					<secret>{AQAAABAAA -WE1-BwePKJJwiRN0lZ_qBe4WpZpgeAeYy281o5nImlhqaxG}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"-WE1-BwePKJJwiRN0lZ_qBe4WpZpgeAeYy281o5nImlhqaxG"},
 		},
 	}
 

@@ -2,8 +2,9 @@ package copper
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -23,9 +24,17 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"copper"}) + `\b([a-z0-9]{32})\b`)
-	idPat  = regexp.MustCompile(`\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
+	emailPat = regexp.MustCompile(common.EmailPattern)
+	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"copper"}) + `\b([a-f0-9]{32})\b`)
 )
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Copper
+}
+
+func (s Scanner) Description() string {
+	return "Copper is a CRM platform that helps businesses manage their relationships with customers and leads. Copper API keys can be used to access and modify customer data and interactions."
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -37,41 +46,28 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idmatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	var emails, apiKeys = make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-		for _, idmatch := range idmatches {
-			resIdMatch := strings.TrimSpace(idmatch[1])
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		emails[match[1]] = struct{}{}
+	}
 
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		apiKeys[match[1]] = struct{}{}
+	}
+
+	for email := range emails {
+		for apiKey := range apiKeys {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Copper,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          []byte(apiKey),
+				RawV2:        []byte(apiKey + email),
 			}
 
 			if verify {
-
-				payload := strings.NewReader(`{
-					"page_size": 25,
-					"sort_by": "name"
-					}`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.copper.com/developer_api/v1/tasks/search", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("X-PW-AccessToken", resMatch)
-				req.Header.Add("X-PW-Application", "developer_api")
-				req.Header.Add("X-PW-UserEmail", resIdMatch)
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyCopper(ctx, client, email, apiKey)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, apiKey)
 			}
 
 			results = append(results, s1)
@@ -83,10 +79,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Copper
-}
+func verifyCopper(ctx context.Context, client *http.Client, emailID, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.copper.com/developer_api/v1/account", http.NoBody)
+	if err != nil {
+		return false, err
+	}
 
-func (s Scanner) Description() string {
-	return "Copper is a CRM platform that helps businesses manage their relationships with customers and leads. Copper API keys can be used to access and modify customer data and interactions."
+	req.Header.Add("X-PW-AccessToken", apiKey)
+	req.Header.Add("X-PW-Application", "developer_api")
+	req.Header.Add("X-PW-UserEmail", emailID)
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

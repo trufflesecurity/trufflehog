@@ -65,6 +65,7 @@ message Confluence {
   string timestamp = 6;
   string location = 7;
   string file = 8;
+  string user = 9;
 }
 
 message Docker {
