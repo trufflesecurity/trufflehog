@@ -103,7 +103,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string, endpoin
 		return false, err
 	}
 
-	func() {
+	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
