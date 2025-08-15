@@ -3,13 +3,9 @@ package github
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
 
 	regexp "github.com/wasilibs/go-re2"
-	"golang.org/x/sync/singleflight"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
@@ -32,7 +28,6 @@ func (s Scanner) Version() int {
 func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 
 var (
-	client = common.SaneHttpClient()
 	// Oauth token
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
 	// Token type list:
@@ -42,20 +37,7 @@ var (
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
-
-	credsCache = simple.NewCache(simple.WithExpirationInterval[detectors.CachedVerificationResult](1*time.Hour),
-		simple.WithPurgeInterval[detectors.CachedVerificationResult](1*time.Hour))
-
-	verificationGroup = new(singleflight.Group)
 )
-
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Github
-}
-
-func (s Scanner) Description() string {
-	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
-}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -71,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 		// First match is entire regex, second is the first group.
+
 		token := match[1]
 
 		s1 := detectors.Result{
@@ -84,8 +67,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			if err := s.verifyOrGetCachedResult(ctx, client, token, &s1); err != nil {
-				return results, err
+			client := common.SaneHttpClient()
+
+			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, token)
+
+			if userResponse != nil {
+				v1.SetUserResponse(userResponse, &s1)
+			}
+			if headers != nil {
+				v1.SetHeaderInfo(headers, &s1)
 			}
 		}
 
@@ -95,54 +87,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-// verifyOrGetCachedResult checks the cache for a verification result for the given secret and updates the result's verification fields.
-// If no cached result exists, it verifies the secret using the GitHub API and caches the result, using singleflight to prevent concurrent verifications of the same secret.
-func (s Scanner) verifyOrGetCachedResult(ctx context.Context, client *http.Client, token string, result *detectors.Result) error {
-	secretHash := detectors.ComputeXXHash(result.Raw)
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Github
+}
 
-	_, err, shared := verificationGroup.Do(secretHash, func() (interface{}, error) {
-		// check if result for the secret is cached already
-		credData, exist := credsCache.Get(secretHash)
-		if exist {
-			result.Verified = credData.Verified
-			result.SetVerificationError(credData.VerificationErr)
-			result.VerificationFromCache = true
-
-			return nil, nil
-		}
-
-		// if not cached, verify the secret using github API
-		isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
-		result.Verified = isVerified
-		result.SetVerificationError(err, token)
-
-		if userResponse != nil {
-			v1.SetUserResponse(userResponse, result)
-		}
-		if headers != nil {
-			v1.SetHeaderInfo(headers, result)
-		}
-
-		credsCache.Set(secretHash, detectors.CachedVerificationResult{
-			Verified:        result.Verified,
-			VerificationErr: result.VerificationError(),
-		})
-
-		return nil, nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// for shared results, update result fields from cache
-	// as first request for a secret always set result in cache, in case of shared the cache must exist
-	if shared {
-		if credData, exists := credsCache.Get(secretHash); exists {
-			result.Verified = credData.Verified
-			result.SetVerificationError(credData.VerificationErr)
-			result.VerificationFromCache = true
-		}
-	}
-
-	return nil
+func (s Scanner) Description() string {
+	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
 }
