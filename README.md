@@ -123,6 +123,22 @@ git clone https://github.com/trufflesecurity/trufflehog.git
 cd trufflehog; go install
 ```
 
+### Using gah (only Linux and macOS)
+
+Install the latest version:
+
+```bash
+gah install trufflehog
+```
+
+Install a specific version:
+
+```bash
+gah install trufflehog --tag=<ReleaseTag like v3.56.0>
+```
+
+Note: [gah](https://github.com/marverix/gah) will verify the checksum signature using openssl and digest assigned to the related asset
+
 ### Using installation script
 
 ```bash
