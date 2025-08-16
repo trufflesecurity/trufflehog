@@ -5,27 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern = `[{
-		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
-		"name": "Github",
-		"type": "Detector",
-		"api": true,
-		"authentication_type": "",
-		"verification_url": "https://api.example.com/example",
-		"test_secrets": {
-			"github_secret": "abc123def4567890abcdef1234567890abcdef12"
-		},
-		"expected_response": "200",
-		"method": "GET",
-		"deprecated": false
-	}]`
-	secret = "abc123def4567890abcdef1234567890abcdef12"
 )
 
 func TestGithub_Pattern(t *testing.T) {
@@ -38,9 +19,22 @@ func TestGithub_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name: "valid pattern",
+			input: `[{
+				"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
+				"name": "Github",
+				"type": "Detector",
+				"api": true,
+				"authentication_type": "",
+				"verification_url": "https://api.example.com/example",
+				"test_secrets": {
+					"github_secret": "abc123def4567890abcdef1234567890abcdef12"
+				},
+				"expected_response": "200",
+				"method": "GET",
+				"deprecated": false
+			}]`,
+			want: []string{"abc123def4567890abcdef1234567890abcdef12"},
 		},
 	}
 
@@ -82,6 +76,45 @@ func TestGithub_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func Test_isKnownNonSensitiveCommonPrefix(t *testing.T) {
+	type args struct {
+		matchPrefix string
+	}
+	tests := []struct {
+		name          string
+		args          args
+		isKnownPrefix bool
+	}{
+		{
+			name:          "repo url",
+			args:          args{matchPrefix: "github.com/repos/symfony/monolog-bridge/zipball/9d14621e59f22c2b6d030d92d37ffe5ae1e60452"},
+			isKnownPrefix: true,
+		},
+		{
+			name:          "sha256 hash",
+			args:          args{matchPrefix: "Digest: sha256:f9a92af4d46ca171bffa5c00509414a19d9887c9ed4fe98d1f43757b52600e39"},
+			isKnownPrefix: true,
+		},
+		{
+			name:          "real looking token",
+			args:          args{matchPrefix: "github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e"},
+			isKnownPrefix: false,
+		},
+		{
+			name:          "github url",
+			args:          args{matchPrefix: "github.com/wrandelshofer/FastDoubleParser/blob/39e123b15b71f29a38a087d16a0bc620fc879aa6/bigint-LICENSE"},
+			isKnownPrefix: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isKnownNonSensitiveCommonPrefix(tt.args.matchPrefix); got != tt.isKnownPrefix {
+				t.Errorf("isKnownNonSensitiveCommonPrefix() = %v, want %v", got, tt.isKnownPrefix)
 			}
 		})
 	}
