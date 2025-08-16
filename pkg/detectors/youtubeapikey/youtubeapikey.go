@@ -2,8 +2,10 @@ package youtubeapikey
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
+	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -21,9 +23,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"youtube"}) + `\b([a-zA-Z-0-9_]{39})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"youtube"}) + `\b([a-zA-Z-0-9]{24})\b`)
+	// YouTube API keys are typically 39 characters, alphanumeric with hyphens and underscores
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"youtube"}) + `\b([a-zA-Z0-9_-]{39})\b`)
+	// Channel IDs are 24 characters, alphanumeric
+	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"youtube"}) + `\b([a-zA-Z0-9]{24})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,34 +45,91 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 
-		for _, idmatch := range idmatches {
-			resIdmatch := strings.TrimSpace(idmatch[1])
+		s1 := detectors.Result{
+			DetectorType: detectorspb.DetectorType_YoutubeApiKey,
+			Raw:          []byte(resMatch),
+		}
 
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_YoutubeApiKey,
-				Raw:          []byte(resMatch),
-			}
+		if verify {
+			// Try verification with channel IDs if available
+			var isVerified bool
+			var verificationErr error
 
-			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/youtube/v3/channelSections?key="+resMatch+"&channelId="+resIdmatch, nil)
-				if err != nil {
-					continue
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
+			if len(idmatches) > 0 {
+				// Try with available channel IDs first
+				for _, idmatch := range idmatches {
+					resIdmatch := strings.TrimSpace(idmatch[1])
+					isVerified, verificationErr = verifyWithChannelId(ctx, client, resMatch, resIdmatch)
+					if isVerified {
+						break
 					}
 				}
 			}
 
-			results = append(results, s1)
+			// If no channel IDs or verification failed, try simpler verification
+			if !isVerified {
+				isVerified, verificationErr = verifyApiKey(ctx, client, resMatch)
+			}
+
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
+		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyWithChannelId(ctx context.Context, client *http.Client, apiKey, channelId string) (bool, error) {
+	// Reference: https://developers.google.com/youtube/v3/docs/channelSections/list
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("https://www.googleapis.com/youtube/v3/channelSections?key=%s&channelId=%s&part=snippet", apiKey, channelId),
+		http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	return executeRequest(client, req)
+}
+
+func verifyApiKey(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
+	// Use a simpler endpoint that doesn't require specific IDs
+	// Reference: https://developers.google.com/youtube/v3/docs/i18nLanguages/list
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("https://www.googleapis.com/youtube/v3/i18nLanguages?key=%s&part=snippet", apiKey),
+		http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	return executeRequest(client, req)
+}
+
+func executeRequest(client *http.Client, req *http.Request) (bool, error) {
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK, http.StatusTooManyRequests:
+		return true, nil
+	case http.StatusBadRequest:
+		return false, nil
+	case http.StatusForbidden:
+		body, _ := io.ReadAll(res.Body)
+		if strings.Contains(string(body), "quotaExceeded") {
+			return true, nil
+		}
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
