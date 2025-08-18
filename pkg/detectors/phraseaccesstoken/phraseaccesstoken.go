@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -36,18 +35,13 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	var tokens []string
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var tokens = make(map[string]struct{})
 
-	for _, match := range matches {
-		token := match[1]
-
-		if !slices.Contains(tokens, token) {
-			tokens = append(tokens, token)
-		}
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		tokens[match[1]] = struct{}{}
 	}
 
-	for _, token := range tokens {
+	for token := range tokens {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PhraseAccessToken,
 			Raw:          []byte(token),
