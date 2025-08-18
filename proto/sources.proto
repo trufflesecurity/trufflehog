@@ -113,6 +113,10 @@ message Bitbucket {
   bool skip_binaries = 7;
   bool skip_archives = 8;
   BitbucketInstallationType installation_type = 9;
+  string oauth_authorization_endpoint = 10; // endpoint for OAuth authorization flow in Bitbucket Data Center application links
+  string oauth_token_endpoint = 11; // endpoint for getting OAuth access/refresh tokens in Bitbucket Data Center application links
+  repeated string oauth_scopes = 12; // list of OAuth scopes that the access token is provided
+  bool allow_secrets_manager_write = 13; // flag to explicitly allow TruffleHog to write to the user's secrets manager
 }
 
 message CircleCI {
