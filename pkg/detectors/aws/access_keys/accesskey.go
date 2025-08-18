@@ -26,12 +26,16 @@ import (
 type scanner struct {
 	verificationClient config.HTTPClient
 	skipIDs            map[string]struct{}
+	allowedAccounts    map[string]struct{}
+	deniedAccounts     map[string]struct{}
 	detectors.DefaultMultiPartCredentialProvider
 }
 
 func New(opts ...func(*scanner)) *scanner {
 	scanner := &scanner{
-		skipIDs: map[string]struct{}{},
+		skipIDs:         map[string]struct{}{},
+		allowedAccounts: map[string]struct{}{},
+		deniedAccounts:  map[string]struct{}{},
 	}
 	for _, opt := range opts {
 		opt(scanner)
@@ -48,6 +52,26 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 		}
 
 		s.skipIDs = ids
+	}
+}
+
+func WithAllowedAccounts(accounts []string) func(*scanner) {
+	return func(s *scanner) {
+		accountMap := map[string]struct{}{}
+		for _, account := range accounts {
+			accountMap[account] = struct{}{}
+		}
+		s.allowedAccounts = accountMap
+	}
+}
+
+func WithDeniedAccounts(accounts []string) func(*scanner) {
+	return func(s *scanner) {
+		accountMap := map[string]struct{}{}
+		for _, account := range accounts {
+			accountMap[account] = struct{}{}
+		}
+		s.deniedAccounts = accountMap
 	}
 }
 
@@ -143,16 +167,16 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				},
 			}
 
-			// Decode the account ID.
-			account, err := aws.GetAccountNumFromID(idMatch)
+			// Decode the AWS Account ID.
+			accountID, err := aws.GetAccountNumFromID(idMatch)
 			isCanary := false
 			if err != nil {
-				logger.V(3).Info("Failed to decode account number", "err", err)
+				logger.V(3).Info("Failed to decode AWS Account ID", "err", err)
 			} else {
-				s1.ExtraData["account"] = account
+				s1.ExtraData["account"] = accountID
 
 				// Handle canary IDs.
-				if _, ok := thinkstCanaryList[account]; ok {
+				if _, ok := thinkstCanaryList[accountID]; ok {
 					isCanary = true
 					s1.ExtraData["message"] = thinkstMessage
 					if verify {
@@ -164,7 +188,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.SetVerificationError(err, secretMatch)
 					}
 				}
-				if _, ok := thinkstKnockoffsCanaryList[account]; ok {
+				if _, ok := thinkstKnockoffsCanaryList[accountID]; ok {
 					isCanary = true
 					s1.ExtraData["message"] = thinkstKnockoffsMessage
 					if verify {
@@ -183,13 +207,22 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify && !isCanary {
+				// Check account filtering before verification
+				if accountID != "" {
+					if shouldSkipAccount, skipReason := s.shouldSkipAccountVerification(accountID); shouldSkipAccount {
+						s1.SetVerificationError(fmt.Errorf("%s", skipReason), secretMatch)
+						results = append(results, s1)
+						continue
+					}
+				}
+
 				isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch, len(secretMatches) > 1)
 				s1.Verified = isVerified
 
 				// Log if the calculated ID does not match the ID value from verification.
 				// Should only be edge cases at most.
-				if account != "" && extraData["account"] != "" && extraData["account"] != s1.ExtraData["account"] {
-					logger.V(2).Info("Calculated account ID does not match actual account ID", "calculated", account, "actual", extraData["account"])
+				if accountID != "" && extraData["account"] != "" && extraData["account"] != s1.ExtraData["account"] {
+					logger.V(2).Info("Calculated account ID does not match actual account ID", "calculated", accountID, "actual", extraData["account"])
 				}
 
 				// Append the extraData to the existing ExtraData map.
@@ -217,6 +250,28 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s scanner) ShouldCleanResultsIrrespectiveOfConfiguration() bool {
 	return true
+}
+
+// shouldSkipAccountVerification checks if an AWS Account ID should be skipped for verification
+// based on allow and deny lists. Returns (shouldSkip, reason).
+// Precedence: deny list > allow list (if account is in both, it's denied)
+func (s scanner) shouldSkipAccountVerification(accountID string) (bool, string) {
+	// Check deny list first - takes precedence
+	if len(s.deniedAccounts) > 0 {
+		if _, isDenied := s.deniedAccounts[accountID]; isDenied {
+			return true, aws.VerificationErrAccountIDInDenyList
+		}
+	}
+
+	// Check allow list - if populated, account must be in it
+	if len(s.allowedAccounts) > 0 {
+		if _, isAllowed := s.allowedAccounts[accountID]; !isAllowed {
+			return true, aws.VerificationErrAccountIDNotInAllowList
+		}
+	}
+
+	// Account is allowed for verification
+	return false, ""
 }
 
 const (
