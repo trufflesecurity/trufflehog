@@ -1,71 +1,42 @@
-package brandfetch
+package webexbot
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"
-	complexPattern = `
-	func main() {
-		url := "https://api.example.com/v1/resource"
-
-		// Create a new request with the secret as a header
-		req, err := http.NewRequest("GET", url, http.NoBody)
-		if err != nil {
-			fmt.Println("Error creating request:", err)
-			return
-		}
-		
-		brandfetchAPIKey := "uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"
-		req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
-
-		// Perform the request
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode == http.StatusOK {
-			fmt.Println("Request successful!")
-		} else {
-			fmt.Println("Request failed with status:", resp.Status)
-		}
-	}
-	`
-	invalidPattern = "yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U[qy]UeIqnFwILOIlEPyBtJ^"
-)
-
-func TestBrandFetch_Pattern(t *testing.T) {
+func TestWebexbot_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("brandfetch credentials: %s", validPattern),
-			want:  []string{validPattern},
+			name:  "typical pattern",
+			input: "webexbot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl'",
+			want:  []string{"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl"},
 		},
 		{
-			name:  "valid pattern - complex",
-			input: complexPattern,
-			want:  []string{validPattern},
+			name: "finds multiple Webex Bot tokens",
+			input: `
+			webex_bot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert'
+			webexbot = "ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh"
+		`,
+			want: []string{
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert",
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh",
+			},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("brandfetch credentials: %s", invalidPattern),
-			want:  nil,
+			name:  "does not match invalid token name",
+			input: "webex = 'asdf1234qwer5678zxcv9012lkjh_asdf_qwer3456-qwer-vbnm-asdf-zxcvbnmasdfgh'",
+			want:  []string{},
 		},
 	}
 

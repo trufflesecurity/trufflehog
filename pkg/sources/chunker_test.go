@@ -97,6 +97,38 @@ func TestNewChunkedReader(t *testing.T) {
 			wantChunks: []string{strings.Repeat("a", 2048), strings.Repeat("a", 2048), strings.Repeat("a", 2048), strings.Repeat("a", 1024)},
 			wantErr:    false,
 		},
+		{
+			name:       "binary data - bin",
+			input:      string(generateBinaryContent("bin")),
+			chunkSize:  DefaultChunkSize,
+			peekSize:   DefaultPeekSize,
+			wantChunks: []string{"TuffleHog"},
+			wantErr:    false,
+		},
+		{
+			name:       "binary data - exe",
+			input:      string(generateBinaryContent("exe")),
+			chunkSize:  DefaultChunkSize,
+			peekSize:   DefaultPeekSize,
+			wantChunks: []string{"MZ\x90\x03\x00\x04\x00\xff\x00\xb8:\xf2~\x11]\x9b\xc8O\xa1g0\xeb\x94,\rzV\x88\xfa\x19+\xc3\xd0nTuffleHog\xab\xcd8\x04W\xf1j\x9e\x03\xd8A\xb6/u\xcc\v\x94\xe7P8\xad\x1fc{\x0e\xf5)\xc4m\x82\x10"},
+			wantErr:    false,
+		},
+		{
+			name:       "binary data - dmg",
+			input:      string(generateBinaryContent("dmg")),
+			chunkSize:  DefaultChunkSize,
+			peekSize:   DefaultPeekSize,
+			wantChunks: []string{"\x00\x00\x00\x00TruffleHog\x00\x00\x00\x00koly"},
+			wantErr:    false,
+		},
+		{
+			name:       "binary data - tag.gz",
+			input:      string(generateBinaryContent("tar.gz")),
+			chunkSize:  DefaultChunkSize,
+			peekSize:   DefaultPeekSize,
+			wantChunks: []string{"\x1f\x8b\bthis is binary content - trufflehog\x00\x00\x00\x00"},
+			wantErr:    false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -211,4 +243,44 @@ func TestReadInChunksWithCancellation(t *testing.T) {
 			t.Error("Potential goroutine leak detected")
 		}
 	}
+}
+
+// https://en.wikipedia.org/wiki/List_of_file_signatures
+func generateBinaryContent(contentType string) []byte {
+	switch contentType {
+	case "tar.gz":
+		return []byte{
+			0x1F, 0x8B, 0x08, // GZIP magic + compression method
+			0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20,
+			0x62, 0x69, 0x6E, 0x61, 0x72, 0x79, 0x20, 0x63,
+			0x6F, 0x6E, 0x74, 0x65, 0x6E, 0x74, 0x20, 0x2D,
+			0x20, 0x74, 0x72, 0x75, 0x66, 0x66, 0x6C, 0x65,
+			0x68, 0x6F, 0x67, 0x00, 0x00, 0x00, 0x00,
+		}
+	case "exe":
+		return []byte{
+			// https://superuser.com/questions/1334140/how-to-check-if-a-binary-is-16-bit-on-windows
+			0x4D, 0x5A, // 'MZ' magic number for EXE
+			0x90, 0x03, 0x00, 0x04, 0x00, 0xff, 0x00, 0xb8,
+			0x3a, 0xf2, 0x7e, 0x11, 0x5d, 0x9b, 0xc8, 0x4f,
+			0xa1, 0x67, 0x30, 0xeb, 0x94, 0x2c, 0x0d, 0x7a,
+			0x56, 0x88, 0xfa, 0x19, 0x2b, 0xc3, 0xd0, 0x6e,
+			0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F,
+			0x67, 0xab, 0xcd, 0x38, 0x04, 0x57, 0xf1, 0x6a,
+			0x9e, 0x03, 0xd8, 0x41, 0xb6, 0x2f, 0x75, 0xcc,
+			0x0b, 0x94, 0xe7, 0x50, 0x38, 0xad, 0x1f, 0x63,
+			0x7b, 0x0e, 0xf5, 0x29, 0xc4, 0x6d, 0x82, 0x10,
+		}
+	case "bin":
+		return []byte{0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F, 0x67}
+	case "dmg":
+		return []byte{
+			0x00, 0x00, 0x00, 0x00,
+			0x54, 0x72, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F, 0x67,
+			0x00, 0x00, 0x00, 0x00,
+			0x6B, 0x6F, 0x6C, 0x79, // "koly" magic number for dmg
+		}
+	}
+
+	return nil
 }
