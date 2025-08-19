@@ -175,30 +175,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			} else {
 				s1.ExtraData["account"] = accountID
 
-				// Handle canary IDs.
+				// Check if this is a canary token
 				if _, ok := thinkstCanaryList[accountID]; ok {
 					isCanary = true
 					s1.ExtraData["message"] = thinkstMessage
-					if verify {
-						verified, arn, err := s.verifyCanary(ctx, idMatch, secretMatch)
-						s1.Verified = verified
-						if arn != "" {
-							s1.ExtraData["arn"] = arn
-						}
-						s1.SetVerificationError(err, secretMatch)
-					}
 				}
 				if _, ok := thinkstKnockoffsCanaryList[accountID]; ok {
 					isCanary = true
 					s1.ExtraData["message"] = thinkstKnockoffsMessage
-					if verify {
-						verified, arn, err := s.verifyCanary(ctx, idMatch, secretMatch)
-						s1.Verified = verified
-						if arn != "" {
-							s1.ExtraData["arn"] = arn
-						}
-						s1.SetVerificationError(err, secretMatch)
-					}
 				}
 
 				if isCanary {
@@ -206,8 +190,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if verify && !isCanary {
-				// Check account filtering before verification
+			if verify {
+				// Check account filtering before verification for ALL secrets (including canaries)
 				if accountID != "" {
 					if shouldSkipAccount, skipReason := s.shouldSkipAccountVerification(accountID); shouldSkipAccount {
 						s1.SetVerificationError(fmt.Errorf("%s", skipReason), secretMatch)
@@ -216,20 +200,32 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 
-				isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch, len(secretMatches) > 1)
-				s1.Verified = isVerified
+				// Perform verification based on token type
+				if isCanary {
+					// Canary verification logic
+					verified, arn, err := s.verifyCanary(ctx, idMatch, secretMatch)
+					s1.Verified = verified
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					s1.SetVerificationError(err, secretMatch)
+				} else {
+					// Normal verification logic
+					isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch, len(secretMatches) > 1)
+					s1.Verified = isVerified
 
-				// Log if the calculated ID does not match the ID value from verification.
-				// Should only be edge cases at most.
-				if accountID != "" && extraData["account"] != "" && extraData["account"] != s1.ExtraData["account"] {
-					logger.V(2).Info("Calculated account ID does not match actual account ID", "calculated", accountID, "actual", extraData["account"])
-				}
+					// Log if the calculated ID does not match the ID value from verification.
+					// Should only be edge cases at most.
+					if accountID != "" && extraData["account"] != "" && extraData["account"] != s1.ExtraData["account"] {
+						logger.V(2).Info("Calculated account ID does not match actual account ID", "calculated", accountID, "actual", extraData["account"])
+					}
 
-				// Append the extraData to the existing ExtraData map.
-				for k, v := range extraData {
-					s1.ExtraData[k] = v
+					// Append the extraData to the existing ExtraData map.
+					for k, v := range extraData {
+						s1.ExtraData[k] = v
+					}
+					s1.SetVerificationError(verificationErr, secretMatch)
 				}
-				s1.SetVerificationError(verificationErr, secretMatch)
 			}
 
 			if !s1.Verified && aws.FalsePositiveSecretPat.MatchString(secretMatch) {

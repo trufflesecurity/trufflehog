@@ -2,6 +2,7 @@ package access_keys
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -196,4 +197,84 @@ func TestAWS_WithDeniedAccounts(t *testing.T) {
 	shouldSkip, reason = s.shouldSkipAccountVerification("111222333444")
 	require.False(t, shouldSkip)
 	require.Empty(t, reason)
+}
+
+func TestAWS_CanaryTokenFiltering(t *testing.T) {
+	// Using known canary token from integration tests
+	canaryAccessKeyID := "AKIASP2TPHJSQH3FJRUX" // Account ID: 171436882533
+	canarySecret := "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+	testData := []byte(fmt.Sprintf("%s:%s", canaryAccessKeyID, canarySecret))
+
+	t.Run("debug canary detection", func(t *testing.T) {
+		// First, let's test basic canary detection without verification
+		s := New()
+
+		results, err := s.FromData(context.Background(), false, testData) // verify = false
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		result := results[0]
+		t.Logf("Result without verification - Verified: %v, Account: %s, IsCanary: %s, Message: %s",
+			result.Verified, result.ExtraData["account"], result.ExtraData["is_canary"], result.ExtraData["message"])
+
+		// Should detect as canary but not verify (since verify=false)
+		require.False(t, result.Verified)
+		require.Equal(t, "171436882533", result.ExtraData["account"])
+		require.Equal(t, "true", result.ExtraData["is_canary"])
+		require.Contains(t, result.ExtraData["message"], "canarytokens.org")
+	})
+
+	t.Run("canary token with allow list - account not allowed", func(t *testing.T) {
+		// Configure scanner with allow list that excludes the canary account
+		s := New(WithAllowedAccounts([]string{"123456789012", "999888777666"}))
+
+		results, err := s.FromData(context.Background(), true, testData)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		result := results[0]
+		// Should detect the canary token but not verify it due to filtering
+		require.False(t, result.Verified)
+		require.NotNil(t, result.VerificationError())
+		require.Contains(t, result.VerificationError().Error(), "not in the allow list")
+		require.Equal(t, "171436882533", result.ExtraData["account"])
+		require.Equal(t, "true", result.ExtraData["is_canary"])
+	})
+
+	t.Run("canary token with deny list - account denied", func(t *testing.T) {
+		// Configure scanner with deny list that includes the canary account
+		s := New(WithDeniedAccounts([]string{"171436882533", "123456789012"}))
+
+		results, err := s.FromData(context.Background(), true, testData)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		result := results[0]
+		// Should detect the canary token but not verify it due to filtering
+		require.False(t, result.Verified)
+		require.NotNil(t, result.VerificationError())
+		require.Contains(t, result.VerificationError().Error(), "in the deny list")
+		require.Equal(t, "171436882533", result.ExtraData["account"])
+		require.Equal(t, "true", result.ExtraData["is_canary"])
+	})
+
+	t.Run("precedence test - deny list takes precedence over allow list", func(t *testing.T) {
+		// Configure scanner where canary account is in both allow and deny lists
+		s := New(
+			WithAllowedAccounts([]string{"171436882533", "123456789012"}),
+			WithDeniedAccounts([]string{"171436882533"}),
+		)
+
+		results, err := s.FromData(context.Background(), true, testData)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		result := results[0]
+		// Should detect the canary token but not verify it since deny takes precedence
+		require.False(t, result.Verified)
+		require.NotNil(t, result.VerificationError())
+		require.Contains(t, result.VerificationError().Error(), "in the deny list")
+		require.Equal(t, "171436882533", result.ExtraData["account"])
+		require.Equal(t, "true", result.ExtraData["is_canary"])
+	})
 }
