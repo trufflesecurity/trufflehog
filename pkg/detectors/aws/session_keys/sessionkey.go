@@ -23,21 +23,18 @@ type scanner struct {
 	*detectors.CustomMultiPartCredentialProvider
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
-	allowedAccounts    map[string]struct{}
-	deniedAccounts     map[string]struct{}
+	detectors.AccountFilter
 }
 
 func New(opts ...func(*scanner)) *scanner {
 	scanner := &scanner{
-		skipIDs:         map[string]struct{}{},
-		allowedAccounts: map[string]struct{}{},
-		deniedAccounts:  map[string]struct{}{},
+		skipIDs: map[string]struct{}{},
 	}
 	for _, opt := range opts {
 		opt(scanner)
 	}
 
-	scanner.CustomMultiPartCredentialProvider = detectors.NewCustomMultiPartCredentialProvider(2048) // ????
+	scanner.CustomMultiPartCredentialProvider = detectors.NewCustomMultiPartCredentialProvider(2048)
 	return scanner
 }
 
@@ -54,21 +51,13 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 
 func WithAllowedAccounts(accounts []string) func(*scanner) {
 	return func(s *scanner) {
-		accountMap := map[string]struct{}{}
-		for _, account := range accounts {
-			accountMap[account] = struct{}{}
-		}
-		s.allowedAccounts = accountMap
+		s.SetAllowedAccounts(accounts)
 	}
 }
 
 func WithDeniedAccounts(accounts []string) func(*scanner) {
 	return func(s *scanner) {
-		accountMap := map[string]struct{}{}
-		for _, account := range accounts {
-			accountMap[account] = struct{}{}
-		}
-		s.deniedAccounts = accountMap
+		s.SetDeniedAccounts(accounts)
 	}
 }
 
@@ -153,7 +142,13 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					// Check account filtering before verification
 					if accountIDForFiltering != "" {
-						if shouldSkipAccount, skipReason := s.shouldSkipAccountVerification(accountIDForFiltering); shouldSkipAccount {
+						if s.ShouldSkipAccount(accountIDForFiltering) {
+							var skipReason string
+							if s.IsInDenyList(accountIDForFiltering) {
+								skipReason = aws.VerificationErrAccountIDInDenyList
+							} else {
+								skipReason = aws.VerificationErrAccountIDNotInAllowList
+							}
 							s1.SetVerificationError(fmt.Errorf("%s", skipReason), secretMatch)
 							// If we haven't already found an AWS Account ID for this ID (via API), calculate one.
 							if _, ok := s1.ExtraData["account"]; !ok {
@@ -205,28 +200,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s scanner) ShouldCleanResultsIrrespectiveOfConfiguration() bool {
 	return true
-}
-
-// shouldSkipAccountVerification checks if an AWS Account ID should be skipped for verification
-// based on allow and deny lists. Returns (shouldSkip, reason).
-// Precedence: deny list > allow list (if account is in both, it's denied)
-func (s scanner) shouldSkipAccountVerification(accountID string) (bool, string) {
-	// Check deny list first - takes precedence
-	if len(s.deniedAccounts) > 0 {
-		if _, isDenied := s.deniedAccounts[accountID]; isDenied {
-			return true, aws.VerificationErrAccountIDInDenyList
-		}
-	}
-
-	// Check allow list - if populated, account must be in it
-	if len(s.allowedAccounts) > 0 {
-		if _, isAllowed := s.allowedAccounts[accountID]; !isAllowed {
-			return true, aws.VerificationErrAccountIDNotInAllowList
-		}
-	}
-
-	// Account is allowed for verification
-	return false, ""
 }
 
 const (

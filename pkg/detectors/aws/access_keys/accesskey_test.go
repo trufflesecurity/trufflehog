@@ -94,94 +94,19 @@ func TestAWS_Pattern(t *testing.T) {
 	}
 }
 
-func TestAWS_shouldSkipAccountVerification(t *testing.T) {
-	testCases := []struct {
-		name               string
-		scanner            scanner
-		accountID          string
-		expectedShouldSkip bool
-		expectedReason     string
-	}{
-		{
-			name: "no filtering configured - should not skip",
-			scanner: scanner{
-				allowedAccounts: map[string]struct{}{},
-				deniedAccounts:  map[string]struct{}{},
-			},
-			accountID:          "123456789012",
-			expectedShouldSkip: false,
-			expectedReason:     "",
-		},
-		{
-			name: "account in deny list - should skip",
-			scanner: scanner{
-				allowedAccounts: map[string]struct{}{},
-				deniedAccounts:  map[string]struct{}{"123456789012": {}},
-			},
-			accountID:          "123456789012",
-			expectedShouldSkip: true,
-			expectedReason:     "Account ID is in the deny list for verification",
-		},
-		{
-			name: "account not in allow list - should skip",
-			scanner: scanner{
-				allowedAccounts: map[string]struct{}{"999888777666": {}},
-				deniedAccounts:  map[string]struct{}{},
-			},
-			accountID:          "123456789012",
-			expectedShouldSkip: true,
-			expectedReason:     "Account ID is not in the allow list for verification",
-		},
-		{
-			name: "account in allow list - should not skip",
-			scanner: scanner{
-				allowedAccounts: map[string]struct{}{"123456789012": {}},
-				deniedAccounts:  map[string]struct{}{},
-			},
-			accountID:          "123456789012",
-			expectedShouldSkip: false,
-			expectedReason:     "",
-		},
-		{
-			name: "account in both allow and deny list - deny takes precedence",
-			scanner: scanner{
-				allowedAccounts: map[string]struct{}{"123456789012": {}},
-				deniedAccounts:  map[string]struct{}{"123456789012": {}},
-			},
-			accountID:          "123456789012",
-			expectedShouldSkip: true,
-			expectedReason:     "Account ID is in the deny list for verification",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			shouldSkip, reason := tc.scanner.shouldSkipAccountVerification(tc.accountID)
-
-			if shouldSkip != tc.expectedShouldSkip {
-				t.Errorf("Expected shouldSkip=%v, got shouldSkip=%v", tc.expectedShouldSkip, shouldSkip)
-			}
-
-			if reason != tc.expectedReason {
-				t.Errorf("Expected reason=%q, got reason=%q", tc.expectedReason, reason)
-			}
-		})
-	}
-}
-
 func TestAWS_WithAllowedAccounts(t *testing.T) {
 	accounts := []string{"123456789012", "999888777666"}
 	s := New(WithAllowedAccounts(accounts))
 
 	// Test that allowed accounts are properly configured
-	shouldSkip, reason := s.shouldSkipAccountVerification("123456789012")
+	shouldSkip := s.ShouldSkipAccount("123456789012")
 	require.False(t, shouldSkip)
-	require.Empty(t, reason)
+	require.True(t, s.IsInAllowList("123456789012"))
 
 	// Test that non-allowed accounts are skipped
-	shouldSkip, reason = s.shouldSkipAccountVerification("111222333444")
+	shouldSkip = s.ShouldSkipAccount("111222333444")
 	require.True(t, shouldSkip)
-	require.Equal(t, "Account ID is not in the allow list for verification", reason)
+	require.False(t, s.IsInAllowList("111222333444"))
 }
 
 func TestAWS_WithDeniedAccounts(t *testing.T) {
@@ -189,14 +114,14 @@ func TestAWS_WithDeniedAccounts(t *testing.T) {
 	s := New(WithDeniedAccounts(accounts))
 
 	// Test that denied accounts are properly skipped
-	shouldSkip, reason := s.shouldSkipAccountVerification("123456789012")
+	shouldSkip := s.ShouldSkipAccount("123456789012")
 	require.True(t, shouldSkip)
-	require.Equal(t, "Account ID is in the deny list for verification", reason)
+	require.True(t, s.IsInDenyList("123456789012"))
 
 	// Test that non-denied accounts are not skipped
-	shouldSkip, reason = s.shouldSkipAccountVerification("111222333444")
+	shouldSkip = s.ShouldSkipAccount("111222333444")
 	require.False(t, shouldSkip)
-	require.Empty(t, reason)
+	require.False(t, s.IsInDenyList("111222333444"))
 }
 
 func TestAWS_CanaryTokenFiltering(t *testing.T) {
