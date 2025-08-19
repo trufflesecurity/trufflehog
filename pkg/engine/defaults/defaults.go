@@ -237,7 +237,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/doppler"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dotmailer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dotdigital"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dovico"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dronahq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/droneci"
@@ -546,6 +546,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedream"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedrive"
@@ -1100,7 +1101,7 @@ func buildDetectorList() []detectors.Detector {
 		&documo.Scanner{},
 		&docusign.Scanner{},
 		&doppler.Scanner{},
-		&dotmailer.Scanner{},
+		&dotdigital.Scanner{},
 		&dovico.Scanner{},
 		&dronahq.Scanner{},
 		&droneci.Scanner{},
@@ -1420,6 +1421,7 @@ func buildDetectorList() []detectors.Detector {
 		&peopledatalabs.Scanner{},
 		&pepipost.Scanner{},
 		&percy.Scanner{},
+		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
 		&pipedream.Scanner{},
 		&pipedrive.Scanner{},
