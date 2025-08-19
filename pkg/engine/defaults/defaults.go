@@ -547,6 +547,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedream"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedrive"
@@ -1422,6 +1423,7 @@ func buildDetectorList() []detectors.Detector {
 		&peopledatalabs.Scanner{},
 		&pepipost.Scanner{},
 		&percy.Scanner{},
+		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
 		&pipedream.Scanner{},
 		&pipedrive.Scanner{},
