@@ -53,6 +53,7 @@ enum SourceType {
   SOURCE_TYPE_SENTRY = 38;
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
+  SOURCE_TYPE_SLACK_CONTINUOUS = 41;
 }
 
 message LocalSource {
@@ -112,6 +113,9 @@ message Bitbucket {
   bool skip_binaries = 7;
   bool skip_archives = 8;
   BitbucketInstallationType installation_type = 9;
+  string oauth_authorization_endpoint = 10; // endpoint for OAuth authorization flow in Bitbucket Data Center application links
+  string oauth_token_endpoint = 11; // endpoint for getting OAuth access/refresh tokens in Bitbucket Data Center application links
+  repeated string oauth_scopes = 12; // list of OAuth scopes that the access token is provided
 }
 
 message CircleCI {
@@ -175,6 +179,7 @@ message Filesystem {
   repeated string paths = 2;
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
+  bool skip_binaries = 5; // allows skipping binary files from the scan
 }
 
 message GCS {
@@ -232,6 +237,7 @@ message GitLab {
   repeated string include_repos = 9;
   bool exclude_projects_shared_into_groups = 10;
   bool remove_auth_in_url = 11;
+  repeated string group_ids = 12;
 }
 
 message GitHub {
@@ -474,6 +480,14 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+  oneof variant {
+    Vector vector = 4;
+  }
+}
+
+message Vector {
+  string locator_field = 1;
+  string link_format = 2;
 }
 
 message Elasticsearch {
@@ -501,3 +515,8 @@ message Sentry {
 }
 
 message Stdin {}
+
+message SlackContinuous {
+  string namespace = 1;
+  string project_id = 2;
+}
