@@ -7,6 +7,12 @@ const (
 	RequiredSecretEntropy = 4.25
 )
 
+// Verification error messages
+const (
+	VerificationErrAccountIDInDenyList     = "Account ID is in the deny list for verification"
+	VerificationErrAccountIDNotInAllowList = "Account ID is not in the allow list for verification"
+)
+
 var SecretPat = regexp.MustCompile(`(?:[^A-Za-z0-9+/]|\A)([A-Za-z0-9+/]{40})(?:[^A-Za-z0-9+/]|\z)`)
 
 type IdentityResponse struct {
