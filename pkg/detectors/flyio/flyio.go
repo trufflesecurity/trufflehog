@@ -20,6 +20,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -111,40 +112,12 @@ func (s Scanner) Description() string {
 	return "Fly.io is a platform for running applications globally. Fly.io tokens can be used to access the Fly.io API and manage applications."
 }
 
-// IsFalsePositive implements CustomFalsePositiveChecker interface
 func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
-	token := string(result.Raw)
-
-	// For Fly.io tokens, we need to bypass the default false positive checks
-	// that might flag repeated characters (like "aaaaaa") as false positives.
-	// Fly.io tokens can legitimately contain repeated characters in their base64 encoding.
-
-	// Check if this matches the expected Fly.io token pattern
-	if keyPat.MatchString(token) {
-		// For valid Fly.io token patterns, only check for obvious test patterns
-		// but skip the general wordlist filtering that catches repeated characters
-
-		lower := strings.ToLower(token)
-
-		// Check for obvious test/example patterns that should be filtered
-		obviousTestPatterns := []string{
-			"example", "test", "demo", "sample", "placeholder",
-			"your_token_here", "insert_token_here", "fake", "dummy",
-			"xxxxxxxx", "11111111", "22222222", "33333333", "44444444",
-			"55555555", "66666666", "77777777", "88888888", "99999999",
-		}
-
-		for _, pattern := range obviousTestPatterns {
-			if strings.Contains(lower, pattern) {
-				return true, "contains obvious test pattern: " + pattern
-			}
-		}
-
-		// Don't apply default false positive logic for valid Fly.io tokens
-		// This prevents legitimate tokens with repeated chars from being filtered
+	// ignore AAAAAA for Flyio detector
+	if strings.Contains(string(result.Raw), "AAAAAA") {
 		return false, ""
 	}
 
 	// For non-matching patterns, fall back to default false positive logic
-	return detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true)
+	return detectors.IsKnownFalsePositive(string(result.Raw), detectors.DefaultFalsePositives, true)
 }
