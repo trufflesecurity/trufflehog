@@ -735,12 +735,16 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo repoInfo, reporter sources.ChunkReporter) (time.Duration, error) {
 	var duration time.Duration
 
-	ctx.Logger().V(2).Info("attempting to clone repo")
+	ctx.Logger().V(2).Info("attempting to clone repo", "repo_name", repoInfo.name)
 	path, repo, err := s.cloneRepo(ctx, repoURL)
 	if err != nil {
 		return duration, err
 	}
-	defer os.RemoveAll(path)
+
+	// clean up the path if it is a clone path and --no-cleanup is not set.
+	if !s.conn.GetNoCleanup() && s.conn.GetClonePath() != "" {
+		defer os.RemoveAll(path)
+	}
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
 	s.setScanOptions(s.conn.Base, s.conn.Head)
@@ -1660,11 +1664,11 @@ func newConnector(source *Source) (Connector, error) {
 		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
-		return NewTokenConnector(apiEndpoint, cred.Token, source.useAuthInUrl, func(c context.Context, err error) bool {
+		return NewTokenConnector(apiEndpoint, cred.Token, source.conn.GetClonePath(), source.useAuthInUrl, func(c context.Context, err error) bool {
 			return source.handleRateLimit(c, err)
 		})
 	case *sourcespb.GitHub_Unauthenticated:
-		return NewUnauthenticatedConnector(apiEndpoint)
+		return NewUnauthenticatedConnector(apiEndpoint, source.conn.GetClonePath())
 	default:
 		return nil, fmt.Errorf("unknown connection type %T", source.conn.GetCredential())
 	}

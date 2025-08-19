@@ -221,6 +221,8 @@ message Git {
   string uri = 13; // repository URL. https://, file://, or ssh://
   bool skip_binaries = 14;
   bool skip_archives = 15;
+  string clone_path = 16;
+  bool no_cleanup = 17;
 }
 
 message GitLab {
@@ -238,6 +240,8 @@ message GitLab {
   bool exclude_projects_shared_into_groups = 10;
   bool remove_auth_in_url = 11;
   repeated string group_ids = 12;
+  string clone_path = 13;
+  bool no_cleanup = 14;
 }
 
 message GitHub {
@@ -264,6 +268,8 @@ message GitHub {
   bool include_wikis = 19;
   uint32 comments_timeframe_days = 20;
   bool remove_auth_in_url = 21;
+  string clone_path = 22;
+  bool no_cleanup = 23;
 }
 
 message GitHubExperimental {
