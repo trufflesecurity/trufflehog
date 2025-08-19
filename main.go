@@ -725,15 +725,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			}
 		}
 
-		if *gitClonePath != "" {
-			// clone path is only supported for HTTPS repository URLs, not for local repositories.
-			if !strings.HasPrefix(*gitScanURI, "https://") {
-				return scanMetrics, fmt.Errorf("invalid configuration: --clone-path can only be used with an HTTPS repository URL")
-			}
+		// clone path is only supported for HTTPS repository URLs, not for local repositories.
+		if *gitClonePath != "" && !strings.HasPrefix(*gitScanURI, "https://") {
+			return scanMetrics, fmt.Errorf("invalid configuration: --clone-path can only be used with an HTTPS repository URL")
+		}
 
-			if err := validateClonePath(*gitClonePath, *gitNoCleanup); err != nil {
-				return scanMetrics, err
-			}
+		if err := validateClonePath(*gitClonePath, *gitNoCleanup); err != nil {
+			return scanMetrics, err
 		}
 
 		gitCfg := sources.GitConfig{
