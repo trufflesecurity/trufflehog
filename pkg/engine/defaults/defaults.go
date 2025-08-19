@@ -237,7 +237,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/doppler"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dotmailer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dotdigital"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dovico"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dronahq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/droneci"
@@ -1101,7 +1101,7 @@ func buildDetectorList() []detectors.Detector {
 		&documo.Scanner{},
 		&docusign.Scanner{},
 		&doppler.Scanner{},
-		&dotmailer.Scanner{},
+		&dotdigital.Scanner{},
 		&dovico.Scanner{},
 		&dronahq.Scanner{},
 		&droneci.Scanner{},
