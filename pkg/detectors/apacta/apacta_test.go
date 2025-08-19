@@ -2,45 +2,13 @@ package apacta
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "abcd1234-ef56-gh78-ij90-klmn1234opqr"
-	complexPattern = `
-	func main() {
-		url := "https://api.example.com/v1/resource"
-
-		// Create a new request with the secret as a header
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte("{}")))
-		if err != nil {
-			fmt.Println("Error creating request:", err)
-			return
-		}
-		
-		apactaSecret := "Bearer abcd1234-ef56-gh78-ij90-klmn1234opqr"
-		req.Header.Set("Authorization", apactaSecret)
-
-		// Perform the request
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode == http.StatusOK {
-			fmt.Println("Request successful!")
-		} else {
-			fmt.Println("Request failed with status:", resp.Status)
-		}
-	}
-	`
-	invalidPattern = "abcD$1234-ef56-gH78-ij90-klmn1234opqr"
 )
 
 func TestApacta_Pattern(t *testing.T) {
@@ -53,19 +21,62 @@ func TestApacta_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("apacta credentials: %s", validPattern),
-			want:  []string{"abcd1234-ef56-gh78-ij90-klmn1234opqr"},
+			name: "valid pattern",
+			input: `
+				func main() {
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("POST", "https://api.example.com/v1/resource", bytes.NewBuffer([]byte("{}")))
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
+					}
+					
+					apactaSecret := "Bearer abcd1234-ef56-gh78-ij90-klmn1234opqr"
+					req.Header.Set("Authorization", apactaSecret)
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer resp.Body.Close()
+				}
+				`,
+			want: []string{"abcd1234-ef56-gh78-ij90-klmn1234opqr"},
 		},
 		{
-			name:  "valid pattern - complex",
-			input: complexPattern,
-			want:  []string{"abcd1234-ef56-gh78-ij90-klmn1234opqr"},
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apacta}</id>
+  					<secret>{AQAAABAAA w8-p59rc70q0unyupknadu5sr8bf5us04mpt}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"w8-p59rc70q0unyupknadu5sr8bf5us04mpt"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("apacta credentials: %s", invalidPattern),
-			want:  nil,
+			name: "invalid pattern",
+			input: `
+				func main() {
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("POST", "https://api.example.com/v1/resource", bytes.NewBuffer([]byte("{}")))
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
+					}
+					
+					apactaSecret := "Bearer abcD$1234-ef56-gH78-ij90-klmn1234opqr"
+					req.Header.Set("Authorization", apactaSecret)
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer resp.Body.Close()
+				}
+				`,
+			want: nil,
 		},
 	}
 
@@ -73,22 +84,15 @@ func TestApacta_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -100,6 +104,7 @@ func TestApacta_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

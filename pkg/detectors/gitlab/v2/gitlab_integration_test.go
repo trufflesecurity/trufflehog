@@ -87,6 +87,8 @@ func TestGitlabV2_FromChunk_WithV1Secrets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.s.SetCloudEndpoint("https://gitlab.com")
+			tt.s.UseCloudEndpoint(true)
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Gitlab.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -101,7 +103,7 @@ func TestGitlabV2_FromChunk_WithV1Secrets(t *testing.T) {
 				}
 				got[i].AnalysisInfo = nil
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
@@ -280,7 +282,7 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				}
 				got[i].AnalysisInfo = nil
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -28,6 +28,18 @@ func TestUTF16Decoder(t *testing.T) {
 			expectNil: false,
 		},
 		{
+			name:      "Valid UTF-16LE input with BOM (FF FE)",
+			input:     []byte{255, 254, 72, 0, 101, 0, 108, 0, 108, 0, 111, 0, 32, 0, 87, 0, 111, 0, 114, 0, 108, 0, 100, 0},
+			expected:  []byte("Hello World"),
+			expectNil: false,
+		},
+		{
+			name:      "Valid UTF-16BE input with BOM (FE FF)",
+			input:     []byte{254, 255, 0, 72, 0, 101, 0, 108, 0, 108, 0, 111, 0, 32, 0, 87, 0, 111, 0, 114, 0, 108, 0, 100},
+			expected:  []byte("Hello World"),
+			expectNil: false,
+		},
+		{
 			name:      "Invalid UTF-16 input (it's UTF-8)",
 			input:     []byte("Hello World!"),
 			expected:  nil,
