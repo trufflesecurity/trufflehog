@@ -3,24 +3,20 @@ package grafanaapikey
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
-	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(eyJrIjoi[A-Za-z0-9]{70,400}={0,2})\b`)
 )
@@ -36,11 +32,6 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Grafanaapikey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
-	client := s.client
-	if client == nil {
-		client = defaultClient
-	}
 
 	uniqueMatches := make(map[string]struct{})
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
