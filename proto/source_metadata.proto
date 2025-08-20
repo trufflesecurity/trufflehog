@@ -99,6 +99,7 @@ message Git {
   string repository = 4;
   string timestamp = 5;
   int64 line = 6;
+  string repository_local_path = 7;
 }
 
 message Github {
@@ -111,6 +112,7 @@ message Github {
   string timestamp = 7;
   int64 line = 8;
   Visibility visibility = 9;
+  string repository_local_path = 10;
 }
 
 message Gitlab {

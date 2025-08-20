@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -285,14 +284,15 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
-						Commit:     sanitizer.UTF8(commit),
-						File:       sanitizer.UTF8(file),
-						Email:      sanitizer.UTF8(email),
-						Repository: sanitizer.UTF8(repository),
-						Link:       giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:  sanitizer.UTF8(timestamp),
-						Line:       line,
-						Visibility: s.visibilityOf(aCtx, repository),
+						Commit:              sanitizer.UTF8(commit),
+						File:                sanitizer.UTF8(file),
+						Email:               sanitizer.UTF8(email),
+						Repository:          sanitizer.UTF8(repository),
+						Link:                giturl.GenerateLink(repository, commit, file, line),
+						Timestamp:           sanitizer.UTF8(timestamp),
+						Line:                line,
+						Visibility:          s.visibilityOf(aCtx, repository),
+						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
 					},
 				},
 			}
@@ -741,11 +741,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	if err != nil {
 		return duration, err
 	}
-
-	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
-		defer os.RemoveAll(path)
-	}
+	defer os.RemoveAll(path)
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
 	s.setScanOptions(s.conn.Base, s.conn.Head)

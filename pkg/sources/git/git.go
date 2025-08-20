@@ -216,12 +216,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
-						Commit:     sanitizer.UTF8(commit),
-						File:       sanitizer.UTF8(file),
-						Email:      sanitizer.UTF8(email),
-						Repository: sanitizer.UTF8(repository),
-						Timestamp:  sanitizer.UTF8(timestamp),
-						Line:       line,
+						Commit:              sanitizer.UTF8(commit),
+						File:                sanitizer.UTF8(file),
+						Email:               sanitizer.UTF8(email),
+						Repository:          sanitizer.UTF8(repository),
+						Timestamp:           sanitizer.UTF8(timestamp),
+						Line:                line,
+						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
 					},
 				},
 			}
@@ -352,9 +353,8 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 	}
 
 	err = func() error {
-		// remove the directory only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-			defer os.RemoveAll(gitDir)
+		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) {
+			// defer os.RemoveAll(gitDir)
 		}
 
 		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)

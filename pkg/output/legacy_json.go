@@ -25,27 +25,26 @@ import (
 type LegacyJSONPrinter struct{ mu sync.Mutex }
 
 func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
-	var repo string
+	var repo, repoPath string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
 		repo = r.SourceMetadata.GetGit().Repository
+		repoPath = r.SourceMetadata.GetGit().RepositoryLocalPath
 	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
 		repo = r.SourceMetadata.GetGithub().Repository
+		repoPath = r.SourceMetadata.GetGithub().RepositoryLocalPath
 	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
 		repo = r.SourceMetadata.GetGitlab().Repository
+		repoPath = r.SourceMetadata.GetGitlab().RepositoryLocalPath
 	default:
 		return fmt.Errorf("unsupported source type for legacy json output: %s", r.SourceType)
 	}
 
 	// cloning the repo again here is not great and only works with unauthed repos
-	repoPath := ""
 	remote := false
 	var err error
 
-	if r.SourceMetadata != nil && r.SourceMetadata.GetGitlab().RepositoryLocalPath != "" {
-		repoPath = r.SourceMetadata.GetGitlab().RepositoryLocalPath + "/.git"
-		remote = true
-	} else {
+	if repoPath == "" {
 		repoPath, remote, err = git.PrepareRepo(ctx, repo, "")
 		if err != nil || repoPath == "" {
 			return fmt.Errorf("error preparing git repo for scanning: %w", err)

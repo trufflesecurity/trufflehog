@@ -1072,6 +1072,8 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for Line
 
+	// no validation rules for RepositoryLocalPath
+
 	if len(errors) > 0 {
 		return GitMultiError(errors)
 	}
@@ -1187,6 +1189,8 @@ func (m *Github) validate(all bool) error {
 	// no validation rules for Line
 
 	// no validation rules for Visibility
+
+	// no validation rules for RepositoryLocalPath
 
 	if len(errors) > 0 {
 		return GithubMultiError(errors)
