@@ -24,7 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(glc_eyJ[A-Za-z0-9+\/=]{60,160})`)
+	keyPat = regexp.MustCompile(`\b(glc_[A-Za-z0-9+/]{32,400}={0,2})\b`)
 )
 
 func (s Scanner) getClient() *http.Client {
@@ -38,8 +38,10 @@ func (s Scanner) getClient() *http.Client {
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
+// Grafana uses "glc_" as a prefix for cloud API tokens, see for example.
+// https://github.com/grafana/pyroscope-dotnet/blob/0c17634653af09befa7bc07b2e1c420b5dc8578c/tracer/src/Datadog.Trace/Iast/Analyzers/HardcodedSecretsAnalyzer.cs#L174
 func (s Scanner) Keywords() []string {
-	return []string{"glc_eyJ"}
+	return []string{"glc_"}
 }
 
 // FromData will find and optionally verify Grafana secrets in a given set of bytes.
