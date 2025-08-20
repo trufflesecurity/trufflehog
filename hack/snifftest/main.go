@@ -181,7 +181,7 @@ func main() {
 				defer sem.Release(1)
 				defer wgChunkers.Done()
 				logger.Info("cloning repo", "repo", r)
-				path, repo, err := git.CloneRepoUsingUnauthenticated(ctx, r)
+				path, repo, err := git.CloneRepoUsingUnauthenticated(ctx, r, "")
 				if err != nil {
 					logFatal(err, "error cloning repo", "repo", r)
 				}

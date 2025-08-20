@@ -94,3 +94,33 @@ func TestAWSSessionKey_Pattern(t *testing.T) {
 		})
 	}
 }
+
+func TestAWSSessionKey_WithAllowedAccounts(t *testing.T) {
+	accounts := []string{"123456789012", "999888777666"}
+	s := New(WithAllowedAccounts(accounts))
+
+	// Test that allowed accounts are properly configured
+	shouldSkip := s.ShouldSkipAccount("123456789012")
+	require.False(t, shouldSkip)
+	require.True(t, s.IsInAllowList("123456789012"))
+
+	// Test that non-allowed accounts are skipped
+	shouldSkip = s.ShouldSkipAccount("111222333444")
+	require.True(t, shouldSkip)
+	require.False(t, s.IsInAllowList("111222333444"))
+}
+
+func TestAWSSessionKey_WithDeniedAccounts(t *testing.T) {
+	accounts := []string{"123456789012", "999888777666"}
+	s := New(WithDeniedAccounts(accounts))
+
+	// Test that denied accounts are properly skipped
+	shouldSkip := s.ShouldSkipAccount("123456789012")
+	require.True(t, shouldSkip)
+	require.True(t, s.IsInDenyList("123456789012"))
+
+	// Test that non-denied accounts are not skipped
+	shouldSkip = s.ShouldSkipAccount("111222333444")
+	require.False(t, shouldSkip)
+	require.False(t, s.IsInDenyList("111222333444"))
+}
