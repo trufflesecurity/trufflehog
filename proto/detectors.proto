@@ -1046,6 +1046,7 @@ enum DetectorType {
   TableauPersonalAccessToken = 1034;
   Rootly = 1035;
   HashiCorpVaultAuth = 1036;
+  GrafanaAPIKey = 1037;
 }
 
 message Result {
