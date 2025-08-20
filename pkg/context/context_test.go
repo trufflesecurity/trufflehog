@@ -186,9 +186,9 @@ func TestCause(t *testing.T) {
 	assert.Equal(t, err, Cause(ctx))
 }
 
-// TestBurriedLogger tests when a logging context is wrapped by a non-logging
+// TestBuriedLogger tests when a logging context is wrapped by a non-logging
 // implementation that we can still regain the original logger.
-func TestBurriedLogger(t *testing.T) {
+func TestBuriedLogger(t *testing.T) {
 	var buffer bytes.Buffer
 	logger, sync := log.New("test",
 		log.WithConsoleSink(&buffer),
