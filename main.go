@@ -726,8 +726,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 
 		// clone path is only supported for HTTPS repository URLs, not for local repositories.
-		if *gitClonePath != "" && !strings.HasPrefix(*gitScanURI, "https://") {
-			return scanMetrics, fmt.Errorf("invalid configuration: --clone-path can only be used with an HTTPS repository URL")
+		if *gitClonePath != "" && strings.HasPrefix(*gitScanURI, "file://") {
+			return scanMetrics, fmt.Errorf("invalid configuration: --clone-path cannot be used with a local repository URL")
 		}
 
 		if err := validateClonePath(*gitClonePath, *gitNoCleanup); err != nil {
@@ -1167,14 +1167,14 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	info, err := os.Stat(clonePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("path provided to --clone-path: %s does not exist", clonePath)
+			return fmt.Errorf("path provided to --clone-path: %q does not exist", clonePath)
 		}
 
-		return fmt.Errorf("failed to access --clone-path %s: %w", clonePath, err)
+		return fmt.Errorf("failed to access --clone-path %q: %w", clonePath, err)
 	}
 
 	if !info.IsDir() {
-		return fmt.Errorf("path provided to --clone-path: %s is not a directory", clonePath)
+		return fmt.Errorf("path provided to --clone-path: %q is not a directory", clonePath)
 	}
 
 	return nil

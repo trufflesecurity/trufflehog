@@ -1272,7 +1272,6 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string) (string, bool
 	case "file":
 		path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
 	case "http", "https":
-		ctx.Logger().V(5).Info("HTTPS", "clone_path", clonePath)
 		remotePath := uri.String()
 		remote = true
 		switch {
