@@ -1662,7 +1662,7 @@ func newConnector(source *Source) (Connector, error) {
 		return NewAppConnector(apiEndpoint, cred.GithubApp)
 	case *sourcespb.GitHub_BasicAuth:
 		log.RedactGlobally(cred.BasicAuth.GetPassword())
-		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
+		return NewBasicAuthConnector(apiEndpoint, source.conn.GetClonePath(), cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
 		return NewTokenConnector(apiEndpoint, cred.Token, source.conn.GetClonePath(), source.useAuthInUrl, func(c context.Context, err error) bool {
