@@ -9,11 +9,13 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -161,5 +163,126 @@ func TestSource_Chunks(t *testing.T) {
 			}
 			waitFn()
 		})
+	}
+}
+
+func TestSource_Chunks_TargetedScanning(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Skipf("Failed to access secret: %v", err)
+	}
+
+	s3key := secret.MustGetField("AWS_S3_KEY")
+	s3secret := secret.MustGetField("AWS_S3_SECRET")
+
+	// Create S3 source
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		},
+		Buckets: []string{"truffletestbucket-s3-tests"},
+	})
+	require.NoError(t, err)
+
+	err = s.Init(ctx, "s3 test source for targeted scanning", 0, 0, false, conn, 8)
+	require.NoError(t, err)
+
+	// First, let's find what objects are actually in the bucket by running a regular scan
+	// and capturing the first chunk to get its metadata
+	var actualBucket string
+	var actualKey string
+	var actualData []byte
+	
+	// Run a quick scan to discover available objects
+	tempChunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(tempChunksCh)
+		_ = s.Chunks(ctx, tempChunksCh)
+	}()
+	
+	// Get the first chunk to extract actual S3 metadata
+	select {
+	case <-ctx.Done():
+		t.Fatal("Failed to get sample chunk for S3 metadata")
+	case chunk, ok := <-tempChunksCh:
+		require.True(t, ok, "Should receive at least one chunk from regular scan")
+		
+		// Extract the S3 metadata from the chunk
+		s3Meta, ok := chunk.SourceMetadata.GetData().(*source_metadatapb.MetaData_S3)
+		require.True(t, ok, "First chunk should have S3 metadata")
+		
+		actualBucket = s3Meta.S3.GetBucket()
+		actualKey = s3Meta.S3.GetFile()
+		actualData = chunk.Data
+		
+		t.Logf("Found S3 object: bucket=%s, key=%s, size=%d bytes", actualBucket, actualKey, len(actualData))
+		
+		// Drain remaining chunks
+		for range tempChunksCh {
+		}
+	}
+	
+	require.NotEmpty(t, actualBucket, "Should have found a bucket")
+	require.NotEmpty(t, actualKey, "Should have found a key")
+	require.NotEmpty(t, actualData, "Should have found data")
+
+	// Create a ChunkingTarget with the actual S3 metadata we discovered
+	target := sources.ChunkingTarget{
+		SecretID: 12345,
+		QueryCriteria: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_S3{
+				S3: &source_metadatapb.S3{
+					Bucket: actualBucket,
+					File:   actualKey,
+					Link:   fmt.Sprintf("s3://%s/%s", actualBucket, actualKey),
+					Email:  "test@trufflesecurity.com",
+				},
+			},
+		},
+	}
+
+	// Test targeted scanning
+	chunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunksCh)
+		err = s.Chunks(ctx, chunksCh, target)
+		assert.NoError(t, err)
+	}()
+
+	// Wait for and verify the chunk
+	select {
+	case <-ctx.Done():
+		t.Fatal("TestSource_Chunks_TargetedScanning timed out")
+	case chunk, ok := <-chunksCh:
+		require.True(t, ok, "Should receive at least one chunk")
+		
+		// Verify the chunk has the right properties
+		assert.Equal(t, SourceType, chunk.SourceType)
+		assert.Equal(t, sources.SourceID(0), chunk.SourceID)
+		assert.Equal(t, sources.JobID(0), chunk.JobID)
+		assert.Equal(t, int64(12345), chunk.SecretID)
+		assert.False(t, chunk.Verify)
+		
+		// Verify the metadata
+		require.NotNil(t, chunk.SourceMetadata)
+		s3Meta, ok := chunk.SourceMetadata.GetData().(*source_metadatapb.MetaData_S3)
+		require.True(t, ok, "Metadata should be S3 type")
+		assert.Equal(t, actualBucket, s3Meta.S3.GetBucket())
+		assert.Equal(t, actualKey, s3Meta.S3.GetFile())
+		assert.Equal(t, fmt.Sprintf("s3://%s/%s", actualBucket, actualKey), s3Meta.S3.GetLink())
+		assert.Equal(t, "test@trufflesecurity.com", s3Meta.S3.GetEmail())
+		
+		// Verify the chunk has data (should match the content we discovered from regular scan)
+		assert.Equal(t, actualData, chunk.Data, "Chunk data should match the S3 object content from targeted scan")
+		
+		t.Logf("Successfully received targeted chunk: bucket=%s, key=%s, size=%d bytes", 
+			s3Meta.S3.GetBucket(), s3Meta.S3.GetFile(), len(chunk.Data))
 	}
 }
