@@ -235,32 +235,49 @@ func (m *CustomRegex) validate(all bool) error {
 
 	// no validation rules for PrimaryRegexName
 
-	if all {
-		switch v := interface{}(m.GetValidations()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, CustomRegexValidationError{
-					field:  "Validations",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, CustomRegexValidationError{
-					field:  "Validations",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+	{
+		sorted_keys := make([]string, len(m.GetValidations()))
+		i := 0
+		for key := range m.GetValidations() {
+			sorted_keys[i] = key
+			i++
 		}
-	} else if v, ok := interface{}(m.GetValidations()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return CustomRegexValidationError{
-				field:  "Validations",
-				reason: "embedded message failed validation",
-				cause:  err,
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetValidations()[key]
+			_ = val
+
+			// no validation rules for Validations[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, CustomRegexValidationError{
+							field:  fmt.Sprintf("Validations[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, CustomRegexValidationError{
+							field:  fmt.Sprintf("Validations[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return CustomRegexValidationError{
+						field:  fmt.Sprintf("Validations[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
 			}
+
 		}
 	}
 

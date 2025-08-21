@@ -21,7 +21,7 @@ message CustomRegex {
   float entropy = 8;
   repeated string exclude_regexes_match = 9;
   string primary_regex_name = 10;
-  ValidationConfig validations = 11;
+  map<string, ValidationConfig> validations = 11;
 }
 
 

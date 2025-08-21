@@ -249,8 +249,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsDigit: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsDigit: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -274,8 +276,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsDigit: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsDigit: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -292,8 +296,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsLowercase: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsLowercase: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -317,8 +323,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsLowercase: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsLowercase: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -335,8 +343,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsUppercase: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -360,8 +370,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsUppercase: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -378,8 +390,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsSpecialChar: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsSpecialChar: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -403,8 +417,10 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsSpecialChar: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsSpecialChar: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -421,9 +437,11 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsUppercase:   true,
-						ContainsSpecialChar: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase:   true,
+							ContainsSpecialChar: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -447,9 +465,11 @@ func TestDetectorValidations(t *testing.T) {
 					Name:     "test",
 					Keywords: []string{"password"},
 					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
-					Validations: &custom_detectorspb.ValidationConfig{
-						ContainsUppercase:   true,
-						ContainsSpecialChar: true,
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase:   true,
+							ContainsSpecialChar: true,
+						},
 					},
 				},
 				Data: `This is custom example
@@ -458,6 +478,69 @@ func TestDetectorValidations(t *testing.T) {
 						End of file`,
 			},
 			want: nil,
+		},
+		{
+			name: "custom validation - wrong regex name in validations",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"wrong": {
+							ContainsUppercase: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: mystrongp@ssword
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("mystrongp@ssword"),
+				},
+			},
+		},
+		{
+			name: "custom validation - multiple regex validations",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password", "api_key"},
+					Regex: map[string]string{
+						"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`,
+						"api_key":  `([a-f0-9_-]{32})`,
+					},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase:   true,
+							ContainsSpecialChar: true,
+						},
+						"api_key": {
+							ContainsSpecialChar: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongP@ssword
+						API_Key: c392c9837d69b44c764cbf260b-e6184 // should be detected
+						API_Key: c392c9837d69b44c764cbf260be6184 // should be filtered by validation
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("MyStrongP@sswordc392c9837d69b44c764cbf260b-e6184"),
+				},
+			},
 		},
 	}
 
