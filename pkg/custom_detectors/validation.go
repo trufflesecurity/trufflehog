@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 func ValidateKeywords(keywords []string) error {
@@ -113,8 +112,9 @@ func ValidateRegexVars(regex map[string]string, body ...string) error {
 
 // ContainsDigit checks if string contains at least one digit
 func ContainsDigit(s string) bool {
-	for _, r := range s {
-		if unicode.IsDigit(r) {
+	for i := 0; i < len(s); i++ {
+		char := s[i]
+		if char >= '0' && char <= '9' {
 			return true
 		}
 	}
@@ -124,21 +124,25 @@ func ContainsDigit(s string) bool {
 
 // ContainsLowercase checks if string contains at least one lowercase letter
 func ContainsLowercase(s string) bool {
-	for _, r := range s {
-		if unicode.IsLower(r) {
+	for i := 0; i < len(s); i++ {
+		char := s[i]
+		if char >= 'a' && char <= 'z' {
 			return true
 		}
 	}
+
 	return false
 }
 
 // ContainsUppercase checks if string contains at least one uppercase letter
 func ContainsUppercase(s string) bool {
-	for _, r := range s {
-		if unicode.IsUpper(r) {
+	for i := 0; i < len(s); i++ {
+		char := s[i]
+		if char >= 'A' && char <= 'Z' {
 			return true
 		}
 	}
+
 	return false
 }
 
