@@ -395,7 +395,7 @@ func (s *Source) scanBuckets(
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	chunksReporter := sources.ChanReporter{Ch: chunksChan}
-	
+
 	// If targets are provided, we're only scanning the data in those targets.
 	// Otherwise, we're scanning all data.
 	// This allows us to only scan the specific S3 object where a secret was found for reverification.
@@ -504,7 +504,7 @@ func (s *Source) getClientForBucket(ctx context.Context, bucket string) (*s3.Cli
 	// For targeted scanning, we need to handle bucket access through the configured roles
 	// We'll try to get a client that can access this bucket
 	var lastErr error
-	
+
 	// Try each configured role to find one that can access this bucket
 	for _, role := range s.conn.GetRoles() {
 		client, err := s.newClient(ctx, defaultAWSRegion, role)
@@ -532,7 +532,7 @@ func (s *Source) getClientForBucket(ctx context.Context, bucket string) (*s3.Cli
 
 		return regionalClient, nil
 	}
-	
+
 	// If no roles worked, try with the default (no role)
 	client, err := s.newClient(ctx, defaultAWSRegion, "")
 	if err != nil {

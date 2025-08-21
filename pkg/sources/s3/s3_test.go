@@ -199,36 +199,36 @@ func TestSource_Chunks_TargetedScanning(t *testing.T) {
 	var actualBucket string
 	var actualKey string
 	var actualData []byte
-	
+
 	// Run a quick scan to discover available objects
 	tempChunksCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(tempChunksCh)
 		_ = s.Chunks(ctx, tempChunksCh)
 	}()
-	
+
 	// Get the first chunk to extract actual S3 metadata
 	select {
 	case <-ctx.Done():
 		t.Fatal("Failed to get sample chunk for S3 metadata")
 	case chunk, ok := <-tempChunksCh:
 		require.True(t, ok, "Should receive at least one chunk from regular scan")
-		
+
 		// Extract the S3 metadata from the chunk
 		s3Meta, ok := chunk.SourceMetadata.GetData().(*source_metadatapb.MetaData_S3)
 		require.True(t, ok, "First chunk should have S3 metadata")
-		
+
 		actualBucket = s3Meta.S3.GetBucket()
 		actualKey = s3Meta.S3.GetFile()
 		actualData = chunk.Data
-		
+
 		t.Logf("Found S3 object: bucket=%s, key=%s, size=%d bytes", actualBucket, actualKey, len(actualData))
-		
+
 		// Drain remaining chunks
 		for range tempChunksCh {
 		}
 	}
-	
+
 	require.NotEmpty(t, actualBucket, "Should have found a bucket")
 	require.NotEmpty(t, actualKey, "Should have found a key")
 	require.NotEmpty(t, actualData, "Should have found data")
@@ -262,14 +262,14 @@ func TestSource_Chunks_TargetedScanning(t *testing.T) {
 		t.Fatal("TestSource_Chunks_TargetedScanning timed out")
 	case chunk, ok := <-chunksCh:
 		require.True(t, ok, "Should receive at least one chunk")
-		
+
 		// Verify the chunk has the right properties
 		assert.Equal(t, SourceType, chunk.SourceType)
 		assert.Equal(t, sources.SourceID(0), chunk.SourceID)
 		assert.Equal(t, sources.JobID(0), chunk.JobID)
 		assert.Equal(t, int64(12345), chunk.SecretID)
 		assert.False(t, chunk.Verify)
-		
+
 		// Verify the metadata
 		require.NotNil(t, chunk.SourceMetadata)
 		s3Meta, ok := chunk.SourceMetadata.GetData().(*source_metadatapb.MetaData_S3)
@@ -278,11 +278,11 @@ func TestSource_Chunks_TargetedScanning(t *testing.T) {
 		assert.Equal(t, actualKey, s3Meta.S3.GetFile())
 		assert.Equal(t, fmt.Sprintf("s3://%s/%s", actualBucket, actualKey), s3Meta.S3.GetLink())
 		assert.Equal(t, "test@trufflesecurity.com", s3Meta.S3.GetEmail())
-		
+
 		// Verify the chunk has data (should match the content we discovered from regular scan)
 		assert.Equal(t, actualData, chunk.Data, "Chunk data should match the S3 object content from targeted scan")
-		
-		t.Logf("Successfully received targeted chunk: bucket=%s, key=%s, size=%d bytes", 
+
+		t.Logf("Successfully received targeted chunk: bucket=%s, key=%s, size=%d bytes",
 			s3Meta.S3.GetBucket(), s3Meta.S3.GetFile(), len(chunk.Data))
 	}
 }
