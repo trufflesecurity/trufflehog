@@ -41,18 +41,13 @@ func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMe
 	}
 
 	// cloning the repo again here is not great and only works with unauthed repos
-	remote := false
 	var err error
 
 	if repoPath == "" {
-		repoPath, remote, err = git.PrepareRepo(ctx, repo, "")
+		repoPath, _, err = git.PrepareRepo(ctx, repo, "")
 		if err != nil || repoPath == "" {
 			return fmt.Errorf("error preparing git repo for scanning: %w", err)
 		}
-	}
-	if remote {
-		// defer os.RemoveAll(repoPath)
-		// TODO: we need to remove the repo after printing, but this is not implemented yet.
 	}
 
 	legacy, err := convertToLegacyJSON(r, repoPath)
