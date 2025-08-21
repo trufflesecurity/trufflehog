@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"sync"
@@ -392,13 +393,158 @@ func (s *Source) scanBuckets(
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
+	chunksReporter := sources.ChanReporter{Ch: chunksChan}
+	
+	// If targets are provided, we're only scanning the data in those targets.
+	// Otherwise, we're scanning all data.
+	// This allows us to only scan the specific S3 object where a secret was found for reverification.
+	if len(targets) > 0 {
+		errs := s.scanTargets(ctx, targets, chunksReporter)
+		return errors.Join(errs...)
+	}
+
 	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
 		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
 		return nil
 	}
 
 	return s.visitRoles(ctx, visitor)
+}
+
+// scanTargets scans the provided targets for secrets.
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, reporter sources.ChunkReporter) []error {
+	var errs []error
+	for _, tgt := range targets {
+		if err := s.scanTarget(ctx, tgt, reporter); err != nil {
+			ctx.Logger().Error(err, "error scanning target")
+			errs = append(errs, &sources.TargetedScanError{Err: err, SecretID: tgt.SecretID})
+		}
+	}
+
+	return errs
+}
+
+// scanTarget scans a single target for secrets.
+func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, reporter sources.ChunkReporter) error {
+	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_S3)
+	if !ok {
+		return fmt.Errorf("unable to cast metadata type for S3 targeted scan")
+	}
+	meta := metaType.S3
+
+	chunkSkel := sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
+		SecretID:   target.SecretID,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_S3{S3: meta},
+		},
+		Verify: s.verify,
+	}
+
+	bucket := meta.GetBucket()
+	key := meta.GetFile()
+
+	if bucket == "" || key == "" {
+		return fmt.Errorf("missing required S3 metadata: bucket=%s, key=%s", bucket, key)
+	}
+
+	ctx.Logger().V(2).Info("scanning S3 object for reverification",
+		"bucket", bucket,
+		"key", key,
+		"secret_id", target.SecretID)
+
+	// Get an S3 client for this bucket
+	client, err := s.getClientForBucket(ctx, bucket)
+	if err != nil {
+		return fmt.Errorf("failed to get S3 client for bucket %s: %w", bucket, err)
+	}
+
+	// Get the S3 object
+	response, err := client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to get S3 object s3://%s/%s: %w", bucket, key, err)
+	}
+	defer response.Body.Close()
+
+	// Read the object content
+	buf, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read S3 object content: %w", err)
+	}
+
+	ctx.Logger().V(3).Info("read S3 object for reverification",
+		"bucket", bucket,
+		"key", key,
+		"size_bytes", len(buf))
+
+	// Update the chunk with the object data
+	chunkSkel.Data = buf
+
+	// Report the chunk for processing
+	if err := reporter.ChunkOk(ctx, chunkSkel); err != nil {
+		return fmt.Errorf("failed to report chunk: %w", err)
+	}
+
+	ctx.Logger().V(2).Info("completed S3 reverification scan for object",
+		"bucket", bucket,
+		"key", key)
+
+	return nil
+}
+
+// getClientForBucket gets an S3 client for the specified bucket, handling region detection.
+func (s *Source) getClientForBucket(ctx context.Context, bucket string) (*s3.Client, error) {
+	// For targeted scanning, we need to handle bucket access through the configured roles
+	// We'll try to get a client that can access this bucket
+	var lastErr error
+	
+	// Try each configured role to find one that can access this bucket
+	for _, role := range s.conn.GetRoles() {
+		client, err := s.newClient(ctx, defaultAWSRegion, role)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		// Try to get the bucket region and create a regional client
+		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		// Test access by trying to list objects (just to validate access)
+		_, err = regionalClient.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:  aws.String(bucket),
+			MaxKeys: aws.Int32(1),
+		})
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		return regionalClient, nil
+	}
+	
+	// If no roles worked, try with the default (no role)
+	client, err := s.newClient(ctx, defaultAWSRegion, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create default S3 client: %w", err)
+	}
+
+	regionalClient, err := s.getRegionalClientForBucket(ctx, client, "", bucket)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create regional client for bucket %s: %w (last role error: %v)", bucket, err, lastErr)
+	}
+
+	return regionalClient, nil
 }
 
 func (s *Source) getRegionalClientForBucket(
