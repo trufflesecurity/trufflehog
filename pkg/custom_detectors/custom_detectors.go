@@ -150,6 +150,26 @@ MatchLoop:
 					continue MatchLoop
 				}
 			}
+
+			if validations := c.GetValidations(); validations != nil {
+				validationRules := []struct {
+					enabled   bool
+					validator func(string) bool
+				}{
+					{validations.GetContainsDigit(), ContainsDigit},
+					{validations.GetContainsLowercase(), ContainsLowercase},
+					{validations.GetContainsUppercase(), ContainsUppercase},
+					{validations.GetContainsSpecialChar(), ContainsSpecialChar},
+				}
+
+				for _, rule := range validationRules {
+					if rule.enabled && !rule.validator(secret) {
+						// skip this match if a validation rule is enabled but missing from the secret
+						continue MatchLoop
+					}
+				}
+			}
+
 		}
 
 		g.Go(func() error {
