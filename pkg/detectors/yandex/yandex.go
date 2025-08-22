@@ -2,8 +2,10 @@ package yandex
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
+	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -44,23 +46,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://dictionary.yandex.net/api/v1/dicservice.json/getLangs?key="+resMatch, nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
+	// Reference: https://yandex.com/dev/dictionary/doc/dg/reference/getLangs.html
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://dictionary.yandex.net/api/v1/dicservice.json/getLangs?key=%s", apiKey), http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusPaymentRequired:
+		return false, fmt.Errorf("blocked: %d", res.StatusCode)
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
