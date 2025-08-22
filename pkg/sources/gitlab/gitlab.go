@@ -1095,7 +1095,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 
 	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
+	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog-")) || (!s.noCleanup && s.clonePath != "") {
 		defer os.RemoveAll(path)
 	}
 

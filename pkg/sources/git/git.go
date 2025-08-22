@@ -354,7 +354,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 
 	err = func() error {
 		// remove the directory only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
+		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog-")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
 			defer os.RemoveAll(gitDir)
 		}
 

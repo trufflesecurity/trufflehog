@@ -709,26 +709,30 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 	eng.Start(ctx)
 
-	tmpFile := filepath.Join(os.TempDir(), "truffle-temp-repo")
+	tmpDir := filepath.Join(os.TempDir(), "trufflehog_"+strconv.Itoa(os.Getpid()))
+	// We need to persist the repo(s) if we're using legacy JSON output
+	// because it requires commit SHAs in the output.
+	persistRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
+	if *jsonLegacy && !persistRepo {
+		if err := os.MkdirAll(tmpDir, os.ModePerm); err != nil {
+			return scanMetrics, fmt.Errorf("failed to create temporary directory: %v", err)
+		}
+		*gitNoCleanup, *githubNoCleanup, *gitlabNoCleanup = true, true, true
+		*gitClonePath, *githubClonePath, *gitlabClonePath = tmpDir, tmpDir, tmpDir
+	}
+
 	defer func() {
 		// Clean up temporary artifacts.
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 			ctx.Logger().Error(err, "error cleaning temp artifacts")
 		}
 
-		if err := os.RemoveAll(tmpFile); err != nil {
-			ctx.Logger().Error(err, "error removing temporary directory")
+		if !persistRepo {
+			if err := os.RemoveAll(tmpDir); err != nil {
+				ctx.Logger().Error(err, "error removing temporary directory")
+			}
 		}
 	}()
-
-	persistRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
-	if *jsonLegacy && !persistRepo {
-		if err := os.MkdirAll(tmpFile, os.ModePerm); err != nil {
-			return scanMetrics, fmt.Errorf("failed to create temporary directory: %v", err)
-		}
-		*gitNoCleanup, *githubNoCleanup, *gitlabNoCleanup = true, true, true
-		*gitClonePath, *githubClonePath, *gitlabClonePath = tmpFile, tmpFile, tmpFile
-	}
 
 	var refs []sources.JobProgressRef
 	switch cmd {

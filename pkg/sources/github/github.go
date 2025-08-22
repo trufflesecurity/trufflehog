@@ -743,7 +743,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 		return duration, err
 	}
 	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
+	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog-")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
 		defer os.RemoveAll(path)
 	}
 
