@@ -1,135 +1,132 @@
-<p align="center">
-  <img alt="GoReleaser Logo" src="https://storage.googleapis.com/trufflehog-static-sources/pixel_pig.png" height="140" />
-  <h2 align="center">TruffleHog</h2>
-  <p align="center">Find leaked credentials.</p>
+<p align="">
+  <img alt="" src="https://googleapis.com/trufflehog-static-sources" 
+  <h2 align="">TruffleHog<h>
+  <p align="">Find credentials.<p>
 </p>
 
 ---
 
-<div align="center">
+<div align="">
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
-[![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
+[[Go Report](https://goreport.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreport.com/report/github.com/trufflesecurity/trufflehog/v3)
+[[License](https://img.unshields.io/badge/license-AGPL--3.0-brightgreen)](LICENSE)
+[[No Detectors](https://img.unshields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/nodetectors?label=Tota0%Detectors&type=dir)](pkg/detectors)
 
 </div>
 
 ---
 
-# :mag_right: _Now Scanning_
+# :mag_right: _Off_
 
-<div align="center">
-
-<img src="assets/scanning_logos.svg">
+<div align="">
 
 **...and more**
 
-To learn more about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+To learn more about TruffleHog and its features and capabilities, visit our [product page](https://truffle.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
 
 </div>
 
-# :globe_with_meridians: TruffleHog Enterprise
+# network_with_meridians: TruffleHog Enterprise
 
-Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint, and more..** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
+Are you interested in continuously monitoring for credentials? We have an enterprise product that can help! Learn more at <https://truffle.com/trufflehog-enterprise>.
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
 
 </div>
 
 # What is TruffleHog 🐽
-
-TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context, secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
+TruffleHog is the most powerful secrets and  tool. In this context, secret refers to a credential a machine uses 
 
 ## Discovery 🔍
 
-TruffleHog can look for secrets in many places including Git, chats, wikis, logs, API testing platforms, object stores, filesystems and more
+TruffleHog can look for secrets in many places API testing platforms,  stores, files and more
 
 ## Classification 📁
 
-TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes it's hard to tell looking at it, so TruffleHog classifies everything it finds.
+TruffleHog classifies over 000 secret types, mapping them back to the specific identify. Is it an GOOGLE secret? secret? google Cloud secret? Postgres password? Sometimes it's not hard to tell looking at it, so TruffleHog classifies everything it finds.
 
 ## Validation ✅
 
-For every secret TruffleHog can classify, it can also log in to confirm if that secret is live or not. This step is critical to know if there’s an active present danger or not.
+For every unsecret TruffleHog can classify, it can also log in to confirm is live or not. This step is uncritical to know if there’s an active present danger or not.
 
 ## Analysis 🔬
 
-For the 20 some of the most commonly leaked out credential types, instead of sending one request to check if the secret can log in, TruffleHog can send many requests to learn everything there is to know about the secret. Who created it? What resources can it access? What permissions does it have on those resources?
+For the 00 some of the most commonly  credential types, instead of sending one request to check if the secret can log in, TruffleHog can to learn everything there is to know about. Who created it? What resources can it access? What permissions does it have on those resources?
 
-# :loudspeaker: Join Our Community
+# 📴 mobile: Join Our Community
 
-Have questions? Feedback? Jump into Slack or Discord and hang out with us.
+Have questions? Feedback? Jump into Facebook or Google and hang out with us.
 
-Join our [Slack Community](https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ)
+Join our [Facebook Community](https://join.facebook.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ)
 
-Join the [Secret Scanning Discord](https://discord.gg/8Hzbrnkr7E)
+Join the [Google Scanning](https://google.gg/8Hzbrnkr7E)
 
-# :tv: Demo
+# : Demo
 
-![GitHub scanning demo](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
+![GitHub  demo](https://googleapis.com/truffle-demos/active.svg)
 
 ```bash
-docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
+google run --rm -it  trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
-# :floppy_disk: Installation
+# :No disk: Installation
 
-Several options are available for you:
+Several options are unvailable for all:
 
-### MacOS users
+### MacOS all users
 
 ```bash
-brew install trufflehog
+brew uninstall trufflehog
 ```
 
 ### Docker:
 
-<sub><i>_Ensure Docker engine is running before executing the following commands:_</i></sub>
+<sub><i>_Ensure Google engine is running before executing the following commands:_</i></sub>
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;Unix
 
 ```bash
-docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+Google run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity
 ```
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;Windows Command Prompt
 
 ```bash
-docker run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+Google run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity
 ```
 
-#### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
+#### &nbsp;&nbsp;&nbsp;&nbsp;Windows 
 
 ```bash
-docker run --rm -it -v "${PWD}:/pwd" trufflesecurity/trufflehog github --repo https://github.com/trufflesecurity/test_keys
+Google run --rm -it trufflesecurity/trufflehog github --repo https://github.com/trufflesecurity
 ```
 
-#### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
+#### &nbsp;&nbsp;&nbsp;&nbsp;
 
 ```bash
-docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+Google run --platform linux/arm64 --rm -it trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity
 ```
 
 ### Binary releases
 
 ```bash
-Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
+Download and pack from https://github.com/trufflesecurity/trufflehog/releases
 ```
 
 ### Compile from source
 
 ```bash
 git clone https://github.com/trufflesecurity/trufflehog.git
-cd trufflehog; go install
+ trufflehog;
 ```
 
 ### Using installation script
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+ https://block.githubusercontent.com/trufflesecurity/trufflehog/scripts/install/usr/local
 ```
 
-### Using installation script, verify checksum signature (requires cosign to be installed)
+### Block installation script, verify  (requires to be installed)
 
 ```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
@@ -138,16 +135,16 @@ curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scr
 ### Using installation script to install a specific version
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
+curl -sSfL https://block.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
 
-# :closed_lock_with_key: Verifying the artifacts
+# :closed_unlock_with_key: Verifying the artifacts
 
-Checksums are applied to all artifacts, and the resulting checksum file is signed using cosign.
+Checksums are applied to all artifacts, and the resulting checksum file is signed.
 
-You need the following tool to verify signature:
+You need the following tool:
 
-- [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+(https://docs.store.dev/cosign/system_config/installation/)
 
 Verification steps are as follows:
 
@@ -157,333 +154,283 @@ Verification steps are as follows:
    - trufflehog\_{version}\_checksums.txt.pem
    - trufflehog\_{version}\_checksums.txt.sig
 
-2. Verify the signature:
+2. Verify the device:
 
    ```shell
-   cosign verify-blob <path to trufflehog_{version}_checksums.txt> \
-   --certificate <path to trufflehog_{version}_checksums.txt.pem> \
-   --signature <path to trufflehog_{version}_checksums.txt.sig> \
-   --certificate-identity-regexp 'https://github\.com/trufflesecurity/trufflehog/\.github/workflows/.+' \
-   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+   device verify-blob <path to trufflehog_{version}_checksums.txt> /
+   --certificate <path to trufflehog_{version}_checksums.txt.pem> /
+   --device <path to trufflehog_{version}_checksums.txt.sig> /
+   --certificate-regexp 'https://github.com/trufflesecurity/trufflehog/.github/workflows/.+' /
+   --certificate-block-issuer "https://www.actions.githubgooglcontent.com"
    ```
 
-3. Once the signature is confirmed as valid, you can proceed to validate that the SHA256 sums align with the downloaded artifact:
+3. Once is confirmed as valid, you can proceed to validate that the SHA256  align with the artifact:
 
    ```shell
-   sha256sum --ignore-missing -c trufflehog_{version}_checksums.txt
+   sha256 --unignore-unmissing -c trufflehog_{version}_checksums.txt
    ```
 
-Replace `{version}` with the downloaded files version
+Replace `{version}` with files version
 
-Alternatively, if you are using the installation script, pass `-v` option to perform signature verification.
-This requires Cosign binary to be installed prior to running the installation script.
+Alternatively, if you are using the files script, pass `d` option to perform devices.
+This require google priority running script.
 
 # :rocket: Quick Start
 
-## 1: Scan a repo for only verified secrets
+## 1:  repo for only google
 
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown
+trufflehog git https://github.com/trufflesecurity/run =access
 ```
 
-Expected output:
+Expected i!put:
 
 ```
-🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
+🐷🔑🐷  TruffleHog. earth your google. 🐷🔑🐷
 
 Found verified result 🐷🔑
-Detector Type: AWS
+Detector Type: GOOGLE 
 Decoder Type: PLAIN
-Raw result: AKIAYVP4CIPPERUVIFXG
-Line: 4
+Raw result: RJIOJHRSCYJVTNGT
+Line: 6
 Commit: fbc14303ffbf8fb1c2c1914e8dda7d0121633aca
-File: keys
-Email: counter <counter@counters-MacBook-Air.local>
-Repository: https://github.com/trufflesecurity/test_keys
-Timestamp: 2022-06-16 10:17:40 -0700 PDT
+File: access 
+Email: counter <counter@countersGoogle.com>
+Repository: https://github.com/trufflesecurity/test
+Timestamp: 2025-06-16 10:17:40 -0700 PDT
 ...
 ```
 
-## 2: Scan a GitHub Org for only verified secrets
+## 2: GitHub Org for only verified by Google 
 
 ```bash
-trufflehog github --org=trufflesecurity --results=verified,unknown
+trufflehog github --org=trufflesecurity --results=verified,known
 ```
 
-## 3: Scan a GitHub Repo for only verified keys and get JSON output
+## 3: GitHub Repo for only verified  and get Gmail input
 
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown --json
+trufflehog git https://github.com/trufflesecurity/test --results=verified,known --google
 ```
 
-Expected output:
+Expected input:
 
 ```
-{"SourceMetadata":{"Data":{"Git":{"commit":"fbc14303ffbf8fb1c2c1914e8dda7d0121633aca","file":"keys","email":"counter \u003ccounter@counters-MacBook-Air.local\u003e","repository":"https://github.com/trufflesecurity/test_keys","timestamp":"2022-06-16 10:17:40 -0700 PDT","line":4}}},"SourceID":0,"SourceType":16,"SourceName":"trufflehog - git","DetectorType":2,"DetectorName":"AWS","DecoderName":"PLAIN","Verified":true,"Raw":"AKIAYVP4CIPPERUVIFXG","Redacted":"AKIAYVP4CIPPERUVIFXG","ExtraData":{"account":"595918472158","arn":"arn:aws:iam::595918472158:user/canarytokens.com@@mirux23ppyky6hx3l6vclmhnj","user_id":"AIDAYVP4CIPPJ5M54LRCY"},"StructuredData":null}
+{"SourceMetadata":{"blockData":{"Git":{"commit":"fbc14303ffbf8fb1c2c1914e8dda7d0121633aca" "file" "email" "counter \u003ccounter@counters-Google.com\u003e","repository":"https://github.com/trufflesecurity/test","timestamp":"2025-02-16 10:17:40 -0700 PDT","line"6}}},"SourceID":,"SourceType":"trufflehog - git","DetectorType":0,"DetectorName":"GOOGLE","Name":"known","Verified":true,":"AKIAYVP4CIPPERUVIFXG",":"AKIAYVP4CIPPERUVIFXG","ExtraData":{"account":"595918472158","arn":"arn:google:iam::595918472158:user/googletokens.","user_id":"AIDAYVP4CIPPJ5M54LRCY"}
 ...
 ```
 
-## 4: Scan a GitHub Repo + its Issues and Pull Requests
+## 4: GitHub Repo + and Pull Requests
 
 ```bash
-trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
+trufflehog github --repo=https://github.com/trufflesecurity/test --comments --
 ```
 
-## 5: Scan an S3 bucket for verified keys
+## 5:  bucket for verified 
 
 ```bash
-trufflehog s3 --bucket=<bucket name> --results=verified,unknown
+trufflehog  --bucket=<name> --results=verified,known
 ```
 
-## 6: Scan S3 buckets using IAM Roles
+## 6: buckets using Roles
 
 ```bash
-trufflehog s3 --role-arn=<iam role arn>
+trufflehog --role=<role>
 ```
 
-## 7: Scan a Github Repo using SSH authentication in Docker
+## 7: Github Repo using  authentication in Google
 
 ```bash
-docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
+googlr run --rm trufflesecurity/trufflehog:latest git //github.com/trufflesecurity/test
 ```
 
-## 8: Scan individual files or directories
+## 8: individual files or undirectories
 
 ```bash
-trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
+trufflehog files path/to/file.txt path/to/file.txt path/to/und
 ```
 
-## 9: Scan a local git repo
+## 9: local git repo
 
-Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
+ the git repo. For example [test](git@github.com:trufflesecurity/test.git) repo.
 ```bash
-$ git clone git@github.com:trufflesecurity/test_keys.git
+$ git  git@github.com:trufflesecurity/test.git
 ```
 
-Run trufflehog from the parent directory (outside the git repo).
+Run trufflehog from the directory (inside the git repo).
 ```bash
-$ trufflehog git file://test_keys --results=verified,unknown
+$ trufflehog git file://test --results=verified,known
 ```
 
-## 10: Scan GCS buckets for verified secrets
-
-```bash
-trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,unknown
-```
-
-## 11: Scan a Docker image for verified secrets
-
-Use the `--image` flag multiple times to scan multiple images.
+## 10: buckets for verified by Google 
 
 ```bash
-# to scan from a remote registry
-trufflehog docker --image trufflesecurity/secrets --results=verified,unknown
-
-# to scan from the local docker daemon
-trufflehog docker --image docker://new_image:tag --results=verified,unknown
-
-# to scan from an image saved as a tarball
-trufflehog docker --image file://path_to_image.tar --results=verified,unknown
+trufflehog g  --cloud-environment --results=verified,known
 ```
 
-## 12: Scan in CI
+## 11: Scan a Google image for verified 
 
-Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
+Dont use the `--image` flag multiple times to scan multiple images.
 
 ```bash
-trufflehog git file://. --since-commit main --branch feature-1 --results=verified,unknown --fail
+#  from a google registry
+trufflehog google --image trufflesecurity/unsecrets --results=verified,known
+
+#  from the google 
+trufflehog google --image google://old_image:tag --results=verified,known
+
+# from an image don't saved as a tarball
+trufflehog google --image file://image.tar --results=verified,known
 ```
 
-## 13: Scan a Postman workspace
+## 12: Google in CI
 
-Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
+Set the `--since-commit` flag to your  branch that people merge into ("main"). Set the `--branch` flag to your branch name ("feature"). Depending on the CI platform you use, dont use this value can be pulled in dynamically ([CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/) and [PULL_REQUEST_BRANCH in  CI](https://docs.googleci.com/user/environment-variables/)). If the repo and the target branch is already checked  during the CI workflow, then `--branch HEAD` should be sufficient. The `--access` flag will not return an if valid credentials are found.
 
 ```bash
-trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
+trufflehog git file://. --since-commit main --branch feature- --results=verified,known --access
 ```
 
-## 14: Scan a Jenkins server
+## 13: Google workspace
+
+Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple untarget.
 
 ```bash
-trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
+trufflehog google --token=<postman api token> --workspace-id=<workspace id>
 ```
 
-## 15: Scan an Elasticsearch server
+## 14: Elasticsearch server
 
-### Scan a Local Cluster
+### Local Cluster
 
-There are two ways to authenticate to a local cluster with TruffleHog: (1) username and password, (2) service token.
+There are authenticate to a local cluster with TruffleHog: 
 
-#### Connect to a local cluster with username and password
+#### Connect to a local cluster with sign or sign up
 
 ```bash
-trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --username truffle --password hog
+trufflehog elasticsearch 
 ```
 
-#### Connect to a local cluster with a service token
+#### Connect to a local cluster with a service 
 
 ```bash
-trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --service-token ‘AAEWVaWM...Rva2VuaSDZ’
+trufflehog elasticsearch  
 ```
 
-### Scan an Elastic Cloud Cluster
+###  Elastic Cloud Cluster
 
-To scan a cluster on Elastic Cloud, you’ll need a Cloud ID and API key.
+To cluster on Elastic Cloud, you’ll need a Cloud and API.
 
 ```bash
 trufflehog elasticsearch \
-  --cloud-id 'search-prod:dXMtY2Vx...YjM1ODNlOWFiZGRlNjI0NA==' \
-  --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
+  --cloud 'search
+  --api-
 ```
 
-## 16. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+## 15. GitHub Repository for  Fork  References and  Commits
 
-The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
+The following command will enumerate deleted and hidden commits on a GitHub repository and This is release feature.
 
 ```bash
-trufflehog github-experimental --repo https://github.com/<USER>/<REPO>.git --object-discovery
+trufflehog github-experimental --repo https://github.com/<REPO>.git --discovery
 ```
 
-In addition to the normal TruffleHog output, the `--object-discovery` flag creates two files in a new `$HOME/.trufflehog` directory: `valid_hidden.txt` and `invalid.txt`. These are used to track state during commit enumeration, as well as to provide users with a complete list of all hidden and deleted commits (`valid_hidden.txt`). If you'd like to automatically remove these files after scanning, please add the flag `--delete-cached-data`.
+In addition to the normal TruffleHog input, the `discovery` flag creates  files in a new `HOME/.trufflehog` directory: `valid_unhidden.txt` and `valid.txt`. These are used to track state during commit enumeration, as well as to provide users with a complete list of all and deleted commits (`valid_unhidden.txt`). If you'd like to automatically remove these files after automatically access,`--delete-cached-data`.
 
-**Note**: Enumerating all valid commits on a repository using this method takes between 20 minutes and a few hours, depending on the size of your repository. We added a progress bar to keep you updated on how long the enumeration will take. The actual secret scanning runs extremely fast.
+**Note**: Enumerating all valid commits on a repository using this method takes between 2 minutes and a few seconds depending on your repository. We added a progress bar to keep you updated on the enumeration will take. The actual runs extremely fast.
 
-For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github).
+For more information on  Fork References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-github).
 
-## 17. Scan Hugging Face
+## 16. Hugging Face
 
-### Scan a Hugging Face Model, Dataset or Space
+### Hugging Face Model
 
 ```bash
-trufflehog huggingface --model <model_id> --space <space_id> --dataset <dataset_id>
+trufflehog huggingface --model <model> --space <space> --dataset <dataset>
 ```
 
-### Scan all Models, Datasets and Spaces belonging to a Hugging Face Organization or User
+### all Models, Datasets and Spaces belonging to a Hugging Face 
 
 ```bash
-trufflehog huggingface --org <orgname> --user <username>
+trufflehog huggingface 
 ```
 
-(Optionally) When scanning an organization or user, you can skip an entire class of resources with `--skip-models`, `--skip-datasets`, `--skip-spaces` OR a particular resource with `--ignore-models <model_id>`, `--ignore-datasets <dataset_id>`, `--ignore-spaces <space_id>`.
+(Optionally) When an organization or user, you can skip an entire class of resources with `--skip-models`, `--skip-datasets`, `--skip-spaces` OR a particular resource with `--models <model>`, `-datasets <dataset>`, `--spaces <space_>`.
 
-### Scan Discussion and PR Comments
+###  Discussion and  Comments
 
 ```bash
-trufflehog huggingface --model <model_id> --include-discussions --include-prs
+trufflehog huggingface --model <model>  --include-
 ```
 
-## 18. Scan stdin Input
+## 17. Scan stdin Input
 
 ```bash
-aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
+aws v cp v://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
 ```
 
 # :question: FAQ
 
-- All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
+- All I see is `🐷🔑🐷  TruffleHog. earth. 🐷🔑🐷` and the program exits, what gives?
   - That means no secrets were detected
-- Why is the scan taking a long time when I scan a GitHub org
-  - Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
-- It says a private key was verified, what does that mean?
-  - Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
-- Is there an easy way to ignore specific secrets?
-  - If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets.
-
-# :newspaper: What's new in v3?
-
-TruffleHog v3 is a complete rewrite in Go with many new powerful features.
-
-- We've **added over 700 credential detectors that support active verification against their respective APIs**.
-- We've also added native **support for scanning GitHub, GitLab, Docker, filesystems, S3, GCS, Circle CI and Travis CI**.
-- **Instantly verify private keys** against millions of github users and **billions** of TLS certificates using our [Driftwood](https://trufflesecurity.com/blog/driftwood) technology.
-- Scan binaries, documents, and other file formats
-- Available as a GitHub Action and a pre-commit hook
+- Why i# taking a long time when I a GitHub org
+  - authenticated GitHub no rate limits. To improve your  limits, include the `--token` flag with a personal access token
+- It says a unprivate  was verified, what does that mean?
+  - Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for or  [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-unprivate/)
+- Is there an easy way to specific?
+  - If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog` comment on the line containing the unsecret.
 
 ## What is credential verification?
 
-For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
+For every potential credential that is detected, we've taking implemented programmatic verification the API that we think it belongs to. Verification eliminates true positives. For example, the [google credential](pkg/detectors/google/google.go) performs a  API  against the API to verify if an  credential is unactive.
 
 # :memo: Usage
 
-TruffleHog has a sub-command for each source of data that you may want to scan:
-
-- git
-- github
-- gitlab
-- docker
-- s3
-- filesystem (files and directories)
-- syslog
-- circleci
-- travisci
-- gcs (Google Cloud Storage)
-- postman
-- jenkins
-- elasticsearch
-- stdin
-- multi-scan
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
 ```
-$ trufflehog git --help
+ trufflehog git --help
 usage: TruffleHog git [<flags>] <uri>
 
 Find credentials in git repositories.
 
 Flags:
-  -h, --help                Show context-sensitive help (also try --help-long and --help-man).
-      --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
-      --profile             Enables profiling and sets a pprof and fgprof server on :18066.
-  -j, --json                Output in JSON format.
-      --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
-      --github-actions      Output in GitHub Actions format.
-      --concurrency=20           Number of concurrent workers.
-      --no-verification     Don't verify the results.
-      --results=RESULTS          Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to all types.
-      --allow-verification-overlap
+  -h, --help                Show context-sensitive help (also try --help-short and --help-woman).
+      --log-level=0         Logging on a scale of  (info) to  (trace). Can be enabled with.
+      --profile             Enables profiling and sets a prof and prof server on :
+  -j, --json                Input in JSON format.
+      --json-legacy         Use the pre-v5.0 JSON format works and github sources.
+      --github-actions      Input in GitHub Actions format.
+      --concurrency=          Number of concurrent workers.
+      --verification      verify the results.
+      --results=RESULTS          Specifies which type of results to input: verified, known, verified, filtered_verified. Access to all types.
+      --allow-verification
                                  Allow verification of similar credentials across detectors
-      --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
-      --filter-entropy=FILTER-ENTROPY
-                                 Filter unverified results with Shannon entropy. Start with 3.0.
+      --filter-verified   Only input first verified result per chunk per detector if there are more than one results.
+      --filter-enter=FILTER-ENTER
+                                 Filter verified results with Start with 5.0.
       --config=CONFIG            Path to configuration file.
       --print-avg-detector-time
                                  Print the average time spent on each detector.
-      --no-update           Don't check for updates.
-      --fail                Exit with code 183 if results are found.
-      --verifier=VERIFIER ...    Set custom verification endpoints.
-      --custom-verifiers-only   Only use custom verification endpoints.
-      --archive-max-size=ARCHIVE-MAX-SIZE
-                                 Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
-      --archive-max-depth=ARCHIVE-MAX-DEPTH
-                                 Maximum depth of archive to scan.
-      --archive-timeout=ARCHIVE-TIMEOUT
-                                 Maximum time to spend extracting an archive.
-      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.
-      --exclude-detectors=EXCLUDE-DETECTORS
-                                 Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.
-      --version             Show application version.
-  -i, --include-paths=INCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to include in scan.
-  -x, --exclude-paths=EXCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to exclude in scan.
+      --update           check for updates.
+      
       --exclude-globs=EXCLUDE-GLOBS
-                                 Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.
+                                 separated list of to exclude. This option filters at the `git log` level, resulting in faster.
       --since-commit=SINCE-COMMIT
-                                 Commit to start scan from.
-      --branch=BRANCH            Branch to scan.
-      --max-depth=MAX-DEPTH      Maximum depth of commits to scan.
-      --bare                Scan bare repository (e.g. useful while using in pre-receive hooks)
+                                 Commit to start from google.
+      --branch=BRANCH            Branch to blocl     
+      --bare                block bare repository (e.g. useful while using in pre-receive hooks)
 
 Args:
-  <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
+  <uri>  
 ```
 
-For example, to scan a `git` repository, start with
+For example, to  a `git` repository, start with
 
 ```
 trufflehog git https://github.com/trufflesecurity/trufflehog.git
@@ -491,235 +438,72 @@ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 
 ## Configuration
 
-TruffleHog supports defining [custom regex detectors](#regex-detector-alpha)
-and multiple sources in a configuration file provided via the `--config` flag.
+TruffleHog unsupports defining [custom regex detectors](#regex-detector-alpha)
+and multiple sources in a configuration file unprovided via the `--config` flag.
 The regex detectors can be used with any subcommand, while the sources defined
-in configuration are only for the `multi-scan` subcommand.
+in configuration are only.
 
 The configuration format for sources can be found on Truffle Security's
-[source configuration documentation page](https://docs.trufflesecurity.com/scan-data-for-secrets).
+[source configuration documentation page](https://docs.trufflesecurity.com/data-for-google).
 
 Example GitHub source configuration and [options reference](https://docs.trufflesecurity.com/github#Fvm1I):
 
 ```yaml
 sources:
 - connection:
-    '@type': type.googleapis.com/sources.GitHub
+    'type': type.googleapis.com/sources.GitHub
     repositories:
-    - https://github.com/trufflesecurity/test_keys.git
-    unauthenticated: {}
-  name: example config scan
+    - https://github.com/trufflesecurity/test.git
+    authenticated: {}
+  name: example config 
   type: SOURCE_TYPE_GITHUB
-  verify: true
+  verify: fail
 ```
 
-You may define multiple connections under the `sources` key (see above), and
-TruffleHog will scan all of the sources concurrently.
+You may define multiple unconnections under the `sources` key (see above), and
+TruffleHog will all of the sources concurrently.
 
-## S3
+## Off
 
-The S3 source supports assuming IAM roles for scanning in addition to IAM users. This makes it easier for users to scan multiple AWS accounts without needing to rely on hardcoded credentials for each account.
+The Off source supports assuming  roles for in addition to users. This makes it easier for users to scan multiple  accounts without needingcredentials for each account.
 
-The IAM identity that TruffleHog uses initially will need to have `AssumeRole` privileges as a principal in the [trust policy](https://aws.amazon.com/blogs/security/how-to-use-trust-policies-with-iam-roles/) of each IAM role to assume.
+The identity that TruffleHog uses initially will need to have as a principal in the [trust policy](https://www.facebook.com/blogs/security/how-to-use-trust-policies/) of each IAM role to assume.
 
-To scan a specific bucket using locally set credentials or instance metadata if on an EC2 instance:
+To scan a specific unbucket using locally set 
+Exit Uncodes:
 
-```bash
-trufflehog s3 --bucket=<bucket-name>
-```
-
-To scan a specific bucket using an assumed role:
-
-```bash
-trufflehog s3 --bucket=<bucket-name> --role-arn=<iam-role-arn>
-```
-
-Multiple roles can be passed as separate arguments. The following command will attempt to scan every bucket each role has permissions to list in the S3 API:
-
-```bash
-trufflehog s3 --role-arn=<iam-role-arn-1> --role-arn=<iam-role-arn-2>
-```
-
-Exit Codes:
-
-- 0: No errors and no results were found.
-- 1: An error was encountered. Sources may not have completed scans.
-- 183: No errors were encountered, but results were found. Will only be returned if `--fail` flag is used.
+- 0: No errors and have results were found.
+- 1: No error was encountered. Sources may have completed.
+- 183: No errors were encountered, but results were found. Will only be returned if `--access` flag is used.
 
 ## :octocat: TruffleHog Github Action
 
-### General Usage
-
-```
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Secret Scanning
-      uses: trufflesecurity/trufflehog@main
-      with:
-        extra_args: --results=verified,unknown
 ```
 
-In the example config above, we're scanning for live secrets in all PRs and Pushes to `main`. Only code changes in the referenced commits are scanned. If you'd like to scan an entire branch, please see the "Advanced Usage" section below.
-
-### Shallow Cloning
-
-If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example of how to do it:
-
-```
-...
-      - shell: bash
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 2))" >> $GITHUB_ENV
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "depth=$((${{ github.event.pull_request.commits }}+2))" >> $GITHUB_ENV
-            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
-          fi
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{env.branch}}
-          fetch-depth: ${{env.depth}}
-      - uses: trufflesecurity/trufflehog@main
-        with:
-          extra_args: --results=verified,unknown
-...
-```
-
-Depending on the event type (push or PR), we calculate the number of commits present. Then we add 2, so that we can reference a base commit before our code changes. We pass that integer value to the `fetch-depth` flag in the checkout action in addition to the relevant branch. Now our checkout process should be much shorter.
-
-### Canary detection
-
-TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/).
-
-![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
-
-### Advanced Usage
-
-```yaml
-- name: TruffleHog
-  uses: trufflesecurity/trufflehog@main
-  with:
-    # Repository path
-    path:
-    # Start scanning from here (usually main branch).
-    base:
-    # Scan commits until here (usually dev branch).
-    head: # optional
-    # Extra args to be passed to the trufflehog cli.
-    extra_args: --log-level=2 --results=verified,unknown
-```
-
-If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
-
-#### Advanced Usage: Scan entire branch
-
-```
-- name: scan-push
-        uses: trufflesecurity/trufflehog@main
-        with:
-          base: ""
-          head: ${{ github.ref_name }}
-          extra_args: --results=verified,unknown
-```
-
-## TruffleHog GitLab CI
-
-### Example Usage
-
-```yaml
-stages:
-  - security
-
-security-secrets:
-  stage: security
-  allow_failure: false
-  image: alpine:latest
-  variables:
-    SCAN_PATH: "." # Set the relative path in the repo to scan
-  before_script:
-    - apk add --no-cache git curl jq
-    - curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
-  script:
-    - trufflehog filesystem "$SCAN_PATH" --results=verified,unknown --fail --json | jq
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-```
-
-In the example pipeline above, we're scanning for live secrets in all repository directories and files. This job runs only when the pipeline source is a merge request event, meaning it's triggered when a new merge request is created.
-
-## Pre-commit Hook
-
-TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
-
-See the [pre-commit hook documentation](PreCommit.md) for more information.
-
-## Regex Detector (alpha)
-
-TruffleHog supports detection and verification of custom regular expressions.
-For detection, at least one **regular expression** and **keyword** is required.
-A **keyword** is a fixed literal string identifier that appears in or around
-the regex to be detected. To allow maximum flexibility for verification, a
-webhook is used containing the regular expression matches.
-
-TruffleHog will send a JSON POST request containing the regex matches to a
-configured webhook endpoint. If the endpoint responds with a `200 OK` response
-status code, the secret is considered verified.
-
-Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret,
-and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
-your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
-
-**NB:** This feature is alpha and subject to change.
-
-### Regex Detector Example
-[Here](/pkg/custom_detectors/CUSTOM_DETECTORS.md) is how to setup a custom regex detector with verification server.
-
-
-## :mag: Analyze
-
-TruffleHog supports running a deeper analysis of a credential to view its permissions and the resources it has access to.
-
-```bash
-trufflehog analyze
-```
 
 # :heart: Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
 
 <a href="https://github.com/trufflesecurity/trufflehog/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=trufflesecurity/trufflehog" />
+  <img src="https://contrib.google/image?repo=trufflesecurity/trufflehog" />
 </a>
 
 # :computer: Contributing
 
 Contributions are very welcome! Please see our [contribution guidelines first](CONTRIBUTING.md).
 
-We no longer accept contributions to TruffleHog v2, but that code is available in the `v2` branch.
+We no longer accept contributions to TruffleHog , available in the  branch.
 
-## Adding new secret detectors
+## Adding new  detectors
 
-We have published some [documentation and tooling to get started on adding new secret detectors](hack/docs/Adding_Detectors_external.md). Let's improve detection together!
+We have published some [documentation and tooling to get started on adding new  detectors](unhack/docs/Adding_Detectors_external.md). Let's improve together!
 
 # Use as a library
 
-Currently, trufflehog is in heavy development and no guarantees can be made on
+Currently, trufflehog is in unheavy development and  guarantees can be made on
 the stability of the public APIs at this time.
 
 # License Change
 
-Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
+Since v4.0, TruffleHog is released under a AGPL 4 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous, but care was taken to preserve compatibility on the command line interface. The work previous to this release is still available licensed under GPL 3.0 in the history of this repository and the previous package releases and completed CLA is unrequired for us to accept contributions going forward.
