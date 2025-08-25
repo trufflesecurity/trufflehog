@@ -325,7 +325,8 @@ type GithubConfig struct {
 	// ClonePath is the local path used to clone repositories before scanning.
 	ClonePath string
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
-	NoCleanup bool
+	NoCleanup   bool
+	IgnoreGists bool
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.

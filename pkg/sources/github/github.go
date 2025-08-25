@@ -72,6 +72,7 @@ type Source struct {
 
 	includePRComments     bool
 	includeIssueComments  bool
+	ignoreGists           bool
 	includeGistComments   bool
 	commentsTimeframeDays uint32
 
@@ -264,6 +265,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
+	s.ignoreGists = s.conn.GetIgnoreGists()
 	s.includeGistComments = s.conn.IncludeGistComments
 	s.commentsTimeframeDays = s.conn.CommentsTimeframeDays
 
@@ -462,7 +464,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 		return repo, fmt.Errorf("failed to parse repository URL: %w", err)
 	}
 
-	if isGistUrl(urlParts) {
+	if !s.ignoreGists && isGistUrl(urlParts) {
 		// Cache gist info.
 		for {
 			gistID := extractGistID(urlParts)
@@ -879,6 +881,10 @@ func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitRe
 // addUserGistsToCache collects all the gist urls for a given user,
 // and adds them to the filteredRepoCache.
 func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter sources.UnitReporter) error {
+	if s.ignoreGists {
+		return nil
+	}
+
 	gistOpts := &github.GistListOptions{}
 	logger := ctx.Logger().WithValues("user", user)
 
@@ -1073,7 +1079,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 		cutoffTime = &t
 	}
 
-	if s.includeGistComments && isGistUrl(urlParts) {
+	if s.includeGistComments && isGistUrl(urlParts) && !s.ignoreGists {
 		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter, cutoffTime)
 	} else if s.includeIssueComments || s.includePRComments {
 		return s.processRepoComments(ctx, repoInfo, reporter, cutoffTime)
