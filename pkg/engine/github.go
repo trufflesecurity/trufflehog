@@ -31,6 +31,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		RemoveAuthInUrl:            !c.AuthInUrl, // configuration uses the opposite field in proto to keep credentials in the URL by default.
 		ClonePath:                  c.ClonePath,
 		NoCleanup:                  c.NoCleanup,
+		IgnoreGists:                c.IgnoreGists,
 	}
 
 	if len(c.Token) > 0 {

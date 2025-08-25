@@ -185,6 +185,25 @@ func TestAddGistsByUser(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestIgnoreGistsByUser(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"id": "aa5a315d61ae9438b18d", "git_pull_url": "https://gist.github.com/aa5a315d61ae9438b18d.git"}})
+
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	s.ignoreGists = true
+	err := s.addUserGistsToCache(context.Background(), "super-secret-user", noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 0, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("aa5a315d61ae9438b18d")
+	assert.False(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.False(t, gock.IsDone())
+}
+
 func TestAddMembersByOrg(t *testing.T) {
 	defer gock.Off()
 
