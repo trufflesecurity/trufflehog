@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -709,16 +710,34 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 	eng.Start(ctx)
 
+	tmpDir := filepath.Join(os.TempDir(), "trufflehog_"+strconv.Itoa(os.Getpid()))
+	persistRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
+
 	defer func() {
 		// Clean up temporary artifacts.
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 			ctx.Logger().Error(err, "error cleaning temp artifacts")
+		}
+
+		if !persistRepo {
+			if err := os.RemoveAll(tmpDir); err != nil {
+				ctx.Logger().Error(err, "error removing temporary directory")
+			}
 		}
 	}()
 
 	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
+		if *jsonLegacy && !*gitNoCleanup {
+			if *gitClonePath == "" {
+				if err := os.MkdirAll(tmpDir, os.ModePerm); err != nil {
+					return scanMetrics, fmt.Errorf("failed to create temporary directory: %v", err)
+				}
+				*gitClonePath = tmpDir
+			}
+			*gitNoCleanup = true
+		}
 		// validate the commit for local repository only
 		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
 			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
@@ -753,6 +772,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case githubScan.FullCommand():
+		if *jsonLegacy && !*githubNoCleanup {
+			if *githubClonePath == "" {
+				if err := os.MkdirAll(tmpDir, os.ModePerm); err != nil {
+					return scanMetrics, fmt.Errorf("failed to create temporary directory: %v", err)
+				}
+				*githubClonePath = tmpDir
+			}
+			*githubNoCleanup = true
+		}
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -809,6 +837,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case gitlabScan.FullCommand():
+		if *jsonLegacy && !*gitlabNoCleanup {
+			if *gitlabClonePath == "" {
+				if err := os.MkdirAll(tmpDir, os.ModePerm); err != nil {
+					return scanMetrics, fmt.Errorf("failed to create temporary directory: %v", err)
+				}
+				*gitlabClonePath = tmpDir
+			}
+			*gitlabNoCleanup = true
+		}
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
