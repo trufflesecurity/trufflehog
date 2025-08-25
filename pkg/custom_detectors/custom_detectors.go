@@ -116,7 +116,7 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 
 MatchLoop:
 	for _, match := range matches {
-		for _, values := range match {
+		for key, values := range match {
 			// attempt to use capture group
 			secret := values[0]
 			if len(values) > 1 {
@@ -150,6 +150,26 @@ MatchLoop:
 					continue MatchLoop
 				}
 			}
+
+			if validations := c.GetValidations(); validations != nil {
+				validationRules := []struct {
+					enabled   bool
+					validator func(string) bool
+				}{
+					{validations[key].GetContainsDigit(), ContainsDigit},
+					{validations[key].GetContainsLowercase(), ContainsLowercase},
+					{validations[key].GetContainsUppercase(), ContainsUppercase},
+					{validations[key].GetContainsSpecialChar(), ContainsSpecialChar},
+				}
+
+				for _, rule := range validationRules {
+					if rule.enabled && !rule.validator(secret) {
+						// skip this match if a validation rule is enabled but missing from the secret
+						continue MatchLoop
+					}
+				}
+			}
+
 		}
 
 		g.Go(func() error {

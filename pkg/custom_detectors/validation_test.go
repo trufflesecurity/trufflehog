@@ -1,6 +1,8 @@
 package custom_detectors
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestCustomDetectorsKeywordValidation(t *testing.T) {
 	tests := []struct {
@@ -228,6 +230,122 @@ func TestCustomDetectorsVerifyRegexVarsValidation(t *testing.T) {
 
 			if (got != nil && !tt.wantErr) || (got == nil && tt.wantErr) {
 				t.Errorf("ValidateRegexVars() error = %v, wantErr %v", got, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestContainsDigit(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "contains digit",
+			args: args{s: "lzscqf&60M"},
+			want: true,
+		},
+		{
+			name: "does not contains digit",
+			args: args{s: "ZlDQOdaM*vsT"},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ContainsDigit(tt.args.s); got != tt.want {
+				t.Errorf("ContainsDigit() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestContainsLowercase(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "contains lower case",
+			args: args{s: "g0AJBHdnhRG2"},
+			want: true,
+		},
+		{
+			name: "does not contains lower case",
+			args: args{s: "V7T#MEA6@+TN"},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ContainsLowercase(tt.args.s); got != tt.want {
+				t.Errorf("ContainsDigit() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestContainsUppercase(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "contains upper case",
+			args: args{s: "G1sKkJeKlSQf"},
+			want: true,
+		},
+		{
+			name: "does not contains upper case",
+			args: args{s: "pq6-14ydz1@d"},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ContainsUppercase(tt.args.s); got != tt.want {
+				t.Errorf("ContainsDigit() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestContainsSpecialChar(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "contains upper case",
+			args: args{s: "HP$gE7s=do0B"},
+			want: true,
+		},
+		{
+			name: "does not contains upper case",
+			args: args{s: "w9gvBYctrSjB"},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ContainsSpecialChar(tt.args.s); got != tt.want {
+				t.Errorf("ContainsDigit() = %v, want %v", got, tt.want)
 			}
 		})
 	}

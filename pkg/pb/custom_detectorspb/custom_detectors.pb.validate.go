@@ -235,6 +235,52 @@ func (m *CustomRegex) validate(all bool) error {
 
 	// no validation rules for PrimaryRegexName
 
+	{
+		sorted_keys := make([]string, len(m.GetValidations()))
+		i := 0
+		for key := range m.GetValidations() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetValidations()[key]
+			_ = val
+
+			// no validation rules for Validations[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, CustomRegexValidationError{
+							field:  fmt.Sprintf("Validations[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, CustomRegexValidationError{
+							field:  fmt.Sprintf("Validations[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return CustomRegexValidationError{
+						field:  fmt.Sprintf("Validations[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return CustomRegexMultiError(errors)
 	}
@@ -425,3 +471,111 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = VerifierConfigValidationError{}
+
+// Validate checks the field values on ValidationConfig with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *ValidationConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ValidationConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ValidationConfigMultiError, or nil if none found.
+func (m *ValidationConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ValidationConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for ContainsDigit
+
+	// no validation rules for ContainsLowercase
+
+	// no validation rules for ContainsUppercase
+
+	// no validation rules for ContainsSpecialChar
+
+	if len(errors) > 0 {
+		return ValidationConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// ValidationConfigMultiError is an error wrapping multiple validation errors
+// returned by ValidationConfig.ValidateAll() if the designated constraints
+// aren't met.
+type ValidationConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ValidationConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ValidationConfigMultiError) AllErrors() []error { return m }
+
+// ValidationConfigValidationError is the validation error returned by
+// ValidationConfig.Validate if the designated constraints aren't met.
+type ValidationConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ValidationConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ValidationConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ValidationConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ValidationConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ValidationConfigValidationError) ErrorName() string { return "ValidationConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ValidationConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sValidationConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ValidationConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ValidationConfigValidationError{}
