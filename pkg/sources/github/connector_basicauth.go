@@ -38,7 +38,7 @@ func NewBasicAuthConnector(ctx context.Context, apiEndpoint, clonePath string, c
 
 	graphqlClient, err := createGraphqlClient(ctx, httpClient, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
 	}
 
 	return &basicAuthConnector{
