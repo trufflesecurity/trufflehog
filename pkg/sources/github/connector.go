@@ -42,21 +42,21 @@ func newConnector(ctx context.Context, source *Source) (Connector, error) {
 		return NewAppConnector(ctx, apiEndpoint, cred.GithubApp)
 	case *sourcespb.GitHub_BasicAuth:
 		log.RedactGlobally(cred.BasicAuth.GetPassword())
-		return NewBasicAuthConnector(ctx, apiEndpoint, cred.BasicAuth)
+		return NewBasicAuthConnector(ctx, apiEndpoint, source.conn.GetClonePath(), cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
-		return NewTokenConnector(ctx, apiEndpoint, cred.Token, func(c context.Context, err error) bool {
+		return NewTokenConnector(ctx, apiEndpoint, cred.Token, source.conn.GetClonePath(), source.useAuthInUrl, func(c context.Context, err error) bool {
 			return source.handleRateLimit(c, err)
 		})
 	case *sourcespb.GitHub_Unauthenticated:
-		return NewUnauthenticatedConnector(ctx, apiEndpoint)
+		return NewUnauthenticatedConnector(ctx, apiEndpoint, source.conn.GetClonePath())
 	default:
 		return nil, fmt.Errorf("unknown connection type %T", source.conn.GetCredential())
 	}
 }
 
 func createAPIClient(ctx context.Context, httpClient *http.Client, apiEndpoint string) (*github.Client, error) {
-	getLogger(ctx).V(2).Info("Creating API client", "url", apiEndpoint)
+	ctx.Logger().V(2).Info("Creating API client", "url", apiEndpoint)
 
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
@@ -85,7 +85,8 @@ func createGraphqlClient(ctx context.Context, client *http.Client, apiEndpoint s
 		parsedURL.Path = before + "/api/graphql"
 		graphqlEndpoint = parsedURL.String()
 	}
-	getLogger(ctx).V(2).Info("Creating GraphQL client", "url", graphqlEndpoint)
+
+	ctx.Logger().V(2).Info("Creating GraphQL client", "url", graphqlEndpoint)
 
 	return githubv4.NewEnterpriseClient(graphqlEndpoint, client), nil
 }
