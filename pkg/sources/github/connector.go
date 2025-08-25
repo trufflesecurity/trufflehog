@@ -76,7 +76,7 @@ func createGraphqlClient(ctx context.Context, client *http.Client, apiEndpoint s
 		// https://docs.github.com/en/enterprise-server@3.11/graphql/guides/introduction-to-graphql
 		parsedURL, err := url.Parse(apiEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("could not create GraphQL client: %w", err)
+			return nil, fmt.Errorf("error parsing URL: %w", err)
 		}
 
 		// GitHub Enterprise uses `/api/v3` for the base. (https://github.com/google/go-github/issues/958)
