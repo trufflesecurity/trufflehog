@@ -271,6 +271,7 @@ message GitHub {
   bool remove_auth_in_url = 21;
   string clone_path = 22;
   bool no_cleanup = 23;
+  bool ignore_gists = 24;
 }
 
 message GitHubExperimental {
