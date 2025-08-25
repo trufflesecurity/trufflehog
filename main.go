@@ -124,6 +124,7 @@ var (
 	githubAuthInUrl             = githubScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -786,6 +787,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			AuthInUrl:                  *githubAuthInUrl,
 			ClonePath:                  *githubClonePath,
 			NoCleanup:                  *githubNoCleanup,
+			IgnoreGists:                *githubIgnoreGists,
 		}
 
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {

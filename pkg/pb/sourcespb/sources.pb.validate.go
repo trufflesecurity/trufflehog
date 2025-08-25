@@ -2572,6 +2572,8 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for NoCleanup
 
+	// no validation rules for IgnoreGists
+
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
 		if v == nil {
