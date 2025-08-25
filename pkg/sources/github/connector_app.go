@@ -72,7 +72,7 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 
 	graphqlClient, err := createGraphqlClient(ctx, httpClient, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
 	}
 
 	return &appConnector{
