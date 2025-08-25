@@ -46,7 +46,7 @@ func NewTokenConnector(ctx context.Context, apiEndpoint, token, clonePath string
 
 	graphqlClient, err := createGraphqlClient(ctx, httpClient, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
 	}
 
 	return &tokenConnector{
