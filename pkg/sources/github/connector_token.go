@@ -24,11 +24,13 @@ type tokenConnector struct {
 	handleRateLimit    func(context.Context, error) bool
 	user               string
 	userMu             sync.Mutex
+	authInUrl          bool
+	clonePath          string
 }
 
 var _ Connector = (*tokenConnector)(nil)
 
-func NewTokenConnector(ctx context.Context, apiEndpoint string, token string, handleRateLimit func(context.Context, error) bool) (Connector, error) {
+func NewTokenConnector(ctx context.Context, apiEndpoint, token, clonePath string, authInUrl bool, handleRateLimit func(context.Context, error) bool) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
@@ -53,6 +55,8 @@ func NewTokenConnector(ctx context.Context, apiEndpoint string, token string, ha
 		token:              token,
 		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudV3Endpoint),
 		handleRateLimit:    handleRateLimit,
+		authInUrl:          authInUrl,
+		clonePath:          clonePath,
 	}, nil
 }
 
@@ -64,7 +68,8 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...stri
 	if err := c.setUserIfUnset(ctx); err != nil {
 		return "", nil, err
 	}
-	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.user, args...)
+
+	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.clonePath, c.user, c.authInUrl, args...)
 }
 
 func (c *tokenConnector) GraphQLClient() *githubv4.Client {

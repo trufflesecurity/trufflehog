@@ -18,11 +18,12 @@ type basicAuthConnector struct {
 	graphqlClient *githubv4.Client
 	username      string
 	password      string
+	clonePath     string
 }
 
 var _ Connector = (*basicAuthConnector)(nil)
 
-func NewBasicAuthConnector(ctx context.Context, apiEndpoint string, cred *credentialspb.BasicAuth) (Connector, error) {
+func NewBasicAuthConnector(ctx context.Context, apiEndpoint, clonePath string, cred *credentialspb.BasicAuth) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	httpClient.Transport = &github.BasicAuthTransport{
@@ -45,6 +46,7 @@ func NewBasicAuthConnector(ctx context.Context, apiEndpoint string, cred *creden
 		graphqlClient: graphqlClient,
 		username:      cred.Username,
 		password:      cred.Password,
+		clonePath:     clonePath,
 	}, nil
 }
 
@@ -53,7 +55,7 @@ func (c *basicAuthConnector) APIClient() *github.Client {
 }
 
 func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
-	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.username, args...)
+	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.clonePath, c.username, true, args...)
 }
 
 func (c *basicAuthConnector) GraphQLClient() *githubv4.Client {

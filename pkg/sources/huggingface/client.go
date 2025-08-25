@@ -119,7 +119,7 @@ type HFClient struct {
 	HTTPClient *http.Client
 }
 
-// NewClient creates a new API client
+// NewHFClient creates a new HF client
 func NewHFClient(baseURL, apiKey string, timeout time.Duration) *HFClient {
 	return &HFClient{
 		BaseURL: baseURL,
@@ -150,11 +150,11 @@ func (c *HFClient) get(ctx context.Context, url string, target interface{}) erro
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		return errors.New("invalid API key.")
+		return errors.New("invalid API key")
 	}
 
 	if resp.StatusCode == http.StatusForbidden {
-		return errors.New("access to this repo is restricted and you are not in the authorized list. Visit the repository to ask for access.")
+		return errors.New("access to this repo is restricted and you are not in the authorized list. Visit the repository to ask for access")
 	}
 
 	defer resp.Body.Close()

@@ -2,15 +2,18 @@ package postman
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"golang.org/x/time/rate"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
 
@@ -214,7 +217,10 @@ func NewClient(postmanToken string, metrics *metrics) *Client {
 	}
 
 	c := &Client{
-		HTTPClient:                        http.DefaultClient,
+		// Requests for large objects (usually collections) take a long time.  While we don't think that _every_
+		// request will take this long, some might take 5 seconds or more.  This seems reasonable, but we should
+		// be very cautious about bumping it further
+		HTTPClient:                        common.RetryableHTTPClientTimeout(30),
 		Headers:                           bh,
 		WorkspaceAndCollectionRateLimiter: rate.NewLimiter(rate.Every(time.Second), 1),
 		GeneralRateLimiter:                rate.NewLimiter(rate.Every(time.Second/5), 1),
@@ -226,8 +232,8 @@ func NewClient(postmanToken string, metrics *metrics) *Client {
 
 // NewRequest creates an API request (Only GET needed for our interaction w/ Postman)
 // If specified, the map provided by headers will be used to update request headers.
-func (c *Client) NewRequest(urlStr string, headers map[string]string) (*http.Request, error) {
-	req, err := http.NewRequest("GET", urlStr, nil)
+func (c *Client) NewRequest(ctx trContext.Context, urlStr string, headers map[string]string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -254,19 +260,27 @@ func checkResponseStatus(r *http.Response) error {
 }
 
 // getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
-func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
-	req, err := c.NewRequest(url, headers)
+func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString string, headers map[string]string) ([]byte, error) {
+	ctx = trContext.WithValues(ctx, "url", urlString)
+
+	req, err := c.NewRequest(ctx, urlString, headers)
 	if err != nil {
 		return nil, err
 	}
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
+		// HTTPClient.Do returns a err which will always be a url.Error
+		// see docs: https://pkg.go.dev/net/http#Client.Do
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) && urlErr.Timeout() {
+			ctx.Logger().Error(urlErr, "postman API timed out.  Are we requesting an especially large item from the Postman API?")
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	c.Metrics.apiRequests.WithLabelValues(url).Inc()
+	c.Metrics.apiRequests.WithLabelValues(urlString).Inc()
 
 	rateLimitRemainingMonthValue := resp.Header.Get("RateLimit-Remaining-Month")
 	if rateLimitRemainingMonthValue == "" {
@@ -301,7 +315,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, he
 
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
 // Consider adding additional flags to support filtering.
-func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
+func (c *Client) EnumerateWorkspaces(ctx trContext.Context) ([]Workspace, error) {
 	ctx.Logger().V(2).Info("enumerating workspaces")
 	workspacesObj := struct {
 		Workspaces []Workspace `json:"workspaces"`
@@ -335,7 +349,7 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 }
 
 // GetWorkspace returns the workspace for a given workspace
-func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Workspace, error) {
+func (c *Client) GetWorkspace(ctx trContext.Context, workspaceUUID string) (Workspace, error) {
 	ctx.Logger().V(2).Info("getting workspace", "workspace", workspaceUUID)
 	obj := struct {
 		Workspace Workspace `json:"workspace"`
@@ -357,7 +371,7 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 }
 
 // GetEnvironmentVariables returns the environment variables for a given environment
-func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid string) (VariableData, error) {
+func (c *Client) GetEnvironmentVariables(ctx trContext.Context, environment_uuid string) (VariableData, error) {
 	ctx.Logger().V(3).Info("getting environment variables", "environment_uuid", environment_uuid)
 	obj := struct {
 		VariableData VariableData `json:"environment"`
@@ -379,7 +393,7 @@ func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid s
 }
 
 // GetCollection returns the collection for a given collection
-func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Collection, error) {
+func (c *Client) GetCollection(ctx trContext.Context, collection_uuid string) (Collection, error) {
 	ctx.Logger().V(3).Info("getting collection", "collection_uuid", collection_uuid)
 	obj := struct {
 		Collection Collection `json:"collection"`

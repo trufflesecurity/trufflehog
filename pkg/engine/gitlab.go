@@ -24,7 +24,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
-	connection := &sourcespb.GitLab{SkipBinaries: c.SkipBinaries}
+	connection := &sourcespb.GitLab{
+		SkipBinaries:    c.SkipBinaries,
+		RemoveAuthInUrl: !c.AuthInUrl, // configuration uses the opposite field in proto to keep credentials in the URL by default.
+	}
 
 	switch {
 	case len(c.Token) > 0:
@@ -43,6 +46,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 		connection.Repositories = c.Repos
 	}
 
+	if len(c.GroupIds) > 0 {
+		connection.GroupIds = c.GroupIds
+	}
+
 	if len(c.IncludeRepos) > 0 {
 		connection.IncludeRepos = c.IncludeRepos
 	}
@@ -50,6 +57,12 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 	if len(c.ExcludeRepos) > 0 {
 		connection.IgnoreRepos = c.ExcludeRepos
 	}
+
+	if c.ClonePath != "" {
+		connection.ClonePath = c.ClonePath
+	}
+
+	connection.NoCleanup = c.NoCleanup
 
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})

@@ -15,11 +15,13 @@ import (
 type unauthenticatedConnector struct {
 	apiClient     *github.Client
 	graphqlClient *githubv4.Client
+
+	clonePath string
 }
 
 var _ Connector = (*unauthenticatedConnector)(nil)
 
-func NewUnauthenticatedConnector(ctx context.Context, apiEndpoint string) (Connector, error) {
+func NewUnauthenticatedConnector(ctx context.Context, apiEndpoint, clonePath string) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	apiClient, err := createAPIClient(ctx, httpClient, apiEndpoint)
@@ -35,6 +37,7 @@ func NewUnauthenticatedConnector(ctx context.Context, apiEndpoint string) (Conne
 	return &unauthenticatedConnector{
 		apiClient:     apiClient,
 		graphqlClient: graphqlClient,
+		clonePath:     clonePath,
 	}, nil
 }
 
@@ -43,7 +46,7 @@ func (c *unauthenticatedConnector) APIClient() *github.Client {
 }
 
 func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
-	return git.CloneRepoUsingUnauthenticated(ctx, repoURL, args...)
+	return git.CloneRepoUsingUnauthenticated(ctx, repoURL, c.clonePath, args...)
 }
 
 func (c *unauthenticatedConnector) GraphQLClient() *githubv4.Client {

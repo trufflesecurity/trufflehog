@@ -35,7 +35,7 @@ type SecretInfo struct {
 	mu                  sync.RWMutex
 }
 
-// AppendPermissions safely append new permission to secret info permissions list.
+// AppendPermission safely append new permission to secret info permissions list.
 func (s *SecretInfo) AppendPermission(perm string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

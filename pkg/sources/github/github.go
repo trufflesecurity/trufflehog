@@ -3,18 +3,20 @@ package github
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v67/github"
 	"golang.org/x/sync/errgroup"
@@ -74,6 +76,8 @@ type Source struct {
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+
+	useAuthInUrl bool // pass credentials in the repository urls for cloning
 }
 
 // --------------------------------------------------------------------------------
@@ -226,6 +230,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
+	// configuration uses the inverse logic of the `useAuthInUrl` flag.
+	s.useAuthInUrl = !s.conn.RemoveAuthInUrl
+
 	connector, err := newConnector(aCtx, s)
 	if err != nil {
 		return fmt.Errorf("could not create connector: %w", err)
@@ -290,6 +297,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			}
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
+		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
 
@@ -467,7 +475,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 			}
 
 			if err != nil {
-				return repo, fmt.Errorf("failed to fetch gist")
+				return repo, fmt.Errorf("failed to fetch gist: %w", err)
 			}
 
 			s.cacheGistInfo(gist)
@@ -481,7 +489,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 				continue
 			}
 			if err != nil {
-				return repo, fmt.Errorf("failed to fetch repository")
+				return repo, fmt.Errorf("failed to fetch repository: %w", err)
 			}
 			s.cacheRepoInfo(ghRepo)
 			break
@@ -717,12 +725,16 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo repoInfo, reporter sources.ChunkReporter) (time.Duration, error) {
 	var duration time.Duration
 
-	ctx.Logger().V(2).Info("attempting to clone repo")
+	ctx.Logger().V(2).Info("attempting to clone repo", "repo_name", repoInfo.name)
 	path, repo, err := s.cloneRepo(ctx, repoURL)
 	if err != nil {
 		return duration, err
 	}
-	defer os.RemoveAll(path)
+
+	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
+	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
+		defer os.RemoveAll(path)
+	}
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
 	s.setScanOptions(s.conn.Base, s.conn.Head)
@@ -1148,8 +1160,26 @@ func extractGistID(urlParts []string) string {
 	return urlParts[len(urlParts)-1]
 }
 
+// isGistUrl returns true if the URL path is of a gist
 func isGistUrl(urlParts []string) bool {
-	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
+	if len(urlParts) == 0 {
+		return false
+	}
+
+	// standard github gists: gist.github.com/user/abc123
+	if strings.EqualFold(urlParts[0], "gist.github.com") {
+		return true
+	}
+
+	// github enterprise: any 3 or 4 parts url with 'gist'
+	if (len(urlParts) == 3 || len(urlParts) == 4) && slices.Contains(urlParts, "gist") {
+		// enterprise.company.com/gist/gist-id
+		// gist.company.com/gist/gist-id
+		// gist.company.com/path/gist/gist-id
+		return true
+	}
+
+	return false
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
@@ -1515,6 +1545,18 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	}
 	meta := metaType.Github
 
+	chunkSkel := sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
+		SecretID:   target.SecretID,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{Github: meta},
+		},
+		Verify: s.verify,
+	}
+
 	u, err := url.Parse(meta.GetLink())
 	if err != nil {
 		return fmt.Errorf("unable to parse GitHub URL: %w", err)
@@ -1527,6 +1569,14 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("invalid GitHub URL")
 	}
 
+	if meta.GetFile() == "" && meta.GetCommit() != "" {
+		ctx := context.WithValues(ctx, "commit_hash", meta.GetCommit())
+		ctx.Logger().V(2).Info("secret metadata has no file; scanning commit metadata instead")
+
+		return s.scanCommitMetadata(ctx, segments[1], segments[2], meta, &chunkSkel, reporter)
+	}
+
+	// else try downloading the file content to scan
 	readCloser, resp, err := s.connector.APIClient().Repositories.DownloadContents(
 		ctx,
 		segments[1],
@@ -1545,19 +1595,36 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("unexpected HTTP response status when trying to download file for scan: %v", resp.Status)
 	}
 
-	chunkSkel := sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		JobID:      s.JobID(),
-		SecretID:   target.SecretID,
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Github{Github: meta},
-		},
-		Verify: s.verify,
-	}
 	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
 	return handlers.HandleFile(fileCtx, readCloser, &chunkSkel, reporter)
+}
+
+func (s *Source) scanCommitMetadata(ctx context.Context, owner, repo string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
+	// fetch the commit
+	commit, resp, err := s.connector.APIClient().Repositories.GetCommit(ctx, owner, repo, meta.GetCommit(), nil)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		return fmt.Errorf("could not fetch commit for metadata scan: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected HTTP response status when fetching commit: %v", resp.Status)
+	}
+
+	// create the string with the exact format we use in Git.ScanCommits()
+	// author email + "\n" + committer + "\n" + commit message
+	var sb strings.Builder
+
+	sb.WriteString(commit.GetCommit().Author.GetEmail())
+	sb.WriteString("\n")
+	sb.WriteString(commit.GetCommitter().GetEmail())
+	sb.WriteString("\n")
+	sb.WriteString(commit.GetCommit().GetMessage())
+
+	content := strings.NewReader(sb.String())
+	return handlers.HandleFile(ctx, io.NopCloser(content), chunkSkel, reporter)
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
@@ -1570,9 +1637,4 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		return err
 	}
 	return s.scanRepo(ctx, repoURL, reporter)
-}
-
-// getLogger returns a named logger: `trufflehog.s.github`.
-func getLogger(ctx context.Context) logr.Logger {
-	return ctx.Logger().WithName("s.github") // short-hand for `sources.github`.
 }
