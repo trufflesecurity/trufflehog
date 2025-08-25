@@ -7,15 +7,19 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
+	"github.com/shurcooL/githubv4"
+	"golang.org/x/oauth2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
-	"golang.org/x/oauth2"
 )
 
 type tokenConnector struct {
-	apiClient          *github.Client
-	token              string
+	token         string
+	apiClient     *github.Client
+	graphqlClient *githubv4.Client
+
 	isGitHubEnterprise bool
 	handleRateLimit    func(context.Context, error) bool
 	user               string
@@ -26,7 +30,7 @@ type tokenConnector struct {
 
 var _ Connector = (*tokenConnector)(nil)
 
-func NewTokenConnector(apiEndpoint, token, clonePath string, authInUrl bool, handleRateLimit func(context.Context, error) bool) (Connector, error) {
+func NewTokenConnector(ctx context.Context, apiEndpoint, token, clonePath string, authInUrl bool, handleRateLimit func(context.Context, error) bool) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
@@ -35,15 +39,21 @@ func NewTokenConnector(apiEndpoint, token, clonePath string, authInUrl bool, han
 		Source: tokenSource,
 	}
 
-	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
+	apiClient, err := createAPIClient(ctx, httpClient, apiEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 
+	graphqlClient, err := createGraphqlClient(ctx, httpClient, apiEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
+	}
+
 	return &tokenConnector{
 		apiClient:          apiClient,
+		graphqlClient:      graphqlClient,
 		token:              token,
-		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
+		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudV3Endpoint),
 		handleRateLimit:    handleRateLimit,
 		authInUrl:          authInUrl,
 		clonePath:          clonePath,
@@ -60,6 +70,10 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...stri
 	}
 
 	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.clonePath, c.user, c.authInUrl, args...)
+}
+
+func (c *tokenConnector) GraphQLClient() *githubv4.Client {
+	return c.graphqlClient
 }
 
 func (c *tokenConnector) IsGithubEnterprise() bool {
