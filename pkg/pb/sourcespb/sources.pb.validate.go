@@ -2081,6 +2081,10 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
+	// no validation rules for ClonePath
+
+	// no validation rules for NoCleanup
+
 	switch v := m.Credential.(type) {
 	case *Git_BasicAuth:
 		if v == nil {
@@ -2327,6 +2331,10 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for RemoveAuthInUrl
 
+	// no validation rules for ClonePath
+
+	// no validation rules for NoCleanup
+
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
 		if v == nil {
@@ -2559,6 +2567,10 @@ func (m *GitHub) validate(all bool) error {
 	// no validation rules for CommentsTimeframeDays
 
 	// no validation rules for RemoveAuthInUrl
+
+	// no validation rules for ClonePath
+
+	// no validation rules for NoCleanup
 
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:

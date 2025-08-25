@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -64,6 +65,9 @@ type Source struct {
 	sources.CommonSourceUnitUnmarshaller
 
 	useAuthInUrl bool
+
+	clonePath string
+	noCleanup bool
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -163,6 +167,8 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
+	s.clonePath = conn.GetClonePath()
+	s.noCleanup = conn.GetNoCleanup()
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
@@ -879,7 +885,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			var repo *gogit.Repository
 			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
-				path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
+				path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL, s.clonePath)
 			} else {
 				// If a username is not provided we need to use a default one in order to clone a private repo.
 				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
@@ -888,13 +894,17 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 					user = "placeholder"
 				}
 
-				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
+				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, s.clonePath, user, s.useAuthInUrl)
 			}
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
-			defer os.RemoveAll(path)
+
+			// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
+			if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
+				defer os.RemoveAll(path)
+			}
 
 			logger.V(2).Info("starting scan", "num", i+1, "total", len(s.repos))
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
@@ -1068,7 +1078,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	var repo *gogit.Repository
 	var err error
 	if s.authMethod == "UNAUTHENTICATED" {
-		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
+		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL, s.clonePath)
 	} else {
 		// If a username is not provided we need to use a default one in order to clone a private repo.
 		// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
@@ -1077,12 +1087,16 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			user = "placeholder"
 		}
 
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, s.clonePath, user, s.useAuthInUrl)
 	}
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(path)
+
+	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
+	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
+		defer os.RemoveAll(path)
+	}
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 }
