@@ -218,7 +218,6 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			}
 
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
-			// FIX: Apply filtering BEFORE adding to cache
 			if s.filteredRepoCache.includeRepo(repoName) && !s.filteredRepoCache.ignoreRepo(repoName) {
 				s.totalRepoSize += r.GetSize()
 				s.filteredRepoCache.Set(repoName, repoURL)
