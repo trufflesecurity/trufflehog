@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -14,63 +13,88 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flightlabs"}) + `\b(ey[a-zA-Z0-9]{34}.ey[a-zA-Z0-9._-]{300,350})\b`)
+	keyPat = regexp.MustCompile(`\b(eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9\.ey[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]{86})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"flightlabs"}
+	return []string{"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9"}
+}
+
+func (s Scanner) getClient() *http.Client {
+	client := s.client
+	if client == nil {
+		client = defaultClient
+	}
+
+	return client
 }
 
 // FromData will find and optionally verify FlightLabs secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueKeys := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[match[1]] = struct{}{}
+	}
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
+	for key := range uniqueKeys {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FlightLabs,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(key),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://app.goflightlabs.com/airports?access_key=%s", resMatch), nil)
-			if err != nil {
-				continue
-			}
-
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				bodyString := string(bodyBytes)
-				validResponse := strings.Contains(bodyString, `"id"`)
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, s.getClient(), key)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, key)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, secret string) (bool, error) {
+	// API Reference: https://www.goflightlabs.com/airports-by-filters
+
+	url := fmt.Sprintf("https://www.goflightlabs.com/airports-by-filter?access_key=%s&iata_code=JFK", secret)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
