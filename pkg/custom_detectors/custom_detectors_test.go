@@ -4,9 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/protoyaml"
 )
 
@@ -225,6 +229,334 @@ func TestDetectorPrimarySecret(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
+}
+
+func TestDetectorValidations(t *testing.T) {
+	type args struct {
+		CustomRegex *custom_detectorspb.CustomRegex
+		Data        string
+	}
+
+	tests := []struct {
+		name  string
+		input args
+		want  []detectors.Result
+	}{
+		{
+			name: "custom validation - contains digit",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsDigit: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStr0ngP@ssword!
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("MyStr0ngP@ssword!"),
+				},
+			},
+		},
+		{
+			name: "custom validation - does not contains digit",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsDigit: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongPassword!
+						End of file`,
+			},
+			want: nil,
+		},
+		{
+			name: "custom validation - contains lowercase",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsLowercase: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongPassword!
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("MyStrongPassword!"),
+				},
+			},
+		},
+		{
+			name: "custom validation - does not contains lowercase",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsLowercase: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MYSTRONGPASSWORD!
+						End of file`,
+			},
+			want: nil,
+		},
+		{
+			name: "custom validation - contains uppercase",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongPassword!
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("MyStrongPassword!"),
+				},
+			},
+		},
+		{
+			name: "custom validation - does not contains uppercase",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: mystrongpassword!
+						End of file`,
+			},
+			want: nil,
+		},
+		{
+			name: "custom validation - contains special character",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsSpecialChar: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStr@ngP@ssword!
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("MyStr@ngP@ssword!"),
+				},
+			},
+		},
+		{
+			name: "custom validation - does not contains special character",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsSpecialChar: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongPassword
+						End of file`,
+			},
+			want: nil,
+		},
+		{
+			name: "custom validation - contains uppercase and special characters",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase:   true,
+							ContainsSpecialChar: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongP@ssword
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("MyStrongP@ssword"),
+				},
+			},
+		},
+		{
+			name: "custom validation - contains uppercase but does not contain special characters",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase:   true,
+							ContainsSpecialChar: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongPassword
+						End of file`,
+			},
+			want: nil,
+		},
+		{
+			name: "custom validation - wrong regex name in validations",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password"},
+					Regex:    map[string]string{"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"wrong": {
+							ContainsUppercase: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: mystrongp@ssword
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("mystrongp@ssword"),
+				},
+			},
+		},
+		{
+			name: "custom validation - multiple regex validations",
+			input: args{
+				CustomRegex: &custom_detectorspb.CustomRegex{
+					Name:     "test",
+					Keywords: []string{"password", "api_key"},
+					Regex: map[string]string{
+						"password": `([A-Za-z0-9!@#$%^&*()_+=\-]{12,})`,
+						"api_key":  `([a-f0-9_-]{32})`,
+					},
+					Validations: map[string]*custom_detectorspb.ValidationConfig{
+						"password": {
+							ContainsUppercase:   true,
+							ContainsSpecialChar: true,
+						},
+						"api_key": {
+							ContainsSpecialChar: true,
+						},
+					},
+				},
+				Data: `This is custom example
+						This file has a random text and maybe a secret
+						Password: MyStrongP@ssword
+						API_Key: c392c9837d69b44c764cbf260b-e6184 // should be detected
+						API_Key: c392c9837d69b44c764cbf260be6184 // should be filtered by validation
+						End of file`,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorName: "test",
+					Verified:     false,
+					Raw:          []byte("MyStrongP@sswordc392c9837d69b44c764cbf260b-e6184"),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detector, err := NewWebhookCustomRegex(tt.input.CustomRegex)
+			assert.NoError(t, err)
+			results, err := detector.FromData(context.Background(), false, []byte(tt.input.Data))
+			assert.NoError(t, err)
+
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "ExtraData", "verificationError", "primarySecret")
+			if diff := cmp.Diff(results, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("CustomDetector.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
 }
 
 func BenchmarkProductIndices(b *testing.B) {
