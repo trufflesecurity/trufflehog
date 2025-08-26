@@ -185,3 +185,34 @@ func TestCause(t *testing.T) {
 	cancel(err)
 	assert.Equal(t, err, Cause(ctx))
 }
+
+// TestBuriedLogger tests when a logging context is wrapped by a non-logging
+// implementation that we can still regain the original logger.
+func TestBuriedLogger(t *testing.T) {
+	var buffer bytes.Buffer
+	logger, sync := log.New("test",
+		log.WithConsoleSink(&buffer),
+	)
+	defer func(prevLogger logr.Logger) {
+		defaultLogger = prevLogger
+	}(defaultLogger)
+	SetDefaultLogger(logger)
+
+	// Create a context with a key/value log entry.
+	ctx := WithValue(Background(), "log", "entry")
+	// Convert it to a stdlib context.
+	stdCtx := context.WithValue(ctx, "std", "entry") //nolint:staticcheck
+	// Try to get the logger back again.
+	ctx = AddLogger(stdCtx)
+	ctx.Logger().Info("test")
+
+	assert.Nil(t, sync())
+	logs := strings.Split(strings.TrimSpace(buffer.String()), "\n")
+
+	// Logger has the key/value log entry.
+	assert.Equal(t, 1, len(logs))
+	assert.Contains(t, logs[0], `{"log": "entry"}`)
+	// Grab bag still has both values.
+	assert.Equal(t, "entry", ctx.Value("log"))
+	assert.Equal(t, "entry", ctx.Value("std"))
+}
