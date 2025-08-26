@@ -186,13 +186,17 @@ func (s *Source) getReposByOrg(ctx context.Context, org string, reporter sources
 }
 
 // userType indicates whether an account belongs to a person or organization.
+//
+// See:
+// - https://docs.github.com/en/get-started/learning-about-github/types-of-github-accounts
+// - https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user
 type userType int
 
 // Constants for userType.
 const (
 	unknown      userType = iota // default invalid state.
-	user                         // the account is a person.
-	organization                 // the account is an organization.
+	user                         // the account is a person (https://docs.github.com/en/rest/users/users).
+	organization                 // the account is an organization (https://docs.github.com/en/rest/orgs/orgs).
 )
 
 // getReposByOrgOrUser retrieves repositories for an organization or user.
@@ -354,6 +358,8 @@ func (s *Source) cacheGistInfo(g *github.Gist) {
 }
 
 // wikiIsReachable checks if the wiki for a repository is reachable by sending a HEAD request.
+// Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
+// but still don't have a cloneable wiki.
 func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 	wikiURL := strings.TrimSuffix(repoURL, ".git") + "/wiki"
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
