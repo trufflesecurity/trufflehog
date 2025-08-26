@@ -11,6 +11,10 @@ detectors:
   regex:
     secret: |-
       (?i)[\w.-]{0,50}?(?:access|auth|(?-i:[Aa]pi|API)|credential|creds|key|passw(?:or)?d|secret|token)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[\x60'"\s=]{0,5}([\w.=-]{10,150}|[a-z0-9][a-z0-9+/]{11,}={0,3})(?:[\x60'"\s;]|\\[nr]|$)
+  validations:
+    secret: # name of the regex to apply these validations to
+      contains_digit: true
+      contains_special_char: true
   entropy: 3.5
   # exclude_regexes_capture:
   #   - |-
