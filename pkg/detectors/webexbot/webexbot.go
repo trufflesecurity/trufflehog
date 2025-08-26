@@ -80,7 +80,7 @@ type response struct {
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://webexapis.com/v1/people/me", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")

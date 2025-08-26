@@ -82,7 +82,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	const baseURL = "https://api.wandb.ai/graphql"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewBufferString(query))
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	authHeader := base64.StdEncoding.EncodeToString([]byte("api:" + token))

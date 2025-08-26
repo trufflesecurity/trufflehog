@@ -95,7 +95,7 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 	payload := strings.NewReader("grant_type=client_credentials&client_id=" + id + "&client_secret=" + secret)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header = http.Header{"content-type": []string{"application/x-www-form-urlencoded"}}

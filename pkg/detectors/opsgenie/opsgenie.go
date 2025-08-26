@@ -110,7 +110,7 @@ func verifyMatch(ctx context.Context, client *http.Client, key string) (bool, ma
 	case http.StatusOK:
 		var accountRes accountResponse
 		if err := json.NewDecoder(res.Body).Decode(&accountRes); err != nil {
-			return false, nil, nil
+			return false, nil, err
 		}
 
 		extraData := map[string]string{
