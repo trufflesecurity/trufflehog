@@ -301,8 +301,11 @@ func (s *Source) scanRepo(ctx context.Context, repoURI string, reporter sources.
 	err := func() error {
 		path, repo, err := cloneFunc()
 		// remove the directory only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-			defer os.RemoveAll(path)
+		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+		if !s.conn.GetPrintLegacyJson() {
+			if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
+				defer os.RemoveAll(path)
+			}
 		}
 
 		if err != nil {
@@ -354,8 +357,11 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 
 	err = func() error {
 		// remove the directory only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog-")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-			defer os.RemoveAll(gitDir)
+		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+		if !s.conn.GetPrintLegacyJson() {
+			if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
+				defer os.RemoveAll(gitDir)
+			}
 		}
 
 		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)
@@ -414,9 +420,9 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 	var path string
 	var err error
 
-	// If --clone-path is set, create a subdirectory <clonePath>/<repo-name> with permissions 0755.
+	// If --clone-path is set, create a subdirectory <clonePath>/trufflehog-<repo-name> with permissions 0755.
 	if clonePath != "" {
-		path = filepath.Join(clonePath, strings.TrimSuffix(filepath.Base(gitURL), ".git"))
+		path = filepath.Join(clonePath, "trufflehog-"+strings.TrimSuffix(filepath.Base(gitURL), ".git"))
 		if err = os.MkdirAll(path, 0755); err != nil {
 			return "", nil, fmt.Errorf("failed to create clone path %s: %w", clonePath, err)
 		}

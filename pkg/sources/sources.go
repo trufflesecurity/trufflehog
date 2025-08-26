@@ -284,6 +284,8 @@ type GitConfig struct {
 	ClonePath string
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup bool
+	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
+	PrintLegacyJSON bool
 }
 
 // GithubConfig defines the optional configuration for a github source.
@@ -327,6 +329,8 @@ type GithubConfig struct {
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup   bool
 	IgnoreGists bool
+	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
+	PrintLegacyJSON bool
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
@@ -367,6 +371,8 @@ type GitlabConfig struct {
 	ClonePath string
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup bool
+	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
+	PrintLegacyJSON bool
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.

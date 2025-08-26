@@ -745,8 +745,11 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 		return duration, err
 	}
 	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog-")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
-		defer os.RemoveAll(path)
+	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+	if !s.conn.GetPrintLegacyJson() {
+		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
+			defer os.RemoveAll(path)
+		}
 	}
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
