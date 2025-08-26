@@ -5,6 +5,8 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
+	"github.com/shurcooL/githubv4"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -12,15 +14,16 @@ import (
 )
 
 type basicAuthConnector struct {
-	apiClient *github.Client
-	username  string
-	password  string
-	clonePath string
+	apiClient     *github.Client
+	graphqlClient *githubv4.Client
+	username      string
+	password      string
+	clonePath     string
 }
 
 var _ Connector = (*basicAuthConnector)(nil)
 
-func NewBasicAuthConnector(apiEndpoint, clonePath string, cred *credentialspb.BasicAuth) (Connector, error) {
+func NewBasicAuthConnector(ctx context.Context, apiEndpoint, clonePath string, cred *credentialspb.BasicAuth) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	httpClient.Transport = &github.BasicAuthTransport{
@@ -28,16 +31,22 @@ func NewBasicAuthConnector(apiEndpoint, clonePath string, cred *credentialspb.Ba
 		Password: cred.Password,
 	}
 
-	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
+	apiClient, err := createAPIClient(ctx, httpClient, apiEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 
+	graphqlClient, err := createGraphqlClient(ctx, httpClient, apiEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
+	}
+
 	return &basicAuthConnector{
-		apiClient: apiClient,
-		username:  cred.Username,
-		password:  cred.Password,
-		clonePath: clonePath,
+		apiClient:     apiClient,
+		graphqlClient: graphqlClient,
+		username:      cred.Username,
+		password:      cred.Password,
+		clonePath:     clonePath,
 	}, nil
 }
 
@@ -47,4 +56,8 @@ func (c *basicAuthConnector) APIClient() *github.Client {
 
 func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
 	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.clonePath, c.username, true, args...)
+}
+
+func (c *basicAuthConnector) GraphQLClient() *githubv4.Client {
+	return c.graphqlClient
 }

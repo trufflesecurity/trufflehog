@@ -107,3 +107,47 @@ func ValidateRegexVars(regex map[string]string, body ...string) error {
 	}
 	return nil
 }
+
+// === Custom Validations ===
+
+// ContainsDigit checks if string contains at least one digit
+func ContainsDigit(s string) bool {
+	for i := 0; i < len(s); i++ {
+		char := s[i]
+		if char >= '0' && char <= '9' {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ContainsLowercase checks if string contains at least one lowercase letter
+func ContainsLowercase(s string) bool {
+	for i := 0; i < len(s); i++ {
+		char := s[i]
+		if char >= 'a' && char <= 'z' {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ContainsUppercase checks if string contains at least one uppercase letter
+func ContainsUppercase(s string) bool {
+	for i := 0; i < len(s); i++ {
+		char := s[i]
+		if char >= 'A' && char <= 'Z' {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ContainsSpecialChar checks if string contains at least one special character
+func ContainsSpecialChar(s string) bool {
+	specialChars := "!@#$%^&*()_+-=[]{}|;:,.<>?"
+	return strings.ContainsAny(s, specialChars)
+}
