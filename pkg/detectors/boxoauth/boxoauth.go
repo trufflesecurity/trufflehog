@@ -120,13 +120,8 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 			if err != nil {
 				return false, nil, err
 			}
-			body := string(bodyBytes)
-
-			if strings.Contains(body, "unauthorized_client") {
-				return true, nil, nil
-			}
-
-			return false, nil, nil
+			verified := !strings.Contains(string(bodyBytes), "unauthorized_client")
+			return verified, nil, nil
 		}
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
