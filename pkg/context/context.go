@@ -16,6 +16,13 @@ var (
 	defaultLogger logr.Logger
 )
 
+// logEntryKey is used to store a reference to the logger in the
+// context.Context key/value bag. This is used for regaining the logger in case
+// the context is converted into a different type.
+const logEntryKey logEntryKeyT = 0
+
+type logEntryKeyT int
+
 func init() {
 	defaultLogger, _ = log.New("context", log.WithConsoleSink(os.Stderr))
 }
@@ -132,12 +139,14 @@ func Cause(ctx context.Context) error {
 // the value added to the structured log values (if the key is a string).
 func WithValue(parent Context, key, val any) Context {
 	logger := parent.Logger()
+	parentCtx := context.WithValue(parent, key, val)
 	if k, ok := key.(string); ok {
 		logger = logger.WithValues(k, val)
+		parentCtx = context.WithValue(parentCtx, logEntryKey, logger)
 	}
 	return logCtx{
 		log:     logger,
-		Context: context.WithValue(parent, key, val),
+		Context: parentCtx,
 	}
 }
 
@@ -155,7 +164,7 @@ func WithValues(parent Context, keyAndVals ...any) Context {
 func WithLogger(parent context.Context, logger logr.Logger) Context {
 	return logCtx{
 		log:     logger,
-		Context: parent,
+		Context: context.WithValue(parent, logEntryKey, logger),
 	}
 }
 
@@ -163,9 +172,18 @@ func WithLogger(parent context.Context, logger logr.Logger) Context {
 // is already a Context, that will be returned, otherwise a default logger will
 // be added.
 func AddLogger(parent context.Context) Context {
+	// If the context.Context is already a Context, return that.
 	if loggerCtx, ok := parent.(Context); ok {
 		return loggerCtx
 	}
+	// If the logger exists in the grab bag (and is the correct type),
+	// return that.
+	if logEntryVal := parent.Value(logEntryKey); logEntryVal != nil {
+		if logger, ok := logEntryVal.(logr.Logger); ok {
+			return WithLogger(parent, logger)
+		}
+	}
+	// Otherwise, add the default logger.
 	return WithLogger(parent, defaultLogger)
 }
 
