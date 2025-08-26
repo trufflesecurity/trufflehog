@@ -560,7 +560,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
 	if !specificScope {
 		// Enumerate the user's orgs and repos if none were specified.
-		if err := s.getReposByUser(ctx, ghUser.GetLogin(), reporter); err != nil {
+		if err := s.getReposByAuthenticatedUser(ctx, ghUser.GetLogin(), reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to fetch repos for the current user", "user", ghUser.GetLogin())
 		}
 		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin(), reporter); err != nil {
@@ -579,7 +579,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
 			orgCtx := context.WithValue(ctx, "account", org)
-			userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+			userType, err := s.getReposByOrgOrAuthenticatedUser(ctx, org, reporter)
 			if err != nil {
 				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
 				continue
