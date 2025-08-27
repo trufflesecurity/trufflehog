@@ -104,7 +104,7 @@ func (s *Source) getReposByApp(ctx context.Context, reporter sources.UnitReporte
 
 // userListOptions represents options for listing repositories by user.
 type userListOptions struct {
-	github.RepositoryListByUserOptions // Embedded options for listing repositories by user.
+	github.RepositoryListByUserOptions // embedded options for listing repositories by user.
 }
 
 // getListOptions returns the ListOptions for userListOptions.
@@ -112,27 +112,9 @@ func (u *userListOptions) getListOptions() *github.ListOptions {
 	return &u.ListOptions
 }
 
-// userListReposWrapper lists repositories for a user, using the provided options.
-func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.connector.APIClient().Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
-}
-
-// getReposByUser retrieves repositories for a given user.
-func (s *Source) getReposByUser(ctx context.Context, user string, reporter sources.UnitReporter) error {
-	return s.processRepos(ctx, user, reporter, s.userListReposWrapper, &userListOptions{
-		RepositoryListByUserOptions: github.RepositoryListByUserOptions{
-			ListOptions: github.ListOptions{
-				PerPage: defaultPagination,
-			},
-		},
-	})
-}
-
-// === GitHub Authenticated User Repositories ===
-
 // authenticatedUserListOption represents options for listing repositories by authenticated user.
 type authenticatedUserListOption struct {
-	github.RepositoryListByAuthenticatedUserOptions // Embedded options for listing repositories by authenticated user.
+	github.RepositoryListByAuthenticatedUserOptions // embedded options for listing repositories by authenticated user.
 }
 
 // getListOptions returns the ListOptions for authenticatedUserListOption.
@@ -140,15 +122,30 @@ func (a *authenticatedUserListOption) getListOptions() *github.ListOptions {
 	return &a.ListOptions
 }
 
+// userListReposWrapper lists repositories for a user, using the provided options.
+func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+	return s.connector.APIClient().Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
+}
+
 // authenticatedUserListReposWrapper lists repositories for an authenticated user, using the provided options.
 func (s *Source) authenticatedUserListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
 	return s.connector.APIClient().Repositories.ListByAuthenticatedUser(ctx, &opts.(*authenticatedUserListOption).RepositoryListByAuthenticatedUserOptions)
 }
 
-// getReposByAuthenticatedUser retrieves repositories for an authenticated user.
-func (s *Source) getReposByAuthenticatedUser(ctx context.Context, user string, reporter sources.UnitReporter) error {
-	return s.processRepos(ctx, user, reporter, s.authenticatedUserListReposWrapper, &authenticatedUserListOption{
-		RepositoryListByAuthenticatedUserOptions: github.RepositoryListByAuthenticatedUserOptions{
+// getReposByUser retrieves repositories for a given user.
+func (s *Source) getReposByUser(ctx context.Context, user string, authenticated bool, reporter sources.UnitReporter) error {
+	if authenticated {
+		return s.processRepos(ctx, user, reporter, s.authenticatedUserListReposWrapper, &authenticatedUserListOption{
+			RepositoryListByAuthenticatedUserOptions: github.RepositoryListByAuthenticatedUserOptions{
+				ListOptions: github.ListOptions{
+					PerPage: defaultPagination,
+				},
+			},
+		})
+	}
+
+	return s.processRepos(ctx, user, reporter, s.userListReposWrapper, &userListOptions{
+		RepositoryListByUserOptions: github.RepositoryListByUserOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
 			},
@@ -200,7 +197,7 @@ const (
 )
 
 // getReposByOrgOrUser retrieves repositories for an organization or user.
-func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter sources.UnitReporter) (userType, error) {
+func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, authenticated bool, reporter sources.UnitReporter) (userType, error) {
 	var err error
 
 	// try to get repositories for the organization first.
@@ -211,11 +208,12 @@ func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter 
 		if err := reporter.UnitErr(ctx, fmt.Errorf("error getting repos by org: %w", err)); err != nil {
 			return unknown, err
 		}
+
 		return unknown, err
 	}
 
 	// if organization repos aren't found, try user repos.
-	err = s.getReposByUser(ctx, name, reporter)
+	err = s.getReposByUser(ctx, name, authenticated, reporter)
 	if err == nil {
 		if err := s.addUserGistsToCache(ctx, name, reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to add user to cache")
@@ -226,35 +224,6 @@ func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter 
 	}
 
 	// if neither organization nor user repos are found, return an error.
-	return unknown, fmt.Errorf("account '%s' not found", name)
-}
-
-// getReposByOrgOrAuthenticatedUser retrieves repositories for an org or authenticated user.
-func (s *Source) getReposByOrgOrAuthenticatedUser(ctx context.Context, name string, reporter sources.UnitReporter) (userType, error) {
-	var err error
-
-	// try to get repositories for the organization first.
-	err = s.getReposByOrg(ctx, name, reporter)
-	if err == nil {
-		return organization, nil
-	} else if !isGitHub404Error(err) {
-		if err := reporter.UnitErr(ctx, fmt.Errorf("error getting repos by org: %w", err)); err != nil {
-			return unknown, err
-		}
-		return unknown, err
-	}
-
-	// if organization repos aren't found, try authenticated user repos.
-	err = s.getReposByAuthenticatedUser(ctx, name, reporter)
-	if err == nil {
-		if err := s.addUserGistsToCache(ctx, name, reporter); err != nil {
-			ctx.Logger().Error(err, "Unable to add user to cache")
-		}
-		return user, nil
-	} else if !isGitHub404Error(err) {
-		return unknown, err
-	}
-
 	return unknown, fmt.Errorf("account '%s' not found", name)
 }
 
