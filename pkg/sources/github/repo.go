@@ -218,17 +218,13 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			}
 
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
-			if s.filteredRepoCache.includeRepo(repoName) && !s.filteredRepoCache.ignoreRepo(repoName) {
-				s.totalRepoSize += r.GetSize()
-				s.filteredRepoCache.Set(repoName, repoURL)
-				s.cacheRepoInfo(r)
-				if err := reporter.UnitOk(ctx, RepoUnit{Name: repoName, URL: repoURL}); err != nil {
-					return err
-				}
-				logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
-			} else {
-				logger.V(3).Info("skipping repo due to filter", "name", repoName)
+			s.totalRepoSize += r.GetSize()
+			s.filteredRepoCache.Set(repoName, repoURL)
+			s.cacheRepoInfo(r)
+			if err := reporter.UnitOk(ctx, RepoUnit{Name: repoName, URL: repoURL}); err != nil {
+				return err
 			}
+			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
 		if res.NextPage == 0 {

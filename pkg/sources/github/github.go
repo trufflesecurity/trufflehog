@@ -193,15 +193,18 @@ func (c *filteredRepoCache) ignoreRepo(s string) bool {
 }
 
 func (c *filteredRepoCache) includeRepo(s string) bool {
+	// If no include patterns are specified, default to including everything
 	if len(c.include) == 0 {
 		return true
 	}
 
+	// If include patterns are specified, only include repos that match at least one pattern
 	for _, g := range c.include {
 		if g.Match(s) {
 			return true
 		}
 	}
+	// No patterns matched, so exclude this repo
 	return false
 }
 
@@ -248,9 +251,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
 		simple.NewCache[string](),
-		s.conn.GetIncludeRepos(),
+		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
+
 	s.repos = s.conn.Repositories
 	for _, repo := range s.repos {
 		r, err := s.normalizeRepo(repo)
@@ -501,6 +505,12 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 }
 
 func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitReporter) error {
+	// If specific repositories are specified, skip organization-wide enumeration
+	if len(s.conn.GetRepositories()) > 0 {
+		ctx.Logger().V(1).Info("Specific repositories specified, skipping organization-wide enumeration")
+		return nil
+	}
+
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
 		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
@@ -522,6 +532,12 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitRe
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context, reporter sources.UnitReporter) {
+	// If specific repositories are specified, skip organization-wide enumeration
+	if len(s.conn.GetRepositories()) > 0 {
+		ctx.Logger().V(1).Info("Specific repositories specified, skipping organization-wide enumeration")
+		return
+	}
+
 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
 		ctx.Logger().Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
@@ -576,24 +592,29 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	}
 
 	if len(s.orgsCache.Keys()) > 0 {
-		for _, org := range s.orgsCache.Keys() {
-			orgCtx := context.WithValue(ctx, "account", org)
-			userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
-			if err != nil {
-				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
-				continue
-			}
+		// If specific repositories are specified, skip organization-wide enumeration
+		if len(s.conn.GetRepositories()) > 0 {
+			ctx.Logger().V(1).Info("Specific repositories specified, skipping organization-wide enumeration")
+		} else {
+			for _, org := range s.orgsCache.Keys() {
+				orgCtx := context.WithValue(ctx, "account", org)
+				userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+				if err != nil {
+					orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
+					continue
+				}
 
-			if userType == organization && s.conn.ScanUsers {
-				if err := s.addMembersByOrg(ctx, org, reporter); err != nil {
-					orgCtx.Logger().Error(err, "Unable to add members for org")
+				if userType == organization && s.conn.ScanUsers {
+					if err := s.addMembersByOrg(ctx, org, reporter); err != nil {
+						orgCtx.Logger().Error(err, "Unable to add members for org")
+					}
 				}
 			}
-		}
 
-		if s.conn.ScanUsers && len(s.memberCache) > 0 {
-			ctx.Logger().Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
-			s.addReposForMembers(ctx, reporter)
+			if s.conn.ScanUsers && len(s.memberCache) > 0 {
+				ctx.Logger().Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
+				s.addReposForMembers(ctx, reporter)
+			}
 		}
 	}
 
@@ -601,6 +622,12 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 }
 
 func (s *Source) enumerateWithApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
+	// If specific repositories are specified, skip app-wide enumeration
+	if len(s.conn.GetRepositories()) > 0 {
+		ctx.Logger().V(1).Info("Specific repositories specified, skipping app-wide enumeration")
+		return nil
+	}
+
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
 		if err := s.getReposByApp(ctx, reporter); err != nil {
