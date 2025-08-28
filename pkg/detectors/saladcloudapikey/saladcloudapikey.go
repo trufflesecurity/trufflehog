@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.salad.com/api/public", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header.Set("Salad-Api-Key", token)
