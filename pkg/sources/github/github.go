@@ -454,6 +454,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 				_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
 			}
 			s.repos = append(s.repos, repo)
+		}
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	ctx.Logger().Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
