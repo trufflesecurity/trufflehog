@@ -289,9 +289,14 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {
-	// If there's a '/', assume it's a URL and try to normalize it.
-	if strings.ContainsRune(repo, '/') {
+	// If it's a full URL, normalize it
+	if strings.HasPrefix(repo, "http") {
 		return giturl.NormalizeGithubRepo(repo)
+	}
+	// If it's a repository name (contains / but not http), convert to full URL first
+	if strings.Contains(repo, "/") && !strings.HasPrefix(repo, "http") {
+		fullURL := "https://github.com/" + repo
+		return giturl.NormalizeGithubRepo(fullURL)
 	}
 
 	return "", fmt.Errorf("no repositories found for %s", repo)
