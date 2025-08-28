@@ -150,7 +150,7 @@ func verifyMatch(ctx logContext.Context, client *http.Client, registry string, u
 	// Build the request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, registryUrl, nil)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	req.Header.Set("Authorization", "Basic "+basicAuth)

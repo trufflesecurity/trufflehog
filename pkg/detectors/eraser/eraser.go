@@ -76,7 +76,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	url := "https://app.eraser.io/api/render/elements"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header = http.Header{"Authorization": []string{"Bearer " + token}}

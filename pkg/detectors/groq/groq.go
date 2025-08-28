@@ -76,7 +76,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	// This endpoint will return a JSON list of all active models.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.groq.com/openai/v1/models", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
 
