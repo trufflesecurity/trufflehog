@@ -19,6 +19,7 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v67/github"
+	"github.com/shurcooL/githubv4"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -1224,38 +1225,21 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 	return nil
 }
 
-// Note: these can't be consts because the address is needed when using with the GitHub library.
-var (
-	// sortType defines the criteria for sorting comments.
-	// By setting this to "updated" we can use this to reliably manage the comment timeframe filtering below
-	sortType = "updated"
-	// directionType defines the direction of sorting.
-	// "desc" means comments will be sorted in descending order, showing the latest comments first, which is critical for managing the comment timeframe filtering
-	directionType = "desc"
-	// allComments is a placeholder for specifying the comment ID to start listing from.
-	// A value of 0 means that all comments will be listed.
-	allComments = 0
-	// state of "all" for the ListByRepo captures both open and closed issues.
-	state = "all"
-)
-
 func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
-		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
-			return err
-		}
-		if err := s.processIssueComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+		if err := s.processIssuesWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
 
 	if s.includePRComments {
 		ctx.Logger().V(2).Info("Scanning pull requests")
-		if err := s.processPRs(ctx, repoInfo, reporter); err != nil {
+		if err := s.processPRWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
-		if err := s.processPRComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+
+		if err := s.processReviewThreads(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
@@ -1263,47 +1247,223 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, rep
 	return nil
 }
 
-func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
-	bodyTextsOpts := &github.IssueListByRepoOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		State:     state,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
-		},
+func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+	vars := map[string]any{
+		owner:              githubv4.String(repoInfo.owner),
+		repository:         githubv4.String(repoInfo.name),
+		issuesPerPage:      githubv4.Int(defaultPagination),
+		issuesPagination:   (*githubv4.String)(nil),
+		commentsPerPage:    githubv4.Int(defaultPagination),
+		commentsPagination: (*githubv4.String)(nil),
 	}
 
 	for {
-		issues, _, err := s.connector.APIClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
+		var query issuesWithComments
+		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
+			return fmt.Errorf("error fetching issues: %w", err)
 		}
 
-		if err != nil {
+		ctx.Logger().V(4).Info("Scanning Issues",
+			"total_issues", len(query.GetIssues()))
+
+		if err := s.chunkIssues(ctx, repoInfo, query.Repository.Issues.Nodes, reporter); err != nil {
 			return err
 		}
 
-		if err = s.chunkIssues(ctx, repoInfo, issues, reporter); err != nil {
-			return err
+		for _, issue := range query.GetIssues() {
+			ctx.Logger().V(4).Info("Scanning Issue Comments",
+				"issue_id", issue.Number,
+				"total_comments", len(issue.GetIssueComments()),
+			)
+
+			if err := s.chunkIssueComments(ctx, repoInfo, issue.GetIssueComments(), reporter, cutoffTime); err != nil {
+				return err
+			}
+
+			// paginate comments for this issue
+			for issue.Comments.HasNextPage() {
+				commentVars := map[string]any{
+					owner:              githubv4.String(repoInfo.owner),
+					repository:         githubv4.String(repoInfo.name),
+					issueNumber:        githubv4.Int(issue.Number),
+					commentsPerPage:    githubv4.Int(defaultPagination),
+					commentsPagination: issue.Comments.PageInfo.EndCursor,
+				}
+
+				var commentsQuery singleIssueComments
+				if err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars); err != nil {
+					return err
+				}
+
+				ctx.Logger().V(4).Info("Scanning additional issue comments",
+					"issue_id", issue.Number,
+					"total_comments", len(commentsQuery.GetIssueComments()))
+
+				if err := s.chunkPullRequestComments(ctx, repoInfo, commentsQuery.GetIssueComments(), reporter, cutoffTime); err != nil {
+					return err
+				}
+
+				// update page info for loop
+				commentsQuery.UpdatePageInfo(issue.Comments.PageInfo)
+			}
 		}
 
-		bodyTextsOpts.ListOptions.Page++
-
-		if len(issues) < defaultPagination {
+		// paginate issues
+		if !query.Repository.Issues.PageInfo.HasNextPage {
+			ctx.Logger().V(4).Info("Scanned all repository issues with comments")
 			break
 		}
+
+		vars[issuesPagination] = githubv4.NewString(query.Repository.Issues.PageInfo.EndCursor)
 	}
+
 	return nil
 }
 
-func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter) error {
-	for _, issue := range issues {
-		// Skip pull requests since covered by processPRs.
-		if issue.IsPullRequest() {
-			continue
+func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+	vars := map[string]any{
+		owner:                 githubv4.String(repoInfo.owner),
+		repository:            githubv4.String(repoInfo.name),
+		pullRequestPerPage:    githubv4.Int(defaultPagination),
+		pullRequestPagination: (*githubv4.String)(nil),
+		commentsPerPage:       githubv4.Int(defaultPagination),
+		commentsPagination:    (*githubv4.String)(nil),
+	}
+
+	for {
+		var query pullRequestWithComments
+		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
+			return err
 		}
 
+		ctx.Logger().V(4).Info("Scanning pull requests",
+			"total_pull_requests", len(query.GetPullRequests()))
+
+		if err := s.chunkPullRequests(ctx, repoInfo, query.GetPullRequests(), reporter); err != nil {
+			return err
+		}
+
+		for _, pr := range query.GetPullRequests() {
+			ctx.Logger().V(4).Info("Scanning pull request comments",
+				"pull_request_no", pr.Number,
+				"total_comments", len(pr.Comments.Nodes))
+
+			if err := s.chunkPullRequestComments(ctx, repoInfo, pr.GetPRComments(), reporter, cutoffTime); err != nil {
+				return err
+			}
+
+			for pr.Comments.HasNextPage() {
+				var commentQuery singlePRComments
+				singlePRVars := map[string]any{
+					owner:              githubv4.String(repoInfo.owner),
+					repository:         githubv4.String(repoInfo.name),
+					pullRequestNumber:  pr.Number,
+					commentsPerPage:    githubv4.Int(defaultPagination),
+					commentsPagination: pr.Comments.PageInfo.EndCursor,
+				}
+
+				if err := s.connector.GraphQLClient().Query(ctx, &commentQuery, singlePRVars); err != nil {
+					return err
+				}
+
+				ctx.Logger().V(4).Info("Scanning additional comments",
+					"pull_request_no", pr.Number,
+					"total_comments", len(commentQuery.GetPRComments()))
+
+				if err := s.chunkPullRequestComments(ctx, repoInfo, commentQuery.GetPRComments(), reporter, cutoffTime); err != nil {
+					return err
+				}
+
+				// update pr.Comments.PageInfo so loop condition reflects new state
+				commentQuery.UpdatePageInfo(pr.Comments.PageInfo)
+			}
+		}
+
+		// move to next page of PRs
+		if !query.Repository.PullRequests.PageInfo.HasNextPage {
+			ctx.Logger().V(4).Info("Scanned all repository pull requests with comments")
+			break
+		}
+
+		vars[pullRequestPagination] = githubv4.NewString(query.Repository.PullRequests.PageInfo.EndCursor)
+	}
+
+	return nil
+}
+
+func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+	vars := map[string]any{
+		owner:                 githubv4.String(repoInfo.owner),
+		repository:            githubv4.String(repoInfo.name),
+		pullRequestPerPage:    githubv4.Int(defaultPagination),
+		pullRequestPagination: (*githubv4.String)(nil),
+		threadPerPage:         githubv4.Int(20), // keep threads count to 20 to not hit the max nodes threshold
+		threadPagination:      (*githubv4.String)(nil),
+		commentsPerPage:       githubv4.Int(defaultPagination),
+		commentsPagination:    (*githubv4.String)(nil),
+	}
+
+	for {
+		var query prWithReviewComments
+		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
+			return err
+		}
+
+		for _, pr := range query.GetMinimalPullRequests() {
+			ctx.Logger().V(4).Info("Scanning pull request review threads",
+				"pull_request_no", pr.Number,
+				"total_threads", len(pr.GetReviewThreads()))
+
+			for _, thread := range pr.GetReviewThreads() {
+				ctx.Logger().V(4).Info("Scanning pull request review threads comments",
+					"pull_request_no", pr.Number,
+					"thread_id", thread.ID,
+					"total_comments", len(thread.GetThreadComments()),
+				)
+
+				// first page of comments
+				if err := s.chunkPullRequestComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
+					return err
+				}
+
+				// paginate inside THIS thread only
+				for thread.Comments.HasNextPage() {
+					commentVars := map[string]any{
+						owner:              githubv4.String(repoInfo.owner),
+						repository:         githubv4.String(repoInfo.name),
+						pullRequestNumber:  githubv4.Int(pr.Number),
+						threadID:           thread.ID,
+						commentsPerPage:    githubv4.Int(defaultPagination),
+						commentsPagination: thread.Comments.PageInfo.EndCursor,
+					}
+
+					var commentsQuery singleReviewThreadComments
+					if err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars); err != nil {
+						return err
+					}
+
+					if err := s.chunkPullRequestComments(ctx, repoInfo, commentsQuery.GetThreadComments(), reporter, cutoffTime); err != nil {
+						return err
+					}
+
+					commentsQuery.UpdatePageInfo(thread.Comments.PageInfo)
+				}
+			}
+		}
+
+		if !query.Repository.PullRequests.PageInfo.HasNextPage {
+			ctx.Logger().V(4).Info("Scanned all repository PR's threads with comments")
+			break
+		}
+
+		vars[pullRequestPagination] = githubv4.NewString(query.Repository.PullRequests.PageInfo.EndCursor)
+	}
+
+	return nil
+}
+
+func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []issue, reporter sources.ChunkReporter) error {
+	for _, issue := range issues {
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -1313,16 +1473,16 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
-						Link:       sanitizer.UTF8(issue.GetHTMLURL()),
-						Username:   sanitizer.UTF8(issue.GetUser().GetLogin()),
-						Email:      sanitizer.UTF8(issue.GetUser().GetEmail()),
+						Link:       sanitizer.UTF8(issue.URL),
+						Username:   sanitizer.UTF8(issue.Author.Login),
+						Email:      sanitizer.UTF8(issue.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
-						Timestamp:  sanitizer.UTF8(issue.GetCreatedAt().String()),
+						Timestamp:  sanitizer.UTF8(issue.CreatedAt.String()),
 						Visibility: repoInfo.visibility,
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.GetTitle() + "\n" + issue.GetBody())),
+			Data:   []byte(sanitizer.UTF8(issue.Title + "\n" + issue.Body)),
 			Verify: s.verify,
 		}
 
@@ -1333,41 +1493,10 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 	return nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	issueOpts := &github.IssueListCommentsOptions{
-		Sort:      &sortType,
-		Direction: &directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
-		},
-	}
-
-	for {
-		issueComments, _, err := s.connector.APIClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		issueOpts.ListOptions.Page++
-		if len(issueComments) < defaultPagination {
-			break
-		}
-	}
-	return nil
-}
-
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []comment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
 		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
-		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
+		if cutoffTime != nil && comment.UpdatedAt.Before(*cutoffTime) {
 			continue
 		}
 
@@ -1380,16 +1509,16 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
-						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
-						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
-						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Link:       sanitizer.UTF8(comment.URL),
+						Username:   sanitizer.UTF8(comment.Author.Login),
+						Email:      sanitizer.UTF8(comment.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
-						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+						Timestamp:  sanitizer.UTF8(comment.CreatedAt.String()),
 						Visibility: repoInfo.visibility,
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Data:   []byte(sanitizer.UTF8(comment.BodyText)),
 			Verify: s.verify,
 		}
 
@@ -1400,72 +1529,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 	return nil
 }
 
-func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
-	prOpts := &github.PullRequestListOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		State:     state,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
-		},
-	}
-
-	for {
-		prs, _, err := s.connector.APIClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkPullRequests(ctx, repoInfo, prs, reporter); err != nil {
-			return err
-		}
-
-		prOpts.ListOptions.Page++
-
-		if len(prs) < defaultPagination {
-			break
-		}
-	}
-	return nil
-}
-
-func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	prOpts := &github.PullRequestListCommentsOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
-		},
-	}
-
-	for {
-		prComments, _, err := s.connector.APIClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		prOpts.ListOptions.Page++
-
-		if len(prComments) < defaultPagination {
-			break
-		}
-	}
-	return nil
-}
-
-func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []*github.PullRequest, reporter sources.ChunkReporter) error {
+func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []pullRequest, reporter sources.ChunkReporter) error {
 	for _, pr := range prs {
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
@@ -1476,16 +1540,16 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
-						Link:       sanitizer.UTF8(pr.GetHTMLURL()),
-						Username:   sanitizer.UTF8(pr.GetUser().GetLogin()),
-						Email:      sanitizer.UTF8(pr.GetUser().GetEmail()),
+						Link:       sanitizer.UTF8(pr.URL),
+						Username:   sanitizer.UTF8(pr.Author.Login),
+						Email:      sanitizer.UTF8(pr.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
-						Timestamp:  sanitizer.UTF8(pr.GetCreatedAt().String()),
+						Timestamp:  sanitizer.UTF8(pr.CreatedAt.String()),
 						Visibility: repoInfo.visibility,
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(pr.GetTitle() + "\n" + pr.GetBody())),
+			Data:   []byte(sanitizer.UTF8(pr.Title + "\n" + pr.BodyText)),
 			Verify: s.verify,
 		}
 
@@ -1496,10 +1560,10 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []comment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
 		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
-		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
+		if cutoffTime != nil && comment.UpdatedAt.Before(*cutoffTime) {
 			continue
 		}
 
@@ -1512,16 +1576,16 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
-						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
-						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
-						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Link:       sanitizer.UTF8(comment.URL),
+						Username:   sanitizer.UTF8(comment.Author.Login),
+						Email:      sanitizer.UTF8(comment.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
-						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+						Timestamp:  sanitizer.UTF8(comment.CreatedAt.String()),
 						Visibility: repoInfo.visibility,
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Data:   []byte(sanitizer.UTF8(comment.BodyText)),
 			Verify: s.verify,
 		}
 
