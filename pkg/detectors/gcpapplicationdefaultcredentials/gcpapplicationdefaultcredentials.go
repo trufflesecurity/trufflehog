@@ -140,7 +140,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	// Build request to call an IAM endpoint
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://iam.googleapis.com/v1/roles", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	// If we are not using a faketransport, leave it as is because the test wants to modify the response. Otherwise, set the retrieved token to the client.

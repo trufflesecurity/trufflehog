@@ -72,7 +72,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	url := "https://logistics-api.flexport.com/logistics/api/2024-04/webhooks"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
