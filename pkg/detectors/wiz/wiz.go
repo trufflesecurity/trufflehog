@@ -91,7 +91,7 @@ func verifyMatch(ctx context.Context, client *http.Client, clientID, clientSecre
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://auth.app.wiz.io/oauth/token", strings.NewReader(authData.Encode()))
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header.Add("Encoding", "UTF-8")
