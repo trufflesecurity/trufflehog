@@ -186,7 +186,7 @@ func verifyMatch(ctx context.Context, client *http.Client, refreshToken string, 
 	tokenUrl := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantId)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenUrl, bytes.NewBufferString(data.Encode()))
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 

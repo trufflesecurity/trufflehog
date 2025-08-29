@@ -83,7 +83,7 @@ func verifyMatch(ctx context.Context, client *http.Client, key, secret string) (
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.endorlabs.com/v1/auth/api-key", strings.NewReader(authData))
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
