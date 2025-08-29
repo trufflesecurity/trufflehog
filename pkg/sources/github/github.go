@@ -1256,13 +1256,17 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 		commentsPagination: (*githubv4.String)(nil),
 	}
 
+	var totalIssues int
+
 	for {
 		var query issuesWithComments
 		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
 			return fmt.Errorf("error fetching issues: %w", err)
 		}
 
-		ctx.Logger().V(4).Info("Scanning Issues",
+		totalIssues += len(query.GetIssues())
+
+		ctx.Logger().V(5).Info("Scanning Issues",
 			"total_issues", len(query.GetIssues()))
 
 		if err := s.chunkIssues(ctx, repoInfo, query.Repository.Issues.Nodes, reporter); err != nil {
@@ -1270,7 +1274,7 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 		}
 
 		for _, issue := range query.GetIssues() {
-			ctx.Logger().V(4).Info("Scanning Issue Comments",
+			ctx.Logger().V(5).Info("Scanning Issue Comments",
 				"issue_id", issue.Number,
 				"total_comments", len(issue.GetIssueComments()),
 			)
@@ -1294,7 +1298,7 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 					return err
 				}
 
-				ctx.Logger().V(4).Info("Scanning additional issue comments",
+				ctx.Logger().V(5).Info("Scanning additional issue comments",
 					"issue_id", issue.Number,
 					"total_comments", len(commentsQuery.GetIssueComments()))
 
@@ -1309,7 +1313,7 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 
 		// paginate issues
 		if !query.Repository.Issues.PageInfo.HasNextPage {
-			ctx.Logger().V(4).Info("Scanned all repository issues with comments")
+			ctx.Logger().V(4).Info("Scanned all repository issues with comments", "total_issues_scanned", totalIssues)
 			break
 		}
 
@@ -1329,13 +1333,17 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 		commentsPagination:    (*githubv4.String)(nil),
 	}
 
+	var totalPRs int
+
 	for {
 		var query pullRequestWithComments
 		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
 			return err
 		}
 
-		ctx.Logger().V(4).Info("Scanning pull requests",
+		totalPRs += len(query.GetPullRequests())
+
+		ctx.Logger().V(5).Info("Scanning pull requests",
 			"total_pull_requests", len(query.GetPullRequests()))
 
 		if err := s.chunkPullRequests(ctx, repoInfo, query.GetPullRequests(), reporter); err != nil {
@@ -1343,7 +1351,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 		}
 
 		for _, pr := range query.GetPullRequests() {
-			ctx.Logger().V(4).Info("Scanning pull request comments",
+			ctx.Logger().V(5).Info("Scanning pull request comments",
 				"pull_request_no", pr.Number,
 				"total_comments", len(pr.Comments.Nodes))
 
@@ -1365,7 +1373,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 					return err
 				}
 
-				ctx.Logger().V(4).Info("Scanning additional comments",
+				ctx.Logger().V(5).Info("Scanning additional comments",
 					"pull_request_no", pr.Number,
 					"total_comments", len(commentQuery.GetPRComments()))
 
@@ -1380,7 +1388,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 
 		// move to next page of PRs
 		if !query.Repository.PullRequests.PageInfo.HasNextPage {
-			ctx.Logger().V(4).Info("Scanned all repository pull requests with comments")
+			ctx.Logger().V(4).Info("Scanned all repository pull requests with comments", "total_pullrequests_scanned", totalPRs)
 			break
 		}
 
@@ -1396,11 +1404,13 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 		repository:            githubv4.String(repoInfo.name),
 		pullRequestPerPage:    githubv4.Int(defaultPagination),
 		pullRequestPagination: (*githubv4.String)(nil),
-		threadPerPage:         githubv4.Int(20), // keep threads count to 20 to not hit the max nodes threshold
+		threadPerPage:         githubv4.Int(30), // keep threads count to 20 to not hit the max nodes threshold
 		threadPagination:      (*githubv4.String)(nil),
-		commentsPerPage:       githubv4.Int(defaultPagination),
+		commentsPerPage:       githubv4.Int(50),
 		commentsPagination:    (*githubv4.String)(nil),
 	}
+
+	var totalThreads int
 
 	for {
 		var query prWithReviewComments
@@ -1409,7 +1419,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 		}
 
 		for _, pr := range query.GetMinimalPullRequests() {
-			ctx.Logger().V(4).Info("Scanning pull request review threads",
+			ctx.Logger().V(5).Info("Scanning pull request review threads",
 				"pull_request_no", pr.Number,
 				"total_threads", len(pr.GetReviewThreads()))
 
@@ -1418,9 +1428,10 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 			prPageInfo := pr.ReviewThreads.PageInfo
 
 			for {
+				totalThreads += len(prThreads)
 				// process threads in current batch
 				for _, thread := range prThreads {
-					ctx.Logger().V(4).Info("Scanning thread comments",
+					ctx.Logger().V(5).Info("Scanning thread comments",
 						"pull_request_no", pr.Number,
 						"thread_id", thread.ID,
 						"total_comments", len(thread.GetThreadComments()),
@@ -1480,7 +1491,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 		}
 
 		if !query.Repository.PullRequests.PageInfo.HasNextPage {
-			ctx.Logger().V(4).Info("Scanned all repository PR's threads with comments")
+			ctx.Logger().V(4).Info("Scanned all repository PR's threads with comments", "total_threads_scanned", totalThreads)
 			break
 		}
 
