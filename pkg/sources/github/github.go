@@ -205,6 +205,11 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 	return false
 }
 
+// wantRepo returns true if the repository should be included based on include/exclude patterns
+func (c *filteredRepoCache) wantRepo(s string) bool {
+	return !c.ignoreRepo(s) && c.includeRepo(s)
+}
+
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	err := git.CmdCheck()
@@ -445,7 +450,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		}
 
 		// Final filter check - only include repositories that pass the filter
-		if s.filteredRepoCache.includeRepo(repoName) && !s.filteredRepoCache.ignoreRepo(repoName) {
+		if s.filteredRepoCache.wantRepo(repoName) {
 			ctx = context.WithValue(ctx, "repo", repo)
 
 			repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
