@@ -1207,7 +1207,6 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 					Github: &source_metadatapb.Github{
 						Link:       sanitizer.UTF8(comment.GetURL()),
 						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
-						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
 						Repository: sanitizer.UTF8(gistURL),
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
 						Visibility: gistInfo.visibility,
@@ -1475,14 +1474,13 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []is
 					Github: &source_metadatapb.Github{
 						Link:       sanitizer.UTF8(issue.URL),
 						Username:   sanitizer.UTF8(issue.Author.Login),
-						Email:      sanitizer.UTF8(issue.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
 						Timestamp:  sanitizer.UTF8(issue.CreatedAt.String()),
 						Visibility: repoInfo.visibility,
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.Title + "\n" + issue.Body)),
+			Data:   []byte(sanitizer.UTF8(issue.Title + "\n" + issue.BodyText)),
 			Verify: s.verify,
 		}
 
@@ -1511,7 +1509,6 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 					Github: &source_metadatapb.Github{
 						Link:       sanitizer.UTF8(comment.URL),
 						Username:   sanitizer.UTF8(comment.Author.Login),
-						Email:      sanitizer.UTF8(comment.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
 						Timestamp:  sanitizer.UTF8(comment.CreatedAt.String()),
 						Visibility: repoInfo.visibility,
@@ -1542,7 +1539,6 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 					Github: &source_metadatapb.Github{
 						Link:       sanitizer.UTF8(pr.URL),
 						Username:   sanitizer.UTF8(pr.Author.Login),
-						Email:      sanitizer.UTF8(pr.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
 						Timestamp:  sanitizer.UTF8(pr.CreatedAt.String()),
 						Visibility: repoInfo.visibility,
@@ -1578,7 +1574,6 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 					Github: &source_metadatapb.Github{
 						Link:       sanitizer.UTF8(comment.URL),
 						Username:   sanitizer.UTF8(comment.Author.Login),
-						Email:      sanitizer.UTF8(comment.Author.Login),
 						Repository: sanitizer.UTF8(repoInfo.fullName),
 						Timestamp:  sanitizer.UTF8(comment.CreatedAt.String()),
 						Visibility: repoInfo.visibility,

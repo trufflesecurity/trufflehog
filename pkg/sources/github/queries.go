@@ -185,7 +185,7 @@ type issueNodes struct {
 type issue struct {
 	Number    int
 	Title     string
-	Body      string
+	BodyText  string
 	URL       string
 	Author    author
 	CreatedAt time.Time
