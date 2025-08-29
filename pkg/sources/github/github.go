@@ -620,6 +620,8 @@ func (s *Source) enumerateWithApp(ctx context.Context, installationClient *githu
 				if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
 					logger.Error(err, "error fetching gists by user")
 				}
+				// TODO: Add authenticated user list repo for app token. It does support as per docs but need to test it before we enable it here.
+				// docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repositories-for-the-authenticated-user
 				if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
 					logger.Error(err, "error fetching repos by user")
 				}
