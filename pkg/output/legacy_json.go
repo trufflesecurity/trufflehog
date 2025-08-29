@@ -18,32 +18,22 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 // LegacyJSONPrinter is a printer that prints results in legacy JSON format for backwards compatibility.
 type LegacyJSONPrinter struct{ mu sync.Mutex }
 
 func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
-	var repo string
+	var repoPath string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
-		repo = r.SourceMetadata.GetGit().Repository
+		repoPath = r.SourceMetadata.GetGit().RepositoryLocalPath
 	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
-		repo = r.SourceMetadata.GetGithub().Repository
+		repoPath = r.SourceMetadata.GetGithub().RepositoryLocalPath
 	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
-		repo = r.SourceMetadata.GetGitlab().Repository
+		repoPath = r.SourceMetadata.GetGitlab().RepositoryLocalPath
 	default:
 		return fmt.Errorf("unsupported source type for legacy json output: %s", r.SourceType)
-	}
-
-	// cloning the repo again here is not great and only works with unauthed repos
-	repoPath, remote, err := git.PrepareRepo(ctx, repo, "")
-	if err != nil || repoPath == "" {
-		return fmt.Errorf("error preparing git repo for scanning: %w", err)
-	}
-	if remote {
-		defer os.RemoveAll(repoPath)
 	}
 
 	legacy, err := convertToLegacyJSON(r, repoPath)
