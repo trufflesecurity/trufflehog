@@ -60,10 +60,6 @@ type commentNodes struct {
 	PageInfo pageInfo
 }
 
-func (c commentNodes) HasNextPage() bool {
-	return c.PageInfo.HasNextPage
-}
-
 // comment represents a single comment
 type comment struct {
 	BodyText  string
@@ -95,10 +91,6 @@ func (p pullRequest) GetPRComments() []comment {
 // GetPRComments return list of comments of the PR
 func (p singlePRComments) GetPRComments() []comment {
 	return p.Repository.PullRequest.Comments.Nodes
-}
-
-func (i *singlePRComments) UpdatePageInfo(pageInfo pageInfo) {
-	i.Repository.PullRequest.Comments.PageInfo = pageInfo
 }
 
 // === Pull Request Review Threads and Comments ===
@@ -162,10 +154,6 @@ func (r singleReviewThreadComments) GetThreadComments() []comment {
 	return r.Repository.PullRequest.ReviewThread.Comments.Nodes
 }
 
-func (r *singleReviewThreadComments) UpdatePageInfo(pageInfo pageInfo) {
-	r.Repository.PullRequest.ReviewThread.Comments.PageInfo = pageInfo
-}
-
 // === Issues with comments ===
 
 // issuesWithComments represents a repository issues with comments
@@ -211,10 +199,6 @@ func (i issue) GetIssueComments() []comment {
 
 func (i singleIssueComments) GetIssueComments() []comment {
 	return i.Repository.Issue.Comments.Nodes
-}
-
-func (i *singleIssueComments) UpdatePageInfo(pageInfo pageInfo) {
-	i.Repository.Issue.Comments.PageInfo = pageInfo
 }
 
 // === Others ===

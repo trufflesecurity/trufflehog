@@ -1280,7 +1280,7 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 			}
 
 			// paginate comments for this issue
-			for issue.Comments.HasNextPage() {
+			for issue.Comments.PageInfo.HasNextPage {
 				commentVars := map[string]any{
 					owner:              githubv4.String(repoInfo.owner),
 					repository:         githubv4.String(repoInfo.name),
@@ -1303,7 +1303,7 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 				}
 
 				// update page info for loop
-				commentsQuery.UpdatePageInfo(issue.Comments.PageInfo)
+				issue.Comments.PageInfo = commentsQuery.Repository.Issue.Comments.PageInfo
 			}
 		}
 
@@ -1351,7 +1351,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 				return err
 			}
 
-			for pr.Comments.HasNextPage() {
+			for pr.Comments.PageInfo.HasNextPage {
 				var commentQuery singlePRComments
 				singlePRVars := map[string]any{
 					owner:              githubv4.String(repoInfo.owner),
@@ -1374,7 +1374,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 				}
 
 				// update pr.Comments.PageInfo so loop condition reflects new state
-				commentQuery.UpdatePageInfo(pr.Comments.PageInfo)
+				pr.Comments.PageInfo = commentQuery.Repository.PullRequest.Comments.PageInfo
 			}
 		}
 
@@ -1420,13 +1420,12 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 					"total_comments", len(thread.GetThreadComments()),
 				)
 
-				// first page of comments
 				if err := s.chunkPullRequestComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
 					return err
 				}
 
 				// paginate inside THIS thread only
-				for thread.Comments.HasNextPage() {
+				for thread.Comments.PageInfo.HasNextPage {
 					commentVars := map[string]any{
 						owner:              githubv4.String(repoInfo.owner),
 						repository:         githubv4.String(repoInfo.name),
@@ -1445,7 +1444,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 						return err
 					}
 
-					commentsQuery.UpdatePageInfo(thread.Comments.PageInfo)
+					thread.Comments.PageInfo = commentsQuery.Repository.PullRequest.ReviewThread.Comments.PageInfo
 				}
 			}
 		}
