@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -218,6 +219,12 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			}
 
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
+
+			// Check if we should process this repository based on the filter
+			if !s.filteredRepoCache.wantRepo(repoName) {
+				continue
+			}
+
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
 			s.cacheRepoInfo(r)
@@ -289,9 +296,14 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {
-	// If there's a '/', assume it's a URL and try to normalize it.
-	if strings.ContainsRune(repo, '/') {
+	// If it's a full URL (has protocol), normalize it
+	if regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
 		return giturl.NormalizeGithubRepo(repo)
+	}
+	// If it's a repository name (contains / but not http), convert to full URL first
+	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
+		fullURL := "https://github.com/" + repo
+		return giturl.NormalizeGithubRepo(fullURL)
 	}
 
 	return "", fmt.Errorf("no repositories found for %s", repo)
