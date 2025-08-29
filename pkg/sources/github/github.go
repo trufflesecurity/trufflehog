@@ -1413,39 +1413,69 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 				"pull_request_no", pr.Number,
 				"total_threads", len(pr.GetReviewThreads()))
 
-			for _, thread := range pr.GetReviewThreads() {
-				ctx.Logger().V(4).Info("Scanning pull request review threads comments",
-					"pull_request_no", pr.Number,
-					"thread_id", thread.ID,
-					"total_comments", len(thread.GetThreadComments()),
-				)
+			// ---- THREAD PAGINATION LOOP ----
+			prThreads := pr.GetReviewThreads()
+			prPageInfo := pr.ReviewThreads.PageInfo
 
-				if err := s.chunkPullRequestComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
+			for {
+				// process threads in current batch
+				for _, thread := range prThreads {
+					ctx.Logger().V(4).Info("Scanning thread comments",
+						"pull_request_no", pr.Number,
+						"thread_id", thread.ID,
+						"total_comments", len(thread.GetThreadComments()),
+					)
+
+					if err := s.chunkPullRequestComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
+						return err
+					}
+
+					// ---- COMMENT PAGINATION LOOP ----
+					for thread.Comments.PageInfo.HasNextPage {
+						commentVars := map[string]any{
+							owner:              githubv4.String(repoInfo.owner),
+							repository:         githubv4.String(repoInfo.name),
+							pullRequestNumber:  githubv4.Int(pr.Number),
+							threadID:           thread.ID,
+							commentsPerPage:    githubv4.Int(defaultPagination),
+							commentsPagination: thread.Comments.PageInfo.EndCursor,
+						}
+
+						var commentsQuery singleReviewThreadComments
+						if err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars); err != nil {
+							return err
+						}
+
+						if err := s.chunkPullRequestComments(ctx, repoInfo, commentsQuery.GetThreadComments(), reporter, cutoffTime); err != nil {
+							return err
+						}
+
+						thread.Comments.PageInfo = commentsQuery.Repository.PullRequest.ReviewThread.Comments.PageInfo
+					}
+				}
+
+				// fetch next page of threads (if any)
+				if !prPageInfo.HasNextPage {
+					break
+				}
+
+				threadVars := map[string]any{
+					owner:              githubv4.String(repoInfo.owner),
+					repository:         githubv4.String(repoInfo.name),
+					pullRequestNumber:  githubv4.Int(pr.Number),
+					threadPerPage:      githubv4.Int(20),
+					threadPagination:   prPageInfo.EndCursor,
+					commentsPerPage:    githubv4.Int(defaultPagination),
+					commentsPagination: (*githubv4.String)(nil),
+				}
+
+				var threadsQuery singlePullRequestThreads
+				if err := s.connector.GraphQLClient().Query(ctx, &threadsQuery, threadVars); err != nil {
 					return err
 				}
 
-				// paginate inside THIS thread only
-				for thread.Comments.PageInfo.HasNextPage {
-					commentVars := map[string]any{
-						owner:              githubv4.String(repoInfo.owner),
-						repository:         githubv4.String(repoInfo.name),
-						pullRequestNumber:  githubv4.Int(pr.Number),
-						threadID:           thread.ID,
-						commentsPerPage:    githubv4.Int(defaultPagination),
-						commentsPagination: thread.Comments.PageInfo.EndCursor,
-					}
-
-					var commentsQuery singleReviewThreadComments
-					if err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars); err != nil {
-						return err
-					}
-
-					if err := s.chunkPullRequestComments(ctx, repoInfo, commentsQuery.GetThreadComments(), reporter, cutoffTime); err != nil {
-						return err
-					}
-
-					thread.Comments.PageInfo = commentsQuery.Repository.PullRequest.ReviewThread.Comments.PageInfo
-				}
+				prThreads = threadsQuery.Repository.PullRequest.ReviewThreads.Nodes
+				prPageInfo = threadsQuery.Repository.PullRequest.ReviewThreads.PageInfo
 			}
 		}
 

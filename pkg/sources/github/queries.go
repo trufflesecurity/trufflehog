@@ -127,6 +127,17 @@ type reviewThread struct {
 	Comments commentNodes `graphql:"comments(first: $commentsFirst, after: $commentsAfter)"`
 }
 
+type singlePullRequestThreads struct {
+	Repository struct {
+		PullRequest struct {
+			ReviewThreads struct {
+				Nodes    []reviewThread
+				PageInfo pageInfo
+			} `graphql:"reviewThreads(first: $threadsFirst, after: $threadsAfter)"`
+		} `graphql:"pullRequest(number: $number)"`
+	} `graphql:"repository(owner: $owner, name: $repo)"`
+}
+
 // singleReviewThreadComments represents a single review threads comments
 type singleReviewThreadComments struct {
 	Repository struct {
