@@ -1279,7 +1279,7 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 				"total_comments", len(issue.GetIssueComments()),
 			)
 
-			if err := s.chunkIssueComments(ctx, repoInfo, issue.GetIssueComments(), reporter, cutoffTime); err != nil {
+			if err := s.chunkComments(ctx, repoInfo, issue.GetIssueComments(), reporter, cutoffTime); err != nil {
 				return err
 			}
 
@@ -1302,7 +1302,7 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 					"issue_id", issue.Number,
 					"total_comments", len(commentsQuery.GetIssueComments()))
 
-				if err := s.chunkPullRequestComments(ctx, repoInfo, commentsQuery.GetIssueComments(), reporter, cutoffTime); err != nil {
+				if err := s.chunkComments(ctx, repoInfo, commentsQuery.GetIssueComments(), reporter, cutoffTime); err != nil {
 					return err
 				}
 
@@ -1355,7 +1355,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 				"pull_request_no", pr.Number,
 				"total_comments", len(pr.Comments.Nodes))
 
-			if err := s.chunkPullRequestComments(ctx, repoInfo, pr.GetPRComments(), reporter, cutoffTime); err != nil {
+			if err := s.chunkComments(ctx, repoInfo, pr.GetPRComments(), reporter, cutoffTime); err != nil {
 				return err
 			}
 
@@ -1377,7 +1377,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 					"pull_request_no", pr.Number,
 					"total_comments", len(commentQuery.GetPRComments()))
 
-				if err := s.chunkPullRequestComments(ctx, repoInfo, commentQuery.GetPRComments(), reporter, cutoffTime); err != nil {
+				if err := s.chunkComments(ctx, repoInfo, commentQuery.GetPRComments(), reporter, cutoffTime); err != nil {
 					return err
 				}
 
@@ -1437,7 +1437,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 						"total_comments", len(thread.GetThreadComments()),
 					)
 
-					if err := s.chunkPullRequestComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
+					if err := s.chunkComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
 						return err
 					}
 
@@ -1457,7 +1457,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 							return err
 						}
 
-						if err := s.chunkPullRequestComments(ctx, repoInfo, commentsQuery.GetThreadComments(), reporter, cutoffTime); err != nil {
+						if err := s.chunkComments(ctx, repoInfo, commentsQuery.GetThreadComments(), reporter, cutoffTime); err != nil {
 							return err
 						}
 
@@ -1531,7 +1531,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []is
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []comment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) chunkComments(ctx context.Context, repoInfo repoInfo, comments []comment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
 		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
 		if cutoffTime != nil && comment.UpdatedAt.Before(*cutoffTime) {
@@ -1586,41 +1586,6 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 				},
 			},
 			Data:   []byte(sanitizer.UTF8(pr.Title + "\n" + pr.BodyText)),
-			Verify: s.verify,
-		}
-
-		if err := reporter.ChunkOk(ctx, chunk); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []comment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
-		if cutoffTime != nil && comment.UpdatedAt.Before(*cutoffTime) {
-			continue
-		}
-
-		// Create chunk and send it to the channel.
-		chunk := sources.Chunk{
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			JobID:      s.JobID(),
-			SourceType: s.Type(),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Github{
-					Github: &source_metadatapb.Github{
-						Link:       sanitizer.UTF8(comment.URL),
-						Username:   sanitizer.UTF8(comment.Author.Login),
-						Repository: sanitizer.UTF8(repoInfo.fullName),
-						Timestamp:  sanitizer.UTF8(comment.CreatedAt.String()),
-						Visibility: repoInfo.visibility,
-					},
-				},
-			},
-			Data:   []byte(sanitizer.UTF8(comment.BodyText)),
 			Verify: s.verify,
 		}
 
