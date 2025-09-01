@@ -1425,7 +1425,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 
 			// ---- THREAD PAGINATION LOOP ----
 			prThreads := pr.GetReviewThreads()
-			prPageInfo := pr.ReviewThreads.PageInfo
+			threadPageInfo := pr.ReviewThreads.PageInfo
 
 			for {
 				totalThreads += len(prThreads)
@@ -1466,7 +1466,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 				}
 
 				// fetch next page of threads (if any)
-				if !prPageInfo.HasNextPage {
+				if !threadPageInfo.HasNextPage {
 					break
 				}
 
@@ -1475,7 +1475,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 					repository:         githubv4.String(repoInfo.name),
 					pullRequestNumber:  githubv4.Int(pr.Number),
 					threadPerPage:      githubv4.Int(30),
-					threadPagination:   prPageInfo.EndCursor,
+					threadPagination:   threadPageInfo.EndCursor,
 					commentsPerPage:    githubv4.Int(50),
 					commentsPagination: (*githubv4.String)(nil),
 				}
@@ -1486,7 +1486,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 				}
 
 				prThreads = threadsQuery.Repository.PullRequest.ReviewThreads.Nodes
-				prPageInfo = threadsQuery.Repository.PullRequest.ReviewThreads.PageInfo
+				threadPageInfo = threadsQuery.Repository.PullRequest.ReviewThreads.PageInfo
 			}
 		}
 
