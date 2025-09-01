@@ -1404,7 +1404,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 		repository:            githubv4.String(repoInfo.name),
 		pullRequestPerPage:    githubv4.Int(defaultPagination),
 		pullRequestPagination: (*githubv4.String)(nil),
-		threadPerPage:         githubv4.Int(30), // keep threads count to 20 to not hit the max nodes threshold
+		threadPerPage:         githubv4.Int(30), // keep threads count to 30 to not hit the max nodes threshold
 		threadPagination:      (*githubv4.String)(nil),
 		commentsPerPage:       githubv4.Int(50),
 		commentsPagination:    (*githubv4.String)(nil),
@@ -1474,9 +1474,9 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 					owner:              githubv4.String(repoInfo.owner),
 					repository:         githubv4.String(repoInfo.name),
 					pullRequestNumber:  githubv4.Int(pr.Number),
-					threadPerPage:      githubv4.Int(20),
+					threadPerPage:      githubv4.Int(30),
 					threadPagination:   prPageInfo.EndCursor,
-					commentsPerPage:    githubv4.Int(defaultPagination),
+					commentsPerPage:    githubv4.Int(50),
 					commentsPagination: (*githubv4.String)(nil),
 				}
 
