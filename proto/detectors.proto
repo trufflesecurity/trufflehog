@@ -1047,8 +1047,8 @@ enum DetectorType {
   Rootly = 1035;
   HashiCorpVaultAuth = 1036;
   PhraseAccessToken = 1037;
-  GrafanaAPIKey = 1038;
-
+  Photoroom = 1038;
+  GrafanaAPIKey = 1039;
 }
 
 message Result {

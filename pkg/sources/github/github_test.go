@@ -158,7 +158,7 @@ func TestAddReposByUser(t *testing.T) {
 		},
 		IgnoreRepos: []string{"super-secret-user/super-secret-repo2"},
 	})
-	err := s.getReposByUser(context.Background(), "super-secret-user", noopReporter())
+	err := s.getReposByUser(context.Background(), "super-secret-user", false, noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
