@@ -50,7 +50,7 @@ type pullRequest struct {
 	URL       string
 	Author    author
 	CreatedAt time.Time
-	BodyText  string
+	Body      string
 	Comments  commentNodes `graphql:"comments(first: $commentsFirst, after: $commentsAfter, orderBy: {field: UPDATED_AT, direction: DESC})"`
 }
 
@@ -62,7 +62,7 @@ type commentNodes struct {
 
 // comment represents a single comment
 type comment struct {
-	BodyText  string
+	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Author    author
@@ -184,7 +184,7 @@ type issueNodes struct {
 type issue struct {
 	Number    int
 	Title     string
-	BodyText  string
+	Body      string
 	URL       string
 	Author    author
 	CreatedAt time.Time

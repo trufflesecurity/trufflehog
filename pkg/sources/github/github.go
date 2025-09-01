@@ -1520,7 +1520,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []is
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.Title + "\n" + issue.BodyText)),
+			Data:   []byte(sanitizer.UTF8(issue.Title + "\n" + issue.Body)),
 			Verify: s.verify,
 		}
 
@@ -1555,7 +1555,7 @@ func (s *Source) chunkComments(ctx context.Context, repoInfo repoInfo, comments 
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.BodyText)),
+			Data:   []byte(sanitizer.UTF8(comment.Body)),
 			Verify: s.verify,
 		}
 
@@ -1585,7 +1585,7 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(pr.Title + "\n" + pr.BodyText)),
+			Data:   []byte(sanitizer.UTF8(pr.Title + "\n" + pr.Body)),
 			Verify: s.verify,
 		}
 
