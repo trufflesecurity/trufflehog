@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -523,7 +522,7 @@ func run(state overseer.State) {
 	var whitelistedSecrets map[string]struct{}
 	if *whitelistSecretsFile != "" {
 		var err error
-		whitelistedSecrets, err = loadWhitelistedSecrets(*whitelistSecretsFile)
+		whitelistedSecrets, err = detectors.LoadWhitelistedSecrets(*whitelistSecretsFile)
 		if err != nil {
 			logFatal(err, "failed to load whitelisted secrets")
 		}
@@ -1194,28 +1193,4 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	}
 
 	return nil
-}
-
-// loadWhitelistedSecrets loads secrets from a file that should be whitelisted
-func loadWhitelistedSecrets(filename string) (map[string]struct{}, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open whitelist file: %w", err)
-	}
-	defer file.Close()
-
-	whitelistedSecrets := make(map[string]struct{})
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		secret := strings.TrimSpace(scanner.Text())
-		if secret != "" { // Skip empty lines
-			whitelistedSecrets[secret] = struct{}{}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading whitelist file: %w", err)
-	}
-
-	return whitelistedSecrets, nil
 }

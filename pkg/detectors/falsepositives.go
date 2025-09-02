@@ -1,9 +1,11 @@
 package detectors
 
 import (
+	"bufio"
 	_ "embed"
 	"fmt"
 	"math"
+	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -239,6 +241,30 @@ func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelisted
 	}
 
 	return filteredResults
+}
+
+// loadWhitelistedSecrets loads secrets from a file that should be whitelisted
+func LoadWhitelistedSecrets(filename string) (map[string]struct{}, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open whitelist file: %w", err)
+	}
+	defer file.Close()
+
+	whitelistedSecrets := make(map[string]struct{})
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		secret := strings.TrimSpace(scanner.Text())
+		if secret != "" { // Skip empty lines
+			whitelistedSecrets[secret] = struct{}{}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading whitelist file: %w", err)
+	}
+
+	return whitelistedSecrets, nil
 }
 
 // isSecretWhitelisted checks if a secret matches any whitelisted pattern (exact string or regex)
