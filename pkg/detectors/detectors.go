@@ -167,7 +167,7 @@ func redactSecrets(err error, secrets ...string) error {
 	lastErr := unwrapToLast(err)
 	errStr := lastErr.Error()
 	for _, secret := range secrets {
-		errStr = strings.Replace(errStr, secret, "[REDACTED]", -1)
+		errStr = strings.ReplaceAll(errStr, secret, "[REDACTED]")
 	}
 	return errors.New(errStr)
 }
@@ -304,7 +304,7 @@ func MustGetBenchmarkData() map[string][]byte {
 
 func RedactURL(u url.URL) string {
 	u.User = url.UserPassword(u.User.Username(), "********")
-	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
+	return strings.TrimSpace(strings.ReplaceAll(u.String(), "%2A", "*"))
 }
 
 func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
