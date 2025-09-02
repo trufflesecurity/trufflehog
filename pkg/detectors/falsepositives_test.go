@@ -264,7 +264,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				`^secret.*`: {}, // case sensitive - should only match lowercase
 			},
 			expected: []Result{
-				{Raw: []byte("Secret123")}, // uppercase S, should not match
+				{Raw: []byte("Secret123")},
 			},
 		},
 		{
@@ -444,7 +444,6 @@ func TestIsSecretWhitelisted(t *testing.T) {
 func BenchmarkFilterWhitelistedSecrets(b *testing.B) {
 	ctx := logContext.Background()
 
-	// Create test data
 	results := []Result{
 		{Raw: []byte("secret1")},
 		{Raw: []byte("test-api-key-12345")},

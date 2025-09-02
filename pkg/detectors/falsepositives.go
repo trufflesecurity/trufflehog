@@ -205,7 +205,7 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 
 // FilterWhitelistedSecrets filters out results that match whitelisted secrets.
 // This allows users to specify known safe secrets that should not be reported.
-// Supports both exact string matching and regex patterns.
+// Supports regex patterns.
 func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelistedSecrets map[string]struct{}) []Result {
 	if len(whitelistedSecrets) == 0 {
 		return results
@@ -269,20 +269,18 @@ func LoadWhitelistedSecrets(filename string) (map[string]struct{}, error) {
 
 // isSecretWhitelisted checks if a secret matches any whitelisted pattern (exact string or regex)
 func isSecretWhitelisted(secret string, whitelistedSecrets map[string]struct{}) (bool, string) {
-	// First, try exact string matching for backward compatibility and performance
+	// First, try exact string matching for performance
 	if _, isWhitelisted := whitelistedSecrets[secret]; isWhitelisted {
 		return true, "exact match"
 	}
 
-	// If no exact match, try regex matching
+	// Try regex matching
 	for pattern := range whitelistedSecrets {
-		// Try to compile as regex and match
 		if regex, err := regexp.Compile(pattern); err == nil {
 			if regex.MatchString(secret) {
 				return true, "regex match: " + pattern
 			}
 		}
-		// If regex compilation fails, pattern is treated as literal string only (already checked above)
 	}
 
 	return false, ""

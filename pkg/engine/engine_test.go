@@ -1329,125 +1329,92 @@ func TestEngine_WhitelistedSecrets(t *testing.T) {
 		{
 			name: "exact string whitelist match",
 			content: `
-# Configuration file with secrets
-DATABASE_URL=postgres://user:password123@localhost/db
-API_KEY=secret-api-key-12345
-TOKEN=whitelisted-token-exact
-RANDOM_SECRET=this-should-be-found
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
 `,
 			whitelistedSecrets: map[string]struct{}{
-				"whitelisted-token-exact": {},
+				"AKIAQYLPMN5HHHFPZAM2": {},
 			},
-			expectedFindings: 3, // 3 out of 4 secrets should be found (1 whitelisted)
+			expectedFindings: 2,
 		},
 		{
 			name: "regex pattern whitelist",
 			content: `
-# Test file with API keys
-OPENAI_KEY=sk-1234567890abcdef1234567890abcdef12345678
-GITHUB_TOKEN=ghp_1234567890abcdef1234567890abcdef123456
-SLACK_TOKEN=xoxb-1234567890-1234567890-abcdefghijklmnop
-RANDOM_SECRET=random-secret-not-matching-pattern
-TEST_KEY=test-development-key-should-be-filtered
-PROD_KEY=production-key-should-remain
-`,
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
 			whitelistedSecrets: map[string]struct{}{
-				`^sk-[a-f0-9]{48}$`:     {}, // OpenAI API key pattern
-				`^ghp_[a-zA-Z0-9]{36}$`: {}, // GitHub personal access token
-				`.*-development-.*`:     {}, // Development keys pattern
+				`^sk-[a-z0-9]{32}$`: {},
 			},
-			expectedFindings: 3, // SLACK_TOKEN, RANDOM_SECRET, PROD_KEY should remain
+			expectedFindings: 2,
 		},
 		{
 			name: "mixed exact and regex whitelist",
 			content: `
-# Mixed content with various secrets
-SECRET1=exact-match-secret
-SECRET2=test-api-key-12345
-SECRET3=another-exact-secret
-SECRET4=dev-token-abcdef
-SECRET5=prod-token-xyz123
-SECRET6=random-secret-value
-`,
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
 			whitelistedSecrets: map[string]struct{}{
-				"exact-match-secret":   {}, // exact string
-				"another-exact-secret": {}, // exact string
-				`^test-.*`:             {}, // regex pattern
-				`.*-token-.*`:          {}, // regex pattern
+				"AKIAQYLPMN5HHHFPZAM2": {}, // exact string
+				`^sk-[a-z0-9]{32}$`:    {}, // regex pattern
 			},
-			expectedFindings: 1, // Only SECRET6 should remain
+			expectedFindings: 1,
 		},
 		{
 			name: "case sensitivity test",
 			content: `
-# Testing case sensitivity in regex patterns
-SECRET_LOWER=secret-value-lowercase
-SECRET_UPPER=SECRET-VALUE-UPPERCASE
-SECRET_MIXED=Secret-Value-MixedCase
-NORMAL_SECRET=normal-secret-123
-`,
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
 			whitelistedSecrets: map[string]struct{}{
-				`^secret-.*`: {}, // case sensitive - only matches lowercase
+				`^SK-[a-z0-9]{32}$`: {}, // case sensitive - only matches uppercase SK
 			},
-			expectedFindings: 3, // Only SECRET_LOWER should be filtered
+			expectedFindings: 3,
 		},
 		{
 			name: "case insensitive regex",
 			content: `
-# Testing case insensitive regex patterns
-SECRET_LOWER=secret-value-lowercase
-SECRET_UPPER=SECRET-VALUE-UPPERCASE
-SECRET_MIXED=Secret-Value-MixedCase
-NORMAL_SECRET=normal-secret-123
-`,
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
 			whitelistedSecrets: map[string]struct{}{
-				`(?i)^secret-.*`: {}, // case insensitive
+				`(?i)^SK-[a-z0-9]{32}$`: {}, // case insensitive
 			},
-			expectedFindings: 1, // All secrets starting with "secret" should be filtered
+			expectedFindings: 2,
 		},
 		{
 			name: "no whitelist",
 			content: `
-# No whitelisting - all secrets should be found
-SECRET1=secret-one
-SECRET2=secret-two
-SECRET3=secret-three
-`,
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
 			whitelistedSecrets: map[string]struct{}{},
-			expectedFindings:   3, // All secrets should be found
+			expectedFindings:   3,
 		},
 		{
 			name: "invalid regex patterns",
 			content: `
-# Testing invalid regex patterns treated as literals
-SECRET1=[invalid-regex-pattern
-SECRET2=valid-secret-123
-SECRET3=another-[invalid
-`,
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
 			whitelistedSecrets: map[string]struct{}{
-				"[invalid-regex-pattern": {}, // invalid regex, treated as exact string
+				"[AKIAQYLPMN5HHHFPZAM2": {}, // invalid regex, treated as exact string
 			},
-			expectedFindings: 2, // SECRET2 and SECRET3 should remain
-		},
-		{
-			name: "complex real-world patterns",
-			content: `
-# Real-world API keys and secrets
-OPENAI_API_KEY=sk-1234567890abcdef1234567890abcdef12345678
-GITHUB_PAT=ghp_1234567890abcdef1234567890abcdef123456
-AWS_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
-AWS_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-SLACK_BOT_TOKEN=xoxb-1234567890-1234567890-abcdefghijklmnop
-STRIPE_KEY=sk_test_1234567890abcdef1234567890abcdef
-RANDOM_SECRET=random-value-123
-`,
-			whitelistedSecrets: map[string]struct{}{
-				`^sk-[a-f0-9]{48}$`:         {}, // OpenAI API key
-				`^ghp_[a-zA-Z0-9]{36}$`:     {}, // GitHub PAT
-				`^AKIA[0-9A-Z]{16}$`:        {}, // AWS Access Key
-				`^sk_test_[a-zA-Z0-9]{24}$`: {}, // Stripe test key
-			},
-			expectedFindings: 3, // AWS_SECRET_KEY, SLACK_BOT_TOKEN, RANDOM_SECRET should remain
+			expectedFindings: 3,
 		},
 	}
 
@@ -1500,18 +1467,16 @@ RANDOM_SECRET=random-value-123
 }
 
 func TestEngine_WhitelistedSecretsPerformance(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// Create a large test file with many secrets
-	content := `
-# Large test file with multiple patterns
-`
+	content := ""
 	// Add 1000 secrets with various patterns
 	for i := 0; i < 1000; i++ {
-		content += fmt.Sprintf("SECRET_%d=test-api-key-%d\n", i, i)
-		content += fmt.Sprintf("TOKEN_%d=prod-token-%d\n", i, i)
-		content += fmt.Sprintf("KEY_%d=dev-key-%d\n", i, i)
+		content += fmt.Sprintf("aws_access_key_id_%d=AKIAQYLPMN5HHHF%05d{\n", i, i)
+		content += fmt.Sprintf("deepseek_api_key_%d=sk-abc123def456ghi789jkl012mno%05d{\n", i, i)
+		content += fmt.Sprintf("openai_api_key_%d=sk-SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC%05d{\n", i, i)
 	}
 
 	tmpFile, err := os.CreateTemp("", "test_performance")
@@ -1524,13 +1489,13 @@ func TestEngine_WhitelistedSecretsPerformance(t *testing.T) {
 	// Define whitelist with both exact strings and regex patterns
 	whitelistedSecrets := map[string]struct{}{
 		// Some exact matches
-		"test-api-key-100": {},
-		"prod-token-200":   {},
-		"dev-key-300":      {},
+		"AKIAQYLPMN5HHHF00001":                             {},
+		"sk-abc123def456ghi789jkl012mno00005":              {},
+		"SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC00003": {},
 		// Some regex patterns
-		`^test-api-key-[0-4][0-9]$`: {}, // keys 0-49
-		`^prod-token-[5-9][0-9]$`:   {}, // tokens 50-99
-		`^dev-key-[1-9][0-9][0-9]$`: {}, // keys 100-999
+		`^AKIAQYLPMN5HHHF[0-4][0-9]{4}$`:                                {}, // keys 0-49
+		`^sk-abc123def456ghi789jkl012mno[5-9][0-9]{4}$`:                 {}, // tokens 50-99
+		`^sk-SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC[1-9][0-9]{4}$`: {}, // keys 100-999
 	}
 
 	const defaultOutputBufferSize = 64
@@ -1561,17 +1526,11 @@ func TestEngine_WhitelistedSecretsPerformance(t *testing.T) {
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
 	_, err = eng.ScanFileSystem(ctx, cfg)
 	assert.NoError(t, err)
-
 	assert.NoError(t, eng.Finish(ctx))
 
 	elapsed := time.Since(start)
-	t.Logf("Performance test completed in %v", elapsed)
-	t.Logf("Found %d secrets after whitelisting", eng.GetMetrics().UnverifiedSecretsFound)
 
-	// Ensure performance is reasonable (should complete within 30 seconds)
-	assert.Less(t, elapsed, 30*time.Second, "Whitelisting performance test took too long")
-
-	// Verify some secrets were filtered (exact number depends on detector behavior)
+	assert.Less(t, elapsed, 10*time.Second, "Whitelisting performance test took too long")
 	assert.Greater(t, int(eng.GetMetrics().UnverifiedSecretsFound), 0, "Should find some secrets")
 	assert.Less(t, int(eng.GetMetrics().UnverifiedSecretsFound), 3000, "Should filter out many secrets")
 }

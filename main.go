@@ -521,8 +521,7 @@ func run(state overseer.State) {
 	// Load whitelisted secrets if specified
 	var whitelistedSecrets map[string]struct{}
 	if *whitelistSecretsFile != "" {
-		var err error
-		whitelistedSecrets, err = detectors.LoadWhitelistedSecrets(*whitelistSecretsFile)
+		whitelistedSecrets, err := detectors.LoadWhitelistedSecrets(*whitelistSecretsFile)
 		if err != nil {
 			logFatal(err, "failed to load whitelisted secrets")
 		}
