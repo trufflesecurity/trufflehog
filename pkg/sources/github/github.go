@@ -1,6 +1,7 @@
 package github
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -846,6 +847,72 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 	return true
 }
 
+// handleGraphQLRateLimit inspects the rateLimit info returned in GraphQL queries.
+func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errIn error, reporters ...errorReporter) bool {
+	// if RATE_LIMITED error happened, wait for 5 minute before trying again
+	if errIn != nil && strings.Contains(errIn.Error(), "RATE_LIMITED") {
+		retryAfter := 1 * time.Minute
+		ctx.Logger().Info("GraphQL RATE_LIMITED error (fallback)",
+			"retry_after", retryAfter.String())
+		time.Sleep(retryAfter)
+		return true
+	}
+
+	// if rate limit object is nil
+	if rl == nil {
+		return false
+	}
+
+	// check global resume time first (in case another worker already set it)
+	rateLimitMu.RLock()
+	resumeTime := rateLimitResumeTime
+	rateLimitMu.RUnlock()
+
+	// if resume time is not empty and is after current time, than put the worker to sleep till that.
+	if !resumeTime.IsZero() && time.Now().Before(resumeTime) {
+		retryAfter := time.Until(resumeTime)
+		time.Sleep(retryAfter)
+		return true
+	}
+
+	// if rate limit remaining is more than 3 continue using graphql api
+	if rl.Remaining > 3 {
+		return false
+	}
+
+	// === only reach here if error is nil and rate limit remaining is less than 3 (saftey)
+
+	now := time.Now()
+	retryAfter := time.Until(rl.ResetAt)
+	// never negative and enforce a sane minimum backoff (avoid thrashing with 1s/2s retries)
+	if cmp.Less(retryAfter, 10*time.Second) {
+		retryAfter = 10 * time.Second
+	}
+
+	jitter := time.Duration(rand.IntN(10)+1) * time.Second
+	retryAfter += jitter
+
+	// update global resume time
+	rateLimitMu.Lock()
+	rateLimitResumeTime = now.Add(retryAfter)
+	rateLimitMu.Unlock()
+
+	ctx.Logger().Info("exceeded GraphQL rate limit",
+		"retry_after", retryAfter.String(),
+		"resume_time", rateLimitResumeTime.Format(time.RFC3339))
+
+	for _, reporter := range reporters {
+		_ = reporter.Err(ctx, fmt.Errorf("exceeded GraphQL rate limit"))
+	}
+
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
+
+	time.Sleep(retryAfter)
+
+	return true
+}
+
 // handleRateLimitWithUnitReporter is a wrapper around handleRateLimit that includes unit reporting
 func (s *Source) handleRateLimitWithUnitReporter(ctx context.Context, reporter sources.UnitReporter, errIn error) bool {
 	return s.handleRateLimit(ctx, errIn, &unitErrorReporter{reporter: reporter})
@@ -854,6 +921,11 @@ func (s *Source) handleRateLimitWithUnitReporter(ctx context.Context, reporter s
 // handleRateLimitWithChunkReporter is a wrapper around handleRateLimit that includes chunk reporting
 func (s *Source) handleRateLimitWithChunkReporter(ctx context.Context, reporter sources.ChunkReporter, errIn error) bool {
 	return s.handleRateLimit(ctx, errIn, &chunkErrorReporter{reporter: reporter})
+}
+
+// handleRateLimitWithChunkReporter is a wrapper around handleRateLimit that includes chunk reporting
+func (s *Source) handleGraphqlRateLimitWithChunkReporter(ctx context.Context, reporter sources.ChunkReporter, rl *rateLimit, errIn error) bool {
+	return s.handleGraphQLRateLimit(ctx, rl, errIn, &chunkErrorReporter{reporter: reporter})
 }
 
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
@@ -1260,7 +1332,12 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 
 	for {
 		var query issuesWithComments
-		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
+		err := s.connector.GraphQLClient().Query(ctx, &query, vars)
+		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+			continue
+		}
+
+		if err != nil {
 			return fmt.Errorf("error fetching issues: %w", err)
 		}
 
@@ -1294,8 +1371,13 @@ func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInf
 				}
 
 				var commentsQuery singleIssueComments
-				if err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars); err != nil {
-					return err
+				err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars)
+				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+					continue
+				}
+
+				if err != nil {
+					return fmt.Errorf("error fetching issue: %w", err)
 				}
 
 				ctx.Logger().V(5).Info("Scanning additional issue comments",
@@ -1337,8 +1419,13 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 
 	for {
 		var query pullRequestWithComments
-		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
-			return err
+		err := s.connector.GraphQLClient().Query(ctx, &query, vars)
+		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+			continue
+		}
+
+		if err != nil {
+			return fmt.Errorf("error fetching pull requests with comments: %w", err)
 		}
 
 		totalPRs += len(query.GetPullRequests())
@@ -1369,8 +1456,13 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 					commentsPagination: pr.Comments.PageInfo.EndCursor,
 				}
 
-				if err := s.connector.GraphQLClient().Query(ctx, &commentQuery, singlePRVars); err != nil {
-					return err
+				err := s.connector.GraphQLClient().Query(ctx, &commentQuery, singlePRVars)
+				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+					continue
+				}
+
+				if err != nil {
+					return fmt.Errorf("error fetching pull request with comments: %w", err)
 				}
 
 				ctx.Logger().V(5).Info("Scanning additional comments",
@@ -1414,8 +1506,13 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 
 	for {
 		var query prWithReviewComments
-		if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
-			return err
+		err := s.connector.GraphQLClient().Query(ctx, &query, vars)
+		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+			continue
+		}
+
+		if err != nil {
+			return fmt.Errorf("error fetching pr thread reviews: %w", err)
 		}
 
 		for _, pr := range query.GetMinimalPullRequests() {
@@ -1453,8 +1550,13 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 						}
 
 						var commentsQuery singleReviewThreadComments
-						if err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars); err != nil {
-							return err
+						err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars)
+						if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+							continue
+						}
+
+						if err != nil {
+							return fmt.Errorf("error fetching thread review comments: %w", err)
 						}
 
 						if err := s.chunkComments(ctx, repoInfo, commentsQuery.GetThreadComments(), reporter, cutoffTime); err != nil {
@@ -1481,8 +1583,13 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 				}
 
 				var threadsQuery singlePullRequestThreads
-				if err := s.connector.GraphQLClient().Query(ctx, &threadsQuery, threadVars); err != nil {
-					return err
+				err := s.connector.GraphQLClient().Query(ctx, &threadsQuery, threadVars)
+				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+					continue
+				}
+
+				if err != nil {
+					return fmt.Errorf("error fetching pr review threads: %w", err)
 				}
 
 				prThreads = threadsQuery.Repository.PullRequest.ReviewThreads.Nodes

@@ -76,6 +76,7 @@ type singlePRComments struct {
 			Comments commentNodes `graphql:"comments(first: $commentsFirst, after: $commentsAfter, orderBy: {field: UPDATED_AT, direction: DESC})"`
 		} `graphql:"pullRequest(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
+	RateLimit rateLimit
 }
 
 // GetPullRequests return list of pull requests
@@ -136,6 +137,7 @@ type singlePullRequestThreads struct {
 			} `graphql:"reviewThreads(first: $threadsFirst, after: $threadsAfter)"`
 		} `graphql:"pullRequest(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
+	RateLimit rateLimit
 }
 
 // singleReviewThreadComments represents a single review threads comments
@@ -147,6 +149,7 @@ type singleReviewThreadComments struct {
 			} `graphql:"reviewThread(id: $threadID)"`
 		} `graphql:"pullRequest(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
+	RateLimit rateLimit
 }
 
 func (p prWithReviewComments) GetMinimalPullRequests() []minimalPullRequest {
@@ -172,6 +175,7 @@ type issuesWithComments struct {
 	Repository struct {
 		Issues issueNodes `graphql:"issues(first: $issuesFirst, after: $issuesAfter, orderBy: {field: UPDATED_AT, direction: DESC})"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
+	RateLimit rateLimit
 }
 
 // issueNodes represents a paginated list of issues
@@ -198,6 +202,7 @@ type singleIssueComments struct {
 			Comments commentNodes `graphql:"comments(first: $commentsFirst, after: $commentsAfter)"`
 		} `graphql:"issue(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
+	RateLimit rateLimit
 }
 
 func (i issuesWithComments) GetIssues() []issue {
