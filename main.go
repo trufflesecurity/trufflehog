@@ -709,8 +709,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 	eng.Start(ctx)
 
-	persistRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
-	clonePath := ""
+	persistGitRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
+	gitCloneTempPath := ""
 
 	defer func() {
 		// Clean up temporary artifacts.
@@ -722,8 +722,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			// If JSON legacy is enabled, that means the cloned repos are not deleted yet
 			// because they were needed for outputting legacy JSON.
 			// We only clean them up here if the user did not request to persist them.
-			if !persistRepo {
-				if err := cleantemp.CleanTempDirsForLegacyJSON(clonePath); err != nil {
+			if !persistGitRepo {
+				if err := cleantemp.CleanTempDirsForLegacyJSON(gitCloneTempPath); err != nil {
 					ctx.Logger().Error(err, "error cleaning temp artifacts for legacy JSON")
 				}
 			}
@@ -733,7 +733,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
-		clonePath = *gitClonePath
+		gitCloneTempPath = *gitClonePath
 		// validate the commit for local repository only
 		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
 			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
@@ -769,7 +769,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case githubScan.FullCommand():
-		clonePath = *githubClonePath
+		gitCloneTempPath = *githubClonePath
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -827,7 +827,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case gitlabScan.FullCommand():
-		clonePath = *gitlabClonePath
+		gitCloneTempPath = *gitlabClonePath
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)

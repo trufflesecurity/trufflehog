@@ -121,6 +121,8 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 // CleanTempDirsForLegacyJSON removes all directories that start with "trufflehog-"
 // from either the provided clonePath (if not empty) or the OS temp directory.
 func CleanTempDirsForLegacyJSON(baseDir string) error {
+	// If no custom clone path was provided, clean repos from the OS temp directory
+	// since that's where they were cloned during the scan.
 	if baseDir == "" {
 		baseDir = os.TempDir()
 	}
