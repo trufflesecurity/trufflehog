@@ -504,7 +504,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+		userType, err := s.getReposByOrgOrUser(ctx, org, true, reporter)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
@@ -529,7 +529,7 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, reporter sources.
 
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+		userType, err := s.getReposByOrgOrUser(ctx, org, false, reporter)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
@@ -560,7 +560,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
 	if !specificScope {
 		// Enumerate the user's orgs and repos if none were specified.
-		if err := s.getReposByUser(ctx, ghUser.GetLogin(), reporter); err != nil {
+		if err := s.getReposByUser(ctx, ghUser.GetLogin(), true, reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to fetch repos for the current user", "user", ghUser.GetLogin())
 		}
 		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin(), reporter); err != nil {
@@ -579,7 +579,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
 			orgCtx := context.WithValue(ctx, "account", org)
-			userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+			userType, err := s.getReposByOrgOrUser(ctx, org, true, reporter)
 			if err != nil {
 				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
 				continue
@@ -621,7 +621,9 @@ func (s *Source) enumerateWithApp(ctx context.Context, installationClient *githu
 				if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
 					logger.Error(err, "error fetching gists by user")
 				}
-				if err := s.getReposByUser(ctx, member, reporter); err != nil {
+				// TODO: Add authenticated user list repo for app token. It does support as per docs but need to test it before we enable it here.
+				// docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repositories-for-the-authenticated-user
+				if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
 					logger.Error(err, "error fetching repos by user")
 				}
 			}
@@ -864,7 +866,7 @@ func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitRe
 		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
 			ctx.Logger().Info("Unable to fetch gists by user", "user", member, "error", err)
 		}
-		if err := s.getReposByUser(ctx, member, reporter); err != nil {
+		if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
 			ctx.Logger().Info("Unable to fetch repos by user", "user", member, "error", err)
 		}
 	}
