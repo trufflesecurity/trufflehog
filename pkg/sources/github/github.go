@@ -849,9 +849,9 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 
 // handleGraphQLRateLimit inspects the rateLimit info returned in GraphQL queries.
 func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errIn error, reporters ...errorReporter) bool {
-	// if RATE_LIMITED error happened, wait for 5 minute before trying again
-	if errIn != nil && strings.Contains(errIn.Error(), "RATE_LIMITED") {
-		retryAfter := 1 * time.Minute
+	// if rate limit exceeded error happened, wait for 5 minute before trying again
+	if errIn != nil && strings.Contains(errIn.Error(), "rate limit exceeded") {
+		retryAfter := 5 * time.Minute
 		ctx.Logger().Info("GraphQL RATE_LIMITED error (fallback)",
 			"retry_after", retryAfter.String())
 		time.Sleep(retryAfter)
@@ -885,8 +885,8 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 	now := time.Now()
 	retryAfter := time.Until(rl.ResetAt)
 	// never negative and enforce a sane minimum backoff (avoid thrashing with 1s/2s retries)
-	if cmp.Less(retryAfter, 10*time.Second) {
-		retryAfter = 10 * time.Second
+	if cmp.Less(retryAfter, 5*time.Second) {
+		retryAfter = 5 * time.Second
 	}
 
 	jitter := time.Duration(rand.IntN(10)+1) * time.Second

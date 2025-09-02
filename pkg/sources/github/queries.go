@@ -34,7 +34,7 @@ type pullRequestWithComments struct {
 	Repository struct {
 		PullRequests pullRequestNodes `graphql:"pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC})"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
-	RateLimit rateLimit
+	RateLimit rateLimit `graphql:"rateLimit"`
 }
 
 // pullRequestNodes represents a paginated list of pull requests
@@ -76,7 +76,7 @@ type singlePRComments struct {
 			Comments commentNodes `graphql:"comments(first: $commentsFirst, after: $commentsAfter, orderBy: {field: UPDATED_AT, direction: DESC})"`
 		} `graphql:"pullRequest(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
-	RateLimit rateLimit
+	RateLimit rateLimit `graphql:"rateLimit"`
 }
 
 // GetPullRequests return list of pull requests
@@ -101,7 +101,7 @@ type prWithReviewComments struct {
 	Repository struct {
 		PullRequests minimalPullRequestNodes `graphql:"pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC})"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
-	RateLimit rateLimit
+	RateLimit rateLimit `graphql:"rateLimit"`
 }
 
 // minimalPullRequestNodes represents a paginated list of pull request
@@ -137,7 +137,7 @@ type singlePullRequestThreads struct {
 			} `graphql:"reviewThreads(first: $threadsFirst, after: $threadsAfter)"`
 		} `graphql:"pullRequest(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
-	RateLimit rateLimit
+	RateLimit rateLimit `graphql:"rateLimit"`
 }
 
 // singleReviewThreadComments represents a single review threads comments
@@ -149,7 +149,7 @@ type singleReviewThreadComments struct {
 			} `graphql:"reviewThread(id: $threadID)"`
 		} `graphql:"pullRequest(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
-	RateLimit rateLimit
+	RateLimit rateLimit `graphql:"rateLimit"`
 }
 
 func (p prWithReviewComments) GetMinimalPullRequests() []minimalPullRequest {
@@ -175,7 +175,7 @@ type issuesWithComments struct {
 	Repository struct {
 		Issues issueNodes `graphql:"issues(first: $issuesFirst, after: $issuesAfter, orderBy: {field: UPDATED_AT, direction: DESC})"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
-	RateLimit rateLimit
+	RateLimit rateLimit `graphql:"rateLimit"`
 }
 
 // issueNodes represents a paginated list of issues
@@ -220,15 +220,15 @@ func (i singleIssueComments) GetIssueComments() []comment {
 // === Others ===
 
 type author struct {
-	Login string
+	Login string `graphql:"login"`
 }
 
 type pageInfo struct {
-	HasNextPage bool
-	EndCursor   githubv4.String
+	HasNextPage bool            `graphql:"hasNextPage"`
+	EndCursor   githubv4.String `graphql:"endCursor"`
 }
 
 type rateLimit struct {
-	Remaining int
-	ResetAt   time.Time
+	Remaining int       `graphql:"remaining"`
+	ResetAt   time.Time `graphql:"resetAt"`
 }
