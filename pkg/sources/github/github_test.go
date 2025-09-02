@@ -528,7 +528,7 @@ func TestEnumerateWithToken(t *testing.T) {
 		JSON(map[string]string{"login": "super-secret-user"})
 
 	gock.New("https://api.github.com").
-		Get("/users/super-secret-user/repos").
+		Get("/user/repos").
 		MatchParam("per_page", "100").
 		Reply(200).
 		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
@@ -609,7 +609,7 @@ func TestEnumerate(t *testing.T) {
 
 	//
 	gock.New("https://api.github.com").
-		Get("/users/super-secret-user/repos").
+		Get("/user/repos").
 		Reply(200).
 		JSON(`[{"name": "super-secret-repo", "full_name": "super-secret-user/super-secret-repo", "owner": {"login": "super-secret-user"}, "clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "has_wiki": false, "size": 1}]`)
 
