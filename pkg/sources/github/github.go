@@ -880,7 +880,7 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 		return false
 	}
 
-	// === only reach here if error is nil and rate limit remaining is less than 3 (saftey)
+	// === only reach here if error is nil and rate limit remaining is less than 3 (safety)
 
 	now := time.Now()
 	retryAfter := time.Until(rl.ResetAt)
