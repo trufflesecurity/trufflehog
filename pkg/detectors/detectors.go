@@ -289,7 +289,7 @@ func MustGetBenchmarkData() map[string][]byte {
 	for key, size := range sizes {
 		// Generating a byte slice of a specific size with random data.
 		content := make([]byte, size)
-		for i := 0; i < size; i++ {
+		for i := range(size) {
 			randomByte, err := rand.Int(rand.Reader, big.NewInt(256))
 			if err != nil {
 				panic(err)
