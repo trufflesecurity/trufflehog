@@ -243,6 +243,7 @@ message GitLab {
   repeated string group_ids = 12;
   string clone_path = 13;
   bool no_cleanup = 14;
+  int64 projects_per_page = 15;
 }
 
 message GitHub {

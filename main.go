@@ -149,6 +149,7 @@ var (
 	gitlabAuthInUrl        = gitlabScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
 	gitlabClonePath        = gitlabScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir)").String()
 	gitlabNoCleanup        = gitlabScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	gitlabProjectsPerPage  = gitlabScan.Flag("projects-per-page", "Number of GitLab projects to fetch per page during enumeration (default: 100)").Default("100").Int()
 
 	filesystemScan  = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemPaths = filesystemScan.Arg("path", "Path to file or directory to scan.").Strings()
@@ -822,17 +823,22 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, err
 		}
 
+		if *gitlabProjectsPerPage > 100 {
+			return scanMetrics, fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
+		}
+
 		cfg := sources.GitlabConfig{
-			Endpoint:     *gitlabScanEndpoint,
-			Token:        *gitlabScanToken,
-			Repos:        *gitlabScanRepos,
-			GroupIds:     *gitlabScanGroupIds,
-			IncludeRepos: *gitlabScanIncludeRepos,
-			ExcludeRepos: *gitlabScanExcludeRepos,
-			Filter:       filter,
-			AuthInUrl:    *gitlabAuthInUrl,
-			ClonePath:    *gitlabClonePath,
-			NoCleanup:    *gitlabNoCleanup,
+			Endpoint:        *gitlabScanEndpoint,
+			Token:           *gitlabScanToken,
+			Repos:           *gitlabScanRepos,
+			GroupIds:        *gitlabScanGroupIds,
+			IncludeRepos:    *gitlabScanIncludeRepos,
+			ExcludeRepos:    *gitlabScanExcludeRepos,
+			Filter:          filter,
+			AuthInUrl:       *gitlabAuthInUrl,
+			ClonePath:       *gitlabClonePath,
+			NoCleanup:       *gitlabNoCleanup,
+			ProjectsPerPage: *gitlabProjectsPerPage,
 		}
 
 		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {

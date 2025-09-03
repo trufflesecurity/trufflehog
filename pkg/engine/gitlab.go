@@ -63,6 +63,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 	}
 
 	connection.NoCleanup = c.NoCleanup
+	connection.ProjectsPerPage = int64(c.ProjectsPerPage)
 
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})

@@ -68,6 +68,8 @@ type Source struct {
 
 	clonePath string
 	noCleanup bool
+
+	projectsPerPage int
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -169,6 +171,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
+	s.projectsPerPage = int(conn.GetProjectsPerPage())
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
@@ -543,10 +546,9 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	const (
-		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
-		paginationLimit = 100  // Default is 20, max is 100.
+		orderBy = "id"
 	)
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage} // default is 20, max is 100(Gitlab) - Default is 100 for trufflehog, value can be configured by user
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
 	for {
@@ -651,13 +653,11 @@ func (s *Source) getAllProjectReposV2(
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 
-	const paginationLimit = 100 // default is 20, max is 100.
-
 	// example: https://gitlab.com/gitlab-org/api/client-go/-/blob/main/examples/pagination.go#L55
 	listOpts := gitlab.ListOptions{
 		OrderBy:    "id",
-		Pagination: "keyset", // https://docs.gitlab.com/api/rest/#keyset-based-pagination
-		PerPage:    paginationLimit,
+		Pagination: "keyset",          // https://docs.gitlab.com/api/rest/#keyset-based-pagination
+		PerPage:    s.projectsPerPage, // default is 20, max is 100(Gitlab) - Default is 100 for trufflehog, value can be configured by user
 		Sort:       "asc",
 	}
 
