@@ -94,10 +94,10 @@ func (p singlePRComments) GetPRComments() []comment {
 	return p.Repository.PullRequest.Comments.Nodes
 }
 
-// === Pull Request Review Threads and Comments ===
+// === Pull Request Review Threads IDs ===
 
-// prWithReviewComments represents repository pull requests with review threads
-type prWithReviewComments struct {
+// prWithReviewThreadIDs represents repository pull requests with review threads IDs
+type prWithReviewThreadIDs struct {
 	Repository struct {
 		PullRequests minimalPullRequestNodes `graphql:"pullRequests(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC})"`
 	} `graphql:"repository(owner: $owner, name: $repo)"`
@@ -113,59 +113,73 @@ type minimalPullRequestNodes struct {
 // minimalPullRequest represents a pull request with no and review threads
 type minimalPullRequest struct {
 	Number        int
-	ReviewThreads reviewThreadNodes `graphql:"reviewThreads(first: $threadsFirst, after: $threadsAfter)"`
+	ReviewThreads reviewThreadIDNodes `graphql:"reviewThreads(first: $threadsFirst, after: $threadsAfter)"`
 }
 
-// reviewThreadNodes represents a paginated list of pr review threads
-type reviewThreadNodes struct {
-	Nodes    []reviewThread
+// reviewThreadIDNodes represents a paginated list of pr review threads
+type reviewThreadIDNodes struct {
+	Nodes    []reviewThreadID
 	PageInfo pageInfo
 }
 
-// reviewThread represents a single review thread with comment nodes
-type reviewThread struct {
+// reviewThreadID represents a single review thread with ID
+type reviewThreadID struct {
+	ID string
+}
+
+func (p prWithReviewThreadIDs) GetMinimalPullRequests() []minimalPullRequest {
+	return p.Repository.PullRequests.Nodes
+}
+
+func (r reviewThreadIDNodes) GetThreadIDs() []string {
+	var ids = make([]string, 0)
+
+	for _, id := range r.Nodes {
+		ids = append(ids, id.ID)
+	}
+
+	return ids
+}
+
+// === Review Threads with comments ===
+
+// multiReviewThreadComments fetches multiple review threads (by IDs) and the first page of their comments.
+type multiReviewThreadComments struct {
+	Nodes []struct {
+		PullRequestReviewThread reviewThreadComments `graphql:"... on PullRequestReviewThread"`
+	} `graphql:"nodes(ids: $ids)"`
+	RateLimit rateLimit `graphql:"rateLimit"`
+}
+
+// reviewThreadComments represents a single thread and its comments.
+type reviewThreadComments struct {
 	ID       string
 	Comments commentNodes `graphql:"comments(first: $commentsFirst, after: $commentsAfter)"`
 }
 
-type singlePullRequestThreads struct {
-	Repository struct {
-		PullRequest struct {
-			ReviewThreads struct {
-				Nodes    []reviewThread
-				PageInfo pageInfo
-			} `graphql:"reviewThreads(first: $threadsFirst, after: $threadsAfter)"`
-		} `graphql:"pullRequest(number: $number)"`
-	} `graphql:"repository(owner: $owner, name: $repo)"`
-	RateLimit rateLimit `graphql:"rateLimit"`
-}
-
-// singleReviewThreadComments represents a single review threads comments
+// singleReviewThreadComments fetches one review thread with comment pagination
 type singleReviewThreadComments struct {
-	Repository struct {
-		PullRequest struct {
-			ReviewThread struct {
-				Comments commentNodes `graphql:"comments(first: $commentsFirst, after: $commentsAfter)"`
-			} `graphql:"reviewThread(id: $threadID)"`
-		} `graphql:"pullRequest(number: $number)"`
-	} `graphql:"repository(owner: $owner, name: $repo)"`
+	Node struct {
+		ID       string
+		Comments commentNodes `graphql:"... on PullRequestReviewThread"`
+	} `graphql:"node(id: $id)"`
 	RateLimit rateLimit `graphql:"rateLimit"`
 }
 
-func (p prWithReviewComments) GetMinimalPullRequests() []minimalPullRequest {
-	return p.Repository.PullRequests.Nodes
+// GetThreads returns all review thread nodes
+func (r multiReviewThreadComments) GetThreads() []reviewThreadComments {
+	threads := make([]reviewThreadComments, 0)
+	for _, n := range r.Nodes {
+		if n.PullRequestReviewThread.ID != "" {
+			threads = append(threads, n.PullRequestReviewThread)
+		}
+	}
+
+	return threads
 }
 
-func (p minimalPullRequest) GetReviewThreads() []reviewThread {
-	return p.ReviewThreads.Nodes
-}
-
-func (r reviewThread) GetThreadComments() []comment {
+func (r reviewThreadComments) GetThreadComments() []comment {
 	return r.Comments.Nodes
-}
-
-func (r singleReviewThreadComments) GetThreadComments() []comment {
-	return r.Repository.PullRequest.ReviewThread.Comments.Nodes
 }
 
 // === Issues with comments ===

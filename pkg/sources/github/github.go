@@ -1498,16 +1498,14 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 		repository:            githubv4.String(repoInfo.name),
 		pullRequestPerPage:    githubv4.Int(defaultPagination),
 		pullRequestPagination: (*githubv4.String)(nil),
-		threadPerPage:         githubv4.Int(30), // keep threads count to 30 to not hit the max nodes threshold
+		threadPerPage:         githubv4.Int(defaultPagination),
 		threadPagination:      (*githubv4.String)(nil),
-		commentsPerPage:       githubv4.Int(50),
-		commentsPagination:    (*githubv4.String)(nil),
 	}
 
-	var totalThreads int
+	var threadIDs = make([]string, 0)
 
 	for {
-		var query prWithReviewComments
+		var query prWithReviewThreadIDs
 		err := s.connector.GraphQLClient().Query(ctx, &query, vars)
 		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
 			continue
@@ -1518,96 +1516,88 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 		}
 
 		for _, pr := range query.GetMinimalPullRequests() {
-			ctx.Logger().V(5).Info("Scanning pull request review threads",
-				"pull_request_no", pr.Number,
-				"total_threads", len(pr.GetReviewThreads()))
-
-			// ---- THREAD PAGINATION LOOP ----
-			prThreads := pr.GetReviewThreads()
-			threadPageInfo := pr.ReviewThreads.PageInfo
-
-			for {
-				totalThreads += len(prThreads)
-				// process threads in current batch
-				for _, thread := range prThreads {
-					ctx.Logger().V(5).Info("Scanning thread comments",
-						"pull_request_no", pr.Number,
-						"thread_id", thread.ID,
-						"total_comments", len(thread.GetThreadComments()),
-					)
-
-					if err := s.chunkComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
-						return err
-					}
-
-					// ---- COMMENT PAGINATION LOOP ----
-					for thread.Comments.PageInfo.HasNextPage {
-						commentVars := map[string]any{
-							owner:              githubv4.String(repoInfo.owner),
-							repository:         githubv4.String(repoInfo.name),
-							pullRequestNumber:  githubv4.Int(pr.Number),
-							threadID:           thread.ID,
-							commentsPerPage:    githubv4.Int(defaultPagination),
-							commentsPagination: thread.Comments.PageInfo.EndCursor,
-						}
-
-						var commentsQuery singleReviewThreadComments
-						err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars)
-						if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
-							continue
-						}
-
-						if err != nil {
-							return fmt.Errorf("error fetching thread review comments: %w", err)
-						}
-
-						if err := s.chunkComments(ctx, repoInfo, commentsQuery.GetThreadComments(), reporter, cutoffTime); err != nil {
-							return err
-						}
-
-						thread.Comments.PageInfo = commentsQuery.Repository.PullRequest.ReviewThread.Comments.PageInfo
-					}
-				}
-
-				// fetch next page of threads (if any)
-				if !threadPageInfo.HasNextPage {
-					break
-				}
-
-				threadVars := map[string]any{
-					owner:              githubv4.String(repoInfo.owner),
-					repository:         githubv4.String(repoInfo.name),
-					pullRequestNumber:  githubv4.Int(pr.Number),
-					threadPerPage:      githubv4.Int(30),
-					threadPagination:   threadPageInfo.EndCursor,
-					commentsPerPage:    githubv4.Int(50),
-					commentsPagination: (*githubv4.String)(nil),
-				}
-
-				var threadsQuery singlePullRequestThreads
-				err := s.connector.GraphQLClient().Query(ctx, &threadsQuery, threadVars)
-				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
-					continue
-				}
-
-				if err != nil {
-					return fmt.Errorf("error fetching pr review threads: %w", err)
-				}
-
-				prThreads = threadsQuery.Repository.PullRequest.ReviewThreads.Nodes
-				threadPageInfo = threadsQuery.Repository.PullRequest.ReviewThreads.PageInfo
-			}
+			prThreadIDs := pr.ReviewThreads.GetThreadIDs()
+			threadIDs = append(threadIDs, prThreadIDs...)
 		}
 
 		if !query.Repository.PullRequests.PageInfo.HasNextPage {
-			ctx.Logger().V(4).Info("Scanned all repository PR's threads with comments", "total_threads_scanned", totalThreads)
+			ctx.Logger().V(4).Info("Pulled all repository PR's threads IDs")
 			break
 		}
 
 		vars[pullRequestPagination] = githubv4.NewString(query.Repository.PullRequests.PageInfo.EndCursor)
 	}
 
+	ctx.Logger().V(4).Info("Pulled all thread IDs", "total_threads", len(threadIDs))
+
+	if len(threadIDs) > 0 {
+		// process in batches of max 100
+		for _, batch := range chunkIDs(threadIDs, 100) {
+			ctx.Logger().V(4).Info("Processing Thread comments in Batches", "batch_length", len(batch))
+			if err := s.fetchThreadComments(ctx, batch, repoInfo, reporter, cutoffTime); err != nil {
+				return fmt.Errorf("error fetching thread review comments: %w", err)
+			}
+		}
+	}
+
 	return nil
+}
+
+func (s *Source) fetchThreadComments(ctx context.Context, threadIDs []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+	// Process in batches of 100
+	var query multiReviewThreadComments
+	vars := map[string]any{
+		"ids":              threadIDs,
+		commentsPerPage:    githubv4.Int(defaultPagination),
+		commentsPagination: (*githubv4.String)(nil),
+	}
+
+	if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
+		return fmt.Errorf("multi-thread query failed: %w", err)
+	}
+
+	// process each thread in batch
+	for _, thread := range query.GetThreads() {
+		// process first-page comments
+		if err := s.chunkComments(ctx, repoInfo, thread.GetThreadComments(), reporter, cutoffTime); err != nil {
+			return err
+		}
+
+		// pagination for this thread if needed
+		for thread.Comments.PageInfo.HasNextPage {
+			var query singleReviewThreadComments
+			reviewThreadVars := map[string]any{
+				threadID:           thread.ID,
+				commentsPerPage:    githubv4.Int(defaultPagination),
+				commentsPagination: (*githubv4.String)(nil),
+			}
+
+			if err := s.connector.GraphQLClient().Query(ctx, &query, reviewThreadVars); err != nil {
+				return fmt.Errorf("single-thread query failed: %w", err)
+			}
+
+			node := query.Node
+			if err := s.chunkComments(ctx, repoInfo, node.Comments.Nodes, reporter, cutoffTime); err != nil {
+				return err
+			}
+
+			if !node.Comments.PageInfo.HasNextPage {
+				break
+			}
+
+			reviewThreadVars[commentsPagination] = &node.Comments.PageInfo.EndCursor
+		}
+	}
+
+	return nil
+}
+
+func chunkIDs(ids []string, size int) [][]string {
+	var chunks [][]string
+	for size < len(ids) {
+		ids, chunks = ids[size:], append(chunks, ids[0:size:size])
+	}
+	return append(chunks, ids)
 }
 
 func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []issue, reporter sources.ChunkReporter) error {
