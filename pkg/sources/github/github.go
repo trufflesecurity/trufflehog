@@ -205,6 +205,11 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 	return false
 }
 
+// wantRepo returns true if the repository should be included based on include/exclude patterns
+func (c *filteredRepoCache) wantRepo(s string) bool {
+	return !c.ignoreRepo(s) && c.includeRepo(s)
+}
+
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	err := git.CmdCheck()
@@ -433,14 +438,29 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// Double make sure that all enumerated repositories in the
 	// filteredRepoCache have an entry in the repoInfoCache.
 	for _, repo := range s.filteredRepoCache.Values() {
-		ctx := context.WithValue(ctx, "repo", repo)
-
-		repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
-		if err != nil {
-			ctx.Logger().Error(err, "error caching repo info")
-			_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+		// Extract the repository name from the URL for filtering
+		repoName := repo
+		if strings.Contains(repo, "/") {
+			// Try to extract org/repo name from URL
+			if strings.Contains(repo, "github.com") {
+				parts := strings.Split(repo, "/")
+				if len(parts) >= 2 {
+					repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
+				}
+			}
 		}
-		s.repos = append(s.repos, repo)
+
+		// Final filter check - only include repositories that pass the filter
+		if s.filteredRepoCache.wantRepo(repoName) {
+			ctx = context.WithValue(ctx, "repo", repo)
+
+			repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
+			if err != nil {
+				ctx.Logger().Error(err, "error caching repo info")
+				_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+			}
+			s.repos = append(s.repos, repo)
+		}
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	ctx.Logger().Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
