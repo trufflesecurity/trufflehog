@@ -548,7 +548,8 @@ func (s *Source) getAllProjectRepos(
 	const (
 		orderBy = "id"
 	)
-	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage} // default is 20, max is 100(Gitlab) - Default is 100 for trufflehog, value can be configured by user
+	// Trufflehog default per page is 100 unless set to other value through flag. If 0 provided in flag gitlab default it to 20
+	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
 	for {
@@ -656,9 +657,10 @@ func (s *Source) getAllProjectReposV2(
 	// example: https://gitlab.com/gitlab-org/api/client-go/-/blob/main/examples/pagination.go#L55
 	listOpts := gitlab.ListOptions{
 		OrderBy:    "id",
-		Pagination: "keyset",          // https://docs.gitlab.com/api/rest/#keyset-based-pagination
-		PerPage:    s.projectsPerPage, // default is 20, max is 100(Gitlab) - Default is 100 for trufflehog, value can be configured by user
-		Sort:       "asc",
+		Pagination: "keyset", // https://docs.gitlab.com/api/rest/#keyset-based-pagination
+		// Trufflehog default per page 100 unless set to other value through flag. If 0 provided in flag gitlab default it to 20
+		PerPage: s.projectsPerPage,
+		Sort:    "asc",
 	}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{
@@ -753,11 +755,10 @@ func (s *Source) getAllProjectReposInGroups(
 
 	var projectsWithNamespace []string
 	const (
-		orderBy         = "id"
-		paginationLimit = 100
+		orderBy = "id"
 	)
 
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 	projectOpts := &gitlab.ListGroupProjectsOptions{
 		ListOptions:      listOpts,
 		OrderBy:          gitlab.Ptr(orderBy),
