@@ -9,7 +9,8 @@ var (
 	EnableAPKHandler               atomic.Bool
 	UserAgentSuffix                AtomicString
 	UseSimplifiedGitlabEnumeration atomic.Bool
-	UseGitMirror       atomic.Bool
+	UseGitMirror                   atomic.Bool
+	UseGithubGraphqlAPI            atomic.Bool // use github graphql api to fetch issues, pr's and comments
 )
 
 type AtomicString struct {

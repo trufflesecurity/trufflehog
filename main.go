@@ -464,6 +464,9 @@ func run(state overseer.State) {
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
 
+	// OSS Default using github graphql api for issues, pr's and comments
+	feature.UseGithubGraphqlAPI.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
