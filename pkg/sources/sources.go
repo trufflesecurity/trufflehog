@@ -371,13 +371,10 @@ type GitlabConfig struct {
 	ClonePath string
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup bool
-<<<<<<< HEAD
-	// ProjectsPerPage is the number of projects to fetch per page during enumeration.
-	ProjectsPerPage int
-=======
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
->>>>>>> main
+	// ProjectsPerPage is the number of projects to fetch per page during enumeration.
+	ProjectsPerPage int
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.

@@ -857,11 +857,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			AuthInUrl:       *gitlabAuthInUrl,
 			ClonePath:       *gitlabClonePath,
 			NoCleanup:       *gitlabNoCleanup,
-<<<<<<< HEAD
 			ProjectsPerPage: *gitlabProjectsPerPage,
-=======
 			PrintLegacyJSON: *jsonLegacy,
->>>>>>> main
 		}
 
 		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {

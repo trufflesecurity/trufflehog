@@ -66,16 +66,12 @@ type Source struct {
 
 	useAuthInUrl bool
 
-<<<<<<< HEAD
 	clonePath string
 	noCleanup bool
 
-	projectsPerPage int
-=======
-	clonePath       string
-	noCleanup       bool
 	printLegacyJSON bool
->>>>>>> main
+
+	projectsPerPage int
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -177,11 +173,8 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
-<<<<<<< HEAD
-	s.projectsPerPage = int(conn.GetProjectsPerPage())
-=======
 	s.printLegacyJSON = conn.GetPrintLegacyJson()
->>>>>>> main
+	s.projectsPerPage = int(conn.GetProjectsPerPage())
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
