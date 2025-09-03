@@ -66,8 +66,9 @@ type Source struct {
 
 	useAuthInUrl bool
 
-	clonePath string
-	noCleanup bool
+	clonePath       string
+	noCleanup       bool
+	printLegacyJSON bool
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -169,6 +170,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
+	s.printLegacyJSON = conn.GetPrintLegacyJson()
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
@@ -211,17 +213,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{
 					Gitlab: &source_metadatapb.Gitlab{
-						Commit:     sanitizer.UTF8(commit),
-						File:       sanitizer.UTF8(file),
-						Email:      sanitizer.UTF8(email),
-						Repository: sanitizer.UTF8(repository),
-						Link:       giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:  sanitizer.UTF8(timestamp),
-						Line:       line,
+						Commit:              sanitizer.UTF8(commit),
+						File:                sanitizer.UTF8(file),
+						Email:               sanitizer.UTF8(email),
+						Repository:          sanitizer.UTF8(repository),
+						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+						Link:                giturl.GenerateLink(repository, commit, file, line),
+						Timestamp:           sanitizer.UTF8(timestamp),
+						Line:                line,
 					},
 				},
 			}
@@ -902,8 +905,11 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 
 			// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-			if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-				defer os.RemoveAll(path)
+			// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+			if !s.printLegacyJSON {
+				if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
+					defer os.RemoveAll(path)
+				}
 			}
 
 			logger.V(2).Info("starting scan", "num", i+1, "total", len(s.repos))
@@ -1094,8 +1100,11 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 
 	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-		defer os.RemoveAll(path)
+	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+	if !s.printLegacyJSON {
+		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
+			defer os.RemoveAll(path)
+		}
 	}
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
