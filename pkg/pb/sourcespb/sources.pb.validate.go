@@ -2085,6 +2085,8 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for NoCleanup
 
+	// no validation rules for PrintLegacyJson
+
 	switch v := m.Credential.(type) {
 	case *Git_BasicAuth:
 		if v == nil {
@@ -2335,6 +2337,8 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for NoCleanup
 
+	// no validation rules for PrintLegacyJson
+
 	// no validation rules for ProjectsPerPage
 
 	switch v := m.Credential.(type) {
@@ -2575,6 +2579,8 @@ func (m *GitHub) validate(all bool) error {
 	// no validation rules for NoCleanup
 
 	// no validation rules for IgnoreGists
+
+	// no validation rules for PrintLegacyJson
 
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
