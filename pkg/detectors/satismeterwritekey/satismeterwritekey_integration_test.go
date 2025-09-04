@@ -69,7 +69,7 @@ func TestSatismeterWritekey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a satismeterwritekey project %s satismeter writekey %s and satismeter token %s in here but not vaild", inactiveProjectID, inactiveWriteKey, inactiveToken)), // the secret would satisfy the regex but not pass validation,
+				data:   []byte(fmt.Sprintf("You can find a satismeterwritekey project %s satismeter writekey %s and satismeter token %s in here but not valid", inactiveProjectID, inactiveWriteKey, inactiveToken)), // the secret would satisfy the regex but not pass validation,
 				verify: true,
 			},
 			want: []detectors.Result{
