@@ -1,4 +1,4 @@
-package alchemy
+package jwt
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAlchemy_Pattern(t *testing.T) {
+func TestJwt_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -20,45 +20,26 @@ func TestAlchemy_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern",
+			name: "valid pattern 1",
 			input: `
-				[INFO] Sending request to the alchemy API
-				[DEBUG] Using Key=alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
-				[INFO] Response received: 200 OK
+				// secret is "a-string-secret-at-least-256-bits-long"
+				eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{"alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D"},
+			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
 		},
 		{
-			name: "valid pattern - xml",
+			name: "valid pattern 2",
 			input: `
-				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
-					<scope>GLOBAL</scope>
-					<id>{alchemy}</id>
-					<secret>{alchemy AQAAABAAA 5iqW7gKQVXvwnykF9xAVfenemmnUJznI}</secret>
-					<description>configuration for production</description>
-					<creationDate>2023-05-18T14:32:10Z</creationDate>
-					<owner>jenkins-admin</owner>
-				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+				// secret is "a-string-secret-at-least-256-bits-long"
+				ewogICJ0eXAiOiBqd3QsCiAgImFsZyI6IEhTMjU2Cn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{"5iqW7gKQVXvwnykF9xAVfenemmnUJznI"},
+			want: []string{"ewogICJ0eXAiOiBqd3QsCiAgImFsZyI6IEhTMjU2Cn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
 		},
 		{
-			name: "finds all matches",
+			name: "invalid pattern 2",
 			input: `
-				[INFO] Sending request to the alchemy API
-				[DEBUG] Using Key=alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
-				[ERROR] Response received 401 UnAuthorized
-				[DEBUG] Using alchemy Key=xuQIeWFVEp8k8Uu9FwPx6X5C8IViOe1o
-				[INFO] Response received: 200 OK
-			`,
-			want: []string{"alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D", "xuQIeWFVEp8k8Uu9FwPx6X5C8IViOe1o"},
-		},
-		{
-			name: "invalid pattern",
-			input: `
-				[INFO] Sending request to the alchemy API
-				[DEBUG] Using Key=alcht_a2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
-				[ERROR] Response received: 401 UnAuthorized
+				// secret is "a-string-secret-at-least-256-bits-long"
+				ewogICJ0eXAiOiBqd3QsCiAgImFsZyI6IEhTMjU2Cn0=.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
 			want: []string{},
 		},
