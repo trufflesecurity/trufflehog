@@ -556,7 +556,7 @@ func (s *Source) getAllProjectRepos(
 	const (
 		orderBy = "id"
 	)
-	// Trufflehog default per page is 100 unless set to other value through flag. If 0 provided in flag gitlab default it to 20
+	// Trufflehog default per page 100 unless set to other value through feature flag. If 0 provided in feature flag gitlab default it to 20
 	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
@@ -666,7 +666,7 @@ func (s *Source) getAllProjectReposV2(
 	listOpts := gitlab.ListOptions{
 		OrderBy:    "id",
 		Pagination: "keyset", // https://docs.gitlab.com/api/rest/#keyset-based-pagination
-		// Trufflehog default per page 100 unless set to other value through flag. If 0 provided in flag gitlab default it to 20
+		// Trufflehog default per page 100 unless set to other value through feature flag. If 0 provided in feature flag gitlab default it to 20
 		PerPage: s.projectsPerPage,
 		Sort:    "asc",
 	}
