@@ -1,9 +1,12 @@
 package detectors
 
 import (
+	"bufio"
 	_ "embed"
 	"fmt"
 	"math"
+	"os"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -198,4 +201,87 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 	}
 
 	return filteredResults
+}
+
+// FilterWhitelistedSecrets filters out results that match whitelisted secrets.
+// This allows users to specify known safe secrets that should not be reported.
+// Supports regex patterns.
+func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelistedSecrets map[string]struct{}) []Result {
+	if len(whitelistedSecrets) == 0 {
+		return results
+	}
+
+	var filteredResults []Result
+	for _, result := range results {
+		if len(result.Raw) == 0 {
+			filteredResults = append(filteredResults, result)
+			continue
+		}
+
+		isWhitelisted := false
+		var matchReason string
+
+		// Check if the raw secret matches any whitelisted secret
+		rawSecret := string(result.Raw)
+		if isWhitelisted, matchReason = isSecretWhitelisted(rawSecret, whitelistedSecrets); isWhitelisted {
+			ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", rawSecret, "reason", matchReason)
+			continue
+		}
+
+		// Also check RawV2 if present
+		if result.RawV2 != nil {
+			rawV2Secret := string(result.RawV2)
+			if isWhitelisted, matchReason = isSecretWhitelisted(rawV2Secret, whitelistedSecrets); isWhitelisted {
+				ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", rawV2Secret, "reason", matchReason)
+				continue
+			}
+		}
+
+		filteredResults = append(filteredResults, result)
+	}
+
+	return filteredResults
+}
+
+// loadWhitelistedSecrets loads secrets from a file that should be whitelisted
+func LoadWhitelistedSecrets(filename string) (map[string]struct{}, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open whitelist file: %w", err)
+	}
+	defer file.Close()
+
+	whitelistedSecrets := make(map[string]struct{})
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		secret := strings.TrimSpace(scanner.Text())
+		if secret != "" { // Skip empty lines
+			whitelistedSecrets[secret] = struct{}{}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading whitelist file: %w", err)
+	}
+
+	return whitelistedSecrets, nil
+}
+
+// isSecretWhitelisted checks if a secret matches any whitelisted pattern (exact string or regex)
+func isSecretWhitelisted(secret string, whitelistedSecrets map[string]struct{}) (bool, string) {
+	// First, try exact string matching for performance
+	if _, isWhitelisted := whitelistedSecrets[secret]; isWhitelisted {
+		return true, "exact match"
+	}
+
+	// Try regex matching
+	for pattern := range whitelistedSecrets {
+		if regex, err := regexp.Compile(pattern); err == nil {
+			if regex.MatchString(secret) {
+				return true, "regex match: " + pattern
+			}
+		}
+	}
+
+	return false, ""
 }
