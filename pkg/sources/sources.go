@@ -373,8 +373,6 @@ type GitlabConfig struct {
 	NoCleanup bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
-	// ProjectsPerPage is the number of projects to fetch per page during enumeration.
-	ProjectsPerPage int
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.

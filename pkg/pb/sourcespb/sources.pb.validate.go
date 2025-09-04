@@ -2339,8 +2339,6 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for PrintLegacyJson
 
-	// no validation rules for ProjectsPerPage
-
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
 		if v == nil {

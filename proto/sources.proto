@@ -245,7 +245,6 @@ message GitLab {
   string clone_path = 13;
   bool no_cleanup = 14;
   bool print_legacy_json = 15;
-  int64 projects_per_page = 16;
 }
 
 message GitHub {

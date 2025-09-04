@@ -174,7 +174,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
 	s.printLegacyJSON = conn.GetPrintLegacyJson()
-	s.projectsPerPage = int(conn.GetProjectsPerPage())
+	s.projectsPerPage = int(feature.GitlabProjectsPerPage.Load())
+
+	if s.projectsPerPage > 100 {
+		return fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
+	}
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
