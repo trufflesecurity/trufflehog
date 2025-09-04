@@ -463,6 +463,7 @@ func run(state overseer.State) {
 
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
+	feature.GitlabProjectsPerPage.Store(100)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
