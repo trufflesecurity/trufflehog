@@ -329,12 +329,12 @@ func (s *Source) handleGraphqlRateLimitWithChunkReporter(ctx context.Context, re
 
 // handleGraphQLRateLimit inspects the rateLimit info returned in GraphQL queries.
 func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errIn error, reporters ...errorReporter) bool {
-	// check global resume time first (in case another worker already set it)
+	// check global resume time first (in case another request already set it)
 	rateLimitMu.RLock()
 	resumeTime := rateLimitResumeTime
 	rateLimitMu.RUnlock()
 
-	// if resume time is not empty and is after current time, than put the worker to sleep till that.
+	// if resume time is not empty and is after current time, than put the request to sleep till that.
 	if !resumeTime.IsZero() && time.Now().Before(resumeTime) {
 		retryAfter := time.Until(resumeTime)
 		time.Sleep(retryAfter)
