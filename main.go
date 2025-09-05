@@ -463,6 +463,7 @@ func run(state overseer.State) {
 
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
+	feature.GitlabProjectsPerPage.Store(100)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -709,16 +710,31 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 	eng.Start(ctx)
 
+	persistGitRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
+	gitCloneTempPath := ""
+
 	defer func() {
 		// Clean up temporary artifacts.
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 			ctx.Logger().Error(err, "error cleaning temp artifacts")
+		}
+
+		if *jsonLegacy {
+			// If JSON legacy is enabled, that means the cloned repos are not deleted yet
+			// because they were needed for outputting legacy JSON.
+			// We only clean them up here if the user did not request to persist them.
+			if !persistGitRepo {
+				if err := cleantemp.CleanTempDirsForLegacyJSON(gitCloneTempPath); err != nil {
+					ctx.Logger().Error(err, "error cleaning temp artifacts for legacy JSON")
+				}
+			}
 		}
 	}()
 
 	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
+		gitCloneTempPath = *gitClonePath
 		// validate the commit for local repository only
 		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
 			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
@@ -746,6 +762,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ExcludeGlobs:     *gitScanExcludeGlobs,
 			ClonePath:        *gitClonePath,
 			NoCleanup:        *gitNoCleanup,
+			PrintLegacyJSON:  *jsonLegacy,
 		}
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
@@ -753,6 +770,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case githubScan.FullCommand():
+		gitCloneTempPath = *githubClonePath
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -788,6 +806,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ClonePath:                  *githubClonePath,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
+			PrintLegacyJSON:            *jsonLegacy,
 		}
 
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
@@ -809,6 +828,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case gitlabScan.FullCommand():
+		gitCloneTempPath = *gitlabClonePath
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -823,16 +843,17 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 
 		cfg := sources.GitlabConfig{
-			Endpoint:     *gitlabScanEndpoint,
-			Token:        *gitlabScanToken,
-			Repos:        *gitlabScanRepos,
-			GroupIds:     *gitlabScanGroupIds,
-			IncludeRepos: *gitlabScanIncludeRepos,
-			ExcludeRepos: *gitlabScanExcludeRepos,
-			Filter:       filter,
-			AuthInUrl:    *gitlabAuthInUrl,
-			ClonePath:    *gitlabClonePath,
-			NoCleanup:    *gitlabNoCleanup,
+			Endpoint:        *gitlabScanEndpoint,
+			Token:           *gitlabScanToken,
+			Repos:           *gitlabScanRepos,
+			GroupIds:        *gitlabScanGroupIds,
+			IncludeRepos:    *gitlabScanIncludeRepos,
+			ExcludeRepos:    *gitlabScanExcludeRepos,
+			Filter:          filter,
+			AuthInUrl:       *gitlabAuthInUrl,
+			ClonePath:       *gitlabClonePath,
+			NoCleanup:       *gitlabNoCleanup,
+			PrintLegacyJSON: *jsonLegacy,
 		}
 
 		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {
