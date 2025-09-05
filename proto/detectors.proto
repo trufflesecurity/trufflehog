@@ -1045,9 +1045,11 @@ enum DetectorType {
   WebexBot = 1033;
   TableauPersonalAccessToken = 1034;
   Rootly = 1035;
-  MakeApiToken = 1036;
-  MakeMcpToken = 1037;
-  HashiCorpVaultAuth = 1038;
+  HashiCorpVaultAuth = 1036;
+  PhraseAccessToken = 1037;
+  Photoroom = 1038;
+  MakeApiToken = 1039;
+  MakeMcpToken = 1040;
 }
 
 message Result {

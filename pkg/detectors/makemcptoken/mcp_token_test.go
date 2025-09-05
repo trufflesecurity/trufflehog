@@ -1,4 +1,4 @@
-package mcp_token
+package makemcptoken
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package api_token
+package makemcptoken
 
 import (
 	"context"
@@ -17,15 +17,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestMake_FromChunk(t *testing.T) {
+func TestMakemcptoken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAKE_API_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MAKE_API_TOKEN_INACTIVE")
+	secret := testSecrets.MustGetField("MAKE_MCP_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("MAKE_MCP_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,12 +45,12 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint us2.make.com", secret)),
+				data:   []byte(fmt.Sprintf("You can find a makemcptoken secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MakeApiToken,
+					DetectorType: detectorspb.DetectorType_MakeMcpToken,
 					Verified:     true,
 				},
 			},
@@ -62,12 +62,12 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint us2.make.com but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a makemcptoken secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MakeApiToken,
+					DetectorType: detectorspb.DetectorType_MakeMcpToken,
 					Verified:     false,
 				},
 			},
@@ -91,12 +91,12 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint us2.make.com", secret)),
+				data:   []byte(fmt.Sprintf("You can find a makemcptoken secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MakeApiToken,
+					DetectorType: detectorspb.DetectorType_MakeMcpToken,
 					Verified:     false,
 				},
 			},
@@ -108,12 +108,12 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint us2.make.com", secret)),
+				data:   []byte(fmt.Sprintf("You can find a makemcptoken secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MakeApiToken,
+					DetectorType: detectorspb.DetectorType_MakeMcpToken,
 					Verified:     false,
 				},
 			},
@@ -123,11 +123,9 @@ func TestMake_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.s.UseFoundEndpoints(true)
-
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Make.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Makemcptoken.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -138,9 +136,9 @@ func TestMake_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Make.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Makemcptoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
