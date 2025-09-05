@@ -27,7 +27,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.87.1
 	github.com/aws/aws-sdk-go-v2/service/sns v1.37.2
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.0
-	github.com/aws/smithy-go v1.22.5
+	github.com/aws/smithy-go v1.23.0
 	github.com/aymanbagabas/go-osc52 v1.2.1
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bradleyfalzon/ghinstallation/v2 v2.16.0
