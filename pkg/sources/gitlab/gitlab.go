@@ -66,9 +66,12 @@ type Source struct {
 
 	useAuthInUrl bool
 
-	clonePath       string
-	noCleanup       bool
+	clonePath string
+	noCleanup bool
+
 	printLegacyJSON bool
+
+	projectsPerPage int
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -171,6 +174,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
 	s.printLegacyJSON = conn.GetPrintLegacyJson()
+	s.projectsPerPage = int(feature.GitlabProjectsPerPage.Load())
+
+	if s.projectsPerPage > 100 {
+		return fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
+	}
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
@@ -546,10 +554,10 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	const (
-		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
-		paginationLimit = 100  // Default is 20, max is 100.
+		orderBy = "id"
 	)
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	// Trufflehog default per page 100 unless set to other value through feature flag. If 0 provided in feature flag gitlab default it to 20
+	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
 	for {
@@ -654,14 +662,13 @@ func (s *Source) getAllProjectReposV2(
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 
-	const paginationLimit = 100 // default is 20, max is 100.
-
 	// example: https://gitlab.com/gitlab-org/api/client-go/-/blob/main/examples/pagination.go#L55
 	listOpts := gitlab.ListOptions{
 		OrderBy:    "id",
 		Pagination: "keyset", // https://docs.gitlab.com/api/rest/#keyset-based-pagination
-		PerPage:    paginationLimit,
-		Sort:       "asc",
+		// Trufflehog default per page 100 unless set to other value through feature flag. If 0 provided in feature flag gitlab default it to 20
+		PerPage: s.projectsPerPage,
+		Sort:    "asc",
 	}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{
@@ -756,11 +763,10 @@ func (s *Source) getAllProjectReposInGroups(
 
 	var projectsWithNamespace []string
 	const (
-		orderBy         = "id"
-		paginationLimit = 100
+		orderBy = "id"
 	)
 
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 	projectOpts := &gitlab.ListGroupProjectsOptions{
 		ListOptions:      listOpts,
 		OrderBy:          gitlab.Ptr(orderBy),
