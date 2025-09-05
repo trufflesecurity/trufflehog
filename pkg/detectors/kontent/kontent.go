@@ -25,7 +25,7 @@ var (
 	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kontent"}) + common.BuildRegexJWT("30,34", "200,400", "40,43"))
 	envIDPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"kontent", "env"}) + common.UUIDPattern)
 
-	// API return this error when the environment does not exist or the api key does not have the persmission to access that environment
+	// API return this error when the environment does not exist or the api key does not have the permission to access that environment
 	envErr = "The specified API key does not provide the permissions required to access the environment"
 )
 

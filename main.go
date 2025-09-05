@@ -463,6 +463,7 @@ func run(state overseer.State) {
 
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
+	feature.GitlabProjectsPerPage.Store(100)
 
 	// OSS Default using github graphql api for issues, pr's and comments
 	feature.UseGithubGraphqlAPI.Store(true)
