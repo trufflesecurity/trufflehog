@@ -329,20 +329,6 @@ func (s *Source) handleGraphqlRateLimitWithChunkReporter(ctx context.Context, re
 
 // handleGraphQLRateLimit inspects the rateLimit info returned in GraphQL queries.
 func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errIn error, reporters ...errorReporter) bool {
-	// if rate limit exceeded error happened, wait for 5 minute before trying again
-	if errIn != nil && strings.Contains(errIn.Error(), "rate limit exceeded") {
-		retryAfter := 5 * time.Minute
-		ctx.Logger().Info("GraphQL RATE_LIMITED error (fallback)",
-			"retry_after", retryAfter.String())
-		time.Sleep(retryAfter)
-		return true
-	}
-
-	// if rate limit object is nil
-	if rl == nil {
-		return false
-	}
-
 	// check global resume time first (in case another worker already set it)
 	rateLimitMu.RLock()
 	resumeTime := rateLimitResumeTime
@@ -355,40 +341,50 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 		return true
 	}
 
-	// if rate limit remaining is more than 3 continue using graphql api
-	if rl.Remaining > 3 {
-		return false
-	}
+	var retryAfter time.Duration
+	// if rate limit exceeded error happened, wait for 5 minute before trying again
+	if errIn != nil && strings.Contains(errIn.Error(), "rate limit exceeded") {
+		now := time.Now()
 
-	// === only reach here if error is nil and rate limit remaining is less than 3 (safety)
+		rateLimitMu.Lock()
+		rateLimitResumeTime = now.Add(1 * time.Minute)
+		retryAfter = time.Until(rateLimitResumeTime)
+		ctx.Logger().Info("GraphQL RATE_LIMITED error (fallback)",
+			"retry_after", retryAfter.String())
+		rateLimitMu.Unlock()
+	} else if rl != nil {
+		// if rate limit remaining is more than 3 continue using graphql api
+		if rl.Remaining > 3 {
+			return false
+		}
 
-	now := time.Now()
-	retryAfter := time.Until(rl.ResetAt)
-	// never negative and enforce a sane minimum backoff (avoid thrashing with 1s/2s retries)
-	if cmp.Less(retryAfter, 5*time.Second) {
-		retryAfter = 5 * time.Second
-	}
+		// === only reach here if error is nil and rate limit remaining is less than 3 (safety)
+		now := time.Now()
+		retryAfter = time.Until(rl.ResetAt)
+		// never negative and enforce a sane minimum backoff (avoid thrashing with 1s/2s retries)
+		if cmp.Less(retryAfter, 5*time.Second) {
+			retryAfter = 5 * time.Second
+		}
 
-	jitter := time.Duration(rand.IntN(10)+1) * time.Second
-	retryAfter += jitter
+		jitter := time.Duration(rand.IntN(10)+1) * time.Second
+		retryAfter += jitter
 
-	// update global resume time
-	rateLimitMu.Lock()
-	rateLimitResumeTime = now.Add(retryAfter)
-	rateLimitMu.Unlock()
+		// update global resume time
+		rateLimitMu.Lock()
+		rateLimitResumeTime = now.Add(retryAfter)
+		ctx.Logger().Info("exceeded GraphQL rate limit",
+			"retry_after", retryAfter.String(),
+			"resume_time", rateLimitResumeTime.Format(time.RFC3339))
+		rateLimitMu.Unlock()
 
-	ctx.Logger().Info("exceeded GraphQL rate limit",
-		"retry_after", retryAfter.String(),
-		"resume_time", rateLimitResumeTime.Format(time.RFC3339))
-
-	for _, reporter := range reporters {
-		_ = reporter.Err(ctx, fmt.Errorf("exceeded GraphQL rate limit"))
+		for _, reporter := range reporters {
+			_ = reporter.Err(ctx, fmt.Errorf("exceeded GraphQL rate limit"))
+		}
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
-
 	time.Sleep(retryAfter)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
 
 	return true
 }
