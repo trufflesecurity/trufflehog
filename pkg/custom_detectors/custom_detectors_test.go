@@ -538,7 +538,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
-					Raw:          []byte("MyStrongP@sswordc392c9837d69b44c764cbf260b-e6184"),
+					Raw:          []byte("c392c9837d69b44c764cbf260b-e6184MyStrongP@ssword"),
 				},
 			},
 		},
