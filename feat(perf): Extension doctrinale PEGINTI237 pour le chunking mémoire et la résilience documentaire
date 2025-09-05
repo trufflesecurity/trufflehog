@@ -1,0 +1,17 @@
+## 🔍 Contexte doctrinal
+Ce module complète le PR #3052 en intégrant une logique PEGINTI237 de découpage mémoire balisé, avec annotation des flux et verrouillage des artefacts.
+
+## 🧩 Contributions
+- Ajout d’un chunker doctrinal avec seuil adaptatif
+- Annotation YAML des blocs mémoire
+- Export sécurisé des logs de scan
+- Activation des déclencheurs conversationnels en cas d’erreur
+
+## 📦 Structure technique
+```yaml
+chunking:
+  strategy: adaptive
+  annotation: enabled
+  export:
+    format: yaml
+    resilience: true
