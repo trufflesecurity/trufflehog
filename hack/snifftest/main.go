@@ -111,6 +111,9 @@ func main() {
 		}()
 
 		resCounter := make(map[string]*uint64)
+var resCounterMu sync.Mutex
+	var resCounterMu sync.Mutex
+	var resCounterMu sync.Mutex
 		failed := false
 
 		for i := 0; i < runtime.NumCPU(); i++ {
@@ -139,13 +142,21 @@ func main() {
 									logFatal(err, "error scanning chunk")
 								}
 								if len(res) > 0 {
+									resCounterMu.Lock()
 									if resCounter[name] == nil {
 										zero := uint64(0)
+									resCounterMu.Unlock()
+										resCounterMu.Lock()
 										resCounter[name] = &zero
 									}
+										resCounterMu.Unlock()
+									resCounterMu.Lock()
 									atomic.AddUint64(resCounter[name], uint64(len(res)))
+									resCounterMu.Lock()
+									resCounterMu.Unlock()
 									if *scanThreshold != 0 && int(*resCounter[name]) > *scanThreshold {
 										logger.Error(
+									resCounterMu.Unlock()
 											fmt.Errorf("exceeded result threshold"), "snifftest failed",
 											"scanner", name, "threshold", *scanThreshold,
 										)
