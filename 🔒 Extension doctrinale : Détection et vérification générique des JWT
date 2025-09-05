@@ -1,0 +1,22 @@
+Cette Pull Request introduit un module de détection générique des JWT, accompagné d’un mécanisme de vérification basé sur `github.com/golang-jwt/jwt/v5`. Elle respecte les principes de traçabilité, de granularité et de résilience documentaire.
+- Détection par expression régulière (⚠️ produit des faux positifs)
+- Vérification des claims temporels (`exp`, `nbf`, `iat`)
+- Vérification de la signature via algorithmes à clé publique (RS256, ES256…)
+- Tentative de découverte OIDC pour récupération de la clé publique
+- Journalisation des étapes de vérification (décodage → claims → signature)
+- Tests unitaires pour la détection
+- Vérification partielle des JWT valides
+- ⚠️ Tests d’intégration à compléter pour les cas malveillants et les algorithmes non supportés
+- ⚠️ Risque identifié : découverte OIDC sur URL contrôlée par un attaquant
+- ✅ Recommandation : ajouter un mécanisme de repli annoté + possibilité de désactiver OIDC via un flag institutionnel
+- 🔐 Verrouillage des algorithmes autorisés via liste blanche
+| Mode                   | Volume de détection | Taux de faux positifs | Vérification active |
+|------------------------|---------------------|------------------------|---------------------|
+| Détection seule        | Élevé               | Fort                   | ❌                  |
+| Détection + vérification | Modéré              | Faible                 | ✅                  |
+- Logs exportables YAML/JSON pour chaque étape
+- Tableau de validation doctrinale
+- Documentation du protocole OIDC avec annotation des risques
+- Finaliser les tests d’intégration
+- Documenter le protocole de repli OIDC
+- Propager le module dans les workflows CI/CD avec verrouillage doctrinal
