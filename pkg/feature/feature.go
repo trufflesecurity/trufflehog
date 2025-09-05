@@ -11,6 +11,7 @@ var (
 	UseSimplifiedGitlabEnumeration atomic.Bool
 	UseGitMirror                   atomic.Bool
 	GitlabProjectsPerPage          atomic.Int64
+	UseGithubGraphqlAPI            atomic.Bool // use github graphql api to fetch issues, pr's and comments
 )
 
 type AtomicString struct {
