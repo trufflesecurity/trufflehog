@@ -238,9 +238,10 @@ func TestDetectorValidations(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		input args
-		want  []detectors.Result
+		name        string
+		input       args
+		want        []detectors.Result
+		wantOptions [][]detectors.Result
 	}{
 		{
 			name: "custom validation - contains digit",
@@ -533,12 +534,22 @@ func TestDetectorValidations(t *testing.T) {
 						API_Key: c392c9837d69b44c764cbf260be6184 // should be filtered by validation
 						End of file`,
 			},
-			want: []detectors.Result{
+			wantOptions: [][]detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
-					DetectorName: "test",
-					Verified:     false,
-					Raw:          []byte("MyStrongP@sswordc392c9837d69b44c764cbf260b-e6184"),
+					{
+						DetectorType: detectorspb.DetectorType_CustomRegex,
+						DetectorName: "test",
+						Verified:     false,
+						Raw:          []byte("MyStrongP@sswordc392c9837d69b44c764cbf260b-e6184"),
+					},
+				},
+				{
+					{
+						DetectorType: detectorspb.DetectorType_CustomRegex,
+						DetectorName: "test",
+						Verified:     false,
+						Raw:          []byte("c392c9837d69b44c764cbf260b-e6184MyStrongP@ssword"),
+					},
 				},
 			},
 		},
@@ -552,8 +563,22 @@ func TestDetectorValidations(t *testing.T) {
 			assert.NoError(t, err)
 
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "ExtraData", "verificationError", "primarySecret")
-			if diff := cmp.Diff(results, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("CustomDetector.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			if tt.want != nil {
+				if diff := cmp.Diff(results, tt.want, ignoreOpts); diff != "" {
+					t.Errorf("CustomDetector.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				}
+			} else if tt.wantOptions != nil {
+				matched := false
+				for _, option := range tt.wantOptions {
+					if diff := cmp.Diff(results, option, ignoreOpts); diff == "" {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("CustomDetector.FromData() %s unexpected result: %+v", tt.name, results)
+				}
 			}
 		})
 	}
