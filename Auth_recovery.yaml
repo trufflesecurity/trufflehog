@@ -1,0 +1,8 @@
+auth:
+  method: TOTP
+  recovery_codes:
+    - xxxxxxx
+    - yyyyyyy
+    - zzzzzzz
+  last_verified: 2025-09-05
+  owner: TOMO OMBEDE BARNABÉ BERTRAND
