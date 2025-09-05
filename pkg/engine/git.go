@@ -15,17 +15,18 @@ import (
 // ScanGit scans any git source.
 func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Git{
-		Head:             c.HeadRef,
-		Base:             c.BaseRef,
-		Bare:             c.Bare,
-		Uri:              c.URI,
-		ExcludeGlobs:     c.ExcludeGlobs,
-		IncludePathsFile: c.IncludePathsFile,
-		ExcludePathsFile: c.ExcludePathsFile,
-		MaxDepth:         int64(c.MaxDepth),
-		SkipBinaries:     c.SkipBinaries,
-		ClonePath:        c.ClonePath,
-		NoCleanup:        c.NoCleanup,
+		Head:                c.HeadRef,
+		Base:                c.BaseRef,
+		Bare:                c.Bare,
+		Uri:                 c.URI,
+		ExcludeGlobs:        c.ExcludeGlobs,
+		IncludePathsFile:    c.IncludePathsFile,
+		ExcludePathsFile:    c.ExcludePathsFile,
+		MaxDepth:            int64(c.MaxDepth),
+		SkipBinaries:        c.SkipBinaries,
+		ClonePath:           c.ClonePath,
+		NoCleanup:           c.NoCleanup,
+		TrustLocalGitConfig: c.TrustLocalGitConfig,
 	}
 
 	var conn anypb.Any

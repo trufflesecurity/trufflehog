@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -161,7 +162,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	}
 
 	if uri := conn.GetUri(); uri != "" {
-		repoPath, _, err := prepareRepoSinceCommit(aCtx, uri, conn.GetClonePath(), conn.GetBase())
+		repoPath, _, err := prepareRepoSinceCommit(aCtx, uri, conn.GetClonePath(), conn.GetBase(), conn.GetTrustLocalGitConfig(), conn.GetBare())
 		if err != nil || repoPath == "" {
 			return fmt.Errorf("error preparing repo: %w", err)
 		}
@@ -345,8 +346,10 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		return fmt.Errorf("directory does not exist: %s", gitDir)
 	}
 
-	// try paths instead of url
-	repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
+	// treat mirror clones as bare
+	// what if mirror is overriden?
+	isBare := s.scanOptions.Bare || feature.UseGitMirror.Load()
+	repo, err := RepoFromPath(gitDir, isBare)
 	if err != nil {
 		return reporter.ChunkErr(ctx, err)
 	}
@@ -469,30 +472,27 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 			gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
 		}
 	}
-	// append clone argument
+
+	// Check if this was a bare clone by looking for --bare in args
+	isBareClone := slices.Contains(params.args, "--bare")
+
+	// append clone argument and options
 	gitArgs = append(gitArgs, "clone")
-	var dstGitDir string
-	if feature.UseGitMirror.Load() {
-		gitArgs = append(gitArgs,
-			"--mirror",
-		)
-		dstGitDir = filepath.Join(params.clonePath, gitDirName) // <tmp>/.git
+	if feature.UseGitMirror.Load() && cloneURL.Scheme != "file" {
+		gitArgs = append(gitArgs, "--mirror")
+		isBareClone = true
 	} else {
 		if !feature.SkipAdditionalRefs.Load() {
 			gitArgs = append(gitArgs,
 				"-c",
 				"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
 		}
-		dstGitDir = params.clonePath
 	}
 
-	gitArgs = append(gitArgs,
-		cloneURL.String(),
-		dstGitDir,
-		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
-	)
-
+	// Place standard flags and caller-provided args before repo and destination
+	gitArgs = append(gitArgs, "--quiet") // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
 	gitArgs = append(gitArgs, params.args...)
+	gitArgs = append(gitArgs, cloneURL.String(), params.clonePath)
 	cloneCmd := exec.Command("git", gitArgs...)
 
 	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
@@ -531,8 +531,8 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
-	options := &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
-	repo, err := git.PlainOpenWithOptions(params.clonePath, options)
+	// Use appropriate options based on repository type
+	repo, err := RepoFromPath(params.clonePath, isBareClone)
 	if err != nil {
 		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
@@ -653,7 +653,12 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
+	// Determine bare/non-bare by inspecting the scanOptions + the repo path instead of global mirror flag.
+	isBareForParse := scanOptions.Bare
+	if _, statErr := os.Stat(filepath.Join(path, ".git")); statErr != nil {
+		isBareForParse = true
+	}
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isBareForParse)
 	if err != nil {
 		return err
 	}
@@ -664,10 +669,16 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	logger.Info("scanning repo", logValues...)
 
 	var (
-		gitDir         = getGitDir(path, scanOptions)
+		gitDir         string
 		depth          int64
 		lastCommitHash string
 	)
+
+	if isBareForParse {
+		gitDir = path
+	} else {
+		gitDir = filepath.Join(path, gitDirName)
+	}
 
 	for diff := range diffChan {
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
@@ -1034,7 +1045,8 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		s.metrics.RecordRepoScanned(statusFailure)
 		return err
 	}
-	if !scanOptions.Bare {
+	// Skip staged scanning for mirror/bare clones
+	if !(scanOptions.Bare || feature.UseGitMirror.Load()) {
 		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter); err != nil {
 			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 		}
@@ -1185,9 +1197,9 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 }
 
 // prepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
-func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHash string) (string, bool, error) {
+func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHash string, trustLocalGitConfig bool, isBare bool) (string, bool, error) {
 	if commitHash == "" {
-		return PrepareRepo(ctx, uriString, clonePath)
+		return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 	}
 	// TODO: refactor with PrepareRepo to remove duplicated logic
 
@@ -1202,13 +1214,13 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 	}
 
 	if uri.Scheme == "file" || uri.Host != "github.com" {
-		return PrepareRepo(ctx, uriString, "")
+		return PrepareRepo(ctx, uriString, "", trustLocalGitConfig, isBare)
 	}
 
 	uriPath := strings.TrimPrefix(uri.Path, "/")
 	owner, repoName, found := strings.Cut(uriPath, "/")
 	if !found {
-		return PrepareRepo(ctx, uriString, clonePath)
+		return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 	}
 
 	client := github.NewClient(nil)
@@ -1222,13 +1234,13 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 
 	commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
 	if err != nil {
-		return PrepareRepo(ctx, uriString, clonePath)
+		return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 	}
 	var timestamp string
 	{
 		author := commit.GetAuthor()
 		if author == nil {
-			return PrepareRepo(ctx, uriString, clonePath)
+			return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 		}
 		timestamp = author.GetDate().Format(time.RFC3339)
 	}
@@ -1260,7 +1272,7 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 }
 
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
-func PrepareRepo(ctx context.Context, uriString, clonePath string) (string, bool, error) {
+func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGitConfig bool, isBare bool) (string, bool, error) {
 	var path string
 	uri, err := GitURLParse(uriString)
 	if err != nil {
@@ -1270,7 +1282,34 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string) (string, bool
 	remote := false
 	switch uri.Scheme {
 	case "file":
-		path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
+		switch {
+		case trustLocalGitConfig:
+			path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
+		default:
+			args := []string{}
+			if isBare {
+				args = append(args, "--bare")
+			}
+			path, _, err = CloneRepo(ctx, uri.User, uri.String(), clonePath, false, args...)
+			if err != nil {
+				return path, remote, fmt.Errorf("failed to clone file Git repo (%s): %s", uriString, err)
+			}
+
+			if !isBare {
+				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
+				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
+				originalIndexPath := filepath.Join(strings.TrimPrefix(uri.String(), "file://"), ".git", "index")
+				clonedIndexPath := filepath.Join(path, ".git", "index")
+
+				indexData, err := os.ReadFile(originalIndexPath)
+				if err != nil {
+					return path, remote, fmt.Errorf("failed to read index file: %w", err)
+				}
+				if err := os.WriteFile(clonedIndexPath, indexData, 0644); err != nil {
+					return path, remote, fmt.Errorf("failed to write index file: %w", err)
+				}
+			}
+		}
 	case "http", "https":
 		remotePath := uri.String()
 		remote = true

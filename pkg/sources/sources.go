@@ -284,6 +284,8 @@ type GitConfig struct {
 	ClonePath string
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup bool
+	// TrustLocalGitConfig allows to trust the local git config.
+	TrustLocalGitConfig bool
 }
 
 // GithubConfig defines the optional configuration for a github source.

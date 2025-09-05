@@ -2085,6 +2085,8 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for NoCleanup
 
+	// no validation rules for TrustLocalGitConfig
+
 	switch v := m.Credential.(type) {
 	case *Git_BasicAuth:
 		if v == nil {

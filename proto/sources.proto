@@ -224,6 +224,7 @@ message Git {
   bool skip_archives = 15;
   string clone_path = 16;
   bool no_cleanup = 17;
+  bool trust_local_git_config = 18; // Trust local git configurations
 }
 
 message GitLab {

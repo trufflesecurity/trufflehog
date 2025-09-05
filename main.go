@@ -90,20 +90,21 @@ var (
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 
-	gitScan             = cli.Command("git", "Find credentials in git repositories.")
-	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
-	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	gitScanExcludeGlobs = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
-	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
-	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
-	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
-	gitScanBare         = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
-	gitClonePath        = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
-	gitNoCleanup        = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
-	_                   = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
-	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
-	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
+	gitScan                = cli.Command("git", "Find credentials in git repositories.")
+	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
+	gitScanIncludePaths    = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	gitScanExcludePaths    = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitScanExcludeGlobs    = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
+	gitScanSinceCommit     = gitScan.Flag("since-commit", "Commit to start scan from.").String()
+	gitScanBranch          = gitScan.Flag("branch", "Branch to scan.").String()
+	gitScanMaxDepth        = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	gitScanBare            = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
+	gitClonePath           = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
+	gitNoCleanup           = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	gitTrustLocalGitConfig = gitScan.Flag("trust-local-git-config", "Trust local git config.").Bool()
+	_                      = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
+	_                      = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
+	_                      = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
 	githubScan                  = cli.Command("github", "Find credentials in GitHub repositories.")
 	githubScanEndpoint          = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
@@ -719,33 +720,23 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
-		// validate the commit for local repository only
-		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
-			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
-				ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
-			}
-		}
-
-		// clone path is only supported for HTTPS repository URLs, not for local repositories.
-		if *gitClonePath != "" && strings.HasPrefix(*gitScanURI, "file://") {
-			return scanMetrics, fmt.Errorf("invalid configuration: --clone-path cannot be used with a local repository URL")
-		}
 
 		if err := validateClonePath(*gitClonePath, *gitNoCleanup); err != nil {
 			return scanMetrics, err
 		}
 
 		gitCfg := sources.GitConfig{
-			URI:              *gitScanURI,
-			IncludePathsFile: *gitScanIncludePaths,
-			ExcludePathsFile: *gitScanExcludePaths,
-			HeadRef:          *gitScanBranch,
-			BaseRef:          *gitScanSinceCommit,
-			MaxDepth:         *gitScanMaxDepth,
-			Bare:             *gitScanBare,
-			ExcludeGlobs:     *gitScanExcludeGlobs,
-			ClonePath:        *gitClonePath,
-			NoCleanup:        *gitNoCleanup,
+			URI:                 *gitScanURI,
+			IncludePathsFile:    *gitScanIncludePaths,
+			ExcludePathsFile:    *gitScanExcludePaths,
+			HeadRef:             *gitScanBranch,
+			BaseRef:             *gitScanSinceCommit,
+			MaxDepth:            *gitScanMaxDepth,
+			Bare:                *gitScanBare,
+			ExcludeGlobs:        *gitScanExcludeGlobs,
+			ClonePath:           *gitClonePath,
+			NoCleanup:           *gitNoCleanup,
+			TrustLocalGitConfig: *gitTrustLocalGitConfig,
 		}
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)

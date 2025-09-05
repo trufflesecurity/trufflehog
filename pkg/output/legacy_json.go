@@ -38,7 +38,7 @@ func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMe
 	}
 
 	// cloning the repo again here is not great and only works with unauthed repos
-	repoPath, remote, err := git.PrepareRepo(ctx, repo, "")
+	repoPath, remote, err := git.PrepareRepo(ctx, repo, "", true, false)
 	if err != nil || repoPath == "" {
 		return fmt.Errorf("error preparing git repo for scanning: %w", err)
 	}
