@@ -280,6 +280,12 @@ type GitConfig struct {
 	ExcludeGlobs string
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
+	// ClonePath is the local path used to clone repositories before scanning.
+	ClonePath string
+	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
+	NoCleanup bool
+	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
+	PrintLegacyJSON bool
 }
 
 // GithubConfig defines the optional configuration for a github source.
@@ -318,6 +324,13 @@ type GithubConfig struct {
 	CommentsTimeframeDays uint32
 	// AuthInUrl determines wether to use authentication token in repository url or in header.
 	AuthInUrl bool
+	// ClonePath is the local path used to clone repositories before scanning.
+	ClonePath string
+	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
+	NoCleanup   bool
+	IgnoreGists bool
+	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
+	PrintLegacyJSON bool
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
@@ -354,6 +367,12 @@ type GitlabConfig struct {
 	ExcludeRepos []string
 	// AuthInUrl determines wether to use authentication token in repository url or in header.
 	AuthInUrl bool
+	// ClonePath is the local path used to clone repositories before scanning
+	ClonePath string
+	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
+	NoCleanup bool
+	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
+	PrintLegacyJSON bool
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.

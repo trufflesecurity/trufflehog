@@ -99,6 +99,8 @@ var (
 	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	gitScanBare         = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
+	gitClonePath        = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
+	gitNoCleanup        = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	_                   = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
@@ -120,6 +122,9 @@ var (
 	githubScanGistComments      = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 	githubCommentsTimeframeDays = githubScan.Flag("comments-timeframe", "Number of days in the past to review when scanning issue, PR, and gist comments.").Uint32()
 	githubAuthInUrl             = githubScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
+	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
+	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -142,6 +147,8 @@ var (
 	gitlabScanIncludeRepos = gitlabScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
 	gitlabScanExcludeRepos = gitlabScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	gitlabAuthInUrl        = gitlabScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
+	gitlabClonePath        = gitlabScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir)").String()
+	gitlabNoCleanup        = gitlabScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 
 	filesystemScan  = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemPaths = filesystemScan.Arg("path", "Path to file or directory to scan.").Strings()
@@ -456,6 +463,7 @@ func run(state overseer.State) {
 
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
+	feature.GitlabProjectsPerPage.Store(100)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -702,21 +710,45 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 	eng.Start(ctx)
 
+	persistGitRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
+	gitCloneTempPath := ""
+
 	defer func() {
 		// Clean up temporary artifacts.
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 			ctx.Logger().Error(err, "error cleaning temp artifacts")
+		}
+
+		if *jsonLegacy {
+			// If JSON legacy is enabled, that means the cloned repos are not deleted yet
+			// because they were needed for outputting legacy JSON.
+			// We only clean them up here if the user did not request to persist them.
+			if !persistGitRepo {
+				if err := cleantemp.CleanTempDirsForLegacyJSON(gitCloneTempPath); err != nil {
+					ctx.Logger().Error(err, "error cleaning temp artifacts for legacy JSON")
+				}
+			}
 		}
 	}()
 
 	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
+		gitCloneTempPath = *gitClonePath
 		// validate the commit for local repository only
 		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
 			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
 				ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
 			}
+		}
+
+		// clone path is only supported for HTTPS repository URLs, not for local repositories.
+		if *gitClonePath != "" && strings.HasPrefix(*gitScanURI, "file://") {
+			return scanMetrics, fmt.Errorf("invalid configuration: --clone-path cannot be used with a local repository URL")
+		}
+
+		if err := validateClonePath(*gitClonePath, *gitNoCleanup); err != nil {
+			return scanMetrics, err
 		}
 
 		gitCfg := sources.GitConfig{
@@ -728,6 +760,9 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			MaxDepth:         *gitScanMaxDepth,
 			Bare:             *gitScanBare,
 			ExcludeGlobs:     *gitScanExcludeGlobs,
+			ClonePath:        *gitClonePath,
+			NoCleanup:        *gitNoCleanup,
+			PrintLegacyJSON:  *jsonLegacy,
 		}
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
@@ -735,6 +770,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case githubScan.FullCommand():
+		gitCloneTempPath = *githubClonePath
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -744,6 +780,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if len(*githubScanOrgs) > 0 && len(*githubScanRepos) > 0 {
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories at the same time")
+		}
+
+		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {
+			return scanMetrics, err
 		}
 
 		cfg := sources.GithubConfig{
@@ -763,7 +803,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CommentsTimeframeDays:      *githubCommentsTimeframeDays,
 			Filter:                     filter,
 			AuthInUrl:                  *githubAuthInUrl,
+			ClonePath:                  *githubClonePath,
+			NoCleanup:                  *githubNoCleanup,
+			IgnoreGists:                *githubIgnoreGists,
+			PrintLegacyJSON:            *jsonLegacy,
 		}
+
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
 		} else {
@@ -783,6 +828,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case gitlabScan.FullCommand():
+		gitCloneTempPath = *gitlabClonePath
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -792,16 +838,24 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both repositories and groups at the same time")
 		}
 
-		cfg := sources.GitlabConfig{
-			Endpoint:     *gitlabScanEndpoint,
-			Token:        *gitlabScanToken,
-			Repos:        *gitlabScanRepos,
-			GroupIds:     *gitlabScanGroupIds,
-			IncludeRepos: *gitlabScanIncludeRepos,
-			ExcludeRepos: *gitlabScanExcludeRepos,
-			Filter:       filter,
-			AuthInUrl:    *gitlabAuthInUrl,
+		if err := validateClonePath(*gitlabClonePath, *gitlabNoCleanup); err != nil {
+			return scanMetrics, err
 		}
+
+		cfg := sources.GitlabConfig{
+			Endpoint:        *gitlabScanEndpoint,
+			Token:           *gitlabScanToken,
+			Repos:           *gitlabScanRepos,
+			GroupIds:        *gitlabScanGroupIds,
+			IncludeRepos:    *gitlabScanIncludeRepos,
+			ExcludeRepos:    *gitlabScanExcludeRepos,
+			Filter:          filter,
+			AuthInUrl:       *gitlabAuthInUrl,
+			ClonePath:       *gitlabClonePath,
+			NoCleanup:       *gitlabNoCleanup,
+			PrintLegacyJSON: *jsonLegacy,
+		}
+
 		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
 		} else {
@@ -1119,4 +1173,32 @@ func isValidCommit(uri, commit string) bool {
 	}
 
 	return strings.TrimSpace(string(output)) == "commit"
+}
+
+// validateClonePath ensures that --clone-path, if provided, exists and is a directory.
+// It also verifies that --no-cleanup is only allowed when --clone-path is set.
+// Note: without a custom clone path, repositories are cloned into temporary directories, which should never be retained.
+func validateClonePath(clonePath string, noCleanup bool) error {
+	if noCleanup && clonePath == "" {
+		return fmt.Errorf("invalid configuration: --no-cleanup can only be used together with --clone-path")
+	}
+
+	if clonePath == "" {
+		return nil
+	}
+
+	info, err := os.Stat(clonePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("path provided to --clone-path: %q does not exist", clonePath)
+		}
+
+		return fmt.Errorf("failed to access --clone-path %q: %w", clonePath, err)
+	}
+
+	if !info.IsDir() {
+		return fmt.Errorf("path provided to --clone-path: %q is not a directory", clonePath)
+	}
+
+	return nil
 }

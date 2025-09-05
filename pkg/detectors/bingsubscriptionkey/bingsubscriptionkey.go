@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, subscriptionKey string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.bing.microsoft.com/v7.0/search?q=trufflehog", nil)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	req.Header.Add("Ocp-Apim-Subscription-Key", subscriptionKey)

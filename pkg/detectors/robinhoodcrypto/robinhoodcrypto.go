@@ -114,7 +114,7 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, base64Private
 
 	req, err := http.NewRequestWithContext(ctx, method, "https://trading.robinhood.com/"+path, strings.NewReader(body))
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	// Set the required headers.
