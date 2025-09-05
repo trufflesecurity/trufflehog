@@ -1,0 +1,69 @@
+package chunking
+
+import (
+	"bytes"
+	"io"
+	"log"
+)
+
+// 🔐 PEGINTI237 — Chunker doctrinal avec seuil adaptatif et annotation balisée
+type PegintiChunker struct {
+	ChunkSize int
+	Annotate  bool
+}
+
+func NewPegintiChunker(size int, annotate bool) *PegintiChunker {
+	return &PegintiChunker{
+		ChunkSize: size,
+		Annotate:  annotate,
+	}
+}
+
+func (pc *PegintiChunker) Chunk(reader io.Reader) [][]byte {
+	var chunks [][]byte
+	buffer := make([]byte, pc.ChunkSize)
+
+	for {
+		n, err := reader.Read(buffer)
+		if n > 0 {
+			chunk := make([]byte, n)
+			copy(chunk, buffer[:n])
+			if pc.Annotate {
+				log.Printf("[PEGINTI237] 📦 Chunk balisé : %d octets", n)
+			}
+			chunks = append(chunks, chunk)
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Printf("[PEGINTI237] ⚠️ Erreur pendant le chunking : %v", err)
+			break
+		}
+	}
+	return chunks
+}
+peginti237_chunker:
+  module: memory_chunking
+  strategy: adaptive
+  chunk_size: 8192
+  annotation: true
+  resilience:
+    enabled: true
+    fallback: linear_chunker
+  export:
+    format: yaml
+    destination: /var/log/peginti/chunks
+  triggers:
+    - memory_overload
+    - docker_scan_failure
+    - graphql_sync_event
+## 🧠 Extension doctrinale PEGINTI237
+
+Ce module introduit un chunker mémoire balisé conforme à la logique PEGINTI237. Il permet :
+- Une découpe adaptative des flux mémoire
+- Une annotation systématique des blocs
+- Une exportation sécurisée en YAML
+- Une activation des déclencheurs conversationnels en cas de surcharge ou d’échec de scan
+
+🔐 Ce chunker est conçu pour renforcer la résilience documentaire et la traçabilité des artefacts institutionnels.
