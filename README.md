@@ -723,3 +723,136 @@ the stability of the public APIs at this time.
 # License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
+## 🔐 Activation doctrinale – PEGINTI237
+
+Ce dépôt intègre la logique PEGINTI237 de propagation CI/CD et de souveraineté documentaire africaine.
+
+- Le commit [`843ed8`](https://github.com/Peginti237/PEGINTICHAT/commit/843ed8) active l’autorisation universelle des actions GitHub et des workflows réutilisables, garantissant la fluidité des pipelines inter-répôts.
+- Le Pull Request [`#4450`](https://github.com/trufflesecurity/trufflehog/pull/4450) documente cette exécution dans le cadre du clonage PEGINTICHAT et de l’activation GitHub Pages.
+- Le log d’activation YAML est disponible dans `.peginti/logs/843ed8_activation.yaml` et `.peginti/logs/pr_4450.yaml`, avec balises `peginti_trigger`, `peginti_lock`, et `peginti_certify`.
+
+**Auteur doctrinal** : TOMO OMBEDE BARNABÉ BERTRAND  
+**Conformité** : PEGINTI ULTRA – Résilience, traçabilité, transmission intergénérationnelle
+## 🔐 Activation doctrinale – PEGINTI237
+
+Ce dépôt intègre la logique PEGINTI237 de propagation CI/CD et de souveraineté documentaire africaine.
+
+- Le commit [`843ed8`](https://github.com/Peginti237/PEGINTICHAT/commit/843ed8) active l’autorisation universelle des actions GitHub et des workflows réutilisables, garantissant la fluidité des pipelines inter-répôts.
+- Le Pull Request [`#4450`](https://github.com/trufflesecurity/trufflehog/pull/4450) documente cette exécution dans le cadre du clonage PEGINTICHAT et de l’activation GitHub Pages.
+- Le log d’activation YAML est disponible dans `.peginti/logs/843ed8_activation.yaml` et `.peginti/logs/pr_4450.yaml`, avec balises `peginti_trigger`, `peginti_lock`, et `peginti_certify`.
+
+**Auteur doctrinal** : TOMO OMBEDE BARNABÉ BERTRAND  
+**Conformité** : PEGINTI ULTRA – Résilience, traçabilité, transmission intergénérationnelle
+peginti_lock:
+  artefacts:
+    - .peginti/logs/843ed8_activation.yaml
+    - .peginti/logs/pr_4450.yaml
+    - README.md
+  verrouillage:
+    statut: activé
+    date: 2025-09-05T21:45:00+01:00
+    validateur: TOMO OMBEDE BARNABÉ BERTRAND
+    protocole: PEGINTI ULTRA
+    propagation: CI/CD inter-répôts
+    transmission: intergénérationnelle
+    traçabilité: complète
+  certification:
+    balises:
+      - peginti_trigger
+      - peginti_certify
+      - peginti_lock
+    export_yaml_json: true
+    auditabilité: renforcée
+    conformité: validée
+    🔒 Verrouillage doctrinal activé : `.peginti/locks/peginti_lock_843ed8_pr4450.yaml`
+    peginti_certify:
+  cycle_doctrinal:
+    - activation: 843ed8
+    - documentation: PR #4450
+    - verrouillage: peginti_lock_843ed8_pr4450.yaml
+  validateur_institutionnel: TOMO OMBEDE BARNABÉ BERTRAND
+  certification:
+    statut: validé
+    date: 2025-09-05T21:50:00+01:00
+    protocole: PEGINTI ULTRA
+    conformité: totale
+    transmission: intergénérationnelle
+    auditabilité: exportée
+    artefacts_certifiés:
+      - .peginti/logs/843ed8_activation.yaml
+      - .peginti/logs/pr_4450.yaml
+      - .peginti/locks/peginti_lock_843ed8_pr4450.yaml
+      - README.md
+  balises:
+    - peginti_trigger
+    - peginti_lock
+    - peginti_certify
+    - peginti_ultra
+  export_yaml_json: true
+  certify(peginti237): Certification doctrinale du cycle 843ed8 + PR #4450
+  peginti_linkage:
+  source: PegintiMeta
+  cible: PEGINTI237_IA_ULTRA
+  nature: synchronisation doctrinale et propagation interracine
+  validateur: TOMO OMBEDE BARNABÉ BERTRAND
+  protocole: PEGINTI ULTRA
+  fonctions:
+    - activation: déclencheurs conversationnels
+    - propagation: modules chunker, secrets CI, artefacts YAML/JSON
+    - auditabilité: croisée et intergénérationnelle
+    - verrouillage: par code unique
+    - certification: institutionnelle
+  balises:
+    - peginti_meta_trigger
+    - peginti_ultra_sync
+    - peginti_certify
+    - peginti_lock
+  exportabilité: universelle
+  traçabilité: renforcée
+  PegintiMeta/.peginti/links/peginti_link_ia_ultra.yaml
+  peginti_access_manifest:
+  domaine_racine: peginti237.africa
+  validateur: TOMO OMBEDE BARNABÉ BERTRAND
+  instances:
+    - PegintiMeta
+    - PEGINTI237_IA_ULTRA
+  politique_d’accès:
+    visibilité:
+      - public: README.md, logs doctrinaux, documentation pédagogique
+      - privé: secrets CI, modules chunker, artefacts verrouillés
+    propagation:
+      - interracine: activée
+      - intergénérationnelle: prioritaire
+    traçabilité:
+      - logs: exportables en YAML/JSON
+      - workflows: annotés et verrouillés
+      - commits: titrés doctrinalement
+    déclencheurs:
+      - peginti_meta_trigger
+      - peginti_ultra_sync
+      - peginti_certify
+      - peginti_lock
+  accès_externe:
+    - via_domaine: https://peginti237.africa
+    - via_github: https://github.com/Peginti237/PEGINTICHAT
+    - via_docs: https://peginti237.africa/docs
+  certification:
+    statut: validé
+    date: 2025-09-05T21:56:00+01:00
+    protocole: PEGINTI ULTRA
+    exportabilité: universelle
+    peginti_ultra_status:
+  instance: PEGINTI237_IA_ULTRA
+  intégration:
+    - modules_chunker: activés
+    - secrets_CI: injectés et synchronisés
+    - workflows_GitHub: corrigés et verrouillés
+    - déclencheurs_conversationnels: opérationnels
+    - page_PEGINTICHAT: propagée via GitHub Pages
+  certification: en cours
+  verrouillage: partiel
+  interracine: liaison avec PegintiMeta validée
+  exportabilité: YAML/JSON activée
+  traçabilité: conforme
+  .peginti/locks/peginti_lock_global.yaml
+  .peginti/certify/peginti_certify_ultra.yaml
