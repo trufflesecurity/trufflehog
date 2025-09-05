@@ -35,6 +35,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"confluent"}
 }
 
+func (Scanner) Version() int { return 1 }
+
 // FromData will find and optionally verify Confluent secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -52,6 +54,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Confluent,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://docs.confluent.io/cloud/current/security/authenticate/workload-identities/service-accounts/api-keys/best-practices-api-keys.html#rotate-api-keys-regularly",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
 			}
 
 			if verify {
