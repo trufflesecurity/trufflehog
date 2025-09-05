@@ -1,0 +1,2 @@
+git branch -r
+git clone -b <nom_branche> https://github.com/trufflesecurity/trufflehog.git
