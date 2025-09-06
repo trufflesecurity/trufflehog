@@ -676,18 +676,29 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		lastCommitHash string
 	)
 
-	for diff := range diffChan {
-		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-			logger.V(1).Info("reached max depth", "depth", depth)
-			break
-		}
+        // Track when we've reached the base hash so we can
+        // include it in the scan, then stop on the next commit.
+        reachedBase := false
+        for diff := range diffChan {
+            if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+                logger.V(1).Info("reached max depth", "depth", depth)
+                break
+            }
 
-		commit := diff.Commit
-		fullHash := commit.Hash
-		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
-			logger.V(1).Info("reached base commit", "commit", fullHash)
-			break
-		}
+            commit := diff.Commit
+            fullHash := commit.Hash
+
+            // If we've already processed the base commit, stop when the commit changes.
+            if reachedBase && fullHash != scanOptions.BaseHash {
+                break
+            }
+
+            if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
+                // Align behavior with staged scanning: include the base commit,
+                // and stop after finishing its files.
+                logger.V(1).Info("reached base hash, finishing scanning files")
+                reachedBase = true
+            }
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
