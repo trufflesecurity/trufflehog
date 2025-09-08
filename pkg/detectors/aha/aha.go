@@ -34,6 +34,14 @@ func (s Scanner) Keywords() []string {
 	return []string{"aha.io"}
 }
 
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Aha
+}
+
+func (s Scanner) Description() string {
+	return "Aha is a product management software suite. Aha API keys can be used to access and modify product data and workflows."
+}
+
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
 		return s.client
@@ -44,30 +52,39 @@ func (s Scanner) getClient() *http.Client {
 // FromData will find and optionally verify Aha secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	URLmatches := URLPat.FindAllStringSubmatch(dataStr, -1)
 
-	resURLMatch := "aha.io"
-	for _, URLmatch := range URLmatches {
-		resURLMatch = strings.TrimSpace(URLmatch[1])
+	var uniqueFoundUrls = make(map[string]struct{})
+
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+
+	for _, match := range URLPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueFoundUrls[match[1]] = struct{}{}
+	}
+
+	// if no url was found use the default
+	if len(uniqueFoundUrls) == 0 {
+		uniqueFoundUrls["aha.io"] = struct{}{}
 	}
 
 	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+		for url := range uniqueFoundUrls {
+			resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Aha,
-			Raw:          []byte(resMatch),
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Aha,
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + url),
+			}
+
+			if verify {
+				client := s.getClient()
+				isVerified, verificationErr := verifyAha(ctx, client, resMatch, url)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
+			}
+
+			results = append(results, s1)
 		}
-
-		if verify {
-			client := s.getClient()
-			isVerified, verificationErr := verifyAha(ctx, client, resMatch, resURLMatch)
-			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, resMatch)
-		}
-
-		results = append(results, s1)
 	}
 
 	return results, nil
@@ -97,12 +114,4 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-}
-
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Aha
-}
-
-func (s Scanner) Description() string {
-	return "Aha is a product management software suite. Aha API keys can be used to access and modify product data and workflows."
 }

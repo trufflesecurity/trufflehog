@@ -3,7 +3,12 @@ package gcp
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -118,6 +123,31 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			},
 		}
 
+		// Populate private_key_id by matching the private key to certificates from the x509 endpoint.
+		// Only do this when verification is enabled to avoid network calls during fast scans/tests.
+		// Falls back to the value present in the found data when fetching fails or is disabled.
+		var privateKeyID string
+		if verify && creds.PrivateKey != "" {
+			certsURL := strings.TrimSpace(creds.ClientX509CertURL)
+			if certsURL == "" && creds.ClientEmail != "" {
+				certsURL = "https://www.googleapis.com/robot/v1/metadata/x509/" + url.PathEscape(creds.ClientEmail)
+			}
+			if certsURL != "" {
+				if matchedKID, err := findMatchingCertificateKID(ctx, certsURL, creds.PrivateKey); err == nil && matchedKID != "" {
+					privateKeyID = matchedKID
+				}
+			}
+		}
+		if privateKeyID == "" {
+			privateKeyID = creds.PrivateKeyID
+		}
+		if result.ExtraData == nil {
+			result.ExtraData = map[string]string{}
+		}
+		if privateKeyID != "" {
+			result.ExtraData["private_key_id"] = privateKeyID
+		}
+
 		if creds.Type != "" {
 			result.AnalysisInfo["type"] = creds.Type
 		}
@@ -147,6 +177,103 @@ func verifyMatch(ctx context.Context, credBytes []byte) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// findMatchingCertificateKID fetches certificates from the x509 endpoint and finds the one
+// that matches the public key derived from the given private key.
+func findMatchingCertificateKID(ctx context.Context, certsURL, privateKeyPEM string) (string, error) {
+	// Extract public key from private key
+	privateKey, err := parsePrivateKey(privateKeyPEM)
+	if err != nil {
+		return "", err
+	}
+
+	publicKey, ok := privateKey.(*rsa.PrivateKey)
+	if !ok {
+		return "", nil // Only RSA keys supported for now
+	}
+
+	// Fetch certificates from endpoint
+	kidToCert, err := fetchServiceAccountCerts(ctx, certsURL)
+	if err != nil {
+		return "", err
+	}
+
+	// Compare public keys to find matching certificate
+	for kid, certPEM := range kidToCert {
+		cert, err := parseCertificate(certPEM)
+		if err != nil {
+			continue
+		}
+
+		certPublicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			continue
+		}
+
+		// Compare RSA public keys
+		if publicKey.PublicKey.N.Cmp(certPublicKey.N) == 0 && publicKey.PublicKey.E == certPublicKey.E {
+			return kid, nil
+		}
+	}
+
+	return "", nil // No matching certificate found
+}
+
+// fetchServiceAccountCerts fetches the service account x509 certificates JSON.
+// Returns a map of kid -> PEM certificate string.
+func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, certsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil
+	}
+
+	var kidToCert map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&kidToCert); err != nil {
+		return nil, err
+	}
+
+	return kidToCert, nil
+}
+
+// parsePrivateKey parses a PEM-encoded private key
+func parsePrivateKey(privateKeyPEM string) (interface{}, error) {
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil {
+		return nil, nil
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		// Try PKCS1 if PKCS8 fails
+		key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return key, nil
+}
+
+// parseCertificate parses a PEM-encoded certificate
+func parseCertificate(certPEM string) (*x509.Certificate, error) {
+	block, _ := pem.Decode([]byte(certPEM))
+	if block == nil {
+		return nil, nil
+	}
+
+	return x509.ParseCertificate(block.Bytes)
 }
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {

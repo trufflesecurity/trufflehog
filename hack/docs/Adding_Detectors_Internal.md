@@ -57,7 +57,7 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
 
 3. Add a 'version' field in ExtraData for both existing and new detector versions.
 
-4. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults.go`
+4. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults/defaults.go`
 
 5. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
 
@@ -87,7 +87,7 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
       4. Found and unverified (indeterminately due to an unexpected API response)
       5. Not found
       6. Any false positive cases that you come across
-   5. Add your new detector to DefaultDetectors in `/pkg/engine/defaults.go`
+   5. Add your new detector to DefaultDetectors in `/pkg/engine/defaults/defaults.go`
    6. Create a merge request for review. CI tests must be passing.
 
 ## Addendum

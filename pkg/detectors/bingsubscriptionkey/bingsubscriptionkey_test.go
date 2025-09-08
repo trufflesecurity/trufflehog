@@ -2,10 +2,13 @@ package bingsubscriptionkey
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
 
 func TestBingsubscriptionkey_Pattern(t *testing.T) {
@@ -17,20 +20,66 @@ func TestBingsubscriptionkey_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "bing_subscription_key=89017d414ed64edb9c776d4a52102b9a",
-			want:  []string{"89017d414ed64edb9c776d4a52102b9a"},
+			name: "valid pattern",
+			input: `
+					func main() {
+						url := "https://api.example.net/v2/api"
+
+						// Create a new request with the secret as a header
+						req, err := http.NewRequest("GET", url, http.NoBody)
+						if err != nil {
+							fmt.Println("Error creating request:", err)
+							return
+						}
+						
+						// set bing subscription key
+						bingKey := "89017d414ed64edb9c776d4a52102b9a"
+						req.Header.Set("Ocp-Apim-Subscription-Key", bingKey)
+
+						// Perform the request
+						client := &http.Client{}
+						resp, _ := client.Do(req)
+						defer resp.Body.Close()
+					}`,
+			want: []string{"89017d414ed64edb9c776d4a52102b9a"},
 		},
 		{
-			name: "finds all matches",
-			input: `bing_subscription_key1=89017d414ed64edb9c776d4a52102b9b'
-bing_subscription_key2=89017d414ed64edb9c776d4a52102b9c`,
-			want: []string{"89017d414ed64edb9c776d4a52102b9b", "89017d414ed64edb9c776d4a52102b9c"},
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{bing}</id>
+  					<secret>{bing AQAAABAAA dB963b030A1DafB02d8299F04A00a306}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"dB963b030A1DafB02d8299F04A00a306"},
 		},
 		{
-			name:  "invalid pattern",
-			input: "bing_subscription_key=89017d414ed64edb9c776d4a52102b9",
-			want:  []string{},
+			name: "invalid pattern",
+			input: `
+					func main() {
+						url := "https://api.example.net/v2/api"
+
+						// Create a new request with the secret as a header
+						req, err := http.NewRequest("GET", url, http.NoBody)
+						if err != nil {
+							fmt.Println("Error creating request:", err)
+							return
+						}
+						
+						// set bing subscription key
+						bingKey := "89017d414ed64edb9c776d4J52102b9"
+						req.Header.Set("Ocp-Apim-Subscription-Key", bingKey)
+
+						// Perform the request
+						client := &http.Client{}
+						resp, _ := client.Do(req)
+						defer resp.Body.Close()
+					}`,
+			want: []string{},
 		},
 	}
 
@@ -38,22 +87,15 @@ bing_subscription_key2=89017d414ed64edb9c776d4a52102b9c`,
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -65,6 +107,7 @@ bing_subscription_key2=89017d414ed64edb9c776d4a52102b9c`,
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

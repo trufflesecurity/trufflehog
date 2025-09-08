@@ -46,6 +46,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 		connection.Repositories = c.Repos
 	}
 
+	if len(c.GroupIds) > 0 {
+		connection.GroupIds = c.GroupIds
+	}
+
 	if len(c.IncludeRepos) > 0 {
 		connection.IncludeRepos = c.IncludeRepos
 	}
@@ -53,6 +57,14 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 	if len(c.ExcludeRepos) > 0 {
 		connection.IgnoreRepos = c.ExcludeRepos
 	}
+
+	if c.ClonePath != "" {
+		connection.ClonePath = c.ClonePath
+	}
+
+	connection.NoCleanup = c.NoCleanup
+
+	connection.PrintLegacyJson = c.PrintLegacyJSON
 
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})

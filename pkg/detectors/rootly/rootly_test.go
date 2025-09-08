@@ -1,4 +1,4 @@
-package dotmailer
+package rootly
 
 import (
 	"context"
@@ -10,35 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			auth_type: "Basic"
-			in: "Path"
-			api_version: v1
-			dotmailer_key: "apiuser-trq6zw9mmdlt@apiconnector@com"
-			dotmailer_secret: "N{w44mqa'2si(zY8"
-			base_url: "https://api.example.com/$api_version/example"
-			response_code: 200
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secrets = []string{
-		"apiuser-trq6zw9mmdlt@apiconnector@comN{w44mqa'2si(zY8",
-		"apiuser-trq6zw9mmdlt@apiconnector@comapiuser-trq6zw9mmdlt@",
-	}
-)
-
-func TestDotMailer_Pattern(t *testing.T) {
+func TestRootly_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -49,8 +21,18 @@ func TestDotMailer_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: validPattern,
-			want:  secrets,
+			input: "rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
+		},
+		{
+			name:  "valid pattern - key out of prefix range",
+			input: "rootly keyword is not close to the real key in the data ='rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282'",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
+		},
+		{
+			name:  "invalid pattern",
+			input: "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+			want:  nil,
 		},
 	}
 

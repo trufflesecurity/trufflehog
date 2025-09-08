@@ -2,18 +2,13 @@ package airvisual
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "qscgyygcsq-wdvvok7slklklaasnd8afafxd"
-	invalidPattern = "wdvvok7slklklaasnd8afafxd"
 )
 
 func TestAirVisual_Pattern(t *testing.T) {
@@ -26,19 +21,46 @@ func TestAirVisual_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("airvisual = '%s'", validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the airvisual API
+				[DEBUG] Using Key=qscgyygcsq-wdvvok7slklklaasnd8afafxd
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"qscgyygcsq-wdvvok7slklklaasnd8afafxd"},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("airvisual keyword is not close to the real key and secret = '%s'", validPattern),
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{airvisual}</id>
+  					<secret>{airvisual AQAAABAAA rtcbsxiee3d5au8ik14g-8iqrsu8thl1pku8}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"rtcbsxiee3d5au8ik14g-8iqrsu8thl1pku8"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("airvisual key: '%s'", invalidPattern),
-			want:  nil,
+			name: "valid pattern - key out of prefix range",
+			input: `
+				[DEBUG] airvisual api processing
+				[INFO] Sending request to the API
+				[DEBUG] Using Key=qscgyygcsq-wdvvok7slklklaasnd8afafxd
+				[INFO] Response received: 200 OK
+			`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the airvisual API
+				[DEBUG] Using Key=wdvvok7slklklaasnd8afafxd
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: nil,
 		},
 	}
 
@@ -46,22 +68,15 @@ func TestAirVisual_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -73,6 +88,7 @@ func TestAirVisual_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

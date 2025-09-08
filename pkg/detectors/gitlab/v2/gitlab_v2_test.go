@@ -10,26 +10,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `[{
-		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
-		"name": "Gitlab",
-		"type": "Detector",
-		"api": true,
-		"authentication_type": "",
-		"verification_url": "https://api.example.com/example",
-		"test_secrets": {
-			"gitlab_secret": "glpat-W6fYSu70dPEo5w_SwbHWgQ"
-		},
-		"expected_response": "200",
-		"method": "GET",
-		"deprecated": false
-	}]`
-	secret = "glpat-W6fYSu70dPEo5w_SwbHWgQ"
-)
-
 func TestGitLab_Pattern(t *testing.T) {
 	d := Scanner{}
+	d.SetCloudEndpoint("https://gitlab.com")
+	d.UseCloudEndpoint(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
 	tests := []struct {
@@ -38,9 +22,22 @@ func TestGitLab_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name: "valid pattern",
+			input: `[{
+					"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
+					"name": "Gitlab",
+					"type": "Detector",
+					"api": true,
+					"authentication_type": "",
+					"verification_url": "https://api.example.com/example",
+					"test_secrets": {
+						"gitlab_secret": "glpat-W6fYSu70dPEo5w_SwbHWgQ"
+					},
+					"expected_response": "200",
+					"method": "GET",
+					"deprecated": false
+				}]`,
+			want: []string{"glpat-W6fYSu70dPEo5w_SwbHWgQhttps://gitlab.com"},
 		},
 	}
 

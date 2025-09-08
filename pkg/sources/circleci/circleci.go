@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync/atomic"
 
 	"github.com/go-errors/errors"
@@ -23,7 +26,9 @@ import (
 const (
 	SourceType = sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
 
-	baseURL = "https://circleci.com/api/v1.1/"
+	// CircleCI has released API v2, but we're continuing to use v1.1
+	// Because v1.1 still supports listing endpoints and remains officially supported.
+	baseURL = "https://circleci.com/api/v1.1"
 )
 
 type Source struct {
@@ -36,6 +41,32 @@ type Source struct {
 	sources.Progress
 	client *http.Client
 	sources.CommonSourceUnitUnmarshaller
+}
+
+// CircleCI API Response types
+type project struct {
+	VCS      string `json:"vcs_type"`
+	Username string `json:"username"`
+	Reponame string `json:"reponame"`
+	VcsUrl   string `json:"vcs_url"`
+}
+
+type BuildNum int
+
+type buildJobs struct {
+	CircleYaml struct {
+		YamlString string `json:"string"`
+	} `json:"circle_yml"`
+	Steps []buildStep `json:"steps"`
+}
+
+type buildStep struct {
+	Name    string   `json:"name"`
+	Actions []action `json:"actions"`
+}
+
+type action struct {
+	OutputUrl string `json:"output_url"`
 }
 
 // Ensure the Source satisfies the interfaces at compile time.
@@ -82,162 +113,249 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	projects, err := s.projects(ctx)
+	// TODO: list Artifacts, list checkout-keys, list env-variables
+
+	projects, err := s.listAllProjects(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting projects: %w", err)
 	}
 
-	var scanned uint64
-	scanErrs := sources.NewScanErrors()
+	var countOfProjectsScanned atomic.Uint64
+	var errors []error
 
-	for _, proj := range projects {
+	for _, project := range projects {
+		ctx = context.WithValues(ctx,
+			"repository_name", project.Reponame,
+		)
+
 		s.jobPool.Go(func() error {
-			builds, err := s.buildsForProject(ctx, proj)
+			projectBuilds, err := s.listProjectBuilds(ctx, &project)
 			if err != nil {
-				scanErrs.Add(fmt.Errorf("error getting builds for project %s: %w", proj.RepoName, err))
+				ctx.Logger().Error(err, "error getting builds for project")
+				errors = append(errors, err)
+
 				return nil
 			}
 
-			for _, bld := range builds {
-				buildSteps, err := s.stepsForBuild(ctx, proj, bld)
+			for _, buildNum := range projectBuilds {
+				ctx = context.WithValues(ctx,
+					"build_number", buildNum,
+				)
+
+				projBuildJobs, err := s.listProjBuildJobs(ctx, &project, buildNum)
 				if err != nil {
-					scanErrs.Add(fmt.Errorf("error getting steps for build %d: %w", bld.BuildNum, err))
-					return nil
+					ctx.Logger().Error(err, "error getting steps for build")
+					errors = append(errors, err)
+
+					continue
 				}
 
-				for _, step := range buildSteps {
+				for _, step := range projBuildJobs.Steps {
 					for _, action := range step.Actions {
-						if err = s.chunkAction(ctx, proj, bld, action, step.Name, chunksChan); err != nil {
-							scanErrs.Add(fmt.Errorf("error chunking action %v: %w", action, err))
-							return nil
+						data, err := s.getOutputUrlResponse(action.OutputUrl)
+						if err != nil {
+							ctx.Logger().Error(err, "error getting action output url response")
+							errors = append(errors, err)
+
+							continue
+						}
+
+						if err = s.chunk(ctx, project, buildNum, step.Name, data, chunksChan); err != nil {
+							ctx.Logger().Error(err, "error chunking action")
+							errors = append(errors, err)
+
+							continue
 						}
 					}
 				}
+
+				if err = s.chunk(ctx, project, buildNum, "", projBuildJobs.CircleYaml.YamlString, chunksChan); err != nil {
+					ctx.Logger().Error(err, "error chunking build yaml")
+					errors = append(errors, err)
+
+					continue
+				}
 			}
 
-			atomic.AddUint64(&scanned, 1)
-			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", scanned, len(projects)))
+			scanCount := countOfProjectsScanned.Add(1)
+			s.SetProgressComplete(
+				int(scanCount),
+				len(projects),
+				fmt.Sprintf("Scanned %d/%d projects", scanCount, len(projects)),
+				"", // this would be for resumption, but we're not currently using it
+			)
+
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", countOfProjectsScanned.Load(), len(projects)))
+
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
-	if scanErrs.Count() > 0 {
-		ctx.Logger().V(2).Info("encountered errors while scanning", "count", scanErrs.Count(), "errors", scanErrs)
+
+	if len(errors) > 0 {
+		ctx.Logger().Info("encountered errors during scanning", "count", len(errors), "errors", errors)
 	}
 
 	return nil
 }
 
-type project struct {
-	VCS      string `json:"vcs_type"`
-	Username string `json:"username"`
-	RepoName string `json:"reponame"`
-}
-
-func (s *Source) projects(_ context.Context) ([]project, error) {
-	reqURL := fmt.Sprintf("%sprojects", baseURL)
-	req, err := http.NewRequest("GET", reqURL, nil)
+// listAllProjects lists all the projects the token can access
+func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
+	ctx.Logger().V(5).Info("listing projects")
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/projects", baseURL), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Circle-Token", s.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := s.client.Do(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	if res.StatusCode > 399 && res.StatusCode < 500 {
-		return nil, fmt.Errorf("invalid credentials, status %d", res.StatusCode)
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var projects []project
+		if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
+			return nil, fmt.Errorf("cannot decode CircleCI projects JSON: %w", err)
+		}
+
+		ctx.Logger().V(2).Info("successfully listed projects", "project_count", len(projects))
+
+		return projects, nil
+	case http.StatusUnauthorized:
+		return nil, fmt.Errorf("invalid credentials, status %d", resp.StatusCode)
+	default:
+		return nil, fmt.Errorf("unexpected status code: %d while listing projects", resp.StatusCode)
 	}
-
-	var projects []project
-	if err := json.NewDecoder(res.Body).Decode(&projects); err != nil {
-		return nil, err
-	}
-
-	return projects, nil
 }
 
-type build struct {
-	BuildNum int `json:"build_num"`
-}
-
-func (s *Source) buildsForProject(_ context.Context, proj project) ([]build, error) {
-	reqURL := fmt.Sprintf("%sproject/%s/%s/%s", baseURL, proj.VCS, proj.Username, proj.RepoName)
-	req, err := http.NewRequest("GET", reqURL, nil)
+func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]BuildNum, error) {
+	// the vcs url is in format //circleci.com/org-id/proj-id, so we need to remove the // and .com to use it in the API
+	parsedURL, err := url.Parse(proj.VcsUrl)
 	if err != nil {
 		return nil, err
 	}
+
+	vcsURL := strings.ReplaceAll(parsedURL.Host, ".com", "") + parsedURL.Path // circleci/org-id/proj-id
+
+	// update clean vcs url in the project for later use
+	proj.VcsUrl = vcsURL
+
+	ctx.Logger().V(5).Info("listing project builds with URL", "repo_name", proj.Reponame, "vcs_url", proj.VcsUrl)
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s", baseURL, vcsURL), http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Set("Circle-Token", s.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := s.client.Do(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	var builds []build
-	if err := json.NewDecoder(res.Body).Decode(&builds); err != nil {
-		return nil, err
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var rawBuilds []map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&rawBuilds); err != nil {
+			return nil, fmt.Errorf("cannot decode CircleCI project builds JSON: %w", err)
+		}
+
+		buildNums := make([]BuildNum, 0)
+		for _, item := range rawBuilds {
+			if bn, ok := item["build_num"].(float64); ok {
+				buildNums = append(buildNums, BuildNum(bn))
+			}
+		}
+
+		ctx.Logger().V(2).Info("successfully listed builds for project", "repo_name", proj.Reponame, "build_count", len(buildNums))
+
+		return buildNums, nil
+	case http.StatusNotFound:
+		return nil, fmt.Errorf("no builds found for project: %s", proj.Reponame)
+	default:
+		return nil, fmt.Errorf("unexpected status code while fetching builds for project: %s", proj.Reponame)
 	}
-
-	return builds, nil
 }
 
-type action struct {
-	Index     int    `json:"index"`
-	OutputURL string `json:"output_url"`
-}
-
-type buildStep struct {
-	Name    string   `json:"name"`
-	Actions []action `json:"actions"`
-}
-
-func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]buildStep, error) {
-	reqURL := fmt.Sprintf("%sproject/%s/%s/%s/%d", baseURL, proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
-	req, err := http.NewRequest("GET", reqURL, nil)
+func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, buildNum BuildNum) (*buildJobs, error) {
+	ctx.Logger().V(5).Info(fmt.Sprintf("listing project: %s build: %d jobs", proj.Reponame, buildNum))
+	// /project/circleci/org-id/proj-id/1
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s/%d", baseURL, proj.VcsUrl, buildNum), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Circle-Token", s.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := s.client.Do(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
 
-	type buildRes struct {
-		Steps []buildStep `json:"steps"`
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var buildResp buildJobs
+		if err := json.NewDecoder(resp.Body).Decode(&buildResp); err != nil {
+			return nil, fmt.Errorf("cannot decode CircleCI project build jobs JSON: %w", err)
+		}
+
+		ctx.Logger().V(2).Info("successfully listed project build jobs", "repo_name", proj.Reponame, "build_num", buildNum)
+
+		return &buildResp, nil
+	default:
+		return nil, fmt.Errorf("unexpected status code: %d while fetching project: %s build: %d jobs", resp.StatusCode, proj.Reponame, buildNum)
 	}
-
-	var bldRes buildRes
-	if err := json.NewDecoder(res.Body).Decode(&bldRes); err != nil {
-		return nil, err
-	}
-
-	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
-	req, err := http.NewRequest("GET", act.OutputURL, nil)
+func (s *Source) getOutputUrlResponse(outputUrl string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, outputUrl, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
-	res, err := s.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
 
-	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return string(bodyBytes), nil
+}
+
+func (s *Source) chunk(ctx context.Context, proj project, buildNum BuildNum, stepName, chunkData string, chunksChan chan *sources.Chunk) error {
+	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.Reponame, buildNum)
 
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, res.Body)
+	chunkResChan := chunkReader(ctx, strings.NewReader(chunkData))
 	for data := range chunkResChan {
 		chunk := &sources.Chunk{
 			SourceType: s.Type(),
@@ -250,8 +368,8 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 					Circleci: &source_metadatapb.CircleCI{
 						VcsType:     proj.VCS,
 						Username:    proj.Username,
-						Repository:  proj.RepoName,
-						BuildNumber: int64(bld.BuildNum),
+						Repository:  proj.Reponame,
+						BuildNumber: int64(buildNum),
 						BuildStep:   stepName,
 						Link:        linkURL,
 					},
@@ -259,10 +377,10 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 			},
 			Verify: s.verify,
 		}
-		chunk.Data = data.Bytes()
 		if err := data.Error(); err != nil {
 			return err
 		}
+
 		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
 			return err
 		}

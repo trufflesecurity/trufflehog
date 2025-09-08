@@ -53,6 +53,7 @@ enum SourceType {
   SOURCE_TYPE_SENTRY = 38;
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
+  SOURCE_TYPE_SLACK_CONTINUOUS = 41;
 }
 
 message LocalSource {
@@ -112,6 +113,10 @@ message Bitbucket {
   bool skip_binaries = 7;
   bool skip_archives = 8;
   BitbucketInstallationType installation_type = 9;
+  string oauth_authorization_endpoint = 10; // endpoint for OAuth authorization flow in Bitbucket Data Center application links
+  string oauth_token_endpoint = 11; // endpoint for getting OAuth access/refresh tokens in Bitbucket Data Center application links
+  repeated string oauth_scopes = 12; // list of OAuth scopes that the access token is provided
+  bool allow_secrets_manager_write = 13; // flag to explicitly allow TruffleHog to write to the user's secrets manager
 }
 
 message CircleCI {
@@ -175,6 +180,7 @@ message Filesystem {
   repeated string paths = 2;
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
+  bool skip_binaries = 5; // allows skipping binary files from the scan
 }
 
 message GCS {
@@ -216,6 +222,9 @@ message Git {
   string uri = 13; // repository URL. https://, file://, or ssh://
   bool skip_binaries = 14;
   bool skip_archives = 15;
+  string clone_path = 16;
+  bool no_cleanup = 17;
+  bool print_legacy_json = 18;
 }
 
 message GitLab {
@@ -232,6 +241,10 @@ message GitLab {
   repeated string include_repos = 9;
   bool exclude_projects_shared_into_groups = 10;
   bool remove_auth_in_url = 11;
+  repeated string group_ids = 12;
+  string clone_path = 13;
+  bool no_cleanup = 14;
+  bool print_legacy_json = 15;
 }
 
 message GitHub {
@@ -258,6 +271,10 @@ message GitHub {
   bool include_wikis = 19;
   uint32 comments_timeframe_days = 20;
   bool remove_auth_in_url = 21;
+  string clone_path = 22;
+  bool no_cleanup = 23;
+  bool ignore_gists = 24;
+  bool print_legacy_json = 25;
 }
 
 message GitHubExperimental {
@@ -474,6 +491,14 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+  oneof variant {
+    Vector vector = 4;
+  }
+}
+
+message Vector {
+  string locator_field = 1;
+  string link_format = 2;
 }
 
 message Elasticsearch {
@@ -501,3 +526,8 @@ message Sentry {
 }
 
 message Stdin {}
+
+message SlackContinuous {
+  string namespace = 1;
+  string project_id = 2;
+}

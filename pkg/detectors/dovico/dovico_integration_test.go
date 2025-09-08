@@ -19,7 +19,7 @@ import (
 func TestDovico_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -53,6 +53,10 @@ func TestDovico_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Dovico,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_Dovico,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -65,6 +69,10 @@ func TestDovico_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dovico,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Dovico,
 					Verified:     false,
@@ -97,6 +105,7 @@ func TestDovico_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Dovico.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

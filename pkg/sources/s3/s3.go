@@ -182,7 +182,9 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		return nil, err
 	}
 
-	return s3.NewFromConfig(cfg), nil
+	return s3.NewFromConfig(cfg, func(options *s3.Options) {
+		options.DisableLogOutputChecksumValidationSkipped = true
+	}), nil
 }
 
 // getBucketsToScan returns a list of S3 buckets to scan.

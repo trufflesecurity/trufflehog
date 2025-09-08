@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package dotmailer
+package dotdigital
 
 import (
 	"context"
@@ -9,23 +9,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestDotmailer_FromChunk(t *testing.T) {
+func TestDotdigital_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DOTMAILER")
-	pass := testSecrets.MustGetField("DOTMAILER_PASS")
-	inactiveSecret := testSecrets.MustGetField("DOTMAILER_INACTIVE")
+	email := testSecrets.MustGetField("DOTDIGITAL_EMAIL")
+	password := testSecrets.MustGetField("DOTDIGITAL_PASSWORD")
+	inactivePassword := testSecrets.MustGetField("DOTDIGITAL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -44,12 +45,12 @@ func TestDotmailer_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dotmailer secret %s within dotmailer pass %s", secret, pass)),
+				data:   []byte(fmt.Sprintf("You can find a dotdigital user %s within dotdigital pass %s", email, password)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dotmailer,
+					DetectorType: detectorspb.DetectorType_Dotdigital,
 					Verified:     true,
 				},
 			},
@@ -60,12 +61,12 @@ func TestDotmailer_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dotmailer secret %s within dotmailer pass %s but not valid ", inactiveSecret, pass)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a dotdigital user %s within dotdigital pass %s but not valid ", email, inactivePassword)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dotmailer,
+					DetectorType: detectorspb.DetectorType_Dotdigital,
 					Verified:     false,
 				},
 			},
@@ -88,17 +89,28 @@ func TestDotmailer_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Dotmailer.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Dotdigital.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Dotmailer.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("Dotdigital.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

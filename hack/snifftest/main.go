@@ -181,7 +181,7 @@ func main() {
 				defer sem.Release(1)
 				defer wgChunkers.Done()
 				logger.Info("cloning repo", "repo", r)
-				path, repo, err := git.CloneRepoUsingUnauthenticated(ctx, r)
+				path, repo, err := git.CloneRepoUsingUnauthenticated(ctx, r, "")
 				if err != nil {
 					logFatal(err, "error cloning repo", "repo", r)
 				}
@@ -197,7 +197,7 @@ func main() {
 					SkipBinaries: true,
 					SkipArchives: false,
 					Concurrency:  runtime.NumCPU(),
-					SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+					SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
 						return &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Git{
 								Git: &source_metadatapb.Git{

@@ -335,7 +335,7 @@ enum DetectorType {
   Appcues = 322;
   Autoklose = 323;
   Cloudplan = 324;
-  Dotmailer = 325;
+  Dotdigital = 325;
   GetEmail = 326;
   GetEmails = 327;
   Kontent = 328;
@@ -1040,6 +1040,14 @@ enum DetectorType {
   LangSmith = 1028;
   BitbucketAppPassword = 1029;
   Hasura = 1030;
+  SalesforceRefreshToken = 1031;
+  AnypointOAuth2 = 1032;
+  WebexBot = 1033;
+  TableauPersonalAccessToken = 1034;
+  Rootly = 1035;
+  HashiCorpVaultAuth = 1036;
+  PhraseAccessToken = 1037;
+  Photoroom = 1038;
 }
 
 message Result {
