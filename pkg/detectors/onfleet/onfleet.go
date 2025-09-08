@@ -69,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://onfleet.com/api/v2/organization", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 	data := fmt.Sprintf("%s:", token)
 	encoded := b64.StdEncoding.EncodeToString([]byte(data))

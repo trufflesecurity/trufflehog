@@ -108,7 +108,7 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 	url := "https://" + env + ".plaid.com/item/get"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, payload)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
