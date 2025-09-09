@@ -224,7 +224,7 @@ func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelisted
 		// Check if the raw secret matches any whitelisted secret
 		rawSecret := string(result.Raw)
 		if isWhitelisted, matchReason = isSecretWhitelisted(rawSecret, whitelistedSecrets); isWhitelisted {
-			ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", rawSecret, "reason", matchReason)
+			ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", maskSecret(rawSecret), "reason", matchReason)
 			continue
 		}
 
@@ -232,7 +232,7 @@ func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelisted
 		if result.RawV2 != nil {
 			rawV2Secret := string(result.RawV2)
 			if isWhitelisted, matchReason = isSecretWhitelisted(rawV2Secret, whitelistedSecrets); isWhitelisted {
-				ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", rawV2Secret, "reason", matchReason)
+				ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", maskSecret(rawV2Secret), "reason", matchReason)
 				continue
 			}
 		}
@@ -284,4 +284,15 @@ func isSecretWhitelisted(secret string, whitelistedSecrets map[string]struct{}) 
 	}
 
 	return false, ""
+}
+
+// maskSecret masks a secret for safe logging by showing only the first and last few characters
+func maskSecret(secret string) string {
+	if len(secret) <= 8 {
+		return "***"
+	}
+	if len(secret) <= 16 {
+		return secret[:2] + "***" + secret[len(secret)-2:]
+	}
+	return secret[:4] + "***" + secret[len(secret)-4:]
 }
