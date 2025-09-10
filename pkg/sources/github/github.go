@@ -205,6 +205,11 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 	return false
 }
 
+// wantRepo returns true if the repository should be included based on include/exclude patterns
+func (c *filteredRepoCache) wantRepo(s string) bool {
+	return !c.ignoreRepo(s) && c.includeRepo(s)
+}
+
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	err := git.CmdCheck()
@@ -282,18 +287,19 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
-						Commit:     sanitizer.UTF8(commit),
-						File:       sanitizer.UTF8(file),
-						Email:      sanitizer.UTF8(email),
-						Repository: sanitizer.UTF8(repository),
-						Link:       giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:  sanitizer.UTF8(timestamp),
-						Line:       line,
-						Visibility: s.visibilityOf(aCtx, repository),
+						Commit:              sanitizer.UTF8(commit),
+						File:                sanitizer.UTF8(file),
+						Email:               sanitizer.UTF8(email),
+						Repository:          sanitizer.UTF8(repository),
+						Link:                giturl.GenerateLink(repository, commit, file, line),
+						Timestamp:           sanitizer.UTF8(timestamp),
+						Line:                line,
+						Visibility:          s.visibilityOf(aCtx, repository),
+						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
 					},
 				},
 			}
@@ -432,14 +438,29 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// Double make sure that all enumerated repositories in the
 	// filteredRepoCache have an entry in the repoInfoCache.
 	for _, repo := range s.filteredRepoCache.Values() {
-		ctx := context.WithValue(ctx, "repo", repo)
-
-		repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
-		if err != nil {
-			ctx.Logger().Error(err, "error caching repo info")
-			_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+		// Extract the repository name from the URL for filtering
+		repoName := repo
+		if strings.Contains(repo, "/") {
+			// Try to extract org/repo name from URL
+			if strings.Contains(repo, "github.com") {
+				parts := strings.Split(repo, "/")
+				if len(parts) >= 2 {
+					repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
+				}
+			}
 		}
-		s.repos = append(s.repos, repo)
+
+		// Final filter check - only include repositories that pass the filter
+		if s.filteredRepoCache.wantRepo(repoName) {
+			ctx = context.WithValue(ctx, "repo", repo)
+
+			repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
+			if err != nil {
+				ctx.Logger().Error(err, "error caching repo info")
+				_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+			}
+			s.repos = append(s.repos, repo)
+		}
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	ctx.Logger().Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
@@ -734,10 +755,12 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	if err != nil {
 		return duration, err
 	}
-
 	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
-	if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
-		defer os.RemoveAll(path)
+	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+	if !s.conn.GetPrintLegacyJson() {
+		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
+			defer os.RemoveAll(path)
+		}
 	}
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
