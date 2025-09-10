@@ -1,7 +1,6 @@
 package detectors
 
 import (
-	"bufio"
 	_ "embed"
 	"fmt"
 	"math"
@@ -12,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+	"gopkg.in/yaml.v3"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -30,6 +30,12 @@ type CustomFalsePositiveChecker interface {
 	// 1. Whether the result is a false positive.
 	// 2. If #1 is `true`, the reason why.
 	IsFalsePositive(result Result) (bool, string)
+}
+
+// WhitelistEntry represents a whitelist entry in the YAML config
+type WhitelistEntry struct {
+	Description string   `yaml:"description,omitempty"` // Optional description for the whitelist
+	Values      []string `yaml:"values"`                // List of secret patterns/regexes to whitelist
 }
 
 var (
@@ -243,25 +249,28 @@ func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelisted
 	return filteredResults
 }
 
-// loadWhitelistedSecrets loads secrets from a file that should be whitelisted
-func LoadWhitelistedSecrets(filename string) (map[string]struct{}, error) {
-	file, err := os.Open(filename)
+// LoadWhitelistedSecrets loads secrets from a YAML file that should be whitelisted.
+// The YAML format supports multiline secrets and includes optional descriptions.
+func LoadWhitelistedSecrets(yamlFile string) (map[string]struct{}, error) {
+	file, err := os.Open(yamlFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open whitelist file: %w", err)
 	}
 	defer file.Close()
 
-	whitelistedSecrets := make(map[string]struct{})
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		secret := strings.TrimSpace(scanner.Text())
-		if secret != "" { // Skip empty lines
-			whitelistedSecrets[secret] = struct{}{}
-		}
+	var entries []WhitelistEntry
+	decoder := yaml.NewDecoder(file)
+	if err := decoder.Decode(&entries); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML whitelist file: %w", err)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading whitelist file: %w", err)
+	whitelistedSecrets := make(map[string]struct{})
+	for _, entry := range entries {
+		for _, value := range entry.Values {
+			if strings.TrimSpace(value) != "" { // Skip empty values
+				whitelistedSecrets[value] = struct{}{}
+			}
+		}
 	}
 
 	return whitelistedSecrets, nil

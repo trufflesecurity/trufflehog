@@ -3,9 +3,11 @@ package detectors
 import (
 	"context"
 	_ "embed"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -356,6 +358,72 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("ghijklmnop123456")},    // contains non-hex chars
 			},
 		},
+		{
+			name: "multiline RSA private key exact match",
+			results: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte("single-line-secret")},
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+			},
+			whitelistedSecrets: map[string]struct{}{
+				`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`: {},
+			},
+			expected: []Result{
+				{Raw: []byte("single-line-secret")},
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+			},
+		},
+		{
+			name: "multiline regex pattern matching",
+			results: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte(`-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
+-----END PRIVATE KEY-----`)},
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+				{Raw: []byte("some-other-secret")},
+			},
+			whitelistedSecrets: map[string]struct{}{
+				`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`: {}, // regex for any private key
+			},
+			expected: []Result{
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+				{Raw: []byte("some-other-secret")},
+			},
+		},
+		{
+			name: "multiline patterns that shouldn't match",
+			results: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte("production-api-key-12345")},
+			},
+			whitelistedSecrets: map[string]struct{}{
+				`(?s)-----BEGIN.*CERTIFICATE-----.*-----END.*CERTIFICATE-----`: {}, // only certificates, not private keys
+				`^test-.*`: {}, // only test patterns
+			},
+			expected: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte("production-api-key-12345")},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -430,6 +498,55 @@ func TestIsSecretWhitelisted(t *testing.T) {
 			expectedMatch:  true,
 			expectedReason: "exact match",
 		},
+		{
+			name: "multiline RSA key exact match",
+			secret: `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`,
+			whitelistedSecrets: map[string]struct{}{
+				`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`: {},
+			},
+			expectedMatch:  true,
+			expectedReason: "exact match",
+		},
+		{
+			name: "multiline private key regex match",
+			secret: `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`,
+			whitelistedSecrets: map[string]struct{}{
+				`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`: {},
+			},
+			expectedMatch:  true,
+			expectedReason: "regex match: (?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----",
+		},
+		{
+			name: "multiline certificate not matching private key pattern",
+			secret: `-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`,
+			whitelistedSecrets: map[string]struct{}{
+				`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`: {},
+			},
+			expectedMatch:  false,
+			expectedReason: "",
+		},
+		{
+			name: "multiline secret with exact match precedence",
+			secret: `-----BEGIN RSA PRIVATE KEY-----
+test-content
+-----END RSA PRIVATE KEY-----`,
+			whitelistedSecrets: map[string]struct{}{
+				`-----BEGIN RSA PRIVATE KEY-----
+test-content
+-----END RSA PRIVATE KEY-----`: {}, // exact match
+				`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`: {}, // regex match
+			},
+			expectedMatch:  true,
+			expectedReason: "exact match", // should prefer exact over regex
+		},
 	}
 
 	for _, tt := range tests {
@@ -493,4 +610,107 @@ func BenchmarkDefaultIsKnownFalsePositive(b *testing.B) {
 		// Use a string that won't be found in any dictionary for the worst case check.
 		IsKnownFalsePositive("aoeuaoeuaoeuaoeuaoeuaoeu", DefaultFalsePositives, true)
 	}
+}
+
+func TestLoadWhitelistedSecrets(t *testing.T) {
+	tests := []struct {
+		name        string
+		yamlContent string
+		expected    map[string]struct{}
+		wantErr     bool
+	}{
+		{
+			name: "basic patterns with descriptions",
+			yamlContent: `- description: "Used in tests"
+  values:
+    - "^dev-.*"
+    - "^stage.*"
+- description: "Legacy API keys"
+  values:
+    - "legacy-key-123"
+    - "old-token-.*"`,
+			expected: map[string]struct{}{
+				"^dev-.*":        {},
+				"^stage.*":       {},
+				"legacy-key-123": {},
+				"old-token-.*":   {},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiline RSA key",
+			yamlContent: `- description: "Test RSA keys"
+  values:
+    - |
+      -----BEGIN RSA PRIVATE KEY-----
+      MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+      -----END RSA PRIVATE KEY-----`,
+			expected: map[string]struct{}{
+				"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...\n-----END RSA PRIVATE KEY-----": {},
+			},
+			wantErr: false,
+		},
+		{
+			name: "entry without description field",
+			yamlContent: `- values:
+    - "no-description-pattern"
+    - "another-pattern"`,
+			expected: map[string]struct{}{
+				"no-description-pattern": {},
+				"another-pattern":        {},
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty values filtered out",
+			yamlContent: `- description: "Test filtering"
+  values:
+    - "valid-pattern"
+    - ""
+    - "   "
+    - "another-valid"`,
+			expected: map[string]struct{}{
+				"valid-pattern": {},
+				"another-valid": {},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "invalid YAML",
+			yamlContent: `invalid yaml [content`,
+			expected:    nil,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary file
+			tmpFile, err := os.CreateTemp("", "whitelist-test-*.yaml")
+			require.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			// Write test content
+			_, err = tmpFile.WriteString(tt.yamlContent)
+			require.NoError(t, err)
+			require.NoError(t, tmpFile.Close())
+
+			// Test the function
+			result, err := LoadWhitelistedSecrets(tmpFile.Name())
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoadWhitelistedSecretsFileNotFound(t *testing.T) {
+	_, err := LoadWhitelistedSecrets("nonexistent-file.yaml")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to open whitelist file")
 }
