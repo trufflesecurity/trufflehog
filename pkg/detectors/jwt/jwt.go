@@ -2,16 +2,19 @@ package jwt
 
 import (
 	"context"
+	"io"
 	// "encoding/base64"
 	"encoding/json"
 	"fmt"
+
 	// "strings"
 	"errors"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"net/url"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -33,8 +36,12 @@ var (
 	keyPat = regexp.MustCompile(`\b((?:eyJ|ewogIC)[A-Za-z0-9_-]{12,}\.ey[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
+// The keywords for JWT detection are derived from prefixes of JWT header values with `typ` and `alg` values taken from the following:
+//
+//     typ: ['JWT', 'jwt']
+//     alg: ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512']
+//
+// These were used to create JSON values for the header, using a few variations of whitespace and indentation, and then base64url-encoded.
 func (s Scanner) Keywords() []string {
 	return []string{
 		"ewogICJ0eXA",
@@ -42,6 +49,11 @@ func (s Scanner) Keywords() []string {
 		"eyJ0eXAiOiJ",
 		"eyJhbGciOiJ",
 	}
+}
+
+// Wrap an `io.Reader` with a reasonable limit as an additional measure against DoS from a malicious JWKS issuer
+func limitReader(reader io.Reader) io.Reader {
+	return io.LimitReader(reader, 1024 * 1024)
 }
 
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
@@ -77,6 +89,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
+// Parse a string into a URL and check that it is an HTTPS URL.
+// The `name` parameter is used only for producing an error message.
+func parseHttpsUrl(name string, urlString string) (*url.URL, error) {
+	url, err := url.Parse(urlString)
+	if err != nil {
+		return nil, err
+	}
+	if url.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported scheme for %s URL (expected https)", name)
+	} else {
+		return url, nil
+	}
+}
+
+func performHttpRequest(client *http.Client, ctx context.Context, method string, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform request: %w", err)
+	}
+	return resp, nil
+}
+
 // Attempt to verify a JWT.
 //
 // This implementation only attempts to verify JWTs that use an asymmetric encryption algorithm,
@@ -89,30 +127,23 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		if !ok {
 			return nil, fmt.Errorf("invalid issuer")
 		}
-		issuerURL, err := url.Parse(issuer)
+		issuerURL, err := parseHttpsUrl("issuer", issuer)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid issuer URL: %w", err)
 		}
 
 		oidcDiscoveryURL := issuerURL.JoinPath(".well-known/openid-configuration")
-		if oidcDiscoveryURL.Scheme != "https" {
-			return nil, fmt.Errorf("unsupported OIDC discovery scheme %s (expected https)", oidcDiscoveryURL.Scheme)
-		}
 
 		// Check for a proper key id before making any network requests
 		kid, ok := unverifiedToken.Header["kid"].(string)
 		if !ok {
-			return nil, fmt.Errorf("missing key id")
+			return nil, fmt.Errorf("invalid key id")
 		}
 
 		// Fetch the OIDC discovery document
-		req, err := http.NewRequestWithContext(ctx, "GET", oidcDiscoveryURL.String(), nil)
+		resp, err := performHttpRequest(client, ctx, "GET", oidcDiscoveryURL.String())
 		if err != nil {
-			return nil, fmt.Errorf("failed to create OIDC discovery request: %w", err)
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch OIDC discovery document: %w", err)
+			return nil, fmt.Errorf("failed to perform OIDC discovery: %w", err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
@@ -123,16 +154,13 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		var discoveryDoc struct {
 			JWKSUri string `json:"jwks_uri"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&discoveryDoc); err != nil {
+		if err := json.NewDecoder(limitReader(resp.Body)).Decode(&discoveryDoc); err != nil {
 			return nil, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
 		}
 
-		jwksURL, err := url.Parse(discoveryDoc.JWKSUri)
+		jwksURL, err := parseHttpsUrl("JWKS", discoveryDoc.JWKSUri)
 		if err != nil {
 			return nil, fmt.Errorf("invalid JWKS URL: %w", err)
-		}
-		if jwksURL.Scheme != "https" {
-			return nil, fmt.Errorf("unsupported JWKS URL scheme %s (expected https)", jwksURL.Scheme)
 		}
 
 		if jwksURL.Host != issuerURL.Host {
@@ -140,11 +168,7 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		}
 
 		// Fetch the JWKS
-		req, err = http.NewRequestWithContext(ctx, "GET", discoveryDoc.JWKSUri, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create JWKS request: %w", err)
-		}
-		resp, err = client.Do(req)
+		resp, err = performHttpRequest(client, ctx, "GET", discoveryDoc.JWKSUri)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
 		}
@@ -158,7 +182,7 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		var jwks struct {
 			Keys []Key `json:"keys"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		if err := json.NewDecoder(limitReader(resp.Body)).Decode(&jwks); err != nil {
 			return nil, fmt.Errorf("failed to parse JWKS: %w", err)
 		}
 		var matchingKey Key = nil
