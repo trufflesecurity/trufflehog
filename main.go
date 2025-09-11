@@ -522,7 +522,7 @@ func run(state overseer.State) {
 	// Load allowlisted secrets if specified
 	var allowlistedSecrets map[string]struct{}
 	if *allowlistSecretsFile != "" {
-		allowlistedSecrets, err := detectors.LoadWhitelistedSecrets(*allowlistSecretsFile)
+		allowlistedSecrets, err := detectors.LoadAllowlistedSecrets(*allowlistSecretsFile)
 		if err != nil {
 			logFatal(err, "failed to load allowlisted secrets")
 		}
@@ -545,7 +545,7 @@ func run(state overseer.State) {
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
-		WhitelistedSecrets:       allowlistedSecrets,
+		AllowlistedSecrets:       allowlistedSecrets,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
