@@ -1319,48 +1319,48 @@ def test_something():
 	}
 }
 
-func TestEngine_WhitelistedSecrets(t *testing.T) {
+func TestEngine_AllowlistedSecrets(t *testing.T) {
 	tests := []struct {
 		name               string
 		content            string
-		whitelistedSecrets map[string]struct{}
+		allowlistedSecrets map[string]struct{}
 		expectedFindings   int
 	}{
 		{
-			name: "exact string whitelist match",
+			name: "exact string allowlist match",
 			content: `
 aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
 aws_secret_access_key = 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
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 `,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"AKIAQYLPMN5HHHFPZAM2": {},
 			},
 			expectedFindings: 2,
 		},
 		{
-			name: "regex pattern whitelist",
+			name: "regex pattern allowlist",
 			content: `
 aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
 aws_secret_access_key = 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
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`^sk-[a-z0-9]{32}$`: {},
 			},
 			expectedFindings: 2,
 		},
 		{
-			name: "mixed exact and regex whitelist",
+			name: "mixed exact and regex allowlist",
 			content: `
 aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
 aws_secret_access_key = 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
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"AKIAQYLPMN5HHHFPZAM2": {}, // exact string
 				`^sk-[a-z0-9]{32}$`:    {}, // regex pattern
 			},
@@ -1374,7 +1374,7 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`^SK-[a-z0-9]{32}$`: {}, // case sensitive - only matches uppercase SK
 			},
 			expectedFindings: 3,
@@ -1387,31 +1387,31 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`(?i)^SK-[a-z0-9]{32}$`: {}, // case insensitive
 			},
 			expectedFindings: 2,
 		},
 		{
-			name: "no whitelist",
+			name: "no allowlist",
 			content: `
 aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
 aws_secret_access_key = 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
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			whitelistedSecrets: map[string]struct{}{},
+			allowlistedSecrets: map[string]struct{}{},
 			expectedFindings:   3,
 		},
 		{
-			name: "invalid regex patterns",
+			name: "invalid regex patterns allowlist",
 			content: `
 aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
 aws_secret_access_key = 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
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"[AKIAQYLPMN5HHHFPZAM2": {}, // invalid regex, treated as exact string
 			},
 			expectedFindings: 3,
@@ -1425,7 +1425,7 @@ openai_api_key = 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
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			tmpFile, err := os.CreateTemp("", "test_whitelist")
+			tmpFile, err := os.CreateTemp("", "test_allowlist")
 			assert.NoError(t, err)
 			defer os.Remove(tmpFile.Name())
 
@@ -1447,7 +1447,7 @@ openai_api_key = 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
 				Verify:             false,
 				SourceManager:      sourceManager,
 				Dispatcher:         NewPrinterDispatcher(new(discardPrinter)),
-				WhitelistedSecrets: tt.whitelistedSecrets,
+				AllowlistedSecrets: tt.allowlistedSecrets,
 			}
 
 			eng, err := NewEngine(ctx, &conf)
@@ -1466,7 +1466,7 @@ openai_api_key = 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
 	}
 }
 
-func TestEngine_WhitelistedSecretsPerformance(t *testing.T) {
+func TestEngine_allowlistedSecretsPerformance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -1486,8 +1486,8 @@ func TestEngine_WhitelistedSecretsPerformance(t *testing.T) {
 	err = os.WriteFile(tmpFile.Name(), []byte(content), os.ModeAppend)
 	assert.NoError(t, err)
 
-	// Define whitelist with both exact strings and regex patterns
-	whitelistedSecrets := map[string]struct{}{
+	// Define allowlist with both exact strings and regex patterns
+	allowlistedSecrets := map[string]struct{}{
 		// Some exact matches
 		"AKIAQYLPMN5HHHF00001":                             {},
 		"sk-abc123def456ghi789jkl012mno00005":              {},
@@ -1515,7 +1515,7 @@ func TestEngine_WhitelistedSecretsPerformance(t *testing.T) {
 		Verify:             false,
 		SourceManager:      sourceManager,
 		Dispatcher:         NewPrinterDispatcher(new(discardPrinter)),
-		WhitelistedSecrets: whitelistedSecrets,
+		AllowlistedSecrets: allowlistedSecrets,
 	}
 
 	eng, err := NewEngine(ctx, &conf)
@@ -1530,7 +1530,7 @@ func TestEngine_WhitelistedSecretsPerformance(t *testing.T) {
 
 	elapsed := time.Since(start)
 
-	assert.Less(t, elapsed, 10*time.Second, "Whitelisting performance test took too long")
+	assert.Less(t, elapsed, 10*time.Second, "Allowlisting performance test took too long")
 	assert.Greater(t, int(eng.GetMetrics().UnverifiedSecretsFound), 0, "Should find some secrets")
 	assert.Less(t, int(eng.GetMetrics().UnverifiedSecretsFound), 3000, "Should filter out many secrets")
 }

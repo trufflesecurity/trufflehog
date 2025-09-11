@@ -185,13 +185,13 @@ func TestStringShannonEntropy(t *testing.T) {
 	}
 }
 
-func TestFilterWhitelistedSecrets(t *testing.T) {
+func TestFilterAllowlistedSecrets(t *testing.T) {
 	ctx := logContext.Background()
 
 	tests := []struct {
 		name               string
 		results            []Result
-		whitelistedSecrets map[string]struct{}
+		allowlistedSecrets map[string]struct{}
 		expected           []Result
 	}{
 		{
@@ -201,7 +201,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("password456")},
 				{Raw: []byte("token789")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"secret123": {},
 			},
 			expected: []Result{
@@ -217,7 +217,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("dev-token-abcdef")},
 				{Raw: []byte("random-secret")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`^test-.*`:    {},
 				`.*-token-.*`: {},
 			},
@@ -234,7 +234,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("prod-key-456")},
 				{Raw: []byte("another-secret")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"exact-match": {}, // exact string
 				`^dev-.*`:     {}, // regex pattern
 			},
@@ -249,7 +249,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("[invalid")},
 				{Raw: []byte("valid-secret")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"[invalid": {}, // invalid regex, treated as literal
 			},
 			expected: []Result{
@@ -262,7 +262,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("Secret123")},
 				{Raw: []byte("secret456")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`^secret.*`: {}, // case sensitive - should only match lowercase
 			},
 			expected: []Result{
@@ -276,7 +276,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("secret456")},
 				{Raw: []byte("other789")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`(?i)^secret.*`: {}, // case insensitive
 			},
 			expected: []Result{
@@ -291,7 +291,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 					RawV2: []byte("secondary-secret"),
 				},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"secondary-secret": {},
 			},
 			expected: []Result{}, // should be filtered out due to RawV2 match
@@ -299,27 +299,27 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 		{
 			name:    "empty results",
 			results: []Result{},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"any-pattern": {},
 			},
 			expected: []Result{},
 		},
 		{
-			name: "empty whitelist",
+			name: "empty allowlist",
 			results: []Result{
 				{Raw: []byte("secret123")},
 			},
-			whitelistedSecrets: map[string]struct{}{},
+			allowlistedSecrets: map[string]struct{}{},
 			expected: []Result{
 				{Raw: []byte("secret123")},
 			},
 		},
 		{
-			name: "nil whitelist",
+			name: "nil allowlist",
 			results: []Result{
 				{Raw: []byte("secret123")},
 			},
-			whitelistedSecrets: nil,
+			allowlistedSecrets: nil,
 			expected: []Result{
 				{Raw: []byte("secret123")},
 			},
@@ -332,7 +332,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("secret-abcdef")},
 				{Raw: []byte("random-secret-123")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`^api-key-\d+$`:   {}, // API keys with numbers
 				`^token-\d+$`:     {}, // Tokens with numbers
 				`^secret-[a-f]+$`: {}, // Secrets with hex chars
@@ -349,7 +349,7 @@ func TestFilterWhitelistedSecrets(t *testing.T) {
 				{Raw: []byte("ghijklmnop123456")},    // not hex
 				{Raw: []byte("ABC123DEF456")},        // mixed case hex
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`^[a-f0-9]{16}$`:    {}, // exactly 16 lowercase hex chars
 				`^[A-F0-9a-f]{12}$`: {}, // exactly 12 mixed case hex chars
 			},
@@ -369,7 +369,7 @@ MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
 MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
 -----END CERTIFICATE-----`)},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
 -----END RSA PRIVATE KEY-----`: {},
@@ -395,7 +395,7 @@ MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
 -----END CERTIFICATE-----`)},
 				{Raw: []byte("some-other-secret")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`: {}, // regex for any private key
 			},
 			expected: []Result{
@@ -413,7 +413,7 @@ MIIEpAIBAAKCAQEA...
 -----END RSA PRIVATE KEY-----`)},
 				{Raw: []byte("production-api-key-12345")},
 			},
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`(?s)-----BEGIN.*CERTIFICATE-----.*-----END.*CERTIFICATE-----`: {}, // only certificates, not private keys
 				`^test-.*`: {}, // only test patterns
 			},
@@ -428,24 +428,24 @@ MIIEpAIBAAKCAQEA...
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FilterWhitelistedSecrets(ctx, tt.results, tt.whitelistedSecrets)
+			result := FilterAllowlistedSecrets(ctx, tt.results, tt.allowlistedSecrets)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
 
-func TestIsSecretWhitelisted(t *testing.T) {
+func TestIsSecretAllowlisted(t *testing.T) {
 	tests := []struct {
 		name               string
 		secret             string
-		whitelistedSecrets map[string]struct{}
+		allowlistedSecrets map[string]struct{}
 		expectedMatch      bool
 		expectedReason     string
 	}{
 		{
 			name:   "exact string match",
 			secret: "exact-secret",
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"exact-secret": {},
 			},
 			expectedMatch:  true,
@@ -454,7 +454,7 @@ func TestIsSecretWhitelisted(t *testing.T) {
 		{
 			name:   "regex pattern match",
 			secret: "test-key-12345",
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`^test-.*`: {},
 			},
 			expectedMatch:  true,
@@ -463,7 +463,7 @@ func TestIsSecretWhitelisted(t *testing.T) {
 		{
 			name:   "no match",
 			secret: "random-secret",
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"different-secret": {},
 				`^test-.*`:         {},
 			},
@@ -473,7 +473,7 @@ func TestIsSecretWhitelisted(t *testing.T) {
 		{
 			name:   "exact match takes precedence over regex",
 			secret: "test-key",
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"test-key": {}, // exact match
 				`^test-.*`: {}, // regex match
 			},
@@ -483,7 +483,7 @@ func TestIsSecretWhitelisted(t *testing.T) {
 		{
 			name:   "invalid regex treated as literal",
 			secret: "[invalid",
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"[invalid": {}, // invalid regex
 			},
 			expectedMatch:  true,
@@ -492,7 +492,7 @@ func TestIsSecretWhitelisted(t *testing.T) {
 		{
 			name:   "empty secret",
 			secret: "",
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				"": {},
 			},
 			expectedMatch:  true,
@@ -503,7 +503,7 @@ func TestIsSecretWhitelisted(t *testing.T) {
 			secret: `-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
 -----END RSA PRIVATE KEY-----`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
 -----END RSA PRIVATE KEY-----`: {},
@@ -516,7 +516,7 @@ MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
 			secret: `-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA...
 -----END RSA PRIVATE KEY-----`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`: {},
 			},
 			expectedMatch:  true,
@@ -527,7 +527,7 @@ MIIEpAIBAAKCAQEA...
 			secret: `-----BEGIN CERTIFICATE-----
 MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
 -----END CERTIFICATE-----`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`: {},
 			},
 			expectedMatch:  false,
@@ -538,7 +538,7 @@ MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
 			secret: `-----BEGIN RSA PRIVATE KEY-----
 test-content
 -----END RSA PRIVATE KEY-----`,
-			whitelistedSecrets: map[string]struct{}{
+			allowlistedSecrets: map[string]struct{}{
 				`-----BEGIN RSA PRIVATE KEY-----
 test-content
 -----END RSA PRIVATE KEY-----`: {}, // exact match
@@ -551,14 +551,14 @@ test-content
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			match, reason := isSecretWhitelisted(tt.secret, tt.whitelistedSecrets)
+			match, reason := isSecretAllowlisted(tt.secret, tt.allowlistedSecrets)
 			assert.Equal(t, tt.expectedMatch, match)
 			assert.Equal(t, tt.expectedReason, reason)
 		})
 	}
 }
 
-func BenchmarkFilterWhitelistedSecrets(b *testing.B) {
+func BenchmarkFilterallowlistedSecrets(b *testing.B) {
 	ctx := logContext.Background()
 
 	results := []Result{
@@ -569,7 +569,7 @@ func BenchmarkFilterWhitelistedSecrets(b *testing.B) {
 		{Raw: []byte("dev-key-67890")},
 	}
 
-	whitelistedSecrets := map[string]struct{}{
+	allowlistedSecrets := map[string]struct{}{
 		"secret1":     {}, // exact match
 		`^test-.*`:    {}, // regex
 		`.*-token-.*`: {}, // regex
@@ -577,12 +577,12 @@ func BenchmarkFilterWhitelistedSecrets(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		FilterWhitelistedSecrets(ctx, results, whitelistedSecrets)
+		FilterAllowlistedSecrets(ctx, results, allowlistedSecrets)
 	}
 }
 
-func BenchmarkIsSecretWhitelisted(b *testing.B) {
-	whitelistedSecrets := map[string]struct{}{
+func BenchmarkIsSecretAllowlisted(b *testing.B) {
+	allowlistedSecrets := map[string]struct{}{
 		"exact-secret":   {},
 		`^test-.*`:       {},
 		`.*-token-.*`:    {},
@@ -600,7 +600,7 @@ func BenchmarkIsSecretWhitelisted(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, secret := range secrets {
-			isSecretWhitelisted(secret, whitelistedSecrets)
+			isSecretAllowlisted(secret, allowlistedSecrets)
 		}
 	}
 }
@@ -612,7 +612,7 @@ func BenchmarkDefaultIsKnownFalsePositive(b *testing.B) {
 	}
 }
 
-func TestLoadWhitelistedSecrets(t *testing.T) {
+func TestLoadallowlistedSecrets(t *testing.T) {
 	tests := []struct {
 		name        string
 		yamlContent string
@@ -686,7 +686,7 @@ func TestLoadWhitelistedSecrets(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temporary file
-			tmpFile, err := os.CreateTemp("", "whitelist-test-*.yaml")
+			tmpFile, err := os.CreateTemp("", "allowlist-test-*.yaml")
 			require.NoError(t, err)
 			defer os.Remove(tmpFile.Name())
 
@@ -696,7 +696,7 @@ func TestLoadWhitelistedSecrets(t *testing.T) {
 			require.NoError(t, tmpFile.Close())
 
 			// Test the function
-			result, err := LoadWhitelistedSecrets(tmpFile.Name())
+			result, err := LoadAllowlistedSecrets(tmpFile.Name())
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -709,8 +709,8 @@ func TestLoadWhitelistedSecrets(t *testing.T) {
 	}
 }
 
-func TestLoadWhitelistedSecretsFileNotFound(t *testing.T) {
-	_, err := LoadWhitelistedSecrets("nonexistent-file.yaml")
+func TestLoadAllowlistedSecretsFileNotFound(t *testing.T) {
+	_, err := LoadAllowlistedSecrets("nonexistent-file.yaml")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to open whitelist file")
+	assert.Contains(t, err.Error(), "failed to open allowlist file")
 }

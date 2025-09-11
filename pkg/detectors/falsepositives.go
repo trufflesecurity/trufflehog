@@ -32,10 +32,10 @@ type CustomFalsePositiveChecker interface {
 	IsFalsePositive(result Result) (bool, string)
 }
 
-// WhitelistEntry represents a whitelist entry in the YAML config
-type WhitelistEntry struct {
-	Description string   `yaml:"description,omitempty"` // Optional description for the whitelist
-	Values      []string `yaml:"values"`                // List of secret patterns/regexes to whitelist
+// AllowlistEntry represents an allowlist entry in the YAML config
+type AllowlistEntry struct {
+	Description string   `yaml:"description,omitempty"` // Optional description for the allowlist
+	Values      []string `yaml:"values"`                // List of secret patterns/regexes to allowlist
 }
 
 var (
@@ -209,11 +209,11 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 	return filteredResults
 }
 
-// FilterWhitelistedSecrets filters out results that match whitelisted secrets.
+// FilterAllowlistedSecrets filters out results that match allowlisted secrets.
 // This allows users to specify known safe secrets that should not be reported.
 // Supports regex patterns.
-func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelistedSecrets map[string]struct{}) []Result {
-	if len(whitelistedSecrets) == 0 {
+func FilterAllowlistedSecrets(ctx context.Context, results []Result, allowlistedSecrets map[string]struct{}) []Result {
+	if len(allowlistedSecrets) == 0 {
 		return results
 	}
 
@@ -224,21 +224,21 @@ func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelisted
 			continue
 		}
 
-		isWhitelisted := false
+		isAllowlisted := false
 		var matchReason string
 
-		// Check if the raw secret matches any whitelisted secret
+		// Check if the raw secret matches any allowlisted secret
 		rawSecret := string(result.Raw)
-		if isWhitelisted, matchReason = isSecretWhitelisted(rawSecret, whitelistedSecrets); isWhitelisted {
-			ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", maskSecret(rawSecret), "reason", matchReason)
+		if isAllowlisted, matchReason = isSecretAllowlisted(rawSecret, allowlistedSecrets); isAllowlisted {
+			ctx.Logger().V(4).Info("Skipping result: allowlisted secret", "result", maskSecret(rawSecret), "reason", matchReason)
 			continue
 		}
 
 		// Also check RawV2 if present
 		if result.RawV2 != nil {
 			rawV2Secret := string(result.RawV2)
-			if isWhitelisted, matchReason = isSecretWhitelisted(rawV2Secret, whitelistedSecrets); isWhitelisted {
-				ctx.Logger().V(4).Info("Skipping result: whitelisted secret", "result", maskSecret(rawV2Secret), "reason", matchReason)
+			if isAllowlisted, matchReason = isSecretAllowlisted(rawV2Secret, allowlistedSecrets); isAllowlisted {
+				ctx.Logger().V(4).Info("Skipping result: allowlisted secret", "result", maskSecret(rawV2Secret), "reason", matchReason)
 				continue
 			}
 		}
@@ -249,42 +249,42 @@ func FilterWhitelistedSecrets(ctx context.Context, results []Result, whitelisted
 	return filteredResults
 }
 
-// LoadWhitelistedSecrets loads secrets from a YAML file that should be whitelisted.
+// LoadAllowlistedSecrets loads secrets from a YAML file that should be allowlisted.
 // The YAML format supports multiline secrets and includes optional descriptions.
-func LoadWhitelistedSecrets(yamlFile string) (map[string]struct{}, error) {
+func LoadAllowlistedSecrets(yamlFile string) (map[string]struct{}, error) {
 	file, err := os.Open(yamlFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open whitelist file: %w", err)
+		return nil, fmt.Errorf("failed to open allowlist file: %w", err)
 	}
 	defer file.Close()
 
-	var entries []WhitelistEntry
+	var entries []AllowlistEntry
 	decoder := yaml.NewDecoder(file)
 	if err := decoder.Decode(&entries); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML whitelist file: %w", err)
+		return nil, fmt.Errorf("failed to parse YAML allowlist file: %w", err)
 	}
 
-	whitelistedSecrets := make(map[string]struct{})
+	allowlistedSecrets := make(map[string]struct{})
 	for _, entry := range entries {
 		for _, value := range entry.Values {
 			if strings.TrimSpace(value) != "" { // Skip empty values
-				whitelistedSecrets[value] = struct{}{}
+				allowlistedSecrets[value] = struct{}{}
 			}
 		}
 	}
 
-	return whitelistedSecrets, nil
+	return allowlistedSecrets, nil
 }
 
-// isSecretWhitelisted checks if a secret matches any whitelisted pattern (exact string or regex)
-func isSecretWhitelisted(secret string, whitelistedSecrets map[string]struct{}) (bool, string) {
+// isSecretAllowlisted checks if a secret matches any allowlisted pattern (exact string or regex)
+func isSecretAllowlisted(secret string, allowlistedSecrets map[string]struct{}) (bool, string) {
 	// First, try exact string matching for performance
-	if _, isWhitelisted := whitelistedSecrets[secret]; isWhitelisted {
+	if _, isAllowlisted := allowlistedSecrets[secret]; isAllowlisted {
 		return true, "exact match"
 	}
 
 	// Try regex matching
-	for pattern := range whitelistedSecrets {
+	for pattern := range allowlistedSecrets {
 		if regex, err := regexp.Compile(pattern); err == nil {
 			if regex.MatchString(secret) {
 				return true, "regex match: " + pattern
