@@ -1,6 +1,3 @@
-//go:build integration
-// +build integration
-
 package github
 
 import (
@@ -17,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -153,6 +151,106 @@ func TestSource_ScanComments(t *testing.T) {
 							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/pull/2#discussion_r1242763304",
 							Username:  "truffle-sandbox",
 							Timestamp: "2023-06-26 21:00:11 +0000 UTC",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				// Close the channel
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh)
+				if (err != nil) != tt.wantErr {
+					if ctx.Err() != nil {
+						return
+					}
+					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+			}()
+
+			i := 0
+			for gotChunk := range chunksCh {
+				// Skip chunks that are not comments.
+				if gotChunk.SourceMetadata.GetGithub().GetCommit() != "" {
+					continue
+				}
+				i++
+				githubCommentCheckFunc(gotChunk, tt.wantChunk, i, t, tt.name)
+			}
+
+			// Confirm all comments were processed.
+			if i != tt.numExpectedChunks {
+				t.Errorf("did not complete all chunks, got %d, want %d", i, tt.numExpectedChunks)
+			}
+
+		})
+	}
+}
+
+func TestSource_ScanCommentsWithGraphql(t *testing.T) {
+	feature.UseGithubGraphqlAPI.Store(true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	type init struct {
+		name       string
+		verify     bool
+		connection *sourcespb.GitHub
+	}
+	tests := []struct {
+		name              string
+		init              init
+		wantChunk         *sources.Chunk
+		wantErr           bool
+		numExpectedChunks int
+	}{
+		{
+			name: "unauthenticated, single repo, issue comments and pr comments",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories:               []string{"https://github.com/trufflesecurity/driftwood.git"},
+					IncludeIssueComments:       true,
+					IncludePullRequestComments: true,
+					Credential:                 &sourcespb.GitHub_Unauthenticated{},
+				},
+			},
+			numExpectedChunks: 5,
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Link:      "https://github.com/trufflesecurity/driftwood.git/issues/1",
+							Username:  "truffle-sandbox",
+							Timestamp: "2023-06-22 23:33:46 +0000 UTC",
 						},
 					},
 				},
@@ -957,7 +1055,7 @@ func TestSource_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			connector, err := newConnector(tt.sourceConfig)
+			connector, err := newConnector(tt.args.ctx, tt.sourceConfig)
 			require.NoError(t, err)
 			tt.sourceConfig.connector = connector
 

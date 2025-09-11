@@ -1271,7 +1271,10 @@ var (
 	state = "all"
 )
 
-func (s *Source) processIssueandPRsWithCommentsREST(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processIssueandPRsWithCommentsREST(
+	ctx context.Context, repoInfo repoInfo,
+	reporter sources.ChunkReporter, cutoffTime *time.Time,
+) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
@@ -1295,7 +1298,10 @@ func (s *Source) processIssueandPRsWithCommentsREST(ctx context.Context, repoInf
 	return nil
 }
 
-func (s *Source) processRepoIssueandPRsWithCommentsGraphql(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
+	ctx context.Context, repoInfo repoInfo,
+	reporter sources.ChunkReporter, cutoffTime *time.Time,
+) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssuesWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {

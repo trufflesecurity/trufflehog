@@ -16,7 +16,10 @@ import (
 )
 
 // processIssuesWithComments process github repo issues with comments using graphql API
-func (s *Source) processIssuesWithComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processIssuesWithComments(
+	ctx context.Context, repoInfo repoInfo,
+	reporter sources.ChunkReporter, cutoffTime *time.Time,
+) error {
 	vars := map[string]any{
 		owner:              githubv4.String(repoInfo.owner),
 		repository:         githubv4.String(repoInfo.name),
@@ -323,7 +326,10 @@ func chunkIDs(ids []string, size int) [][]string {
 }
 
 // handleRateLimitWithChunkReporter is a wrapper around handleRateLimit that includes chunk reporting
-func (s *Source) handleGraphqlRateLimitWithChunkReporter(ctx context.Context, reporter sources.ChunkReporter, rl *rateLimit, errIn error) bool {
+func (s *Source) handleGraphqlRateLimitWithChunkReporter(
+	ctx context.Context, reporter sources.ChunkReporter,
+	rl *rateLimit, errIn error,
+) bool {
 	return s.handleGraphQLRateLimit(ctx, rl, errIn, &chunkErrorReporter{reporter: reporter})
 }
 
