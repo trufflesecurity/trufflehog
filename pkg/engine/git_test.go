@@ -128,11 +128,11 @@ func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
 
 	parent, err := os.MkdirTemp("", "trufflehog-test-keys-*")
 	if err != nil {
-		t.Skipf("skipping: unable to create temp dir: %v", err)
+		t.Fail()
 	}
 	defer os.RemoveAll(parent)
 	localRepo := filepath.Join(parent, "test_keys.git")
-	cloneCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	cloneCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	// clone with --mirror and --bare from https://github.com/trufflesecurity/test_keys.git to local and then pass it in as a local path
@@ -146,7 +146,6 @@ func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
 	run := func(t *testing.T, mirror bool, cfg sources.GitConfig) (uint64, uint64) {
 		t.Helper()
 
-		// Configure engine
 		const defaultOutputBufferSize = 64
 		opts := []func(*sources.SourceManager){
 			sources.WithSourceUnits(),
@@ -163,7 +162,6 @@ func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
 			Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 		}
 
-		// Toggle mirror mode if requested
 		feature.UseGitMirror.Store(false)
 		if mirror {
 			feature.UseGitMirror.Store(true)
@@ -184,16 +182,10 @@ func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
 		return secrets, bytes
 	}
 
-	// 1) Remote URL with mirror clone (engine will clone with --mirror), scanned as local path
 	s1, b1 := run(t, true, sources.GitConfig{URI: "https://github.com/trufflesecurity/test_keys.git"})
-
-	// 2) file:// URI of local bare mirror (engine clones from file remote), explicit bare
 	s2, b2 := run(t, false, sources.GitConfig{URI: fileURI, Bare: true})
-
-	// 3) file:// URI with trust-local-git-config (scan the repo in-place), explicit bare
 	s3, b3 := run(t, false, sources.GitConfig{URI: fileURI, Bare: true, TrustLocalGitConfig: true})
 
-	// All should be equal and greater than 0
 	assert.Greater(t, int(s1), 0)
 	assert.Greater(t, int(b1), 0)
 
