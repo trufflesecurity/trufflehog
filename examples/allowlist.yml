@@ -1,0 +1,20 @@
+- description: "RSA test keys"
+  values:
+    - |
+      -----BEGIN RSA PRIVATE KEY-----
+      MIIEpAIBAAKCAQEA...
+      -----END RSA PRIVATE KEY-----
+- description: "Demo API keys for documentation"
+  values:
+    - "demo_.*"
+    - "example-api-key-.*"
+    - "sk_test_.*"
+- description: "Decommissioned secrets (rotated out)"
+  values:
+    - "old-prod-key-2023"
+    - "^legacy-.*-deprecated$"
+- description: "Public certificates and well-known test tokens"
+  values:
+    - "^-----BEGIN CERTIFICATE-----"
+    - "password123"
+    - "token_1234567890abcdef"

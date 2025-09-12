@@ -3,12 +3,16 @@ package detectors
 import (
 	_ "embed"
 	"fmt"
+	"io"
 	"math"
+	"os"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+	"gopkg.in/yaml.v3"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -27,6 +31,12 @@ type CustomFalsePositiveChecker interface {
 	// 1. Whether the result is a false positive.
 	// 2. If #1 is `true`, the reason why.
 	IsFalsePositive(result Result) (bool, string)
+}
+
+// AllowlistEntry represents an allowlist entry in the YAML config
+type AllowlistEntry struct {
+	Description string   `yaml:"description,omitempty"` // Optional description for the allowlist
+	Values      []string `yaml:"values"`                // List of secret patterns/regexes to allowlist
 }
 
 var (
@@ -198,4 +208,111 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 	}
 
 	return filteredResults
+}
+
+// FilterAllowlistedSecrets filters out results that match allowlisted secrets.
+// This allows users to specify known safe secrets that should not be reported.
+// Supports regex patterns.
+func FilterAllowlistedSecrets(ctx context.Context, results []Result, allowlistedSecrets map[string]struct{}) []Result {
+	if len(allowlistedSecrets) == 0 {
+		return results
+	}
+
+	var filteredResults []Result
+	for _, result := range results {
+		if len(result.Raw) == 0 {
+			filteredResults = append(filteredResults, result)
+			continue
+		}
+
+		isAllowlisted := false
+		var matchReason string
+
+		// Check if the raw secret matches any allowlisted secret
+		rawSecret := string(result.Raw)
+		if isAllowlisted, matchReason = isSecretAllowlisted(rawSecret, allowlistedSecrets); isAllowlisted {
+			ctx.Logger().V(4).Info("Skipping result: allowlisted secret", "result", maskSecret(rawSecret), "reason", matchReason)
+			continue
+		}
+
+		// Also check RawV2 if present
+		if result.RawV2 != nil {
+			rawV2Secret := string(result.RawV2)
+			if isAllowlisted, matchReason = isSecretAllowlisted(rawV2Secret, allowlistedSecrets); isAllowlisted {
+				ctx.Logger().V(4).Info("Skipping result: allowlisted secret", "result", maskSecret(rawV2Secret), "reason", matchReason)
+				continue
+			}
+		}
+
+		filteredResults = append(filteredResults, result)
+	}
+
+	return filteredResults
+}
+
+// LoadAllowlistedSecrets loads secrets from a YAML file that should be allowlisted.
+// The YAML format supports multiline secrets and includes optional descriptions.
+func LoadAllowlistedSecrets(yamlFile string) (map[string]struct{}, error) {
+	file, err := os.Open(yamlFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open allowlist file: %w", err)
+	}
+	defer file.Close()
+
+	// Read the entire file content
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read allowlist file: %w", err)
+	}
+
+	// Ensure the content ends with a newline for proper YAML parsing
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		content = append(content, '\n')
+	}
+
+	var entries []AllowlistEntry
+	if err := yaml.Unmarshal(content, &entries); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML allowlist file: %w", err)
+	}
+
+	allowlistedSecrets := make(map[string]struct{})
+	for _, entry := range entries {
+		for _, value := range entry.Values {
+			if strings.TrimSpace(value) != "" { // Skip empty values
+				allowlistedSecrets[value] = struct{}{}
+			}
+		}
+	}
+
+	return allowlistedSecrets, nil
+}
+
+// isSecretAllowlisted checks if a secret matches any allowlisted pattern (exact string or regex)
+func isSecretAllowlisted(secret string, allowlistedSecrets map[string]struct{}) (bool, string) {
+	// First, try exact string matching for performance
+	if _, isAllowlisted := allowlistedSecrets[secret]; isAllowlisted {
+		return true, "exact match"
+	}
+
+	// Try regex matching
+	for pattern := range allowlistedSecrets {
+		if regex, err := regexp.Compile(pattern); err == nil {
+			if regex.MatchString(secret) {
+				return true, "regex match: " + pattern
+			}
+		}
+	}
+
+	return false, ""
+}
+
+// maskSecret masks a secret for safe logging by showing only the first and last few characters
+func maskSecret(secret string) string {
+	if len(secret) <= 8 {
+		return "***"
+	}
+	if len(secret) <= 16 {
+		return secret[:2] + "***" + secret[len(secret)-2:]
+	}
+	return secret[:4] + "***" + secret[len(secret)-4:]
 }
