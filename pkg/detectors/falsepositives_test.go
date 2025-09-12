@@ -646,7 +646,7 @@ func TestLoadallowlistedSecrets(t *testing.T) {
       MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
       -----END RSA PRIVATE KEY-----`,
 			expected: map[string]struct{}{
-				"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...\n-----END RSA PRIVATE KEY-----": {},
+				"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...\n-----END RSA PRIVATE KEY-----\n": {},
 			},
 			wantErr: false,
 		},
