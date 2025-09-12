@@ -1133,18 +1133,6 @@ func printAverageDetectorTime(e *engine.Engine) {
 	}
 }
 
-// Function to check if the commit is valid
-func isValidCommit(uri, commit string) bool {
-	// handle file:// urls
-	repoPath, _ := strings.CutPrefix(uri, "file://") // remove the prefix to validate against the repo path
-	output, err := exec.Command("git", "-C", repoPath, "cat-file", "-t", commit).Output()
-	if err != nil {
-		return false
-	}
-
-	return strings.TrimSpace(string(output)) == "commit"
-}
-
 // validateClonePath ensures that --clone-path, if provided, exists and is a directory.
 // It also verifies that --no-cleanup is only allowed when --clone-path is set.
 // Note: without a custom clone path, repositories are cloned into temporary directories, which should never be retained.
