@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -214,7 +216,8 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 
 	var raw string
-	for key, values := range match {
+	for _, key := range slices.Sorted(maps.Keys(match)) {
+		values := match[key]
 		// values[0] contains the entire regex match.
 		secret := values[0]
 		if len(values) > 1 {
