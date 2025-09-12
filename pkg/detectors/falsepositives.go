@@ -3,6 +3,7 @@ package detectors
 import (
 	_ "embed"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"regexp"
@@ -258,9 +259,19 @@ func LoadAllowlistedSecrets(yamlFile string) (map[string]struct{}, error) {
 	}
 	defer file.Close()
 
+	// Read the entire file content
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read allowlist file: %w", err)
+	}
+
+	// Ensure the content ends with a newline for proper YAML parsing
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		content = append(content, '\n')
+	}
+
 	var entries []AllowlistEntry
-	decoder := yaml.NewDecoder(file)
-	if err := decoder.Decode(&entries); err != nil {
+	if err := yaml.Unmarshal(content, &entries); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML allowlist file: %w", err)
 	}
 
