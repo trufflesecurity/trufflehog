@@ -112,6 +112,12 @@ func verifyMatch(ctx context.Context, client *http.Client, userId string, secret
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
+	case http.StatusBadRequest:
+		// The request was malformed. We can't verify this secret, but it might be valid.
+		return false, nil, fmt.Errorf("received HTTP 400 Bad Request from Smartling API")
+	case http.StatusTooManyRequests:
+		// We have been rate limited. We can't verify this secret, but it might be valid.
+		return false, nil, fmt.Errorf("received HTTP 429 Too Many Requests from Smartling API")
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
