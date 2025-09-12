@@ -1,0 +1,112 @@
+package smartling
+
+import (
+	"context"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+func TestSmartling_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the smartling API
+				[DEBUG] Using UserIdentifier=bxraiavfkoirvbzhlhvwggnzuouwjp
+				[DEBUG] Using Secret=aprb039cirfv071nqagvb22f3rWW^7qc802dle3rqeija66dkb1ulaa
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"bxraiavfkoirvbzhlhvwggnzuouwjp:aprb039cirfv071nqagvb22f3rWW^7qc802dle3rqeija66dkb1ulaa"},
+		},
+		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{smartling}</id>
+					<userId>bxraiavfkoirvbzhlhvwggnzuouwjp</userId>
+  					<secret>aprb039cirfv071nqagvb22f3rWW^7qc802dle3rqeija66dkb1ulaa</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"bxraiavfkoirvbzhlhvwggnzuouwjp:aprb039cirfv071nqagvb22f3rWW^7qc802dle3rqeija66dkb1ulaa"},
+		},
+		{
+			name: "finds all matches",
+			input: `
+				[INFO] Sending request to the smartling API
+				[DEBUG] Using UserId=bxraiavfkoirvbzhlhvwggnzuouwjp
+				[DEBUG] Using Secret=aprb039cirfv071nqagvb22f3rWW^7qc802dle3rqeija66dkb1ulaa
+				[ERROR] Response received 401 UnAuthorized
+				[DEBUG] Using smartling UserId=einnwiufkduvcizimcnwnnggymexoy
+				[DEBUG] Using smartling Key=tjl02sv8fvefol38535m5cguwoHa.966dmn82jcaprs3ulqqtb7v23c
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{
+				"bxraiavfkoirvbzhlhvwggnzuouwjp:aprb039cirfv071nqagvb22f3rWW^7qc802dle3rqeija66dkb1ulaa",
+				"bxraiavfkoirvbzhlhvwggnzuouwjp:tjl02sv8fvefol38535m5cguwoHa.966dmn82jcaprs3ulqqtb7v23c",
+				"einnwiufkduvcizimcnwnnggymexoy:aprb039cirfv071nqagvb22f3rWW^7qc802dle3rqeija66dkb1ulaa",
+				"einnwiufkduvcizimcnwnnggymexoy:tjl02sv8fvefol38535m5cguwoHa.966dmn82jcaprs3ulqqtb7v23c",
+			},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the smartling API
+				[DEBUG] Using smartling UserId=d7e8f5c1459d0e2fbc9d71f40c8a
+				[DEBUG] Using smartling Key=tjl02sv8fvefol38535m5cguwoHa.966dmn82jcaprs3ulqqtv23c
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: []string{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
+				return
+			}
+
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			require.NoError(t, err)
+
+			if len(results) != len(test.want) {
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
