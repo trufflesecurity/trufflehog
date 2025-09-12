@@ -137,8 +137,8 @@ func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
 
 	// clone with --mirror and --bare from https://github.com/trufflesecurity/test_keys.git to local and then pass it in as a local path
 	cloneCmd := exec.CommandContext(cloneCtx, "git", "clone", "--mirror", "--bare", "https://github.com/trufflesecurity/test_keys.git", localRepo)
-	if out, err := cloneCmd.CombinedOutput(); err != nil {
-		t.Skipf("skipping: unable to prepare local mirror clone: %v, output: %s", err, string(out))
+	if _, err := cloneCmd.CombinedOutput(); err != nil {
+		t.Fail()
 	}
 
 	fileURI := (&url.URL{Scheme: "file", Path: filepath.ToSlash(localRepo)}).String()

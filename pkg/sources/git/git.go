@@ -1239,13 +1239,13 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 
 		path, _, err = CloneRepoUsingToken(ctx, password, remotePath, clonePath, uri.User.Username(), true, "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
+			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %w", uri.Redacted(), err)
 		}
 	default:
 		ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
 		path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath, clonePath, "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %w", remotePath, err)
 		}
 	}
 
