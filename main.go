@@ -522,7 +522,7 @@ func run(state overseer.State) {
 	// Load allowlisted secrets if specified
 	var allowlistedSecrets map[string]struct{}
 	if *allowlistSecretsFile != "" {
-		allowlistedSecrets, err := detectors.LoadAllowlistedSecrets(*allowlistSecretsFile)
+		allowlistedSecrets, err = detectors.LoadAllowlistedSecrets(*allowlistSecretsFile)
 		if err != nil {
 			logFatal(err, "failed to load allowlisted secrets")
 		}
