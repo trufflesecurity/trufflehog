@@ -742,7 +742,8 @@ func TestGitConfigSecurityIsolation(t *testing.T) {
 				assert.Equal(t, "!touch malicious_alias.txt", strings.TrimSpace(string(output)),
 					"Config alias.test should have original dangerous value")
 
-				exec.Command("git", "-C", preparedPath, "test").Run()
+				err = exec.Command("git", "-C", preparedPath, "test").Run()
+				assert.NoError(t, err)
 				_, err = os.Stat(maliciousFilePath)
 				assert.False(t, os.IsNotExist(err), "Malicious file malicious_alias.txt should exist in trusted environment")
 
@@ -755,11 +756,16 @@ func TestGitConfigSecurityIsolation(t *testing.T) {
 				_, err = exec.Command("git", "-C", preparedPath, "status").Output()
 				assert.NoError(t, err, "Sanitized repo should be a valid git repository")
 
-				exec.Command("git", "-C", preparedPath, "test").Run()
+				err = exec.Command("git", "-C", preparedPath, "test").Run()
+				assert.Error(t, err)
+
 				_, err = os.Stat(maliciousFilePath)
 				assert.True(t, os.IsNotExist(err), "Malicious file malicious_alias.txt should not exist in sanitized environment")
 			}
-			os.Remove(maliciousFilePath)
+			// if the file exists, remove it
+			if _, err := os.Stat(maliciousFilePath); err == nil {
+				assert.NoError(t, os.Remove(maliciousFilePath))
+			}
 		})
 	}
 }
