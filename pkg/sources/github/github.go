@@ -1098,7 +1098,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter, cutoffTime)
 	} else if s.includeIssueComments || s.includePRComments {
 		// if we need to use graphql api for repo issues, prs and comments
-		if feature.UseGithubGraphqlAPI.Load() {
+		if feature.UseGithubGraphQLAPI.Load() {
 			return s.processRepoIssueandPRsWithCommentsGraphql(ctx, repoInfo, reporter, cutoffTime)
 		}
 
