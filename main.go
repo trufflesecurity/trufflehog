@@ -65,7 +65,7 @@ var (
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
-	allowlistSecretsFile       = cli.Flag("allowlist-secrets", "Path to YAML file with secrets to allowlist. See examples/allowlist.yml for format.").String()
+	allowlistSecretsFile       = cli.Flag("allowlist-secrets-file", "Path to YAML file with secrets to allowlist. See examples/allowlist.yml for format.").String()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
 	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
