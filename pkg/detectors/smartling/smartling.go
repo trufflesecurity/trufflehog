@@ -71,9 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, extraData, verificationErr := verifyMatch(ctx, client, userId, secret)
+				isVerified, verificationErr := verifyMatch(ctx, client, userId, secret)
 				s1.Verified = isVerified
-				s1.ExtraData = extraData
 				s1.SetVerificationError(verificationErr, userId, secret)
 				s1.SetPrimarySecretValue(secret)
 			}
@@ -86,19 +85,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, userId string, secret string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, userId string, secret string) (bool, error) {
 	body := []byte(fmt.Sprintf(`{"userIdentifier":"%s","userSecret":"%s"}`, userId, secret))
 
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, "https://api.smartling.com/auth-api/v2/authenticate", bytes.NewReader(body))
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -108,18 +107,12 @@ func verifyMatch(ctx context.Context, client *http.Client, userId string, secret
 	switch res.StatusCode {
 	case http.StatusOK:
 		// The secret is verified
-		return true, nil, nil
+		return true, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
-		return false, nil, nil
-	case http.StatusBadRequest:
-		// The request was malformed. We can't verify this secret, but it might be valid.
-		return false, nil, fmt.Errorf("received HTTP 400 Bad Request from Smartling API")
-	case http.StatusTooManyRequests:
-		// We have been rate limited. We can't verify this secret, but it might be valid.
-		return false, nil, fmt.Errorf("received HTTP 429 Too Many Requests from Smartling API")
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
