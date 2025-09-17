@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -185,25 +186,23 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 			return nil, fmt.Errorf("bad status for JWKS: %v", resp.Status)
 		}
 
-		// Load JWKS into `jwt.VerificationKeySet` or `jwt.VerificationKey` from JSON
-		type Key map[string]any
-		var jwks struct {
-			Keys []Key `json:"keys"`
-		}
-		if err := json.NewDecoder(limitReader(resp.Body)).Decode(&jwks); err != nil {
+		// Parse the JWKS and find the first matching key
+		keySet, err := jwk.ParseReader(limitReader(resp.Body))
+		if err != nil {
 			return nil, fmt.Errorf("failed to parse JWKS: %w", err)
 		}
-		var matchingKey Key = nil
-		for _, key := range jwks.Keys {
-			if key["kid"] == kid {
-				matchingKey = key
-			}
-		}
-		if matchingKey == nil {
+		matchingKey, found := keySet.LookupKeyID(kid)
+		if !found {
 			return nil, fmt.Errorf("no matching JWKS key")
 		}
 
-		return matchingKey, nil
+		// Parse matching key to the "raw" key type needed for signature verification
+		var rawMatchingKey any
+		err = jwk.Export(matchingKey, &rawMatchingKey); if err != nil {
+			return nil, fmt.Errorf("failed to export matching key: %w", err)
+		}
+
+		return rawMatchingKey, nil
 	}
 
 	token, err := jwt.Parse(
