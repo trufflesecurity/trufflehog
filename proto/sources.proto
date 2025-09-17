@@ -262,19 +262,18 @@ message GitHub {
   string head = 9;
   string base = 10;
   repeated string ignore_repos = 11;
-  repeated string include_repos = 12;
-  bool include_pull_request_comments = 14;
-  bool include_issue_comments = 15;
-  bool include_gist_comments = 16;
-  bool skip_binaries = 17;
-  bool skip_archives = 18;
-  bool include_wikis = 19;
-  uint32 comments_timeframe_days = 20;
-  bool remove_auth_in_url = 21;
-  string clone_path = 22;
-  bool no_cleanup = 23;
-  bool ignore_gists = 24;
-  bool print_legacy_json = 25;
+  bool include_pull_request_comments = 12;
+  bool include_issue_comments = 18;
+  bool include_gist_comments = 19;
+  bool skip_binaries = 20;
+  bool skip_archives = 21;
+  bool include_wikis = 22;
+  uint32 comments_timeframe_days = 23;
+  bool remove_auth_in_url = 24;
+  string clone_path = 25;
+  bool no_cleanup = 26;
+  bool ignore_gists = 27;
+  bool print_legacy_json = 28;
 }
 
 message GitHubExperimental {
