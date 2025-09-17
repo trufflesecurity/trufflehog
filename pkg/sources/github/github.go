@@ -253,7 +253,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
 		simple.NewCache[string](),
-		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
+		s.conn.GetRepositories(),
 		s.conn.GetIgnoreRepos(),
 	)
 	s.repos = s.conn.Repositories
