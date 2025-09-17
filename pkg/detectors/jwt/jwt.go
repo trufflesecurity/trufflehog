@@ -34,7 +34,7 @@ var _ interface {
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b((?:eyJ|ewogIC|ewoid)[A-Za-z0-9_-]{12,}\.(?:eyJ|ewo)[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,})\b`)
+	keyPat = regexp.MustCompile(`\b((?:eyJ|ewogIC|ewoid)[A-Za-z0-9_-]{12,}={0,2}\.(?:eyJ|ewo)[A-Za-z0-9_-]{12,}={0,2}\.[A-Za-z0-9_-]{12,})\b`)
 )
 
 // The default max secret size value for this detector must be overridden or JWTs with lots of claims will get missed.
