@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRetryableHTTPClientCheckRetry(t *testing.T) {
@@ -268,4 +271,171 @@ func TestRetryableHTTPClientTimeout(t *testing.T) {
 			assert.True(t, isRoundTripperTransport, "HTTP client transport is not a retryablehttp.RoundTripper")
 		})
 	}
+}
+
+func TestSanitizeURL(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "valid https URL",
+			input:    "https://api.example.com/v1/users",
+			expected: "https://api.example.com/v1/users",
+		},
+		{
+			name:     "URL with query parameters",
+			input:    "https://api.example.com/search?q=secret&limit=10",
+			expected: "https://api.example.com/search",
+		},
+		{
+			name:     "URL with fragment",
+			input:    "https://example.com/page#section",
+			expected: "https://example.com/page",
+		},
+		{
+			name:     "URL with user info",
+			input:    "https://user:pass@api.example.com/path",
+			expected: "https://api.example.com/path",
+		},
+		{
+			name:     "empty URL",
+			input:    "",
+			expected: "unknown",
+		},
+		{
+			name:     "invalid URL",
+			input:    "not-a-url",
+			expected: "relative_or_invalid",
+		},
+		{
+			name:     "very long path",
+			input:    "https://example.com/" + strings.Repeat("a", 150),
+			expected: "https://example.com/" + strings.Repeat("a", 99) + "...", // 99 + 1 ("/") = 100 chars
+		},
+		{
+			name:     "root path",
+			input:    "https://example.com",
+			expected: "https://example.com/",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := sanitizeURL(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestSaneHttpClientMetrics(t *testing.T) {
+	// Create a test server that returns different status codes
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/success":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("success"))
+		case "/error":
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("error"))
+		case "/notfound":
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("not found"))
+		default:
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("default"))
+		}
+	}))
+	defer server.Close()
+
+	// Create a SaneHttpClient
+	client := SaneHttpClient()
+
+	testCases := []struct {
+		name               string
+		path               string
+		expectedStatusCode int
+		expectsNon200      bool
+	}{
+		{
+			name:               "successful request",
+			path:               "/success",
+			expectedStatusCode: 200,
+			expectsNon200:      false,
+		},
+		{
+			name:               "server error request",
+			path:               "/error",
+			expectedStatusCode: 500,
+			expectsNon200:      true,
+		},
+		{
+			name:               "not found request",
+			path:               "/notfound",
+			expectedStatusCode: 404,
+			expectsNon200:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var requestURL string
+			if strings.HasPrefix(tc.path, "http") {
+				requestURL = tc.path
+			} else {
+				requestURL = server.URL + tc.path
+			}
+
+			// Get initial metric values
+			sanitizedURL := sanitizeURL(requestURL)
+			initialRequestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+
+			// Make the request
+			resp, err := client.Get(requestURL)
+
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, tc.expectedStatusCode, resp.StatusCode)
+
+			// Check that request counter was incremented
+			requestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+			assert.Equal(t, initialRequestsTotal+1, requestsTotal)
+		})
+	}
+}
+
+func TestInstrumentedTransport(t *testing.T) {
+	// Create a mock transport that we can control
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("test response"))
+	}))
+	defer server.Close()
+
+	// Create instrumented transport
+	transport := NewInstrumentedTransport(nil)
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   5 * time.Second,
+	}
+
+	// Get initial metric value
+	sanitizedURL := sanitizeURL(server.URL)
+	initialCount := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+
+	// Make a request
+	resp, err := client.Get(server.URL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Verify the request was successful
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Verify metrics were recorded
+	finalCount := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+	assert.Equal(t, initialCount+1, finalCount)
+
+	// Note: Testing histogram metrics is complex due to the way Prometheus handles them
+	// The main thing is that the request completed successfully and counters were incremented
 }
