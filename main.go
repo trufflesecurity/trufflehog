@@ -520,13 +520,14 @@ func run(state overseer.State) {
 	verificationCacheMetrics := verificationcache.InMemoryMetrics{}
 
 	// Load allowlisted secrets if specified
-	var allowlistedSecrets map[string]struct{}
+	var allowlistedSecrets *detectors.CompiledAllowlist
 	if *allowlistSecretsFile != "" {
 		allowlistedSecrets, err = detectors.LoadAllowlistedSecrets(*allowlistSecretsFile)
 		if err != nil {
 			logFatal(err, "failed to load allowlisted secrets")
 		}
-		logger.Info("loaded allowlisted secrets", "count", len(allowlistedSecrets), "file", *allowlistSecretsFile)
+		totalCount := len(allowlistedSecrets.ExactMatches) + len(allowlistedSecrets.CompiledRegexes)
+		logger.Info("loaded allowlisted secrets", "exact_matches", len(allowlistedSecrets.ExactMatches), "regex_patterns", len(allowlistedSecrets.CompiledRegexes), "total", totalCount, "file", *allowlistSecretsFile)
 	}
 
 	engConf := engine.Config{

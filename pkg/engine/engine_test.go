@@ -1323,7 +1323,7 @@ func TestEngine_AllowlistedSecrets(t *testing.T) {
 	tests := []struct {
 		name               string
 		content            string
-		allowlistedSecrets map[string]struct{}
+		allowlistedSecrets []detectors.AllowlistEntry
 		expectedFindings   int
 	}{
 		{
@@ -1334,8 +1334,12 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 `,
-			allowlistedSecrets: map[string]struct{}{
-				"AKIAQYLPMN5HHHFPZAM2": {},
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						"AKIAQYLPMN5HHHFPZAM2",
+					},
+				},
 			},
 			expectedFindings: 2,
 		},
@@ -1347,8 +1351,12 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			allowlistedSecrets: map[string]struct{}{
-				`^sk-[a-z0-9]{32}$`: {},
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						`^sk-[a-z0-9]{32}$`,
+					},
+				},
 			},
 			expectedFindings: 2,
 		},
@@ -1360,9 +1368,13 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			allowlistedSecrets: map[string]struct{}{
-				"AKIAQYLPMN5HHHFPZAM2": {}, // exact string
-				`^sk-[a-z0-9]{32}$`:    {}, // regex pattern
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						"AKIAQYLPMN5HHHFPZAM2", // exact string
+						`^sk-[a-z0-9]{32}$`,    // regex pattern
+					},
+				},
 			},
 			expectedFindings: 1,
 		},
@@ -1374,8 +1386,12 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			allowlistedSecrets: map[string]struct{}{
-				`^SK-[a-z0-9]{32}$`: {}, // case sensitive - only matches uppercase SK
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						`^SK-[a-z0-9]{32}$`, // case sensitive - only matches uppercase SK
+					},
+				},
 			},
 			expectedFindings: 3,
 		},
@@ -1387,8 +1403,12 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			allowlistedSecrets: map[string]struct{}{
-				`(?i)^SK-[a-z0-9]{32}$`: {}, // case insensitive
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						`(?i)^SK-[a-z0-9]{32}$`, // case insensitive
+					},
+				},
 			},
 			expectedFindings: 2,
 		},
@@ -1400,7 +1420,7 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			allowlistedSecrets: map[string]struct{}{},
+			allowlistedSecrets: []detectors.AllowlistEntry{},
 			expectedFindings:   3,
 		},
 		{
@@ -1411,8 +1431,12 @@ aws_secret_access_key = 1tUm636uS1yOEcfP5pvfqJ/ml36mF7AkyHsEU0IU
 deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
 openai_api_key = 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
 		`,
-			allowlistedSecrets: map[string]struct{}{
-				"[AKIAQYLPMN5HHHFPZAM2": {}, // invalid regex, treated as exact string
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						"[AKIAQYLPMN5HHHFPZAM2", // invalid regex, treated as exact string
+					},
+				},
 			},
 			expectedFindings: 3,
 		},
@@ -1447,7 +1471,7 @@ openai_api_key = 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
 				Verify:             false,
 				SourceManager:      sourceManager,
 				Dispatcher:         NewPrinterDispatcher(new(discardPrinter)),
-				AllowlistedSecrets: tt.allowlistedSecrets,
+				AllowlistedSecrets: detectors.CompileAllowlistPatterns(tt.allowlistedSecrets),
 			}
 
 			eng, err := NewEngine(ctx, &conf)
@@ -1487,15 +1511,19 @@ func TestEngine_allowlistedSecretsPerformance(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Define allowlist with both exact strings and regex patterns
-	allowlistedSecrets := map[string]struct{}{
-		// Some exact matches
-		"AKIAQYLPMN5HHHF00001":                             {},
-		"sk-abc123def456ghi789jkl012mno00005":              {},
-		"SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC00003": {},
-		// Some regex patterns
-		`^AKIAQYLPMN5HHHF[0-4][0-9]{4}$`:                                {}, // keys 0-49
-		`^sk-abc123def456ghi789jkl012mno[5-9][0-9]{4}$`:                 {}, // tokens 50-99
-		`^sk-SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC[1-9][0-9]{4}$`: {}, // keys 100-999
+	allowlistedSecrets := []detectors.AllowlistEntry{
+		{
+			Values: []string{
+				// Some exact matches
+				"AKIAQYLPMN5HHHF00001",
+				"sk-abc123def456ghi789jkl012mno00005",
+				"SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC00003",
+				// Some regex patterns
+				`^AKIAQYLPMN5HHHF[0-4][0-9]{4}$`,                                // keys 0-49
+				`^sk-abc123def456ghi789jkl012mno[5-9][0-9]{4}$`,                 // tokens 50-99
+				`^sk-SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC[1-9][0-9]{4}$`, // keys 100-999
+			},
+		},
 	}
 
 	const defaultOutputBufferSize = 64
@@ -1515,7 +1543,7 @@ func TestEngine_allowlistedSecretsPerformance(t *testing.T) {
 		Verify:             false,
 		SourceManager:      sourceManager,
 		Dispatcher:         NewPrinterDispatcher(new(discardPrinter)),
-		AllowlistedSecrets: allowlistedSecrets,
+		AllowlistedSecrets: detectors.CompileAllowlistPatterns(allowlistedSecrets),
 	}
 
 	eng, err := NewEngine(ctx, &conf)
