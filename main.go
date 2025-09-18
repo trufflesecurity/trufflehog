@@ -65,6 +65,7 @@ var (
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	allowlistSecretsFile       = cli.Flag("allowlist-secrets-file", "Path to YAML file with secrets to allowlist. See examples/allowlist.yml for format.").String()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
 	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
@@ -518,6 +519,17 @@ func run(state overseer.State) {
 
 	verificationCacheMetrics := verificationcache.InMemoryMetrics{}
 
+	// Load allowlisted secrets if specified
+	var allowlistedSecrets *detectors.CompiledAllowlist
+	if *allowlistSecretsFile != "" {
+		allowlistedSecrets, err = detectors.LoadAllowlistedSecrets(*allowlistSecretsFile)
+		if err != nil {
+			logFatal(err, "failed to load allowlisted secrets")
+		}
+		totalCount := len(allowlistedSecrets.ExactMatches) + len(allowlistedSecrets.CompiledRegexes)
+		logger.Info("loaded allowlisted secrets", "exact_matches", len(allowlistedSecrets.ExactMatches), "regex_patterns", len(allowlistedSecrets.CompiledRegexes), "total", totalCount, "file", *allowlistSecretsFile)
+	}
+
 	engConf := engine.Config{
 		Concurrency:       *concurrency,
 		ConfiguredSources: conf.Sources,
@@ -534,6 +546,7 @@ func run(state overseer.State) {
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
+		AllowlistedSecrets:       allowlistedSecrets,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
