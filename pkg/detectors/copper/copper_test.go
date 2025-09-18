@@ -10,6 +10,29 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
+var (
+	validPattern = `
+		# Configuration File: config.yaml
+		database:
+			host: $DB_HOST
+			port: $DB_PORT
+			username: $DB_USERNAME
+			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+		api:
+			auth_type: ""
+			in: "Header"
+			copper_email: "s0ovh@P8I~p3"
+			copper_token: "noqs39jzqaegbam2k6mai9ov1uwsl21y"
+			base_url: "https://api.example.com/v1/user"
+
+		# Notes:
+		# - Remember to rotate the secret every 90 days.
+		# - The above credentials should only be used in a secure environment.
+	`
+	secret = "noqs39jzqaegbam2k6mai9ov1uwsl21ys0ovh@P8I~p3"
+)
+
 func TestCopper_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -20,27 +43,9 @@ func TestCopper_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern",
-			input: `
-				# Configuration File: config.yaml
-				database:
-					host: $DB_HOST
-					port: $DB_PORT
-					username: $DB_USERNAME
-					password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-				api:
-					auth_type: ""
-					in: "Header"
-					email: "test@truffle.co"
-					copper_token: "1affa0d5966556307efd91046e87fe2f"
-					base_url: "https://api.example.com/v1/user"
-
-				# Notes:
-				# - Remember to rotate the secret every 90 days.
-				# - The above credentials should only be used in a secure environment.
-			`,
-			want: []string{"1affa0d5966556307efd91046e87fe2ftest@truffle.co"},
+			name:  "valid pattern",
+			input: validPattern,
+			want:  []string{secret},
 		},
 	}
 
