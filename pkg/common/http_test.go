@@ -335,16 +335,16 @@ func TestSaneHttpClientMetrics(t *testing.T) {
 		switch r.URL.Path {
 		case "/success":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success"))
+			_, _ = w.Write([]byte("success"))
 		case "/error":
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("error"))
+			_, _ = w.Write([]byte("error"))
 		case "/notfound":
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("not found"))
+			_, _ = w.Write([]byte("not found"))
 		default:
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("default"))
+			_, _ = w.Write([]byte("default"))
 		}
 	}))
 	defer server.Close()
@@ -409,7 +409,7 @@ func TestInstrumentedTransport(t *testing.T) {
 	// Create a mock transport that we can control
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test response"))
+		_, _ = w.Write([]byte("test response"))
 	}))
 	defer server.Close()
 
