@@ -896,7 +896,11 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get current directory: %v", err)
 	}
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Fatalf("failed to restore original directory: %v", err)
+		}
+	}()
 
 	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
@@ -998,7 +1002,11 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get current directory: %v", err)
 	}
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Fatalf("failed to restore original directory: %v", err)
+		}
+	}()
 
 	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
