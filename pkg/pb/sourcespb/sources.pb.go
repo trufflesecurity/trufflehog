@@ -1994,27 +1994,30 @@ type GitHub struct {
 	//	*GitHub_Token
 	//	*GitHub_Unauthenticated
 	//	*GitHub_BasicAuth
-	Credential                 isGitHub_Credential `protobuf_oneof:"credential"`
-	Repositories               []string            `protobuf:"bytes,5,rep,name=repositories,proto3" json:"repositories,omitempty"`
-	Organizations              []string            `protobuf:"bytes,6,rep,name=organizations,proto3" json:"organizations,omitempty"`
-	ScanUsers                  bool                `protobuf:"varint,7,opt,name=scanUsers,proto3" json:"scanUsers,omitempty"`
-	IncludeForks               bool                `protobuf:"varint,8,opt,name=includeForks,proto3" json:"includeForks,omitempty"`
-	Head                       string              `protobuf:"bytes,9,opt,name=head,proto3" json:"head,omitempty"`
-	Base                       string              `protobuf:"bytes,10,opt,name=base,proto3" json:"base,omitempty"`
-	IgnoreRepos                []string            `protobuf:"bytes,11,rep,name=ignore_repos,json=ignoreRepos,proto3" json:"ignore_repos,omitempty"`
-	IncludeRepos               []string            `protobuf:"bytes,12,rep,name=include_repos,json=includeRepos,proto3" json:"include_repos,omitempty"`
-	IncludePullRequestComments bool                `protobuf:"varint,14,opt,name=include_pull_request_comments,json=includePullRequestComments,proto3" json:"include_pull_request_comments,omitempty"`
-	IncludeIssueComments       bool                `protobuf:"varint,15,opt,name=include_issue_comments,json=includeIssueComments,proto3" json:"include_issue_comments,omitempty"`
-	IncludeGistComments        bool                `protobuf:"varint,16,opt,name=include_gist_comments,json=includeGistComments,proto3" json:"include_gist_comments,omitempty"`
-	SkipBinaries               bool                `protobuf:"varint,17,opt,name=skip_binaries,json=skipBinaries,proto3" json:"skip_binaries,omitempty"`
-	SkipArchives               bool                `protobuf:"varint,18,opt,name=skip_archives,json=skipArchives,proto3" json:"skip_archives,omitempty"`
-	IncludeWikis               bool                `protobuf:"varint,19,opt,name=include_wikis,json=includeWikis,proto3" json:"include_wikis,omitempty"`
-	CommentsTimeframeDays      uint32              `protobuf:"varint,20,opt,name=comments_timeframe_days,json=commentsTimeframeDays,proto3" json:"comments_timeframe_days,omitempty"`
-	RemoveAuthInUrl            bool                `protobuf:"varint,21,opt,name=remove_auth_in_url,json=removeAuthInUrl,proto3" json:"remove_auth_in_url,omitempty"`
-	ClonePath                  string              `protobuf:"bytes,22,opt,name=clone_path,json=clonePath,proto3" json:"clone_path,omitempty"`
-	NoCleanup                  bool                `protobuf:"varint,23,opt,name=no_cleanup,json=noCleanup,proto3" json:"no_cleanup,omitempty"`
-	IgnoreGists                bool                `protobuf:"varint,24,opt,name=ignore_gists,json=ignoreGists,proto3" json:"ignore_gists,omitempty"`
-	PrintLegacyJson            bool                `protobuf:"varint,25,opt,name=print_legacy_json,json=printLegacyJson,proto3" json:"print_legacy_json,omitempty"`
+	Credential    isGitHub_Credential `protobuf_oneof:"credential"`
+	Repositories  []string            `protobuf:"bytes,5,rep,name=repositories,proto3" json:"repositories,omitempty"`
+	Organizations []string            `protobuf:"bytes,6,rep,name=organizations,proto3" json:"organizations,omitempty"`
+	ScanUsers     bool                `protobuf:"varint,7,opt,name=scanUsers,proto3" json:"scanUsers,omitempty"`
+	IncludeForks  bool                `protobuf:"varint,8,opt,name=includeForks,proto3" json:"includeForks,omitempty"`
+	Head          string              `protobuf:"bytes,9,opt,name=head,proto3" json:"head,omitempty"`
+	Base          string              `protobuf:"bytes,10,opt,name=base,proto3" json:"base,omitempty"`
+	IgnoreRepos   []string            `protobuf:"bytes,11,rep,name=ignore_repos,json=ignoreRepos,proto3" json:"ignore_repos,omitempty"`
+	IncludeRepos  []string            `protobuf:"bytes,12,rep,name=include_repos,json=includeRepos,proto3" json:"include_repos,omitempty"`
+	// DEPRECATED: include_repos is deprecated in favor of repositories.
+	// It was used for filtering when the repositories field wasn't populating the UI-input results correctly
+	// It can be removed when we no longer depend on it
+	IncludePullRequestComments bool   `protobuf:"varint,14,opt,name=include_pull_request_comments,json=includePullRequestComments,proto3" json:"include_pull_request_comments,omitempty"`
+	IncludeIssueComments       bool   `protobuf:"varint,15,opt,name=include_issue_comments,json=includeIssueComments,proto3" json:"include_issue_comments,omitempty"`
+	IncludeGistComments        bool   `protobuf:"varint,16,opt,name=include_gist_comments,json=includeGistComments,proto3" json:"include_gist_comments,omitempty"`
+	SkipBinaries               bool   `protobuf:"varint,17,opt,name=skip_binaries,json=skipBinaries,proto3" json:"skip_binaries,omitempty"`
+	SkipArchives               bool   `protobuf:"varint,18,opt,name=skip_archives,json=skipArchives,proto3" json:"skip_archives,omitempty"`
+	IncludeWikis               bool   `protobuf:"varint,19,opt,name=include_wikis,json=includeWikis,proto3" json:"include_wikis,omitempty"`
+	CommentsTimeframeDays      uint32 `protobuf:"varint,20,opt,name=comments_timeframe_days,json=commentsTimeframeDays,proto3" json:"comments_timeframe_days,omitempty"`
+	RemoveAuthInUrl            bool   `protobuf:"varint,21,opt,name=remove_auth_in_url,json=removeAuthInUrl,proto3" json:"remove_auth_in_url,omitempty"`
+	ClonePath                  string `protobuf:"bytes,22,opt,name=clone_path,json=clonePath,proto3" json:"clone_path,omitempty"`
+	NoCleanup                  bool   `protobuf:"varint,23,opt,name=no_cleanup,json=noCleanup,proto3" json:"no_cleanup,omitempty"`
+	IgnoreGists                bool   `protobuf:"varint,24,opt,name=ignore_gists,json=ignoreGists,proto3" json:"ignore_gists,omitempty"`
+	PrintLegacyJson            bool   `protobuf:"varint,25,opt,name=print_legacy_json,json=printLegacyJson,proto3" json:"print_legacy_json,omitempty"`
 }
 
 func (x *GitHub) Reset() {
