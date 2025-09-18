@@ -813,3 +813,294 @@ func TestPrepareRepoErrorPaths(t *testing.T) {
 		assert.Equal(t, "", preparedPath)
 	})
 }
+
+func TestNormalizeFileURI(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "absolute file URI unchanged",
+			input:    "file:///absolute/path",
+			expected: "file:///absolute/path",
+		},
+		{
+			name:     "relative file URI with current directory",
+			input:    "file://.",
+			expected: "", // Will be set to current working directory
+		},
+		{
+			name:     "relative file URI with subdirectory",
+			input:    "file://./subdir",
+			expected: "", // Will be set to current working directory + subdir
+		},
+		{
+			name:     "relative file URI with parent directory",
+			input:    "file://..",
+			expected: "", // Will be set to parent of current working directory
+		},
+		{
+			name:     "non-file URI unchanged",
+			input:    "https://github.com/user/repo.git",
+			expected: "https://github.com/user/repo.git",
+		},
+		{
+			name:     "file URI with host and path",
+			input:    "file://hostname/path",
+			expected: "", // Will be set to absolute path of hostname/path
+		},
+	}
+
+	// Get current working directory for expected results
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current working directory: %v", err)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inputURI, err := GitURLParse(tt.input)
+			if err != nil {
+				t.Fatalf("failed to parse input URI: %v", err)
+			}
+
+			result, err := normalizeFileURI(inputURI)
+			assert.NoError(t, err)
+
+			var expected string
+			switch tt.name {
+			case "relative file URI with current directory":
+				expected = "file://" + cwd
+			case "relative file URI with subdirectory":
+				expected = "file://" + filepath.Join(cwd, "subdir")
+			case "relative file URI with parent directory":
+				expected = "file://" + filepath.Dir(cwd)
+			case "file URI with host and path":
+				expectedPath, _ := filepath.Abs(filepath.Join("hostname", "path"))
+				expected = "file://" + expectedPath
+			default:
+				expected = tt.expected
+			}
+
+			assert.Equal(t, expected, result.String())
+		})
+	}
+}
+
+func TestPrepareRepoWithNormalization(t *testing.T) {
+	repoPath := setupTestRepo(t, "test-repo")
+	addTestFileAndCommit(t, repoPath, "test.txt", "test content")
+
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	// Test absolute paths first (without changing directory)
+	absoluteTests := []struct {
+		name             string
+		uri              string
+		trustLocalConfig bool
+	}{
+		{
+			name:             "absolute file URI - no trust",
+			uri:              "file://" + repoPath,
+			trustLocalConfig: false,
+		},
+		{
+			name:             "absolute file URI - with trust",
+			uri:              "file://" + repoPath,
+			trustLocalConfig: true,
+		},
+	}
+
+	for _, tt := range absoluteTests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			path, _, _ := PrepareRepo(ctx, tt.uri, "", tt.trustLocalConfig, false)
+
+			if !tt.trustLocalConfig {
+				assert.NotEqual(t, repoPath, path, "Cloned repo should not use original path")
+				cmd := exec.Command("git", "-C", path, "status")
+				err := cmd.Run()
+				assert.NoError(t, err, "Cloned repo should be a valid git repository")
+			} else {
+				assert.Equal(t, repoPath, path, "Trusted repo should use original path")
+			}
+
+			if path != repoPath && path != "" {
+				os.RemoveAll(path)
+			}
+		})
+	}
+
+	// Now change to temp directory for relative path tests
+	if err := os.Chdir(repoPath); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	relativeTests := []struct {
+		name             string
+		uri              string
+		trustLocalConfig bool
+	}{
+		{
+			name:             "relative file URI with current directory - no trust",
+			uri:              "file://.",
+			trustLocalConfig: false,
+		},
+		{
+			name:             "relative file URI with current directory - with trust",
+			uri:              "file://.",
+			trustLocalConfig: true,
+		},
+	}
+
+	for _, tt := range relativeTests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			path, _, _ := PrepareRepo(ctx, tt.uri, "", tt.trustLocalConfig, false)
+
+			if !tt.trustLocalConfig {
+				assert.NotEqual(t, tt.uri, "file://"+path, "Cloned repo should not use original path")
+				cmd := exec.Command("git", "-C", path, "status")
+				err := cmd.Run()
+				assert.NoError(t, err, "Cloned repo should be a valid git repository")
+			} else {
+				assert.Equal(t, tt.uri, "file://"+path, "Trusted repo should use original path")
+			}
+
+			if path != repoPath && path != "" {
+				os.RemoveAll(path)
+			}
+		})
+	}
+}
+
+func TestPrepareRepoWithNormalizationBare(t *testing.T) {
+	t.Parallel()
+
+	workingRepoPath := setupTestRepo(t, "working-repo-original")
+	addTestFileAndCommit(t, workingRepoPath, "test.txt", "test content")
+
+	tempDir := t.TempDir()
+	bareRepoPath := filepath.Join(tempDir, "bare-repo")
+	assert.NoError(t, exec.Command("git", "clone", workingRepoPath, bareRepoPath, "--bare").Run())
+
+	_, err := os.Stat(filepath.Join(bareRepoPath, "refs"))
+	assert.NoError(t, err, "Bare repository should have refs directory")
+	_, err = os.Stat(filepath.Join(bareRepoPath, "HEAD"))
+	assert.NoError(t, err, "Bare repository should have HEAD file")
+
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	// Test absolute paths first (without changing directory)
+	absoluteTests := []struct {
+		name             string
+		uri              string
+		trustLocalConfig bool
+	}{
+		{
+			name:             "absolute file URI with bare repo - no trust",
+			uri:              "file://" + bareRepoPath,
+			trustLocalConfig: false,
+		},
+		{
+			name:             "absolute file URI with bare repo - with trust",
+			uri:              "file://" + bareRepoPath,
+			trustLocalConfig: true,
+		},
+	}
+
+	for _, tt := range absoluteTests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			path, isRemote, err := PrepareRepo(ctx, tt.uri, "", tt.trustLocalConfig, true)
+
+			assert.NoError(t, err, "PrepareRepo should succeed")
+			assert.False(t, isRemote, "File URI should not be considered remote")
+
+			if tt.trustLocalConfig {
+				assert.Equal(t, bareRepoPath, path, "Trusted bare repo should use original path")
+
+				_, err = os.Stat(filepath.Join(path, "refs"))
+				assert.NoError(t, err, "Original bare repo should have refs directory")
+				_, err = os.Stat(filepath.Join(path, "HEAD"))
+				assert.NoError(t, err, "Original bare repo should have HEAD file")
+			} else {
+				assert.NotEqual(t, bareRepoPath, path, "Sanitized bare repo path should be different from original")
+
+				_, err = os.Stat(filepath.Join(path, "refs"))
+				assert.NoError(t, err, "Cloned bare repo should have refs directory")
+				_, err = os.Stat(filepath.Join(path, "HEAD"))
+				assert.NoError(t, err, "Cloned bare repo should have HEAD file")
+				_, err = os.Stat(filepath.Join(path, ".git"))
+				assert.True(t, os.IsNotExist(err), "Bare repo should not have .git subdirectory")
+			}
+
+			if path != bareRepoPath && path != "" {
+				os.RemoveAll(path)
+			}
+		})
+	}
+
+	// Now change to temp directory for relative path tests
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	relativeTests := []struct {
+		name             string
+		uri              string
+		trustLocalConfig bool
+	}{
+		{
+			name:             "relative file URI with bare repo - no trust",
+			uri:              "file://./bare-repo",
+			trustLocalConfig: false,
+		},
+		{
+			name:             "relative file URI with bare repo - with trust",
+			uri:              "file://./bare-repo",
+			trustLocalConfig: true,
+		},
+	}
+
+	for _, tt := range relativeTests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			path, isRemote, err := PrepareRepo(ctx, tt.uri, "", tt.trustLocalConfig, true)
+
+			assert.NoError(t, err, "PrepareRepo should succeed")
+			assert.False(t, isRemote, "File URI should not be considered remote")
+
+			if tt.trustLocalConfig {
+				assert.Equal(t, tt.uri, "file://"+path, "Trusted bare repo should use relative path")
+
+				_, err = os.Stat(filepath.Join(path, "refs"))
+				assert.NoError(t, err, "Original bare repo should have refs directory")
+				_, err = os.Stat(filepath.Join(path, "HEAD"))
+				assert.NoError(t, err, "Original bare repo should have HEAD file")
+			} else {
+				assert.NotEqual(t, tt.uri, "file://"+path, "Sanitized bare repo path should be different from original")
+
+				_, err = os.Stat(filepath.Join(path, "refs"))
+				assert.NoError(t, err, "Cloned bare repo should have refs directory")
+				_, err = os.Stat(filepath.Join(path, "HEAD"))
+				assert.NoError(t, err, "Cloned bare repo should have HEAD file")
+				_, err = os.Stat(filepath.Join(path, ".git"))
+				assert.True(t, os.IsNotExist(err), "Bare repo should not have .git subdirectory")
+			}
+
+			if path != bareRepoPath && path != "" {
+				os.RemoveAll(path)
+			}
+		})
+	}
+}

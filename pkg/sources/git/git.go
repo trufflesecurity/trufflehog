@@ -401,6 +401,39 @@ func GitURLParse(gitURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
+// normalizeFileURI converts relative file URIs to absolute paths.
+// This ensures that file:// URIs work correctly with git clone operations.
+func normalizeFileURI(uri *url.URL) (*url.URL, error) {
+	if uri.Scheme != "file" {
+		return uri, nil
+	}
+
+	var rawPath string
+	if uri.Host != "" {
+		// Handle cases like file://. or file://./relative/path
+		if uri.Path == "" {
+			rawPath = uri.Host
+		} else {
+			rawPath = filepath.Join(uri.Host, uri.Path)
+		}
+	} else {
+		// Handle cases like file:///absolute/path
+		rawPath = uri.Path
+	}
+
+	absPath, err := filepath.Abs(rawPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve absolute path for %q: %w", rawPath, err)
+	}
+
+	normalizedURI := &url.URL{
+		Scheme: "file",
+		Path:   absPath,
+	}
+
+	return normalizedURI, nil
+}
+
 type cloneParams struct {
 	userInfo  *url.Userinfo
 	gitURL    string
@@ -1268,19 +1301,24 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 		case trustLocalGitConfig:
 			path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
 		default:
+			normalizedURI, err := normalizeFileURI(uri)
+			if err != nil {
+				return "", remote, fmt.Errorf("failed to normalize file URI (%s): %w", uriString, err)
+			}
+
 			args := []string{}
 			if isBare {
 				args = append(args, "--bare")
 			}
-			path, _, err = CloneRepo(ctx, uri.User, uri.String(), clonePath, false, args...)
+			path, _, err = CloneRepo(ctx, uri.User, normalizedURI.String(), clonePath, false, args...)
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone file Git repo (%s): %s", uriString, err)
+				return path, remote, fmt.Errorf("failed to clone file Git repo (%s): %w", normalizedURI.String(), err)
 			}
 
 			if !isBare {
 				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
-				originalIndexPath := filepath.Join(strings.TrimPrefix(uri.String(), "file://"), gitDirName, "index")
+				originalIndexPath := filepath.Join(strings.TrimPrefix(normalizedURI.String(), "file://"), gitDirName, "index")
 				clonedIndexPath := filepath.Join(path, gitDirName, "index")
 
 				indexData, err := os.ReadFile(originalIndexPath)
