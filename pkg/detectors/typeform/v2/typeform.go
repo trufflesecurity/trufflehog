@@ -86,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, secret string) (bool, *TypeFormResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.typeform.com/me", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", secret))
 	res, err := client.Do(req)

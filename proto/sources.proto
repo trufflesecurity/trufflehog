@@ -224,6 +224,7 @@ message Git {
   bool skip_archives = 15;
   string clone_path = 16;
   bool no_cleanup = 17;
+  bool print_legacy_json = 18;
 }
 
 message GitLab {
@@ -243,6 +244,7 @@ message GitLab {
   repeated string group_ids = 12;
   string clone_path = 13;
   bool no_cleanup = 14;
+  bool print_legacy_json = 15;
 }
 
 message GitHub {
@@ -271,6 +273,8 @@ message GitHub {
   bool remove_auth_in_url = 21;
   string clone_path = 22;
   bool no_cleanup = 23;
+  bool ignore_gists = 24;
+  bool print_legacy_json = 25;
 }
 
 message GitHubExperimental {

@@ -38,7 +38,7 @@ var (
 		webhooksKey:     "/v2/webhooks",
 		/*
 			TODO:
-			release piplelines: https://launchdarkly.com/docs/api/release-pipelines-beta/get-all-release-pipelines (Beta)
+			release pipelines: https://launchdarkly.com/docs/api/release-pipelines-beta/get-all-release-pipelines (Beta)
 			insight deployments: https://launchdarkly.com/docs/api/insights-deployments-beta/get-deployments (Beta)
 			delivery configuration: https://launchdarkly.com/docs/api/integration-delivery-configurations-beta/get-integration-delivery-configuration-by-environment (Beta)
 			metrics: https://launchdarkly.com/docs/api/metrics-beta/get-metric-groups (Beta)
