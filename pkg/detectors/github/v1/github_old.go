@@ -95,6 +95,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		matchPrefix := match[0]
 		token := match[1]
 
+		// It may seem strange to filter out findings prior to verifying them. However, this credential looks like a
+		// normal sha256 hash, which is an incredibly common string to see. So the filter here prevents an excessive
+		// number of requests to be sent for findings which will almost certainly not be verified. It must occur before
+		// verification, because otherwise the number of verification requests can be quite excessive.
+		if isKnownNonSensitiveCommonPrefix(matchPrefix) {
+			continue
+		}
+
 		// Note that this false positive check happens **before** verification! I don't know why it's written this way
 		// but that's why this logic wasn't moved into a CustomFalsePositiveChecker implementation.
 		if isFp, _ := detectors.IsKnownFalsePositive(token, ghFalsePositives, false); isFp {
@@ -119,13 +127,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := common.SaneHttpClient()
 
 			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
-
-			if !isVerified {
-				// to avoid false positives for unverified findings
-				if isKnownNonSensitiveCommonPrefix(matchPrefix) {
-					continue
-				}
-			}
 
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
