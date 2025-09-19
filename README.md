@@ -269,6 +269,11 @@ Run trufflehog from the parent directory (outside the git repo).
 $ trufflehog git file://test_keys --results=verified,unknown
 ```
 
+Run trufflehog but exclude specific files
+```bash
+$ trufflehog git file://test_keys --exclude-globs=yarn.lock
+```
+
 ## 10: Scan GCS buckets for verified secrets
 
 ```bash
