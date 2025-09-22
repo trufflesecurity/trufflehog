@@ -256,7 +256,7 @@ func FilterAllowlistedSecrets(ctx context.Context, results []Result, allowlist *
 // LoadAllowlistedSecrets loads secrets from a YAML file that should be allowlisted.
 // The YAML format supports multiline secrets and includes optional descriptions.
 // Returns a CompiledAllowlist with pre-compiled regex patterns for efficient matching.
-func LoadAllowlistedSecrets(yamlFile string) (*CompiledAllowlist, error) {
+func LoadAllowlistedSecrets(yamlFile string) ([]AllowlistEntry, error) {
 	file, err := os.Open(yamlFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open allowlist file: %w", err)
@@ -278,9 +278,8 @@ func LoadAllowlistedSecrets(yamlFile string) (*CompiledAllowlist, error) {
 	if err := yaml.Unmarshal(content, &allowList); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML allowlist file: %w", err)
 	}
-	// Use the shared compilation function
-	allowlist := CompileAllowlistPatterns(allowList)
-	return allowlist, nil
+
+	return allowList, nil
 }
 
 // CompileAllowlistPatterns compiles a list of patterns into a CompiledAllowlist.

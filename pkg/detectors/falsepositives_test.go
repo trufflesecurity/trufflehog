@@ -3,63 +3,20 @@ package detectors
 import (
 	"context"
 	_ "embed"
+	"os"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/google/go-cmp/cmp"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type fakeDetector struct{}
 type customFalsePositiveChecker struct{ fakeDetector }
-
-// helperCompiledAllowlistsEqual compares two CompiledAllowlist instances functionally
-func helperCompiledAllowlistsEqual(a, b *CompiledAllowlist) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-
-	// Compare exact matches (maps are easily comparable)
-	if len(a.ExactMatches) != len(b.ExactMatches) {
-		return false
-	}
-	for key := range a.ExactMatches {
-		if _, exists := b.ExactMatches[key]; !exists {
-			return false
-		}
-	}
-
-	// Compare regex patterns (by their string representation)
-	if len(a.RegexPatterns) != len(b.RegexPatterns) {
-		return false
-	}
-
-	// Convert to maps for easy comparison regardless of order
-	aPatterns := make(map[string]bool)
-	bPatterns := make(map[string]bool)
-
-	for _, pattern := range a.RegexPatterns {
-		aPatterns[pattern] = true
-	}
-	for _, pattern := range b.RegexPatterns {
-		bPatterns[pattern] = true
-	}
-
-	if len(aPatterns) != len(bPatterns) {
-		return false
-	}
-	for pattern := range aPatterns {
-		if !bPatterns[pattern] {
-			return false
-		}
-	}
-
-	return true
-}
 
 func (d fakeDetector) FromData(ctx context.Context, verify bool, data []byte) ([]Result, error) {
 	return nil, nil
@@ -750,102 +707,110 @@ func BenchmarkDefaultIsKnownFalsePositive(b *testing.B) {
 	}
 }
 
-// func TestLoadallowlistedSecrets(t *testing.T) {
-// 	tests := []struct {
-// 		name        string
-// 		yamlContent string
-// 		expected    *CompiledAllowlist
-// 		wantErr     bool
-// 	}{
-// 		{
-// 			name: "basic patterns with descriptions",
-// 			yamlContent: `- description: "Used in tests"
-//   values:
-//     - "^dev-.*"
-//     - "^stage.*"
-// - description: "Legacy API keys"
-//   values:
-//     - "legacy-key-123"
-//     - "old-token-.*"`,
-// 			expected: helperCreateCompiledAllowlist(map[string]struct{}{
-// 				"^dev-.*":        {},
-// 				"^stage.*":       {},
-// 				"legacy-key-123": {},
-// 				"old-token-.*":   {},
-// 			}),
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "multiline RSA key",
-// 			yamlContent: `- description: "Test RSA keys"
-//   values:
-//     - |
-//       -----BEGIN RSA PRIVATE KEY-----
-//       MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
-//       -----END RSA PRIVATE KEY-----`,
-// 			expected: helperCreateCompiledAllowlist(map[string]struct{}{
-// 				"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...\n-----END RSA PRIVATE KEY-----": {},
-// 			}),
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "entry without description field",
-// 			yamlContent: `- values:
-//     - "no-description-pattern"
-//     - "another-pattern"`,
-// 			expected: helperCreateCompiledAllowlist(map[string]struct{}{
-// 				"no-description-pattern": {},
-// 				"another-pattern":        {},
-// 			}),
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "empty values filtered out",
-// 			yamlContent: `- description: "Test filtering"
-//   values:
-//     - "valid-pattern"
-//     - ""
-//     - "   "
-//     - "another-valid"`,
-// 			expected: helperCreateCompiledAllowlist(map[string]struct{}{
-// 				"valid-pattern": {},
-// 				"another-valid": {},
-// 			}),
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name:        "invalid YAML",
-// 			yamlContent: `invalid yaml [content`,
-// 			expected:    nil,
-// 			wantErr:     true,
-// 		},
-// 	}
+func TestLoadallowlistedSecrets(t *testing.T) {
+	tests := []struct {
+		name        string
+		yamlContent string
+		expected    []AllowlistEntry
+		wantErr     bool
+	}{
+		{
+			name: "basic patterns with descriptions",
+			yamlContent: `- description: "Used in tests"
+  values:
+    - "^dev-.*"
+    - "^stage.*"
+- description: "Legacy API keys"
+  values:
+    - "legacy-key-123"
+    - "old-token-.*"`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"^dev-.*", "^stage.*"},
+				},
+				{
+					Values: []string{"legacy-key-123", "old-token-.*"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiline RSA key",
+			yamlContent: `- description: "Test RSA keys"
+  values:
+    - |
+      -----BEGIN RSA PRIVATE KEY-----
+      MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+      -----END RSA PRIVATE KEY-----`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...\n-----END RSA PRIVATE KEY-----"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "entry without description field",
+			yamlContent: `- values:
+    - "no-description-pattern"
+    - "another-pattern"`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"no-description-pattern", "another-pattern"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty values filtered out",
+			yamlContent: `- description: "Test filtering"
+  values:
+    - "valid-pattern"
+    - ""
+    - "   "
+    - "another-valid"`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"valid-pattern", "another-valid"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "invalid YAML",
+			yamlContent: `invalid yaml [content`,
+			expected:    nil,
+			wantErr:     true,
+		},
+	}
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			// Create temporary file
-// 			tmpFile, err := os.CreateTemp("", "allowlist-test-*.yaml")
-// 			require.NoError(t, err)
-// 			defer os.Remove(tmpFile.Name())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary file
+			tmpFile, err := os.CreateTemp("", "allowlist-test-*.yaml")
+			require.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
 
-// 			// Write test content
-// 			_, err = tmpFile.WriteString(tt.yamlContent)
-// 			require.NoError(t, err)
-// 			require.NoError(t, tmpFile.Close())
+			// Write test content
+			_, err = tmpFile.WriteString(tt.yamlContent)
+			require.NoError(t, err)
+			require.NoError(t, tmpFile.Close())
 
-// 			// Test the function
-// 			result, err := LoadAllowlistedSecrets(tmpFile.Name())
+			// Test the function
+			result, err := LoadAllowlistedSecrets(tmpFile.Name())
 
-// 			if tt.wantErr {
-// 				assert.Error(t, err)
-// 				return
-// 			}
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
 
-// 			require.NoError(t, err)
-// 			assert.True(t, helperCompiledAllowlistsEqual(tt.expected, result), "CompiledAllowlist structures should be functionally equivalent")
-// 		})
-// 	}
-// }
+			require.NoError(t, err)
+			want := CompileAllowlistPatterns(tt.expected)
+			got := CompileAllowlistPatterns(result)
+			assert.True(t, cmp.Equal(want, got, cmp.AllowUnexported(regexp.Regexp{})), "CompiledAllowlist structures should be functionally equivalent")
+		})
+	}
+}
 
 func TestLoadAllowlistedSecretsFileNotFound(t *testing.T) {
 	_, err := LoadAllowlistedSecrets("nonexistent-file.yaml")

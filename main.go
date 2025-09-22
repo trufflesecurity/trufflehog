@@ -520,15 +520,23 @@ func run(state overseer.State) {
 	verificationCacheMetrics := verificationcache.InMemoryMetrics{}
 
 	// Load allowlisted secrets if specified
-	var allowlistedSecrets *detectors.CompiledAllowlist
+	var allowlistedSecrets []detectors.AllowlistEntry
 	if *allowlistSecretsFile != "" {
 		allowlistedSecrets, err = detectors.LoadAllowlistedSecrets(*allowlistSecretsFile)
 		if err != nil {
 			logFatal(err, "failed to load allowlisted secrets")
 		}
-		totalCount := len(allowlistedSecrets.ExactMatches) + len(allowlistedSecrets.CompiledRegexes)
-		logger.Info("loaded allowlisted secrets", "exact_matches", len(allowlistedSecrets.ExactMatches), "regex_patterns", len(allowlistedSecrets.CompiledRegexes), "total", totalCount, "file", *allowlistSecretsFile)
 	}
+	allowListedSecrets := append(allowlistedSecrets, conf.Allowlists...)
+	compiledAllowlist := detectors.CompileAllowlistPatterns(allowListedSecrets)
+
+	logger.Info(
+		"loaded allowlisted secrets",
+		"exact_matches", len(compiledAllowlist.ExactMatches),
+		"regex_patterns", len(compiledAllowlist.CompiledRegexes),
+		"total", len(compiledAllowlist.ExactMatches)+len(compiledAllowlist.CompiledRegexes),
+		"file", *allowlistSecretsFile,
+	)
 
 	engConf := engine.Config{
 		Concurrency:       *concurrency,
@@ -546,7 +554,7 @@ func run(state overseer.State) {
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
-		AllowlistedSecrets:       allowlistedSecrets,
+		AllowlistedSecrets:       compiledAllowlist,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
