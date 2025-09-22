@@ -23,7 +23,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"calendly"}) + `\b(eyJ[A-Za-z0-9-_]{10,300}\.eyJ[A-Za-z0-9-_]{10,300}\.[A-Za-z0-9-_]+)\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"calendly"}) + `\b(eyJ[A-Za-z0-9-_]{100,300}\.eyJ[A-Za-z0-9-_]{100,300}\.[A-Za-z0-9-_]+)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
