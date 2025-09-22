@@ -65,6 +65,7 @@ message Confluence {
   string timestamp = 6;
   string location = 7;
   string file = 8;
+  string user = 9;
 }
 
 message Docker {
@@ -98,6 +99,7 @@ message Git {
   string repository = 4;
   string timestamp = 5;
   int64 line = 6;
+  string repository_local_path = 7;
 }
 
 message Github {
@@ -110,6 +112,7 @@ message Github {
   string timestamp = 7;
   int64 line = 8;
   Visibility visibility = 9;
+  string repository_local_path = 10;
 }
 
 message Gitlab {
@@ -123,6 +126,7 @@ message Gitlab {
   int64 project_id = 8;
   string project_name = 9;
   string project_owner = 10;
+  string repository_local_path = 11;
 }
 
 message GCS {

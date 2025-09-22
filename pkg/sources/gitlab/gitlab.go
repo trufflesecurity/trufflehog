@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -64,6 +65,13 @@ type Source struct {
 	sources.CommonSourceUnitUnmarshaller
 
 	useAuthInUrl bool
+
+	clonePath string
+	noCleanup bool
+
+	printLegacyJSON bool
+
+	projectsPerPage int
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -163,6 +171,14 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
+	s.clonePath = conn.GetClonePath()
+	s.noCleanup = conn.GetNoCleanup()
+	s.printLegacyJSON = conn.GetPrintLegacyJson()
+	s.projectsPerPage = int(feature.GitlabProjectsPerPage.Load())
+
+	if s.projectsPerPage > 100 {
+		return fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
+	}
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
@@ -205,17 +221,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{
 					Gitlab: &source_metadatapb.Gitlab{
-						Commit:     sanitizer.UTF8(commit),
-						File:       sanitizer.UTF8(file),
-						Email:      sanitizer.UTF8(email),
-						Repository: sanitizer.UTF8(repository),
-						Link:       giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:  sanitizer.UTF8(timestamp),
-						Line:       line,
+						Commit:              sanitizer.UTF8(commit),
+						File:                sanitizer.UTF8(file),
+						Email:               sanitizer.UTF8(email),
+						Repository:          sanitizer.UTF8(repository),
+						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+						Link:                giturl.GenerateLink(repository, commit, file, line),
+						Timestamp:           sanitizer.UTF8(timestamp),
+						Line:                line,
 					},
 				},
 			}
@@ -537,10 +554,10 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	const (
-		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
-		paginationLimit = 100  // Default is 20, max is 100.
+		orderBy = "id"
 	)
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	// Trufflehog default per page 100 unless set to other value through feature flag. If 0 provided in feature flag gitlab default it to 20
+	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
 	for {
@@ -645,14 +662,13 @@ func (s *Source) getAllProjectReposV2(
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 
-	const paginationLimit = 100 // default is 20, max is 100.
-
 	// example: https://gitlab.com/gitlab-org/api/client-go/-/blob/main/examples/pagination.go#L55
 	listOpts := gitlab.ListOptions{
 		OrderBy:    "id",
 		Pagination: "keyset", // https://docs.gitlab.com/api/rest/#keyset-based-pagination
-		PerPage:    paginationLimit,
-		Sort:       "asc",
+		// Trufflehog default per page 100 unless set to other value through feature flag. If 0 provided in feature flag gitlab default it to 20
+		PerPage: s.projectsPerPage,
+		Sort:    "asc",
 	}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{
@@ -747,11 +763,10 @@ func (s *Source) getAllProjectReposInGroups(
 
 	var projectsWithNamespace []string
 	const (
-		orderBy         = "id"
-		paginationLimit = 100
+		orderBy = "id"
 	)
 
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 	projectOpts := &gitlab.ListGroupProjectsOptions{
 		ListOptions:      listOpts,
 		OrderBy:          gitlab.Ptr(orderBy),
@@ -879,7 +894,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			var repo *gogit.Repository
 			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
-				path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
+				path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL, s.clonePath)
 			} else {
 				// If a username is not provided we need to use a default one in order to clone a private repo.
 				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
@@ -888,13 +903,20 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 					user = "placeholder"
 				}
 
-				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
+				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, s.clonePath, user, s.useAuthInUrl)
 			}
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
-			defer os.RemoveAll(path)
+
+			// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
+			// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+			if !s.printLegacyJSON {
+				if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
+					defer os.RemoveAll(path)
+				}
+			}
 
 			logger.V(2).Info("starting scan", "num", i+1, "total", len(s.repos))
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
@@ -1068,7 +1090,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	var repo *gogit.Repository
 	var err error
 	if s.authMethod == "UNAUTHENTICATED" {
-		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
+		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL, s.clonePath)
 	} else {
 		// If a username is not provided we need to use a default one in order to clone a private repo.
 		// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
@@ -1077,12 +1099,19 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			user = "placeholder"
 		}
 
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, s.clonePath, user, s.useAuthInUrl)
 	}
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(path)
+
+	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
+	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+	if !s.printLegacyJSON {
+		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
+			defer os.RemoveAll(path)
+		}
+	}
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 }

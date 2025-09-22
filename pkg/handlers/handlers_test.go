@@ -588,6 +588,7 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	cmds := [][]string{
 		{"git", "-C", tempDir, "config", "user.name", "Test User"},
 		{"git", "-C", tempDir, "config", "user.email", "test@example.com"},
+		{"git", "-C", tempDir, "config", "commit.gpgsign", "false"},
 	}
 
 	for _, cmdArgs := range cmds {

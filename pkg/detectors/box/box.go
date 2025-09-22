@@ -74,7 +74,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	url := "https://api.box.com/2.0/users/me"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header = http.Header{"Authorization": []string{"Bearer " + token}}

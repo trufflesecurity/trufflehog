@@ -237,7 +237,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/doppler"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dotmailer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dotdigital"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dovico"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dronahq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/droneci"
@@ -293,6 +293,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/float"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowflu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flutterwave"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fmfw"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formbucket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formcraft"
@@ -349,6 +350,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvaultauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hasura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
@@ -545,6 +547,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/photoroom"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedream"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedrive"
@@ -1099,7 +1103,7 @@ func buildDetectorList() []detectors.Detector {
 		&documo.Scanner{},
 		&docusign.Scanner{},
 		&doppler.Scanner{},
-		&dotmailer.Scanner{},
+		&dotdigital.Scanner{},
 		&dovico.Scanner{},
 		&dronahq.Scanner{},
 		&droneci.Scanner{},
@@ -1155,6 +1159,7 @@ func buildDetectorList() []detectors.Detector {
 		&float.Scanner{},
 		&flowflu.Scanner{},
 		&flutterwave.Scanner{},
+		&flyio.Scanner{},
 		&fmfw.Scanner{},
 		&formbucket.Scanner{},
 		&formcraft.Scanner{},
@@ -1214,6 +1219,7 @@ func buildDetectorList() []detectors.Detector {
 		&happyscribe.Scanner{},
 		&harness.Scanner{},
 		&harvest.Scanner{},
+		&hashicorpvaultauth.Scanner{},
 		&hasura.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
@@ -1418,6 +1424,8 @@ func buildDetectorList() []detectors.Detector {
 		&peopledatalabs.Scanner{},
 		&pepipost.Scanner{},
 		&percy.Scanner{},
+		&photoroom.Scanner{},
+		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
 		&pipedream.Scanner{},
 		&pipedrive.Scanner{},

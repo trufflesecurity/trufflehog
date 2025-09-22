@@ -28,8 +28,8 @@ func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 var (
 	// Oauth token
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
-	// the middle regex `\b[a-zA-Z0-9.\/?=&]{0,40}` is to match the prefix of token match to avoid processing common known patterns
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github", "gh", "pat", "token"}) + `\b[a-zA-Z0-9.\/?=&]{0,40}` + `\b([a-f0-9]{40})\b`)
+	// the middle regex `(?:[a-zA-Z0-9.\/?=&:-]{0,40})` is to match the prefix of token match to avoid processing common known patterns
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github", "gh", "pat", "token"}) + `\b(?:[a-zA-Z0-9.\/?=&:-]{0,40})([a-f0-9]{40})\b`)
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
@@ -73,7 +73,15 @@ var ghFalsePositives = map[detectors.FalsePositive]struct{}{
 }
 
 var ghKnownNonSensitivePrefixes = []string{
-	"avatars.githubusercontent.com", // github avatar urls prefix
+	"avatars.githubusercontent.com",            // GitHub avatar URLs
+	"actions/",                                 // GitHub Actions paths
+	"raw.githubusercontent.com/",               // Raw file URLs from GitHub
+	"api.github.com/repos/",                    // GitHub API repository endpoints
+	"gist.github.com/",                         // GitHub Gist URLs
+	"sha256:",                                  // SHA256 hash prefix
+	"github.com/",                              // General GitHub repo URLs
+	"pipelines.actions.githubusercontent.com/", // GitHub Actions infrastructure
+	"ghcr.io/",                                 // GitHub Container Registry
 }
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
@@ -87,14 +95,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		matchPrefix := match[0]
 		token := match[1]
 
-		// Note that this false positive check happens **before** verification! I don't know why it's written this way
-		// but that's why this logic wasn't moved into a CustomFalsePositiveChecker implementation.
-		if isFp, _ := detectors.IsKnownFalsePositive(token, ghFalsePositives, false); isFp {
+		// It may seem strange to filter out findings prior to verifying them. However, this credential looks like a
+		// normal sha256 hash, which is an incredibly common string to see. So the filter here prevents an excessive
+		// number of requests to be sent for findings which will almost certainly not be verified. It must occur before
+		// verification, because otherwise the number of verification requests can be quite excessive.
+		if isKnownNonSensitiveCommonPrefix(matchPrefix) {
 			continue
 		}
 
-		// to avoid false positives
-		if isKnownNonSensitiveCommonPrefix(matchPrefix) {
+		// Note that this false positive check happens **before** verification! I don't know why it's written this way
+		// but that's why this logic wasn't moved into a CustomFalsePositiveChecker implementation.
+		if isFp, _ := detectors.IsKnownFalsePositive(token, ghFalsePositives, false); isFp {
 			continue
 		}
 
@@ -116,6 +127,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := common.SaneHttpClient()
 
 			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
 

@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.smith.langchain.com/api/v1/api-key", http.NoBody)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	req.Header.Set("X-API-Key", apiKey)

@@ -412,6 +412,55 @@ func TestScanSubDirFile(t *testing.T) {
 	require.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors")
 }
 
+func TestSkipBinaries(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "trufflehog_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a binary file (executable)
+	binaryFile := filepath.Join(tempDir, "test.exe")
+	err = os.WriteFile(binaryFile, []byte{0x4D, 0x5A, 0x90, 0x00}, 0644)
+	require.NoError(t, err)
+
+	// Create a text file
+	textFile := filepath.Join(tempDir, "test.txt")
+	err = os.WriteFile(textFile, []byte("This is a text file"), 0644)
+	require.NoError(t, err)
+
+	// Test with skipBinaries = true
+	source := &Source{
+		paths:        []string{textFile, binaryFile}, // Test individual files
+		skipBinaries: true,
+		log:          logr.Discard(),
+	}
+
+	chunks := make(chan *sources.Chunk, 10)
+	ctx := context.Background()
+
+	// Run the scan
+	go func() {
+		err := source.Chunks(ctx, chunks)
+		require.NoError(t, err)
+		close(chunks)
+	}()
+
+	// Collect chunks
+	var chunkCount int
+	var processedFiles []string
+	for chunk := range chunks {
+		chunkCount++
+		metadata := chunk.SourceMetadata.GetFilesystem()
+		require.NotNil(t, metadata)
+		processedFiles = append(processedFiles, metadata.File)
+	}
+
+	// Should have exactly one chunk from the text file
+	require.Equal(t, 1, chunkCount, "Should have processed exactly one text file")
+	require.Contains(t, processedFiles, textFile, "Should have processed the text file")
+	require.NotContains(t, processedFiles, binaryFile, "Binary file should be skipped")
+}
+
 // createTempFile is a helper function to create a temporary file in the given
 // directory with the provided contents. If dir is "", the operating system's
 // temp directory is used.

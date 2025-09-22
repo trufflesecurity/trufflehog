@@ -67,29 +67,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
+		resMatch := strings.TrimSpace(match[1])
+
 		// ignore v2 detectors which have a prefix of `glpat-`
 		if strings.Contains(match[0], "glpat-") {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
 
 		// to avoid false positives
 		if detectors.StringShannonEntropy(resMatch) < 3.6 {
 			continue
 		}
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Gitlab,
-			Raw:          []byte(resMatch),
-			ExtraData:    map[string]string{},
-		}
-		s1.ExtraData = map[string]string{
-			"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
-			"version":        fmt.Sprintf("%d", s.Version()),
-		}
+		for _, endpoint := range s.Endpoints() {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Gitlab,
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + endpoint),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
+			}
 
-		if verify {
-			for _, endpoint := range s.Endpoints() {
+			if verify {
 				isVerified, extraData, verificationErr := VerifyGitlab(ctx, s.getClient(), endpoint, resMatch)
 				s1.Verified = isVerified
 				maps.Copy(s1.ExtraData, extraData)
@@ -102,11 +103,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						"key":  resMatch,
 						"host": endpoint,
 					}
+
+					// if secret is verified with one endpoint, break the loop to continue to next secret
+					results = append(results, s1)
+					break
 				}
 			}
-		}
 
-		results = append(results, s1)
+			results = append(results, s1)
+		}
 	}
 
 	return results, nil

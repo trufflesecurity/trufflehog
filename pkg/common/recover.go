@@ -40,7 +40,13 @@ func RecoverWithHandler(ctx context.Context, callback func(error)) {
 		ctx.Logger().Error(fmt.Errorf("panic"), panicStack,
 			"recover", err,
 		)
-		callback(fmt.Errorf("panic: %e", err))
+
+		switch v := err.(type) {
+		case error:
+			callback(fmt.Errorf("panic: %w", v))
+		default:
+			callback(fmt.Errorf("panic: %v", v))
+		}
 	}
 }
 

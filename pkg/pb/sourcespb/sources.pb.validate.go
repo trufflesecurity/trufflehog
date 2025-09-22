@@ -660,6 +660,12 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for InstallationType
 
+	// no validation rules for OauthAuthorizationEndpoint
+
+	// no validation rules for OauthTokenEndpoint
+
+	// no validation rules for AllowSecretsManagerWrite
+
 	switch v := m.Credential.(type) {
 	case *Bitbucket_Token:
 		if v == nil {
@@ -1689,6 +1695,8 @@ func (m *Filesystem) validate(all bool) error {
 
 	// no validation rules for ExcludePathsFile
 
+	// no validation rules for SkipBinaries
+
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
 	}
@@ -2073,6 +2081,12 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
+	// no validation rules for ClonePath
+
+	// no validation rules for NoCleanup
+
+	// no validation rules for PrintLegacyJson
+
 	switch v := m.Credential.(type) {
 	case *Git_BasicAuth:
 		if v == nil {
@@ -2319,6 +2333,12 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for RemoveAuthInUrl
 
+	// no validation rules for ClonePath
+
+	// no validation rules for NoCleanup
+
+	// no validation rules for PrintLegacyJson
+
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
 		if v == nil {
@@ -2551,6 +2571,14 @@ func (m *GitHub) validate(all bool) error {
 	// no validation rules for CommentsTimeframeDays
 
 	// no validation rules for RemoveAuthInUrl
+
+	// no validation rules for ClonePath
+
+	// no validation rules for NoCleanup
+
+	// no validation rules for IgnoreGists
+
+	// no validation rules for PrintLegacyJson
 
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:

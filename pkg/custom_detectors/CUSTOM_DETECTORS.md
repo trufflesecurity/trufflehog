@@ -43,6 +43,13 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    - **`exclude_regexes_match`**: This parameter enables you to define regex patterns to exclude entire matches from being reported as secrets. This applies to the entire matched string, not just the token.
    - **`entropy`**: This parameter is used to assess the randomness of detected strings. High entropy often indicates that a string is a potential secret, such as an API key or password, due to its complexity and unpredictability. It helps in filtering false-positives. While an entropy threshold of `3` can be a starting point, it's essential to adjust this value based on your project's specific requirements and the nature of the data you have.
    - **`exclude_words`**: This parameter allows you to specify a list of words that, if present in a detected string, will cause TruffleHog to ignore that string. This is a substring match and does not enforce word boundaries. It applies only to the token.
+   - **`validations`**: This parameter lets you define extra validation rules for each regex specified in the regex option. These rules address limitations of Go's RE2 engine, such as the lack of lookahead support, and are applied after a regex match to help reduce false positives.
+   Available validation options:
+     - **`contains_digit`**: Ensures the match contains at least one numeric digit (0-9). Useful for API keys or tokens that must include numbers.
+     - **`contains_lowercase`**: Ensures the match contains at least one lowercase letter (a-z). Common requirement for passwords and mixed-case tokens.
+     - **`contains_uppercase`**: Ensures the match contains at least one uppercase letter (A-Z). Helps validate tokens that follow mixed-case conventions.
+     - **`contains_special_char`**: Ensures the match contains at least one special character from the set `!@#$%^&*()_+-=[]{}|;:,.<>?`. Useful for complex passwords or encoded tokens.
+    
 
     [Here](/examples/generic_with_filters.yml) is an example of a custom detector using these parameters. 
 

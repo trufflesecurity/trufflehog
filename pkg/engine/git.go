@@ -24,7 +24,11 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobP
 		ExcludePathsFile: c.ExcludePathsFile,
 		MaxDepth:         int64(c.MaxDepth),
 		SkipBinaries:     c.SkipBinaries,
+		ClonePath:        c.ClonePath,
+		NoCleanup:        c.NoCleanup,
+		PrintLegacyJson:  c.PrintLegacyJSON,
 	}
+
 	var conn anypb.Any
 	if err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{}); err != nil {
 		ctx.Logger().Error(err, "failed to marshal git connection")

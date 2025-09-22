@@ -90,7 +90,7 @@ API Reference: https://apidocs.harness.io/tag/User/#operation/getCurrentUserInfo
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://app.harness.io/ng/api/user/currentUser", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header.Set("x-api-key", token)

@@ -38,7 +38,7 @@ We take the revenue from the enterprise product to fund more awesome open source
 
 # What is TruffleHog 🐽
 
-TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
+TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context, secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
 
 ## Discovery 🔍
 
@@ -46,7 +46,7 @@ TruffleHog can look for secrets in many places including Git, chats, wikis, logs
 
 ## Classification 📁
 
-TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes its hard to tell looking at it, so TruffleHog classifies everything it finds.
+TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes it's hard to tell looking at it, so TruffleHog classifies everything it finds.
 
 ## Validation ✅
 
@@ -58,7 +58,7 @@ For the 20 some of the most commonly leaked out credential types, instead of sen
 
 # :loudspeaker: Join Our Community
 
-Have questions? Feedback? Jump in slack or discord and hang out with us
+Have questions? Feedback? Jump into Slack or Discord and hang out with us.
 
 Join our [Slack Community](https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ)
 
@@ -74,7 +74,7 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --or
 
 # :floppy_disk: Installation
 
-Several options available for you:
+Several options are available for you:
 
 ### MacOS users
 
@@ -149,7 +149,7 @@ You need the following tool to verify signature:
 
 - [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
 
-Verification steps are as follow:
+Verification steps are as follows:
 
 1. Download the artifact files you want, and the following files from the [releases](https://github.com/trufflesecurity/trufflehog/releases) page.
 
@@ -175,8 +175,8 @@ Verification steps are as follow:
 
 Replace `{version}` with the downloaded files version
 
-Alternatively, if you are using installation script, pass `-v` option to perform signature verification.
-This required Cosign binary to be installed prior to running installation script.
+Alternatively, if you are using the installation script, pass `-v` option to perform signature verification.
+This requires Cosign binary to be installed prior to running the installation script.
 
 # :rocket: Quick Start
 
@@ -245,7 +245,7 @@ trufflehog s3 --bucket=<bucket name> --results=verified,unknown
 trufflehog s3 --role-arn=<iam role arn>
 ```
 
-## 7: Scan a Github Repo using SSH authentication in docker
+## 7: Scan a Github Repo using SSH authentication in Docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
@@ -575,7 +575,7 @@ In the example config above, we're scanning for live secrets in all PRs and Push
 
 ### Shallow Cloning
 
-If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example for how to do it:
+If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example of how to do it:
 
 ```
 ...

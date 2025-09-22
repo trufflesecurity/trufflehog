@@ -23,6 +23,7 @@ type scanner struct {
 	*detectors.CustomMultiPartCredentialProvider
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
+	detectors.AccountFilter
 }
 
 func New(opts ...func(*scanner)) *scanner {
@@ -33,7 +34,7 @@ func New(opts ...func(*scanner)) *scanner {
 		opt(scanner)
 	}
 
-	scanner.CustomMultiPartCredentialProvider = detectors.NewCustomMultiPartCredentialProvider(2048) // ????
+	scanner.CustomMultiPartCredentialProvider = detectors.NewCustomMultiPartCredentialProvider(2048)
 	return scanner
 }
 
@@ -45,6 +46,18 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 		}
 
 		s.skipIDs = ids
+	}
+}
+
+func WithAllowedAccounts(accounts []string) func(*scanner) {
+	return func(s *scanner) {
+		s.SetAllowedAccounts(accounts)
+	}
+}
+
+func WithDeniedAccounts(accounts []string) func(*scanner) {
+	return func(s *scanner) {
+		s.SetDeniedAccounts(accounts)
 	}
 }
 
@@ -121,6 +134,35 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
+					// If we haven't already found an AWS Account ID for this ID (via API), calculate one for filtering.
+					var accountIDForFiltering string
+					if accountID, err := aws.GetAccountNumFromID(idMatch); err == nil {
+						accountIDForFiltering = accountID
+					}
+
+					// Check account filtering before verification
+					if accountIDForFiltering != "" {
+						if s.ShouldSkipAccount(accountIDForFiltering) {
+							var skipReason string
+							if s.IsInDenyList(accountIDForFiltering) {
+								skipReason = aws.VerificationErrAccountIDInDenyList
+							} else {
+								skipReason = aws.VerificationErrAccountIDNotInAllowList
+							}
+							s1.SetVerificationError(fmt.Errorf("%s", skipReason), secretMatch)
+							// If we haven't already found an AWS Account ID for this ID (via API), calculate one.
+							if _, ok := s1.ExtraData["account"]; !ok {
+								if accountID, err := aws.GetAccountNumFromID(idMatch); err != nil {
+									logger.V(3).Info("Failed to decode AWS Account ID", "err", err)
+								} else {
+									s1.ExtraData["account"] = accountID
+								}
+							}
+							results = append(results, s1)
+							continue
+						}
+					}
+
 					isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch, sessionMatch, true)
 					s1.Verified = isVerified
 					if extraData != nil {
@@ -134,12 +176,12 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 
-				// If we haven't already found an account number for this ID (via API), calculate one.
+				// If we haven't already found an AWS Account ID for this ID (via API), calculate one.
 				if _, ok := s1.ExtraData["account"]; !ok {
-					if account, err := aws.GetAccountNumFromID(idMatch); err != nil {
-						logger.V(3).Info("Failed to decode account number", "err", err)
+					if accountID, err := aws.GetAccountNumFromID(idMatch); err != nil {
+						logger.V(3).Info("Failed to decode AWS Account ID", "err", err)
 					} else {
-						s1.ExtraData["account"] = account
+						s1.ExtraData["account"] = accountID
 					}
 				}
 
