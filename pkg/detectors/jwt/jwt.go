@@ -94,18 +94,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-// Parse a string into a URL and check that it is an HTTPS URL.
-// The `name` parameter is used only for producing an error message.
-func parseHttpsUrl(name string, urlString string) (*url.URL, error) {
-	url, err := url.Parse(urlString)
+func isLocalhost(url *url.URL) bool {
+	switch url.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+// Parse a string into a URL, check that it is an HTTPS URL, and that it doesn't refer to localhost.
+func parseNonlocalhostHttpsUrl(urlString string) (*url.URL, error) {
+	url, err := url.ParseRequestURI(urlString)
 	if err != nil {
 		return nil, err
 	}
 	if url.Scheme != "https" {
-		return nil, fmt.Errorf("unsupported scheme for %s URL (expected https)", name)
-	} else {
-		return url, nil
+		return nil, fmt.Errorf("only https scheme is supported")
 	}
+	if isLocalhost(url) {
+		return nil, fmt.Errorf("only non-local hosts are supported")
+	}
+
+	return url, nil
 }
 
 func performHttpRequest(client *http.Client, ctx context.Context, method string, url string) (*http.Response, error) {
@@ -136,9 +147,9 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		if issuer == "" {
 			return nil, fmt.Errorf("missing issuer")
 		}
-		issuerURL, err := parseHttpsUrl("issuer", issuer)
+		issuerURL, err := parseNonlocalhostHttpsUrl(issuer)
 		if err != nil {
-			return nil, fmt.Errorf("invalid issuer URL %v: %w", issuer, err)
+			return nil, fmt.Errorf("unsupported issuer: %w: %q", err, issuer)
 		}
 
 		oidcDiscoveryURL := issuerURL.JoinPath(".well-known/openid-configuration")
@@ -167,13 +178,13 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 			return nil, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
 		}
 
-		jwksURL, err := parseHttpsUrl("JWKS", discoveryDoc.JWKSUri)
+		jwksURL, err := parseNonlocalhostHttpsUrl(discoveryDoc.JWKSUri)
 		if err != nil {
 			return nil, fmt.Errorf("invalid JWKS URL: %w", err)
 		}
 
 		if jwksURL.Host != issuerURL.Host {
-			return nil, fmt.Errorf("JWKS URL host does not match issuer host: %v", discoveryDoc.JWKSUri)
+			return nil, fmt.Errorf("JWKS host does not match issuer host: %q", discoveryDoc.JWKSUri)
 		}
 
 		// Fetch the JWKS
