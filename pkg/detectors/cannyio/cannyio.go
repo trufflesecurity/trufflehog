@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	payload := strings.NewReader("apiKey=" + token)
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://canny.io/api/v1/boards/list", payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://canny.io/api/v1/boards/list", payload)
 	if err != nil {
 		return false, err
 	}
