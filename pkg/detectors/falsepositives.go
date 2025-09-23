@@ -269,11 +269,6 @@ func LoadAllowlistedSecrets(yamlFile string) ([]AllowlistEntry, error) {
 		return nil, fmt.Errorf("failed to read allowlist file: %w", err)
 	}
 
-	// Ensure the content ends with a newline for proper YAML parsing
-	if len(content) > 0 && content[len(content)-1] != '\n' {
-		content = append(content, '\n')
-	}
-
 	var allowList []AllowlistEntry
 	if err := yaml.Unmarshal(content, &allowList); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML allowlist file: %w", err)
@@ -287,7 +282,9 @@ func LoadAllowlistedSecrets(yamlFile string) ([]AllowlistEntry, error) {
 // they are treated as exact string matches.
 func CompileAllowlistPatterns(allowList []AllowlistEntry) *CompiledAllowlist {
 	allowlist := &CompiledAllowlist{
-		ExactMatches: make(map[string]struct{}),
+		ExactMatches:    make(map[string]struct{}, 0),
+		CompiledRegexes: make([]*regexp.Regexp, 0),
+		RegexPatterns:   make([]string, 0),
 	}
 
 	for _, entry := range allowList {
@@ -317,6 +314,9 @@ func isSecretAllowlisted(secret string, allowlist *CompiledAllowlist) (bool, str
 	if allowlist == nil {
 		return false, ""
 	}
+
+	// Trim all whitespace (spaces, tabs, newlines, carriage returns) from the secret
+	secret = strings.TrimSpace(secret)
 
 	// First, try exact string matching for performance (O(1) lookup)
 	if _, isAllowlisted := allowlist.ExactMatches[secret]; isAllowlisted {
