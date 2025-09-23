@@ -281,7 +281,7 @@ func LoadAllowlistedSecrets(yamlFile string) ([]AllowlistEntry, error) {
 // All patterns are first attempted to be compiled as regex. If compilation fails,
 // they are treated as exact string matches.
 func CompileAllowlistPatterns(allowList []AllowlistEntry) *CompiledAllowlist {
-	allowlist := &CompiledAllowlist{
+	compiledAllowlist := &CompiledAllowlist{
 		ExactMatches:    make(map[string]struct{}, 0),
 		CompiledRegexes: make([]*regexp.Regexp, 0),
 		RegexPatterns:   make([]string, 0),
@@ -297,16 +297,16 @@ func CompileAllowlistPatterns(allowList []AllowlistEntry) *CompiledAllowlist {
 			// Always try to compile as regex first
 			if compiledRegex, err := regexp.Compile(pattern); err == nil {
 				// Successfully compiled as regex
-				allowlist.CompiledRegexes = append(allowlist.CompiledRegexes, compiledRegex)
-				allowlist.RegexPatterns = append(allowlist.RegexPatterns, pattern)
+				compiledAllowlist.CompiledRegexes = append(compiledAllowlist.CompiledRegexes, compiledRegex)
+				compiledAllowlist.RegexPatterns = append(compiledAllowlist.RegexPatterns, pattern)
 			} else {
 				// Invalid regex, treat as exact string match
-				allowlist.ExactMatches[pattern] = struct{}{}
+				compiledAllowlist.ExactMatches[pattern] = struct{}{}
 			}
 		}
 	}
 
-	return allowlist
+	return compiledAllowlist
 }
 
 // isSecretAllowlisted checks if a secret matches any allowlisted pattern (exact string or regex)
