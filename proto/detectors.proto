@@ -218,7 +218,7 @@ enum DetectorType {
   Omnisend = 205;
   Groovehq = 206;
   Newsapi = 207;
-  Chatbot = 208;
+  Chatbot = 208 [deprecated = true];
   ClickSendsms = 209;
   Getgist = 210;
   CustomerIO = 211;
