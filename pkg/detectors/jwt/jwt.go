@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -64,28 +65,59 @@ func limitReader(reader io.Reader) io.Reader {
 
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	client := cmp.Or(s.client, defaultClient)
+	seenMatches := make(map[string]bool)
 
-	uniqueMatches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueMatches[match[1]] = struct{}{}
-	}
+	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
+		match := matchGroups[1]
 
-	for match := range uniqueMatches {
+		if seenMatches[match] {
+			continue
+		}
+		seenMatches[match] = true
+
+		parsedToken, _, err := jwt.NewParser(jwt.WithPaddingAllowed()).ParseUnverified(match, jwt.MapClaims{})
+		if err != nil {
+			// we can skip a token that doesn't parse without any validation or verification
+			continue
+		}
+
+		issString, _ := parsedToken.Claims.GetIssuer()
+
+		iatString := ""
+		iat, err := parsedToken.Claims.GetIssuedAt()
+		if err == nil && iat != nil {
+			iatString = iat.String()
+		}
+
+		expString := ""
+		exp, err := parsedToken.Claims.GetExpirationTime()
+		if err == nil && exp != nil {
+			expString = exp.String()
+		}
+
+		extraData := map[string]string{
+			"iss": issString,
+			"iat": iatString,
+			"exp": expString,
+		}
+
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_JWT,
 			Raw:          []byte(match),
+			ExtraData:    extraData,
 		}
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
+			var isVerified bool
+			var verificationErr error
+			switch parsedToken.Method.Alg() {
+			case "HS256", "HS384", "HS512":
+				isVerified, verificationErr = verifyHMAC(parsedToken)
+			default:
+				isVerified, verificationErr = verifyPublicKey(ctx, client, match)
 			}
-
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, match)
 		}
 
@@ -138,11 +170,31 @@ func performHttpRequest(ctx context.Context, client *http.Client, method string,
 	return resp, nil
 }
 
-// Attempt to verify a JWT.
+// Attempt to verify a JWT that uses an HMAC algorithm.
 //
-// This implementation only attempts to verify JWTs that use an asymmetric encryption algorithm,
-// and only those whose issuers use the OIDC Discovery protocol to make public keys available via request.
-func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (bool, map[string]string, error) {
+// This implementation only attempts to verify JWTs whose issuers use the OIDC Discovery protocol to make public keys available via request.
+func verifyHMAC(parsedToken *jwt.Token) (bool, error) {
+	v := jwt.NewValidator(
+		jwt.WithValidMethods([]string{
+			jwt.SigningMethodHS256.Alg(),
+			jwt.SigningMethodHS384.Alg(),
+			jwt.SigningMethodHS512.Alg(),
+		}),
+		jwt.WithIssuedAt(),
+		jwt.WithPaddingAllowed(),
+		jwt.WithLeeway(time.Minute),
+	)
+	if err := v.Validate(parsedToken.Claims); err != nil {
+		// though we have not checked the signature, the token is definitely invalid
+		return false, nil
+	}
+	return false, fmt.Errorf("no key available to verify an HMAC-based signature")
+}
+
+// Attempt to verify a JWT that uses a public-key signing algorithm.
+//
+// This implementation only attempts to verify JWTs whose issuers use the OIDC Discovery protocol to make public keys available via request.
+func verifyPublicKey(ctx context.Context, client *http.Client, tokenString string) (bool, error) {
 
 	// A key retrieval function that uses the OIDC Discovery protocol,
 	// being careful to avoid possible DoS from a potentially malicious JWKS server.
@@ -216,7 +268,8 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 
 		// Parse matching key to the "raw" key type needed for signature verification
 		var rawMatchingKey any
-		err = jwk.Export(matchingKey, &rawMatchingKey); if err != nil {
+		err = jwk.Export(matchingKey, &rawMatchingKey)
+		if err != nil {
 			return nil, fmt.Errorf("failed to export matching key: %w", err)
 		}
 
@@ -244,13 +297,13 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 	)
 	switch {
 	case token.Valid:
-		return true, nil, nil
+		return true, nil
 	case errors.Is(err, jwt.ErrTokenUnverifiable):
-		return false, nil, err
+		return false, err
 	case errors.Is(err, jwt.ErrHashUnavailable):
-		return false, nil, err
+		return false, err
 	default:
-		return false, nil, nil
+		return false, nil
 	}
 }
 
