@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -94,17 +95,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func isLocalhost(url *url.URL) bool {
-	switch url.Hostname() {
-	case "localhost", "127.0.0.1", "::1":
+// Does the URL's refer to a non-routing host?
+func isNonRoutingHost(url *url.URL) bool {
+	h := url.Hostname()
+	switch h {
+	case "localhost", "::1":
 		return true
-	default:
-		return false
 	}
+
+	ip := net.ParseIP(h)
+	if ip != nil {
+		return ip.IsPrivate()
+	}
+
+	return false
 }
 
-// Parse a string into a URL, check that it is an HTTPS URL, and that it doesn't refer to localhost.
-func parseNonlocalhostHttpsUrl(urlString string) (*url.URL, error) {
+// Parse a string into a URL, check that it is an HTTPS URL, and that it doesn't refer to a non-routing host.
+func parseRoutableHttpsUrl(urlString string) (*url.URL, error) {
 	url, err := url.ParseRequestURI(urlString)
 	if err != nil {
 		return nil, err
@@ -112,8 +120,8 @@ func parseNonlocalhostHttpsUrl(urlString string) (*url.URL, error) {
 	if url.Scheme != "https" {
 		return nil, fmt.Errorf("only https scheme is supported")
 	}
-	if isLocalhost(url) {
-		return nil, fmt.Errorf("only non-local hosts are supported")
+	if isNonRoutingHost(url) {
+		return nil, fmt.Errorf("only public hosts are supported")
 	}
 
 	return url, nil
@@ -147,7 +155,7 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		if issuer == "" {
 			return nil, fmt.Errorf("missing issuer")
 		}
-		issuerURL, err := parseNonlocalhostHttpsUrl(issuer)
+		issuerURL, err := parseRoutableHttpsUrl(issuer)
 		if err != nil {
 			return nil, fmt.Errorf("unsupported issuer: %w: %q", err, issuer)
 		}
@@ -178,7 +186,7 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 			return nil, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
 		}
 
-		jwksURL, err := parseNonlocalhostHttpsUrl(discoveryDoc.JWKSUri)
+		jwksURL, err := parseRoutableHttpsUrl(discoveryDoc.JWKSUri)
 		if err != nil {
 			return nil, fmt.Errorf("invalid JWKS URL: %w", err)
 		}
