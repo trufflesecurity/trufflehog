@@ -231,6 +231,7 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 			jwt.SigningMethodRS256.Alg(),
 			jwt.SigningMethodRS384.Alg(),
 			jwt.SigningMethodRS512.Alg(),
+			jwt.SigningMethodEdDSA.Alg(),
 			jwt.SigningMethodES256.Alg(),
 			jwt.SigningMethodES384.Alg(),
 			jwt.SigningMethodES512.Alg(),
