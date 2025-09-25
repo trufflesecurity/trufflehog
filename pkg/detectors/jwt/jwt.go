@@ -98,8 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // Does the URL's refer to a non-routing host?
 func isNonRoutingHost(url *url.URL) bool {
 	h := url.Hostname()
-	switch h {
-	case "localhost", "::1":
+	if h == "localhost" {
 		return true
 	}
 
@@ -127,7 +126,7 @@ func parseRoutableHttpsUrl(urlString string) (*url.URL, error) {
 	return url, nil
 }
 
-func performHttpRequest(client *http.Client, ctx context.Context, method string, url string) (*http.Response, error) {
+func performHttpRequest(ctx context.Context, client *http.Client, method string, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -169,7 +168,7 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		}
 
 		// Fetch the OIDC discovery document
-		resp, err := performHttpRequest(client, ctx, "GET", oidcDiscoveryURL.String())
+		resp, err := performHttpRequest(ctx, client, "GET", oidcDiscoveryURL.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to perform OIDC discovery: %w", err)
 		}
@@ -196,7 +195,7 @@ func verifyMatch(ctx context.Context, client *http.Client, tokenString string) (
 		}
 
 		// Fetch the JWKS
-		resp, err = performHttpRequest(client, ctx, "GET", discoveryDoc.JWKSUri)
+		resp, err = performHttpRequest(ctx, client, "GET", discoveryDoc.JWKSUri)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
 		}
