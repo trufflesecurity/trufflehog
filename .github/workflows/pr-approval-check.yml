@@ -1,0 +1,85 @@
+name: PR Approval Check
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  check-product-eng-approval:
+    name: Check Product Eng Approval
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check for Product Engineering approval
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+            
+            console.log(`Found ${reviews.length} reviews`);
+            
+            // Get approved reviews
+            const approvals = reviews.filter(review => review.state === 'APPROVED');
+            console.log(`Found ${approvals.length} approvals`);
+            
+            if (approvals.length === 0) {
+              console.log('No approvals found');
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.payload.pull_request.head.sha,
+                state: 'pending',
+                context: 'product-eng-approval',
+                description: 'Waiting for approval from @trufflesecurity/product-eng member'
+              });
+              return;
+            }
+            
+            // Check if any approver is a member of @trufflesecurity/product-eng
+            let hasProductEngApproval = false;
+            
+            for (const approval of approvals) {
+              try {
+                const { data: membership } = await github.rest.teams.getMembershipForUserInOrg({
+                  org: 'trufflesecurity',
+                  team_slug: 'product-eng',
+                  username: approval.user.login
+                });
+                
+                if (membership.state === 'active') {
+                  console.log(`✅ Found active product-eng member approval from: ${approval.user.login}`);
+                  hasProductEngApproval = true;
+                  break;
+                }
+              } catch (error) {
+                // User is not a member of the team (404) or other error
+                console.log(`❌ ${approval.user.login} is not a member of @trufflesecurity/product-eng`);
+              }
+            }
+            
+            if (hasProductEngApproval) {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.payload.pull_request.head.sha,
+                state: 'success',
+                context: 'product-eng-approval',
+                description: '✅ Approved by @trufflesecurity/product-eng member'
+              });
+            } else {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.payload.pull_request.head.sha,
+                state: 'failure',
+                context: 'product-eng-approval',
+                description: '❌ Requires approval from @trufflesecurity/product-eng member'
+              });
+            }
