@@ -1152,6 +1152,7 @@ const (
 	DetectorType_ArtifactoryReferenceToken               DetectorType = 1042
 	DetectorType_DatadogApikey                           DetectorType = 1043
 	DetectorType_ShopifyOAuth                            DetectorType = 1044
+	DetectorType_TelerikLicenseKey                       DetectorType = 1045
 )
 
 // Enum value maps for DetectorType.
