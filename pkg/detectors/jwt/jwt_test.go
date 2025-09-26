@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
+// This tests the JWT detector for a number of different cases (mostly HMAC-based) without verification enabled.
 func TestJwt_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -20,7 +21,7 @@ func TestJwt_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern 1",
+			name: "HS256/valid",
 			input: `
 				// secret is "a-string-secret-at-least-256-bits-long"
 				eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
@@ -28,20 +29,73 @@ func TestJwt_Pattern(t *testing.T) {
 			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
 		},
 		{
-			name: "valid pattern 2",
+			name: "HS256/valid-verbose-header",
 			input: `
 				// secret is "a-string-secret-at-least-256-bits-long"
-				ewogICJ0eXAiOiBqd3QsCiAgImFsZyI6IEhTMjU2Cn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
+				ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQo.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{"ewogICJ0eXAiOiBqd3QsCiAgImFsZyI6IEhTMjU2Cn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
+			want: []string{"ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQo.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
+		},
+
+		{
+			name: "HS384/valid/no-expiration",
+			input: `
+				// secret is "a-string-secret-at-least-256-bits-long"
+				eyJhbGciOiJIUzM4NCJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.NArdGjJ9DjXwGCLdNXDVjlwlvI_tUa2B3H44dvrZfKliBNTUL0YyKi8q4Al0Wl8u
+			`,
+			want: []string{"eyJhbGciOiJIUzM4NCJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.NArdGjJ9DjXwGCLdNXDVjlwlvI_tUa2B3H44dvrZfKliBNTUL0YyKi8q4Al0Wl8u"},
+		},
+
+		{
+			name: "HS512/valid/no-expiration",
+			input: `
+				// secret is "a-string-secret-at-least-256-bits-long"
+				eyJhbGciOiJIUzUxMiJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.SiKgg2-kq7kVXhe5uLMakzlygHsJ70aTyXGhdbqG2SfkUC_fwk8MZ3JAWXrCIEJAUi_QMmQm-7qMU0SCMFRQug
+			`,
+			want: []string{"eyJhbGciOiJIUzUxMiJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.SiKgg2-kq7kVXhe5uLMakzlygHsJ70aTyXGhdbqG2SfkUC_fwk8MZ3JAWXrCIEJAUi_QMmQm-7qMU0SCMFRQug"},
+		},
+
+		{
+			name: "HS256/padding-in-verbose-header/invalid-sig",
+			input: `
+				// secret is "a-string-secret-at-least-256-bits-long"
+				ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQ==.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
+			`,
+			want: []string{"ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQ==.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
 		},
 		{
-			name: "invalid pattern 2",
+			name: "HS256/padding-in-claims/invalid-sig",
 			input: `
 				// secret is "a-string-secret-at-least-256-bits-long"
-				ewogICJ0eXAiOiBqd3QsCiAgImFsZyI6IEhTMjU2Cn0=.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
+				ewogICJhbGciOiJIUzI1NiIsCiAgInR5cCI6IkpXVCIKfQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyfQo=.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{},
+			want: []string{"ewogICJhbGciOiJIUzI1NiIsCiAgInR5cCI6IkpXVCIKfQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyfQo=.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
+		},
+
+		{
+			name: "HS256/expired",
+			input: `
+				// secret is "a-string-secret-at-least-256-bits-long"
+				eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTQxNjIzOTAyMiwiZXhwIjoxNDE2MjM5MTIyfQ.EwRkAg9uOr6kVajMdMvB6KWGvIdDlGNRAH3lsZ2qQHI
+			`,
+			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTQxNjIzOTAyMiwiZXhwIjoxNDE2MjM5MTIyfQ.EwRkAg9uOr6kVajMdMvB6KWGvIdDlGNRAH3lsZ2qQHI"},
+		},
+
+		{
+			name: "HS256/not-yet-valid",
+			input: `
+				// secret is "a-string-secret-at-least-256-bits-long"
+				eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MjQxNjIzOTAyMiwibmJmIjozNDE2MjM5MDIyLCJleHAiOjQ0MTYyMzkwMjJ9.rVQaCey3ETfhn8AeiC_EmFjp6_X2Dq8QY_AzBAF2ZzQ
+			`,
+			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MjQxNjIzOTAyMiwibmJmIjozNDE2MjM5MDIyLCJleHAiOjQ0MTYyMzkwMjJ9.rVQaCey3ETfhn8AeiC_EmFjp6_X2Dq8QY_AzBAF2ZzQ"},
+		},
+
+		{
+			name: "PS384/expired/invalid-issuer",
+			input: `
+				eyJhbGciOiJQUzM4NCIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJMeDFGbWF5UDJZQnR4YXFTMVNLSlJKR2lYUktudzJvdjVXbVlJTUctQkxFIn0.eyJleHAiOjE2MTU0MDY5ODIsImlhdCI6MTYxNTQwNjkyMiwianRpIjoiMGY2NGJjYTktYjU4OC00MWFhLWFkNDEtMmFmZDM2OGRmNTFkIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL2F1dGgvcmVhbG1zL21hc3RlciIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZDEyOGRmMS0xMTQwLTRlNGMtYjA5Ny1hY2RjZTcwNWJkOWIiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ0b2tlbmRlbG1lIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJlbWFpbCBwcm9maWxlIiwiY2xpZW50SG9zdCI6IjE3Mi4yMC4wLjEiLCJjbGllbnRJZCI6InRva2VuZGVsbWUiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInByZWZlcnJlZF91c2VybmFtZSI6InNlcnZpY2UtYWNjb3VudC10b2tlbmRlbG1lIiwiY2xpZW50QWRkcmVzcyI6IjE3Mi4yMC4wLjEifQ.Rxrq41AxbWKIQHWv-Tkb7rqwel3sKT_R_AGvn9mPIHqhw1m7nsQWcL9t2a_8MI2hCwgWtYdgTF1xxBNmb2IW3CZkML5nGfcRrFvNaBHd3UQEqbFKZgnIX29h5VoxekyiwFaGD-0RXL83jF7k39hytEzTatwoVjZ-frga0KFl-nLce3OwncRXVCGmxoFzUsyu9TQFS2Mm_p0AMX1y1MAX1JmLC3WFhH3BohhRqpzBtjSfs_f46nE1-HKjqZ1ERrAc2fmiVJjmG7sT702JRuuzrgUpHlMy2juBG4DkVcMlj4neJUmCD1vZyZBRggfaIxNkwUhHtmS2Cp9tOcwNu47tSg
+			`,
+			want: []string{"eyJhbGciOiJQUzM4NCIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJMeDFGbWF5UDJZQnR4YXFTMVNLSlJKR2lYUktudzJvdjVXbVlJTUctQkxFIn0.eyJleHAiOjE2MTU0MDY5ODIsImlhdCI6MTYxNTQwNjkyMiwianRpIjoiMGY2NGJjYTktYjU4OC00MWFhLWFkNDEtMmFmZDM2OGRmNTFkIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL2F1dGgvcmVhbG1zL21hc3RlciIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZDEyOGRmMS0xMTQwLTRlNGMtYjA5Ny1hY2RjZTcwNWJkOWIiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ0b2tlbmRlbG1lIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJlbWFpbCBwcm9maWxlIiwiY2xpZW50SG9zdCI6IjE3Mi4yMC4wLjEiLCJjbGllbnRJZCI6InRva2VuZGVsbWUiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInByZWZlcnJlZF91c2VybmFtZSI6InNlcnZpY2UtYWNjb3VudC10b2tlbmRlbG1lIiwiY2xpZW50QWRkcmVzcyI6IjE3Mi4yMC4wLjEifQ.Rxrq41AxbWKIQHWv-Tkb7rqwel3sKT_R_AGvn9mPIHqhw1m7nsQWcL9t2a_8MI2hCwgWtYdgTF1xxBNmb2IW3CZkML5nGfcRrFvNaBHd3UQEqbFKZgnIX29h5VoxekyiwFaGD-0RXL83jF7k39hytEzTatwoVjZ-frga0KFl-nLce3OwncRXVCGmxoFzUsyu9TQFS2Mm_p0AMX1y1MAX1JmLC3WFhH3BohhRqpzBtjSfs_f46nE1-HKjqZ1ERrAc2fmiVJjmG7sT702JRuuzrgUpHlMy2juBG4DkVcMlj4neJUmCD1vZyZBRggfaIxNkwUhHtmS2Cp9tOcwNu47tSg"},
 		},
 	}
 

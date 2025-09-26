@@ -26,18 +26,13 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+// Ensure the Scanner satisfies expected interfaces at compile time.
 var _ interface {
 	detectors.Detector
 	detectors.MaxSecretSizeProvider
 } = (*Scanner)(nil)
 
-var (
-	defaultClient = common.SaneHttpClient()
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b((?:eyJ|ewogIC|ewoid)[A-Za-z0-9_-]{12,}={0,2}\.(?:eyJ|ewo)[A-Za-z0-9_-]{12,}={0,2}\.[A-Za-z0-9_-]{12,})\b`)
-)
+var keyPat = regexp.MustCompile(`\b((?:eyJ|ewogIC|ewoid)[A-Za-z0-9_-]{12,}={0,2}\.(?:eyJ|ewo)[A-Za-z0-9_-]{12,}={0,2}\.[A-Za-z0-9_-]{12,})\b`)
 
 // The default max secret size value for this detector must be overridden or JWTs with lots of claims will get missed.
 func (s Scanner) MaxSecretSize() int64 {
@@ -58,14 +53,9 @@ func (s Scanner) Keywords() []string {
 	}
 }
 
-// Wrap an `io.Reader` with a reasonable limit as an additional measure against DoS from a malicious JWKS issuer
-func limitReader(reader io.Reader) io.Reader {
-	return io.LimitReader(reader, 1024*1024)
-}
-
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	client := cmp.Or(s.client, defaultClient)
+	client := cmp.Or(s.client, common.SaneHttpClient())
 	seenMatches := make(map[string]bool)
 
 	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
@@ -76,22 +66,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		seenMatches[match] = true
 
-		parsedToken, _, err := jwt.NewParser(jwt.WithPaddingAllowed()).ParseUnverified(match, jwt.MapClaims{})
+		claims := jwt.MapClaims{}
+		parsedToken, _, err := jwt.NewParser(jwt.WithPaddingAllowed()).ParseUnverified(match, claims)
 		if err != nil {
 			// we can skip a token that doesn't parse without any validation or verification
 			continue
 		}
 
-		issString, _ := parsedToken.Claims.GetIssuer()
+		issString, _ := claims.GetIssuer()
 
 		iatString := ""
-		iat, err := parsedToken.Claims.GetIssuedAt()
+		iat, err := claims.GetIssuedAt()
 		if err == nil && iat != nil {
 			iatString = iat.String()
 		}
 
 		expString := ""
-		exp, err := parsedToken.Claims.GetExpirationTime()
+		exp, err := claims.GetExpirationTime()
 		if err == nil && exp != nil {
 			expString = exp.String()
 		}
@@ -189,6 +180,11 @@ func verifyHMAC(parsedToken *jwt.Token) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("no key available to verify an HMAC-based signature")
+}
+
+// Wrap an `io.Reader` with a reasonable limit as an additional measure against DoS from a malicious JWKS issuer
+func limitReader(reader io.Reader) io.Reader {
+	return io.LimitReader(reader, 1024*1024)
 }
 
 // Attempt to verify a JWT that uses a public-key signing algorithm.
