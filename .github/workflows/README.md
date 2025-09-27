@@ -4,7 +4,7 @@ This directory contains GitHub Actions workflows for the TruffleHog repository.
 
 ## PR Approval Check (`pr-approval-check.yml`)
 
-This workflow enforces that at least one PR approver must be a member of the `@trufflesecurity/product-eng` team.
+This workflow enforces that at least one PR approver must be a member of the `@trufflesecurity/product-eng` team or any of its child teams.
 
 ### How it works:
 
@@ -15,12 +15,13 @@ This workflow enforces that at least one PR approver must be a member of the `@t
 2. **Approval Check**: The workflow:
    - Fetches all reviews for the PR
    - Filters for approved reviews
-   - Checks if any approver is an active member of `@trufflesecurity/product-eng`
+   - Gets all child teams of `@trufflesecurity/product-eng` 
+   - Checks if any approver is an active member of the parent team or any child team
    - Sets a commit status accordingly
 
 3. **Status Check**: Creates a commit status named `product-eng-approval` with:
-   - ✅ **Success**: When at least one approver is a `@trufflesecurity/product-eng` member
-   - ❌ **Failure**: When no `@trufflesecurity/product-eng` members have approved
+   - ✅ **Success**: When at least one approver is a `@trufflesecurity/product-eng` or child team member
+   - ❌ **Failure**: When no `@trufflesecurity/product-eng` or child team members have approved
    - ⏳ **Pending**: When waiting for reviews
 
 ### Branch Protection
@@ -39,4 +40,4 @@ The workflow uses the default `GITHUB_TOKEN` which has sufficient permissions to
 - Check team membership (for public teams)
 - Create commit statuses
 
-**Note**: If the `product-eng` team is private, you may need to use a personal access token with appropriate permissions.
+**Note**: If the `product-eng` team or its child teams are private, you may need to use a personal access token with appropriate permissions.
