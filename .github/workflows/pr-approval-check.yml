@@ -37,30 +37,74 @@ jobs:
                 sha: context.payload.pull_request.head.sha,
                 state: 'pending',
                 context: 'product-eng-approval',
-                description: 'Waiting for approval from @trufflesecurity/product-eng member'
+                description: 'Waiting for approval from @trufflesecurity/product-eng team member'
               });
               return;
             }
             
-            // Check if any approver is a member of @trufflesecurity/product-eng
-            let hasProductEngApproval = false;
-            
-            for (const approval of approvals) {
+            // Helper function to get all teams to check (parent + children)
+            async function getTeamsToCheck() {
+              const teamsToCheck = ['product-eng']; // Start with parent team
+              
               try {
-                const { data: membership } = await github.rest.teams.getMembershipForUserInOrg({
+                // Get child teams of product-eng
+                const { data: childTeams } = await github.rest.teams.listChildInOrg({
                   org: 'trufflesecurity',
-                  team_slug: 'product-eng',
-                  username: approval.user.login
+                  team_slug: 'product-eng'
                 });
                 
-                if (membership.state === 'active') {
-                  console.log(`✅ Found active product-eng member approval from: ${approval.user.login}`);
-                  hasProductEngApproval = true;
-                  break;
-                }
+                // Add child team slugs
+                childTeams.forEach(team => {
+                  teamsToCheck.push(team.slug);
+                });
+                
+                console.log(`Teams to check: ${teamsToCheck.join(', ')}`);
               } catch (error) {
-                // User is not a member of the team (404) or other error
-                console.log(`❌ ${approval.user.login} is not a member of @trufflesecurity/product-eng`);
+                console.log('Error fetching child teams, will only check parent team:', error.message);
+              }
+              
+              return teamsToCheck;
+            }
+            
+            // Helper function to check if user is member of any team
+            async function isUserMemberOfAnyTeam(username, teams) {
+              for (const teamSlug of teams) {
+                try {
+                  const { data: membership } = await github.rest.teams.getMembershipForUserInOrg({
+                    org: 'trufflesecurity',
+                    team_slug: teamSlug,
+                    username: username
+                  });
+                  
+                  if (membership.state === 'active') {
+                    console.log(`✅ Found active member of @trufflesecurity/${teamSlug}: ${username}`);
+                    return { isMember: true, teamSlug };
+                  }
+                } catch (error) {
+                  // User is not a member of this team (404) or other error
+                  console.log(`❌ ${username} is not a member of @trufflesecurity/${teamSlug}`);
+                }
+              }
+              return { isMember: false, teamSlug: null };
+            }
+            
+            // Get all teams to check (parent + children)
+            const teamsToCheck = await getTeamsToCheck();
+            
+            // Check if any approver is a member of product-eng or its child teams
+            let hasProductEngApproval = false;
+            let approverInfo = null;
+            
+            for (const approval of approvals) {
+              const membershipCheck = await isUserMemberOfAnyTeam(approval.user.login, teamsToCheck);
+              
+              if (membershipCheck.isMember) {
+                hasProductEngApproval = true;
+                approverInfo = {
+                  username: approval.user.login,
+                  teamSlug: membershipCheck.teamSlug
+                };
+                break;
               }
             }
             
@@ -71,7 +115,7 @@ jobs:
                 sha: context.payload.pull_request.head.sha,
                 state: 'success',
                 context: 'product-eng-approval',
-                description: '✅ Approved by @trufflesecurity/product-eng member'
+                description: `✅ Approved by @trufflesecurity/${approverInfo.teamSlug} member (${approverInfo.username})`
               });
             } else {
               await github.rest.repos.createCommitStatus({
@@ -80,6 +124,6 @@ jobs:
                 sha: context.payload.pull_request.head.sha,
                 state: 'failure',
                 context: 'product-eng-approval',
-                description: '❌ Requires approval from @trufflesecurity/product-eng member'
+                description: '❌ Requires approval from @trufflesecurity/product-eng team member'
               });
             }
