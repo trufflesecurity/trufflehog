@@ -97,5 +97,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Teleriklicensekey is a blockchain development platform that provides a suite of tools and services for building and scaling decentralized applications. Teleriklicensekey API keys can be used to access these services."
+	return "Telerik and Kendo license keys are for product license validation that verify the developer compiling an application has active license(s) for the version of the Telerik/Kendo product being used in the project."
 }
