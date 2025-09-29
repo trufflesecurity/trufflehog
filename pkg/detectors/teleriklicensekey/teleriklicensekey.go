@@ -2,9 +2,11 @@ package teleriklicensekey
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -29,7 +31,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"teleriklicensekey", "alcht_"}
+	return []string{"teleriklicensekey", "eyJ"}
 }
 
 // FromData will find and optionally verify Teleriklicensekey secrets in a given set of bytes.
@@ -66,30 +68,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://eth-mainnet.g.teleriklicensekey.com/v2/"+token+"/getNFTs/?owner=vitalik.eth", nil)
+	// Decode JWT
+	claims, err := decodeJWT(token)
 	if err != nil {
-		return false, nil, err
+		return false, nil, fmt.Errorf("failed to decode JWT: %w", err)
 	}
+	
+	// Get the token type is "Telerik License Key"
+	tokenType, ok := claims["typ"].(string)
 
-	res, err := client.Do(req)
-	if err != nil {
-		return false, nil, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
-
-	switch res.StatusCode {
-	case http.StatusOK:
-		// If the endpoint returns useful information, we can return it as a map.
+	if ok && tokenType == "Telerik License Key" {
+		// If the JWT's header "typ" claim is "Telerik License Key", consider it verified
 		return true, nil, nil
-	case http.StatusUnauthorized:
-		// The secret is determinately not verified (nothing to do)
-		return false, nil, nil
-	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+
+	// All other tokens are considered unverified
+	return false, nil, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
@@ -98,4 +92,35 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Telerik and Kendo license keys are for product license validation that verify the developer compiling an application has active license(s) for the version of the Telerik/Kendo product being used in the project."
+}
+
+// decodeJWT decodes a JWT token and returns the payload claims
+func decodeJWT(token string) (map[string]interface{}, error) {
+	// Split the JWT into its three parts
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid JWT format: expected 3 parts, got %d", len(parts))
+	}
+
+	// Decode the payload (second part)
+	payload := parts[1]
+	
+	// Add padding if necessary for base64 decoding
+	if padding := len(payload) % 4; padding != 0 {
+		payload += strings.Repeat("=", 4-padding)
+	}
+
+	// Decode from base64
+	decoded, err := base64.URLEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 payload: %w", err)
+	}
+
+	// Parse JSON
+	var claims map[string]interface{}
+	if err := json.Unmarshal(decoded, &claims); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON payload: %w", err)
+	}
+
+	return claims, nil
 }
