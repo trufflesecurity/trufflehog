@@ -94,7 +94,7 @@ func (s Scanner) Description() string {
 	return "Telerik and Kendo license keys are for product license validation that verify the developer compiling an application has active license(s) for the version of the Telerik/Kendo product being used in the project."
 }
 
-// decodeJWT decodes a JWT token and returns the payload claims
+// This function decodes the JWT token so we can verify the typ=Telerik License Key. No remote API call needed!
 func decodeJWT(token string) (map[string]interface{}, error) {
 	// Split the JWT into its three parts
 	parts := strings.Split(token, ".")

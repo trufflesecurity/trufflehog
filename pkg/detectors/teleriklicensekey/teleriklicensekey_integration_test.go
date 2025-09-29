@@ -24,8 +24,9 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TELERIKLICENSEKEY")
-	inactiveSecret := testSecrets.MustGetField("NOT_TELERIKLICENSEKEY")
+
+	secret := testSecrets.MustGetField("SECRET_TYPE_ONE")
+	inactiveSecret := testSecrets.MustGetField("SECRET_TYPE_ONE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
