@@ -7,12 +7,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -93,8 +91,8 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, verified (HTTP client timeout doesn't affect JWT validation)",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			name: "found, verified (no HTTP client needed for JWT validation)",
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within", secret)),
@@ -110,8 +108,8 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, verified (HTTP client response doesn't affect JWT validation)",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
+			name: "found, verified (local JWT validation)",
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within", secret)),
