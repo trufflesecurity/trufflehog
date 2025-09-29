@@ -38,28 +38,38 @@ func TestTeleriklicensekey_Pattern(t *testing.T) {
 			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
 		},
 		{
-			name: "Invalid JWT",
+			name: "Malformed JWT - no JWT pattern detected",
 			input: `
 				[INFO] Checking for Telerik License key
 				[DEBUG] Using MjM0NTY3ODkwIiwibmFtZSI6Ik
 				[ERROR] Response received: Not a valid base64url JWT.
 			`,
-			want: []string{"MjM0NTY3ODkwIiwibmFtZSI6Ik"},
+			want: []string{},
 		},
 		{
-			name: "Invalid JWT",
+			name: "No JWT present",
 			input: `
 				[INFO] Checking for Telerik License key
-				[DEBUG] Using null/empty string.
+				[DEBUG] Using some other text that doesn't contain JWT.
 				[ERROR] Response received: No JWT present.
 			`,
-			want: []string{""},
+			want: []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+
+			// If we expect no results, and no detectors were matched, that's correct
+			if len(test.want) == 0 {
+				if len(matchedDetectors) > 0 {
+					t.Errorf("test %q failed: expected no keywords to be found but found %v", test.name, d.Keywords())
+				}
+				return
+			}
+
+			// If we expect results but no detectors were matched, that's an error
 			if len(matchedDetectors) == 0 {
 				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return

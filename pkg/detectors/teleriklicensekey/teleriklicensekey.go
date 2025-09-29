@@ -25,13 +25,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"teleriklicensekey"}) + `\b(eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_.+\/]*)\b`)
+	keyPat = regexp.MustCompile(`\b(eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_.+\/]*)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"teleriklicensekey", "eyJ"}
+	return []string{"eyJ"}
 }
 
 // FromData will find and optionally verify Teleriklicensekey secrets in a given set of bytes.
@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+			isVerified, extraData, verificationErr := verifyMatch(match)
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, match)
@@ -67,15 +67,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	// Decode JWT
-	claims, err := decodeJWT(token)
+func verifyMatch(token string) (bool, map[string]string, error) {
+	// Decode JWT header
+	headerClaims, err := decodeJWT(token)
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to decode JWT: %w", err)
 	}
-	
-	// Get the token type is "Telerik License Key"
-	tokenType, ok := claims["typ"].(string)
+
+	// Get the token type from header - should be "Telerik License Key"
+	tokenType, ok := headerClaims["typ"].(string)
 
 	if ok && tokenType == "Telerik License Key" {
 		// If the JWT's header "typ" claim is "Telerik License Key", consider it verified
@@ -94,7 +94,7 @@ func (s Scanner) Description() string {
 	return "Telerik and Kendo license keys are for product license validation that verify the developer compiling an application has active license(s) for the version of the Telerik/Kendo product being used in the project."
 }
 
-// This function decodes the JWT token so we can verify the typ=Telerik License Key. No remote API call needed!
+// This function decodes the JWT header so we can verify the typ=Telerik License Key. No remote API call needed!
 func decodeJWT(token string) (map[string]interface{}, error) {
 	// Split the JWT into its three parts
 	parts := strings.Split(token, ".")
@@ -102,25 +102,25 @@ func decodeJWT(token string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("invalid JWT format: expected 3 parts, got %d", len(parts))
 	}
 
-	// Decode the payload (second part)
-	payload := parts[1]
-	
+	// Decode the header (first part)
+	header := parts[0]
+
 	// Add padding if necessary for base64 decoding
-	if padding := len(payload) % 4; padding != 0 {
-		payload += strings.Repeat("=", 4-padding)
+	if padding := len(header) % 4; padding != 0 {
+		header += strings.Repeat("=", 4-padding)
 	}
 
 	// Decode from base64
-	decoded, err := base64.URLEncoding.DecodeString(payload)
+	decoded, err := base64.URLEncoding.DecodeString(header)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64 payload: %w", err)
+		return nil, fmt.Errorf("failed to decode base64 header: %w", err)
 	}
 
 	// Parse JSON
-	var claims map[string]interface{}
-	if err := json.Unmarshal(decoded, &claims); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON payload: %w", err)
+	var headerClaims map[string]interface{}
+	if err := json.Unmarshal(decoded, &headerClaims); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON header: %w", err)
 	}
 
-	return claims, nil
+	return headerClaims, nil
 }
