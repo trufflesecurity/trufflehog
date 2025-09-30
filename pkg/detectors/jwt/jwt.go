@@ -56,15 +56,15 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	client := cmp.Or(s.client, common.SaneHttpClient())
-	seenMatches := make(map[string]bool)
+	seenMatches := make(map[string]struct{})
 
 	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
 		match := matchGroups[1]
 
-		if seenMatches[match] {
+		if _, ok := seenMatches[match]; ok {
 			continue
 		}
-		seenMatches[match] = true
+		seenMatches[match] = struct{}{}
 
 		claims := jwt.MapClaims{}
 		parsedToken, _, err := jwt.NewParser(jwt.WithPaddingAllowed()).ParseUnverified(match, claims)
