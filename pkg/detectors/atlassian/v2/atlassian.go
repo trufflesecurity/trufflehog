@@ -35,7 +35,8 @@ var _ detectors.Versioner = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
+	keyPat            = regexp.MustCompile(`\b(ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
+	organizationIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"org", "id"}) + `\b([0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -58,31 +59,52 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueMatches[match[1]] = struct{}{}
 	}
 
+	uniqueOrgIdMatches := make(map[string]struct{})
+	for _, match := range organizationIdPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueOrgIdMatches[match[1]] = struct{}{}
+	}
+	if len(uniqueOrgIdMatches) == 0 {
+		// we only need an org ID to pass into AnalysisInfo
+		// if we don't find one, we can still verify the key
+		// we can add a dummy entry here just to make sure a result is returned
+		uniqueOrgIdMatches[""] = struct{}{}
+	}
+
 	for match := range uniqueMatches {
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Atlassian,
-			Raw:          []byte(match),
-			ExtraData: map[string]string{
-				"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
-				"version":        fmt.Sprintf("%d", s.Version()),
-			},
-		}
-
-		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
+		for orgId := range uniqueOrgIdMatches {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Atlassian,
+				Raw:          []byte(match),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
 			}
 
-			isVerified, orgResponse, verificationErr := verifyMatch(ctx, client, match)
-			s1.Verified = isVerified
-			if orgResponse != nil && len(orgResponse.Data) > 0 {
-				s1.ExtraData["Organization"] = orgResponse.Data[0].Attributes.Name
-			}
-			s1.SetVerificationError(verificationErr, match)
-		}
+			if verify {
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
 
-		results = append(results, s1)
+				isVerified, orgResponse, verificationErr := verifyMatch(ctx, client, match)
+				s1.Verified = isVerified
+				if orgResponse != nil && len(orgResponse.Data) > 0 {
+					s1.ExtraData["Organization"] = orgResponse.Data[0].Attributes.Name
+				}
+				s1.SetVerificationError(verificationErr, match)
+				if s1.Verified {
+					s1.AnalysisInfo = map[string]string{
+						"key": match,
+					}
+					if orgId != "" {
+						s1.AnalysisInfo["organization_id"] = orgId
+					}
+				}
+			}
+
+			results = append(results, s1)
+		}
 	}
 
 	return
