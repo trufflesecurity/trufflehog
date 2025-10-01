@@ -88,6 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		extraData := map[string]string{
+			"alg": parsedToken.Method.Alg(),
 			"iss": issString,
 			"iat": iatString,
 			"exp": expString,
