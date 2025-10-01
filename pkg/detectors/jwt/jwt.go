@@ -179,7 +179,10 @@ func verifyHMAC(parsedToken *jwt.Token) (bool, error) {
 		// though we have not checked the signature, the token is definitely invalid
 		return false, nil
 	}
-	return false, fmt.Errorf("no key available to verify an HMAC-based signature")
+	// If we return an error here, the finding will have `unknown` status.
+	// Instead, let's treat HMAC-type JWTs (which we cannot verify in general) as `unverified`.
+	// return false, fmt.Errorf("no key available to verify an HMAC-based signature")
+	return false, nil
 }
 
 // Wrap an `io.Reader` with a reasonable limit as an additional measure against DoS from a malicious JWKS issuer
