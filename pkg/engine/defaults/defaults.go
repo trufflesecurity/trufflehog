@@ -399,6 +399,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jupiterone"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/juro"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jwt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanban"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanbantool"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/karmacrm"
@@ -1270,6 +1271,7 @@ func buildDetectorList() []detectors.Detector {
 		&jumpcloud.Scanner{},
 		&jupiterone.Scanner{},
 		&juro.Scanner{},
+		&jwt.Scanner{},
 		&kanban.Scanner{},
 		&kanbantool.Scanner{},
 		&karmacrm.Scanner{},
