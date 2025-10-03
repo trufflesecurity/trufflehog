@@ -637,7 +637,7 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for User
 
-	// no validation rules for Comment
+	// no validation rules for CommentId
 
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
