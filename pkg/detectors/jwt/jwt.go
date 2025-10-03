@@ -295,15 +295,56 @@ func verifyPublicKey(ctx context.Context, client *http.Client, tokenString strin
 		jwt.WithPaddingAllowed(),
 		jwt.WithLeeway(time.Minute),
 	)
+	// We carefully handle possible errors from `jwt.Parse` here.
+	// In only a couple non-nil error cases, we want to propagate the error;
+	// the rest of the cases are for JWT claims-related verification or validation errors,
+	// which indicate that the JWT is invalid and unverified.
 	switch {
 	case token.Valid:
 		return true, nil
+
+	// These cases indicate some problem with the verification process
 	case errors.Is(err, jwt.ErrTokenUnverifiable):
 		return false, err
 	case errors.Is(err, jwt.ErrHashUnavailable):
 		return false, err
-	default:
+
+	// These cases indicate that something about the JWT does not check out
+	case errors.Is(err, jwt.ErrInvalidKey):
 		return false, nil
+	case errors.Is(err, jwt.ErrInvalidKeyType):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenMalformed):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenRequiredClaimMissing):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenInvalidAudience):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenExpired):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenUsedBeforeIssued):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenInvalidIssuer):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenInvalidSubject):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenNotValidYet):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenInvalidId):
+		return false, nil
+	case errors.Is(err, jwt.ErrTokenInvalidClaims):
+		return false, nil
+	case errors.Is(err, jwt.ErrInvalidType):
+		return false, nil
+
+	// In the chance that we get a different type of error, propagate it to make this finding's status `unknown`.
+	//
+	// It's tough to know exactly which kinds of errors can be raised by `jwt.Parse` without poring over the code.
+	// Note: the above cases are believed to cover all cases.
+	default:
+		return false, err
 	}
 }
 
