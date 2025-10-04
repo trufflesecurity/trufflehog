@@ -3,6 +3,7 @@ package privatekey
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -22,6 +23,13 @@ v/Ow5T0q5gIJAiEAyS4RaI9YG8EWx/2w0T67ZUVAw8eOMB6BIUg0Xcu+3okCIBOs
 /5OiPgoTdSy7bcF9IGpSE8ZgGKzgYQVZeN97YE00
 -----END RSA PRIVATE KEY-----
 `
+
+	validPatterExpectedRaw = strings.TrimRight(validPattern, "\n")
+
+	validPatternNoNewLine = "var private_key = (" + "`" + validPatterExpectedRaw + "`)"
+
+	validPatternOneLine = strings.ReplaceAll(validPatterExpectedRaw, "\n", "\\n")
+
 	invalidPattern = `-----BEGIN?RSA?PRIVATE?KEY-----
 MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu
 KUpRKfFLfRYC9AIKjbJTWit+CqvjWYzvQwECAwEAAQJAIJLixBy2qpFoS4DSmoEm
@@ -45,7 +53,17 @@ func TestPrivatekey_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword privatekey",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			want:  []string{validPatterExpectedRaw},
+		},
+		{
+			name:  "valid pattern - one line",
+			input: fmt.Sprintf("var private_key = %s", validPatternOneLine),
+			want:  []string{validPatternOneLine},
+		},
+		{
+			name:  "valid pattern - no new line at end",
+			input: validPatternNoNewLine,
+			want:  []string{validPatterExpectedRaw},
 		},
 		{
 			name:  "invalid pattern",
