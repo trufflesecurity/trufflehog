@@ -66,7 +66,7 @@ message Confluence {
   string location = 7;
   string file = 8;
   string user = 9;
-  string commentId = 10;
+  string comment_id = 10;
 }
 
 message Docker {
