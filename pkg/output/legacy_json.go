@@ -27,11 +27,11 @@ func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMe
 	var repoPath string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
-		repoPath = r.SourceMetadata.GetGit().Repository
+		repoPath = r.SourceMetadata.GetGit().RepositoryLocalPath
 	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
-		repoPath = r.SourceMetadata.GetGithub().Repository
+		repoPath = r.SourceMetadata.GetGithub().RepositoryLocalPath
 	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
-		repoPath = r.SourceMetadata.GetGitlab().Repository
+		repoPath = r.SourceMetadata.GetGitlab().RepositoryLocalPath
 	default:
 		return fmt.Errorf("unsupported source type for legacy json output: %s", r.SourceType)
 	}

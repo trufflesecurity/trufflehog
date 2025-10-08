@@ -1140,6 +1140,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for SkipHistory
 
+	// no validation rules for IncludeComments
+
 	switch v := m.Credential.(type) {
 	case *Confluence_Unauthenticated:
 		if v == nil {
@@ -2339,6 +2341,8 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for NoCleanup
 
+	// no validation rules for PrintLegacyJson
+
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
 		if v == nil {
@@ -2577,6 +2581,8 @@ func (m *GitHub) validate(all bool) error {
 	// no validation rules for NoCleanup
 
 	// no validation rules for IgnoreGists
+
+	// no validation rules for PrintLegacyJson
 
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:

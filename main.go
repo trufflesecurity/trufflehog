@@ -58,7 +58,7 @@ var (
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
-	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to verified,unverified,unknown.").String()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
 	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
 	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
@@ -72,6 +72,7 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	failOnScanErrors     = cli.Flag("fail-on-scan-errors", "Exit with non-zero error code if an error occurs during the scan.").Bool()
 	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
 	customVerifiersOnly  = cli.Flag("custom-verifiers-only", "Only use custom verification endpoints.").Bool()
 	detectorTimeout      = cli.Flag("detector-timeout", "Maximum time to spend scanning chunks per detector (e.g., 30s).").Duration()
@@ -464,6 +465,7 @@ func run(state overseer.State) {
 
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
+	feature.GitlabProjectsPerPage.Store(100)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -710,10 +712,24 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 	eng.Start(ctx)
 
+	persistGitRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
+	gitCloneTempPath := ""
+
 	defer func() {
 		// Clean up temporary artifacts.
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 			ctx.Logger().Error(err, "error cleaning temp artifacts")
+		}
+
+		if *jsonLegacy {
+			// If JSON legacy is enabled, that means the cloned repos are not deleted yet
+			// because they were needed for outputting legacy JSON.
+			// We only clean them up here if the user did not request to persist them.
+			if !persistGitRepo {
+				if err := cleantemp.CleanTempDirsForLegacyJSON(gitCloneTempPath); err != nil {
+					ctx.Logger().Error(err, "error cleaning temp artifacts for legacy JSON")
+				}
+			}
 		}
 	}()
 
@@ -745,6 +761,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case githubScan.FullCommand():
+		gitCloneTempPath = *githubClonePath
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -780,6 +797,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ClonePath:                  *githubClonePath,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
+			PrintLegacyJSON:            *jsonLegacy,
 		}
 
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
@@ -801,6 +819,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case gitlabScan.FullCommand():
+		gitCloneTempPath = *gitlabClonePath
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
@@ -815,16 +834,17 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 
 		cfg := sources.GitlabConfig{
-			Endpoint:     *gitlabScanEndpoint,
-			Token:        *gitlabScanToken,
-			Repos:        *gitlabScanRepos,
-			GroupIds:     *gitlabScanGroupIds,
-			IncludeRepos: *gitlabScanIncludeRepos,
-			ExcludeRepos: *gitlabScanExcludeRepos,
-			Filter:       filter,
-			AuthInUrl:    *gitlabAuthInUrl,
-			ClonePath:    *gitlabClonePath,
-			NoCleanup:    *gitlabNoCleanup,
+			Endpoint:        *gitlabScanEndpoint,
+			Token:           *gitlabScanToken,
+			Repos:           *gitlabScanRepos,
+			GroupIds:        *gitlabScanGroupIds,
+			IncludeRepos:    *gitlabScanIncludeRepos,
+			ExcludeRepos:    *gitlabScanExcludeRepos,
+			Filter:          filter,
+			AuthInUrl:       *gitlabAuthInUrl,
+			ClonePath:       *gitlabClonePath,
+			NoCleanup:       *gitlabNoCleanup,
+			PrintLegacyJSON: *jsonLegacy,
 		}
 
 		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {
@@ -1052,8 +1072,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 
 	// Print any non-fatal errors reported during the scan.
+	var retErr error
 	for _, ref := range refs {
 		if errs := ref.Snapshot().Errors; len(errs) > 0 {
+			if *failOnScanErrors {
+				retErr = fmt.Errorf("encountered errors during scan")
+			}
 			errMsgs := make([]string, len(errs))
 			for i := 0; i < len(errs); i++ {
 				errMsgs[i] = errs[i].Error()
@@ -1070,7 +1094,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		printAverageDetectorTime(eng)
 	}
 
-	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, nil
+	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, retErr
 }
 
 // parseResults ensures that users provide valid CSV input to `--results`.

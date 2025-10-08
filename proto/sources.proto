@@ -153,6 +153,7 @@ message Confluence {
   repeated string ignore_spaces = 8;
   bool include_attachments = 9;
   bool skip_history = 10;
+  bool include_comments = 11;
 }
 
 message Docker {
@@ -245,6 +246,7 @@ message GitLab {
   repeated string group_ids = 12;
   string clone_path = 13;
   bool no_cleanup = 14;
+  bool print_legacy_json = 15;
 }
 
 message GitHub {
@@ -274,6 +276,7 @@ message GitHub {
   string clone_path = 22;
   bool no_cleanup = 23;
   bool ignore_gists = 24;
+  bool print_legacy_json = 25;
 }
 
 message GitHubExperimental {

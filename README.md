@@ -185,7 +185,7 @@ This requires Cosign binary to be installed prior to running the installation sc
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified
 ```
 
 Expected output:
@@ -209,15 +209,15 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 ## 2: Scan a GitHub Org for only verified secrets
 
 ```bash
-trufflehog github --org=trufflesecurity --results=verified,unknown
+trufflehog github --org=trufflesecurity --results=verified
 ```
 
-## 3: Scan a GitHub Repo for only verified keys and get JSON output
+## 3: Scan a GitHub Repo for only verified secrets and get JSON output
 
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown --json
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified --json
 ```
 
 Expected output:
@@ -233,7 +233,7 @@ Expected output:
 trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
 ```
 
-## 5: Scan an S3 bucket for verified keys
+## 5: Scan an S3 bucket for high-confidence results (verified + unknown)
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --results=verified,unknown
@@ -274,22 +274,22 @@ To guard against malicious git configs in local scanning (see CVE-2025-41390), T
 ## 10: Scan GCS buckets for only verified secrets
 
 ```bash
-trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,unknown
+trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified
 ```
 
-## 11: Scan a Docker image for verified secrets
+## 11: Scan a Docker image for only verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
 ```bash
 # to scan from a remote registry
-trufflehog docker --image trufflesecurity/secrets --results=verified,unknown
+trufflehog docker --image trufflesecurity/secrets --results=verified
 
 # to scan from the local docker daemon
-trufflehog docker --image docker://new_image:tag --results=verified,unknown
+trufflehog docker --image docker://new_image:tag --results=verified
 
 # to scan from an image saved as a tarball
-trufflehog docker --image file://path_to_image.tar --results=verified,unknown
+trufflehog docker --image file://path_to_image.tar --results=verified
 ```
 
 ## 12: Scan in CI
@@ -391,7 +391,7 @@ aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
 - Why is the scan taking a long time when I scan a GitHub org
   - Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
 - It says a private key was verified, what does that mean?
-  - Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
+  - A verified result means TruffleHog confirmed the credential is valid by testing it against the service's API. For private keys, we've confirmed the key can be used live for SSH or SSL authentication. Check out our Driftwood blog post to learn more [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 - Is there an easy way to ignore specific secrets?
   - If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets.
 
@@ -407,7 +407,13 @@ TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
 ## What is credential verification?
 
-For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
+For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives and provides three result statuses:
+
+- **verified**: Credential confirmed as valid and active by API testing
+- **unverified**: Credential detected but not confirmed valid (may be invalid, expired, or verification disabled)  
+- **unknown**: Verification attempted but failed due to errors, such as a network or API failure
+
+For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 # :memo: Usage
 
@@ -446,7 +452,7 @@ Flags:
       --github-actions      Output in GitHub Actions format.
       --concurrency=20           Number of concurrent workers.
       --no-verification     Don't verify the results.
-      --results=RESULTS          Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to all types.
+      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to all types.
       --allow-verification-overlap
                                  Allow verification of similar credentials across detectors
       --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
@@ -679,7 +685,7 @@ webhook is used containing the regular expression matches.
 
 TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
-status code, the secret is considered verified.
+status code, the secret is considered verified. If verification fails due to network/API errors, the result is marked as unknown.
 
 Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret,
 and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
