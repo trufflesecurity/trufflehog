@@ -94,19 +94,19 @@ func TestAtlassian_AnalysisInfo_KeyAndOrgId(t *testing.T) {
 	key := "ATCTT3xFfGN0GsZNgOGrQSHSnxiJVi00oHlRicyM0yMNuKCBfw6qOHVcCy4Hm89GnclGb_W-1qAkxqCn5XbuyoX54bNhpK5yFKGFR7ocV6FByvL_P9Sb3tFnbUg3T3I3S_RGCBLMSN7Nsa4GJv8JEJ6bzvDmX-oJ8AnrazMU-zZ5hb-u3t2ERew=366BFE3A"
 	orgId := "123j4567-e89b-12d3-a456-426614174000"
 
-	t.Run("key and organization id both present", func(t *testing.T) {
-		defer gock.Off()
-		defer gock.RestoreClient(client)
-		gock.InterceptClient(client)
-		gock.New("https://api.atlassian.com").
-			Get("/admin/v1/orgs").
-			MatchHeader("Accept", "application/json").
-			MatchHeader("Authorization", fmt.Sprintf("Bearer %s", key)).
-			Reply(http.StatusOK).
-			JSON(map[string]any{
-				"Data": []map[string]any{},
-			})
+	defer gock.Off()
+	defer gock.RestoreClient(client)
+	gock.InterceptClient(client)
+	gock.New("https://api.atlassian.com").
+		Get("/admin/v1/orgs").
+		MatchHeader("Accept", "application/json").
+		MatchHeader("Authorization", fmt.Sprintf("Bearer %s", key)).
+		Reply(http.StatusOK).
+		JSON(map[string]any{
+			"Data": []map[string]any{},
+		})
 
+	t.Run("key and organization id both present", func(t *testing.T) {
 		input := fmt.Sprintf(`
 		[INFO] Sending request to the atlassian API
 		[DEBUG] Using Key=%s
@@ -133,18 +133,18 @@ func TestAtlassian_AnalysisInfo_KeyOnly(t *testing.T) {
 
 	key := "ATCTT3xFfGN0GsZNgOGrQSHSnxiJVi00oHlRicyM0yMNuKCBfw6qOHVcCy4Hm89GnclGb_W-1qAkxqCn5XbuyoX54bNhpK5yFKGFR7ocV6FByvL_P9Sb3tFnbUg3T3I3S_RGCBLMSN7Nsa4GJv8JEJ6bzvDmX-oJ8AnrazMU-zZ5hb-u3t2ERew=366BFE3A"
 
+	defer gock.Off()
+	defer gock.RestoreClient(client)
+	gock.InterceptClient(client)
+	gock.New("https://api.atlassian.com").
+		Get("/admin/v1/orgs").
+		MatchHeader("Accept", "application/json").
+		MatchHeader("Authorization", fmt.Sprintf("Bearer %s", key)).
+		Reply(http.StatusOK).
+		JSON(map[string]any{
+			"Data": []map[string]any{},
+		})
 	t.Run("only key present", func(t *testing.T) {
-		defer gock.Off()
-		defer gock.RestoreClient(client)
-		gock.InterceptClient(client)
-		gock.New("https://api.atlassian.com").
-			Get("/admin/v1/orgs").
-			MatchHeader("Accept", "application/json").
-			MatchHeader("Authorization", fmt.Sprintf("Bearer %s", key)).
-			Reply(http.StatusOK).
-			JSON(map[string]any{
-				"Data": []map[string]any{},
-			})
 
 		input := fmt.Sprintf(`
 		[INFO] Sending request to the atlassian API
