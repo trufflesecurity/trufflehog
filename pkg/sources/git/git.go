@@ -602,11 +602,11 @@ func CloneRepoUsingUnauthenticated(ctx context.Context, url, clonePath string, a
 // CloneRepoUsingSSH clones a repo using SSH.
 func CloneRepoUsingSSH(ctx context.Context, gitURL string, args ...string) (string, *git.Repository, error) {
 	if isCodeCommitURL(gitURL) {
-		return CloneRepo(ctx, nil, gitURL, "", false, args...)
+		return CloneRepo(ctx, nil, gitURL, "", true, args...)
 	}
 
 	userInfo := url.User("git")
-	return CloneRepo(ctx, userInfo, gitURL, "", false, args...)
+	return CloneRepo(ctx, userInfo, gitURL, "", true, args...)
 }
 
 var codeCommitRE = regexp.MustCompile(`ssh://git-codecommit\.[\w-]+\.amazonaws\.com`)
