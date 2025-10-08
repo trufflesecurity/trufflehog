@@ -284,6 +284,8 @@ type GitConfig struct {
 	ClonePath string
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup bool
+	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
+	PrintLegacyJSON bool
 	// TrustLocalGitConfig allows to trust the local git config.
 	TrustLocalGitConfig bool
 }

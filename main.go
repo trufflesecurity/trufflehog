@@ -736,6 +736,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ExcludeGlobs:        *gitScanExcludeGlobs,
 			ClonePath:           *gitClonePath,
 			NoCleanup:           *gitNoCleanup,
+			PrintLegacyJSON:     *jsonLegacy,
 			TrustLocalGitConfig: *gitTrustLocalGitConfig,
 		}
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {

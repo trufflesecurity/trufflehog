@@ -271,7 +271,7 @@ $ trufflehog git file://test_keys --results=verified,unknown
 
 To guard against malicious git configs in local scanning (see CVE-2025-41390), TruffleHog clones local git repositories to a temporary directory prior to scanning. This follows [Git's security best practices](https://git-scm.com/docs/git#_security). If you want to specify a custom path to clone the repository to (instead of tmp), you can use the `--clone-path` flag. If you'd like to skip the local cloning process and scan the repository directly (only do this for trusted repos), you can use the `--trust-local-git-config` flag.
 
-## 10: Scan GCS buckets for verified secrets
+## 10: Scan GCS buckets for only verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,unknown

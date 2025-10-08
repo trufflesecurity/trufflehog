@@ -26,6 +26,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobP
 		SkipBinaries:        c.SkipBinaries,
 		ClonePath:           c.ClonePath,
 		NoCleanup:           c.NoCleanup,
+		PrintLegacyJson:     c.PrintLegacyJSON,
 		TrustLocalGitConfig: c.TrustLocalGitConfig,
 	}
 

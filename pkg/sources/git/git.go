@@ -350,8 +350,12 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 	}
 
 	err = func() error {
-		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-			defer os.RemoveAll(gitDir)
+		// remove the directory only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
+		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
+		if !s.conn.GetPrintLegacyJson() {
+			if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
+				defer os.RemoveAll(gitDir)
+			}
 		}
 
 		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)
@@ -453,7 +457,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 
 	// If --clone-path is set, create a subdirectory <clonePath>/<repo-name> with permissions 0755.
 	if clonePath != "" {
-		path = filepath.Join(clonePath, strings.TrimSuffix(filepath.Base(gitURL), gitDirName))
+		path = filepath.Join(clonePath, "trufflehog-"+strings.TrimSuffix(filepath.Base(gitURL), gitDirName))
 		if err = os.MkdirAll(path, 0755); err != nil {
 			return "", nil, fmt.Errorf("failed to create clone path %s: %w", clonePath, err)
 		}
