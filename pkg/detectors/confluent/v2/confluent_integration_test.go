@@ -18,7 +18,8 @@ func TestConfluent_FromChunk(t *testing.T) {
 	// Valid secret with proper CRC32 checksum
 	validSecret := "cfltT8d8RzkNseTMEDKcjNM1BZTFPHqRn/dQm9q7w6SjzZ12wZfwjaJdipHZtDjw"
 	// Invalid secret with wrong checksum
-	invalidSecret := "cfltT8d8RzkNseTMEDKcjNM1BZTFPHqRn/dQm9q7w6SjzZ12wZfwjaJdipHZtDji"
+	invalidSecret := "cfltT8d8RzkNseTMEDKcjNM1BZTFPHqRn/dQm9q7w6SjzZ12wZfwjaJdipHZtDje"
+	key := "JSAOOCIC74SGECCP"
 
 	type args struct {
 		ctx    context.Context
@@ -37,7 +38,7 @@ func TestConfluent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a confluent secret %s", validSecret)),
+				data:   []byte(fmt.Sprintf("You can find a confluent secret %s with key %s", validSecret, key)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,7 +58,7 @@ func TestConfluent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a confluent secret %s but not valid", invalidSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a confluent secret %s with %s key but not valid", invalidSecret, key)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

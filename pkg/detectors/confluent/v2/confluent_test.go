@@ -12,24 +12,19 @@ import (
 
 var (
 	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+		=== Confluent Cloud API key ===
 
-		api:
-			auth_type: "Basic"
-			in: "Header"
-			confluent_secret: "cfltT8d8RzkNseTMEDKcjNM1BZTFPHqRn/dQm9q7w6SjzZ12wZfwjaJdipj0ObHQ"
-			base_url: "https://api.example.com/v1/user"
+		API key:
+		JSAOOCIC74SGECCP
 
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
+		API secret:
+		cfltT8d8RzkNseTMEDKcjNM1BZTFPHqRn/dQm9q7w6SjzZ12wZfwjaJdipHZtDjw
+
+		Resource scope:
+		Cloud resource management
+
 	`
-	secret = "cfltT8d8RzkNseTMEDKcjNM1BZTFPHqRn/dQm9q7w6SjzZ12wZfwjaJdipj0ObHQ"
+	secret = "JSAOOCIC74SGECCPcfltT8d8RzkNseTMEDKcjNM1BZTFPHqRn/dQm9q7w6SjzZ12wZfwjaJdipHZtDjw"
 )
 
 func TestConfluent_Pattern(t *testing.T) {

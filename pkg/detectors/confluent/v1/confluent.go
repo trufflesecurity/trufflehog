@@ -35,7 +35,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"confluent"}
 }
 
-func (Scanner) Version() int { return 1 }
+func (s Scanner) Version() int { return 1 }
 
 // FromData will find and optionally verify Confluent secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
