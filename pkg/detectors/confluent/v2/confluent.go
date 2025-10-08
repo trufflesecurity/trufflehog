@@ -21,9 +21,10 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"confluent"}) + `\b([a-zA-Z0-9]{16})\b`)
 	// Match cflt prefix followed by 60 characters consisting of A-Z, a-z, 0-9, + or /
 	//See https://docs.confluent.io/cloud/current/security/authenticate/workload-identities/service-accounts/api-keys/overview.html#api-secret-format
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"Confluent"}) + `\b(cflt[A-Za-z0-9+/]{60})\b`)
+	secretPat = regexp.MustCompile(`\b(cflt[A-Za-z0-9+/]{60})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -32,31 +33,37 @@ func (s Scanner) Keywords() []string {
 	return []string{"cflt"}
 }
 
-func (Scanner) Version() int { return 2 }
+func (s Scanner) Version() int { return 2 }
 
 // FromData will find and optionally verify Confluent secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range secretMatches {
-		resSecret := strings.TrimSpace(match[1]) // Use index 1 for the captured group
+	for _, match := range matches {
+		resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Confluent,
-			Raw:          []byte(resSecret),
-			ExtraData: map[string]string{
-				"rotation_guide": "https://docs.confluent.io/cloud/current/security/authenticate/workload-identities/service-accounts/api-keys/best-practices-api-keys.html#rotate-api-keys-regularly",
-				"version":        fmt.Sprintf("%d", s.Version()),
-			},
+		for _, match := range secretMatches {
+			resSecret := strings.TrimSpace(match[1]) // Use index 1 for the captured group
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Confluent,
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resSecret),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://docs.confluent.io/cloud/current/security/authenticate/workload-identities/service-accounts/api-keys/best-practices-api-keys.html#rotate-api-keys-regularly",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
+			}
+
+			if verify {
+				s1.Verified = verifyConfluentSecret(resSecret)
+			}
+
+			results = append(results, s1)
 		}
-
-		if verify {
-			s1.Verified = verifyConfluentSecret(resSecret)
-		}
-
-		results = append(results, s1)
 	}
 
 	return results, nil
