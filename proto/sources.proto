@@ -153,6 +153,7 @@ message Confluence {
   repeated string ignore_spaces = 8;
   bool include_attachments = 9;
   bool skip_history = 10;
+  bool include_comments = 11;
 }
 
 message Docker {
