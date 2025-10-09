@@ -28,11 +28,14 @@ func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 var (
 	// Oauth token
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
-	// the middle regex `(?:[a-zA-Z0-9.\/?=&:-]{0,40})` is to match the prefix of token match to avoid processing common known patterns
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github", "gh", "pat", "token"}) + `\b(?:[a-zA-Z0-9.\/?=&:-]{0,40})([a-f0-9]{40})\b`)
-
-	// TODO: Oauth2 client_id and client_secret
-	// https://developer.github.com/v3/#oauth2-keysecret
+	keyPat = regexp.MustCompile(
+		detectors.PrefixRegex([]string{
+			"github_token", "github_secret", "github_key", "github_api", "github_pat",
+			"githubtoken", "githubsecret", "githubkey", "githubapi", "githubpat",
+			"gh_token", "gh_secret", "gh_key", "gh_api", "gh_pat",
+			"ghtoken", "ghsecret", "ghkey", "ghapi", "ghpat",
+		}) + `\b([0-9a-f]{40})\b`,
+	)
 )
 
 // TODO: Add secret context?? Information about access, ownership etc
