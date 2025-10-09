@@ -21,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"confluent"}) + `\b([a-zA-Z0-9]{16})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"confluent"}) + `\b([A-Z0-9]{16})\b`)
 	// Match cflt prefix followed by 60 characters consisting of A-Z, a-z, 0-9, + or /
 	//See https://docs.confluent.io/cloud/current/security/authenticate/workload-identities/service-accounts/api-keys/overview.html#api-secret-format
 	secretPat = regexp.MustCompile(`\b(cflt[A-Za-z0-9+/]{60})\b`)
