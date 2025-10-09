@@ -27,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -1096,8 +1097,14 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 	if s.includeGistComments && isGistUrl(urlParts) && !s.ignoreGists {
 		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter, cutoffTime)
 	} else if s.includeIssueComments || s.includePRComments {
-		return s.processRepoComments(ctx, repoInfo, reporter, cutoffTime)
+		// if we need to use graphql api for repo issues, prs and comments
+		if feature.UseGithubGraphQLAPI.Load() {
+			return s.processRepoIssueandPRsWithCommentsGraphql(ctx, repoInfo, reporter, cutoffTime)
+		}
+
+		return s.processIssueandPRsWithCommentsREST(ctx, repoInfo, reporter, cutoffTime)
 	}
+
 	return nil
 }
 
@@ -1264,7 +1271,10 @@ var (
 	state = "all"
 )
 
-func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processIssueandPRsWithCommentsREST(
+	ctx context.Context, repoInfo repoInfo,
+	reporter sources.ChunkReporter, cutoffTime *time.Time,
+) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
@@ -1281,6 +1291,31 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, rep
 			return err
 		}
 		if err := s.processPRComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
+	ctx context.Context, repoInfo repoInfo,
+	reporter sources.ChunkReporter, cutoffTime *time.Time,
+) error {
+	if s.includeIssueComments {
+		ctx.Logger().V(2).Info("Scanning issues")
+		if err := s.processIssuesWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+			return err
+		}
+	}
+
+	if s.includePRComments {
+		ctx.Logger().V(2).Info("Scanning pull requests")
+		if err := s.processPRWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+			return err
+		}
+
+		if err := s.processReviewThreads(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
