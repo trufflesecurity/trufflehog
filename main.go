@@ -58,7 +58,7 @@ var (
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
-	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to verified,unverified,unknown.").String()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
 	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
 	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
@@ -73,6 +73,7 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	failOnScanErrors     = cli.Flag("fail-on-scan-errors", "Exit with non-zero error code if an error occurs during the scan.").Bool()
 	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
 	customVerifiersOnly  = cli.Flag("custom-verifiers-only", "Only use custom verification endpoints.").Bool()
 	detectorTimeout      = cli.Flag("detector-timeout", "Maximum time to spend scanning chunks per detector (e.g., 30s).").Duration()
@@ -1102,8 +1103,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 
 	// Print any non-fatal errors reported during the scan.
+	var retErr error
 	for _, ref := range refs {
 		if errs := ref.Snapshot().Errors; len(errs) > 0 {
+			if *failOnScanErrors {
+				retErr = fmt.Errorf("encountered errors during scan")
+			}
 			errMsgs := make([]string, len(errs))
 			for i := 0; i < len(errs); i++ {
 				errMsgs[i] = errs[i].Error()
@@ -1120,7 +1125,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		printAverageDetectorTime(eng)
 	}
 
-	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, nil
+	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, retErr
 }
 
 // parseResults ensures that users provide valid CSV input to `--results`.
