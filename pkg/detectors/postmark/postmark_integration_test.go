@@ -23,7 +23,8 @@ func TestPostmark_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("POSTMARK_TOKEN")
+	secretServerApi := testSecrets.MustGetField("POSTMARK_TOKEN")
+	secretAccountApi := testSecrets.MustGetField("POSTMARK_ACCOUNT_API_TOKEN")
 	inactiveSecret := testSecrets.MustGetField("POSTMARK_INACTIVE")
 
 	type args struct {
@@ -39,17 +40,35 @@ func TestPostmark_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found server api key, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a postmark secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a postmark secret %s within", secretServerApi)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Postmark,
 					Verified:     true,
+					ExtraData:    map[string]string{"type": "server"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found account api key, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a postmark secret %s within", secretAccountApi)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Postmark,
+					Verified:     true,
+					ExtraData:    map[string]string{"type": "account"},
 				},
 			},
 			wantErr: false,
