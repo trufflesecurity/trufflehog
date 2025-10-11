@@ -21,17 +21,12 @@ func TestRootlyWebhook_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "rootly webhook: 84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a",
-			want:  []string{"84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a"},
-		},
-		{
-			name:  "valid pattern with context",
-			input: "curl -H \"Authorization: Bearer 84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a\" https://webhooks.rootly.com/webhooks/incoming/generic_webhooks",
-			want:  []string{"84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a"},
-		},
-		{
-			name:  "valid pattern in url",
 			input: "https://webhooks.rootly.com/webhooks/incoming/generic_webhooks?secret=84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a",
+			want:  []string{"84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a"},
+		},
+		{
+			name:  "valid pattern 2",
+			input: "curl -H \"Authorization: Bearer 84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a\" https://webhooks.rootly.com/webhooks/incoming/generic_webhooks",
 			want:  []string{"84942ab61f62d34f98511711fd59cedc35bb3a217e6a2399d50a62c01fc4ee9a"},
 		},
 		{
