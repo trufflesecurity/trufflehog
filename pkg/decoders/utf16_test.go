@@ -100,7 +100,7 @@ func BenchmarkUtf16ToUtf8(b *testing.B) {
 	// Example UTF-16LE encoded data
 	data := []byte{72, 0, 101, 0, 108, 0, 108, 0, 111, 0, 32, 0, 87, 0, 111, 0, 114, 0, 108, 0, 100, 0}
 
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		_, _ = utf16ToUTF8(data)
 	}
 }
