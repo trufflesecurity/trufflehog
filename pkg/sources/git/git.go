@@ -1323,7 +1323,7 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 				return path, remote, fmt.Errorf("failed to clone file Git repo (%s): %w", normalizedURI.String(), err)
 			}
 
-			if !isBare {
+			if !isRepoBare(path) {
 				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
 				originalIndexPath := filepath.Join(strings.TrimPrefix(normalizedURI.String(), "file://"), gitDirName, "index")
