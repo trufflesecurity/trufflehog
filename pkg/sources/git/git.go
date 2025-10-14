@@ -1295,6 +1295,7 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 }
 
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
+// isBare and trustLocalGitConfig are only used for file:// URIs.
 func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGitConfig bool, isBare bool) (string, bool, error) {
 	var path string
 	uri, err := GitURLParse(uriString)
