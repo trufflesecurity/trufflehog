@@ -60,49 +60,49 @@ var (
 
 // Benchmark individual decoder functions
 func BenchmarkDecodeOriginalEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodeEscaped(originalUnicodeData)
 	}
 }
 
 func BenchmarkDecodeCodePoint(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodeCodePoint(codePointData)
 	}
 }
 
 func BenchmarkDecodeBraceEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodeBraceEscape(braceEscapeData)
 	}
 }
 
 func BenchmarkDecodeLongEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodeLongEscape(longEscapeData)
 	}
 }
 
 func BenchmarkDecodePerlEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodePerlEscape(perlEscapeData)
 	}
 }
 
 func BenchmarkDecodeCssEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodeCssEscape(cssEscapeData)
 	}
 }
 
 func BenchmarkDecodeHtmlEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodeHtmlEscape(htmlEscapeData)
 	}
 }
 
 func BenchmarkDecodePercentEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decodePercentEscape(percentEscapeData)
 	}
 }
@@ -118,8 +118,7 @@ func BenchmarkFromChunk_OriginalFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: originalUnicodeData}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decoder.FromChunk(chunk)
 	}
 }
@@ -128,8 +127,7 @@ func BenchmarkFromChunk_BraceFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: braceEscapeData}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decoder.FromChunk(chunk)
 	}
 }
@@ -138,8 +136,7 @@ func BenchmarkFromChunk_LongFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: longEscapeData}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decoder.FromChunk(chunk)
 	}
 }
@@ -148,8 +145,7 @@ func BenchmarkFromChunk_HtmlFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: htmlEscapeData}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decoder.FromChunk(chunk)
 	}
 }
@@ -158,8 +154,7 @@ func BenchmarkFromChunk_MixedContent(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: mixedContentData}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decoder.FromChunk(chunk)
 	}
 }
@@ -168,8 +163,7 @@ func BenchmarkFromChunk_NoUnicode(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: noUnicodeData}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decoder.FromChunk(chunk)
 	}
 }
@@ -178,8 +172,7 @@ func BenchmarkFromChunk_LargeData(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: largeData}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = decoder.FromChunk(chunk)
 	}
 }
@@ -188,8 +181,7 @@ func BenchmarkFromChunk_LargeData(b *testing.B) {
 func BenchmarkRegexMatching_AllPatterns(b *testing.B) {
 	testData := mixedContentData
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Simulate the pattern matching in FromChunk
 		_ = longEscapePat.Match(testData)
 		_ = braceEscapePat.Match(testData)
@@ -206,8 +198,7 @@ func BenchmarkRegexMatching_AllPatterns(b *testing.B) {
 func BenchmarkRegexMatching_NoMatch(b *testing.B) {
 	testData := noUnicodeData
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Simulate the pattern matching in FromChunk on data with no matches
 		_ = longEscapePat.Match(testData)
 		_ = braceEscapePat.Match(testData)
@@ -226,9 +217,8 @@ func BenchmarkFromChunk_MemoryAllocation(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: mixedContentData}
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		result := decoder.FromChunk(chunk)
 		if result != nil {
 			// Prevent compiler optimization

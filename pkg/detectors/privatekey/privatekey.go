@@ -71,6 +71,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData:    make(map[string]string),
 		}
 
+		// set not normalized match as primary secret value so it is used to calculate line of code
+		s1.SetPrimarySecretValue(match)
+
 		var passphrase string
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
 		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
