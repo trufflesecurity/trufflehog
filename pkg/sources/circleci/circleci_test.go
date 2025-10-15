@@ -22,7 +22,8 @@ func TestSource_Scan(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	token := secret.MustGetField("CIRCLECI_TOKEN")
+	// Fix the chunks test, which might involve updating this token.
+	_ = secret.MustGetField("CIRCLECI_TOKEN")
 
 	type init struct {
 		name       string
