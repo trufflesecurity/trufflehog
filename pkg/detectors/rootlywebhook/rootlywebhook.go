@@ -27,7 +27,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"webhooks.rootly.com", "rootly", "rootlywebhook", "rootly_webhook", "rootly_token"}
+	return []string{"webhooks.rootly.com", "rootly", "rootlywebhook", "rootly_webhook", "rootly_token", "rootly_webhook_token"}
 }
 
 // FromData will find and optionally verify RootlyWebhook secrets in a given set of bytes.
