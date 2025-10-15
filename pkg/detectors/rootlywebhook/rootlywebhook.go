@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Rootly webhook tokens are 64 character hex strings
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"rootly", "webhook"}) + `\b([a-f0-9]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"rootly", "webhook", "Authorization"}) + `\b([a-f0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
