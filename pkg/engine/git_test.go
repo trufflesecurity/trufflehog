@@ -1,9 +1,13 @@
 package engine
 
 import (
+	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -11,6 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -32,7 +37,7 @@ func (p *discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) e
 func TestGitEngine(t *testing.T) {
 	ctx := context.Background()
 	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
-	path, _, err := git.PrepareRepo(ctx, repoUrl, "")
+	path, _, err := git.PrepareRepo(ctx, repoUrl, "", false, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -116,6 +121,78 @@ func TestGitEngine(t *testing.T) {
 			assert.Equal(t, len(tTest.expected), int(metrics.VerifiedSecretsFound)+int(metrics.UnverifiedSecretsFound))
 		})
 	}
+}
+
+func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
+	ctx := context.Background()
+
+	parent, err := os.MkdirTemp("", "trufflehog-test-keys-*")
+	if err != nil {
+		t.Fail()
+	}
+	defer os.RemoveAll(parent)
+	localRepo := filepath.Join(parent, "test_keys.git")
+	cloneCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	// clone with --mirror and --bare from https://github.com/trufflesecurity/test_keys.git to local and then pass it in as a local path
+	cloneCmd := exec.CommandContext(cloneCtx, "git", "clone", "--mirror", "--bare", "https://github.com/trufflesecurity/test_keys.git", localRepo)
+	if _, err := cloneCmd.CombinedOutput(); err != nil {
+		t.Fail()
+	}
+
+	fileURI := (&url.URL{Scheme: "file", Path: filepath.ToSlash(localRepo)}).String()
+
+	run := func(t *testing.T, mirror bool, cfg sources.GitConfig) (uint64, uint64) {
+		t.Helper()
+
+		const defaultOutputBufferSize = 64
+		opts := []func(*sources.SourceManager){
+			sources.WithSourceUnits(),
+			sources.WithBufferedOutput(defaultOutputBufferSize),
+		}
+		sourceManager := sources.NewManager(opts...)
+
+		conf := Config{
+			Concurrency:   1,
+			Decoders:      decoders.DefaultDecoders(),
+			Detectors:     defaults.DefaultDetectors(),
+			Verify:        false, // avoid network-dependent verification in tests
+			SourceManager: sourceManager,
+			Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+		}
+
+		feature.UseGitMirror.Store(false)
+		if mirror {
+			feature.UseGitMirror.Store(true)
+			defer feature.UseGitMirror.Store(false)
+		}
+
+		e, err := NewEngine(ctx, &conf)
+		assert.NoError(t, err)
+
+		e.Start(ctx)
+		_, err = e.ScanGit(ctx, cfg)
+		assert.NoError(t, err)
+		assert.NoError(t, e.Finish(ctx))
+
+		m := e.GetMetrics()
+		secrets := m.VerifiedSecretsFound + m.UnverifiedSecretsFound
+		bytes := m.BytesScanned
+		return secrets, bytes
+	}
+
+	s1, b1 := run(t, true, sources.GitConfig{URI: "https://github.com/trufflesecurity/test_keys.git"})
+	s2, b2 := run(t, false, sources.GitConfig{URI: fileURI, Bare: true})
+	s3, b3 := run(t, false, sources.GitConfig{URI: fileURI, Bare: true, TrustLocalGitConfig: true})
+
+	assert.Greater(t, int(s1), 0)
+	assert.Greater(t, int(b1), 0)
+
+	assert.Equal(t, s1, s2)
+	assert.Equal(t, s1, s3)
+	assert.Equal(t, b1, b2)
+	assert.Equal(t, b1, b3)
 }
 
 func BenchmarkGitEngine(b *testing.B) {
