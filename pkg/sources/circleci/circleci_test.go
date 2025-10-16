@@ -96,9 +96,9 @@ func TestSource_Scan(t *testing.T) {
 
 			// check error
 			if tt.wantErr {
-				assert.NotEmpty(t, chunkErr)
+				assert.Error(t, chunkErr)
 			} else {
-				assert.Empty(t, chunkErr)
+				assert.NoError(t, chunkErr)
 			}
 
 			// check total count of projects scanned
