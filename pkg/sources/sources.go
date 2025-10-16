@@ -286,6 +286,8 @@ type GitConfig struct {
 	NoCleanup bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
+	// TrustLocalGitConfig allows to trust the local git config.
+	TrustLocalGitConfig bool
 }
 
 // GithubConfig defines the optional configuration for a github source.

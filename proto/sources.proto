@@ -226,6 +226,7 @@ message Git {
   string clone_path = 16;
   bool no_cleanup = 17;
   bool print_legacy_json = 18;
+  bool trust_local_git_config = 19; // Trust local git configurations
 }
 
 message GitLab {
