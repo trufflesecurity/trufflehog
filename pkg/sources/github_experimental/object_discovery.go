@@ -14,11 +14,9 @@ import (
 	"github.com/google/go-github/v67/github"
 	"github.com/k0kubun/go-ansi"
 	"github.com/schollz/progressbar/v3"
-	"golang.org/x/oauth2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 // Assumption: sleeping for 60 seconds is enough to reset the secondary rate limit
@@ -100,40 +98,13 @@ func (b *backoff) getValue() int {
 	return int(b.value)
 }
 
-// Github token
-var ghToken = ""
-
-func getForksCount(owner, repoName string) (int, error) {
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: ghToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-
-	client := github.NewClient(tc)
-
+func getForksCount(ctx context.Context, client *github.Client, owner, repoName string) (int, error) {
 	repo, _, err := client.Repositories.Get(ctx, owner, repoName)
 	if err != nil {
 		return 0, err
 	}
 
 	return repo.GetForksCount(), nil
-}
-
-func getGitHubUser() (string, error) {
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: ghToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-
-	client := github.NewClient(tc)
-
-	ghUser, _, err := client.Users.Get(ctx, "")
-	if err != nil {
-		return "", err
-	}
-	return ghUser.GetLogin(), nil
 }
 
 // runGitCommand runs a git command
@@ -322,7 +293,7 @@ func removeBySHA(existingCommits, newCommits []string, charLen int) []string {
 	return filteredCommits
 }
 
-func processCommits(ctx context.Context, needsProcessing []string, owner, repo, path string) {
+func processCommits(ctx context.Context, apiClient *github.Client, needsProcessing []string, owner, repo, path string) {
 	repoCtx := context.WithValue(ctx, "repo", repo)
 
 	startingSize := float64(len(needsProcessing))
@@ -343,10 +314,12 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 		chunk := needsProcessing[:chunkSize]
 		needsProcessing = needsProcessing[chunkSize:]
 
-		commitData, err := checkHashes(owner, repo, chunk)
+		commitData, err := checkHashes(repoCtx, apiClient, owner, repo, chunk)
 		if err != nil {
 			repoCtx.Logger().V(2).Info("Temporary error occurred in guessing commits", "error", err)
-			needsProcessing = append(needsProcessing, chunk...)
+			// Prepend the failed chunk to the FRONT of the queue for immediate retry
+			// This ensures we retry the same hashes instead of moving to the next batch
+			needsProcessing = append(chunk, needsProcessing...)
 			queryChunkSize.errorOccurred()
 			if strings.Contains(err.Error(), "You have exceeded a secondary rate limit") {
 				repoCtx.Logger().V(2).Info("Reached secondary GitHub Rate Limit. Sleeping for 60 seconds.")
@@ -391,7 +364,7 @@ type responseData struct {
 	Message string `json:"message"`
 }
 
-func checkHashes(owner, repo string, hashes []string) (map[string][]string, error) {
+func checkHashes(ctx context.Context, client *github.Client, owner, repo string, hashes []string) (map[string][]string, error) {
 	testCases := ""
 	for _, h := range hashes {
 		testCase := fmt.Sprintf(`
@@ -413,7 +386,6 @@ func checkHashes(owner, repo string, hashes []string) (map[string][]string, erro
     `, owner, repo, testCases)
 
 	headers := map[string]string{
-		"Authorization":         "Bearer " + ghToken,
 		"Content-Type":          "application/json",
 		"Github-Verified-Fetch": "true",
 		"X-Requested-With":      "XMLHttpRequest",
@@ -426,7 +398,7 @@ func checkHashes(owner, repo string, hashes []string) (map[string][]string, erro
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.github.com/graphql", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.github.com/graphql", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -435,8 +407,9 @@ func checkHashes(owner, repo string, hashes []string) (map[string][]string, erro
 		req.Header.Set(key, value)
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	// Use the authenticated HTTP client from the GitHub API client
+	// This client already has the Bearer token configured via OAuth2 transport
+	resp, err := client.Client().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("python request error: %w", err)
 	}
@@ -546,9 +519,6 @@ func downloadPatches(valid_cfor []string, path string) error {
 
 // scanHiddenData scans hidden data (and non-hidden data) for secrets in a GitHub repository
 func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	// assign github token to global variable
-	ghToken = s.conn.GetToken()
-
 	// set collision threshold to user input
 	collisionThreshold = float64(s.conn.CollisionThreshold)
 
@@ -564,7 +534,7 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 
 	// get repo metadata and store in cacheRepoInfo
 	repoCtx := context.WithValue(ctx, "repo", owner+"/"+repoName)
-	ghRepo, _, err := s.apiClient.Repositories.Get(repoCtx, owner, repoName)
+	ghRepo, _, err := s.connector.APIClient().Repositories.Get(repoCtx, owner, repoName)
 	if err != nil {
 		return fmt.Errorf("failed to fetch repository: %w", err)
 	}
@@ -582,20 +552,14 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 		return fmt.Errorf("failed to create .trufflehog folder in user's home directory: %w", err)
 	}
 
-	// Get GitHub User tied to token
-	ghUser, err := getGitHubUser()
-	if err != nil {
-		return fmt.Errorf("failed to get GitHub user details: %w", err)
-	}
-
 	// get the number of forks
-	forksCount, err := getForksCount(owner, repoName)
+	forksCount, err := getForksCount(repoCtx, s.connector.APIClient(), owner, repoName)
 	if err != nil {
 		return fmt.Errorf("failed to get forks count: %w", err)
 	}
 
-	// download the repo
-	path, repo, err := git.CloneRepoUsingToken(ctx, ghToken, repoURL, "", ghUser, true)
+	// download the repo using the authenticated connector
+	path, repo, err := s.connector.Clone(ctx, repoURL)
 	if err != nil {
 		return fmt.Errorf("failed to clone the repository: %w", err)
 	}
@@ -639,7 +603,7 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	possibleCommits = removeByShortSHA(invalidCommits, possibleCommits)
 
 	// Guess all possible commit hashes
-	processCommits(ctx, possibleCommits, owner, repoName, folderPath)
+	processCommits(ctx, s.connector.APIClient(), possibleCommits, owner, repoName, folderPath)
 
 	// Read in the new commits
 	validHiddenCommits, err = readCommitsFromDisk(validHiddenCommit, folderPath)
