@@ -137,7 +137,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/centralstationcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cexio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chartmogul"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chatbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chatfule"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checklyhq"
@@ -1001,7 +1000,6 @@ func buildDetectorList() []detectors.Detector {
 		&centralstationcrm.Scanner{},
 		&cexio.Scanner{},
 		&chartmogul.Scanner{},
-		&chatbot.Scanner{},
 		&chatfule.Scanner{},
 		&checio.Scanner{},
 		&checklyhq.Scanner{},
