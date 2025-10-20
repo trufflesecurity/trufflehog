@@ -76,7 +76,7 @@ func (s *Source) processIssuesWithComments(
 				// request this issue more comments
 				var commentsQuery singleIssueComments
 				err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars)
-				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &commentsQuery.RateLimit, err) {
 					continue
 				}
 
@@ -167,7 +167,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 				}
 
 				err := s.connector.GraphQLClient().Query(ctx, &commentQuery, singlePRVars)
-				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &commentQuery.RateLimit, err) {
 					continue
 				}
 
@@ -288,7 +288,12 @@ func (s *Source) fetchThreadComments(ctx context.Context, threadIDs []string, re
 				commentsPagination: (*githubv4.String)(nil),
 			}
 
-			if err := s.connector.GraphQLClient().Query(ctx, &query, reviewThreadVars); err != nil {
+			err := s.connector.GraphQLClient().Query(ctx, &query, reviewThreadVars)
+			if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+				continue
+			}
+
+			if err != nil {
 				return fmt.Errorf("single-thread query failed: %w", err)
 			}
 
@@ -348,7 +353,6 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 	}
 
 	var retryAfter time.Duration
-	// if rate limit exceeded error happened, wait for 5 minute before trying again
 	if errIn != nil && strings.Contains(errIn.Error(), "rate limit exceeded") {
 		now := time.Now()
 

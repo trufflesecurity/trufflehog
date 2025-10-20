@@ -216,7 +216,7 @@ func TestSource_ScanComments(t *testing.T) {
 }
 
 func TestSource_ScanCommentsWithGraphql(t *testing.T) {
-	feature.UseGithubGraphqlAPI.Store(true)
+	feature.UseGithubGraphQLAPI.Store(true)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
