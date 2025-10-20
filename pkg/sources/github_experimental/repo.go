@@ -2,6 +2,7 @@ package github_experimental
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -62,9 +63,14 @@ func (s *Source) cacheRepoInfo(r *github.Repository) {
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {
-	// If there's a '/', assume it's a URL and try to normalize it.
-	if strings.ContainsRune(repo, '/') {
+	// If it's a full URL (has protocol), normalize it
+	if regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
 		return giturl.NormalizeGithubRepo(repo)
+	}
+	// If it's a repository name (contains / but not http), convert to full URL first
+	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
+		fullURL := "https://github.com/" + repo
+		return giturl.NormalizeGithubRepo(fullURL)
 	}
 
 	return "", fmt.Errorf("no repositories found for %s", repo)
