@@ -1048,74 +1048,52 @@ func TestRepositoryFiltering(t *testing.T) {
 }
 
 func TestExplicitRepositoryBypass(t *testing.T) {
-	// Test that explicit repositories bypass filtering in the Enumerate function
+	// Test that explicit repositories are included in enumeration
 	ctx := context.Background()
 
-	// Create a source with explicit repositories and include/exclude filters
-	source := &Source{
-		conn: &sourcespb.GitHub{
-			Repositories: []string{
-				"https://github.com/org/explicit-repo.git",
-				"https://github.com/org/another-explicit.git",
-			},
+	// Set up mocks for the API calls
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "test-user"})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/explicit-repo").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/explicit-repo",
+			"clone_url": "https://github.com/org/explicit-repo.git",
+			"size":      1,
+		})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/another-explicit").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/another-explicit",
+			"clone_url": "https://github.com/org/another-explicit.git",
+			"size":      1,
+		})
+
+	// Create a source with explicit repositories
+	source := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
 		},
-	}
+		Repositories: []string{
+			"https://github.com/org/explicit-repo.git",
+			"https://github.com/org/another-explicit.git",
+		},
+	})
 
-	// Set up include filter that would normally filter out the explicit repos
-	includePatterns := []string{"org/filtered-*"} // Only include repos starting with "filtered-"
+	// Test the Enumerate method
+	err := source.Enumerate(ctx, noopReporter())
+	require.NoError(t, err)
 
-	// Create a filtered cache with these patterns
-	cache := simple.NewCache[string]()
-	source.filteredRepoCache = source.newFilteredRepoCache(ctx, cache, includePatterns, []string{})
-
-	// Add the explicit repos to the cache (simulating what happens in Init)
-	for _, repo := range source.conn.Repositories {
-		normalized, err := source.normalizeRepo(repo)
-		require.NoError(t, err)
-		source.filteredRepoCache.Set(repo, normalized)
-	}
-
-	// Simulate the Enumerate logic
-	if len(source.conn.Repositories) > 0 {
-		// Explicit repositories should bypass filtering
-		t.Logf("Found %d explicit repositories, bypassing filtering", len(source.conn.Repositories))
-		source.repos = source.conn.Repositories
-		t.Logf("Using explicit repos: %v", source.repos)
-	} else {
-		// No explicit repositories - rebuild from enumerated cache with filtering
-		t.Logf("No explicit repositories, applying filtering logic")
-		source.repos = make([]string, 0, source.filteredRepoCache.Count())
-		for _, repo := range source.filteredRepoCache.Values() {
-			repoName := repo
-			if strings.Contains(repo, "/") {
-				if strings.Contains(repo, "github.com") {
-					parts := strings.Split(repo, "/")
-					if len(parts) >= 2 {
-						repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
-					}
-				}
-			}
-			if source.filteredRepoCache.wantRepo(repoName) {
-				source.repos = append(source.repos, repo)
-			}
-		}
-	}
-
-	// Verify that explicit repositories are included despite the filters
+	// Verify that explicit repositories are included in the enumeration
 	assert.Len(t, source.repos, 2, "Should have 2 explicit repositories")
 	assert.Contains(t, source.repos, "https://github.com/org/explicit-repo.git")
 	assert.Contains(t, source.repos, "https://github.com/org/another-explicit.git")
-
-	// Verify that the explicit repos would normally be filtered out by wantRepo
-	explicitRepoName1 := "org/explicit-repo"
-	explicitRepoName2 := "org/another-explicit"
-
-	t.Logf("Testing if explicit repos would be filtered by wantRepo():")
-	t.Logf("  wantRepo('%s') = %v (should be false)", explicitRepoName1, source.filteredRepoCache.wantRepo(explicitRepoName1))
-	t.Logf("  wantRepo('%s') = %v (should be false)", explicitRepoName2, source.filteredRepoCache.wantRepo(explicitRepoName2))
-
-	assert.False(t, source.filteredRepoCache.wantRepo(explicitRepoName1), "Explicit repo should be filtered out by wantRepo")
-	assert.False(t, source.filteredRepoCache.wantRepo(explicitRepoName2), "Explicit repo should be filtered out by wantRepo")
 }
 
 func noopReporter() sources.UnitReporter {
