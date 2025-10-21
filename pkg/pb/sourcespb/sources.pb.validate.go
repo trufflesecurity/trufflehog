@@ -1339,6 +1339,10 @@ func (m *Docker) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for Namespace
+
+	// no validation rules for RegistryToken
+
 	switch v := m.Credential.(type) {
 	case *Docker_Unauthenticated:
 		if v == nil {

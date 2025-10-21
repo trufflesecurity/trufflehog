@@ -32,6 +32,7 @@ Docker is a containerization platform that packages applications and their depen
 - **Authentication Support**: Multiple authentication methods for private registries
 - **File Exclusion**: Configure patterns to skip specific files or directories
 - **Size Limits**: Automatically skips files exceeding 50MB to optimize performance
+- **Scan All Images Under a Namespace**: Enables automatic discovery and scanning of all container images under a specified namespace (organization or user) in supported registries such as Docker Hub, Quay, and GHCR. Users no longer need to manually list or specify individual image names. The system retrieves all public images within the namespace, and if a valid registry token is provided includes private images as well. This allows for large-scale, automated scanning across all repositories within an organization.
 
 ## Configuration
 
@@ -39,7 +40,7 @@ Docker is a containerization platform that packages applications and their depen
 
 The Docker source supports several image reference formats:
 
-```go
+```text
 // Remote registry (default)
 "nginx:latest"
 "myregistry.com/myapp:v1.0.0"
@@ -51,6 +52,7 @@ The Docker source supports several image reference formats:
 // Tarball file
 "file:///path/to/image.tar"
 ```
+
 ### Authentication Methods
 
 #### 1. Unauthenticated (Public Images)
@@ -159,6 +161,40 @@ docker login quay.io
 cat ~/.docker/config.json
 ```
 
+---
+
+### Namespace Scanning (This feature is currently in beta version and under testing)
+
+To scan **all images** under a namespace (organization or user):
+
+**CLI Usage:**
+```bash
+trufflehog docker --namespace myorg
+```
+
+To include private images within that namespace:
+```bash
+trufflehog docker --namespace myorg --registry-token <access_token>
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+  - type: docker
+    name: org-scan
+    docker:
+      namespace: myorg
+      registry_token: "ghp_xxxxxxxxxxxxxxxxxxxx"
+```
+
+Supported registries:
+- Docker Hub (`docker.io`)
+- Quay (`quay.io`)
+- GitHub Container Registry (`ghcr.io`)
+
+This mode automatically enumerates all repositories within the specified namespace before scanning.
+
+---
 
 ### File Exclusion
 
@@ -200,6 +236,18 @@ trufflehog docker --image myregistry.com/private-image:latest --exclude-paths **
 trufflehog docker --image nginx:latest
 ```
 
+### Scanning All Images Under a Namespace (Beta Version)
+
+```bash
+trufflehog docker --namespace trufflesecurity
+```
+
+Including private images:
+
+```bash
+trufflehog docker --namespace trufflesecurity --registry-token ghp_xxxxxxxxxxxxxxxxxxxx
+```
+
 ### Scanning Multiple Images
 
 ```bash
@@ -215,10 +263,7 @@ trufflehog docker --image docker://myapp:local
 ### Scanning a Tarball
 
 ```bash
-# First, save an image to a tarball
 docker save myapp:latest -o myapp.tar
-
-# Then scan it
 trufflehog docker --image file:///path/to/myapp.tar
 ```
 
@@ -231,40 +276,35 @@ trufflehog docker --image my-registry.io/private-app:v1.0.0
 
 ## Testing Results
 
-### Integration Test Results
-
 | Test Case | Status | Command/Configuration | Registry URL | Notes |
 |-----------|--------|----------------------|--------------|-------|
 | Scan remote image on DockerHub | ✅ Success | `--image <image_name>` | https://hub.docker.com/ | Public images work without authentication |
 | Scan specific tag of image on DockerHub | ✅ Success | `--image <image_name>:<tag_name>` | https://hub.docker.com/ | Tag specification working correctly |
+| Scan all images under namespace | In Progress | `--namespace <namespace>` | DockerHub, Quay, GHCR | Automatically discovers all public images |
 | Scan remote image on Quay.io | ✅ Success | `--image quay.io/prometheus/prometheus` | https://quay.io/search | Public Quay.io registry supported |
 | Scan multiple images | ✅ Success | `--image <image_name> --image <image_name>` | Multiple registries | Sequential scanning of multiple images |
-| Scan remote image on DockerHub with token | ✅ Success | Generate token using username and password | https://hub.docker.com/ | Basic auth with PAT working |
+| Scan remote image on DockerHub with token | ✅ Success | `--registry-token <token>` | https://hub.docker.com/ | Authenticated scanning for private repos |
 | Scan private image on Quay | ⏸️ Halted | N/A | https://quay.io/ | RedHat requires paid account for private repos |
-| Scan private image on GHCR | ✅ Success | `--image ghcr.io/<image_name>` | https://github.com/packages | GitHub Container Registry |
+| Scan private image on GHCR | ✅ Success | `--image ghcr.io/<image_name>` | https://github.com/packages | GitHub Container Registry supported |
 
 ## Troubleshooting
 
 ### Common Issues
 
 **Issue**: Authentication failures with private registries
-
-**Solution**: Ensure credentials are correct and have pull permissions. Use `docker login` first when using Docker Keychain method.
+**Solution**: Ensure credentials are correct and have pull permissions. Use `docker login` first when using Docker Keychain.
 
 ---
 
 **Issue**: Out of memory errors with large images
-
 **Solution**: Reduce concurrency or scan smaller images. Consider increasing available memory.
 
 ---
 
 **Issue**: Slow scanning performance
-
 **Solution**: Enable concurrent processing, use local daemon instead of remote registry, or exclude unnecessary directories.
 
 ---
 
 **Issue**: Files not being scanned
-
 **Solution**: Check exclude patterns and file size limits. Verify files are under 50MB.

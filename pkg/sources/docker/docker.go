@@ -62,7 +62,7 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init initializes the source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -75,6 +75,35 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
+	}
+
+	if namespace := s.conn.GetNamespace(); namespace != "" {
+		var registry Registry
+		switch {
+		case strings.HasPrefix(namespace, "quay.io"):
+			registry = &Quay{
+				Token: s.conn.GetRegistryToken(),
+			}
+		case strings.HasPrefix(namespace, "ghcr.io"):
+			registry = &GHCR{
+				Token: s.conn.GetRegistryToken(),
+			}
+		default: // default is dockerhub
+			registry = &DockerHub{
+				Token: s.conn.GetRegistryToken(),
+			}
+		}
+
+		ctx.Logger().Info(fmt.Sprintf("using registry: %s", registry.Name()))
+
+		namespaceImages, err := registry.ListImages(ctx, namespace)
+		if err != nil {
+			return fmt.Errorf("failed to list namespace images: %w", err)
+		}
+
+		ctx.Logger().Info(fmt.Sprintf("namespace: %s has %d images", namespace, len(namespaceImages)))
+
+		s.conn.Images = append(s.conn.Images, namespaceImages...)
 	}
 
 	// Extract exclude paths from connection and compile glob patterns
@@ -127,42 +156,42 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		imgInfo, err := s.processImage(ctx, image)
 		if err != nil {
 			ctx.Logger().Error(err, "error processing image", "image", image)
-			return nil
+			continue
 		}
 
-		ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
+		imageCtx := context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
 
-		ctx.Logger().V(2).Info("scanning image history")
+		imageCtx.Logger().V(2).Info("scanning image history")
 
 		layers, err := imgInfo.image.Layers()
 		if err != nil {
-			ctx.Logger().Error(err, "error getting image layers")
-			return nil
+			imageCtx.Logger().Error(err, "error getting image layers")
+			continue
 		}
 
 		// Get history entries and associate them with layers
-		historyEntries, err := getHistoryEntries(ctx, imgInfo, layers)
+		historyEntries, err := getHistoryEntries(imageCtx, imgInfo, layers)
 		if err != nil {
-			ctx.Logger().Error(err, "error getting image history entries")
-			return nil
+			imageCtx.Logger().Error(err, "error getting image history entries")
+			continue
 		}
 
 		// Scan each history entry for secrets in build commands
 		for _, historyEntry := range historyEntries {
-			if err := s.processHistoryEntry(ctx, historyEntry, chunksChan); err != nil {
-				ctx.Logger().Error(err, "error processing history entry")
-				return nil
+			if err := s.processHistoryEntry(imageCtx, historyEntry, chunksChan); err != nil {
+				imageCtx.Logger().Error(err, "error processing history entry")
+				continue
 			}
 			dockerHistoryEntriesScanned.WithLabelValues(s.name).Inc()
 		}
 
-		ctx.Logger().V(2).Info("scanning image layers")
+		imageCtx.Logger().V(2).Info("scanning image layers")
 
 		// Process each layer concurrently
 		for _, layer := range layers {
 			workers.Go(func() error {
-				if err := s.processLayer(ctx, layer, imgInfo, chunksChan); err != nil {
-					ctx.Logger().Error(err, "error processing layer")
+				if err := s.processLayer(imageCtx, layer, imgInfo, chunksChan); err != nil {
+					imageCtx.Logger().Error(err, "error processing layer")
 					return nil
 				}
 				dockerLayersScanned.WithLabelValues(s.name).Inc()
@@ -172,8 +201,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 
 		if err := workers.Wait(); err != nil {
-			ctx.Logger().Error(err, "error processing layers")
-			return nil
+			imageCtx.Logger().Error(err, "error processing layers")
+			continue
 		}
 
 		dockerImagesScanned.WithLabelValues(s.name).Inc()
