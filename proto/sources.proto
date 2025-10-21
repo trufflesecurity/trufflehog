@@ -264,7 +264,10 @@ message GitHub {
   string head = 9;
   string base = 10;
   repeated string ignore_repos = 11;
-  repeated string include_repos = 12;
+  // DEPRECATED: include_repos is deprecated in favor of repositories. 
+  // It was used for filtering when the repositories field wasn't populating the UI-input results correctly
+  // It can be removed when we no longer depend on it
+  repeated string include_repos = 12 [deprecated = true];
   bool include_pull_request_comments = 14;
   bool include_issue_comments = 15;
   bool include_gist_comments = 16;
