@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -21,7 +22,25 @@ type Image struct {
 // Registry is an interface for any Docker/OCI registry implementation that can list all images under a given namespace.
 type Registry interface {
 	Name() string                                                       // return name of the registry
+	WithRegistryToken(registryToken string)                             // set token for registry
 	ListImages(ctx context.Context, namespace string) ([]string, error) // list all images
+}
+
+// MakeRegistryFromNamespace returns a Registry implementation
+// based on the namespace prefix (e.g. "ghcr.io/", "quay.io/").
+// If no known prefix is found, DockerHub is used by default.
+func MakeRegistryFromNamespace(namespace string) Registry {
+	var registry Registry
+	switch {
+	case strings.HasPrefix(namespace, "quay.io"): // quay.io/abc123
+		registry = &Quay{}
+	case strings.HasPrefix(namespace, "ghcr.io"): // ghcr.io/abc123
+		registry = &GHCR{}
+	default: // default is dockerhub
+		registry = &DockerHub{}
+	}
+
+	return registry
 }
 
 // === DockerHub registry ===
@@ -39,6 +58,10 @@ type dockerhubResp struct {
 
 func (d *DockerHub) Name() string {
 	return "Dockerhub"
+}
+
+func (d *DockerHub) WithRegistryToken(registryToken string) {
+	d.Token = registryToken
 }
 
 // ListImages lists all images under a Docker Hub namespace using Docker Hub's API.
@@ -99,8 +122,12 @@ type quayResp struct {
 	Repositories []Image `json:"repositories"`
 }
 
-func (d *Quay) Name() string {
+func (q *Quay) Name() string {
 	return "Quay.io"
+}
+
+func (q *Quay) WithRegistryToken(registryToken string) {
+	q.Token = registryToken
 }
 
 // ListImages lists all images under a Quay namespace.
@@ -154,22 +181,28 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 
 // GHCR implements the Registry interface for GHCR.io.
 type GHCR struct {
-	Token string
+	Token string // https://github.com/github/roadmap/issues/558
 }
 
 func (g *GHCR) Name() string {
 	return "ghcr.io"
 }
 
+func (g *GHCR) WithRegistryToken(registryToken string) {
+	g.Token = registryToken
+}
+
 // ListImages lists all images under a Quay namespace.
 func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, error) {
 	ghcrNamespace := path.Base(namespace) // ghcr.io/<namespace> -> namespace
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		fmt.Sprintf("https://api.github.com/users/%s/packages?package_type=container", ghcrNamespace), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 
+	// https://stackoverflow.com/questions/72732582/using-github-packages-without-personal-access-token
 	if g.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+g.Token)
 	}
@@ -204,6 +237,6 @@ func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, erro
 
 		return allImages, nil
 	default:
-		return nil, fmt.Errorf("failed to list quay images: unexpected status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed to list ghcr images: unexpected status code: %d", resp.StatusCode)
 	}
 }

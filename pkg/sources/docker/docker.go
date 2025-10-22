@@ -78,20 +78,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	}
 
 	if namespace := s.conn.GetNamespace(); namespace != "" {
-		var registry Registry
-		switch {
-		case strings.HasPrefix(namespace, "quay.io"):
-			registry = &Quay{
-				Token: s.conn.GetRegistryToken(),
-			}
-		case strings.HasPrefix(namespace, "ghcr.io"):
-			registry = &GHCR{
-				Token: s.conn.GetRegistryToken(),
-			}
-		default: // default is dockerhub
-			registry = &DockerHub{
-				Token: s.conn.GetRegistryToken(),
-			}
+		registry := MakeRegistryFromNamespace(namespace)
+
+		// attach the registry authentication token, if one is available.
+		if registryToken := s.conn.GetRegistryToken(); registryToken != "" {
+			registry.WithRegistryToken(registryToken)
 		}
 
 		ctx.Logger().Info(fmt.Sprintf("using registry: %s", registry.Name()))
