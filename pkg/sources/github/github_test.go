@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
@@ -111,7 +112,7 @@ func TestAddReposByOrg(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
-func TestAddReposByOrg_IncludeRepos(t *testing.T) {
+func TestAddReposByOrg_Repositories(t *testing.T) {
 	defer gock.Off()
 
 	gock.New("https://api.github.com").
@@ -127,7 +128,7 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos:  []string{"super-secret-org/super*"},
+		Repositories:  []string{"super-secret-org/super-secret-repo", "super-secret-org/super-secret-repo2"},
 		Organizations: []string{"super-secret-org"},
 	})
 	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
@@ -748,7 +749,7 @@ func BenchmarkEnumerate(b *testing.B) {
 	}
 }
 
-func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
+func TestEnumerateWithToken_Repositories(t *testing.T) {
 	defer gock.Off()
 
 	gock.New("https://api.github.com").
@@ -1044,6 +1045,55 @@ func TestRepositoryFiltering(t *testing.T) {
 	assert.True(t, cache5.wantRepo("org/repo1"))
 	assert.True(t, cache5.wantRepo("org/repo2"))
 	assert.False(t, cache5.wantRepo("other/repo1"))
+}
+
+func TestExplicitRepositoryBypass(t *testing.T) {
+	// Test that explicit repositories are included in enumeration
+	ctx := context.Background()
+
+	// Set up mocks for the API calls
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "test-user"})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/explicit-repo").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/explicit-repo",
+			"clone_url": "https://github.com/org/explicit-repo.git",
+			"size":      1,
+		})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/another-explicit").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/another-explicit",
+			"clone_url": "https://github.com/org/another-explicit.git",
+			"size":      1,
+		})
+
+	// Create a source with explicit repositories
+	source := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		Repositories: []string{
+			"https://github.com/org/explicit-repo.git",
+			"https://github.com/org/another-explicit.git",
+		},
+	})
+
+	// Test the Enumerate method
+	err := source.Enumerate(ctx, noopReporter())
+	require.NoError(t, err)
+
+	// Verify that explicit repositories are included in the enumeration
+	assert.Len(t, source.repos, 2, "Should have 2 explicit repositories")
+	assert.Contains(t, source.repos, "https://github.com/org/explicit-repo.git")
+	assert.Contains(t, source.repos, "https://github.com/org/another-explicit.git")
 }
 
 func noopReporter() sources.UnitReporter {
