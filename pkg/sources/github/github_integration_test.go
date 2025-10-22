@@ -1058,7 +1058,7 @@ func TestSource_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			connector, err := newConnector(tt.args.ctx, tt.sourceConfig)
+			connector, err := newConnector(ctx, tt.sourceConfig)
 			require.NoError(t, err)
 			tt.sourceConfig.connector = connector
 
