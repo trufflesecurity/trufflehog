@@ -58,7 +58,7 @@ var (
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
-	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to verified,unverified,unknown.").String()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
 	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
 	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
@@ -72,6 +72,7 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	failOnScanErrors     = cli.Flag("fail-on-scan-errors", "Exit with non-zero error code if an error occurs during the scan.").Bool()
 	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
 	customVerifiersOnly  = cli.Flag("custom-verifiers-only", "Only use custom verification endpoints.").Bool()
 	detectorTimeout      = cli.Flag("detector-timeout", "Maximum time to spend scanning chunks per detector (e.g., 30s).").Duration()
@@ -90,20 +91,21 @@ var (
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 
-	gitScan             = cli.Command("git", "Find credentials in git repositories.")
-	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
-	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	gitScanExcludeGlobs = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
-	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
-	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
-	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
-	gitScanBare         = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
-	gitClonePath        = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
-	gitNoCleanup        = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
-	_                   = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
-	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
-	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
+	gitScan                = cli.Command("git", "Find credentials in git repositories.")
+	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
+	gitScanIncludePaths    = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	gitScanExcludePaths    = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitScanExcludeGlobs    = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
+	gitScanSinceCommit     = gitScan.Flag("since-commit", "Commit to start scan from.").String()
+	gitScanBranch          = gitScan.Flag("branch", "Branch to scan.").String()
+	gitScanMaxDepth        = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	gitScanBare            = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
+	gitClonePath           = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
+	gitNoCleanup           = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	gitTrustLocalGitConfig = gitScan.Flag("trust-local-git-config", "Trust local git config.").Bool()
+	_                      = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
+	_                      = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
+	_                      = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
 	githubScan                  = cli.Command("github", "Find credentials in GitHub repositories.")
 	githubScanEndpoint          = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
@@ -734,35 +736,24 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
-		gitCloneTempPath = *gitClonePath
-		// validate the commit for local repository only
-		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
-			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
-				ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
-			}
-		}
-
-		// clone path is only supported for HTTPS repository URLs, not for local repositories.
-		if *gitClonePath != "" && strings.HasPrefix(*gitScanURI, "file://") {
-			return scanMetrics, fmt.Errorf("invalid configuration: --clone-path cannot be used with a local repository URL")
-		}
 
 		if err := validateClonePath(*gitClonePath, *gitNoCleanup); err != nil {
 			return scanMetrics, err
 		}
 
 		gitCfg := sources.GitConfig{
-			URI:              *gitScanURI,
-			IncludePathsFile: *gitScanIncludePaths,
-			ExcludePathsFile: *gitScanExcludePaths,
-			HeadRef:          *gitScanBranch,
-			BaseRef:          *gitScanSinceCommit,
-			MaxDepth:         *gitScanMaxDepth,
-			Bare:             *gitScanBare,
-			ExcludeGlobs:     *gitScanExcludeGlobs,
-			ClonePath:        *gitClonePath,
-			NoCleanup:        *gitNoCleanup,
-			PrintLegacyJSON:  *jsonLegacy,
+			URI:                 *gitScanURI,
+			IncludePathsFile:    *gitScanIncludePaths,
+			ExcludePathsFile:    *gitScanExcludePaths,
+			HeadRef:             *gitScanBranch,
+			BaseRef:             *gitScanSinceCommit,
+			MaxDepth:            *gitScanMaxDepth,
+			Bare:                *gitScanBare,
+			ExcludeGlobs:        *gitScanExcludeGlobs,
+			ClonePath:           *gitClonePath,
+			NoCleanup:           *gitNoCleanup,
+			PrintLegacyJSON:     *jsonLegacy,
+			TrustLocalGitConfig: *gitTrustLocalGitConfig,
 		}
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
@@ -1081,8 +1072,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 
 	// Print any non-fatal errors reported during the scan.
+	var retErr error
 	for _, ref := range refs {
 		if errs := ref.Snapshot().Errors; len(errs) > 0 {
+			if *failOnScanErrors {
+				retErr = fmt.Errorf("encountered errors during scan")
+			}
 			errMsgs := make([]string, len(errs))
 			for i := 0; i < len(errs); i++ {
 				errMsgs[i] = errs[i].Error()
@@ -1099,7 +1094,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		printAverageDetectorTime(eng)
 	}
 
-	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, nil
+	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, retErr
 }
 
 // parseResults ensures that users provide valid CSV input to `--results`.
@@ -1161,18 +1156,6 @@ func printAverageDetectorTime(e *engine.Engine) {
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
-}
-
-// Function to check if the commit is valid
-func isValidCommit(uri, commit string) bool {
-	// handle file:// urls
-	repoPath, _ := strings.CutPrefix(uri, "file://") // remove the prefix to validate against the repo path
-	output, err := exec.Command("git", "-C", repoPath, "cat-file", "-t", commit).Output()
-	if err != nil {
-		return false
-	}
-
-	return strings.TrimSpace(string(output)) == "commit"
 }
 
 // validateClonePath ensures that --clone-path, if provided, exists and is a directory.
