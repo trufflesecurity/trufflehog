@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archives"
+	"google.golang.org/protobuf/proto"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -405,6 +407,8 @@ func handleChunksWithError(
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 ) error {
+	var linesConsumed int64
+
 	for {
 		select {
 		case dataOrErr, ok := <-dataErrChan:
@@ -422,7 +426,13 @@ func handleChunksWithError(
 			}
 			if len(dataOrErr.Data) > 0 {
 				chunk := *chunkSkel
+				if chunk.SourceMetadata != nil {
+					if cloned, ok := proto.Clone(chunk.SourceMetadata).(*source_metadatapb.MetaData); ok {
+						chunk.SourceMetadata = cloned
+					}
+				}
 				chunk.Data = dataOrErr.Data
+				linesConsumed = updateFilesystemLineMetadata(&chunk, linesConsumed)
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					return fmt.Errorf("error reporting chunk: %w", err)
 				}
@@ -431,6 +441,38 @@ func handleChunksWithError(
 			return ctx.Err()
 		}
 	}
+}
+
+// updateFilesystemLineMetadata sets the 1-based starting line for filesystem chunks and
+// updates the running total of lines consumed so subsequent chunks can be
+// correctly anchored. Only the unique portion of the chunk (excluding the peek
+// overlap) contributes to the running count so that lines aren't double counted.
+//
+// This relies on HandleFile's default chunk reader, which emits chunks that
+// contain DefaultChunkSize bytes of unique data followed by a DefaultPeekSize
+// overlap with the next chunk.
+func updateFilesystemLineMetadata(chunk *sources.Chunk, linesConsumed int64) int64 {
+	if chunk.SourceMetadata == nil {
+		return linesConsumed
+	}
+	fsMeta := chunk.SourceMetadata.GetFilesystem()
+	if fsMeta == nil {
+		return linesConsumed
+	}
+
+	fsMeta.Line = linesConsumed + 1
+
+	data := chunk.Data
+	if len(data) == 0 {
+		return linesConsumed
+	}
+
+	uniqueLen := len(data)
+	if uniqueLen > sources.DefaultChunkSize {
+		uniqueLen = sources.DefaultChunkSize
+	}
+
+	return linesConsumed + int64(bytes.Count(data[:uniqueLen], []byte("\n")))
 }
 
 // isFatal determines whether the given error is a fatal error that should
