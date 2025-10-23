@@ -24,8 +24,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
-	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
+	sidPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "account", "sid"}) + `\b(AC[0-9a-f]{32})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "auth", "token", "key"}) + `\b([0-9a-f]{32})\b`)
 )
 
 type serviceResponse struct {
@@ -49,18 +49,20 @@ func (s Scanner) getClient() *http.Client {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sid", "twilio"}
+	return []string{"twilio"}
 }
 
 // FromData will find and optionally verify Twilio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllString(dataStr, -1)
-	sidMatches := sidPat.FindAllString(dataStr, -1)
+	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	sidMatches := sidPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, sid := range sidMatches {
-		for _, key := range keyMatches {
+	for _, sidMatch := range sidMatches {
+		sid := sidMatch[1]
+		for _, keyMatch := range keyMatches {
+			key := keyMatch[1]
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Twilio,
 				Raw:          []byte(sid),
