@@ -230,6 +230,10 @@ type DockerConfig struct {
 	UseDockerKeychain bool
 	// ExcludePaths is a list of paths to exclude from scanning.
 	ExcludePaths []string
+	// Namespace represents a Docker organization or user account.
+	Namespace string
+	// RegistryToken is an optional authentication token used to access private images within the namespace.
+	RegistryToken string
 }
 
 // GCSConfig defines the optional configuration for a GCS source.
