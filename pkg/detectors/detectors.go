@@ -8,11 +8,9 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"unicode"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -330,7 +328,7 @@ type VerificationResult struct {
 var verificationGroup = new(singleflight.Group)
 
 func VerificationRequest(identifier string, request *http.Request, client *http.Client) (*VerificationResult, error) {
-	result, err, _ := verificationGroup.Do(identifier, func() (interface{}, error) {
+	result, err, _ := verificationGroup.Do(identifier, func() (any, error) {
 		resp, err := client.Do(request)
 		if err != nil {
 			return nil, err
@@ -356,10 +354,4 @@ func VerificationRequest(identifier string, request *http.Request, client *http.
 	}
 
 	return result.(*VerificationResult), nil
-}
-
-// ComputeXXHash computes the XXHash of the given secret and returns it as a string.
-// This hash can be used as a unique identifier for caching purposes.
-func ComputeXXHash(secret []byte) string {
-	return strconv.FormatUint(xxhash.Sum64(secret), 10)
 }
