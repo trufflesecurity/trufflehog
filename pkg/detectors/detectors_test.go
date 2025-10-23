@@ -1,11 +1,12 @@
-//go:build detectors
-// +build detectors
-
 package detectors
 
 import (
+	"net/http"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	regexp "github.com/wasilibs/go-re2"
 )
 
@@ -65,6 +66,66 @@ func TestPrefixRegexKeywords(t *testing.T) {
 			t.Errorf("Input: %s, Expected: %v, Got: %v", tc.input, tc.expected, match)
 		}
 	}
+}
+
+// The https://httpbin.org/uuid API returns a new UUID on each call.
+// However, because we're using singleflight and issuing concurrent requests,
+// all response bodies should be identical (only one actual HTTP request is made).
+func TestVerificationRequest_Singleflight(t *testing.T) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	// Create two separate *http.Request instances pointing to same endpoint
+	request1, err := http.NewRequest(http.MethodGet, "https://httpbin.org/uuid", http.NoBody)
+	assert.NoError(t, err)
+
+	request2, err := http.NewRequest(http.MethodGet, "https://httpbin.org/uuid", http.NoBody)
+	assert.NoError(t, err)
+
+	const key = "uuid-test"
+
+	var wg sync.WaitGroup
+	const goroutines = 5
+	results := make([]*VerificationResult, goroutines)
+	errors := make([]error, goroutines)
+
+	// launch several concurrent goroutines all requesting the same identifier
+	for i := range goroutines {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			// alternate between two identical requests just to prove it doesn't matter
+			req := request1
+			if i%2 == 0 {
+				req = request2
+			}
+
+			res, err := VerificationRequest(key, req, client)
+			results[i] = res
+			errors[i] = err
+		}(i)
+	}
+
+	wg.Wait()
+
+	for _, err := range errors {
+		assert.NoError(t, err)
+	}
+
+	// all goroutines should get a non-nil result
+	for _, r := range results {
+		assert.NotNil(t, r)
+	}
+
+	// since singleflight coalesces concurrent calls, all results should have identical bodies
+	firstBody := results[0].Body
+	for i := 1; i < goroutines; i++ {
+		assert.Equal(t, string(firstBody), string(results[i].Body),
+			"Expected all results to share the same response body (one HTTP call only)")
+	}
+
+	t.Logf("All %d goroutines received the same UUID: %s", goroutines, string(firstBody))
 }
 
 func BenchmarkPrefixRegex(b *testing.B) {
