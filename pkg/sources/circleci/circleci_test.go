@@ -23,7 +23,7 @@ func TestSource_Scan(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 	// Fix the chunks test, which might involve updating this token.
-	_ = secret.MustGetField("CIRCLECI_TOKEN")
+	token := secret.MustGetField("CIRCLECI_TOKEN")
 
 	type init struct {
 		name       string
@@ -31,29 +31,25 @@ func TestSource_Scan(t *testing.T) {
 		connection *sourcespb.CircleCI
 	}
 	tests := []struct {
-		name          string
-		init          init
-		wantErr       bool
-		wantMinChunks int // minimum expected chunks
+		name                 string
+		init                 init
+		wantErr              bool
+		totalScannedProjects int32
 	}{
-		// This test is broken, likely need to update the credential or fix the auth.
-		// Commenting it out for now.
-		/*
-			{
-				name: "get all chunks",
-				init: init{
-					name: "trufflehog-test",
-					connection: &sourcespb.CircleCI{
-						Credential: &sourcespb.CircleCI_Token{
-							Token: token,
-						},
+		{
+			name: "scan all projects",
+			init: init{
+				name: "trufflehog-test",
+				connection: &sourcespb.CircleCI{
+					Credential: &sourcespb.CircleCI_Token{
+						Token: token,
 					},
-					verify: true,
 				},
-				wantErr:       false,
-				wantMinChunks: 15,
+				verify: true,
 			},
-		*/
+			wantErr:              false,
+			totalScannedProjects: 2,
+		},
 		{
 			name: "invalid token",
 			init: init{
@@ -65,8 +61,8 @@ func TestSource_Scan(t *testing.T) {
 				},
 				verify: true,
 			},
-			wantErr:       true,
-			wantMinChunks: 0,
+			wantErr:              true,
+			totalScannedProjects: 0,
 		},
 		{
 			name: "empty token",
@@ -79,8 +75,8 @@ func TestSource_Scan(t *testing.T) {
 				},
 				verify: true,
 			},
-			wantErr:       true,
-			wantMinChunks: 0,
+			wantErr:              true,
+			totalScannedProjects: 0,
 		},
 	}
 
@@ -95,20 +91,19 @@ func TestSource_Scan(t *testing.T) {
 			assert.NoError(t, err)
 
 			chunksCh := make(chan *sources.Chunk, 1000)
-			chunksErr := s.Chunks(ctx, chunksCh)
+			chunkErr := s.Chunks(ctx, chunksCh)
 			close(chunksCh)
 
-			chunks := []*sources.Chunk{}
-			for chunk := range chunksCh {
-				chunks = append(chunks, chunk)
-			}
-
+			// check error
 			if tt.wantErr {
-				assert.Error(t, chunksErr)
+				assert.Error(t, chunkErr)
+			} else {
+				assert.NoError(t, chunkErr)
 			}
 
-			// verify minimum chunk count
-			assert.GreaterOrEqual(t, len(chunks), tt.wantMinChunks)
+			// check total count of projects scanned
+			progress := s.GetProgress()
+			assert.Equal(t, tt.totalScannedProjects, progress.SectionsCompleted)
 		})
 	}
 }

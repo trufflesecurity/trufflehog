@@ -768,7 +768,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
 				logger.V(5).Info("skipping binary file",
 					"commit", commitHash.String()[:7],
-					"path", path)
+					"path", fileName)
 				continue
 			}
 
@@ -999,7 +999,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
 				logger.V(5).Info("skipping binary file",
 					"commit", commitHash.String()[:7],
-					"path", path)
+					"path", fileName)
 				continue
 			}
 
