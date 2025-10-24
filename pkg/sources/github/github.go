@@ -253,7 +253,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
 		simple.NewCache[string](),
-		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
+		s.conn.GetRepositories(),
 		s.conn.GetIgnoreRepos(),
 	)
 	s.repos = s.conn.Repositories
@@ -433,33 +433,42 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	case *unauthenticatedConnector:
 		s.enumerateUnauthenticated(ctx, dedupeReporter)
 	}
-	s.repos = make([]string, 0, s.filteredRepoCache.Count())
+	// If explicit repositories were provided, use them directly without filtering
+	// Otherwise, rebuild s.repos from the filteredRepoCache
+	if len(s.conn.Repositories) > 0 {
+		// Explicit repositories bypass filtering - use them as-is
+		s.repos = s.conn.Repositories
+		ctx.Logger().V(1).Info("Using explicit repositories", "count", len(s.repos))
+	} else {
+		// No explicit repositories - rebuild from enumerated cache with filtering
+		s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
-	// Double make sure that all enumerated repositories in the
-	// filteredRepoCache have an entry in the repoInfoCache.
-	for _, repo := range s.filteredRepoCache.Values() {
-		// Extract the repository name from the URL for filtering
-		repoName := repo
-		if strings.Contains(repo, "/") {
-			// Try to extract org/repo name from URL
-			if strings.Contains(repo, "github.com") {
-				parts := strings.Split(repo, "/")
-				if len(parts) >= 2 {
-					repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
+		// Double make sure that all enumerated repositories in the
+		// filteredRepoCache have an entry in the repoInfoCache.
+		for _, repo := range s.filteredRepoCache.Values() {
+			// Extract the repository name from the URL for filtering
+			repoName := repo
+			if strings.Contains(repo, "/") {
+				// Try to extract org/repo name from URL
+				if strings.Contains(repo, "github.com") {
+					parts := strings.Split(repo, "/")
+					if len(parts) >= 2 {
+						repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
+					}
 				}
 			}
-		}
 
-		// Final filter check - only include repositories that pass the filter
-		if s.filteredRepoCache.wantRepo(repoName) {
-			ctx = context.WithValue(ctx, "repo", repo)
+			// Final filter check - only include repositories that pass the filter
+			if s.filteredRepoCache.wantRepo(repoName) {
+				ctx = context.WithValue(ctx, "repo", repo)
 
-			repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
-			if err != nil {
-				ctx.Logger().Error(err, "error caching repo info")
-				_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+				repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
+				if err != nil {
+					ctx.Logger().Error(err, "error caching repo info")
+					_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+				}
+				s.repos = append(s.repos, repo)
 			}
-			s.repos = append(s.repos, repo)
 		}
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
