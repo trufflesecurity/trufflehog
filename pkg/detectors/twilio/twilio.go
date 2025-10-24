@@ -24,8 +24,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	sidPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "account", "sid"}) + `\b(AC[0-9a-f]{32})\b`)
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "auth", "token", "key"}) + `\b([0-9a-f]{32})\b`)
+	sidPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "account", "id", "sid"}) + `\b(AC[0-9a-f]{32})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "auth", "token", "secret", "key"}) + `\b([0-9a-f]{32})\b`)
 )
 
 type serviceResponse struct {
