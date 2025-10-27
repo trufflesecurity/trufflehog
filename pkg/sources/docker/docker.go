@@ -201,6 +201,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 // processImage processes an individual image and prepares it for further processing.
 // It handles three image source types: remote registry, local daemon, and tarball file.
 func (s *Source) processImage(ctx context.Context, image string) (imageInfo, error) {
+	ctx.Logger().V(5).Info("Processing individual Image")
 	var (
 		imgInfo   imageInfo
 		imageName name.Reference
@@ -355,6 +356,8 @@ func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEnt
 // processLayer processes an individual layer of an image.
 // It decompresses the layer and extracts all files for scanning.
 func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo imageInfo, chunksChan chan *sources.Chunk) error {
+	ctx.Logger().V(5).Info("Processing layer")
+
 	layerInfo := layerInfo{
 		base: imgInfo.base,
 		tag:  imgInfo.tag,
