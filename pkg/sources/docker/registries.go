@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 	"time"
@@ -21,8 +22,9 @@ type Image struct {
 
 // Registry is an interface for any Docker/OCI registry implementation that can list all images under a given namespace.
 type Registry interface {
-	Name() string                                                       // return name of the registry
-	WithRegistryToken(registryToken string)                             // set token for registry
+	Name() string                           // return name of the registry
+	WithRegistryToken(registryToken string) // set token for registry
+	// TODO: Handle pagination and rate limits for list images API Call
 	ListImages(ctx context.Context, namespace string) ([]string, error) // list all images
 }
 
@@ -32,9 +34,9 @@ type Registry interface {
 func MakeRegistryFromNamespace(namespace string) Registry {
 	var registry Registry
 	switch {
-	case strings.HasPrefix(namespace, "quay.io"): // quay.io/abc123
+	case strings.HasPrefix(namespace, "quay.io/"): // quay.io/abc123
 		registry = &Quay{}
-	case strings.HasPrefix(namespace, "ghcr.io"): // ghcr.io/abc123
+	case strings.HasPrefix(namespace, "ghcr.io/"): // ghcr.io/abc123
 		registry = &GHCR{}
 	default: // default is dockerhub
 		registry = &DockerHub{}
@@ -66,8 +68,13 @@ func (d *DockerHub) WithRegistryToken(registryToken string) {
 
 // ListImages lists all images under a Docker Hub namespace using Docker Hub's API.
 func (d *DockerHub) ListImages(ctx context.Context, namespace string) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("https://hub.docker.com/v2/namespaces/%s/repositories", namespace), http.NoBody)
+	url := &url.URL{
+		Scheme: "https",
+		Host:   "hub.docker.com",
+		Path:   path.Join("v2", "namespaces", namespace, "repositories"),
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +140,19 @@ func (q *Quay) WithRegistryToken(registryToken string) {
 // ListImages lists all images under a Quay namespace.
 func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, error) {
 	quayNamespace := path.Base(namespace) // quay.io/<namespace> -> namespace
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("https://quay.io/api/v1/repository?namespace=%s&public=true&private=true", quayNamespace), http.NoBody)
+	url := &url.URL{
+		Scheme: "https",
+		Host:   "quay.io",
+		Path:   path.Join("api", "v1", "repository"),
+	}
+
+	query := url.Query()
+	query.Set("namespace", quayNamespace)
+	query.Set("public", "true")
+	query.Set("private", "true")
+	url.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -196,8 +214,17 @@ func (g *GHCR) WithRegistryToken(registryToken string) {
 func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, error) {
 	ghcrNamespace := path.Base(namespace) // ghcr.io/<namespace> -> namespace
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("https://api.github.com/users/%s/packages?package_type=container", ghcrNamespace), http.NoBody)
+	url := &url.URL{
+		Scheme: "https",
+		Host:   "api.github.com",
+		Path:   path.Join("users", ghcrNamespace, "packages"),
+	}
+
+	query := url.Query()
+	query.Set("package_type", "container")
+	url.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}

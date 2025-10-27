@@ -77,26 +77,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
-	if namespace := s.conn.GetNamespace(); namespace != "" {
-		registry := MakeRegistryFromNamespace(namespace)
-
-		// attach the registry authentication token, if one is available.
-		if registryToken := s.conn.GetRegistryToken(); registryToken != "" {
-			registry.WithRegistryToken(registryToken)
-		}
-
-		ctx.Logger().Info(fmt.Sprintf("using registry: %s", registry.Name()))
-
-		namespaceImages, err := registry.ListImages(ctx, namespace)
-		if err != nil {
-			return fmt.Errorf("failed to list namespace images: %w", err)
-		}
-
-		ctx.Logger().Info(fmt.Sprintf("namespace: %s has %d images", namespace, len(namespaceImages)))
-
-		s.conn.Images = append(s.conn.Images, namespaceImages...)
-	}
-
 	// Extract exclude paths from connection and compile glob patterns
 	if paths := s.conn.GetExcludePaths(); len(paths) > 0 {
 		var err error
@@ -138,6 +118,22 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	workers := new(errgroup.Group)
 	workers.SetLimit(s.concurrency)
+
+	// if namespace is set and no images are specified, fetch all images in that namespace.
+	registryNamespace := s.conn.GetNamespace()
+	if registryNamespace != "" && len(s.conn.Images) == 0 {
+		start := time.Now()
+		namespaceImages, err := GetNamespaceImages(ctx, registryNamespace, s.conn.GetRegistryToken())
+		if err != nil {
+			ctx.Logger().Error(err, "failed to list namespace images", "namespace", registryNamespace)
+
+			return nil
+		}
+
+		dockerListImagesAPIDuration.WithLabelValues(s.name).Observe(time.Since(start).Seconds())
+
+		s.conn.Images = append(s.conn.Images, namespaceImages...)
+	}
 
 	for _, image := range s.conn.GetImages() {
 		if common.IsDone(ctx) {
@@ -281,6 +277,7 @@ func (*Source) extractImageNameTagDigest(image string) (imageInfo, name.Referenc
 // getHistoryEntries collates an image's configuration history together with the
 // corresponding layer digests for any non-empty layers.
 func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer) ([]historyEntryInfo, error) {
+	ctx.Logger().V(5).Info("Getting history entries")
 	config, err := imgInfo.image.ConfigFile()
 	if err != nil {
 		return nil, err
@@ -327,6 +324,7 @@ func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer
 // processHistoryEntry processes a history entry from the image configuration metadata.
 // It scans the CreatedBy field which contains the command used to create that layer.
 func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEntryInfo, chunksChan chan *sources.Chunk) error {
+	ctx.Logger().V(5).Info("Processing history entries")
 	// Create a descriptive identifier for this history entry
 	// There's no file name here, so we use a synthetic path
 	entryPath := fmt.Sprintf("image-metadata:history:%d:created-by", historyInfo.index)
@@ -526,6 +524,28 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	}
 
 	return opts, nil
+}
+
+func GetNamespaceImages(ctx context.Context, namespace, registryToken string) ([]string, error) {
+	ctx.Logger().V(5).Info("Getting namespace images")
+
+	registry := MakeRegistryFromNamespace(namespace)
+
+	// attach the registry authentication token, if one is available.
+	if registryToken != "" {
+		registry.WithRegistryToken(registryToken)
+	}
+
+	ctx.Logger().Info(fmt.Sprintf("using registry: %s", registry.Name()))
+
+	namespaceImages, err := registry.ListImages(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list namespace images: %w", err)
+	}
+
+	ctx.Logger().Info(fmt.Sprintf("namespace: %s has %d images", namespace, len(namespaceImages)))
+
+	return namespaceImages, nil
 }
 
 // baseAndTagFromImage extracts the base name and tag/digest from an image reference string.
