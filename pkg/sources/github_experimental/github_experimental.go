@@ -2,26 +2,26 @@ package github_experimental
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/google/go-github/v67/github"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	githubsource "github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
 const (
-	SourceType = sourcespb.SourceType_SOURCE_TYPE_GITHUB_EXPERIMENTAL
+	SourceType      = sourcespb.SourceType_SOURCE_TYPE_GITHUB_EXPERIMENTAL
+	cloudV3Endpoint = "https://api.github.com"
 )
 
 type Source struct {
@@ -33,10 +33,9 @@ type Source struct {
 	useCustomContentWriter bool
 	git                    *git.Git
 	scanOptions            *git.ScanOptions
-	httpClient             *http.Client
 	log                    logr.Logger
 	conn                   *sourcespb.GitHubExperimental
-	apiClient              *github.Client
+	connector              githubsource.Connector
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -81,9 +80,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.jobID = jobID
 	s.verify = verify
 
-	s.httpClient = common.RetryableHTTPClientTimeout(60)
-	s.apiClient = github.NewClient(s.httpClient)
-
 	var conn sourcespb.GitHubExperimental
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
@@ -94,6 +90,32 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	if err != nil {
 		return fmt.Errorf("error normalizing repo: %w", err)
 	}
+
+	// Get the token from the connection
+	token := s.conn.GetToken()
+	if token == "" {
+		return fmt.Errorf("token is required for GitHub Experimental source")
+	}
+
+	// Redact token from logs for security
+	log.RedactGlobally(token)
+
+	// Create authenticated connector using the TokenConnector pattern
+	connector, err := githubsource.NewTokenConnector(
+		aCtx,
+		cloudV3Endpoint, // API endpoint
+		token,           // GitHub token
+		"",              // clonePath (empty for default)
+		true,            // authInUrl
+		func(ctx context.Context, err error) bool {
+			// Simple rate limit handler - can be enhanced later
+			return false
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not create GitHub connector: %w", err)
+	}
+	s.connector = connector
 
 	s.repoInfoCache = newRepoInfoCache()
 
@@ -106,7 +128,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		SkipBinaries: false,
 		SkipArchives: false,
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{

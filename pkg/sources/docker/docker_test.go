@@ -66,6 +66,102 @@ func TestDockerImageScan(t *testing.T) {
 	assert.Equal(t, 1, historyCounter)
 }
 
+func TestQuayRegistry(t *testing.T) {
+	dockerConn := &sourcespb.Docker{
+		Credential: &sourcespb.Docker_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Images: []string{"quay.io/prometheus/busybox"}, // https://quay.io/repository/prometheus/busybox
+	}
+
+	conn := &anypb.Any{}
+	err := conn.MarshalFrom(dockerConn)
+	assert.NoError(t, err)
+
+	s := &Source{}
+	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	var wg sync.WaitGroup
+	chunksChan := make(chan *sources.Chunk, 1)
+	chunkCounter := 0
+	layerCounter := 0
+	historyCounter := 0
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for chunk := range chunksChan {
+			assert.NotEmpty(t, chunk)
+			chunkCounter++
+
+			if isHistoryChunk(t, chunk) {
+				historyCounter++
+			} else {
+				layerCounter++
+			}
+		}
+	}()
+
+	err = s.Chunks(context.TODO(), chunksChan)
+	assert.NoError(t, err)
+
+	close(chunksChan)
+	wg.Wait()
+
+	assert.Equal(t, 945, chunkCounter)
+	assert.Equal(t, 941, layerCounter)
+	assert.Equal(t, 4, historyCounter)
+}
+
+func TestGHCRRegistry(t *testing.T) {
+	dockerConn := &sourcespb.Docker{
+		Credential: &sourcespb.Docker_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Images: []string{"ghcr.io/trufflesecurity/trufflehog:3.0.0-rc0-amd64"}, // https://github.com/trufflesecurity/trufflehog/pkgs/container/trufflehog
+	}
+
+	conn := &anypb.Any{}
+	err := conn.MarshalFrom(dockerConn)
+	assert.NoError(t, err)
+
+	s := &Source{}
+	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	var wg sync.WaitGroup
+	chunksChan := make(chan *sources.Chunk, 1)
+	chunkCounter := 0
+	layerCounter := 0
+	historyCounter := 0
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for chunk := range chunksChan {
+			assert.NotEmpty(t, chunk)
+			chunkCounter++
+
+			if isHistoryChunk(t, chunk) {
+				historyCounter++
+			} else {
+				layerCounter++
+			}
+		}
+	}()
+
+	err = s.Chunks(context.TODO(), chunksChan)
+	assert.NoError(t, err)
+
+	close(chunksChan)
+	wg.Wait()
+
+	assert.Equal(t, 714, chunkCounter)
+	assert.Equal(t, 709, layerCounter)
+	assert.Equal(t, 5, historyCounter)
+}
+
 func TestDockerImageScanWithDigest(t *testing.T) {
 	dockerConn := &sourcespb.Docker{
 		Credential: &sourcespb.Docker_Unauthenticated{

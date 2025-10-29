@@ -73,7 +73,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.ngc.nvidia.com/v3/keys/get-caller-info", strings.NewReader(data.Encode()))
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")

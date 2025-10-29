@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
@@ -111,7 +112,7 @@ func TestAddReposByOrg(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
-func TestAddReposByOrg_IncludeRepos(t *testing.T) {
+func TestAddReposByOrg_Repositories(t *testing.T) {
 	defer gock.Off()
 
 	gock.New("https://api.github.com").
@@ -127,7 +128,7 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos:  []string{"super-secret-org/super*"},
+		Repositories:  []string{"super-secret-org/super-secret-repo", "super-secret-org/super-secret-repo2"},
 		Organizations: []string{"super-secret-org"},
 	})
 	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
@@ -158,7 +159,7 @@ func TestAddReposByUser(t *testing.T) {
 		},
 		IgnoreRepos: []string{"super-secret-user/super-secret-repo2"},
 	})
-	err := s.getReposByUser(context.Background(), "super-secret-user", noopReporter())
+	err := s.getReposByUser(context.Background(), "super-secret-user", false, noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
@@ -183,6 +184,25 @@ func TestAddGistsByUser(t *testing.T) {
 	assert.True(t, ok)
 	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
+}
+
+func TestIgnoreGistsByUser(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"id": "aa5a315d61ae9438b18d", "git_pull_url": "https://gist.github.com/aa5a315d61ae9438b18d.git"}})
+
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	s.ignoreGists = true
+	err := s.addUserGistsToCache(context.Background(), "super-secret-user", noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 0, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("aa5a315d61ae9438b18d")
+	assert.False(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.False(t, gock.IsDone())
 }
 
 func TestAddMembersByOrg(t *testing.T) {
@@ -404,6 +424,41 @@ func TestNormalizeRepos(t *testing.T) {
 	}
 }
 
+func TestNormalizeRepo(t *testing.T) {
+	// Test that normalizeRepo correctly identifies URLs with protocols
+	source := &Source{}
+
+	// Test case 1: HTTP URL
+	result, err := source.normalizeRepo("https://github.com/org/repo.git")
+	assert.NoError(t, err)
+	assert.Contains(t, result, "github.com/org/repo")
+
+	// Test case 2: HTTP URL without .git
+	result, err = source.normalizeRepo("http://github.com/org/repo")
+	assert.NoError(t, err)
+	assert.Contains(t, result, "github.com/org/repo")
+
+	// Test case 3: Git protocol URL
+	result, err = source.normalizeRepo("git://github.com/org/repo.git")
+	assert.NoError(t, err)
+	assert.Contains(t, result, "github.com/org/repo")
+
+	// Test case 4: SSH URL
+	result, err = source.normalizeRepo("ssh://git@github.com/org/repo.git")
+	assert.NoError(t, err)
+	assert.Contains(t, result, "github.com/org/repo")
+
+	// Test case 5: Org/repo format (should convert to full URL)
+	result, err = source.normalizeRepo("org/repo")
+	assert.NoError(t, err)
+	assert.Contains(t, result, "github.com/org/repo")
+
+	// Test case 6: Invalid format (no protocol, no slash)
+	_, err = source.normalizeRepo("invalid")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no repositories found")
+}
+
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
 	ctx := context.Background()
@@ -474,7 +529,7 @@ func TestEnumerateWithToken(t *testing.T) {
 		JSON(map[string]string{"login": "super-secret-user"})
 
 	gock.New("https://api.github.com").
-		Get("/users/super-secret-user/repos").
+		Get("/user/repos").
 		MatchParam("per_page", "100").
 		Reply(200).
 		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
@@ -555,7 +610,7 @@ func TestEnumerate(t *testing.T) {
 
 	//
 	gock.New("https://api.github.com").
-		Get("/users/super-secret-user/repos").
+		Get("/user/repos").
 		Reply(200).
 		JSON(`[{"name": "super-secret-repo", "full_name": "super-secret-user/super-secret-repo", "owner": {"login": "super-secret-user"}, "clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "has_wiki": false, "size": 1}]`)
 
@@ -694,7 +749,7 @@ func BenchmarkEnumerate(b *testing.B) {
 	}
 }
 
-func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
+func TestEnumerateWithToken_Repositories(t *testing.T) {
 	defer gock.Off()
 
 	gock.New("https://api.github.com").
@@ -957,6 +1012,88 @@ func Test_ScanMultipleTargets_MultipleErrors(t *testing.T) {
 		got := unwrappable.Unwrap()
 		assert.ElementsMatch(t, got, want)
 	}
+}
+
+func TestRepositoryFiltering(t *testing.T) {
+	// Test that the filteredRepoCache correctly filters repositories
+	source := &Source{}
+
+	// Test case 1: No filters specified (should include everything)
+	cache1 := source.newFilteredRepoCache(context.Background(), simple.NewCache[string](), []string{}, []string{})
+	assert.True(t, cache1.wantRepo("org/repo1"))
+	assert.True(t, cache1.wantRepo("org/repo2"))
+	assert.True(t, cache1.wantRepo("org/repo3"))
+
+	// Test case 2: Include filter specified (should only include matching repos)
+	cache2 := source.newFilteredRepoCache(context.Background(), simple.NewCache[string](), []string{"org/repo1", "org/repo2"}, []string{})
+	assert.True(t, cache2.wantRepo("org/repo1"))
+	assert.True(t, cache2.wantRepo("org/repo2"))
+	assert.False(t, cache2.wantRepo("org/repo3"))
+
+	// Test case 3: Exclude filter specified (should exclude matching repos)
+	cache3 := source.newFilteredRepoCache(context.Background(), simple.NewCache[string](), []string{}, []string{"org/repo1"})
+	assert.False(t, cache3.wantRepo("org/repo1"))
+	assert.True(t, cache3.wantRepo("org/repo2"))
+	assert.True(t, cache3.wantRepo("org/repo3"))
+
+	// Test case 4: Both include and exclude filters (exclude takes precedence)
+	cache4 := source.newFilteredRepoCache(context.Background(), simple.NewCache[string](), []string{"org/repo1"}, []string{"org/repo1"})
+	assert.False(t, cache4.wantRepo("org/repo1"))
+
+	// Test case 5: Wildcard patterns
+	cache5 := source.newFilteredRepoCache(context.Background(), simple.NewCache[string](), []string{"org/*"}, []string{})
+	assert.True(t, cache5.wantRepo("org/repo1"))
+	assert.True(t, cache5.wantRepo("org/repo2"))
+	assert.False(t, cache5.wantRepo("other/repo1"))
+}
+
+func TestExplicitRepositoryBypass(t *testing.T) {
+	// Test that explicit repositories are included in enumeration
+	ctx := context.Background()
+
+	// Set up mocks for the API calls
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "test-user"})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/explicit-repo").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/explicit-repo",
+			"clone_url": "https://github.com/org/explicit-repo.git",
+			"size":      1,
+		})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/another-explicit").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/another-explicit",
+			"clone_url": "https://github.com/org/another-explicit.git",
+			"size":      1,
+		})
+
+	// Create a source with explicit repositories
+	source := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		Repositories: []string{
+			"https://github.com/org/explicit-repo.git",
+			"https://github.com/org/another-explicit.git",
+		},
+	})
+
+	// Test the Enumerate method
+	err := source.Enumerate(ctx, noopReporter())
+	require.NoError(t, err)
+
+	// Verify that explicit repositories are included in the enumeration
+	assert.Len(t, source.repos, 2, "Should have 2 explicit repositories")
+	assert.Contains(t, source.repos, "https://github.com/org/explicit-repo.git")
+	assert.Contains(t, source.repos, "https://github.com/org/another-explicit.git")
 }
 
 func noopReporter() sources.UnitReporter {

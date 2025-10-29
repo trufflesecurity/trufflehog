@@ -95,7 +95,7 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 	payload := strings.NewReader("grant_type=client_credentials&client_id=" + id + "&client_secret=" + secret)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	req.Header = http.Header{"content-type": []string{"application/x-www-form-urlencoded"}}
@@ -109,10 +109,13 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 		_ = res.Body.Close()
 	}()
 
-	// We are using malformed request to check if the client id and secret are correct
-	// box oauth api returns 400 status code even if they are correct
-	// so we need to check the response body for the error message with 'unauthorized_client' keyword
-	// or if invalid_client keyword is present then the client id & secret are incorrect
+	// We are using malformed request to check if the client id and secret are valid.
+	// In this case, the Box OAuth API returns a 400 status code even if the credentials are valid.
+	//
+	// - If the client ID/secret are valid, the response contains "unauthorized_client"
+	// - If the credentials are invalid, the response contains "invalid_client"
+	//
+	// So we check the response body for one of these keywords.
 	switch res.StatusCode {
 	case http.StatusBadRequest:
 		{
@@ -121,12 +124,13 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 				return false, nil, err
 			}
 			body := string(bodyBytes)
-
 			if strings.Contains(body, "unauthorized_client") {
 				return true, nil, nil
+			} else if strings.Contains(body, "invalid_client") {
+				return false, nil, nil
+			} else {
+				return false, nil, fmt.Errorf("response body missing expected keyword")
 			}
-
-			return false, nil, nil
 		}
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)

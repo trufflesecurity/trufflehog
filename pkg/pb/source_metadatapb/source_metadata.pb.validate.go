@@ -637,6 +637,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for User
 
+	// no validation rules for CommentId
+
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}
@@ -1072,6 +1074,8 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for Line
 
+	// no validation rules for RepositoryLocalPath
+
 	if len(errors) > 0 {
 		return GitMultiError(errors)
 	}
@@ -1187,6 +1191,8 @@ func (m *Github) validate(all bool) error {
 	// no validation rules for Line
 
 	// no validation rules for Visibility
+
+	// no validation rules for RepositoryLocalPath
 
 	if len(errors) > 0 {
 		return GithubMultiError(errors)
@@ -1305,6 +1311,8 @@ func (m *Gitlab) validate(all bool) error {
 	// no validation rules for ProjectName
 
 	// no validation rules for ProjectOwner
+
+	// no validation rules for RepositoryLocalPath
 
 	if len(errors) > 0 {
 		return GitlabMultiError(errors)
