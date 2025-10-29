@@ -10,9 +10,6 @@ jobs:
   check-product-eng-approval:
     name: Check Product Eng Approval
     runs-on: ubuntu-latest
-    permissions:
-      statuses: write
-      pull-requests: write
     steps:
       - name: Check for Product Engineering approval
         uses: actions/github-script@v7
