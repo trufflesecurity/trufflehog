@@ -31,16 +31,16 @@ jobs:
                 repo: context.repo.repo,
                 sha: context.payload.pull_request.head.sha,
                 state: state,
-                context: `product-eng-approval-${team}`,
+                context: 'pr-approval-check',
                 description: msg,
               });
             }
 
             async function fail(msg) {
-              core.setFailed(msg);
+              core.setOutput(msg);
               console.error(msg)
               await status('failure', msg)
-              process.exit(1);
+              process.exit(0);
             }
 
             async function succeed(msg) {
@@ -50,47 +50,71 @@ jobs:
               process.exit(0);
             }
 
+            async function fatal(msg) {
+              core.setFailed(msg);
+              console.error(msg)
+              await status('failure', msg)
+              process.exit(1);
+            }
+
+
             await status('pending', `Waiting for approval from ${prettyTeamName} team member`)
 
-            let latestReviews = {};
+            // reviews maps reviewer logins to their latest review
+            let reviews = new Map();
             try {
               const iter = octokit.paginate.iterator(github.rest.pulls.listReviews, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: context.payload.pull_request.number,
               });
+
               let pages = [];
-              for await (const p of iter) {
-                pages.push(p)
+              for await (const page of iter) {
+                pages.push(page)
               }
 
-              const laterThan = (a, b) => new Date(a.submitted_at) > new Date(b.submitted_at) ? a : b;
-              latestReviews = pages.reduce((acc, page) => page.data.reduce((a, r) => ((!(r.user.login in a) || laterThan(r, a[r.user.login]) ? { ...a, [r.user.login]: r } : a)), acc) , {})
+              const latestReview = (a, b) => new Date(a.submitted_at) > new Date(b.submitted_at) ? a : b;
+              for await (const page of pages) {
+                for (const review of page.data) {
+                  const login = review.user.login;
+                  reviews.set(login, reviews.has(login) ? latestReview(reviews.get(login), review) : review);
+                }
+              }
             } catch (error) {
-              await fail(`⚠️ Could not get reviews: ${error.status}`);
+              await fatal(`⚠️ Could not get reviews: ${error.status}`);
             }
 
-            for (const reviewer in latestReviews) {
-              if (latestReviews[reviewer].state !== 'APPROVED') {
-                continue
-              }
+            let approved = false;
+            let changeRequesters = [];
+            for (const [login, review] of reviews) {
               try {
                 const membership = await github.rest.teams.getMembershipForUserInOrg({
                   org: org,
                   team_slug: team,
-                  username: reviewer,
+                  username: login,
                 });
 
-                if (membership.data.state == 'active') {
-                  await succeed(`✅ Approved by ${reviewer} on behalf of ${prettyTeamName}`)
+                if (membership.data.state === 'active') {
+                  if (review.state === 'APPROVED') {
+                    approved = true;
+                  } else if (review.state === 'CHANGES_REQUESTED') {
+                    changeRequesters.push(login);
+                  }
                 }
+
               } catch (error) {
                 if (error.status != 404) {
-                  await fail(`⚠️ Could not determine membership for ${reviewer} in ${prettyTeamName}: ${error.status}`)
+                  await fatal(`⚠️ Could not determine membership for ${login} in ${prettyTeamName}: ${error.status}`)
                 }
               }
             }
 
-            await fail(`⚠️ No approvers found from ${prettyTeamName}`)
-
+            if (changeRequesters.length > 0) {
+              await fail(`⚠️ Changes requested by: ${changeRequesters.map(login=>`@${login}`).join(", ")} on behalf of ${prettyTeamName}`);
+            } else if (approved) {
+              await succeed(`✅ Approved by ${prettyTeamName}`)
+            } else {
+              await fail(`⚠️ Requires approval from ${prettyTeamName}`)
+            }
 
