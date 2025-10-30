@@ -381,9 +381,8 @@ func HandleFile(
 		return nil
 	}
 
-	// processingCtx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-	// defer cancel()
-	processingCtx := ctx
+	processingCtx, cancel := logContext.WithTimeout(ctx, maxTimeout)
+	defer cancel()
 
 	handler := selectHandler(mimeT, rdr.isGenericArchive)
 	dataOrErrChan := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
