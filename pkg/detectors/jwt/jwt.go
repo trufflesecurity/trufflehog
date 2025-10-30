@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -52,37 +53,38 @@ func (s Scanner) Keywords() []string {
 	}
 }
 
+var jwtOptions = []jwt.ParserOption{
+	jwt.WithValidMethods([]string{
+		// HMAC-based algorithms
+		// jwt.SigningMethodHS256.Alg(),
+		// jwt.SigningMethodHS384.Alg(),
+		// jwt.SigningMethodHS512.Alg(),
+
+		// Public key-based algorithms
+		jwt.SigningMethodRS256.Alg(),
+		jwt.SigningMethodRS384.Alg(),
+		jwt.SigningMethodRS512.Alg(),
+		jwt.SigningMethodEdDSA.Alg(),
+		jwt.SigningMethodES256.Alg(),
+		jwt.SigningMethodES384.Alg(),
+		jwt.SigningMethodES512.Alg(),
+		jwt.SigningMethodPS256.Alg(),
+		jwt.SigningMethodPS384.Alg(),
+		jwt.SigningMethodPS512.Alg(),
+	}),
+	jwt.WithIssuedAt(),
+	jwt.WithPaddingAllowed(),
+	jwt.WithLeeway(time.Minute),
+}
+
+var jwtParser = jwt.NewParser(jwtOptions...)
+
+var jwtValidator = jwt.NewValidator(jwtOptions...)
+
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	client := cmp.Or(s.client, common.SaneHttpClient())
 	seenMatches := make(map[string]struct{})
-
-	var validator *jwt.Validator = nil
-	if verify {
-		validator = jwt.NewValidator(
-			jwt.WithValidMethods([]string{
-				// HMAC-based algorithms
-				jwt.SigningMethodHS256.Alg(),
-				jwt.SigningMethodHS384.Alg(),
-				jwt.SigningMethodHS512.Alg(),
-
-				// Public key-based algorithms
-				jwt.SigningMethodRS256.Alg(),
-				jwt.SigningMethodRS384.Alg(),
-				jwt.SigningMethodRS512.Alg(),
-				jwt.SigningMethodEdDSA.Alg(),
-				jwt.SigningMethodES256.Alg(),
-				jwt.SigningMethodES384.Alg(),
-				jwt.SigningMethodES512.Alg(),
-				jwt.SigningMethodPS256.Alg(),
-				jwt.SigningMethodPS384.Alg(),
-				jwt.SigningMethodPS512.Alg(),
-			}),
-			jwt.WithIssuedAt(),
-			jwt.WithPaddingAllowed(),
-			jwt.WithLeeway(time.Minute),
-		)
-	}
 
 	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
 		match := matchGroups[1]
@@ -93,9 +95,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		seenMatches[match] = struct{}{}
 
 		claims := jwt.MapClaims{}
-		parsedToken, _, err := jwt.NewParser(jwt.WithPaddingAllowed()).ParseUnverified(match, claims)
-		if err != nil {
+		parsedToken, tokenParts, err := jwtParser.ParseUnverified(match, claims)
+		if err != nil || len(tokenParts) != 3 {
 			// skip malformed tokens; no need to do claims validation or signature verification
+			continue
+		}
+
+		switch parsedToken.Method.Alg() {
+		case "HS256", "HS384", "HS512":
+			// The JWT *might* be valid, but we can't in general do signature verification on HMAC-based algorithms.
+			// We don't have a suitable status to represent this situation in trufflehog.
+			// (The `unknown` status is intended to indicate that an error occurred to to external environment conditions, like trannsient network errors.)
+			// So instead, to avoid possible false positives, totally skip HMAC-based JWTs; don't even create results for them.
+			continue
+		}
+
+		// Decode signature
+		parsedToken.Signature, err = jwtParser.DecodeSegment(tokenParts[2])
+		if err != nil {
+			// skip JWTs with malformed signatures
 			continue
 		}
 
@@ -127,7 +145,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyJWT(ctx, client, validator, parsedToken)
+			isVerified, verificationErr := verifyJWT(ctx, client, tokenParts, parsedToken)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, match)
 		}
@@ -194,18 +212,9 @@ func limitReader(reader io.Reader) io.Reader {
 //
 // - If the JWT uses public key cryptography and the OIDC Discovery protocol, we can fetch the public key and perform signature verification
 // - In all cases, we can perform claims validation (e.g., checking expiration time) and sometimes get a definite answer that a JWT is *not* live
-func verifyJWT(ctx context.Context, client *http.Client, validator *jwt.Validator, parsedToken *jwt.Token) (bool, error) {
-	if err := validator.Validate(parsedToken.Claims); err != nil {
+func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, parsedToken *jwt.Token) (bool, error) {
+	if err := jwtValidator.Validate(parsedToken.Claims); err != nil {
 		// though we have not checked the signature, the token is definitely invalid
-		return false, nil
-	}
-
-	switch parsedToken.Method.Alg() {
-	case "HS256", "HS384", "HS512":
-		// The JWT *might* be valid, but we can't in general do signature verification on HMAC-based algorithms.
-		// We don't have a suitable status to represent this situation in trufflehog.
-		// (The `unknown` status is intended to indicate that an error occurred to to external environment conditions, like trannsient network errors.)
-		// So instead, to avoid possible false positives, we choose to give this JWT `unverified` status, even though that's not technically correct.
 		return false, nil
 	}
 
@@ -285,14 +294,13 @@ func verifyJWT(ctx context.Context, client *http.Client, validator *jwt.Validato
 		return false, fmt.Errorf("failed to export matching key: %w", err)
 	}
 
-	err = parsedToken.Method.Verify(parsedToken.Raw, parsedToken.Signature, rawMatchingKey)
-
+	err = parsedToken.Method.Verify(strings.Join(tokenParts[0:2], "."), parsedToken.Signature, rawMatchingKey)
 	if err != nil {
 		// signature invalid
 		return false, nil
 	}
 
-	// signature valid and claims check out
+		// signature valid and claims check out
 	return true, nil
 }
 

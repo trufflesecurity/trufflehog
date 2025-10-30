@@ -26,7 +26,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
+			want: []string{},
 		},
 		{
 			name: "HS256/valid-verbose-header",
@@ -34,7 +34,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQo.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{"ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQo.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
+			want: []string{},
 		},
 
 		{
@@ -43,7 +43,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				eyJhbGciOiJIUzM4NCJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.NArdGjJ9DjXwGCLdNXDVjlwlvI_tUa2B3H44dvrZfKliBNTUL0YyKi8q4Al0Wl8u
 			`,
-			want: []string{"eyJhbGciOiJIUzM4NCJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.NArdGjJ9DjXwGCLdNXDVjlwlvI_tUa2B3H44dvrZfKliBNTUL0YyKi8q4Al0Wl8u"},
+			want: []string{},
 		},
 
 		{
@@ -52,7 +52,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				eyJhbGciOiJIUzUxMiJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.SiKgg2-kq7kVXhe5uLMakzlygHsJ70aTyXGhdbqG2SfkUC_fwk8MZ3JAWXrCIEJAUi_QMmQm-7qMU0SCMFRQug
 			`,
-			want: []string{"eyJhbGciOiJIUzUxMiJ9.eyJtc2ciOiJoZWxsbyBoYWNrZXIsIHRoZXJlJ3Mgbm90aGluZyBmb3IgeW91IGhlcmUg8J-YhiJ9.SiKgg2-kq7kVXhe5uLMakzlygHsJ70aTyXGhdbqG2SfkUC_fwk8MZ3JAWXrCIEJAUi_QMmQm-7qMU0SCMFRQug"},
+			want: []string{},
 		},
 
 		{
@@ -61,7 +61,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQ==.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{"ewogICJhbGciOiJIUzI1NiIsCiIgIHR5cCI6IkpXVCIKfQ==.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
+			want: []string{},
 		},
 		{
 			name: "HS256/padding-in-claims/invalid-sig",
@@ -69,7 +69,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				ewogICJhbGciOiJIUzI1NiIsCiAgInR5cCI6IkpXVCIKfQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyfQo=.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
 			`,
-			want: []string{"ewogICJhbGciOiJIUzI1NiIsCiAgInR5cCI6IkpXVCIKfQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyfQo=.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
+			want: []string{},
 		},
 
 		{
@@ -78,7 +78,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTQxNjIzOTAyMiwiZXhwIjoxNDE2MjM5MTIyfQ.EwRkAg9uOr6kVajMdMvB6KWGvIdDlGNRAH3lsZ2qQHI
 			`,
-			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTQxNjIzOTAyMiwiZXhwIjoxNDE2MjM5MTIyfQ.EwRkAg9uOr6kVajMdMvB6KWGvIdDlGNRAH3lsZ2qQHI"},
+			want: []string{},
 		},
 
 		{
@@ -87,7 +87,7 @@ func TestJwt_Pattern(t *testing.T) {
 				// secret is "a-string-secret-at-least-256-bits-long"
 				eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MjQxNjIzOTAyMiwibmJmIjozNDE2MjM5MDIyLCJleHAiOjQ0MTYyMzkwMjJ9.rVQaCey3ETfhn8AeiC_EmFjp6_X2Dq8QY_AzBAF2ZzQ
 			`,
-			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MjQxNjIzOTAyMiwibmJmIjozNDE2MjM5MDIyLCJleHAiOjQ0MTYyMzkwMjJ9.rVQaCey3ETfhn8AeiC_EmFjp6_X2Dq8QY_AzBAF2ZzQ"},
+			want: []string{},
 		},
 
 		{
