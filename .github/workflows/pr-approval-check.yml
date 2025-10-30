@@ -3,7 +3,7 @@ name: PR Approval Check
 on:
   pull_request_review:
     types: [submitted, dismissed]
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize]
 
 jobs:
