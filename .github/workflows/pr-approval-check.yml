@@ -17,7 +17,7 @@ jobs:
           ORG: trufflesecurity
           APPROVER_TEAM: product-eng
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PR_APPROVAL_CHECK }}
           script: |
             const { ORG: org, APPROVER_TEAM: team} = process.env
             const prettyTeamName = `@${org}/${team}`
