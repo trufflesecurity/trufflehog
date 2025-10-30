@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Require Product Eng approval
-        uses: trufflesecurity/pr-approval-check@v1   # <— just the repo + tag
+        uses: trufflesecurity/pr-approval-check@main   # <— just the repo + tag
         with:
           org: trufflesecurity
           approver_team: product-eng
