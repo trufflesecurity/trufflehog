@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -58,6 +57,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	client := cmp.Or(s.client, common.SaneHttpClient())
 	seenMatches := make(map[string]struct{})
 
+	var validator *jwt.Validator = nil
+	if verify {
+		validator = jwt.NewValidator(
+			jwt.WithValidMethods([]string{
+				// HMAC-based algorithms
+				jwt.SigningMethodHS256.Alg(),
+				jwt.SigningMethodHS384.Alg(),
+				jwt.SigningMethodHS512.Alg(),
+
+				// Public key-based algorithms
+				jwt.SigningMethodRS256.Alg(),
+				jwt.SigningMethodRS384.Alg(),
+				jwt.SigningMethodRS512.Alg(),
+				jwt.SigningMethodEdDSA.Alg(),
+				jwt.SigningMethodES256.Alg(),
+				jwt.SigningMethodES384.Alg(),
+				jwt.SigningMethodES512.Alg(),
+				jwt.SigningMethodPS256.Alg(),
+				jwt.SigningMethodPS384.Alg(),
+				jwt.SigningMethodPS512.Alg(),
+			}),
+			jwt.WithIssuedAt(),
+			jwt.WithPaddingAllowed(),
+			jwt.WithLeeway(time.Minute),
+		)
+	}
+
 	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
 		match := matchGroups[1]
 
@@ -69,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		claims := jwt.MapClaims{}
 		parsedToken, _, err := jwt.NewParser(jwt.WithPaddingAllowed()).ParseUnverified(match, claims)
 		if err != nil {
-			// we can skip a token that doesn't parse without any validation or verification
+			// skip malformed tokens; no need to do claims validation or signature verification
 			continue
 		}
 
@@ -101,14 +127,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			var isVerified bool
-			var verificationErr error
-			switch parsedToken.Method.Alg() {
-			case "HS256", "HS384", "HS512":
-				isVerified, verificationErr = verifyHMAC(parsedToken)
-			default:
-				isVerified, verificationErr = verifyPublicKey(ctx, client, match)
-			}
+			isVerified, verificationErr := verifyJWT(ctx, client, validator, parsedToken)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, match)
 		}
@@ -162,190 +181,119 @@ func performHttpRequest(ctx context.Context, client *http.Client, method string,
 	return resp, nil
 }
 
-// Attempt to verify a JWT that uses an HMAC algorithm.
-//
-// This implementation only attempts to verify JWTs whose issuers use the OIDC Discovery protocol to make public keys available via request.
-func verifyHMAC(parsedToken *jwt.Token) (bool, error) {
-	v := jwt.NewValidator(
-		jwt.WithValidMethods([]string{
-			jwt.SigningMethodHS256.Alg(),
-			jwt.SigningMethodHS384.Alg(),
-			jwt.SigningMethodHS512.Alg(),
-		}),
-		jwt.WithIssuedAt(),
-		jwt.WithPaddingAllowed(),
-		jwt.WithLeeway(time.Minute),
-	)
-	if err := v.Validate(parsedToken.Claims); err != nil {
-		// though we have not checked the signature, the token is definitely invalid
-		return false, nil
-	}
-	// If we return an error here, the finding will have `unknown` status.
-	// Instead, let's treat HMAC-type JWTs (which we cannot verify in general) as `unverified`.
-	// return false, fmt.Errorf("no key available to verify an HMAC-based signature")
-	return false, nil
-}
-
 // Wrap an `io.Reader` with a reasonable limit as an additional measure against DoS from a malicious JWKS issuer
 func limitReader(reader io.Reader) io.Reader {
 	return io.LimitReader(reader, 1024*1024)
 }
 
-// Attempt to verify a JWT that uses a public-key signing algorithm.
+// Attempt to verify a JWT
 //
-// This implementation only attempts to verify JWTs whose issuers use the OIDC Discovery protocol to make public keys available via request.
-func verifyPublicKey(ctx context.Context, client *http.Client, tokenString string) (bool, error) {
+// This cannot be done in general, but in a few special cases we can get definitive answers.
+//
+// In particular:
+//
+// - If the JWT uses public key cryptography and the OIDC Discovery protocol, we can fetch the public key and perform signature verification
+// - In all cases, we can perform claims validation (e.g., checking expiration time) and sometimes get a definite answer that a JWT is *not* live
+func verifyJWT(ctx context.Context, client *http.Client, validator *jwt.Validator, parsedToken *jwt.Token) (bool, error) {
+	if err := validator.Validate(parsedToken.Claims); err != nil {
+		// though we have not checked the signature, the token is definitely invalid
+		return false, nil
+	}
 
-	// A key retrieval function that uses the OIDC Discovery protocol,
+	switch parsedToken.Method.Alg() {
+	case "HS256", "HS384", "HS512":
+		// The JWT *might* be valid, but we can't in general do signature verification on HMAC-based algorithms.
+		// We don't have a suitable status to represent this situation in trufflehog.
+		// (The `unknown` status is intended to indicate that an error occurred to to external environment conditions, like trannsient network errors.)
+		// So instead, to avoid possible false positives, we choose to give this JWT `unverified` status, even though that's not technically correct.
+		return false, nil
+	}
+
+	// Use the OIDC Discovery protocol to fetch the public signing key,
 	// being careful to avoid possible DoS from a potentially malicious JWKS server.
-	oidcDiscoveryKeyFunc := func(unverifiedToken *jwt.Token) (any, error) {
-		issuer, err := unverifiedToken.Claims.GetIssuer()
-		if err != nil {
-			return nil, fmt.Errorf("invalid issuer: %w", err)
-		}
-		if issuer == "" {
-			return nil, fmt.Errorf("missing issuer")
-		}
-		issuerURL, err := parseRoutableHttpsUrl(issuer)
-		if err != nil {
-			return nil, fmt.Errorf("unsupported issuer: %w: %q", err, issuer)
-		}
-
-		oidcDiscoveryURL := issuerURL.JoinPath(".well-known/openid-configuration")
-
-		// Check for a proper key id before making any network requests
-		kid, ok := unverifiedToken.Header["kid"].(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid key id")
-		}
-
-		// Fetch the OIDC discovery document
-		resp, err := performHttpRequest(ctx, client, "GET", oidcDiscoveryURL.String())
-		if err != nil {
-			return nil, fmt.Errorf("failed to perform OIDC discovery: %w", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("bad status for OIDC discovery document: %v", resp.Status)
-		}
-
-		// Get the JWKS URL from the OIDC discovery document
-		var discoveryDoc struct {
-			JWKSUri string `json:"jwks_uri"`
-		}
-		if err := json.NewDecoder(limitReader(resp.Body)).Decode(&discoveryDoc); err != nil {
-			return nil, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
-		}
-
-		jwksURL, err := parseRoutableHttpsUrl(discoveryDoc.JWKSUri)
-		if err != nil {
-			return nil, fmt.Errorf("invalid JWKS URL: %w", err)
-		}
-
-		if jwksURL.Host != issuerURL.Host {
-			return nil, fmt.Errorf("JWKS host does not match issuer host: %q", discoveryDoc.JWKSUri)
-		}
-
-		// Fetch the JWKS
-		resp, err = performHttpRequest(ctx, client, "GET", discoveryDoc.JWKSUri)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("bad status for JWKS: %v", resp.Status)
-		}
-
-		// Parse the JWKS and find the first matching key
-		keySet, err := jwk.ParseReader(limitReader(resp.Body))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse JWKS: %w", err)
-		}
-		matchingKey, found := keySet.LookupKeyID(kid)
-		if !found {
-			return nil, fmt.Errorf("no matching JWKS key")
-		}
-
-		// Parse matching key to the "raw" key type needed for signature verification
-		var rawMatchingKey any
-		err = jwk.Export(matchingKey, &rawMatchingKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to export matching key: %w", err)
-		}
-
-		return rawMatchingKey, nil
+	issuer, err := parsedToken.Claims.GetIssuer()
+	if err != nil || issuer == "" {
+		// missing or invalid issuer
+		return false, nil
+	}
+	issuerURL, err := parseRoutableHttpsUrl(issuer)
+	if err != nil {
+		// unsupported issuer
+		return false, nil
 	}
 
-	token, err := jwt.Parse(
-		tokenString,
-		oidcDiscoveryKeyFunc,
-		jwt.WithValidMethods([]string{
-			jwt.SigningMethodRS256.Alg(),
-			jwt.SigningMethodRS384.Alg(),
-			jwt.SigningMethodRS512.Alg(),
-			jwt.SigningMethodEdDSA.Alg(),
-			jwt.SigningMethodES256.Alg(),
-			jwt.SigningMethodES384.Alg(),
-			jwt.SigningMethodES512.Alg(),
-			jwt.SigningMethodPS256.Alg(),
-			jwt.SigningMethodPS384.Alg(),
-			jwt.SigningMethodPS512.Alg(),
-		}),
-		jwt.WithIssuedAt(),
-		jwt.WithPaddingAllowed(),
-		jwt.WithLeeway(time.Minute),
-	)
-	// We carefully handle possible errors from `jwt.Parse` here.
-	// In only a couple non-nil error cases, we want to propagate the error;
-	// the rest of the cases are for JWT claims-related verification or validation errors,
-	// which indicate that the JWT is invalid and unverified.
-	switch {
-	case token.Valid:
-		return true, nil
+	oidcDiscoveryURL := issuerURL.JoinPath(".well-known/openid-configuration")
 
-	// These cases indicate some problem with the verification process
-	case errors.Is(err, jwt.ErrTokenUnverifiable):
-		return false, err
-	case errors.Is(err, jwt.ErrHashUnavailable):
-		return false, err
-
-	// These cases indicate that something about the JWT does not check out
-	case errors.Is(err, jwt.ErrInvalidKey):
+	// Check for a proper key id before making any network requests
+	kid, ok := parsedToken.Header["kid"].(string)
+	if !ok {
+		// invalid key id
 		return false, nil
-	case errors.Is(err, jwt.ErrInvalidKeyType):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenMalformed):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenSignatureInvalid):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenRequiredClaimMissing):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenInvalidAudience):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenExpired):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenUsedBeforeIssued):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenInvalidIssuer):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenInvalidSubject):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenNotValidYet):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenInvalidId):
-		return false, nil
-	case errors.Is(err, jwt.ErrTokenInvalidClaims):
-		return false, nil
-	case errors.Is(err, jwt.ErrInvalidType):
-		return false, nil
-
-	// In the chance that we get a different type of error, propagate it to make this finding's status `unknown`.
-	//
-	// It's tough to know exactly which kinds of errors can be raised by `jwt.Parse` without poring over the code.
-	// Note: the above cases are believed to cover all cases.
-	default:
-		return false, err
 	}
+
+	// Fetch the OIDC discovery document
+	resp, err := performHttpRequest(ctx, client, "GET", oidcDiscoveryURL.String())
+	if err != nil {
+		return false, fmt.Errorf("failed to perform OIDC discovery: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("bad status for OIDC discovery document: %v", resp.Status)
+	}
+
+	// Get the JWKS URL from the OIDC discovery document
+	var discoveryDoc struct {
+		JWKSUri string `json:"jwks_uri"`
+	}
+	if err := json.NewDecoder(limitReader(resp.Body)).Decode(&discoveryDoc); err != nil {
+		return false, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
+	}
+
+	jwksURL, err := parseRoutableHttpsUrl(discoveryDoc.JWKSUri)
+	if err != nil {
+		return false, fmt.Errorf("invalid JWKS URL: %w", err)
+	}
+
+	if jwksURL.Host != issuerURL.Host {
+		return false, fmt.Errorf("JWKS host does not match issuer host: %q", discoveryDoc.JWKSUri)
+	}
+
+	// Fetch the JWKS
+	resp, err = performHttpRequest(ctx, client, "GET", discoveryDoc.JWKSUri)
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch JWKS: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("bad status for JWKS: %v", resp.Status)
+	}
+
+	// Parse the JWKS and find the first matching key
+	keySet, err := jwk.ParseReader(limitReader(resp.Body))
+	if err != nil {
+		return false, fmt.Errorf("failed to parse JWKS: %w", err)
+	}
+	matchingKey, found := keySet.LookupKeyID(kid)
+	if !found {
+		return false, fmt.Errorf("no matching JWKS key")
+	}
+
+	// Parse matching key to the "raw" key type needed for signature verification
+	var rawMatchingKey any
+	err = jwk.Export(matchingKey, &rawMatchingKey)
+	if err != nil {
+		return false, fmt.Errorf("failed to export matching key: %w", err)
+	}
+
+	err = parsedToken.Method.Verify(parsedToken.Raw, parsedToken.Signature, rawMatchingKey)
+
+	if err != nil {
+		// signature invalid
+		return false, nil
+	}
+
+	// signature valid and claims check out
+	return true, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
