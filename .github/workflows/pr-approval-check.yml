@@ -1,0 +1,26 @@
+name: PR Approval Check
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  approval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint installation token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.PR_APPROVAL_CHECK_APP_ID }}
+          private-key: ${{ secrets.PR_APPROVAL_CHECK }}
+
+      - name: Require Product Eng approval
+        uses: trufflesecurity/pr-approval-check@v1
+        with:
+          org: trufflesecurity
+          approver_team: product-eng
+          github_token: ${{ steps.app-token.outputs.token }}
+
