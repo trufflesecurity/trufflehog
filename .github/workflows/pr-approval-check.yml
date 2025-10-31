@@ -1,0 +1,117 @@
+name: PR Approval Check
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  check-product-eng-approval:
+    name: Check Product Eng Approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for Product Engineering approval
+        uses: actions/github-script@v7
+        env:
+          ORG: trufflesecurity
+          APPROVER_TEAM: product-eng
+        with:
+          github-token: ${{ secrets.PR_APPROVAL_CHECK }}
+          script: |
+            const { ORG: org, APPROVER_TEAM: team} = process.env
+            const prettyTeamName = `@${org}/${team}`
+
+            async function status(state, msg) {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.payload.pull_request.head.sha,
+                state: state,
+                context: 'pr-approval-check',
+                description: msg,
+              });
+            }
+
+            async function fail(msg) {
+              core.setOutput(msg);
+              console.error(msg)
+              await status('failure', msg)
+              process.exit(0);
+            }
+
+            async function succeed(msg) {
+              core.setOutput(msg);
+              console.info(msg)
+              await status('success', msg)
+              process.exit(0);
+            }
+
+            async function fatal(msg) {
+              core.setFailed(msg);
+              console.error(msg)
+              await status('failure', msg)
+              process.exit(1);
+            }
+
+
+            await status('pending', `Waiting for approval from ${prettyTeamName} team member`)
+
+            // reviews maps reviewer logins to their latest review
+            let reviews = new Map();
+            try {
+              const iter = octokit.paginate.iterator(github.rest.pulls.listReviews, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+              });
+
+              let pages = [];
+              for await (const page of iter) {
+                pages.push(page)
+              }
+
+              const latestReview = (a, b) => new Date(a.submitted_at) > new Date(b.submitted_at) ? a : b;
+              for await (const page of pages) {
+                for (const review of page.data) {
+                  const login = review.user.login;
+                  reviews.set(login, reviews.has(login) ? latestReview(reviews.get(login), review) : review);
+                }
+              }
+            } catch (error) {
+              await fatal(`⚠️ Could not get reviews: ${error.status}`);
+            }
+
+            let approved = false;
+            let changeRequesters = [];
+            for (const [login, review] of reviews) {
+              try {
+                const membership = await github.rest.teams.getMembershipForUserInOrg({
+                  org: org,
+                  team_slug: team,
+                  username: login,
+                });
+
+                if (membership.data.state === 'active') {
+                  if (review.state === 'APPROVED') {
+                    approved = true;
+                  } else if (review.state === 'CHANGES_REQUESTED') {
+                    changeRequesters.push(login);
+                  }
+                }
+
+              } catch (error) {
+                if (error.status != 404) {
+                  await fatal(`⚠️ Could not determine membership for ${login} in ${prettyTeamName}: ${error.status}`)
+                }
+              }
+            }
+
+            if (changeRequesters.length > 0) {
+              await fail(`⚠️ Changes requested by: ${changeRequesters.map(login=>`@${login}`).join(", ")} on behalf of ${prettyTeamName}`);
+            } else if (approved) {
+              await succeed(`✅ Approved by ${prettyTeamName}`)
+            } else {
+              await fail(`⚠️ Requires approval from ${prettyTeamName}`)
+            }
+
