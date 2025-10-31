@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Mint installation token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v2.1.4
         with:
           app-id: ${{ secrets.PR_APPROVAL_CHECK_APP_ID }}
           private-key: ${{ secrets.PR_APPROVAL_CHECK }}
