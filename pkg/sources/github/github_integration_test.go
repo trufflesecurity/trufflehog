@@ -17,6 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -966,6 +967,64 @@ func TestSource_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSource_ScanCommentsWithGraphql(t *testing.T) {
+	feature.UseGithubGraphQLAPI.Store(true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	source := &sourcespb.GitHub{
+		Repositories:               []string{"https://github.com/trufflesecurity/driftwood.git"},
+		IncludeIssueComments:       true,
+		IncludePullRequestComments: true,
+		Credential:                 &sourcespb.GitHub_Unauthenticated{},
+	}
+
+	wantChunk := sources.Chunk{
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+		SourceName: "test source",
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{
+				Github: &source_metadatapb.Github{
+					Link:      "https://github.com/trufflesecurity/driftwood.git/issues/1",
+					Username:  "truffle-sandbox",
+					Timestamp: "2023-06-22 23:33:46 +0000 UTC",
+				},
+			},
+		},
+		Verify: false,
+	}
+
+	s := Source{}
+
+	conn, err := anypb.New(source)
+	assert.NoError(t, err)
+
+	err = s.Init(ctx, "test-source", 0, 0, false, conn, 4)
+	assert.NoError(t, err)
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		// Close the channel
+		defer close(chunksCh)
+		err = s.Chunks(ctx, chunksCh)
+		assert.NoError(t, err)
+	}()
+
+	i := 0
+	for gotChunk := range chunksCh {
+		// Skip chunks that are not comments.
+		if gotChunk.SourceMetadata.GetGithub().GetCommit() != "" {
+			continue
+		}
+		i++
+		githubCommentCheckFunc(gotChunk, &wantChunk, i, t, "test-source")
+	}
+
+	// Confirm all comments were processed.
+	assert.Equal(t, i, 5)
 }
 
 type countChunkReporter struct {
