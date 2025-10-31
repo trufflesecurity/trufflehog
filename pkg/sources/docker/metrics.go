@@ -31,4 +31,14 @@ var (
 		Help:      "Total number of Docker images scanned.",
 	},
 		[]string{"source_name"})
+
+	dockerListImagesAPIDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: common.MetricsNamespace,
+			Subsystem: common.MetricsSubsystem,
+			Name:      "docker_list_images_api_duration_seconds",
+			Help:      "Duration of Docker list images API calls.",
+			Buckets:   prometheus.DefBuckets,
+		},
+		[]string{"source_name"})
 )
