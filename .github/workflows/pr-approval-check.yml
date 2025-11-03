@@ -33,7 +33,7 @@ jobs:
           private-key: ${{ secrets.PR_APPROVAL_CHECK }}
 
       - name: Require Product Eng approval
-        uses: trufflesecurity/pr-approval-check@workflow-triggered
+        uses: trufflesecurity/pr-approval-check@main
         with:
           org: trufflesecurity
           approver_team: product-eng
