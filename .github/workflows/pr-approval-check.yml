@@ -1,26 +1,45 @@
 name: PR Approval Check
 
 on:
-  pull_request_review:
-    types: [submitted, dismissed]
-  pull_request_target:
-    types: [opened, reopened, synchronize]
+  workflow_run:
+    workflows: ["Receive PR"]
+    types: ["completed"]
+
+permissions:
+  actions: read
 
 jobs:
   approval:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
+      - name: Download artifact from triggering run
+        uses: actions/download-artifact@v6
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          name: prnum
+          github-token: ${{ github.token }}
+
+      - name: Read inputs
+        id: get-prnum
+        run: |
+          set -euo pipefail
+          echo "prnum=$(cat prnum.txt)" >> "$GITHUB_OUTPUT"
+
       - name: Mint installation token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v2.1.4
         with:
           app-id: ${{ secrets.PR_APPROVAL_CHECK_APP_ID }}
           private-key: ${{ secrets.PR_APPROVAL_CHECK }}
 
       - name: Require Product Eng approval
-        uses: trufflesecurity/pr-approval-check@v1
+        uses: trufflesecurity/pr-approval-check@workflow-triggered
         with:
           org: trufflesecurity
           approver_team: product-eng
+          owner: ${{ github.event.workflow_run.repository.owner.login }}
+          repo: ${{ github.event.workflow_run.repository.name }}
+          head: ${{ github.event.workflow_run.head_sha }}
+          number: ${{ steps.get-prnum.outputs.prnum }}
           github_token: ${{ steps.app-token.outputs.token }}
 
