@@ -15,7 +15,6 @@ jobs:
         run: |
           echo "PR: ${{ github.event.pull_request.number }}"
           echo "${{ github.event.pull_request.number }}" > prnum.txt
-
       - name: Submit
         uses: actions/upload-artifact@v5
         with:
