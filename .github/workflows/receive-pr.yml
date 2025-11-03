@@ -1,0 +1,25 @@
+name: "Receive PR"
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+jobs:
+  prnum:
+    runs-on: ubuntu-slim
+    steps:
+      - name: Determine PR Number
+        id: build
+        run: |
+          echo "PR: ${{ github.event.pull_request.number }}"
+          echo "${{ github.event.pull_request.number }}" > prnum.txt
+
+      - name: Submit
+        uses: actions/upload-artifact@v5
+        with:
+          name: prnum
+          path: prnum.txt
+          retention-days: 1
+
