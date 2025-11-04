@@ -94,12 +94,7 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 		return false, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-
-	// add feature for custom user agent if set
-	userAgent := common.UserAgent()
-	if userAgent != "TruffleHog" {
-		req.Header.Add("User-Agent", userAgent)
-	}
+	req.Header.Add("User-Agent", common.UserAgent())
 
 	req.SetBasicAuth(username, accessKey)
 
