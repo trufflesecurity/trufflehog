@@ -11,6 +11,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/net/publicsuffix"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -93,6 +94,8 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 		return false, err
 	}
 	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("User-Agent", common.UserAgent())
+
 	req.SetBasicAuth(username, accessKey)
 
 	res, err := client.Do(req)
