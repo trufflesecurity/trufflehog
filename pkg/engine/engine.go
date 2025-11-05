@@ -832,7 +832,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 		dataSize := float64(len(chunk.Data))
 
-		scanBytesPerChunk.Observe(dataSize)
+		scanBytesPerChunk.WithLabelValues(chunk.SourceType.String()).Observe(dataSize)
 		jobBytesScanned.WithLabelValues(
 			chunk.SourceType.String(),
 			chunk.SourceName,
