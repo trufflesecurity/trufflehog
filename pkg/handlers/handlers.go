@@ -259,6 +259,8 @@ const (
 	apkMime      mimeType = "application/vnd.android.package-archive"
 	zipMime      mimeType = "application/zip"
 	jarMime      mimeType = "application/java-archive"
+	msgMime      mimeType = "application/vnd.ms-outlook"
+	docMime      mimeType = "application/msword"
 )
 
 // skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
@@ -294,6 +296,8 @@ var skipArchiverMimeTypes = map[mimeType]struct{}{
 	tclTextMime:  {},
 	tclMime:      {},
 	apkMime:      {},
+	msgMime:      {},
+	docMime:      {},
 }
 
 // selectHandler dynamically selects and configures a FileHandler based on the provided |mimetype| type and archive flag.
