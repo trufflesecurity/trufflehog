@@ -159,6 +159,19 @@ func GenerateLink(repo, commit, file string, line int64) string {
 					baseLink += "#L" + strconv.FormatInt(line, 10)
 				}
 			}
+		} else if strings.HasSuffix(repo, ".wiki.git") {
+			// GitHub Wiki links are formatted differently
+			baseLink = repo[:len(repo)-9] + "/wiki/"
+			if file != "" {
+				baseLink += strings.TrimSuffix(file, ".md") + "/"
+			}
+			if commit != "" {
+				baseLink += commit
+			}
+			if line > 0 {
+				baseLink += "#L" + strconv.FormatInt(line, 10)
+			}
+
 		} else if file == "" {
 			baseLink = repo[:len(repo)-4] + "/commit/" + commit
 		} else {
