@@ -2,6 +2,7 @@ package giturl
 
 import (
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -163,7 +164,8 @@ func GenerateLink(repo, commit, file string, line int64) string {
 			// GitHub Wiki links are formatted differently
 			baseLink = repo[:len(repo)-9] + "/wiki/"
 			if file != "" {
-				baseLink += strings.TrimSuffix(file, ".md") + "/"
+				// remove file extension
+				baseLink += strings.TrimSuffix(file, filepath.Ext(file)) + "/"
 			}
 			if commit != "" {
 				baseLink += commit
@@ -171,7 +173,6 @@ func GenerateLink(repo, commit, file string, line int64) string {
 			if line > 0 {
 				baseLink += "#L" + strconv.FormatInt(line, 10)
 			}
-
 		} else if file == "" {
 			baseLink = repo[:len(repo)-4] + "/commit/" + commit
 		} else {
