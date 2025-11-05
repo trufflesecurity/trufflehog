@@ -1,2 +1,21 @@
 *.go text eol=lf
 *.md text eol=lf
+
+# Linguist Detection
+# ==================
+*.gitattributes language-linguist=Git Attributes
+*.gitignore language-linguist=Git Ignore
+*.yml language-linguist=YAML
+*.yaml language-linguist=YAML
+*.md language-linguist=Markdown
+*.goreleaser linguist-detection=True
+Dockerfile language-linguist=Dockerfile
+*.sh language-linguist=Shell
+*.proto linguist-detection=True
+*.go language-linguist=GO
+*.protos linguist-detection=True
+*.gp linguist-detection=True
+*.txt language-linguist=Text
+*.png language-linguist=Image
+*.svg language-linguist=Image
+*.json language-linguist=JSON
