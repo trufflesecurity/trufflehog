@@ -469,6 +469,9 @@ func run(state overseer.State) {
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
 	feature.GitlabProjectsPerPage.Store(100)
 
+	// OSS Default using github graphql api for issues, pr's and comments
+	feature.UseGithubGraphQLAPI.Store(false)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
