@@ -306,8 +306,9 @@ message GitHubRealtime {
 
 message GoogleDrive {
   oneof credential {
-    bool use_token_service = 1; // hosted scanning
-    credentials.Oauth2 oauth = 2; // on-prem scanning
+    string refresh_token = 1;
+    bool use_token_service = 2;
+    credentials.Oauth2 oauth = 3; // on-prem scanning
   }
 }
 

@@ -3207,6 +3207,18 @@ func (m *GoogleDrive) validate(all bool) error {
 	var errors []error
 
 	switch v := m.Credential.(type) {
+	case *GoogleDrive_RefreshToken:
+		if v == nil {
+			err := GoogleDriveValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for RefreshToken
 	case *GoogleDrive_UseTokenService:
 		if v == nil {
 			err := GoogleDriveValidationError{
