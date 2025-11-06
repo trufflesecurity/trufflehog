@@ -165,6 +165,8 @@ message Docker {
   }
   repeated string images = 5;
   repeated string exclude_paths = 6;
+  string namespace = 7;
+  string registry_token = 8;
 }
 
 message ECR {
