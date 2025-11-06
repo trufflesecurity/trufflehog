@@ -220,6 +220,23 @@ func TestGenerateLink(t *testing.T) {
 			},
 			want: "https://github.com/hxnyk/hxnyk/wiki/Home/e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87#L5",
 		},
+		{
+			name: "github wiki link gen - no line",
+			args: args{
+				repo:   "https://github.com/hxnyk/hxnyk.wiki.git",
+				commit: "e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+				file:   "Home.md",
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+		},
+		{
+			name: "github wiki link gen - no commit no line",
+			args: args{
+				repo: "https://github.com/hxnyk/hxnyk.wiki.git",
+				file: "Home.md",
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
