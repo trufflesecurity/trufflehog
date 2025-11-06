@@ -125,9 +125,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		start := time.Now()
 		namespaceImages, err := GetNamespaceImages(ctx, registryNamespace, s.conn.GetRegistryToken())
 		if err != nil {
-			ctx.Logger().Error(err, "failed to list namespace images", "namespace", registryNamespace)
-
-			return nil
+			return fmt.Errorf("failed to list namespace: %s images: %w", registryNamespace, err)
 		}
 
 		dockerListImagesAPIDuration.WithLabelValues(s.name).Observe(time.Since(start).Seconds())
