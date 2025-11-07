@@ -135,6 +135,15 @@ func (t *InstrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 	if resp != nil {
 		// record latency and increment counter for non-200 status code
 		recordHTTPResponse(sanitizedURL, resp.StatusCode, duration.Seconds())
+
+		// wrap the response body to count bytes read
+		resp.Body = &responseSizeCounterReadCloser{
+			ReadCloser: resp.Body,
+			recordSizeFunc: func(size int) {
+				// Record response body size
+				recordResponseBodySize(sanitizedURL, size)
+			},
+		}
 	}
 
 	return resp, err
@@ -145,6 +154,35 @@ func NewInstrumentedTransport(T http.RoundTripper) *InstrumentedTransport {
 		T = http.DefaultTransport
 	}
 	return &InstrumentedTransport{T}
+}
+
+type responseSizeCounterReadCloser struct {
+	io.ReadCloser
+	bytesRead      *int
+	recordSizeFunc func(int)
+}
+
+func (r *responseSizeCounterReadCloser) Read(p []byte) (n int, err error) {
+	n, err = r.ReadCloser.Read(p)
+	if r.bytesRead == nil {
+		r.bytesRead = new(int)
+	}
+	*r.bytesRead += n
+	return n, err
+}
+
+func (r *responseSizeCounterReadCloser) Close() error {
+	if r.recordSizeFunc != nil {
+		if r.bytesRead == nil {
+			// this means downstream code never consumed the body, we must drain the body to get its size
+			_, err := io.Copy(io.Discard, r)
+			if err != nil {
+				return err
+			}
+		}
+		r.recordSizeFunc(*r.bytesRead)
+	}
+	return r.ReadCloser.Close()
 }
 
 func ConstantResponseHttpClient(statusCode int, body string) *http.Client {
@@ -198,7 +236,7 @@ func WithRetryWaitMax(wait time.Duration) ClientOption {
 func PinnedRetryableHttpClient() *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.Logger = nil
-	httpClient.HTTPClient.Transport = NewCustomTransport(&http.Transport{
+	httpClient.HTTPClient.Transport = NewInstrumentedTransport(NewCustomTransport(&http.Transport{
 		TLSClientConfig: &tls.Config{
 			RootCAs: PinnedCertPool(),
 		},
@@ -212,7 +250,7 @@ func PinnedRetryableHttpClient() *http.Client {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-	})
+	}))
 	return httpClient.StandardClient()
 }
 
@@ -220,7 +258,7 @@ func RetryableHTTPClient(opts ...ClientOption) *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = 3
 	httpClient.Logger = nil
-	httpClient.HTTPClient.Transport = NewCustomTransport(nil)
+	httpClient.HTTPClient.Transport = NewInstrumentedTransport(NewCustomTransport(nil))
 
 	for _, opt := range opts {
 		opt(httpClient)
@@ -234,7 +272,7 @@ func RetryableHTTPClientTimeout(timeOutSeconds int64, opts ...ClientOption) *htt
 	httpClient.RetryMax = 3
 	httpClient.Logger = nil
 	httpClient.HTTPClient.Timeout = time.Duration(timeOutSeconds) * time.Second
-	httpClient.HTTPClient.Transport = NewCustomTransport(nil)
+	httpClient.HTTPClient.Transport = NewInstrumentedTransport(NewCustomTransport(nil))
 
 	for _, opt := range opts {
 		opt(httpClient)

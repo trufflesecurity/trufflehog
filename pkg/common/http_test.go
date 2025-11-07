@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -405,6 +406,76 @@ func TestSaneHttpClientMetrics(t *testing.T) {
 	}
 }
 
+func TestRetryableHttpClientMetrics(t *testing.T) {
+	// Create a test server that returns different status codes
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/success":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("success"))
+		case "/error":
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("error"))
+		case "/notfound":
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte("not found"))
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("default"))
+		}
+	}))
+	defer server.Close()
+
+	// Create a RetryableHttpClient
+	client := RetryableHTTPClient()
+
+	testCases := []struct {
+		name               string
+		path               string
+		expectedStatusCode int
+		expectsNon200      bool
+	}{
+		{
+			name:               "successful request",
+			path:               "/success",
+			expectedStatusCode: 200,
+			expectsNon200:      false,
+		},
+		{
+			name:               "not found request",
+			path:               "/notfound",
+			expectedStatusCode: 404,
+			expectsNon200:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var requestURL string
+			if strings.HasPrefix(tc.path, "http") {
+				requestURL = tc.path
+			} else {
+				requestURL = server.URL + tc.path
+			}
+
+			// Get initial metric values
+			sanitizedURL := sanitizeURL(requestURL)
+			initialRequestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+
+			// Make the request
+			resp, err := client.Get(requestURL)
+
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, tc.expectedStatusCode, resp.StatusCode)
+
+			// Check that request counter was incremented
+			requestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+			assert.Equal(t, initialRequestsTotal+1, requestsTotal)
+		})
+	}
+}
+
 func TestInstrumentedTransport(t *testing.T) {
 	// Create a mock transport that we can control
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -438,4 +509,52 @@ func TestInstrumentedTransport(t *testing.T) {
 
 	// Note: Testing histogram metrics is complex due to the way Prometheus handles them
 	// The main thing is that the request completed successfully and counters were incremented
+}
+
+func TestResponseSizeCounterReadCloser(t *testing.T) {
+	bodyContent := "This is a test response body."
+	expectedSize := len(bodyContent)
+	resp := &http.Response{
+		Body: io.NopCloser(strings.NewReader(bodyContent)),
+	}
+
+	var recordedSize int
+	readCloser := &responseSizeCounterReadCloser{
+		ReadCloser: resp.Body,
+		recordSizeFunc: func(size int) {
+			recordedSize = size
+		},
+	}
+	// Read the entire body
+	_, err := io.ReadAll(readCloser)
+	require.NoError(t, err)
+
+	// Close the ReadCloser to trigger size recording
+	err = readCloser.Close()
+	require.NoError(t, err)
+
+	assert.Equal(t, expectedSize, recordedSize, "Response body size does not match expected")
+}
+
+func TestResponseSizeCounterReadCloser_UnreadBody(t *testing.T) {
+	bodyContent := "This is a test response body."
+	expectedSize := len(bodyContent)
+	resp := &http.Response{
+		Body: io.NopCloser(strings.NewReader(bodyContent)),
+	}
+
+	var recordedSize int
+	readCloser := &responseSizeCounterReadCloser{
+		ReadCloser: resp.Body,
+		recordSizeFunc: func(size int) {
+			recordedSize = size
+		},
+	}
+	// Do not read the body
+
+	// Close the ReadCloser to trigger size recording
+	err := readCloser.Close()
+	require.NoError(t, err)
+
+	assert.Equal(t, expectedSize, recordedSize, "Response body size does not match expected for unread body")
 }
