@@ -294,6 +294,30 @@ func TestHandleFileAR(t *testing.T) {
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
 
+func TestHandleFileMSG(t *testing.T) {
+	wantChunkCount := 5
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/test.msg")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 0, len(reporter.Ch))
+	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
+
+func TestHandleFileDOC(t *testing.T) {
+	wantChunkCount := 3
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/test.doc")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 0, len(reporter.Ch))
+	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
+
 func BenchmarkHandleAR(b *testing.B) {
 	file, err := os.Open("testdata/test.deb")
 	assert.Nil(b, err)
