@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -299,9 +300,9 @@ func TestHandleFileMSG(t *testing.T) {
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
 
 	file, err := os.Open("testdata/test.msg")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, 0, len(reporter.Ch))
+	assert.Empty(t, reporter.Ch)
 	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
@@ -311,9 +312,9 @@ func TestHandleFileDOC(t *testing.T) {
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
 
 	file, err := os.Open("testdata/test.doc")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, 0, len(reporter.Ch))
+	assert.Empty(t, reporter.Ch)
 	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
