@@ -156,6 +156,11 @@ func NewInstrumentedTransport(T http.RoundTripper) *InstrumentedTransport {
 	return &InstrumentedTransport{T}
 }
 
+// responseSizeCounterReadCloser wraps an io.ReadCloser to count the number of bytes read.
+// It counts bytes read during Read calls and invokes a callback function when closed to record the total size.
+// If the body is not read before closing, it drains the body to get the size.
+// One caveat is that if the body is only partially read, the recorded size will reflect only the bytes read,
+// but we accept this limitation as it is a very rare case.
 type responseSizeCounterReadCloser struct {
 	io.ReadCloser
 	bytesRead      *int
@@ -174,7 +179,7 @@ func (r *responseSizeCounterReadCloser) Read(p []byte) (n int, err error) {
 func (r *responseSizeCounterReadCloser) Close() error {
 	if r.recordSizeFunc != nil {
 		if r.bytesRead == nil {
-			// this means downstream code never consumed the body, we must drain the body to get its size
+			// this means downstream code never consumed the body, we must drain the body to get its size (io.Copy calls Read())
 			_, err := io.Copy(io.Discard, r)
 			if err != nil {
 				return err

@@ -433,19 +433,16 @@ func TestRetryableHttpClientMetrics(t *testing.T) {
 		name               string
 		path               string
 		expectedStatusCode int
-		expectsNon200      bool
 	}{
 		{
 			name:               "successful request",
 			path:               "/success",
 			expectedStatusCode: 200,
-			expectsNon200:      false,
 		},
 		{
 			name:               "not found request",
 			path:               "/notfound",
 			expectedStatusCode: 404,
-			expectsNon200:      true,
 		},
 	}
 
