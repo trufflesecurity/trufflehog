@@ -55,13 +55,15 @@ var (
 		[]string{"source_type", "source_name"},
 	)
 
-	scanBytesPerChunk = promauto.NewHistogram(prometheus.HistogramOpts{
+	scanBytesPerChunk = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "scan_bytes_per_chunk",
 		Help:      "Total number of bytes in a chunk.",
 		Buckets:   prometheus.ExponentialBuckets(1, 2, 18),
-	})
+	},
+		[]string{"source_type"},
+	)
 
 	jobChunksScanned = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
