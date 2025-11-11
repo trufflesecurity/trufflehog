@@ -49,11 +49,11 @@ var (
 	},
 		[]string{"source_name", "job_id"})
 
-	dockerImagesNumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	dockerImagesEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
-		Name:      "docker_images_numerated",
-		Help:      "Total number of Docker images numerated.",
+		Name:      "docker_images_enumerated",
+		Help:      "Total number of Docker images enumerated.",
 	},
 		[]string{"source_name", "job_id"})
 

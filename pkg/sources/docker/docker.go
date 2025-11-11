@@ -76,7 +76,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	dockerLayersScanned.WithLabelValues(s.name, jobIDStr).Set(0)
 	dockerLayersEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
 	dockerHistoryEntriesEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
-	dockerImagesNumerated.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerImagesEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
 	dockerHistoryEntriesScanned.WithLabelValues(s.name, jobIDStr).Set(0)
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
