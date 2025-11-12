@@ -498,7 +498,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/noticeable"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion"
+	notionv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion/v1"
+	notionv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
@@ -1375,7 +1376,8 @@ func buildDetectorList() []detectors.Detector {
 		&nightfall.Scanner{},
 		&nimble.Scanner{},
 		&noticeable.Scanner{},
-		&notion.Scanner{},
+		&notionv1.Scanner{},
+		&notionv2.Scanner{},
 		&nozbeteams.Scanner{},
 		&npmtoken.Scanner{},
 		&npmtokenv2.Scanner{},

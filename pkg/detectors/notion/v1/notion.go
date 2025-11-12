@@ -17,18 +17,21 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (Scanner) Version() int { return 1 }
 
 var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b((?:secret_[A-Za-z0-9]{43})|ntn_[0-9]{11}[A-Za-z0-9]{32}[A-Za-z0-9]{3})\b`)
+	keyPat = regexp.MustCompile(`\b(secret_[A-Za-z0-9]{43})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"notion", "ntn_"}
+	return []string{"notion"}
 }
 
 // FromData will find and optionally verify Notion secrets in a given set of bytes.
@@ -42,6 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Notion,
 			Raw:          []byte(resMatch),
+			ExtraData: map[string]string{
+				"version": fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
