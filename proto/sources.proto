@@ -153,6 +153,7 @@ message Confluence {
   repeated string ignore_spaces = 8;
   bool include_attachments = 9;
   bool skip_history = 10;
+  bool include_comments = 11;
 }
 
 message Docker {
@@ -164,6 +165,8 @@ message Docker {
   }
   repeated string images = 5;
   repeated string exclude_paths = 6;
+  string namespace = 7;
+  string registry_token = 8;
 }
 
 message ECR {
@@ -225,6 +228,7 @@ message Git {
   string clone_path = 16;
   bool no_cleanup = 17;
   bool print_legacy_json = 18;
+  bool trust_local_git_config = 19; // Trust local git configurations
 }
 
 message GitLab {
@@ -262,7 +266,10 @@ message GitHub {
   string head = 9;
   string base = 10;
   repeated string ignore_repos = 11;
-  repeated string include_repos = 12;
+  // DEPRECATED: include_repos is deprecated in favor of repositories.
+  // It was used for filtering when the repositories field wasn't populating the UI-input results correctly
+  // It can be removed when we no longer depend on it
+  repeated string include_repos = 12 [deprecated = true];
   bool include_pull_request_comments = 14;
   bool include_issue_comments = 15;
   bool include_gist_comments = 16;
@@ -302,6 +309,8 @@ message GitHubRealtime {
 message GoogleDrive {
   oneof credential {
     string refresh_token = 1;
+    bool use_token_service = 2;
+    credentials.Oauth2 oauth = 3; // on-prem scanning
   }
 }
 

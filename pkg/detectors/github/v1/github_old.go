@@ -28,11 +28,14 @@ func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 var (
 	// Oauth token
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
-	// the middle regex `(?:[a-zA-Z0-9.\/?=&:-]{0,40})` is to match the prefix of token match to avoid processing common known patterns
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github", "gh", "pat", "token"}) + `\b(?:[a-zA-Z0-9.\/?=&:-]{0,40})([a-f0-9]{40})\b`)
-
-	// TODO: Oauth2 client_id and client_secret
-	// https://developer.github.com/v3/#oauth2-keysecret
+	keyPat = regexp.MustCompile(
+		detectors.PrefixRegex([]string{
+			"github_token", "github_secret", "github_key", "github_api", "github_pat",
+			"githubtoken", "githubsecret", "githubkey", "githubapi", "githubpat",
+			"gh_token", "gh_secret", "gh_key", "gh_api", "gh_pat",
+			"ghtoken", "ghsecret", "ghkey", "ghapi", "ghpat",
+		}) + `\b([0-9a-f]{40})\b`,
+	)
 )
 
 // TODO: Add secret context?? Information about access, ownership etc
@@ -95,6 +98,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		matchPrefix := match[0]
 		token := match[1]
 
+		// It may seem strange to filter out findings prior to verifying them. However, this credential looks like a
+		// normal sha256 hash, which is an incredibly common string to see. So the filter here prevents an excessive
+		// number of requests to be sent for findings which will almost certainly not be verified. It must occur before
+		// verification, because otherwise the number of verification requests can be quite excessive.
+		if isKnownNonSensitiveCommonPrefix(matchPrefix) {
+			continue
+		}
+
 		// Note that this false positive check happens **before** verification! I don't know why it's written this way
 		// but that's why this logic wasn't moved into a CustomFalsePositiveChecker implementation.
 		if isFp, _ := detectors.IsKnownFalsePositive(token, ghFalsePositives, false); isFp {
@@ -119,13 +130,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := common.SaneHttpClient()
 
 			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
-
-			if !isVerified {
-				// to avoid false positives for unverified findings
-				if isKnownNonSensitiveCommonPrefix(matchPrefix) {
-					continue
-				}
-			}
 
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)

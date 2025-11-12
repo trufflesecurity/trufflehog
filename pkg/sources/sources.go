@@ -230,6 +230,10 @@ type DockerConfig struct {
 	UseDockerKeychain bool
 	// ExcludePaths is a list of paths to exclude from scanning.
 	ExcludePaths []string
+	// Namespace represents a Docker organization or user account.
+	Namespace string
+	// RegistryToken is an optional authentication token used to access private images within the namespace.
+	RegistryToken string
 }
 
 // GCSConfig defines the optional configuration for a GCS source.
@@ -286,6 +290,8 @@ type GitConfig struct {
 	NoCleanup bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
+	// TrustLocalGitConfig allows to trust the local git config.
+	TrustLocalGitConfig bool
 }
 
 // GithubConfig defines the optional configuration for a github source.
