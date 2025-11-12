@@ -34,11 +34,6 @@ func TestNormalizeGitHubEnterpriseEndpoint(t *testing.T) {
 			expected: "https://github.company.com/api/v3",
 		},
 		{
-			name:     "customer reported endpoint (git.musta.ch)",
-			input:    "https://git.musta.ch",
-			expected: "https://git.musta.ch/api/v3",
-		},
-		{
 			name:     "enterprise endpoint with http protocol",
 			input:    "http://github.company.com",
 			expected: "http://github.company.com/api/v3",

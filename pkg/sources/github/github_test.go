@@ -805,6 +805,44 @@ func TestEnumerateWithApp(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestEnumerateWithApp_EnterpriseServer(t *testing.T) {
+	defer gock.Off()
+
+	privateKey := createPrivateKey()
+
+	// Test that the normalized endpoint is used for token refresh
+	gock.New("https://github.company.com").
+		Post("/api/v3/app/installations/1337/access_tokens").
+		Reply(200).
+		JSON(map[string]string{"token": "test-installation-token", "expires_at": "2025-12-31T23:59:59Z"})
+
+	gock.New("https://github.company.com").
+		Get("/api/v3/installation/repositories").
+		Reply(200).
+		JSON(map[string]any{
+			"repositories": []map[string]string{
+				{"clone_url": "https://github.company.com/org/repo.git", "full_name": "org/repo"},
+			},
+		})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://github.company.com", // No /api/v3, should be normalized
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector).InstallationClient(), noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 1, s.filteredRepoCache.Count())
+	assert.True(t, s.filteredRepoCache.Exists("org/repo"))
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 // This only tests the resume info slice portion of setProgressCompleteWithRepo.
 func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 	tests := []struct {
@@ -1101,5 +1139,150 @@ func noopReporter() sources.UnitReporter {
 		VisitUnit: func(context.Context, sources.SourceUnit) error {
 			return nil
 		},
+	}
+}
+
+func TestNewConnector_NormalizesEnterpriseEndpoint(t *testing.T) {
+	defer gock.Off()
+
+	tests := []struct {
+		name            string
+		inputEndpoint   string
+		expectedBaseURL string
+		credential      *sourcespb.GitHub_Token
+	}{
+		{
+			name:            "GitHub.com endpoint unchanged",
+			inputEndpoint:   "https://api.github.com",
+			expectedBaseURL: "https://api.github.com",
+			credential:      &sourcespb.GitHub_Token{Token: "test-token"},
+		},
+		{
+			name:            "Enterprise endpoint without /api/v3 gets normalized",
+			inputEndpoint:   "https://github.company.com",
+			expectedBaseURL: "https://github.company.com/api/v3",
+			credential:      &sourcespb.GitHub_Token{Token: "test-token"},
+		},
+		{
+			name:            "Enterprise endpoint with /api/v3 unchanged",
+			inputEndpoint:   "https://github.company.com/api/v3",
+			expectedBaseURL: "https://github.company.com/api/v3",
+			credential:      &sourcespb.GitHub_Token{Token: "test-token"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Mock the /user endpoint since token connector calls it
+			gock.New(tt.expectedBaseURL).
+				Get("/user").
+				Reply(200).
+				JSON(map[string]string{"login": "test-user"})
+
+			s := &Source{
+				conn: &sourcespb.GitHub{
+					Endpoint:   tt.inputEndpoint,
+					Credential: tt.credential,
+				},
+			}
+
+			connector, err := newConnector(context.Background(), s)
+			require.NoError(t, err)
+			require.NotNil(t, connector)
+
+			// Verify the APIClient was created with the normalized endpoint
+			apiClient := connector.APIClient()
+			require.NotNil(t, apiClient)
+
+			// For GitHub.com, BaseURL should be api.github.com
+			// For Enterprise, BaseURL should include /api/v3/
+			if strings.Contains(tt.expectedBaseURL, "api.github.com") {
+				assert.Equal(t, "https://api.github.com/", apiClient.BaseURL.String())
+			} else {
+				assert.Equal(t, tt.expectedBaseURL+"/", apiClient.BaseURL.String())
+			}
+		})
+	}
+}
+
+func TestNewConnector_GitHubApp_NormalizesEnterpriseEndpoint(t *testing.T) {
+	defer gock.Off()
+
+	privateKey := createPrivateKey()
+
+	tests := []struct {
+		name            string
+		inputEndpoint   string
+		expectedBaseURL string
+	}{
+		{
+			name:            "GitHub.com app endpoint unchanged",
+			inputEndpoint:   "https://api.github.com",
+			expectedBaseURL: "https://api.github.com",
+		},
+		{
+			name:            "Enterprise app endpoint without /api/v3 gets normalized",
+			inputEndpoint:   "https://git.random.ch",
+			expectedBaseURL: "https://git.random.ch/api/v3",
+		},
+		{
+			name:            "Enterprise app endpoint with /api/v3 unchanged",
+			inputEndpoint:   "https://git.random.ch/api/v3",
+			expectedBaseURL: "https://git.random.ch/api/v3",
+		},
+		{
+			name:            "Enterprise app endpoint with trailing slash",
+			inputEndpoint:   "https://github.company.com/",
+			expectedBaseURL: "https://github.company.com/api/v3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Mock the token refresh endpoint that ghinstallation library calls
+			gock.New(tt.expectedBaseURL).
+				Post("/app/installations/1337/access_tokens").
+				Reply(200).
+				JSON(map[string]string{"token": "test-token", "expires_at": "2025-12-31T23:59:59Z"})
+
+			// Mock the installations endpoint
+			gock.New(tt.expectedBaseURL).
+				Get("/app/installations").
+				Reply(200).
+				JSON([]map[string]any{})
+
+			s := &Source{
+				conn: &sourcespb.GitHub{
+					Endpoint: tt.inputEndpoint,
+					Credential: &sourcespb.GitHub_GithubApp{
+						GithubApp: &credentialspb.GitHubApp{
+							PrivateKey:     privateKey,
+							InstallationId: "1337",
+							AppId:          "4141",
+						},
+					},
+				},
+			}
+
+			connector, err := newConnector(context.Background(), s)
+			require.NoError(t, err)
+			require.NotNil(t, connector)
+
+			appConn, ok := connector.(*appConnector)
+			require.True(t, ok, "expected appConnector type")
+			require.NotNil(t, appConn.APIClient())
+			require.NotNil(t, appConn.InstallationClient())
+
+			// Verify the API client was created with the normalized endpoint
+			apiClient := appConn.APIClient()
+			if strings.Contains(tt.expectedBaseURL, "api.github.com") {
+				assert.Equal(t, "https://api.github.com/", apiClient.BaseURL.String())
+			} else {
+				assert.Equal(t, tt.expectedBaseURL+"/", apiClient.BaseURL.String())
+			}
+
+			// Verify no unmatched HTTP mocks (all expected calls were made)
+			assert.False(t, gock.HasUnmatchedRequest(), "had unmatched HTTP requests")
+		})
 	}
 }
