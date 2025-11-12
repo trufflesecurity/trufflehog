@@ -14,7 +14,6 @@ import (
 var (
 	validPatternV2   = "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"
 	invalidPatternV2 = "ntn_123456789012345678901234567890123456789012345678901234567890"
-	keyword          = "notion"
 )
 
 func TestNotion_Pattern(t *testing.T) {
