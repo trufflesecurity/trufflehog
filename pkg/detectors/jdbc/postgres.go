@@ -109,7 +109,7 @@ func parsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 
 	if params["host"] == "" || params["password"] == "" {
 		ctx.Logger().WithName("jdbc").
-			V(3).
+			V(2).
 			Info("Skipping invalid Postgres URL - no password or host found")
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}

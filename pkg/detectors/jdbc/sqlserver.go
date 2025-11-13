@@ -75,7 +75,7 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 
 	if password == "" || host == "" {
 		ctx.Logger().WithName("jdbc").
-			V(3).
+			V(2).
 			Info("Skipping invalid SQL Server URL - no password or host found")
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
@@ -84,7 +84,7 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 	jdbcUrl, err := url.Parse(urlStr)
 	if err != nil {
 		ctx.Logger().WithName("jdbc").
-			V(3).
+			V(2).
 			Info("Skipping invalid SQL Server URL", "url", urlStr, "err", err)
 		return nil, err
 	}

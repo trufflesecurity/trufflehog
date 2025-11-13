@@ -66,7 +66,7 @@ func parseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
 
 	if cfg.Addr == "" || cfg.Passwd == "" {
 		ctx.Logger().WithName("jdbc").
-			V(3).
+			V(2).
 			Info("Skipping invalid MySQL URL - no password or host found")
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
@@ -102,7 +102,7 @@ func parseMySQLURI(ctx logContext.Context, subname string) (jdbc, error) {
 
 	if u.Host == "" || pass == "" {
 		ctx.Logger().WithName("jdbc").
-			V(3).
+			V(2).
 			Info("Skipping invalid MySQL URL - no password or host found")
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
