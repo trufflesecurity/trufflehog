@@ -22,6 +22,12 @@ func TestParseMySQLMissingCredentials(t *testing.T) {
 			reason:      "no password present",
 		},
 		{
+			name:        "no password (tcp format) - should return nil",
+			subname:     "//tcp(examplehost.net:3306)/dbname?user=admin",
+			shouldBeNil: true,
+			reason:      "no password present in tcp format",
+		},
+		{
 			name:        "no host - should return nil",
 			subname:     "///dbname?user=admin&password=secret123",
 			shouldBeNil: true,
@@ -36,6 +42,11 @@ func TestParseMySQLMissingCredentials(t *testing.T) {
 		{
 			name:        "valid with host and password - should succeed",
 			subname:     "//examplehost.net:3306/dbname?user=root&password=secret123",
+			shouldBeNil: false,
+		},
+		{
+			name:        "valid with tcp(host:port) format - should succeed",
+			subname:     "//root:secret123@tcp(examplehost.net:3306)/dbname",
 			shouldBeNil: false,
 		},
 		{
@@ -81,6 +92,11 @@ func TestParseMySQLUsernameRecognition(t *testing.T) {
 			name:         "no user specified - default root",
 			subname:      "//localhost:3306/dbname?password=mypass",
 			wantUsername: "root",
+		},
+		{
+			name:         "user specified (tcp format)",
+			subname:      "//myuser:secret123@tcp(localhost:3306)/dbname",
+			wantUsername: "myuser",
 		},
 	}
 
