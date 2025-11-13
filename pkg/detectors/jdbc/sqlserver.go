@@ -84,7 +84,7 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 	jdbcUrl, err := url.Parse(urlStr)
 	if err != nil {
 		ctx.Logger().WithName("jdbc").
-			V(2).
+			V(3).
 			Info("Skipping invalid SQL Server URL", "url", urlStr, "err", err)
 		return nil, err
 	}
