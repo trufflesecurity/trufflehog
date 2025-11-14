@@ -461,7 +461,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 			// Final filter check - only include repositories that pass the filter
 			if s.filteredRepoCache.wantRepo(repoName) {
-				ctx = context.WithValue(ctx, "repo", repo)
+				ctx := context.WithValue(ctx, "repo", repo)
 
 				repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
 				if err != nil {
