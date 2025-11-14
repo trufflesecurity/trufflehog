@@ -10,7 +10,7 @@ import (
 var (
 	githubNumRateLimitEncountered = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "github_num_rate_limit_encountered",
 		Help:      "Total number of times Github Rate Limit was encountered",
 	},
@@ -18,7 +18,7 @@ var (
 
 	githubSecondsSpentRateLimited = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "github_seconds_spent_rate_limited",
 		Help:      "Total number of seconds spent idle due to GitHub rate limits.",
 	},
@@ -26,7 +26,7 @@ var (
 
 	githubReposEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "github_repos_enumerated",
 		Help:      "Total number of GitHub repositories enumerated.",
 	},
@@ -34,7 +34,7 @@ var (
 
 	githubReposScanned = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "github_repos_scanned",
 		Help:      "Total number of GitHub repositories scanned.",
 	},
@@ -42,7 +42,7 @@ var (
 
 	githubOrgsEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "github_orgs_enumerated",
 		Help:      "Total number of GitHub organizations enumerated.",
 	},

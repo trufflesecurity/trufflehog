@@ -135,6 +135,10 @@ func (t *InstrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 	if resp != nil {
 		// record latency and increment counter for non-200 status code
 		recordHTTPResponse(sanitizedURL, resp.StatusCode, duration.Seconds())
+
+		if resp.ContentLength > 0 {
+			httpResponseBodySize.WithLabelValues(sanitizedURL).Observe(float64(resp.ContentLength))
+		}
 	}
 
 	return resp, err

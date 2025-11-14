@@ -10,7 +10,7 @@ import (
 var (
 	dockerLayersScanned = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "docker_layers_scanned",
 		Help:      "Total number of Docker layers scanned.",
 	},
@@ -18,7 +18,7 @@ var (
 
 	dockerHistoryEntriesScanned = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "docker_history_entries_scanned",
 		Help:      "Total number of Docker image history entries scanned.",
 	},
@@ -26,7 +26,7 @@ var (
 
 	dockerImagesScanned = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "docker_images_scanned",
 		Help:      "Total number of Docker images scanned.",
 	},
@@ -35,7 +35,7 @@ var (
 	dockerListImagesAPIDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "docker_list_images_api_duration_seconds",
 			Help:      "Duration of Docker list images API calls.",
 			Buckets:   prometheus.DefBuckets,

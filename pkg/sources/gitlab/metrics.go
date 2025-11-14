@@ -10,7 +10,7 @@ import (
 var (
 	gitlabGroupsEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "gitlab_groups_enumerated",
 		Help:      "Total number of GitLab groups enumerated.",
 	},
@@ -18,7 +18,7 @@ var (
 
 	gitlabReposEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "gitlab_repos_enumerated",
 		Help:      "Total number of Gitlab repositories enumerated.",
 	},
@@ -26,7 +26,7 @@ var (
 
 	gitlabReposScanned = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "gitlab_repos_scanned",
 		Help:      "Total number of Gitlab repositories scanned.",
 	},

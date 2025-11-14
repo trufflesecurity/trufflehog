@@ -14,7 +14,7 @@ type metrics struct {
 var (
 	postmanAPIRequestsMetric = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "postman_api_requests",
 		Help:      "Total number of API requests made to Postman.",
 	},
@@ -22,7 +22,7 @@ var (
 
 	postmanAPIMonthlyRequestsRemaining = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "postman_api_monthly_requests_remaining",
 		Help:      "Total number Postman API requests remaining this month.",
 	},

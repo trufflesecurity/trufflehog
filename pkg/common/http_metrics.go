@@ -12,7 +12,7 @@ var (
 	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: MetricsNamespace,
-			Subsystem: "http_client",
+			Subsystem: MetricsSubsystemHTTPClient,
 			Name:      "requests_total",
 			Help:      "Total number of HTTP requests made, labeled by URL.",
 		},
@@ -22,7 +22,7 @@ var (
 	httpRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: MetricsNamespace,
-			Subsystem: "http_client",
+			Subsystem: MetricsSubsystemHTTPClient,
 			Name:      "request_duration_seconds",
 			Help:      "HTTP request latency in seconds, labeled by URL.",
 			Buckets:   prometheus.DefBuckets,
@@ -33,11 +33,22 @@ var (
 	httpNon200ResponsesTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: MetricsNamespace,
-			Subsystem: "http_client",
+			Subsystem: MetricsSubsystemHTTPClient,
 			Name:      "non_200_responses_total",
 			Help:      "Total number of non-200 HTTP responses, labeled by URL and status code.",
 		},
 		[]string{"url", "status_code"},
+	)
+
+	httpResponseBodySize = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: MetricsNamespace,
+			Subsystem: "http_client",
+			Name:      "response_body_size_bytes",
+			Help:      "HTTP response body size in bytes, labeled by URL.",
+			Buckets:   prometheus.ExponentialBuckets(1024, 2, 10),
+		},
+		[]string{"url"},
 	)
 )
 

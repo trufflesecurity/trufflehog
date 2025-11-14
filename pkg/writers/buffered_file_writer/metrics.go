@@ -10,21 +10,21 @@ import (
 var (
 	totalWriteSize = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "buffered_file_writer_total_write_size_bytes",
 		Help:      "Total size of data written by the BufferedFileWriter in bytes.",
 	})
 
 	totalWriteDuration = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "buffered_file_writer_total_write_duration_microseconds",
 		Help:      "Total duration of write operations by the BufferedFileWriter in microseconds.",
 	})
 
 	diskWriteCount = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "disk_write_count",
 		Help:      "Total number of times data was written to disk by the BufferedFileWriter.",
 	})
@@ -32,7 +32,7 @@ var (
 	// The first bucket is greater than the default threshold to avoid a bucket with a zero value.
 	fileSizeHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "file_size_bytes",
 		Help:      "Sizes of files created by the BufferedFileWriter.",
 		Buckets:   prometheus.ExponentialBuckets(defaultThreshold*2, 4, 5),

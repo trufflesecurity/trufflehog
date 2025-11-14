@@ -23,7 +23,7 @@ var (
 	handleFileLatency = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_file_latency_milliseconds",
 			Help:      "Latency of the HandleFile method",
 			Buckets:   prometheus.ExponentialBuckets(1, 5, 6),
@@ -33,7 +33,7 @@ var (
 	bytesProcessed = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_bytes_processed_total",
 			Help:      "Total number of bytes processed",
 		},
@@ -42,7 +42,7 @@ var (
 	filesProcessed = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_files_processed_total",
 			Help:      "Total number of files processed",
 		},
@@ -51,7 +51,7 @@ var (
 	errorsEncountered = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_errors_encountered_total",
 			Help:      "Total number of errors encountered",
 		},
@@ -60,7 +60,7 @@ var (
 	filesSkipped = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_files_skipped_total",
 			Help:      "Total number of files skipped",
 		},
@@ -69,7 +69,7 @@ var (
 	maxArchiveDepthCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_max_archive_depth_reached_total",
 			Help:      "Total number of times the maximum archive depth was reached",
 		},
@@ -78,7 +78,7 @@ var (
 	fileSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_file_size_bytes",
 			Help:      "Sizes of files handled by the handler",
 			Buckets:   prometheus.ExponentialBuckets(1, 2, 4),
@@ -88,7 +88,7 @@ var (
 	fileProcessingTimeouts = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "handlers_file_processing_timeouts_total",
 			Help:      "Total number of file processing timeouts encountered",
 		},

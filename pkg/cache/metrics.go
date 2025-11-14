@@ -40,35 +40,35 @@ func init() {
 	baseMetricsInstance = &baseCollector{
 		hits: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "hits_total",
 			Help:      "Total number of cache hits.",
 		}, []string{"cache_name"}),
 
 		misses: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "misses_total",
 			Help:      "Total number of cache misses.",
 		}, []string{"cache_name"}),
 
 		sets: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "sets_total",
 			Help:      "Total number of cache set operations.",
 		}, []string{"cache_name"}),
 
 		deletes: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "deletes_total",
 			Help:      "Total number of cache delete operations.",
 		}, []string{"cache_name"}),
 
 		clears: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "clears_total",
 			Help:      "Total number of cache clear operations.",
 		}, []string{"cache_name"}),
@@ -79,7 +79,7 @@ func init() {
 	evictionMetricsInstance = &evictionMetrics{
 		evictions: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "evictions_total",
 			Help:      "Total number of cache evictions.",
 		}, []string{"cache_name"}),

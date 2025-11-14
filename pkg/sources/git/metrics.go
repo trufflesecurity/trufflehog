@@ -65,21 +65,21 @@ func init() {
 	metricsInstance = &collector{
 		cloneOperations: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "git_clone_operations_total",
 			Help:      "Total number of git clone operations by status, reason, and exit code",
 		}, []string{"status", "reason", "exit_code"}),
 
 		commitsScanned: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "git_commits_scanned_total",
 			Help:      "Total number of git commits scanned",
 		}),
 
 		reposScanned: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "git_repos_scanned_total",
 			Help:      "Total number of git repositories scanned by status (success/failure)",
 		}, []string{"status"}),

@@ -9,7 +9,7 @@ import (
 var (
 	hooksExecTime = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "hooks_exec_time_ms",
 		Help:      "Time spent executing hooks (ms)",
 		Buckets:   []float64{5, 50, 500, 1000},
@@ -17,7 +17,7 @@ var (
 
 	hooksChannelSize = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "hooks_channel_size",
 		Help:      "Total number of metrics waiting in the finished channel.",
 	}, nil)

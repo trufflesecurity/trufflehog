@@ -11,7 +11,7 @@ var (
 	decodeLatency = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "decode_latency",
 			Help:      "Time spent decoding a chunk in microseconds",
 			Buckets:   prometheus.ExponentialBuckets(50, 2, 20),
@@ -23,7 +23,7 @@ var (
 	detectorExecutionCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "detector_execution_count",
 			Help:      "Total number of times a detector has been executed.",
 		},
@@ -38,7 +38,7 @@ var (
 	detectorExecutionDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "detector_execution_duration",
 			Help:      "Duration of detector execution in milliseconds.",
 			Buckets:   prometheus.ExponentialBuckets(1, 5, 6),
@@ -48,7 +48,7 @@ var (
 
 	jobBytesScanned = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "job_bytes_scanned",
 		Help:      "Total number of bytes scanned for a job.",
 	},
@@ -57,7 +57,7 @@ var (
 
 	scanBytesPerChunk = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "scan_bytes_per_chunk",
 		Help:      "Total number of bytes in a chunk.",
 		Buckets:   prometheus.ExponentialBuckets(1, 2, 18),
@@ -67,7 +67,7 @@ var (
 
 	jobChunksScanned = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "job_chunks_scanned",
 		Help:      "Total number of chunks scanned for a job.",
 	},
@@ -76,7 +76,7 @@ var (
 
 	detectBytesPerMatch = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "detect_bytes_per_match",
 		Help:      "Total number of bytes used to detect a credential in a match per chunk.",
 		Buckets:   prometheus.ExponentialBuckets(1, 2, 18),
@@ -84,7 +84,7 @@ var (
 
 	matchesPerChunk = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "matches_per_chunk",
 		Help:      "Total number of matches found in a chunk.",
 		Buckets:   prometheus.ExponentialBuckets(1, 2, 10),
@@ -93,7 +93,7 @@ var (
 	// Metrics around latency for the different stages of the pipeline.
 	chunksScannedLatency = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "chunk_scanned_latency",
 		Help:      "Time taken to scan a chunk in microseconds.",
 		Buckets:   prometheus.ExponentialBuckets(1, 2, 22),
@@ -101,7 +101,7 @@ var (
 
 	chunksDetectedLatency = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "chunk_detected_latency",
 		Help:      "Time taken to detect a chunk in microseconds.",
 		Buckets:   prometheus.ExponentialBuckets(50, 2, 20),
@@ -109,7 +109,7 @@ var (
 
 	chunksNotifiedLatency = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
+		Subsystem: common.MetricsSubsystemScanner,
 		Name:      "chunk_notified_latency",
 		Help:      "Time taken to notify a chunk in milliseconds.",
 		Buckets:   prometheus.ExponentialBuckets(5, 2, 12),

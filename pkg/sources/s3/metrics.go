@@ -35,7 +35,7 @@ func init() {
 	metricsInstance = &collector{
 		objectsScanned: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "objects_scanned_bytes",
 			Help:      "Size distribution of successfully scanned S3 objects in bytes",
 			// 64B, 512B, 4KB, 32KB, 256KB, 2MB, 16MB, 128MB, 1GB.
@@ -44,7 +44,7 @@ func init() {
 
 		objectsSkipped: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "objects_skipped_bytes",
 			Help:      "Size distribution of skipped S3 objects in bytes",
 			// 64B, 512B, 4KB, 32KB, 256KB, 2MB, 16MB, 128MB, 1GB.
@@ -53,21 +53,21 @@ func init() {
 
 		objectsErrors: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "objects_errors_total",
 			Help:      "Total number of errors encountered during S3 scan",
 		}, []string{"bucket"}),
 
 		rolesScanned: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "roles_scanned",
 			Help:      "Number of AWS roles being scanned",
 		}, []string{"role_arn"}),
 
 		bucketsPerRole: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
+			Subsystem: common.MetricsSubsystemScanner,
 			Name:      "buckets_per_role",
 			Help:      "Number of buckets accessible per AWS role",
 		}, []string{"role_arn"}),
