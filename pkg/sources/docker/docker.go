@@ -502,7 +502,8 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	}
 
 	var opts []remote.Option
-	opts = append(opts, remote.WithTransport(defaultTransport))
+	instrumentedTransport := common.NewInstrumentedTransport(common.NewCustomTransport(defaultTransport))
+	opts = append(opts, remote.WithTransport(instrumentedTransport))
 
 	// Configure authentication based on credential type
 	switch s.conn.GetCredential().(type) {
