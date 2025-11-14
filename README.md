@@ -588,10 +588,13 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
 ```
 ...
       - shell: bash
+        env:
+          JSON_STRING: ${{ toJson(github.event.commits) }}
         run: |
           if [ "${{ github.event_name }}" == "push" ]; then
-            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 2))" >> $GITHUB_ENV
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
+            printf '%s\n' "$JSON_STRING" > commit_info.json
+            depth=$(($(jq length <<< "${{ toJson(github.event.commits) }}") + 2))
+            echo "depth=$depth" >> $GITHUB_ENV
           fi
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             echo "depth=$((${{ github.event.pull_request.commits }}+2))" >> $GITHUB_ENV
