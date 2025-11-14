@@ -2,6 +2,8 @@ package cannyio
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -44,25 +46,52 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader("apiKey=" + resMatch)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://canny.io/api/v1/boards/list", payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	payload := strings.NewReader("apiKey=" + token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://canny.io/api/v1/boards/list", payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	res, err := client.Do(req)
+
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusBadRequest:
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		}
+
+		if strings.Contains(strings.ToLower(string(body)), "invalid api key") {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
