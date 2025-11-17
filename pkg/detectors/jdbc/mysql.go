@@ -51,7 +51,7 @@ func isMySQLErrorDeterminate(err error) bool {
 	return false
 }
 
-func parseMySQL(_ logContext.Context, subname string) (jdbc, error) {
+func parseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected host to start with //")
@@ -59,14 +59,26 @@ func parseMySQL(_ logContext.Context, subname string) (jdbc, error) {
 
 	// need for hostnames that have tcp(host:port) format required by this database driver
 	cfg, err := mysql.ParseDSN(strings.TrimPrefix(subname, "//"))
-	if err == nil {
-		return &mysqlJDBC{
-			conn:     subname[2:],
-			userPass: cfg.User + ":" + cfg.Passwd,
-			host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
-			params:   "timeout=5s",
-		}, nil
+	if err != nil {
+		// fall back to URI parsing
+		return parseMySQLURI(ctx, subname)
 	}
+
+	if cfg.Addr == "" || cfg.Passwd == "" {
+		ctx.Logger().WithName("jdbc").
+			V(2).
+			Info("Skipping invalid MySQL URL - no password or host found")
+		return nil, fmt.Errorf("missing host or password in connection string")
+	}
+	return &mysqlJDBC{
+		conn:     subname[2:],
+		userPass: cfg.User + ":" + cfg.Passwd,
+		host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
+		params:   "timeout=5s",
+	}, nil
+}
+
+func parseMySQLURI(ctx logContext.Context, subname string) (jdbc, error) {
 
 	// for standard URI format, which is all i've seen for JDBC
 	u, err := url.Parse(subname)
@@ -88,10 +100,14 @@ func parseMySQL(_ logContext.Context, subname string) (jdbc, error) {
 		pass = v
 	}
 
-	userAndPass := user
-	if pass != "" {
-		userAndPass = userAndPass + ":" + pass
+	if u.Host == "" || pass == "" {
+		ctx.Logger().WithName("jdbc").
+			V(2).
+			Info("Skipping invalid MySQL URL - no password or host found")
+		return nil, fmt.Errorf("missing host or password in connection string")
 	}
+
+	userAndPass := user + ":" + pass
 
 	return &mysqlJDBC{
 		conn:     subname[2:],
