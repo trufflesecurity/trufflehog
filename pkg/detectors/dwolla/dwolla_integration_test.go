@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -19,13 +20,13 @@ import (
 func TestDwolla_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("DWOLLA")
+	id := testSecrets.MustGetField("DWOLLA_ID")
 	secret := testSecrets.MustGetField("DWOLLA_SECRET")
-	inactiveSecret := testSecrets.MustGetField("DWOLLA_SECRET_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField("DWOLLA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -50,6 +51,10 @@ func TestDwolla_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Dwolla,
+					Verified:     false,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_Dwolla,
 					Verified:     true,
 				},
 			},
@@ -64,6 +69,10 @@ func TestDwolla_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dwolla,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Dwolla,
 					Verified:     false,
@@ -95,9 +104,20 @@ func TestDwolla_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Dwolla.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

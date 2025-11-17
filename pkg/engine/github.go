@@ -20,7 +20,6 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		Repositories:               c.Repos,
 		ScanUsers:                  c.IncludeMembers,
 		IgnoreRepos:                c.ExcludeRepos,
-		IncludeRepos:               c.IncludeRepos,
 		IncludeForks:               c.IncludeForks,
 		IncludeIssueComments:       c.IncludeIssueComments,
 		IncludePullRequestComments: c.IncludePullRequestComments,
@@ -29,7 +28,12 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		SkipBinaries:               c.SkipBinaries,
 		CommentsTimeframeDays:      c.CommentsTimeframeDays,
 		RemoveAuthInUrl:            !c.AuthInUrl, // configuration uses the opposite field in proto to keep credentials in the URL by default.
+		ClonePath:                  c.ClonePath,
+		NoCleanup:                  c.NoCleanup,
+		IgnoreGists:                c.IgnoreGists,
+		PrintLegacyJson:            c.PrintLegacyJSON,
 	}
+
 	if len(c.Token) > 0 {
 		connection.Credential = &sourcespb.GitHub_Token{
 			Token: c.Token,

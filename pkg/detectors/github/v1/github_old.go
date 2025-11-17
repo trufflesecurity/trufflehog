@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -27,10 +28,14 @@ func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 var (
 	// Oauth token
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
-	keyPat = regexp.MustCompile(`(?i)(?:github|gh|pat|token)[^\.].{0,40}[ =:'"]+([a-f0-9]{40})\b`)
-
-	// TODO: Oauth2 client_id and client_secret
-	// https://developer.github.com/v3/#oauth2-keysecret
+	keyPat = regexp.MustCompile(
+		detectors.PrefixRegex([]string{
+			"github_token", "github_secret", "github_key", "github_api", "github_pat",
+			"githubtoken", "githubsecret", "githubkey", "githubapi", "githubpat",
+			"gh_token", "gh_secret", "gh_key", "gh_api", "gh_pat",
+			"ghtoken", "ghsecret", "ghkey", "ghapi", "ghpat",
+		}) + `\b([0-9a-f]{40})\b`,
+	)
 )
 
 // TODO: Add secret context?? Information about access, ownership etc
@@ -55,11 +60,31 @@ type HeaderInfo struct {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"github", "gh", "pat", "token"}
+	return []string{"github", "gh"}
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Github
+}
+
+func (s Scanner) Description() string {
+	return "GitHub is a web-based platform used for version control and collaborative software development. GitHub tokens can be used to access and modify repositories and other resources."
 }
 
 var ghFalsePositives = map[detectors.FalsePositive]struct{}{
 	detectors.FalsePositive("github commit"): {},
+}
+
+var ghKnownNonSensitivePrefixes = []string{
+	"avatars.githubusercontent.com",            // GitHub avatar URLs
+	"actions/",                                 // GitHub Actions paths
+	"raw.githubusercontent.com/",               // Raw file URLs from GitHub
+	"api.github.com/repos/",                    // GitHub API repository endpoints
+	"gist.github.com/",                         // GitHub Gist URLs
+	"sha256:",                                  // SHA256 hash prefix
+	"github.com/",                              // General GitHub repo URLs
+	"pipelines.actions.githubusercontent.com/", // GitHub Actions infrastructure
+	"ghcr.io/",                                 // GitHub Container Registry
 }
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
@@ -70,12 +95,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 		// First match is entire regex, second is the first group.
-
+		matchPrefix := match[0]
 		token := match[1]
+
+		// It may seem strange to filter out findings prior to verifying them. However, this credential looks like a
+		// normal sha256 hash, which is an incredibly common string to see. So the filter here prevents an excessive
+		// number of requests to be sent for findings which will almost certainly not be verified. It must occur before
+		// verification, because otherwise the number of verification requests can be quite excessive.
+		if isKnownNonSensitiveCommonPrefix(matchPrefix) {
+			continue
+		}
 
 		// Note that this false positive check happens **before** verification! I don't know why it's written this way
 		// but that's why this logic wasn't moved into a CustomFalsePositiveChecker implementation.
 		if isFp, _ := detectors.IsKnownFalsePositive(token, ghFalsePositives, false); isFp {
+			continue
+		}
+
+		if detectors.StringShannonEntropy(token) < 3.5 {
 			continue
 		}
 
@@ -93,6 +130,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := common.SaneHttpClient()
 
 			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
 
@@ -180,10 +218,16 @@ func SetHeaderInfo(headers *HeaderInfo, s1 *detectors.Result) {
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Github
-}
+// isKnownNonSensitiveCommonPrefix checks if the given prefix is a known, non-sensitive value.
+// The GitHub v1 detector uses a broad regex that can capture many false positives.
+// This function helps filter out matches that begin with common, safe prefixes.
+// Example: avatars.githubusercontent.com/u/56769451?u=088102b6160822bc68c25a2a5df170080d0b16a2
+func isKnownNonSensitiveCommonPrefix(matchPrefix string) bool {
+	for _, prefix := range ghKnownNonSensitivePrefixes {
+		if strings.Contains(matchPrefix, prefix) {
+			return true
+		}
+	}
 
-func (s Scanner) Description() string {
-	return "GitHub is a web-based platform used for version control and collaborative software development. GitHub tokens can be used to access and modify repositories and other resources."
+	return false
 }

@@ -3,6 +3,7 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -57,12 +58,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, err := ping(ctx, paramsUnsafe)
 
 			s1.Verified = isVerified
-
-			if mssqlErr, isMssqlErr := err.(mssql.Error); isMssqlErr && mssqlErr.Number == 18456 {
-				// Login failed
-				// Number taken from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
-				// Nothing to do; determinate failure to verify
-			} else {
+			mssqlErr, isMssqlErr := err.(mssql.Error)
+			if isMssqlErr {
+				if mssqlErr.Number == 18456 {
+					// Login failed
+					// Number taken from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
+					// Nothing to do; determinate failure to verify
+				} else {
+					// If it is a MSSQL error, format the error with error number and message
+					s1.SetVerificationError(fmt.Errorf("SQL Server error %d: %s", mssqlErr.Number, mssqlErr.Message), paramsUnsafe.Password)
+				}
+			} else if err != nil {
+				// If it is an error but not of MSSQL error type, just set error as verification error
 				s1.SetVerificationError(err, paramsUnsafe.Password)
 			}
 		}

@@ -795,7 +795,9 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
 			decodeStart := time.Now()
-			decoded := decoder.FromChunk(chunk)
+			// This copy is needed to preserve the original chunk.Data across multiple decoders.
+			chunkCopy := *chunk
+			decoded := decoder.FromChunk(&chunkCopy)
 			decodeTime := time.Since(decodeStart).Microseconds()
 			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
@@ -830,7 +832,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 		dataSize := float64(len(chunk.Data))
 
-		scanBytesPerChunk.Observe(dataSize)
+		scanBytesPerChunk.WithLabelValues(chunk.SourceType.String()).Observe(dataSize)
 		jobBytesScanned.WithLabelValues(
 			chunk.SourceType.String(),
 			chunk.SourceName,

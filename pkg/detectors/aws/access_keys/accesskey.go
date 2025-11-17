@@ -26,6 +26,7 @@ import (
 type scanner struct {
 	verificationClient config.HTTPClient
 	skipIDs            map[string]struct{}
+	detectors.AccountFilter
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -48,6 +49,18 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 		}
 
 		s.skipIDs = ids
+	}
+}
+
+func WithAllowedAccounts(accounts []string) func(*scanner) {
+	return func(s *scanner) {
+		s.SetAllowedAccounts(accounts)
+	}
+}
+
+func WithDeniedAccounts(accounts []string) func(*scanner) {
+	return func(s *scanner) {
+		s.SetDeniedAccounts(accounts)
 	}
 }
 
@@ -143,38 +156,22 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				},
 			}
 
-			// Decode the account ID.
-			account, err := aws.GetAccountNumFromID(idMatch)
+			// Decode the AWS Account ID.
+			accountID, err := aws.GetAccountNumFromID(idMatch)
 			isCanary := false
 			if err != nil {
-				logger.V(3).Info("Failed to decode account number", "err", err)
+				logger.V(3).Info("Failed to decode AWS Account ID", "err", err)
 			} else {
-				s1.ExtraData["account"] = account
+				s1.ExtraData["account"] = accountID
 
-				// Handle canary IDs.
-				if _, ok := thinkstCanaryList[account]; ok {
+				// Check if this is a canary token
+				if _, ok := thinkstCanaryList[accountID]; ok {
 					isCanary = true
 					s1.ExtraData["message"] = thinkstMessage
-					if verify {
-						verified, arn, err := s.verifyCanary(ctx, idMatch, secretMatch)
-						s1.Verified = verified
-						if arn != "" {
-							s1.ExtraData["arn"] = arn
-						}
-						s1.SetVerificationError(err, secretMatch)
-					}
 				}
-				if _, ok := thinkstKnockoffsCanaryList[account]; ok {
+				if _, ok := thinkstKnockoffsCanaryList[accountID]; ok {
 					isCanary = true
 					s1.ExtraData["message"] = thinkstKnockoffsMessage
-					if verify {
-						verified, arn, err := s.verifyCanary(ctx, idMatch, secretMatch)
-						s1.Verified = verified
-						if arn != "" {
-							s1.ExtraData["arn"] = arn
-						}
-						s1.SetVerificationError(err, secretMatch)
-					}
 				}
 
 				if isCanary {
@@ -182,21 +179,48 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if verify && !isCanary {
-				isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch, len(secretMatches) > 1)
-				s1.Verified = isVerified
-
-				// Log if the calculated ID does not match the ID value from verification.
-				// Should only be edge cases at most.
-				if account != "" && extraData["account"] != "" && extraData["account"] != s1.ExtraData["account"] {
-					logger.V(2).Info("Calculated account ID does not match actual account ID", "calculated", account, "actual", extraData["account"])
+			if verify {
+				// Check account filtering before verification for ALL secrets (including canaries)
+				if accountID != "" {
+					if s.ShouldSkipAccount(accountID) {
+						var skipReason string
+						if s.IsInDenyList(accountID) {
+							skipReason = aws.VerificationErrAccountIDInDenyList
+						} else {
+							skipReason = aws.VerificationErrAccountIDNotInAllowList
+						}
+						s1.SetVerificationError(fmt.Errorf("%s", skipReason), secretMatch)
+						results = append(results, s1)
+						continue
+					}
 				}
 
-				// Append the extraData to the existing ExtraData map.
-				for k, v := range extraData {
-					s1.ExtraData[k] = v
+				// Perform verification based on token type
+				if isCanary {
+					// Canary verification logic
+					verified, arn, err := s.verifyCanary(ctx, idMatch, secretMatch)
+					s1.Verified = verified
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					s1.SetVerificationError(err, secretMatch)
+				} else {
+					// Normal verification logic
+					isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch, len(secretMatches) > 1)
+					s1.Verified = isVerified
+
+					// Log if the calculated ID does not match the ID value from verification.
+					// Should only be edge cases at most.
+					if accountID != "" && extraData["account"] != "" && extraData["account"] != s1.ExtraData["account"] {
+						logger.V(2).Info("Calculated account ID does not match actual account ID", "calculated", accountID, "actual", extraData["account"])
+					}
+
+					// Append the extraData to the existing ExtraData map.
+					for k, v := range extraData {
+						s1.ExtraData[k] = v
+					}
+					s1.SetVerificationError(verificationErr, secretMatch)
 				}
-				s1.SetVerificationError(verificationErr, secretMatch)
 			}
 
 			if !s1.Verified && aws.FalsePositiveSecretPat.MatchString(secretMatch) {

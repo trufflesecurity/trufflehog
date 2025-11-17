@@ -44,6 +44,7 @@ type (
 	Binding struct {
 		Resource   Resource
 		Permission Permission
+		Condition  string
 	}
 )
 

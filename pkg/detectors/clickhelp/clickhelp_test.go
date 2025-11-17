@@ -10,33 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			user_email: "test-user@clickhelp.co"
-			clickhelp_key: "XzUkp562BtmjfRGoOGBiLLNu"
-			clickhelp_domain: testingdev.try.clickhelp.co
-			auth_type: Basic
-			base_url: "https://testing-dev.try.clickhelp.co/v1/user"
-			auth_token: ""
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secrets = []string{
-		"dev.try.clickhelp.cotest-user@clickhelp.co",
-		"testingdev.try.clickhelp.cotest-user@clickhelp.co",
-	}
-)
-
 func TestClickHelp_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -47,9 +20,46 @@ func TestClickHelp_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  secrets,
+			name: "valid pattern",
+			input: `
+				# Configuration File: config.yaml
+				database:
+					host: $DB_HOST
+					port: $DB_PORT
+					username: $DB_USERNAME
+					password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+				api:
+					user_email: "test-user@clickhelp.co"
+					key: "XzUkp562BtmjfRGoOGBiLLNu"
+					portal: testingdev.try.clickhelp.co
+					auth_type: Basic
+					base_url: "https://testing-dev.try.clickhelp.co/v1/user"
+					auth_token: ""
+
+				# Notes:
+				# - Remember to rotate the secret every 90 days.
+				# - The above credentials should only be used in a secure environment.
+			`,
+			want: []string{
+				"testing-dev.try.clickhelp.cotest-user@clickhelp.co",
+				"testingdev.try.clickhelp.cotest-user@clickhelp.co",
+			},
+		},
+		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{test-user01@clickhelp.co}</id>
+  					<secret>{AQAAABAAA XzUkp562BtmjfRGoOGBiLLNu}</secret>
+					<portal>company-prod.clickhelp.co</portal>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"company-prod.clickhelp.cotest-user01@clickhelp.co"},
 		},
 	}
 

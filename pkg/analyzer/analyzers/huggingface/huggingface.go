@@ -416,7 +416,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}, nil
 }
 
-// AnalyzePermissions prints the permissions of a HuggingFace API key
+// AnalyzeAndPrintPermissions prints the permissions of a HuggingFace API key
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {

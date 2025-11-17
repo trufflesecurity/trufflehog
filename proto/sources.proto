@@ -53,6 +53,7 @@ enum SourceType {
   SOURCE_TYPE_SENTRY = 38;
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
+  SOURCE_TYPE_SLACK_CONTINUOUS = 41;
 }
 
 message LocalSource {
@@ -112,6 +113,10 @@ message Bitbucket {
   bool skip_binaries = 7;
   bool skip_archives = 8;
   BitbucketInstallationType installation_type = 9;
+  string oauth_authorization_endpoint = 10; // endpoint for OAuth authorization flow in Bitbucket Data Center application links
+  string oauth_token_endpoint = 11; // endpoint for getting OAuth access/refresh tokens in Bitbucket Data Center application links
+  repeated string oauth_scopes = 12; // list of OAuth scopes that the access token is provided
+  bool allow_secrets_manager_write = 13; // flag to explicitly allow TruffleHog to write to the user's secrets manager
 }
 
 message CircleCI {
@@ -148,6 +153,7 @@ message Confluence {
   repeated string ignore_spaces = 8;
   bool include_attachments = 9;
   bool skip_history = 10;
+  bool include_comments = 11;
 }
 
 message Docker {
@@ -159,6 +165,8 @@ message Docker {
   }
   repeated string images = 5;
   repeated string exclude_paths = 6;
+  string namespace = 7;
+  string registry_token = 8;
 }
 
 message ECR {
@@ -175,6 +183,7 @@ message Filesystem {
   repeated string paths = 2;
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
+  bool skip_binaries = 5; // allows skipping binary files from the scan
 }
 
 message GCS {
@@ -216,6 +225,10 @@ message Git {
   string uri = 13; // repository URL. https://, file://, or ssh://
   bool skip_binaries = 14;
   bool skip_archives = 15;
+  string clone_path = 16;
+  bool no_cleanup = 17;
+  bool print_legacy_json = 18;
+  bool trust_local_git_config = 19; // Trust local git configurations
 }
 
 message GitLab {
@@ -232,6 +245,10 @@ message GitLab {
   repeated string include_repos = 9;
   bool exclude_projects_shared_into_groups = 10;
   bool remove_auth_in_url = 11;
+  repeated string group_ids = 12;
+  string clone_path = 13;
+  bool no_cleanup = 14;
+  bool print_legacy_json = 15;
 }
 
 message GitHub {
@@ -249,7 +266,10 @@ message GitHub {
   string head = 9;
   string base = 10;
   repeated string ignore_repos = 11;
-  repeated string include_repos = 12;
+  // DEPRECATED: include_repos is deprecated in favor of repositories.
+  // It was used for filtering when the repositories field wasn't populating the UI-input results correctly
+  // It can be removed when we no longer depend on it
+  repeated string include_repos = 12 [deprecated = true];
   bool include_pull_request_comments = 14;
   bool include_issue_comments = 15;
   bool include_gist_comments = 16;
@@ -258,6 +278,10 @@ message GitHub {
   bool include_wikis = 19;
   uint32 comments_timeframe_days = 20;
   bool remove_auth_in_url = 21;
+  string clone_path = 22;
+  bool no_cleanup = 23;
+  bool ignore_gists = 24;
+  bool print_legacy_json = 25;
 }
 
 message GitHubExperimental {
@@ -285,6 +309,8 @@ message GitHubRealtime {
 message GoogleDrive {
   oneof credential {
     string refresh_token = 1;
+    bool use_token_service = 2;
+    credentials.Oauth2 oauth = 3; // on-prem scanning
   }
 }
 
@@ -474,6 +500,14 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+  oneof variant {
+    Vector vector = 4;
+  }
+}
+
+message Vector {
+  string locator_field = 1;
+  string link_format = 2;
 }
 
 message Elasticsearch {
@@ -501,3 +535,8 @@ message Sentry {
 }
 
 message Stdin {}
+
+message SlackContinuous {
+  string namespace = 1;
+  string project_id = 2;
+}

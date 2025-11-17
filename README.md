@@ -38,7 +38,7 @@ We take the revenue from the enterprise product to fund more awesome open source
 
 # What is TruffleHog 🐽
 
-TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
+TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context, secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
 
 ## Discovery 🔍
 
@@ -46,7 +46,7 @@ TruffleHog can look for secrets in many places including Git, chats, wikis, logs
 
 ## Classification 📁
 
-TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes its hard to tell looking at it, so TruffleHog classifies everything it finds.
+TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes it's hard to tell looking at it, so TruffleHog classifies everything it finds.
 
 ## Validation ✅
 
@@ -58,7 +58,7 @@ For the 20 some of the most commonly leaked out credential types, instead of sen
 
 # :loudspeaker: Join Our Community
 
-Have questions? Feedback? Jump in slack or discord and hang out with us
+Have questions? Feedback? Jump into Slack or Discord and hang out with us.
 
 Join our [Slack Community](https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ)
 
@@ -74,7 +74,7 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --or
 
 # :floppy_disk: Installation
 
-Several options available for you:
+Several options are available for you:
 
 ### MacOS users
 
@@ -149,7 +149,7 @@ You need the following tool to verify signature:
 
 - [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
 
-Verification steps are as follow:
+Verification steps are as follows:
 
 1. Download the artifact files you want, and the following files from the [releases](https://github.com/trufflesecurity/trufflehog/releases) page.
 
@@ -175,8 +175,8 @@ Verification steps are as follow:
 
 Replace `{version}` with the downloaded files version
 
-Alternatively, if you are using installation script, pass `-v` option to perform signature verification.
-This required Cosign binary to be installed prior to running installation script.
+Alternatively, if you are using the installation script, pass `-v` option to perform signature verification.
+This requires Cosign binary to be installed prior to running the installation script.
 
 # :rocket: Quick Start
 
@@ -185,7 +185,7 @@ This required Cosign binary to be installed prior to running installation script
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified
 ```
 
 Expected output:
@@ -209,15 +209,15 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 ## 2: Scan a GitHub Org for only verified secrets
 
 ```bash
-trufflehog github --org=trufflesecurity --results=verified,unknown
+trufflehog github --org=trufflesecurity --results=verified
 ```
 
-## 3: Scan a GitHub Repo for only verified keys and get JSON output
+## 3: Scan a GitHub Repo for only verified secrets and get JSON output
 
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown --json
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified --json
 ```
 
 Expected output:
@@ -233,7 +233,7 @@ Expected output:
 trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
 ```
 
-## 5: Scan an S3 bucket for verified keys
+## 5: Scan an S3 bucket for high-confidence results (verified + unknown)
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --results=verified,unknown
@@ -245,7 +245,7 @@ trufflehog s3 --bucket=<bucket name> --results=verified,unknown
 trufflehog s3 --role-arn=<iam role arn>
 ```
 
-## 7: Scan a Github Repo using SSH authentication in docker
+## 7: Scan a Github Repo using SSH authentication in Docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
@@ -269,18 +269,27 @@ Run trufflehog from the parent directory (outside the git repo).
 $ trufflehog git file://test_keys --results=verified,unknown
 ```
 
-## 10: Scan GCS buckets for verified secrets
+To guard against malicious git configs in local scanning (see CVE-2025-41390), TruffleHog clones local git repositories to a temporary directory prior to scanning. This follows [Git's security best practices](https://git-scm.com/docs/git#_security). If you want to specify a custom path to clone the repository to (instead of tmp), you can use the `--clone-path` flag. If you'd like to skip the local cloning process and scan the repository directly (only do this for trusted repos), you can use the `--trust-local-git-config` flag.
+
+## 10: Scan GCS buckets for only verified secrets
 
 ```bash
-trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,unknown
+trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified
 ```
 
-## 11: Scan a Docker image for verified secrets
+## 11: Scan a Docker image for only verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
 ```bash
-trufflehog docker --image trufflesecurity/secrets --results=verified,unknown
+# to scan from a remote registry
+trufflehog docker --image trufflesecurity/secrets --results=verified
+
+# to scan from the local docker daemon
+trufflehog docker --image docker://new_image:tag --results=verified
+
+# to scan from an image saved as a tarball
+trufflehog docker --image file://path_to_image.tar --results=verified
 ```
 
 ## 12: Scan in CI
@@ -382,7 +391,7 @@ aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
 - Why is the scan taking a long time when I scan a GitHub org
   - Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
 - It says a private key was verified, what does that mean?
-  - Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
+  - A verified result means TruffleHog confirmed the credential is valid by testing it against the service's API. For private keys, we've confirmed the key can be used live for SSH or SSL authentication. Check out our Driftwood blog post to learn more [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 - Is there an easy way to ignore specific secrets?
   - If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets.
 
@@ -398,7 +407,13 @@ TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
 ## What is credential verification?
 
-For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
+For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives and provides three result statuses:
+
+- **verified**: Credential confirmed as valid and active by API testing
+- **unverified**: Credential detected but not confirmed valid (may be invalid, expired, or verification disabled)  
+- **unknown**: Verification attempted but failed due to errors, such as a network or API failure
+
+For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 # :memo: Usage
 
@@ -437,7 +452,7 @@ Flags:
       --github-actions      Output in GitHub Actions format.
       --concurrency=20           Number of concurrent workers.
       --no-verification     Don't verify the results.
-      --results=RESULTS          Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to all types.
+      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to all types.
       --allow-verification-overlap
                                  Allow verification of similar credentials across detectors
       --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
@@ -568,7 +583,7 @@ In the example config above, we're scanning for live secrets in all PRs and Push
 
 ### Shallow Cloning
 
-If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example for how to do it:
+If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example of how to do it:
 
 ```
 ...
@@ -670,9 +685,9 @@ webhook is used containing the regular expression matches.
 
 TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
-status code, the secret is considered verified.
+status code, the secret is considered verified. If verification fails due to network/API errors, the result is marked as unknown.
 
-Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret, 
+Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret,
 and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
 your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
 

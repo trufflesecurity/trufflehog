@@ -75,7 +75,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
 	res, err := client.Do(req)

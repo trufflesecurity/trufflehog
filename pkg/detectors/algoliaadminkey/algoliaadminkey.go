@@ -3,14 +3,18 @@ package algoliaadminkey
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"slices"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -28,6 +32,10 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia", "docsearch", "appId"}) + `\b([A-Z0-9]{10})\b`)
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia", "docsearch", "apiKey"}) + `\b([a-zA-Z0-9]{32})\b`)
+
+	invalidHosts = simple.NewCache[struct{}]()
+
+	errNoHost = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,6 +46,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify AlgoliaAdminKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logger := logContext.AddLogger(ctx).Logger().WithName("algoliaadminkey")
 	dataStr := string(data)
 
 	// Deduplicate matches.
@@ -59,6 +68,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	// Test matches.
 	for key := range keyMatches {
 		for id := range idMatches {
+			if invalidHosts.Exists(id) {
+				logger.V(3).Info("Skipping application id: no such host", "host", id)
+				delete(idMatches, id)
+				continue
+			}
+
 			r := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AlgoliaAdminKey,
 				Raw:          []byte(key),
@@ -70,7 +85,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, extraData, verificationErr := verifyMatch(ctx, id, key)
 				r.Verified = isVerified
 				r.ExtraData = extraData
-				r.SetVerificationError(verificationErr, key)
+				if verificationErr != nil {
+					if errors.Is(verificationErr, errNoHost) {
+						invalidHosts.Set(id, struct{}{})
+						continue
+					}
+
+					r.SetVerificationError(verificationErr, key)
+				}
 			}
 
 			results = append(results, r)
@@ -101,6 +123,11 @@ func verifyMatch(ctx context.Context, appId, apiKey string) (bool, map[string]st
 
 	res, err := client.Do(req)
 	if err != nil {
+		// lookup xyz.algolia.net: no such host
+		if strings.Contains(err.Error(), "no such host") {
+			return false, nil, errNoHost
+		}
+
 		return false, nil, err
 	}
 	defer func() {

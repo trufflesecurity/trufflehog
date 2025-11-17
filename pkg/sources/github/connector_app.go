@@ -7,6 +7,8 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
+	"github.com/shurcooL/githubv4"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -15,13 +17,14 @@ import (
 
 type appConnector struct {
 	apiClient          *github.Client
+	graphqlClient      *githubv4.Client
 	installationClient *github.Client
 	installationID     int64
 }
 
 var _ Connector = (*appConnector)(nil)
 
-func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (Connector, error) {
+func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp) (Connector, error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse app installation ID %q: %w", app.InstallationId, err)
@@ -67,8 +70,14 @@ func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (Connecto
 		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 
+	graphqlClient, err := createGraphqlClient(ctx, httpClient, apiEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
+	}
+
 	return &appConnector{
 		apiClient:          apiClient,
+		graphqlClient:      graphqlClient,
 		installationClient: installationClient,
 		installationID:     installationID,
 	}, nil
@@ -88,7 +97,11 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 		return "", nil, fmt.Errorf("could not create installation token: %w", err)
 	}
 
-	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token", true, args...)
+	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "", "x-access-token", true, args...)
+}
+
+func (c *appConnector) GraphQLClient() *githubv4.Client {
+	return c.graphqlClient
 }
 
 func (c *appConnector) InstallationClient() *github.Client {

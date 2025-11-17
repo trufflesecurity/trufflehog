@@ -21,6 +21,7 @@ message CustomRegex {
   float entropy = 8;
   repeated string exclude_regexes_match = 9;
   string primary_regex_name = 10;
+  map<string, ValidationConfig> validations = 11;
 }
 
 
@@ -29,4 +30,11 @@ message VerifierConfig {
   bool unsafe = 2;
   repeated string headers = 3;
   repeated string successRanges = 4;
+}
+
+message ValidationConfig {
+  bool contains_digit = 1;
+  bool contains_lowercase = 2;
+  bool contains_uppercase = 3;
+  bool contains_special_char = 4;
 }

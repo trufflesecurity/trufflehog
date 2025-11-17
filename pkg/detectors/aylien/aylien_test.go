@@ -5,22 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern = `
-	aylien credentials:
-		aylien key: cr479du2l9pkmhar8gw5hufofvwp86q9
-		aylien id: y3ejw028
-	`
-	invalidPattern = `
-	aylien credentials:
-		aylien key: cr4U9du2l9pkmhar8gw5hufofvWp86q9
-		aylien id: y3ejwA8
-	`
 )
 
 func TestAylien_Pattern(t *testing.T) {
@@ -33,14 +21,40 @@ func TestAylien_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"cr479du2l9pkmhar8gw5hufofvwp86q9y3ejw028"},
+			name: "valid pattern",
+			input: `
+				# do not share these credentials
+				aylien credentials:
+					aylien key: cr479du2l9pkmhar8gw5hufofvwp86q9
+					aylien id: y3ejw028
+				# valid till Dec 2025
+				`,
+			want: []string{"cr479du2l9pkmhar8gw5hufofvwp86q9y3ejw028"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{aylien wmxv7ckn}</id>
+  					<secret>{aylien AQAAABAAA i09t8rb5r7otvq8sdrfjunakcso157mh}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"i09t8rb5r7otvq8sdrfjunakcso157mhwmxv7ckn"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				# do not share these credentials
+				aylien credentials:
+					aylien key: cr4U9du2l9pkmhar8gw5hufofvWp86q9
+					aylien id: y3ejwA8
+				# valid till Dec 2025
+				`,
+			want: nil,
 		},
 	}
 
@@ -48,22 +62,15 @@ func TestAylien_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -75,6 +82,7 @@ func TestAylien_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

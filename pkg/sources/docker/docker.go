@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	gzip "github.com/klauspost/pgzip"
@@ -37,7 +38,7 @@ type Source struct {
 	verify      bool
 	concurrency int
 	conn        sourcespb.Docker
-	globFilter  *glob.Filter
+	globFilter  *glob.Filter // Filter for excluding files based on glob patterns
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -61,7 +62,7 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init initializes the source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -76,7 +77,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
-	// Extract exclude paths from connection and compile regexes
+	// Extract exclude paths from connection and compile glob patterns
 	if paths := s.conn.GetExcludePaths(); len(paths) > 0 {
 		var err error
 		s.globFilter, err = glob.NewGlobFilter(glob.WithExcludeGlobs(paths...))
@@ -88,24 +89,27 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	return nil
 }
 
+// imageInfo holds information about a Docker image being processed
 type imageInfo struct {
-	image v1.Image
-	base  string
-	tag   string
+	image v1.Image // The image object from go-containerregistry
+	base  string   // Base name of the image (without tag/digest)
+	tag   string   // Tag or digest of the image
 }
 
+// historyEntryInfo represents a single entry from the image's build history
 type historyEntryInfo struct {
-	index       int
-	entry       v1.History
-	layerDigest string
-	base        string
-	tag         string
+	index       int        // Position in the history array
+	entry       v1.History // The history entry containing build commands
+	layerDigest string     // SHA256 digest of the associated layer (empty for empty layers)
+	base        string     // Base name of the image
+	tag         string     // Tag or digest of the image
 }
 
+// layerInfo contains identifying information for a Docker image layer
 type layerInfo struct {
-	digest v1.Hash
-	base   string
-	tag    string
+	digest v1.Hash // SHA256 digest uniquely identifying the layer
+	base   string  // Base name of the image
+	tag    string  // Tag or digest of the image
 }
 
 // Chunks emits data over a channel that is decoded and scanned for secrets.
@@ -115,6 +119,20 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	workers := new(errgroup.Group)
 	workers.SetLimit(s.concurrency)
 
+	// if namespace is set and no images are specified, fetch all images in that namespace.
+	registryNamespace := s.conn.GetNamespace()
+	if registryNamespace != "" && len(s.conn.Images) == 0 {
+		start := time.Now()
+		namespaceImages, err := GetNamespaceImages(ctx, registryNamespace, s.conn.GetRegistryToken())
+		if err != nil {
+			return fmt.Errorf("failed to list namespace: %s images: %w", registryNamespace, err)
+		}
+
+		dockerListImagesAPIDuration.WithLabelValues(s.name).Observe(time.Since(start).Seconds())
+
+		s.conn.Images = append(s.conn.Images, namespaceImages...)
+	}
+
 	for _, image := range s.conn.GetImages() {
 		if common.IsDone(ctx) {
 			return nil
@@ -123,39 +141,42 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		imgInfo, err := s.processImage(ctx, image)
 		if err != nil {
 			ctx.Logger().Error(err, "error processing image", "image", image)
-			return nil
+			continue
 		}
 
-		ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
+		imageCtx := context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
 
-		ctx.Logger().V(2).Info("scanning image history")
+		imageCtx.Logger().V(2).Info("scanning image history")
 
 		layers, err := imgInfo.image.Layers()
 		if err != nil {
-			ctx.Logger().Error(err, "error getting image layers")
-			return nil
+			imageCtx.Logger().Error(err, "error getting image layers")
+			continue
 		}
 
-		historyEntries, err := getHistoryEntries(ctx, imgInfo, layers)
+		// Get history entries and associate them with layers
+		historyEntries, err := getHistoryEntries(imageCtx, imgInfo, layers)
 		if err != nil {
-			ctx.Logger().Error(err, "error getting image history entries")
-			return nil
+			imageCtx.Logger().Error(err, "error getting image history entries")
+			continue
 		}
 
+		// Scan each history entry for secrets in build commands
 		for _, historyEntry := range historyEntries {
-			if err := s.processHistoryEntry(ctx, historyEntry, chunksChan); err != nil {
-				ctx.Logger().Error(err, "error processing history entry")
-				return nil
+			if err := s.processHistoryEntry(imageCtx, historyEntry, chunksChan); err != nil {
+				imageCtx.Logger().Error(err, "error processing history entry")
+				continue
 			}
 			dockerHistoryEntriesScanned.WithLabelValues(s.name).Inc()
 		}
 
-		ctx.Logger().V(2).Info("scanning image layers")
+		imageCtx.Logger().V(2).Info("scanning image layers")
 
+		// Process each layer concurrently
 		for _, layer := range layers {
 			workers.Go(func() error {
-				if err := s.processLayer(ctx, layer, imgInfo, chunksChan); err != nil {
-					ctx.Logger().Error(err, "error processing layer")
+				if err := s.processLayer(imageCtx, layer, imgInfo, chunksChan); err != nil {
+					imageCtx.Logger().Error(err, "error processing layer")
 					return nil
 				}
 				dockerLayersScanned.WithLabelValues(s.name).Inc()
@@ -165,8 +186,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 
 		if err := workers.Wait(); err != nil {
-			ctx.Logger().Error(err, "error processing layers")
-			return nil
+			imageCtx.Logger().Error(err, "error processing layers")
+			continue
 		}
 
 		dockerImagesScanned.WithLabelValues(s.name).Inc()
@@ -176,11 +197,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 // processImage processes an individual image and prepares it for further processing.
+// It handles three image source types: remote registry, local daemon, and tarball file.
 func (s *Source) processImage(ctx context.Context, image string) (imageInfo, error) {
+	ctx.Logger().V(5).Info("Processing individual Image")
 	var (
 		imgInfo   imageInfo
-		hasDigest bool
 		imageName name.Reference
+		err       error
 	)
 
 	remoteOpts, err := s.remoteOpts()
@@ -189,25 +212,31 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 	}
 
 	const filePrefix = "file://"
-	if strings.HasPrefix(image, filePrefix) {
-		image = strings.TrimPrefix(image, filePrefix)
+	const dockerPrefix = "docker://"
+
+	// Handle tarball file images
+	if image, ok := strings.CutPrefix(image, filePrefix); ok {
 		imgInfo.base = image
 		imgInfo.image, err = tarball.ImageFromPath(image, nil)
 		if err != nil {
 			return imgInfo, err
 		}
-	} else {
-		imgInfo.base, imgInfo.tag, hasDigest = baseAndTagFromImage(image)
-
-		if hasDigest {
-			imageName, err = name.NewDigest(image)
-		} else {
-			imageName, err = name.NewTag(image)
-		}
+		// Handle local Docker daemon images
+	} else if image, ok := strings.CutPrefix(image, dockerPrefix); ok {
+		imgInfo, imageName, err = s.extractImageNameTagDigest(image)
 		if err != nil {
 			return imgInfo, err
 		}
-
+		imgInfo.image, err = daemon.Image(imageName)
+		if err != nil {
+			return imgInfo, err
+		}
+		// Handle remote registry images (default)
+	} else {
+		imgInfo, imageName, err = s.extractImageNameTagDigest(image)
+		if err != nil {
+			return imgInfo, err
+		}
 		imgInfo.image, err = remote.Image(imageName, remoteOpts...)
 		if err != nil {
 			return imgInfo, err
@@ -219,9 +248,35 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 	return imgInfo, nil
 }
 
+// extractImageNameTagDigest parses the provided Docker image string and returns a name.Reference
+// representing either the image's tag or digest, and any error encountered during parsing.
+func (*Source) extractImageNameTagDigest(image string) (imageInfo, name.Reference, error) {
+	var (
+		hasDigest bool
+		imgInfo   imageInfo
+		imgName   name.Reference
+		err       error
+	)
+	imgInfo.base, imgInfo.tag, hasDigest = baseAndTagFromImage(image)
+
+	// Parse as digest reference (e.g., nginx@sha256:abc123...)
+	if hasDigest {
+		imgName, err = name.NewDigest(image)
+		// Parse as tag reference (e.g., nginx:latest)
+	} else {
+		imgName, err = name.NewTag(image)
+	}
+	if err != nil {
+		return imgInfo, imgName, err
+	}
+
+	return imgInfo, imgName, nil
+}
+
 // getHistoryEntries collates an image's configuration history together with the
 // corresponding layer digests for any non-empty layers.
 func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer) ([]historyEntryInfo, error) {
+	ctx.Logger().V(5).Info("Getting history entries")
 	config, err := imgInfo.image.ConfigFile()
 	if err != nil {
 		return nil, err
@@ -239,8 +294,8 @@ func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer
 			index: historyIndex,
 		}
 
-		// Associate with a layer if possible -- failing to do this will not affect
-		// the scan, just remove some traceability.
+		// Associate with a layer if possible. Some history entries don't create layers (e.g., ENV, LABEL)
+		// Failing to associate won't affect scanning, just reduces traceability
 		if !entry.EmptyLayer {
 			if layerIndex < len(layers) {
 				digest, err := layers[layerIndex].Digest()
@@ -266,9 +321,11 @@ func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer
 }
 
 // processHistoryEntry processes a history entry from the image configuration metadata.
+// It scans the CreatedBy field which contains the command used to create that layer.
 func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEntryInfo, chunksChan chan *sources.Chunk) error {
-	// Make up an identifier for this entry that is moderately sensible. There is
-	// no file name to use here, so the path tries to be a little descriptive.
+	ctx.Logger().V(5).Info("Processing history entries")
+	// Create a descriptive identifier for this history entry
+	// There's no file name here, so we use a synthetic path
 	entryPath := fmt.Sprintf("image-metadata:history:%d:created-by", historyInfo.index)
 
 	chunk := &sources.Chunk{
@@ -295,7 +352,10 @@ func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEnt
 }
 
 // processLayer processes an individual layer of an image.
+// It decompresses the layer and extracts all files for scanning.
 func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo imageInfo, chunksChan chan *sources.Chunk) error {
+	ctx.Logger().V(5).Info("Processing layer")
+
 	layerInfo := layerInfo{
 		base: imgInfo.base,
 		tag:  imgInfo.tag,
@@ -315,9 +375,10 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	}
 	defer rc.Close()
 
+	// Configure parallel gzip decompression for better performance
 	const (
-		defaultBlockSize = 1 << 24 // 16MB
-		defaultBlocks    = 8
+		defaultBlockSize = 1 << 24 // 16MB blocks
+		defaultBlocks    = 8       // Process 8 blocks in parallel
 	)
 
 	gzipReader, err := gzip.NewReaderN(rc, defaultBlockSize, defaultBlocks)
@@ -326,6 +387,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	}
 	defer gzipReader.Close()
 
+	// Layers are tar archives, so we read them as tar files
 	tarReader := tar.NewReader(gzipReader)
 	for {
 		header, err := tarReader.Next()
@@ -345,28 +407,32 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	return nil
 }
 
+// chunkProcessingInfo holds information needed to process a single file from a layer
 type chunkProcessingInfo struct {
-	size   int64
-	name   string
-	reader io.Reader
-	layer  layerInfo
+	size   int64     // Size of the file in bytes
+	name   string    // Full path of the file within the layer
+	reader io.Reader // Reader for the file contents
+	layer  layerInfo // Information about the layer this file belongs to
 }
 
 // processChunk processes an individual chunk of a layer.
+// It applies file size limits and exclusion patterns before scanning.
 func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chunksChan chan *sources.Chunk) error {
+	// Skip files that are too large to avoid memory issues
 	const filesizeLimitBytes int64 = 50 * 1024 * 1024 // 50MB
 	if info.size > filesizeLimitBytes {
 		ctx.Logger().V(2).Info("skipping file: size exceeds max allowed", "file", info.name, "size", info.size, "limit", filesizeLimitBytes)
 		return nil
 	}
 
-	// Check if the file should be excluded
+	// Check if the file matches any exclude patterns
 	filePath := "/" + info.name
 	if s.isExcluded(ctx, filePath) {
 		return nil
 	}
 
-	chunkReader := sources.NewChunkReader()
+	// Read the file in chunks to handle large files efficiently
+	chunkReader := sources.NewChunkReader(sources.WithFileSize(int(info.size)))
 	chunkResChan := chunkReader(ctx, info.reader)
 
 	for data := range chunkResChan {
@@ -401,14 +467,14 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 	return nil
 }
 
-// isExcluded checks if a given filePath should be excluded based on the configured excludePaths and excludeRegexes.
+// isExcluded checks if a given filePath should be excluded based on the configured glob patterns.
 func (s *Source) isExcluded(ctx context.Context, filePath string) bool {
 	if s.globFilter == nil {
-		return false // No filter configured, so nothing is excluded.
+		return false // No filter configured, so nothing is excluded
 	}
-	// globFilter.ShouldInclude returns true if it's NOT excluded by an exclude glob or if it IS included by an include glob.
-	// If ShouldInclude is true (passes the filter), it means it was NOT matched by an exclude glob, so it's NOT excluded.
-	// If ShouldInclude is false (fails the filter), it means it WAS matched by an exclude glob, so it IS excluded.
+
+	// ShouldInclude returns true if the file should be scanned (not excluded)
+	// If it returns false, the file matches an exclude pattern
 	isIncluded := s.globFilter.ShouldInclude(filePath)
 
 	if !isIncluded {
@@ -417,7 +483,10 @@ func (s *Source) isExcluded(ctx context.Context, filePath string) bool {
 	return !isIncluded
 }
 
+// remoteOpts configures the options for fetching images from remote registries.
+// It sets up HTTP transport and authentication based on the connection configuration.
 func (s *Source) remoteOpts() ([]remote.Option, error) {
+	// Configure HTTP transport with reasonable timeouts and connection pooling
 	defaultTransport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -435,6 +504,7 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	var opts []remote.Option
 	opts = append(opts, remote.WithTransport(defaultTransport))
 
+	// Configure authentication based on credential type
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.Docker_Unauthenticated:
 		return nil, nil
@@ -448,6 +518,7 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 			Token: s.conn.GetBearerToken(),
 		}))
 	case *sourcespb.Docker_DockerKeychain:
+		// Use credentials from ~/.docker/config.json
 		opts = append(opts, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	default:
 		return nil, fmt.Errorf("unknown credential type: %T", s.conn.Credential)
@@ -456,6 +527,30 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	return opts, nil
 }
 
+func GetNamespaceImages(ctx context.Context, namespace, registryToken string) ([]string, error) {
+	ctx.Logger().V(5).Info("Getting namespace images")
+
+	registry := MakeRegistryFromNamespace(namespace)
+
+	// attach the registry authentication token, if one is available.
+	if registryToken != "" {
+		registry.WithRegistryToken(registryToken)
+	}
+
+	ctx.Logger().Info(fmt.Sprintf("using registry: %s", registry.Name()))
+
+	namespaceImages, err := registry.ListImages(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list namespace images: %w", err)
+	}
+
+	ctx.Logger().Info(fmt.Sprintf("namespace: %s has %d images", namespace, len(namespaceImages)))
+
+	return namespaceImages, nil
+}
+
+// baseAndTagFromImage extracts the base name and tag/digest from an image reference string.
+// It handles both digest-based references (image@sha256:...) and tag-based references (image:tag).
 func baseAndTagFromImage(image string) (base, tag string, hasDigest bool) {
 	if base, tag, hasDigest = extractDigest(image); hasDigest {
 		return base, tag, true
@@ -465,8 +560,8 @@ func baseAndTagFromImage(image string) (base, tag string, hasDigest bool) {
 	return base, tag, false
 }
 
-// extractDigest tries to split the image string on the digest delimiter.
-// If successful, it means the image has a digest.
+// extractDigest tries to split the image string on the digest delimiter (@).
+// If successful, it means the image has a digest reference.
 func extractDigest(image string) (base, tag string, hasDigest bool) {
 	const digestDelim = "@"
 
@@ -486,7 +581,8 @@ func extractTagOrUseDefault(image string) (base, tag string) {
 
 	parts := strings.Split(image, tagDelim)
 
-	// Check if the last part is not a hostname with a port (for weak validation)
+	// Check if the last part is a tag (not a hostname with port)
+	// We use a weak validation: if it contains "/" it's likely part of a registry hostname
 	if len(parts) > 1 && !strings.Contains(parts[len(parts)-1], regRepoDelim) {
 		return strings.Join(parts[:len(parts)-1], tagDelim), parts[len(parts)-1]
 	}
