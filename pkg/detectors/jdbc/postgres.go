@@ -59,7 +59,7 @@ func joinKeyValues(m map[string]string, sep string) string {
 	return strings.Join(data, sep)
 }
 
-func parsePostgres(_ logContext.Context, subname string) (jdbc, error) {
+func parsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 
 	if !strings.HasPrefix(subname, "//") {
@@ -105,6 +105,13 @@ func parsePostgres(_ logContext.Context, subname string) (jdbc, error) {
 
 	if v := u.Query().Get("password"); v != "" {
 		params["password"] = v
+	}
+
+	if params["host"] == "" || params["password"] == "" {
+		ctx.Logger().WithName("jdbc").
+			V(2).
+			Info("Skipping invalid Postgres URL - no password or host found")
+		return nil, fmt.Errorf("missing host or password in connection string")
 	}
 
 	return &postgresJDBC{subname[2:], params}, nil
