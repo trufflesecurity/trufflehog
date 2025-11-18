@@ -23,12 +23,16 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(`\b(glsa_[0-9a-zA-Z_]{41})\b`)
+	keyPat    = regexp.MustCompile(`\b(glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8})\b`)
 	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9-]+\.grafana\.net)\b`)
 )
 
+//const noCloudFound = "No Grafana Cloud Instance associated"
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
+// Grafana uses "glsa_" as a prefix for its service accounts, see for example.
+// https://github.com/grafana/pyroscope-dotnet/blob/0c17634653af09befa7bc07b2e1c420b5dc8578c/tracer/src/Datadog.Trace/Iast/Analyzers/HardcodedSecretsAnalyzer.cs#L175
 func (s Scanner) Keywords() []string {
 	return []string{"glsa_"}
 }
@@ -40,49 +44,65 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range keyMatches {
-		key := strings.TrimSpace(match[1])
+	for _, keyMatch := range keyMatches {
+		key := strings.TrimSpace(keyMatch[1])
 
-		for _, domainMatch := range domainMatches {
-			domainRes := strings.TrimSpace(domainMatch[1])
-
-			s1 := detectors.Result{
+		if len(domainMatches) == 0 {
+			res := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GrafanaServiceAccount,
 				Raw:          []byte(key),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", domainRes, key)),
+				RawV2:        []byte(key),
 			}
+			res.SetVerificationError(fmt.Errorf("no grafana instance detected to verify against"), key)
+			results = append(results, res)
+		} else if len(domainMatches) >= 1 {
+			for _, domainMatch := range domainMatches {
+				domainRes := strings.TrimSpace(domainMatch[1])
 
-			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
+				res := detectors.Result{
+					DetectorType: detectorspb.DetectorType_GrafanaServiceAccount,
+					Raw:          []byte(key),
 				}
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/api/access-control/user/permissions", nil)
-				if err != nil {
-					continue
+
+				res.RawV2 = fmt.Appendf(nil, "%s:%s", domainRes, key)
+				if verify {
+					s.verifyGrafanaCloudServiceAccount(ctx, &res, domainRes, key)
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else if res.StatusCode == 401 {
-						// The secret is determinately not verified (nothing to do)
-					} else {
-						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-						s1.SetVerificationError(err, key)
-					}
-				} else {
-					s1.SetVerificationError(err, key)
-				}
+				results = append(results, res)
 			}
-
-			results = append(results, s1)
 		}
 	}
 
 	return results, nil
+}
+
+func (s Scanner) verifyGrafanaCloudServiceAccount(ctx context.Context, res *detectors.Result, domain, key string) {
+	client := s.client
+	if client == nil {
+		client = defaultClient
+	}
+
+	url := fmt.Sprintf("https://%s/api/access-control/user/permissions", domain)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
+
+	resp, err := client.Do(req)
+	if err == nil {
+		defer resp.Body.Close()
+		switch {
+		case resp.StatusCode >= 200 && resp.StatusCode < 300:
+			res.Verified = true
+		case resp.StatusCode == 401:
+			// determinately not verified
+		default:
+			res.SetVerificationError(fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode), key)
+		}
+	} else {
+		res.SetVerificationError(err, key)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
