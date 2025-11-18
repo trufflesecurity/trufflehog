@@ -203,7 +203,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 							},
 						},
 					},
-					Verify: s.verify,
+					SourceVerify: s.verify,
 				}
 
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {

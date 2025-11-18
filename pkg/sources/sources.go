@@ -44,8 +44,8 @@ type Chunk struct {
 	// SourceType is the type of Source that produced the chunk.
 	SourceType sourcespb.SourceType
 
-	// Verify specifies whether any secrets in the Chunk should be verified.
-	Verify bool
+	// SourceVerify specifies whether the source that generated this Chunk has verification enabled by config.
+	SourceVerify bool
 }
 
 // ChunkingTarget specifies criteria for a targeted chunking process.

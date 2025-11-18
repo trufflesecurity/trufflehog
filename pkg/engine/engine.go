@@ -793,7 +793,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
-		sourceVerify := chunk.Verify
+		sourceVerify := chunk.SourceVerify
 		for _, decoder := range e.decoders {
 			decodeStart := time.Now()
 			// This copy is needed to preserve the original chunk.Data across multiple decoders.
@@ -1028,7 +1028,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				chunk:    chunk.chunk,
 				detector: detector,
 				decoder:  chunk.decoder,
-				verify:   e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides),
+				verify:   e.shouldVerifyChunk(chunk.chunk.SourceVerify, detector, e.detectorVerificationOverrides),
 				wgDoneFn: wgDetect.Done,
 			}
 		}

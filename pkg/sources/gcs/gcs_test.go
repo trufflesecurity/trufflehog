@@ -271,11 +271,11 @@ func createTestObject(id int) object {
 
 func createTestSourceChunk(id int) *sources.Chunk {
 	return &sources.Chunk{
-		SourceName: "test",
-		SourceType: sourcespb.SourceType_SOURCE_TYPE_GCS,
-		SourceID:   0,
-		Verify:     true,
-		Data:       []byte(fmt.Sprintf("hello world %d", id)),
+		SourceName:   "test",
+		SourceType:   sourcespb.SourceType_SOURCE_TYPE_GCS,
+		SourceID:     0,
+		SourceVerify: true,
+		Data:         []byte(fmt.Sprintf("hello world %d", id)),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Gcs{
 				Gcs: &source_metadatapb.GCS{
