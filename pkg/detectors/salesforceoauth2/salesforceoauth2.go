@@ -105,6 +105,15 @@ domainLoop:
 
 						s1.SetVerificationError(verificationErr, secret)
 					}
+
+					if isVerified {
+						s1.AnalysisInfo = map[string]string{
+							"domain":        domain,
+							"client_id":     key,
+							"client_secret": secret,
+						}
+
+					}
 				}
 
 				results = append(results, s1)
