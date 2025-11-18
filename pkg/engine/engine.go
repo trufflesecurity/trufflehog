@@ -1091,7 +1091,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := e.verificationCache.FromData(
 			ctx,
 			data.detector.Detector,
-			data.chunk.Verify,
+			data.verify,
 			data.chunk.SecretID != 0,
 			matchBytes)
 		t.Stop()
