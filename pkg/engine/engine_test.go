@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcache"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -1319,8 +1321,55 @@ def test_something():
 	}
 }
 
+type passthroughDetector struct{}
+
+func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, _ []byte) ([]detectors.Result, error) {
+	return []detectors.Result{
+		{
+			Raw:      []byte("l;jaslkghl;akheg"),
+			Verified: verify,
+		},
+	}, nil
+}
+
+func (p passthroughDetector) Keywords() []string             { return []string{"keyword"} }
+func (p passthroughDetector) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+func (p passthroughDetector) Description() string            { return "fake detector for testing" }
+
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
-	t.Fatalf("not implemented")
+	ctx := context.Background()
+
+	// Arrange: Create a minimal engine.
+	e := &Engine{
+		results:           make(chan detectors.ResultWithMetadata, 1),
+		verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+	}
+
+	// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{}})
+	detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
+	require.Len(t, detectorMatches, 1)
+
+	// Arrange: Create a chunk to detect.
+	chunk := detectableChunk{
+		chunk: sources.Chunk{
+			Verify: true,
+		},
+		detector: detectorMatches[0],
+		wgDoneFn: func() {},
+	}
+
+	// Act
+	e.detectChunk(ctx, chunk)
+	close(e.results)
+
+	// Assert: Confirm that a result was generated and that it has the expected verify flag.
+	select {
+	case result := <-e.results:
+		assert.True(t, result.Result.Verified)
+	default:
+		t.Errorf("expected a result but did not get one")
+	}
 }
 
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
