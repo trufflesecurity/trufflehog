@@ -453,26 +453,62 @@ func (s *Source) pageChunker(
 ) {
 	s.checkpointer.Reset() // Reset the checkpointer for each PAGE
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
-
 	for objIdx, obj := range metadata.page.Contents {
 		ctx = context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
-
 		if common.IsDone(ctx) {
 			return
 		}
 
-		skipObject, reason := s.shouldSkipObject(ctx, objIdx, obj, metadata)
-		if skipObject {
-			s.metricsCollector.RecordObjectSkipped(metadata.bucket, reason, float64(*obj.Size))
+		// Skip GLACIER and GLACIER_IR objects.
+		if obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr {
+			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", obj.StorageClass)
+			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "storage_class", float64(*obj.Size))
 			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
-				ctx.Logger().Error(err, fmt.Sprintf("could not update progress for %s", reason))
+				ctx.Logger().Error(err, "could not update progress for glacier object")
 			}
+			continue
+		}
+
+		// Ignore large files.
+		if *obj.Size > s.maxObjectSize {
+			ctx.Logger().V(5).Info("Skipping large file", "max_object_size", s.maxObjectSize)
+			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "size_limit", float64(*obj.Size))
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for large file")
+			}
+			continue
+		}
+
+		// File empty file.
+		if *obj.Size == 0 {
+			ctx.Logger().V(5).Info("Skipping empty file")
+			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "empty_file", 0)
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for empty file")
+			}
+			continue
+		}
+
+		// Skip incompatible extensions.
+		if common.SkipFile(*obj.Key) {
+			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
+			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "incompatible_extension", float64(*obj.Size))
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for incompatible file")
+			}
+			continue
 		}
 
 		s.jobPool.Go(func() error {
 			defer common.RecoverWithExit(ctx)
 			if common.IsDone(ctx) {
 				return ctx.Err()
+			}
+
+			if strings.HasSuffix(*obj.Key, "/") {
+				ctx.Logger().V(5).Info("Skipping directory")
+				s.metricsCollector.RecordObjectSkipped(metadata.bucket, "directory", float64(*obj.Size))
+				return nil
 			}
 
 			path := strings.Split(*obj.Key, "/")
@@ -492,7 +528,10 @@ func (s *Source) pageChunker(
 			objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
 			defer cancel()
 
-			res, err := s.getObject(objCtx, metadata.client, *obj.Key, metadata.bucket, *obj.Size)
+			res, err := metadata.client.GetObject(objCtx, &s3.GetObjectInput{
+				Bucket: &metadata.bucket,
+				Key:    obj.Key,
+			})
 			if err != nil {
 				if strings.Contains(err.Error(), "AccessDenied") {
 					ctx.Logger().Error(err, "could not get S3 object; access denied")
@@ -500,6 +539,13 @@ func (s *Source) pageChunker(
 				} else {
 					ctx.Logger().Error(err, "could not get S3 object")
 					s.metricsCollector.RecordObjectError(metadata.bucket)
+				}
+				// According to the documentation for GetObjectWithContext,
+				// the response can be non-nil even if there was an error.
+				// It's uncertain if the body will be nil in such cases,
+				// but we'll close it if it's not.
+				if res != nil && res.Body != nil {
+					res.Body.Close()
 				}
 
 				nErr, ok := state.errorCount.Load(prefix)
@@ -520,12 +566,35 @@ func (s *Source) pageChunker(
 			}
 			defer res.Body.Close()
 
-			err = s.handleFileChunk(ctx, obj, res, reporter, metadata.bucket, metadata.client.Options().Region)
-			if err != nil {
+			email := "Unknown"
+			if obj.Owner != nil {
+				email = *obj.Owner.DisplayName
+			}
+			modified := obj.LastModified.String()
+			chunkSkel := &sources.Chunk{
+				SourceType: s.Type(),
+				SourceName: s.name,
+				SourceID:   s.SourceID(),
+				JobID:      s.JobID(),
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_S3{
+						S3: &source_metadatapb.S3{
+							Bucket:    metadata.bucket,
+							File:      sanitizer.UTF8(*obj.Key),
+							Link:      sanitizer.UTF8(makeS3Link(metadata.bucket, metadata.client.Options().Region, *obj.Key)),
+							Email:     sanitizer.UTF8(email),
+							Timestamp: sanitizer.UTF8(modified),
+						},
+					},
+				},
+				Verify: s.verify,
+			}
+
+			if err := handlers.HandleFile(ctx, res.Body, chunkSkel, reporter); err != nil {
+				ctx.Logger().Error(err, "error handling file")
 				s.metricsCollector.RecordObjectError(metadata.bucket)
 				return nil
 			}
-
 			atomic.AddUint64(state.objectCount, 1)
 			ctx.Logger().V(5).Info("S3 object scanned.", "object_count", state.objectCount)
 			nErr, ok = state.errorCount.Load(prefix)
@@ -535,17 +604,14 @@ func (s *Source) pageChunker(
 			if nErr.(int) > 0 {
 				state.errorCount.Store(prefix, 0)
 			}
-
 			// Update progress after successful processing.
 			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 			s.metricsCollector.RecordObjectScanned(metadata.bucket, float64(*obj.Size))
-
 			return nil
 		})
 	}
-
 	_ = s.jobPool.Wait()
 }
 
