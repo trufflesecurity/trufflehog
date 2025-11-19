@@ -1318,3 +1318,20 @@ def test_something():
 		})
 	}
 }
+
+func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
+	t.Fatalf("not implemented")
+}
+
+func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
+	t.Fatalf("not implemented")
+}
+
+func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
+	t.Run("overlap", func(t *testing.T) {
+		t.Fatalf("not implemented")
+	})
+	t.Run("no overlap", func(t *testing.T) {
+		t.Fatalf("not implemented")
+	})
+}
