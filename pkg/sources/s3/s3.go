@@ -317,16 +317,7 @@ func (s *Source) scanBuckets(
 
 	bucketsToScanCount := len(bucketsToScan)
 	for bucketIdx := pos.index; bucketIdx < bucketsToScanCount; bucketIdx++ {
-		s.metricsCollector.RecordBucketForRole(role)
 		bucket := bucketsToScan[bucketIdx]
-		ctx := context.WithValue(ctx, "bucket", bucket)
-
-		if common.IsDone(ctx) {
-			ctx.Logger().Error(ctx.Err(), "context done, while scanning bucket")
-			return
-		}
-
-		ctx.Logger().V(3).Info("Scanning bucket")
 
 		s.SetProgressComplete(
 			bucketIdx,
@@ -335,53 +326,16 @@ func (s *Source) scanBuckets(
 			s.Progress.EncodedResumeInfo,
 		)
 
-		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
-		if err != nil {
-			ctx.Logger().Error(err, "could not get regional client for bucket")
-			continue
-		}
-
-		errorCount := sync.Map{}
-
-		input := &s3.ListObjectsV2Input{Bucket: &bucket}
+		var startAfter *string
 		if bucket == pos.bucket && pos.startAfter != "" {
-			input.StartAfter = &pos.startAfter
+			startAfter = &pos.startAfter
 			ctx.Logger().V(3).Info(
 				"Resuming bucket scan",
 				"start_after", pos.startAfter,
 			)
 		}
 
-		pageNumber := 1
-		paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
-		for paginator.HasMorePages() {
-			output, err := paginator.NextPage(ctx)
-			if err != nil {
-				if role == "" {
-					ctx.Logger().Error(err, "could not list objects in bucket")
-				} else {
-					// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
-					// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
-					// account, but the role probably doesn't have access to all of them). This makes it expected behavior
-					// and therefore not an error.
-					ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
-				}
-				break
-			}
-			pageMetadata := pageMetadata{
-				bucket:     bucket,
-				pageNumber: pageNumber,
-				client:     regionalClient,
-				page:       output,
-			}
-			processingState := processingState{
-				errorCount:  &errorCount,
-				objectCount: &objectCount,
-			}
-			s.pageChunker(ctx, pageMetadata, processingState, chunksChan)
-
-			pageNumber++
-		}
+		s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, &objectCount)
 	}
 
 	s.SetProgressComplete(
@@ -390,6 +344,71 @@ func (s *Source) scanBuckets(
 		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount),
 		"",
 	)
+}
+
+func (s *Source) scanBucket(
+	ctx context.Context,
+	client *s3.Client,
+	role string,
+	bucket string,
+	reporter sources.ChunkReporter,
+	startAfter *string,
+	objectCount *uint64,
+) {
+	s.metricsCollector.RecordBucketForRole(role)
+
+	ctx = context.WithValue(ctx, "bucket", bucket)
+
+	if common.IsDone(ctx) {
+		ctx.Logger().Error(ctx.Err(), "context done, while scanning bucket")
+		return
+	}
+
+	ctx.Logger().V(3).Info("Scanning bucket")
+
+	regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
+	if err != nil {
+		ctx.Logger().Error(err, "could not get regional client for bucket")
+		return
+	}
+
+	errorCount := sync.Map{}
+
+	input := &s3.ListObjectsV2Input{Bucket: &bucket}
+	if startAfter != nil {
+		input.StartAfter = startAfter
+	}
+
+	pageNumber := 1
+	paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
+	for paginator.HasMorePages() {
+		output, err := paginator.NextPage(ctx)
+		if err != nil {
+			if role == "" {
+				ctx.Logger().Error(err, "could not list objects in bucket")
+			} else {
+				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
+				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
+				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
+				// and therefore not an error.
+				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
+			}
+			break
+		}
+		pageMetadata := pageMetadata{
+			bucket:     bucket,
+			pageNumber: pageNumber,
+			client:     regionalClient,
+			page:       output,
+		}
+		processingState := processingState{
+			errorCount:  &errorCount,
+			objectCount: objectCount,
+		}
+		s.pageChunker(ctx, pageMetadata, processingState, reporter)
+
+		pageNumber++
+	}
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -430,7 +449,7 @@ func (s *Source) pageChunker(
 	ctx context.Context,
 	metadata pageMetadata,
 	state processingState,
-	chunksChan chan *sources.Chunk,
+	reporter sources.ChunkReporter,
 ) {
 	s.checkpointer.Reset() // Reset the checkpointer for each PAGE
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
@@ -501,7 +520,7 @@ func (s *Source) pageChunker(
 			}
 			defer res.Body.Close()
 
-			err = s.handleFileChunk(ctx, obj, res, sources.ChanReporter{Ch: chunksChan}, metadata.bucket, metadata.client.Options().Region)
+			err = s.handleFileChunk(ctx, obj, res, reporter, metadata.bucket, metadata.client.Options().Region)
 			if err != nil {
 				s.metricsCollector.RecordObjectError(metadata.bucket)
 				return nil
@@ -752,79 +771,13 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	if !ok {
 		return fmt.Errorf("expected *S3SourceUnit, got %T", unit)
 	}
-	bucket, _ := unit.SourceUnitID()
-	logger := ctx.Logger().WithValues("bucket", bucket)
+	bucket := s3unit.Bucket
 
 	defaultClient, err := s.newClient(ctx, defaultAWSRegion, s3unit.Role)
 	if err != nil {
 		return fmt.Errorf("could not create s3 client: %w", err)
 	}
 
-	client, err := s.getRegionalClientForBucket(ctx, defaultClient, s3unit.Role, bucket)
-	if err != nil {
-		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get regional client for bucket: %w", err))
-	}
-
-	input := &s3.ListObjectsV2Input{Bucket: &bucket}
-	paginator := s3.NewListObjectsV2Paginator(client, input)
-
-	pageNumber := 1
-	for paginator.HasMorePages() {
-		output, err := paginator.NextPage(ctx)
-		if err != nil {
-			ctx.Logger().V(5).Error(err, "could not list objects in bucket")
-			break
-		}
-
-		metadata := pageMetadata{
-			bucket:     bucket,
-			pageNumber: pageNumber,
-			client:     client,
-			page:       output,
-		}
-
-		for objIdx, obj := range output.Contents {
-			skipObject, _ := s.shouldSkipObject(ctx, objIdx, obj, metadata)
-			if skipObject {
-				continue
-			}
-
-			logger.V(3).Info(fmt.Sprintf("chunking s3 unit %s", *obj.Key))
-
-			err := s.chunkObject(ctx, client, reporter, &obj, bucket)
-			if err != nil {
-				return reporter.ChunkErr(ctx, err)
-			}
-
-			logger.V(5).Info("S3 object chunked successfully", "object_key", *obj.Key)
-		}
-		pageNumber++
-	}
-	return nil
-}
-
-func (s *Source) chunkObject(
-	ctx context.Context,
-	client *s3.Client,
-	reporter sources.ChunkReporter,
-	obj *s3types.Object,
-	bucket string,
-) error {
-	// Make sure we use a separate context for the GetObjectWithContext call.
-	// This ensures that the timeout is isolated and does not affect any downstream operations. (e.g. HandleFile)
-	const getObjectTimeout = 30 * time.Second
-	objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
-	defer cancel()
-
-	res, err := s.getObject(objCtx, client, *obj.Key, bucket, *obj.Size)
-	if err != nil {
-		return fmt.Errorf("unable to get object: %w", err)
-	}
-	defer res.Body.Close()
-
-	err = s.handleFileChunk(ctx, *obj, res, reporter, bucket, client.Options().Region)
-	if err != nil {
-		return fmt.Errorf("error handling file chunk: %w", err)
-	}
+	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, nil, nil)
 	return nil
 }
