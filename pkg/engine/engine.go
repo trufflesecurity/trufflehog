@@ -773,8 +773,8 @@ type detectableChunk struct {
 	detector *ahocorasick.DetectorMatch
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
-	verify   bool
 	wgDoneFn func()
+	verify   bool
 }
 
 // verificationOverlapChunk is a decoded chunk that has multiple detectors that match it.
