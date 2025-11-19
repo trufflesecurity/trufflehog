@@ -23,10 +23,10 @@ type Image struct {
 
 // Registry is an interface for any Docker/OCI registry implementation that can list all images under a given namespace.
 type Registry interface {
-	Name() string                           // return name of the registry
-	WithRegistryToken(registryToken string) // set token for registry
-	// TODO: Handle pagination and rate limits for list images API Call
+	Name() string                                                       // return name of the registry
+	WithRegistryToken(registryToken string)                             // set token for registry
 	ListImages(ctx context.Context, namespace string) ([]string, error) // list all images
+	WithClient() *http.Client                                           // return the HTTP client to use
 }
 
 // MakeRegistryFromNamespace returns a Registry implementation
@@ -51,7 +51,7 @@ const (
 	maxSleepTime          = 30 * time.Second
 )
 
-func requestWithRateLimit(ctx context.Context, method, urlStr string, headers http.Header) (*http.Response, error) {
+func requestWithRateLimit(ctx context.Context, client *http.Client, method, urlStr string, headers http.Header) (*http.Response, error) {
 	for attempts := 0; attempts < maxRetriesOnRateLimit; attempts++ {
 		req, err := http.NewRequestWithContext(ctx, method, urlStr, http.NoBody)
 		if err != nil {
@@ -65,7 +65,7 @@ func requestWithRateLimit(ctx context.Context, method, urlStr string, headers ht
 			}
 		}
 
-		resp, err := defaultHTTPClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func requestWithRateLimit(ctx context.Context, method, urlStr string, headers ht
 			return resp, nil
 		}
 
-		// We'll honor Retry-After if it's present, otherwise back off a little.
+		// Honor Retry-After if it's present, otherwise back off a little.
 		retryAfter := resp.Header.Get("Retry-After")
 
 		_, _ = io.Copy(io.Discard, resp.Body)
@@ -113,7 +113,8 @@ func requestWithRateLimit(ctx context.Context, method, urlStr string, headers ht
 
 // DockerHub implements the Registry interface for hub.docker.com.
 type DockerHub struct {
-	Token string
+	Token  string
+	Client *http.Client
 }
 
 // dockerhubResp models Docker Hub's /v2/namespaces/<ns>/repositories API response.
@@ -128,6 +129,13 @@ func (d *DockerHub) Name() string {
 
 func (d *DockerHub) WithRegistryToken(registryToken string) {
 	d.Token = registryToken
+}
+
+func (d *DockerHub) WithClient() *http.Client {
+	if d != nil && d.Client != nil {
+		return d.Client
+	}
+	return defaultHTTPClient
 }
 
 // ListImages lists all images under a Docker Hub namespace using Docker Hub's API.
@@ -147,7 +155,7 @@ func (d *DockerHub) ListImages(ctx context.Context, namespace string) ([]string,
 	}
 
 	for nextURL != "" {
-		resp, err := requestWithRateLimit(ctx, http.MethodGet, nextURL, headers)
+		resp, err := requestWithRateLimit(ctx, d.WithClient(), http.MethodGet, nextURL, headers)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +204,8 @@ func (d *DockerHub) ListImages(ctx context.Context, namespace string) ([]string,
 
 // Quay implements the Registry interface for Quay.io.
 type Quay struct {
-	Token string
+	Token  string
+	Client *http.Client
 }
 
 // quayResp models the JSON structure returned by Quay's /api/v1/repository endpoint.
@@ -212,6 +221,13 @@ func (q *Quay) Name() string {
 
 func (q *Quay) WithRegistryToken(registryToken string) {
 	q.Token = registryToken
+}
+
+func (q *Quay) WithClient() *http.Client {
+	if q != nil && q.Client != nil {
+		return q.Client
+	}
+	return defaultHTTPClient
 }
 
 // ListImages lists all images under a Quay namespace.
@@ -241,7 +257,7 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 		}
 		u.RawQuery = query.Encode()
 
-		resp, err := requestWithRateLimit(ctx, http.MethodGet, u.String(), headers)
+		resp, err := requestWithRateLimit(ctx, q.WithClient(), http.MethodGet, u.String(), headers)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +313,8 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 
 // GHCR implements the Registry interface for GHCR.io.
 type GHCR struct {
-	Token string // https://github.com/github/roadmap/issues/558
+	Token  string // https://github.com/github/roadmap/issues/558
+	Client *http.Client
 }
 
 func (g *GHCR) Name() string {
@@ -306,6 +323,13 @@ func (g *GHCR) Name() string {
 
 func (g *GHCR) WithRegistryToken(registryToken string) {
 	g.Token = registryToken
+}
+
+func (g *GHCR) WithClient() *http.Client {
+	if g != nil && g.Client != nil {
+		return g.Client
+	}
+	return defaultHTTPClient
 }
 
 // parseNextLinkURL extracts the URL with rel="next" from a GitHub Link header, if present.
@@ -375,7 +399,7 @@ func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, erro
 	headers.Set("Accept", "application/vnd.github+json")
 
 	for nextURL != "" {
-		resp, err := requestWithRateLimit(ctx, http.MethodGet, nextURL, headers)
+		resp, err := requestWithRateLimit(ctx, g.WithClient(), http.MethodGet, nextURL, headers)
 		if err != nil {
 			return nil, err
 		}
