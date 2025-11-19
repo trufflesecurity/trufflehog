@@ -751,6 +751,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		return fmt.Errorf("could not create s3 client: %w", err)
 	}
 
-	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, nil, nil)
+	var objectCount uint64
+	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, nil, &objectCount)
 	return nil
 }

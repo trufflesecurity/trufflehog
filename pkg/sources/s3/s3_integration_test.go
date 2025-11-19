@@ -428,12 +428,11 @@ func TestSource_Enumerate(t *testing.T) {
 	err = s.Enumerate(ctx, &reporter)
 	assert.NoError(t, err)
 
-	assert.Greater(t, len(reporter.Units), 0, "Expected at least one unit to be enumerated")
+	assert.Equal(t, len(reporter.Units), 1)
 	assert.Equal(t, 0, len(reporter.UnitErrs), "Expected no errors during enumeration")
 
 	for _, unit := range reporter.Units {
 		id, _ := unit.SourceUnitID()
-		t.Logf("Enumerated unit: %s", id)
 		assert.NotEmpty(t, id, "Unit ID should not be empty")
 	}
 }
@@ -478,6 +477,6 @@ func TestSource_ChunkUnit(t *testing.T) {
 		assert.NoError(t, err, "Expected no error during ChunkUnit")
 	}
 
-	assert.Greater(t, len(reporter.Chunks), 0)
+	assert.Equal(t, 103, len(reporter.Chunks))
 	assert.Equal(t, 0, len(reporter.ChunkErrs))
 }
