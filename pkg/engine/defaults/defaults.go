@@ -684,6 +684,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/skybiometry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/slack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/slackwebhook"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smartling"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smartsheets"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smartystreets"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smooch"
@@ -1564,6 +1565,7 @@ func buildDetectorList() []detectors.Detector {
 		&skybiometry.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&slackwebhook.Scanner{},
+		&smartling.Scanner{},
 		&smartsheets.Scanner{},
 		&smartystreets.Scanner{},
 		&smooch.Scanner{},
