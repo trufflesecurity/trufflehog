@@ -47,8 +47,9 @@ func MakeRegistryFromNamespace(namespace string) Registry {
 }
 
 const (
-	maxRetriesOnRateLimit = 5
-	maxSleepTime          = 30 * time.Second
+	maxRetriesOnRateLimit = 5                // maximum number of retries on HTTP 429 responses
+	maxSleepTime          = 30 * time.Second // maximum allowed sleep time between retries
+	initialBackoff        = 1 * time.Second  // initial backoff time before retrying
 )
 
 func requestWithRateLimit(ctx context.Context, client *http.Client, method, urlStr string, headers http.Header) (*http.Response, error) {
@@ -80,7 +81,7 @@ func requestWithRateLimit(ctx context.Context, client *http.Client, method, urlS
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 
-		sleepFor := 5 * time.Second // 5 second default backoff
+		sleepFor := initialBackoff * (1 << attempts) // Exponentially increase backoff time
 
 		if retryAfter != "" {
 			// Retry-After can be either seconds or an HTTP date.
