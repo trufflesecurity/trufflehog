@@ -210,6 +210,33 @@ func TestGenerateLink(t *testing.T) {
 			},
 			want: "https://github.com/GeekMasher/tree-sitter-hcl/blob/a7f23cc5795769262f5515e52902f86c1b768994/example/real_world_stuff/coreos/coreos%25tectonic-installer%25installer%25frontend%25ui-tests%25output%25metal.tfvars#L1",
 		},
+		{
+			name: "github wiki link gen",
+			args: args{
+				repo:   "https://github.com/hxnyk/hxnyk.wiki.git",
+				commit: "e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+				file:   "Home.md",
+				line:   int64(5),
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87#L5",
+		},
+		{
+			name: "github wiki link gen - no line",
+			args: args{
+				repo:   "https://github.com/hxnyk/hxnyk.wiki.git",
+				commit: "e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+				file:   "Home.md",
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+		},
+		{
+			name: "github wiki link gen - no commit no line",
+			args: args{
+				repo: "https://github.com/hxnyk/hxnyk.wiki.git",
+				file: "Home.md",
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
