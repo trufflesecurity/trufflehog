@@ -332,6 +332,7 @@ func (s *Source) scanBuckets(
 			ctx.Logger().V(3).Info(
 				"Resuming bucket scan",
 				"start_after", pos.startAfter,
+				"bucket", bucket,
 			)
 		}
 
