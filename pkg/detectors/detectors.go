@@ -17,10 +17,13 @@ import (
 
 // Detector defines an interface for scanning for and verifying secrets.
 type Detector interface {
-	// FromData will scan bytes for results, and optionally verify them.
+	// FromData will scan bytes for results and optionally verify them.
 	FromData(ctx context.Context, verify bool, data []byte) ([]Result, error)
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.
 	// Use unique identifiers that are part of the secret if you can, or the provider name.
+	//
+	// When multiple keywords are provided, they are is treated as a *union* of filtering terms.
+	// That is, if any of the keywords are found in a chunk, the chunk will be run through the detector.
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
@@ -89,6 +92,7 @@ type Result struct {
 	DetectorType detectorspb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
+	// Verified indicates whether the result was verified or not.
 	Verified     bool
 	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
 	// than an actual remote request.
@@ -104,7 +108,7 @@ type Result struct {
 	ExtraData      map[string]string
 	StructuredData *detectorspb.StructuredData
 
-	// This field should only be populated if the verification process itself failed in a way that provides no
+	// verificationError should be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
 
@@ -167,7 +171,7 @@ func redactSecrets(err error, secrets ...string) error {
 	lastErr := unwrapToLast(err)
 	errStr := lastErr.Error()
 	for _, secret := range secrets {
-		errStr = strings.Replace(errStr, secret, "[REDACTED]", -1)
+		errStr = strings.ReplaceAll(errStr, secret, "[REDACTED]")
 	}
 	return errors.New(errStr)
 }
@@ -289,7 +293,7 @@ func MustGetBenchmarkData() map[string][]byte {
 	for key, size := range sizes {
 		// Generating a byte slice of a specific size with random data.
 		content := make([]byte, size)
-		for i := 0; i < size; i++ {
+		for i := range(size) {
 			randomByte, err := rand.Int(rand.Reader, big.NewInt(256))
 			if err != nil {
 				panic(err)
@@ -304,7 +308,7 @@ func MustGetBenchmarkData() map[string][]byte {
 
 func RedactURL(u url.URL) string {
 	u.User = url.UserPassword(u.User.Username(), "********")
-	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
+	return strings.TrimSpace(strings.ReplaceAll(u.String(), "%2A", "*"))
 }
 
 func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
