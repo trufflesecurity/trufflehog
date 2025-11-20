@@ -161,12 +161,8 @@ func (d *DockerHub) ListImages(ctx context.Context, namespace string) ([]string,
 			return nil, err
 		}
 
-		defer func() {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-		}()
-
 		body, err := io.ReadAll(resp.Body)
+		discardBody(resp)
 		if err != nil {
 			return nil, err
 		}
@@ -213,6 +209,7 @@ type Quay struct {
 type quayResp struct {
 	Repositories  []Image `json:"repositories"`
 	HasAdditional bool    `json:"has_additional"`
+	NextPage      string  `json:"next_page"`
 	Page          int     `json:"page"`
 }
 
@@ -248,6 +245,8 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 		headers.Set("Authorization", "Bearer "+q.Token)
 	}
 
+	// Loop through paginated results that is handled via the "next_page" query parameter
+	// Reference: https://docs.redhat.com/en/documentation/red_hat_quay/3.10/html/use_red_hat_quay/using_the_red_hat_quay_api#example_for_pagination
 	for {
 		u := *baseURL
 		query := u.Query()
@@ -263,13 +262,8 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 			return nil, err
 		}
 
-		defer func() {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-		}()
-
 		body, err := io.ReadAll(resp.Body)
-
+		discardBody(resp)
 		if err != nil {
 			return nil, err
 		}
@@ -288,23 +282,10 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 			allImages = append(allImages, fmt.Sprintf("%s/%s", namespace, image.Name)) // quay.io/<namespace>/<image_name>
 		}
 
-		if !page.HasAdditional {
+		if !page.HasAdditional || page.NextPage == "" {
 			break
 		}
-
-		// Newer Quay API versions may include "next_page" in the top-level JSON.
-		// To support that without introducing another struct, fall back to
-		// parsing it generically when HasAdditional is true.
-		var raw map[string]any
-		if err := json.Unmarshal(body, &raw); err != nil {
-			return nil, err
-		}
-		if np, ok := raw["next_page"].(string); ok && np != "" {
-			nextPageToken = np
-		} else {
-			// No token – stop to avoid an infinite loop.
-			break
-		}
+		nextPageToken = page.NextPage
 	}
 
 	return allImages, nil
@@ -333,7 +314,11 @@ func (g *GHCR) WithClient() *http.Client {
 	return defaultHTTPClient
 }
 
-// parseNextLinkURL extracts the URL with rel="next" from a GitHub Link header, if present.
+// GHCR paginates results and includes pagination links in the HTTP Link header.
+// The Link header contains URLs for "next", "prev", "first", and "last" pages.
+// Example Link header:
+// <https://api.github.com/user/abc/packages?package_type=container&per_page=100&page=2>; rel="next",
+// <https://api.github.com/user/abc/packages?package_type=container&per_page=100&page=5>; rel="last"
 func parseNextLinkURL(linkHeader string) string {
 	if linkHeader == "" {
 		return ""
@@ -405,12 +390,8 @@ func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, erro
 			return nil, err
 		}
 
-		defer func() {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-		}()
-
 		body, err := io.ReadAll(resp.Body)
+		discardBody(resp)
 		if err != nil {
 			return nil, err
 		}
@@ -430,9 +411,18 @@ func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, erro
 			allImages = append(allImages, fmt.Sprintf("%s/%s", namespace, image.Name)) // ghcr.io/<namespace>/<image_name>
 		}
 
+		// Check Link header for next page URL.
 		link := resp.Header.Get("Link")
 		nextURL = parseNextLinkURL(link)
 	}
 
 	return allImages, nil
+}
+
+// Function to discard response body
+func discardBody(resp *http.Response) {
+	if resp != nil && resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
 }
