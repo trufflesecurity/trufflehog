@@ -34,7 +34,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"sk-or-v1-"}
 }
 
-// FromData will find and optionally verify OpenAI secrets in a given set of bytes.
+// FromData will find and optionally verify OpenRouter secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -61,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = verified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
-			s1.AnalysisInfo = map[string]string{"key": token}
 		}
 
 		results = append(results, s1)
