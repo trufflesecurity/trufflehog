@@ -702,8 +702,8 @@ type S3SourceUnit struct {
 }
 
 func (s S3SourceUnit) SourceUnitID() (string, sources.SourceUnitKind) {
-	// The ID is the object key, and the kind is "s3_object".
-	return s.Bucket, "s3_object"
+	// The ID is the bucket name, and the kind is "s3_bucket".
+	return s.Bucket, "s3_bucket"
 }
 
 func (s S3SourceUnit) Display() string {
