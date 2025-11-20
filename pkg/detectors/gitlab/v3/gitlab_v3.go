@@ -30,7 +30,7 @@ func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{34,38}.[0-9]{2}.[a-z0-9]{9})\b`)
+	keyPat        = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{27,300}.[0-9a-z]{2}.[a-z0-9]{9})\b`)
 )
 
 func (s Scanner) getClient() *http.Client {
