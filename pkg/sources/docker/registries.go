@@ -252,6 +252,7 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 		query := u.Query()
 		query.Set("namespace", quayNamespace)
 		query.Set("public", "true")
+		query.Set("private", "true")
 		if nextPageToken != "" {
 			query.Set("next_page", nextPageToken)
 		}
