@@ -461,6 +461,136 @@ func TestSkipBinaries(t *testing.T) {
 	require.NotContains(t, processedFiles, binaryFile, "Binary file should be skipped")
 }
 
+func TestFollowSymlinks(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Create a temporary directory with a file and a symlink
+	tempDir, err := os.MkdirTemp("", "trufflehog_symlink_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a real file
+	realFile := filepath.Join(tempDir, "real_file.txt")
+	fileContents := "secret data in real file"
+	err = os.WriteFile(realFile, []byte(fileContents), 0644)
+	require.NoError(t, err)
+
+	// Create a symlink pointing to the real file
+	symlinkFile := filepath.Join(tempDir, "symlink_file.txt")
+	err = os.Symlink(realFile, symlinkFile)
+	require.NoError(t, err)
+
+	// Test 1: followSymlinks = false (default) - should skip symlink
+	t.Run("skip symlinks when followSymlinks is false", func(t *testing.T) {
+		conn, err := anypb.New(&sourcespb.Filesystem{
+			Paths:          []string{symlinkFile},
+			FollowSymlinks: false,
+		})
+		require.NoError(t, err)
+
+		s := Source{}
+		err = s.Init(ctx, "test skip symlinks", 0, 0, true, conn, 1)
+		require.NoError(t, err)
+
+		reporter := sourcestest.TestReporter{}
+		err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+			ID: symlinkFile,
+		}, &reporter)
+		require.NoError(t, err)
+
+		// Should not have any chunks because symlink was skipped
+		assert.Equal(t, 0, len(reporter.Chunks), "Expected no chunks when symlinks are skipped")
+		// Should have one error for the skipped symlink
+		assert.Equal(t, 1, len(reporter.ChunkErrs), "Expected one error for skipped symlink")
+	})
+
+	// Test 2: followSymlinks = true - should follow symlink
+	t.Run("follow symlinks when followSymlinks is true", func(t *testing.T) {
+		conn, err := anypb.New(&sourcespb.Filesystem{
+			Paths:          []string{symlinkFile},
+			FollowSymlinks: true,
+		})
+		require.NoError(t, err)
+
+		s := Source{}
+		err = s.Init(ctx, "test follow symlinks", 0, 0, true, conn, 1)
+		require.NoError(t, err)
+
+		reporter := sourcestest.TestReporter{}
+		err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+			ID: symlinkFile,
+		}, &reporter)
+		require.NoError(t, err)
+
+		// Should have chunks because symlink was followed
+		assert.Equal(t, 1, len(reporter.Chunks), "Expected chunks when symlinks are followed")
+		assert.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors when following symlinks")
+		
+		// Verify the content is correct
+		if len(reporter.Chunks) > 0 {
+			assert.Contains(t, string(reporter.Chunks[0].Data), fileContents, "Chunk should contain file contents")
+		}
+	})
+
+	// Test 3: Scanning directory with symlink using followSymlinks = false
+	t.Run("skip symlinks in directory scan when followSymlinks is false", func(t *testing.T) {
+		conn, err := anypb.New(&sourcespb.Filesystem{
+			Paths:          []string{tempDir},
+			FollowSymlinks: false,
+		})
+		require.NoError(t, err)
+
+		s := Source{}
+		err = s.Init(ctx, "test directory skip symlinks", 0, 0, true, conn, 1)
+		require.NoError(t, err)
+
+		reporter := sourcestest.TestReporter{}
+		err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+			ID: tempDir,
+		}, &reporter)
+		require.NoError(t, err)
+
+		// Should have exactly one chunk from the real file only
+		assert.Equal(t, 1, len(reporter.Chunks), "Expected one chunk from real file only")
+		
+		// Verify it's the real file, not the symlink
+		if len(reporter.Chunks) > 0 {
+			metadata := reporter.Chunks[0].SourceMetadata.GetFilesystem()
+			assert.NotNil(t, metadata)
+			// The path should be the real file
+			assert.Contains(t, metadata.File, "real_file.txt")
+		}
+	})
+
+	// Test 4: Scanning directory with symlink using followSymlinks = true
+	t.Run("follow symlinks in directory scan when followSymlinks is true", func(t *testing.T) {
+		conn, err := anypb.New(&sourcespb.Filesystem{
+			Paths:          []string{tempDir},
+			FollowSymlinks: true,
+		})
+		require.NoError(t, err)
+
+		s := Source{}
+		err = s.Init(ctx, "test directory follow symlinks", 0, 0, true, conn, 1)
+		require.NoError(t, err)
+
+		reporter := sourcestest.TestReporter{}
+		err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+			ID: tempDir,
+		}, &reporter)
+		require.NoError(t, err)
+
+		// Should have two chunks: one from real file and one from symlink
+		assert.Equal(t, 2, len(reporter.Chunks), "Expected two chunks when following symlinks in directory")
+		
+		// Verify both contain the same content
+		for _, chunk := range reporter.Chunks {
+			assert.Contains(t, string(chunk.Data), fileContents, "Both chunks should contain file contents")
+		}
+	})
+}
+
 // createTempFile is a helper function to create a temporary file in the given
 // directory with the provided contents. If dir is "", the operating system's
 // temp directory is used.
