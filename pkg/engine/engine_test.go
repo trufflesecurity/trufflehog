@@ -1321,7 +1321,9 @@ def test_something():
 	}
 }
 
-type passthroughDetector struct{}
+type passthroughDetector struct {
+	keywords []string
+}
 
 func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
@@ -1332,7 +1334,7 @@ func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) 
 	}, nil
 }
 
-func (p passthroughDetector) Keywords() []string             { return []string{"keyword"} }
+func (p passthroughDetector) Keywords() []string             { return p.keywords }
 func (p passthroughDetector) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (p passthroughDetector) Description() string            { return "fake detector for testing" }
 
@@ -1357,7 +1359,7 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	}
 
 	// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
-	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{}})
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"keyword"}}})
 	detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
 	require.Len(t, detectorMatches, 1)
 
@@ -1387,8 +1389,9 @@ func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) 
 	ctx := context.Background()
 
 	// Arrange: Create a minimal engine.
+	detector := &passthroughDetector{keywords: []string{"keyword"}}
 	e := &Engine{
-		AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{}}),
+		AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
 		decoders:             []decoders.Decoder{passthroughDecoder{}},
 		detectableChunksChan: make(chan detectableChunk, 1),
 		sourceManager:        sources.NewManager(),
