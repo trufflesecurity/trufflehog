@@ -1336,6 +1336,17 @@ func (p passthroughDetector) Keywords() []string             { return []string{"
 func (p passthroughDetector) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (p passthroughDetector) Description() string            { return "fake detector for testing" }
 
+type passthroughDecoder struct{}
+
+func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableChunk {
+	return &decoders.DecodableChunk{
+		Chunk:       chunk,
+		DecoderType: detectorspb.DecoderType(-1),
+	}
+}
+
+func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
+
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
@@ -1373,7 +1384,36 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 }
 
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
-	t.Fatalf("not implemented")
+	ctx := context.Background()
+
+	// Arrange: Create a minimal engine.
+	e := &Engine{
+		AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{}}),
+		decoders:             []decoders.Decoder{passthroughDecoder{}},
+		detectableChunksChan: make(chan detectableChunk, 1),
+		sourceManager:        sources.NewManager(),
+		verify:               true,
+	}
+
+	// Arrange: Create a chunk to scan.
+	chunk := sources.Chunk{
+		Data:   []byte("keyword"),
+		Verify: true,
+	}
+
+	// Arrange: Enqueue a chunk to be scanned.
+	e.sourceManager.ScanChunk(&chunk)
+
+	// Act
+	go e.scannerWorker(ctx)
+
+	// Assert: Confirm that a chunk was generated and that it has the expected verify flag.
+	select {
+	case chunk := <-e.detectableChunksChan:
+		assert.True(t, chunk.chunk.Verify)
+	case <-time.After(1 * time.Second):
+		t.Errorf("expected a detectableChunk but did not get one")
+	}
 }
 
 func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
