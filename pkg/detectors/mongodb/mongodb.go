@@ -102,6 +102,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			r.SetVerificationError(vErr, password)
+
+			if isVerified {
+				r.AnalysisInfo = map[string]string{
+					"key": connStr,
+				}
+			}
 		}
 		results = append(results, r)
 	}
