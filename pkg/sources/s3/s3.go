@@ -381,6 +381,10 @@ func (s *Source) scanBucket(
 
 	pageNumber := 1
 	paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
+	if objectCount == nil {
+		var newObjectCount uint64
+		objectCount = &newObjectCount
+	}
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -400,10 +404,6 @@ func (s *Source) scanBucket(
 			pageNumber: pageNumber,
 			client:     regionalClient,
 			page:       output,
-		}
-		if objectCount == nil {
-			var newObjectCount uint64
-			objectCount = &newObjectCount
 		}
 		processingState := processingState{
 			errorCount:  &errorCount,
