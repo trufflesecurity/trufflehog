@@ -1323,10 +1323,10 @@ def test_something():
 
 type passthroughDetector struct{}
 
-func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, _ []byte) ([]detectors.Result, error) {
+func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
-			Raw:      []byte("l;jaslkghl;akheg"),
+			Raw:      data,
 			Verified: verify,
 		},
 	}, nil
