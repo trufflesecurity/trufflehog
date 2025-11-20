@@ -26,15 +26,16 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM
 
 type Source struct {
-	name         string
-	sourceId     sources.SourceID
-	jobId        sources.JobID
-	concurrency  int
-	verify       bool
-	paths        []string
-	log          logr.Logger
-	filter       *common.Filter
-	skipBinaries bool
+	name           string
+	sourceId       sources.SourceID
+	jobId          sources.JobID
+	concurrency    int
+	verify         bool
+	paths          []string
+	log            logr.Logger
+	filter         *common.Filter
+	skipBinaries   bool
+	followSymlinks bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -74,6 +75,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	}
 	s.paths = append(conn.Paths, conn.Directories...)
 	s.skipBinaries = conn.GetSkipBinaries()
+	s.followSymlinks = conn.GetFollowSymlinks()
 
 	filter, err := common.FilterFromFiles(conn.IncludePathsFile, conn.ExcludePathsFile)
 	if err != nil {
@@ -94,13 +96,19 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path), "")
 
 		cleanPath := filepath.Clean(path)
-		fileInfo, err := os.Lstat(cleanPath)
+		var fileInfo fs.FileInfo
+		var err error
+		if s.followSymlinks {
+			fileInfo, err = os.Stat(cleanPath)
+		} else {
+			fileInfo, err = os.Lstat(cleanPath)
+		}
 		if err != nil {
 			logger.Error(err, "unable to get file info")
 			continue
 		}
 
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
+		if !s.followSymlinks && fileInfo.Mode()&os.ModeSymlink != 0 {
 			logger.Info("skipping, not a regular file", "path", cleanPath)
 			continue
 		}
@@ -148,6 +156,28 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			return nil // skip the file
 		}
 
+		// Handle symlinks when followSymlinks is enabled
+		if s.followSymlinks && d.Type()&fs.ModeSymlink != 0 {
+			// Follow the symlink to see what it points to
+			targetInfo, err := os.Stat(fullPath)
+			if err != nil {
+				// Broken symlink or permission issue, skip it
+				ctx.Logger().V(5).Info("unable to follow symlink", "path", fullPath, "error", err)
+				return nil
+			}
+			// If the symlink points to a regular file, process it
+			if targetInfo.Mode().IsRegular() {
+				workerPool.Go(func() error {
+					if err := s.scanFile(ctx, fullPath, chunksChan); err != nil {
+						ctx.Logger().Error(err, "error scanning file", "path", fullPath, "error", err)
+					}
+					s.SetEncodedResumeInfoFor(path, fullPath)
+					return nil
+				})
+			}
+			return nil
+		}
+
 		// Skip over non-regular files. We do this check here to suppress noisy
 		// logs for trying to scan directories and other non-regular files in
 		// our traversal.
@@ -181,11 +211,17 @@ var skipSymlinkErr = errors.New("skipping symlink")
 
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	fileCtx := context.WithValues(ctx, "path", path)
-	fileStat, err := os.Lstat(path)
+	var fileStat fs.FileInfo
+	var err error
+	if s.followSymlinks {
+		fileStat, err = os.Stat(path)
+	} else {
+		fileStat, err = os.Lstat(path)
+	}
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
 	}
-	if fileStat.Mode()&os.ModeSymlink != 0 {
+	if !s.followSymlinks && fileStat.Mode()&os.ModeSymlink != 0 {
 		return skipSymlinkErr
 	}
 
@@ -247,7 +283,13 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	logger := ctx.Logger().WithValues("path", path)
 
 	cleanPath := filepath.Clean(path)
-	fileInfo, err := os.Lstat(cleanPath)
+	var fileInfo fs.FileInfo
+	var err error
+	if s.followSymlinks {
+		fileInfo, err = os.Stat(cleanPath)
+	} else {
+		fileInfo, err = os.Lstat(cleanPath)
+	}
 	if err != nil {
 		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get file info: %w", err))
 	}
