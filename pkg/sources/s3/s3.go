@@ -401,6 +401,10 @@ func (s *Source) scanBucket(
 			client:     regionalClient,
 			page:       output,
 		}
+		if objectCount == nil {
+			var newObjectCount uint64
+			objectCount = &newObjectCount
+		}
 		processingState := processingState{
 			errorCount:  &errorCount,
 			objectCount: objectCount,
@@ -751,7 +755,6 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		return fmt.Errorf("could not create s3 client: %w", err)
 	}
 
-	var objectCount uint64
-	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, nil, &objectCount)
+	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, nil, nil)
 	return nil
 }
