@@ -1430,12 +1430,16 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 			results:                       make(chan detectors.ResultWithMetadata, 2),
 			retainFalsePositives:          true,
 			verificationOverlapChunksChan: make(chan verificationOverlapChunk, 2),
+			verify:                        true,
 		}
 
-		// Arrange: Ensure that any chunks (incorrectly) sent to e.detectableChunksChan don't block the test.
+		// Arrange: Set up a fake detectableChunk processor so that any chunks (incorrectly) sent to
+		// e.detectableChunksChan don't block the test.
+		processedDetectableChunks := make(chan detectableChunk, 2)
 		go func() {
 			for chunk := range e.detectableChunksChan {
 				chunk.wgDoneFn()
+				processedDetectableChunks <- chunk
 			}
 		}()
 
@@ -1465,6 +1469,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		e.verificationOverlapWorker(ctx)
 		close(e.results)
 		close(e.detectableChunksChan)
+		close(processedDetectableChunks)
 
 		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it).
 		for result := range e.results {
@@ -1474,7 +1479,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
 		// CMR: There should be not be any of these chunks. However, due to what I believe is an unrelated bug, there
 		// are. This test ensures that even in that erroneous case, their Verify flag is correct.
-		for detectableChunk := range e.detectableChunksChan {
+		for detectableChunk := range processedDetectableChunks {
 			assert.True(t, detectableChunk.chunk.Verify)
 		}
 	})
