@@ -184,7 +184,14 @@ message Filesystem {
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
   bool skip_binaries = 5; // allows skipping binary files from the scan
-  bool follow_symlinks = 6; // allows following symbolic links during scan
+  // follow_symlinks enables following symbolic links during filesystem scanning.
+  // When enabled:
+  // - Only symlinks that are direct children of scan paths are followed (depth-1)
+  // - Loop detection prevents infinite cycles
+  // - Memory usage is bounded via LRU cache (max 10k paths per scan)
+  // - Symlinks in subdirectories are NOT followed for security
+  // Default: false (symlinks are skipped)
+  bool follow_symlinks = 6;
 }
 
 message GCS {

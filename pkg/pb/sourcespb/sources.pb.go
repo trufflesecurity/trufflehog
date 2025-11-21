@@ -1391,7 +1391,14 @@ type Filesystem struct {
 	IncludePathsFile string   `protobuf:"bytes,3,opt,name=include_paths_file,json=includePathsFile,proto3" json:"include_paths_file,omitempty"` // path to file containing newline separated list of paths
 	ExcludePathsFile string   `protobuf:"bytes,4,opt,name=exclude_paths_file,json=excludePathsFile,proto3" json:"exclude_paths_file,omitempty"` // path to file containing newline separated list of paths
 	SkipBinaries     bool     `protobuf:"varint,5,opt,name=skip_binaries,json=skipBinaries,proto3" json:"skip_binaries,omitempty"`              // allows skipping binary files from the scan
-	FollowSymlinks   bool     `protobuf:"varint,6,opt,name=follow_symlinks,json=followSymlinks,proto3" json:"follow_symlinks,omitempty"`        // allows following symbolic links during scan
+	// follow_symlinks enables following symbolic links during filesystem scanning.
+	// When enabled:
+	// - Only symlinks that are direct children of scan paths are followed (depth-1)
+	// - Loop detection prevents infinite cycles
+	// - Memory usage is bounded via LRU cache (max 10k paths per scan)
+	// - Symlinks in subdirectories are NOT followed for security
+	// Default: false (symlinks are skipped)
+	FollowSymlinks bool `protobuf:"varint,6,opt,name=follow_symlinks,json=followSymlinks,proto3" json:"follow_symlinks,omitempty"`
 }
 
 func (x *Filesystem) Reset() {

@@ -13,6 +13,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/lru"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -36,6 +38,22 @@ type Source struct {
 	filter         *common.Filter
 	skipBinaries   bool
 	followSymlinks bool
+	// scanRootPaths tracks the top-level directories/files being scanned.
+	// Used to enforce depth-1 symlink following: only symlinks that are direct children
+	// of these paths will be followed, preventing deep symlink chains.
+	scanRootPaths map[string]struct{}
+	// visitedPaths is an LRU cache tracking canonical paths of followed symlinks.
+	// Only created when followSymlinks=true to avoid memory overhead.
+	//
+	// Why LRU cache instead of a map:
+	// - Bounded memory: Limits to 10k paths (~1MB) even for massive directory trees
+	// - Per-path reset: Cache is recreated for each scan path to prevent accumulation
+	// - Loop detection: Prevents scanning the same file multiple times via different symlinks
+	//
+	// Why depth-1 limiting:
+	// - Prevents infinite loops: Symlink chains (A->B->C->...) are limited
+	// - Predictable behavior: Users know exactly which symlinks will be followed
+	visitedPaths cache.Cache[struct{}]
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -95,7 +113,30 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path), "")
 
+		// Initialize per-path tracking - critically important for memory management.
+		// scanRootPaths is reset for each top-level path to track depth-1 symlinks.
+		s.scanRootPaths = make(map[string]struct{})
+
+		// Create LRU cache only if following symlinks to avoid unnecessary memory allocation.
+		// The cache is recreated for each scan path to prevent memory accumulation across
+		// multiple scans. This ensures O(paths_per_scan) memory instead of O(total_paths).
+		if s.followSymlinks {
+			// Maximum of 10k paths limits memory to ~1MB even for very large directory trees.
+			// If a directory has >10k symlinks, oldest entries are evicted (LRU behavior).
+			const maxCacheSize = 10000
+			cache, err := lru.NewCache[struct{}]("filesystem_visited", lru.WithCapacity[struct{}](maxCacheSize))
+			if err != nil {
+				logger.Error(err, "failed to create LRU cache for symlink tracking")
+				continue
+			}
+			s.visitedPaths = cache
+		}
+
 		cleanPath := filepath.Clean(path)
+
+		// Store the scan root path for depth tracking
+		s.scanRootPaths[cleanPath] = struct{}{}
+
 		var fileInfo fs.FileInfo
 		var err error
 		if s.followSymlinks {
@@ -111,6 +152,29 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if !s.followSymlinks && fileInfo.Mode()&os.ModeSymlink != 0 {
 			logger.Info("skipping, not a regular file", "path", cleanPath)
 			continue
+		}
+
+		// If followSymlinks is enabled and this is a symlink, check for loops
+		if s.followSymlinks && fileInfo.Mode()&os.ModeSymlink != 0 {
+			canonicalPath, err := filepath.EvalSymlinks(cleanPath)
+			if err != nil {
+				logger.V(5).Info("unable to resolve symlink", "path", cleanPath, "error", err)
+				continue
+			}
+
+			// Check for loops using the LRU cache
+			if s.visitedPaths.Exists(canonicalPath) {
+				logger.Info("skipping symlink loop detected", "path", cleanPath, "target", canonicalPath)
+				continue
+			}
+			s.visitedPaths.Set(canonicalPath, struct{}{})
+
+			// Re-stat the canonical path to determine if it's a file or directory
+			fileInfo, err = os.Stat(canonicalPath)
+			if err != nil {
+				logger.Error(err, "unable to stat symlink target")
+				continue
+			}
 		}
 
 		if fileInfo.IsDir() {
@@ -156,8 +220,42 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			return nil // skip the file
 		}
 
-		// Handle symlinks when followSymlinks is enabled
+		// Handle symlinks when followSymlinks is enabled.
+		// DEPTH-1 ENFORCEMENT: Only follow symlinks that are direct children of scan root paths.
+		// This prevents:
+		// 1. Infinite symlink chains (A->B->C->...)
+		// 2. Deep directory traversal through symlinks
+		//
+		// Example: If scanning /path/to/dir:
+		//   - /path/to/dir/link.txt (direct child) -> WILL be followed
+		//   - /path/to/dir/subdir/link.txt (not direct child) -> will NOT be followed
 		if s.followSymlinks && d.Type()&fs.ModeSymlink != 0 {
+			// Only follow symlinks that are direct children of the scan root
+			if !s.isDirectChild(fullPath) {
+				ctx.Logger().V(5).Info("skipping symlink (not a direct child of scan root)", "path", fullPath)
+				return nil
+			}
+
+			// Resolve the symlink to its canonical path for loop detection.
+			// This handles cases where multiple symlinks point to the same file.
+			canonicalPath, err := filepath.EvalSymlinks(fullPath)
+			if err != nil {
+				// Broken symlink or permission issue, skip it
+				ctx.Logger().V(5).Info("unable to resolve symlink", "path", fullPath, "error", err)
+				return nil
+			}
+
+			// Check for loops using LRU cache.
+			// Prevents scanning the same file multiple times if reachable via different symlinks.
+			// Also prevents infinite loops where symlinks form cycles.
+			if s.followSymlinks && s.visitedPaths != nil && s.visitedPaths.Exists(canonicalPath) {
+				ctx.Logger().Info("skipping symlink loop detected", "path", fullPath, "target", canonicalPath)
+				return nil
+			}
+			if s.followSymlinks && s.visitedPaths != nil {
+				s.visitedPaths.Set(canonicalPath, struct{}{})
+			}
+
 			// Follow the symlink to see what it points to
 			targetInfo, err := os.Stat(fullPath)
 			if err != nil {
@@ -208,6 +306,18 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 }
 
 var skipSymlinkErr = errors.New("skipping symlink")
+
+// isDirectChild checks if a path is a direct child of any scan root path.
+// This enforces depth-1 symlink following to prevent:
+// - Infinite symlink loops
+// - Deep directory traversal through symlinks
+//
+// Returns true only if the symlink's parent directory matches a scan root path.
+func (s *Source) isDirectChild(path string) bool {
+	dir := filepath.Clean(filepath.Dir(path))
+	_, isRoot := s.scanRootPaths[dir]
+	return isRoot
+}
 
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	fileCtx := context.WithValues(ctx, "path", path)
@@ -282,7 +392,26 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	path, _ := unit.SourceUnitID()
 	logger := ctx.Logger().WithValues("path", path)
 
+	// Initialize per-unit tracking - same rationale as Chunks() method.
+	// Each ChunkUnit call gets fresh tracking to prevent memory accumulation.
+	s.scanRootPaths = make(map[string]struct{})
+
+	// Create LRU cache only if following symlinks.
+	// Memory is bounded to 10k paths (~1MB) per unit scan.
+	if s.followSymlinks {
+		const maxCacheSize = 10000
+		cache, err := lru.NewCache[struct{}]("filesystem_visited", lru.WithCapacity[struct{}](maxCacheSize))
+		if err != nil {
+			return reporter.ChunkErr(ctx, fmt.Errorf("failed to create LRU cache: %w", err))
+		}
+		s.visitedPaths = cache
+	}
+
 	cleanPath := filepath.Clean(path)
+
+	// Store the scan root path for depth tracking
+	s.scanRootPaths[cleanPath] = struct{}{}
+
 	var fileInfo fs.FileInfo
 	var err error
 	if s.followSymlinks {
@@ -292,6 +421,28 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 	if err != nil {
 		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get file info: %w", err))
+	}
+
+	// If followSymlinks is enabled and this is a symlink, check for loops
+	if s.followSymlinks && fileInfo.Mode()&os.ModeSymlink != 0 {
+		canonicalPath, err := filepath.EvalSymlinks(cleanPath)
+		if err != nil {
+			logger.V(5).Info("unable to resolve symlink", "path", cleanPath, "error", err)
+			return reporter.ChunkErr(ctx, fmt.Errorf("unable to resolve symlink: %w", err))
+		}
+
+		// Check for loops
+		if s.visitedPaths.Exists(canonicalPath) {
+			logger.Info("skipping symlink loop detected", "path", cleanPath, "target", canonicalPath)
+			return nil
+		}
+		s.visitedPaths.Set(canonicalPath, struct{}{})
+
+		// Re-stat the canonical path to determine if it's a file or directory
+		fileInfo, err = os.Stat(canonicalPath)
+		if err != nil {
+			return reporter.ChunkErr(ctx, fmt.Errorf("unable to stat symlink target: %w", err))
+		}
 	}
 
 	ch := make(chan *sources.Chunk)
