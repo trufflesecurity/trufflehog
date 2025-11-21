@@ -194,10 +194,12 @@ var (
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 
-	dockerScan         = cli.Command("docker", "Scan Docker Image")
-	dockerScanImages   = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, the docker:// prefix to point to the docker daemon, otherwise an image registry is assumed.").Required().Strings()
-	dockerScanToken    = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
-	dockerExcludePaths = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
+	dockerScan              = cli.Command("docker", "Scan Docker Image")
+	dockerScanImages        = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, the docker:// prefix to point to the docker daemon, otherwise an image registry is assumed.").Strings()
+	dockerScanToken         = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
+	dockerExcludePaths      = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
+	dockerScanNamespace     = dockerScan.Flag("namespace", "Docker namespace (organization or user). For non-Docker Hub registries, include the registry address as well (e.g., ghcr.io/namespace or quay.io/namespace).").String()
+	dockerScanRegistryToken = dockerScan.Flag("registry-token", "Optional Docker registry access token. Provide this if you want to include private images within the specified namespace.").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -467,6 +469,9 @@ func run(state overseer.State) {
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
 	feature.GitlabProjectsPerPage.Store(100)
+
+	// OSS Default using github graphql api for issues, pr's and comments
+	feature.UseGithubGraphQLAPI.Store(false)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -952,11 +957,25 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			refs = []sources.JobProgressRef{ref}
 		}
 	case dockerScan.FullCommand():
+		if *dockerScanImages != nil && *dockerScanNamespace != "" {
+			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both images and namespace at the same time")
+		}
+
+		if *dockerScanImages == nil && *dockerScanNamespace == "" {
+			return scanMetrics, fmt.Errorf("invalid config: both images and namespace cannot be empty; one is required")
+		}
+
+		if *dockerScanRegistryToken != "" && *dockerScanNamespace == "" {
+			return scanMetrics, fmt.Errorf("invalid config: registry token can only be used with registry namespace")
+		}
+
 		cfg := sources.DockerConfig{
 			BearerToken:       *dockerScanToken,
 			Images:            *dockerScanImages,
 			UseDockerKeychain: *dockerScanToken == "",
 			ExcludePaths:      strings.Split(*dockerExcludePaths, ","),
+			Namespace:         *dockerScanNamespace,
+			RegistryToken:     *dockerScanRegistryToken,
 		}
 		if ref, err := eng.ScanDocker(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)

@@ -27,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -253,7 +254,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
 		simple.NewCache[string](),
-		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
+		s.conn.GetRepositories(),
 		s.conn.GetIgnoreRepos(),
 	)
 	s.repos = s.conn.Repositories
@@ -433,33 +434,42 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	case *unauthenticatedConnector:
 		s.enumerateUnauthenticated(ctx, dedupeReporter)
 	}
-	s.repos = make([]string, 0, s.filteredRepoCache.Count())
+	// If explicit repositories were provided, use them directly without filtering
+	// Otherwise, rebuild s.repos from the filteredRepoCache
+	if len(s.conn.Repositories) > 0 {
+		// Explicit repositories bypass filtering - use them as-is
+		s.repos = s.conn.Repositories
+		ctx.Logger().V(1).Info("Using explicit repositories", "count", len(s.repos))
+	} else {
+		// No explicit repositories - rebuild from enumerated cache with filtering
+		s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
-	// Double make sure that all enumerated repositories in the
-	// filteredRepoCache have an entry in the repoInfoCache.
-	for _, repo := range s.filteredRepoCache.Values() {
-		// Extract the repository name from the URL for filtering
-		repoName := repo
-		if strings.Contains(repo, "/") {
-			// Try to extract org/repo name from URL
-			if strings.Contains(repo, "github.com") {
-				parts := strings.Split(repo, "/")
-				if len(parts) >= 2 {
-					repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
+		// Double make sure that all enumerated repositories in the
+		// filteredRepoCache have an entry in the repoInfoCache.
+		for _, repo := range s.filteredRepoCache.Values() {
+			// Extract the repository name from the URL for filtering
+			repoName := repo
+			if strings.Contains(repo, "/") {
+				// Try to extract org/repo name from URL
+				if strings.Contains(repo, "github.com") {
+					parts := strings.Split(repo, "/")
+					if len(parts) >= 2 {
+						repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
+					}
 				}
 			}
-		}
 
-		// Final filter check - only include repositories that pass the filter
-		if s.filteredRepoCache.wantRepo(repoName) {
-			ctx = context.WithValue(ctx, "repo", repo)
+			// Final filter check - only include repositories that pass the filter
+			if s.filteredRepoCache.wantRepo(repoName) {
+				ctx := context.WithValue(ctx, "repo", repo)
 
-			repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
-			if err != nil {
-				ctx.Logger().Error(err, "error caching repo info")
-				_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+				repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
+				if err != nil {
+					ctx.Logger().Error(err, "error caching repo info")
+					_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+				}
+				s.repos = append(s.repos, repo)
 			}
-			s.repos = append(s.repos, repo)
 		}
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
@@ -1096,8 +1106,14 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 	if s.includeGistComments && isGistUrl(urlParts) && !s.ignoreGists {
 		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter, cutoffTime)
 	} else if s.includeIssueComments || s.includePRComments {
-		return s.processRepoComments(ctx, repoInfo, reporter, cutoffTime)
+		// if we need to use graphql api for repo issues, prs and comments
+		if feature.UseGithubGraphQLAPI.Load() {
+			return s.processRepoIssueandPRsWithCommentsGraphql(ctx, repoInfo, reporter, cutoffTime)
+		}
+
+		return s.processIssueandPRsWithCommentsREST(ctx, repoInfo, reporter, cutoffTime)
 	}
+
 	return nil
 }
 
@@ -1264,7 +1280,10 @@ var (
 	state = "all"
 )
 
-func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processIssueandPRsWithCommentsREST(
+	ctx context.Context, repoInfo repoInfo,
+	reporter sources.ChunkReporter, cutoffTime *time.Time,
+) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
@@ -1281,6 +1300,31 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, rep
 			return err
 		}
 		if err := s.processPRComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
+	ctx context.Context, repoInfo repoInfo,
+	reporter sources.ChunkReporter, cutoffTime *time.Time,
+) error {
+	if s.includeIssueComments {
+		ctx.Logger().V(2).Info("Scanning issues")
+		if err := s.processIssuesWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+			return err
+		}
+	}
+
+	if s.includePRComments {
+		ctx.Logger().V(2).Info("Scanning pull requests")
+		if err := s.processPRWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+			return err
+		}
+
+		if err := s.processReviewThreads(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
