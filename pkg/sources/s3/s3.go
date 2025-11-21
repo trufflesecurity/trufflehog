@@ -726,8 +726,6 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 				return ctx.Err()
 			}
 
-			ctx.Logger().V(5).Info("Enumerating bucket", "bucket", bucket)
-
 			unit := S3SourceUnit{
 				Bucket: bucket,
 				Role:   roleArn,
@@ -753,7 +751,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 
 	defaultClient, err := s.newClient(ctx, defaultAWSRegion, s3unit.Role)
 	if err != nil {
-		return fmt.Errorf("could not create s3 client: %w", err)
+		return fmt.Errorf("could not create s3 client for bucket %s and role %s: %w", bucket, s3unit.Role, err)
 	}
 
 	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, nil, nil)
