@@ -23,8 +23,9 @@ import (
 
 // Config holds user supplied configuration.
 type Config struct {
-	Sources   []sources.ConfiguredSource
-	Detectors []detectors.Detector
+	Sources    []sources.ConfiguredSource
+	Detectors  []detectors.Detector
+	Allowlists []detectors.AllowlistEntry
 }
 
 // Read parses a given filename into a Config.
@@ -66,9 +67,19 @@ func NewYAML(input []byte) (*Config, error) {
 		sourceConfigs = append(sourceConfigs, src)
 	}
 
+	// Convert allowlist entries to Go structs.
+	var allowlistConfigs []detectors.AllowlistEntry
+	for _, pbAllowlist := range inputYAML.Allowlists {
+		allowlistConfigs = append(allowlistConfigs, detectors.AllowlistEntry{
+			Description: pbAllowlist.GetDescription(),
+			Values:      pbAllowlist.GetValues(),
+		})
+	}
+
 	return &Config{
-		Detectors: detectorConfigs,
-		Sources:   sourceConfigs,
+		Detectors:  detectorConfigs,
+		Sources:    sourceConfigs,
+		Allowlists: allowlistConfigs,
 	}, nil
 }
 

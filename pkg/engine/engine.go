@@ -120,7 +120,9 @@ type Config struct {
 	FilterEntropy float64
 	// FilterUnverified sets the filterUnverified flag on the engine. If set to
 	// true, the engine will only return the first unverified result for a chunk for a detector.
-	FilterUnverified      bool
+	FilterUnverified bool
+	// AllowlistedSecrets contains secrets that should be ignored during scanning.
+	AllowlistedSecrets    *detectors.CompiledAllowlist
 	ShouldScanEntireChunk bool
 
 	Dispatcher ResultsDispatcher
@@ -174,6 +176,7 @@ type Engine struct {
 	filterUnverified bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
 	filterEntropy           float64
+	allowlistedSecrets      *detectors.CompiledAllowlist
 	notifyVerifiedResults   bool
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
@@ -236,6 +239,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
 		filterEntropy:                       cfg.FilterEntropy,
+		allowlistedSecrets:                  cfg.AllowlistedSecrets,
 		printAvgDetectorTime:                cfg.PrintAvgDetectorTime,
 		retainFalsePositives:                cfg.LogFilteredUnverified,
 		verificationOverlap:                 cfg.VerificationOverlap,
@@ -1165,6 +1169,10 @@ func (e *Engine) filterResults(
 
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
+	}
+
+	if e.allowlistedSecrets != nil && (len(e.allowlistedSecrets.ExactMatches) > 0 || len(e.allowlistedSecrets.CompiledRegexes) > 0) {
+		results = detectors.FilterAllowlistedSecrets(ctx, results, e.allowlistedSecrets)
 	}
 
 	return results

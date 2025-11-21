@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package allowlists;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/allowlistspb";
+
+// AllowlistEntry represents an allowlist entry with optional description
+// and a list of patterns (exact strings or regex) to allowlist
+message AllowlistEntry {
+    // Optional description for this allowlist entry (for documentation/organization)
+    string description = 1;
+    
+    // List of secret patterns/regexes to allowlist
+    // Each value can be either:
+    // - An exact string match
+    // - A regular expression pattern
+    // The implementation will automatically determine which type it is
+    repeated string values = 2;
+}

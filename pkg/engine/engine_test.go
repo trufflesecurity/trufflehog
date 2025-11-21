@@ -1318,3 +1318,247 @@ def test_something():
 		})
 	}
 }
+
+func TestEngine_AllowlistedSecrets(t *testing.T) {
+	tests := []struct {
+		name               string
+		content            string
+		allowlistedSecrets []detectors.AllowlistEntry
+		expectedFindings   int
+	}{
+		{
+			name: "exact string allowlist match",
+			content: `
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+`,
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						"AKIAQYLPMN5HHHFPZAM2",
+					},
+				},
+			},
+			expectedFindings: 2,
+		},
+		{
+			name: "regex pattern allowlist",
+			content: `
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						`^sk-[a-z0-9]{32}$`,
+					},
+				},
+			},
+			expectedFindings: 2,
+		},
+		{
+			name: "mixed exact and regex allowlist",
+			content: `
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						"AKIAQYLPMN5HHHFPZAM2", // exact string
+						`^sk-[a-z0-9]{32}$`,    // regex pattern
+					},
+				},
+			},
+			expectedFindings: 1,
+		},
+		{
+			name: "case sensitivity test",
+			content: `
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						`^SK-[a-z0-9]{32}$`, // case sensitive - only matches uppercase SK
+					},
+				},
+			},
+			expectedFindings: 3,
+		},
+		{
+			name: "case insensitive regex",
+			content: `
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						`(?i)^SK-[a-z0-9]{32}$`, // case insensitive
+					},
+				},
+			},
+			expectedFindings: 2,
+		},
+		{
+			name: "no allowlist",
+			content: `
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
+			allowlistedSecrets: []detectors.AllowlistEntry{},
+			expectedFindings:   3,
+		},
+		{
+			name: "invalid regex patterns allowlist",
+			content: `
+aws_access_key_id = AKIAQYLPMN5HHHFPZAM2
+aws_secret_access_key = 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
+deepseek_api_key = sk-abc123def456ghi789jkl012mno345pq
+openai_api_key = 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
+		`,
+			allowlistedSecrets: []detectors.AllowlistEntry{
+				{
+					Values: []string{
+						"[AKIAQYLPMN5HHHFPZAM2", // invalid regex, treated as exact string
+					},
+				},
+			},
+			expectedFindings: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			tmpFile, err := os.CreateTemp("", "test_allowlist")
+			assert.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
+			assert.NoError(t, err)
+
+			const defaultOutputBufferSize = 64
+			opts := []func(*sources.SourceManager){
+				sources.WithSourceUnits(),
+				sources.WithBufferedOutput(defaultOutputBufferSize),
+			}
+
+			sourceManager := sources.NewManager(opts...)
+
+			conf := Config{
+				Concurrency:        1,
+				Decoders:           decoders.DefaultDecoders(),
+				Detectors:          defaults.DefaultDetectors(),
+				Verify:             false,
+				SourceManager:      sourceManager,
+				Dispatcher:         NewPrinterDispatcher(new(discardPrinter)),
+				AllowlistedSecrets: detectors.CompileAllowlistPatterns(tt.allowlistedSecrets),
+			}
+
+			eng, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
+
+			eng.Start(ctx)
+
+			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+			_, err = eng.ScanFileSystem(ctx, cfg)
+			assert.NoError(t, err)
+
+			assert.NoError(t, eng.Finish(ctx))
+			assert.Equal(t, tt.expectedFindings, int(eng.GetMetrics().UnverifiedSecretsFound),
+				"Expected %d findings but got %d", tt.expectedFindings, eng.GetMetrics().UnverifiedSecretsFound)
+		})
+	}
+}
+
+func TestEngine_allowlistedSecretsPerformance(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create a large test file with many secrets
+	content := ""
+	// Add 1000 secrets with various patterns
+	for i := 0; i < 1000; i++ {
+		content += fmt.Sprintf("aws_access_key_id_%d=AKIAQYLPMN5HHHF%05d{\n", i, i)
+		content += fmt.Sprintf("deepseek_api_key_%d=sk-abc123def456ghi789jkl012mno%05d{\n", i, i)
+		content += fmt.Sprintf("openai_api_key_%d=sk-SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC%05d{\n", i, i)
+	}
+
+	tmpFile, err := os.CreateTemp("", "test_performance")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	err = os.WriteFile(tmpFile.Name(), []byte(content), os.ModeAppend)
+	assert.NoError(t, err)
+
+	// Define allowlist with both exact strings and regex patterns
+	allowlistedSecrets := []detectors.AllowlistEntry{
+		{
+			Values: []string{
+				// Some exact matches
+				"AKIAQYLPMN5HHHF00001",
+				"sk-abc123def456ghi789jkl012mno00005",
+				"SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC00003",
+				// Some regex patterns
+				`^AKIAQYLPMN5HHHF[0-4][0-9]{4}$`,                                // keys 0-49
+				`^sk-abc123def456ghi789jkl012mno[5-9][0-9]{4}$`,                 // tokens 50-99
+				`^sk-SDAPGGZUyVr7SYJpSODgT3BlbkFJM1fIItFASvyIsaC[1-9][0-9]{4}$`, // keys 100-999
+			},
+		},
+	}
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	start := time.Now()
+
+	conf := Config{
+		Concurrency:        4, // Use multiple threads for realistic performance test
+		Decoders:           decoders.DefaultDecoders(),
+		Detectors:          defaults.DefaultDetectors(),
+		Verify:             false,
+		SourceManager:      sourceManager,
+		Dispatcher:         NewPrinterDispatcher(new(discardPrinter)),
+		AllowlistedSecrets: detectors.CompileAllowlistPatterns(allowlistedSecrets),
+	}
+
+	eng, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	eng.Start(ctx)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+	_, err = eng.ScanFileSystem(ctx, cfg)
+	assert.NoError(t, err)
+	assert.NoError(t, eng.Finish(ctx))
+
+	elapsed := time.Since(start)
+
+	assert.Less(t, elapsed, 10*time.Second, "Allowlisting performance test took too long")
+	assert.Greater(t, int(eng.GetMetrics().UnverifiedSecretsFound), 0, "Should find some secrets")
+	assert.Less(t, int(eng.GetMetrics().UnverifiedSecretsFound), 3000, "Should filter out many secrets")
+}

@@ -3,10 +3,14 @@ package detectors
 import (
 	"context"
 	_ "embed"
+	"os"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/google/go-cmp/cmp"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -183,9 +187,633 @@ func TestStringShannonEntropy(t *testing.T) {
 	}
 }
 
+func TestFilterAllowlistedSecrets(t *testing.T) {
+	ctx := logContext.Background()
+
+	tests := []struct {
+		name               string
+		results            []Result
+		allowlistedSecrets []AllowlistEntry
+		expected           []Result
+	}{
+		{
+			name: "exact string match",
+			results: []Result{
+				{Raw: []byte("secret123")},
+				{Raw: []byte("password456")},
+				{Raw: []byte("token789")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"secret123",
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("password456")},
+				{Raw: []byte("token789")},
+			},
+		},
+		{
+			name: "regex pattern match",
+			results: []Result{
+				{Raw: []byte("test-api-key-12345")},
+				{Raw: []byte("prod-api-key-67890")},
+				{Raw: []byte("dev-token-abcdef")},
+				{Raw: []byte("random-secret")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`^test-.*`,
+						`.*-token-.*`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("prod-api-key-67890")},
+				{Raw: []byte("random-secret")},
+			},
+		},
+		{
+			name: "mixed exact and regex patterns",
+			results: []Result{
+				{Raw: []byte("exact-match")},
+				{Raw: []byte("dev-key-123")},
+				{Raw: []byte("prod-key-456")},
+				{Raw: []byte("another-secret")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"exact-match",
+						`^dev-.*`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("prod-key-456")},
+				{Raw: []byte("another-secret")},
+			},
+		},
+		{
+			name: "invalid regex treated as literal string",
+			results: []Result{
+				{Raw: []byte("[invalid")},
+				{Raw: []byte("valid-secret")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"[invalid",
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("valid-secret")},
+			},
+		},
+		{
+			name: "case sensitive regex",
+			results: []Result{
+				{Raw: []byte("Secret123")},
+				{Raw: []byte("secret456")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`^secret.*`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("Secret123")},
+			},
+		},
+		{
+			name: "case insensitive regex",
+			results: []Result{
+				{Raw: []byte("Secret123")},
+				{Raw: []byte("secret456")},
+				{Raw: []byte("other789")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`(?i)^secret.*`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("other789")},
+			},
+		},
+		{
+			name: "RawV2 field testing",
+			results: []Result{
+				{
+					Raw:   []byte("primary-secret"),
+					RawV2: []byte("secondary-secret"),
+				},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"secondary-secret",
+					},
+				},
+			},
+			expected: []Result{}, // should be filtered out due to RawV2 match
+		},
+		{
+			name:    "empty results",
+			results: []Result{},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"any-pattern",
+					},
+				},
+			},
+			expected: []Result{},
+		},
+		{
+			name: "empty allowlist",
+			results: []Result{
+				{Raw: []byte("secret123")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("secret123")},
+			},
+		},
+		{
+			name: "nil allowlist",
+			results: []Result{
+				{Raw: []byte("secret123")},
+			},
+			allowlistedSecrets: nil,
+			expected: []Result{
+				{Raw: []byte("secret123")},
+			},
+		},
+		{
+			name: "complex regex patterns",
+			results: []Result{
+				{Raw: []byte("api-key-12345")},
+				{Raw: []byte("token-67890")},
+				{Raw: []byte("secret-abcdef")},
+				{Raw: []byte("random-secret-123")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`^api-key-\d+$`,
+						`^token-\d+$`,
+						`^secret-[a-f]+$`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("random-secret-123")}, // This doesn't match any pattern
+			},
+		},
+		{
+			name: "hexadecimal pattern matching",
+			results: []Result{
+				{Raw: []byte("abcdef1234567890")},    // 16-char hex
+				{Raw: []byte("123456789abcdef0123")}, // 19-char hex
+				{Raw: []byte("ghijklmnop123456")},    // not hex
+				{Raw: []byte("ABC123DEF456")},        // mixed case hex
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`^[a-f0-9]{16}$`,
+						`^[A-F0-9a-f]{12}$`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("123456789abcdef0123")}, // 19 chars, doesn't match 16-char pattern
+				{Raw: []byte("ghijklmnop123456")},    // contains non-hex chars
+			},
+		},
+		{
+			name: "multiline RSA private key exact match",
+			results: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte("single-line-secret")},
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte("single-line-secret")},
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+			},
+		},
+		{
+			name: "multiline regex pattern matching",
+			results: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte(`-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
+-----END PRIVATE KEY-----`)},
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+				{Raw: []byte("some-other-secret")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte(`-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`)},
+				{Raw: []byte("some-other-secret")},
+			},
+		},
+		{
+			name: "multiline patterns that shouldn't match",
+			results: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte("production-api-key-12345")},
+			},
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`(?s)-----BEGIN.*CERTIFICATE-----.*-----END.*CERTIFICATE-----`,
+						`^test-.*`,
+					},
+				},
+			},
+			expected: []Result{
+				{Raw: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`)},
+				{Raw: []byte("production-api-key-12345")},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiledAllowlist := CompileAllowlistPatterns(tt.allowlistedSecrets)
+			result := FilterAllowlistedSecrets(ctx, tt.results, compiledAllowlist)
+			assert.ElementsMatch(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsSecretAllowlisted(t *testing.T) {
+	tests := []struct {
+		name               string
+		secret             string
+		allowlistedSecrets []AllowlistEntry
+		expectedMatch      bool
+		expectedReason     string
+	}{
+		{
+			name:   "simple string compiled as regex",
+			secret: "exact-secret",
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{"exact-secret"},
+				},
+			},
+			expectedMatch:  true,
+			expectedReason: "regex match: exact-secret",
+		},
+		{
+			name:   "regex pattern match",
+			secret: "test-key-12345",
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{`^test-.*`},
+				},
+			},
+			expectedMatch:  true,
+			expectedReason: "regex match: ^test-.*",
+		},
+		{
+			name:   "no match",
+			secret: "random-secret",
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"different-secret",
+						`^test-.*`,
+					},
+				},
+			},
+			expectedMatch:  false,
+			expectedReason: "",
+		},
+		{
+			name:   "simple string and regex pattern both work",
+			secret: "test-key",
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"test-key",
+						`^test-.*`,
+					},
+				},
+			},
+			expectedMatch:  true,
+			expectedReason: "regex match: test-key", // simple strings are compiled as regex first
+		},
+		{
+			name:   "invalid regex treated as literal",
+			secret: "[invalid",
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						"[invalid",
+					},
+				},
+			},
+			expectedMatch:  true,
+			expectedReason: "exact match",
+		},
+		{
+			name: "multiline RSA key compiled as regex",
+			secret: `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`,
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+-----END RSA PRIVATE KEY-----`,
+					},
+				},
+			},
+			expectedMatch:  true,
+			expectedReason: "regex match: -----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...\n-----END RSA PRIVATE KEY-----",
+		},
+		{
+			name: "multiline private key regex match",
+			secret: `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----`,
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`,
+					},
+				},
+			},
+			expectedMatch:  true,
+			expectedReason: "regex match: (?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----",
+		},
+		{
+			name: "multiline certificate not matching private key pattern",
+			secret: `-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+-----END CERTIFICATE-----`,
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`,
+					},
+				},
+			},
+			expectedMatch:  false,
+			expectedReason: "",
+		},
+		{
+			name: "multiline secret with multiple patterns",
+			secret: `-----BEGIN RSA PRIVATE KEY-----
+test-content
+-----END RSA PRIVATE KEY-----`,
+			allowlistedSecrets: []AllowlistEntry{
+				{
+					Values: []string{
+						`-----BEGIN RSA PRIVATE KEY-----
+test-content
+-----END RSA PRIVATE KEY-----`,
+						`(?s)-----BEGIN.*PRIVATE KEY-----.*-----END.*PRIVATE KEY-----`,
+					},
+				},
+			},
+			expectedMatch:  true,
+			expectedReason: "", // Don't check specific reason since map iteration order is non-deterministic
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiledAllowlist := CompileAllowlistPatterns(tt.allowlistedSecrets)
+			match, reason := isSecretAllowlisted(tt.secret, compiledAllowlist)
+			assert.Equal(t, tt.expectedMatch, match)
+			if tt.expectedReason != "" {
+				assert.Equal(t, tt.expectedReason, reason)
+			}
+		})
+	}
+}
+
+func BenchmarkFilterallowlistedSecrets(b *testing.B) {
+	ctx := logContext.Background()
+
+	results := []Result{
+		{Raw: []byte("secret1")},
+		{Raw: []byte("test-api-key-12345")},
+		{Raw: []byte("prod-token-abcdef")},
+		{Raw: []byte("random-secret-123")},
+		{Raw: []byte("dev-key-67890")},
+	}
+
+	allowlistedSecrets := []AllowlistEntry{
+		{
+			Values: []string{
+				"secret1",     // exact match
+				`^test-.*`,    // regex
+				`.*-token-.*`, // regex
+			},
+		},
+	}
+
+	compiledAllowlist := CompileAllowlistPatterns(allowlistedSecrets)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		FilterAllowlistedSecrets(ctx, results, compiledAllowlist)
+	}
+}
+
+func BenchmarkIsSecretAllowlisted(b *testing.B) {
+	allowlistedSecrets := []AllowlistEntry{
+		{
+			Values: []string{
+				"exact-secret",
+				`^test-.*`,
+				`.*-token-.*`,
+				`^[a-f0-9]{32}$`,
+			},
+		},
+	}
+
+	secrets := []string{
+		"exact-secret",                     // exact match
+		"test-key-12345",                   // regex match
+		"random-token-abc",                 // regex match
+		"abcdef1234567890abcdef1234567890", // regex match
+		"no-match-secret",                  // no match
+	}
+
+	compiledAllowlist := CompileAllowlistPatterns(allowlistedSecrets)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, secret := range secrets {
+			isSecretAllowlisted(secret, compiledAllowlist)
+		}
+	}
+}
+
 func BenchmarkDefaultIsKnownFalsePositive(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Use a string that won't be found in any dictionary for the worst case check.
 		IsKnownFalsePositive("aoeuaoeuaoeuaoeuaoeuaoeu", DefaultFalsePositives, true)
 	}
+}
+
+func TestLoadallowlistedSecrets(t *testing.T) {
+	tests := []struct {
+		name        string
+		yamlContent string
+		expected    []AllowlistEntry
+		wantErr     bool
+	}{
+		{
+			name: "basic patterns with descriptions",
+			yamlContent: `- description: "Used in tests"
+  values:
+    - "^dev-.*"
+    - "^stage.*"
+- description: "Legacy API keys"
+  values:
+    - "legacy-key-123"
+    - "old-token-.*"`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"^dev-.*", "^stage.*"},
+				},
+				{
+					Values: []string{"legacy-key-123", "old-token-.*"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiline RSA key",
+			yamlContent: `- description: "Test RSA keys"
+  values:
+    - |
+      -----BEGIN RSA PRIVATE KEY-----
+      MIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...
+      -----END RSA PRIVATE KEY-----`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7YQU7gTBJOfGJ4NlMJOtL...\n-----END RSA PRIVATE KEY-----"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "entry without description field",
+			yamlContent: `- values:
+    - "no-description-pattern"
+    - "another-pattern"`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"no-description-pattern", "another-pattern"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty values filtered out",
+			yamlContent: `- description: "Test filtering"
+  values:
+    - "valid-pattern"
+    - ""
+    - "   "
+    - "another-valid"`,
+			expected: []AllowlistEntry{
+				{
+					Values: []string{"valid-pattern", "another-valid"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "invalid YAML",
+			yamlContent: `invalid yaml [content`,
+			expected:    nil,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary file
+			tmpFile, err := os.CreateTemp("", "allowlist-test-*.yaml")
+			require.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			// Write test content
+			_, err = tmpFile.WriteString(tt.yamlContent)
+			require.NoError(t, err)
+			require.NoError(t, tmpFile.Close())
+
+			// Test the function
+			result, err := LoadAllowlistedSecrets(tmpFile.Name())
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			want := CompileAllowlistPatterns(tt.expected)
+			got := CompileAllowlistPatterns(result)
+			assert.True(t, cmp.Equal(want, got, cmp.AllowUnexported(regexp.Regexp{})), "CompiledAllowlist structures should be functionally equivalent")
+		})
+	}
+}
+
+func TestLoadAllowlistedSecretsFileNotFound(t *testing.T) {
+	_, err := LoadAllowlistedSecrets("nonexistent-file.yaml")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to open allowlist file")
 }
