@@ -1324,12 +1324,17 @@ def test_something():
 type passthroughDetector struct {
 	detectorType detectorspb.DetectorType
 	keywords     []string
+	secret       string
 }
 
 func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) ([]detectors.Result, error) {
+	raw := data
+	if p.secret != "" {
+		raw = []byte(p.secret)
+	}
 	return []detectors.Result{
 		{
-			Raw:      data,
+			Raw:      raw,
 			Verified: verify,
 		},
 	}, nil
@@ -1484,6 +1489,54 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		}
 	})
 	t.Run("no overlap", func(t *testing.T) {
-		t.Fatalf("not implemented")
+		// Arrange: Create a minimal engine
+		e := &Engine{
+			detectableChunksChan:          make(chan detectableChunk, 2),
+			retainFalsePositives:          true,
+			verificationOverlapChunksChan: make(chan verificationOverlapChunk, 2),
+			verify:                        true,
+		}
+
+		// Arrange: Set up a fake detectableChunk processor so that any chunks sent to e.detectableChunksChan don't
+		// block the test.
+		processedDetectableChunks := make(chan detectableChunk, 2)
+		go func() {
+			for chunk := range e.detectableChunksChan {
+				chunk.wgDoneFn()
+				processedDetectableChunks <- chunk
+			}
+		}()
+
+		// Arrange: Create a chunk to "scan."
+		chunk := sources.Chunk{
+			Data:   []byte("keyword ;oahpow8heg;blaisd"),
+			Verify: true,
+		}
+
+		// Arrange: Create non-overlapping detector matches. We can't create them directly, so we have to use a minimal
+		// A-H core.
+		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
+			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}, secret: "oahpow"},
+			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}, secret: "blaisd"},
+		})
+		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
+		require.Len(t, detectorMatches, 2)
+
+		// Arrange: Enqueue a verification overlap chunk
+		e.verificationOverlapChunksChan <- verificationOverlapChunk{
+			chunk:                       chunk,
+			detectors:                   detectorMatches,
+			verificationOverlapWgDoneFn: func() { close(e.verificationOverlapChunksChan) },
+		}
+
+		// Act
+		e.verificationOverlapWorker(ctx)
+		close(e.detectableChunksChan)
+		close(processedDetectableChunks)
+
+		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		for detectableChunk := range processedDetectableChunks {
+			assert.True(t, detectableChunk.chunk.Verify)
+		}
 	})
 }
