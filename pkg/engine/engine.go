@@ -773,6 +773,7 @@ type detectableChunk struct {
 	detector *ahocorasick.DetectorMatch
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
+	verify   bool
 	wgDoneFn func()
 }
 
@@ -792,7 +793,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
-		sourceVerify := chunk.Verify
+		sourceVerify := chunk.SourceVerify
 		for _, decoder := range e.decoders {
 			decodeStart := time.Now()
 			// This copy is needed to preserve the original chunk.Data across multiple decoders.
@@ -819,12 +820,12 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			}
 
 			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
 				wgDetect.Add(1)
 				e.detectableChunksChan <- detectableChunk{
 					chunk:    *decoded.Chunk,
 					detector: detector,
 					decoder:  decoded.DecoderType,
+					verify:   e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides),
 					wgDoneFn: wgDetect.Done,
 				}
 			}
@@ -1004,6 +1005,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 								chunk:    chunk.chunk,
 								detector: detector,
 								decoder:  chunk.decoder,
+								verify:   false,
 								wgDoneFn: wgDetect.Done,
 							},
 							res,
@@ -1022,11 +1024,11 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
-			chunk.chunk.Verify = e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
 			e.detectableChunksChan <- detectableChunk{
 				chunk:    chunk.chunk,
 				detector: detector,
 				decoder:  chunk.decoder,
+				verify:   e.shouldVerifyChunk(chunk.chunk.SourceVerify, detector, e.detectorVerificationOverrides),
 				wgDoneFn: wgDetect.Done,
 			}
 		}
@@ -1089,7 +1091,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := e.verificationCache.FromData(
 			ctx,
 			data.detector.Detector,
-			data.chunk.Verify,
+			data.verify,
 			data.chunk.SecretID != 0,
 			matchBytes)
 		t.Stop()
