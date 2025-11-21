@@ -1322,7 +1322,8 @@ def test_something():
 }
 
 type passthroughDetector struct {
-	keywords []string
+	detectorType detectorspb.DetectorType
+	keywords     []string
 }
 
 func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) ([]detectors.Result, error) {
@@ -1335,7 +1336,7 @@ func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) 
 }
 
 func (p passthroughDetector) Keywords() []string             { return p.keywords }
-func (p passthroughDetector) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+func (p passthroughDetector) Type() detectorspb.DetectorType { return p.detectorType }
 func (p passthroughDetector) Description() string            { return "fake detector for testing" }
 
 type passthroughDecoder struct{}
@@ -1420,8 +1421,62 @@ func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) 
 }
 
 func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
+	ctx := context.Background()
+
 	t.Run("overlap", func(t *testing.T) {
-		t.Fatalf("not implemented")
+		// Arrange: Create a minimal engine
+		e := &Engine{
+			detectableChunksChan:          make(chan detectableChunk, 2),
+			results:                       make(chan detectors.ResultWithMetadata, 2),
+			retainFalsePositives:          true,
+			verificationOverlapChunksChan: make(chan verificationOverlapChunk, 2),
+		}
+
+		// Arrange: Ensure that any chunks (incorrectly) sent to e.detectableChunksChan don't block the test.
+		go func() {
+			for chunk := range e.detectableChunksChan {
+				chunk.wgDoneFn()
+			}
+		}()
+
+		// Arrange: Create a chunk to "scan."
+		chunk := sources.Chunk{
+			Data:   []byte("keyword ;oahpow8heg;blaisd"),
+			Verify: true,
+		}
+
+		// Arrange: Create overlapping detector matches. We can't create them directly, so we have to use a minimal A-H
+		// core.
+		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
+			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}},
+			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}},
+		})
+		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
+		require.Len(t, detectorMatches, 2)
+
+		// Arrange: Enqueue a verification overlap chunk
+		e.verificationOverlapChunksChan <- verificationOverlapChunk{
+			chunk:                       chunk,
+			detectors:                   detectorMatches,
+			verificationOverlapWgDoneFn: func() { close(e.verificationOverlapChunksChan) },
+		}
+
+		// Act
+		e.verificationOverlapWorker(ctx)
+		close(e.results)
+		close(e.detectableChunksChan)
+
+		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it).
+		for result := range e.results {
+			assert.False(t, result.Result.Verified)
+		}
+
+		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		// CMR: There should be not be any of these chunks. However, due to what I believe is an unrelated bug, there
+		// are. This test ensures that even in that erroneous case, their Verify flag is correct.
+		for detectableChunk := range e.detectableChunksChan {
+			assert.True(t, detectableChunk.chunk.Verify)
+		}
 	})
 	t.Run("no overlap", func(t *testing.T) {
 		t.Fatalf("not implemented")
