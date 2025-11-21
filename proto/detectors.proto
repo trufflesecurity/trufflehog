@@ -1048,6 +1048,7 @@ enum DetectorType {
   HashiCorpVaultAuth = 1036;
   PhraseAccessToken = 1037;
   Photoroom = 1038;
+  JWT = 1039;
 }
 
 message Result {
