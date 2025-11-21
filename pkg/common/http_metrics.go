@@ -103,7 +103,7 @@ func recordHTTPRequest(sanitizedURL string) {
 }
 
 // recordHTTPResponse records metrics for an HTTP response.
-func recordHTTPResponse(sanitizedURL string, statusCode int, durationSeconds float64) {
+func recordHTTPResponse(sanitizedURL string, statusCode int, durationSeconds float64, contentLength int64) {
 	// Record latency
 	httpRequestDuration.WithLabelValues(sanitizedURL).Observe(durationSeconds)
 
@@ -111,14 +111,14 @@ func recordHTTPResponse(sanitizedURL string, statusCode int, durationSeconds flo
 	if statusCode != 200 {
 		httpNon200ResponsesTotal.WithLabelValues(sanitizedURL, strconv.Itoa(statusCode)).Inc()
 	}
+
+	// Record response body size if known
+	if contentLength >= 0 {
+		httpResponseBodySizeBytes.WithLabelValues(sanitizedURL).Observe(float64(contentLength))
+	}
 }
 
 // recordNetworkError records metrics for failed HTTP response
 func recordNetworkError(sanitizedURL string) {
 	httpNon200ResponsesTotal.WithLabelValues(sanitizedURL, "network_error").Inc()
-}
-
-// recordResponseBodySize records metrics for the size of an HTTP response body.
-func recordResponseBodySize(sanitizedURL string, sizeBytes int) {
-	httpResponseBodySizeBytes.WithLabelValues(sanitizedURL).Observe(float64(sizeBytes))
 }

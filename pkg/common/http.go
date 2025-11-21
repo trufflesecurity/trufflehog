@@ -133,17 +133,8 @@ func (t *InstrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 	}
 
 	if resp != nil {
-		// record latency and increment counter for non-200 status code
-		recordHTTPResponse(sanitizedURL, resp.StatusCode, duration.Seconds())
-
-		// wrap the response body to count bytes read
-		resp.Body = &responseSizeCounterReadCloser{
-			ReadCloser: resp.Body,
-			recordSizeFunc: func(size int) {
-				// Record response body size
-				recordResponseBodySize(sanitizedURL, size)
-			},
-		}
+		// record latency, response size and increment counter for non-200 status code
+		recordHTTPResponse(sanitizedURL, resp.StatusCode, duration.Seconds(), resp.ContentLength)
 	}
 
 	return resp, err
@@ -154,40 +145,6 @@ func NewInstrumentedTransport(T http.RoundTripper) *InstrumentedTransport {
 		T = http.DefaultTransport
 	}
 	return &InstrumentedTransport{T}
-}
-
-// responseSizeCounterReadCloser wraps an io.ReadCloser to count the number of bytes read.
-// It counts bytes read during Read calls and invokes a callback function when closed to record the total size.
-// If the body is not read before closing, it drains the body to get the size.
-// One caveat is that if the body is only partially read, the recorded size will reflect only the bytes read,
-// but we accept this limitation as it is a very rare case.
-type responseSizeCounterReadCloser struct {
-	io.ReadCloser
-	bytesRead      *int
-	recordSizeFunc func(int)
-}
-
-func (r *responseSizeCounterReadCloser) Read(p []byte) (n int, err error) {
-	n, err = r.ReadCloser.Read(p)
-	if r.bytesRead == nil {
-		r.bytesRead = new(int)
-	}
-	*r.bytesRead += n
-	return n, err
-}
-
-func (r *responseSizeCounterReadCloser) Close() error {
-	if r.recordSizeFunc != nil {
-		if r.bytesRead == nil {
-			// this means downstream code never consumed the body, we must drain the body to get its size (io.Copy calls Read())
-			_, err := io.Copy(io.Discard, r)
-			if err != nil {
-				return err
-			}
-		}
-		r.recordSizeFunc(*r.bytesRead)
-	}
-	return r.ReadCloser.Close()
 }
 
 func ConstantResponseHttpClient(statusCode int, body string) *http.Client {

@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -506,52 +505,4 @@ func TestInstrumentedTransport(t *testing.T) {
 
 	// Note: Testing histogram metrics is complex due to the way Prometheus handles them
 	// The main thing is that the request completed successfully and counters were incremented
-}
-
-func TestResponseSizeCounterReadCloser(t *testing.T) {
-	bodyContent := "This is a test response body."
-	expectedSize := len(bodyContent)
-	resp := &http.Response{
-		Body: io.NopCloser(strings.NewReader(bodyContent)),
-	}
-
-	var recordedSize int
-	readCloser := &responseSizeCounterReadCloser{
-		ReadCloser: resp.Body,
-		recordSizeFunc: func(size int) {
-			recordedSize = size
-		},
-	}
-	// Read the entire body
-	_, err := io.ReadAll(readCloser)
-	require.NoError(t, err)
-
-	// Close the ReadCloser to trigger size recording
-	err = readCloser.Close()
-	require.NoError(t, err)
-
-	assert.Equal(t, expectedSize, recordedSize, "Response body size does not match expected")
-}
-
-func TestResponseSizeCounterReadCloser_UnreadBody(t *testing.T) {
-	bodyContent := "This is a test response body."
-	expectedSize := len(bodyContent)
-	resp := &http.Response{
-		Body: io.NopCloser(strings.NewReader(bodyContent)),
-	}
-
-	var recordedSize int
-	readCloser := &responseSizeCounterReadCloser{
-		ReadCloser: resp.Body,
-		recordSizeFunc: func(size int) {
-			recordedSize = size
-		},
-	}
-	// Do not read the body
-
-	// Close the ReadCloser to trigger size recording
-	err := readCloser.Close()
-	require.NoError(t, err)
-
-	assert.Equal(t, expectedSize, recordedSize, "Response body size does not match expected for unread body")
 }
