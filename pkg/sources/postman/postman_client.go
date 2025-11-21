@@ -87,6 +87,8 @@ type Metadata struct {
 	FieldType       string // Path of the item type
 	fromLocal       bool
 	LocationType    source_metadatapb.PostmanLocationType // The distinct Postman location type that the item falls under
+	ResponseID      string
+	ResponseName    string
 }
 
 type Collection struct {
