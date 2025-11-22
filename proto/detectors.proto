@@ -1049,6 +1049,15 @@ enum DetectorType {
   PhraseAccessToken = 1037;
   Photoroom = 1038;
   JWT = 1039;
+  ExaAI = 1040;
+  FireCrawl = 1041;
+  Perplexity = 1042;
+  OpenRouter = 1043;
+  GoogleGemini = 1044;
+  RunwayML = 1045;
+  GoogleVeo = 1046;
+  HeyGen = 1047;
+  MidJourney = 1048;
 }
 
 message Result {
