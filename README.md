@@ -499,7 +499,7 @@ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 
 ## Configuration
 
-TruffleHog supports defining [custom regex detectors](#regex-detector-alpha)
+TruffleHog supports defining [custom regex detectors](#custom-regex-detector-(alpha))
 and multiple sources in a configuration file provided via the `--config` flag.
 The regex detectors can be used with any subcommand, while the sources defined
 in configuration are only for the `multi-scan` subcommand.
