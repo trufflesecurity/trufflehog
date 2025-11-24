@@ -2,10 +2,10 @@ package atlassian
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"encoding/json"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -80,6 +80,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.ExtraData["Organization"] = orgResponse.Data[0].Attributes.Name
 			}
 			s1.SetVerificationError(verificationErr, match)
+
+			if isVerified {
+				s1.AnalysisInfo = map[string]string{
+					"key": match,
+				}
+			}
 		}
 
 		results = append(results, s1)
