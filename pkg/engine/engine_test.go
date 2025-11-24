@@ -1360,34 +1360,46 @@ func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
-	// Arrange: Create a minimal engine.
-	e := &Engine{
-		results:           make(chan detectors.ResultWithMetadata, 1),
-		verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+	testCases := []struct {
+		name   string
+		verify bool
+	}{
+		{name: "verify=true", verify: true},
+		{name: "verify=false", verify: false},
 	}
 
-	// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
-	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"keyword"}}})
-	detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
-	require.Len(t, detectorMatches, 1)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange: Create a minimal engine.
+			e := &Engine{
+				results:           make(chan detectors.ResultWithMetadata, 1),
+				verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+			}
 
-	// Arrange: Create a chunk to detect.
-	chunk := detectableChunk{
-		detector: detectorMatches[0],
-		verify:   true,
-		wgDoneFn: func() {},
-	}
+			// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+			ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"keyword"}}})
+			detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
+			require.Len(t, detectorMatches, 1)
 
-	// Act
-	e.detectChunk(ctx, chunk)
-	close(e.results)
+			// Arrange: Create a chunk to detect.
+			chunk := detectableChunk{
+				detector: detectorMatches[0],
+				verify:   tc.verify,
+				wgDoneFn: func() {},
+			}
 
-	// Assert: Confirm that a result was generated and that it has the expected verify flag.
-	select {
-	case result := <-e.results:
-		assert.True(t, result.Result.Verified)
-	default:
-		t.Errorf("expected a result but did not get one")
+			// Act
+			e.detectChunk(ctx, chunk)
+			close(e.results)
+
+			// Assert: Confirm that a result was generated and that it has the expected verify flag.
+			select {
+			case result := <-e.results:
+				assert.Equal(t, tc.verify, result.Result.Verified)
+			default:
+				t.Errorf("expected a result but did not get one")
+			}
+		})
 	}
 }
 
