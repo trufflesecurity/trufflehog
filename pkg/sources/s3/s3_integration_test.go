@@ -480,3 +480,40 @@ func TestSource_ChunkUnit(t *testing.T) {
 	assert.Equal(t, 103, len(reporter.Chunks))
 	assert.Equal(t, 0, len(reporter.ChunkErrs))
 }
+
+func TestSource_ChunkUnit_Resumption(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Second)
+	defer cancel()
+
+	s := new(Source)
+	s.Progress = sources.Progress{
+		Message:           "Bucket: integration-resumption-tests",
+		EncodedResumeInfo: "{\"integration-resumption-tests\":\"test-dir/\"}",
+		SectionsCompleted: 0,
+		SectionsRemaining: 1,
+	}
+	connection := &sourcespb.S3{
+		Credential:       &sourcespb.S3_Unauthenticated{},
+		Buckets:          []string{"integration-resumption-tests"},
+		EnableResumption: true,
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+
+	err = s.Init(ctx, "test name", 0, 0, false, conn, 2)
+	require.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.NoError(t, err)
+
+	for _, unit := range reporter.Units {
+		err = s.ChunkUnit(ctx, unit, &reporter)
+		assert.NoError(t, err, "Expected no error during ChunkUnit")
+	}
+
+	// Verify that we processed all remaining data on resume.
+	assert.Equal(t, 9638, len(reporter.Chunks), "Should have processed all remaining data on resume")
+}

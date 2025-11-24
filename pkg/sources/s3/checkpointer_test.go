@@ -258,6 +258,36 @@ func TestCheckpointerUpdate(t *testing.T) {
 	}
 }
 
+func TestCheckpointerUpdateUnitScan(t *testing.T) {
+	ctx := context.Background()
+	progress := new(sources.Progress)
+	tracker := NewCheckpointer(ctx, progress)
+	tracker.SetIsUnitScan(true)
+
+	page := &s3.ListObjectsV2Output{
+		Contents: make([]s3types.Object, 3),
+	}
+	for i := range 3 {
+		key := fmt.Sprintf("key-%d", i)
+		page.Contents[i] = s3types.Object{Key: &key}
+	}
+
+	// Complete first object.
+	err := tracker.UpdateObjectCompletion(ctx, 0, "test-bucket", page.Contents)
+	assert.NoError(t, err, "Unexpected error updating progress")
+
+	var info map[string]string
+	err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
+	var gotBucket, gotStartAfter string
+	for k, v := range info {
+		gotBucket = k
+		gotStartAfter = v
+	}
+	assert.NoError(t, err, "Failed to decode resume info")
+	assert.Equal(t, "test-bucket", gotBucket, "Incorrect bucket")
+	assert.Equal(t, "key-0", gotStartAfter, "Incorrect resume point")
+}
+
 func TestComplete(t *testing.T) {
 	tests := []struct {
 		name         string

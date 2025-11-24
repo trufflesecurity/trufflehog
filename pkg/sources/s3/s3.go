@@ -295,7 +295,7 @@ func (s *Source) scanBuckets(
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
-	var objectCount uint64
+	var totalObjectCount uint64
 
 	pos := determineResumePosition(ctx, s.checkpointer, bucketsToScan)
 	switch {
@@ -336,13 +336,14 @@ func (s *Source) scanBuckets(
 			)
 		}
 
-		s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, &objectCount)
+		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter)
+		totalObjectCount += objectCount
 	}
 
 	s.SetProgressComplete(
 		len(bucketsToScan),
 		len(bucketsToScan),
-		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount),
+		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, totalObjectCount),
 		"",
 	)
 }
@@ -354,15 +355,14 @@ func (s *Source) scanBucket(
 	bucket string,
 	reporter sources.ChunkReporter,
 	startAfter *string,
-	objectCount *uint64,
-) {
+) uint64 {
 	s.metricsCollector.RecordBucketForRole(role)
 
 	ctx = context.WithValue(ctx, "bucket", bucket)
 
 	if common.IsDone(ctx) {
 		ctx.Logger().Error(ctx.Err(), "context done, while scanning bucket")
-		return
+		return 0
 	}
 
 	ctx.Logger().V(3).Info("Scanning bucket")
@@ -370,7 +370,7 @@ func (s *Source) scanBucket(
 	regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
 	if err != nil {
 		ctx.Logger().Error(err, "could not get regional client for bucket")
-		return
+		return 0
 	}
 
 	errorCount := sync.Map{}
@@ -382,10 +382,7 @@ func (s *Source) scanBucket(
 
 	pageNumber := 1
 	paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
-	if objectCount == nil {
-		var newObjectCount uint64
-		objectCount = &newObjectCount
-	}
+	var objectCount uint64
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -408,12 +405,13 @@ func (s *Source) scanBucket(
 		}
 		processingState := processingState{
 			errorCount:  &errorCount,
-			objectCount: objectCount,
+			objectCount: &objectCount,
 		}
 		s.pageChunker(ctx, pageMetadata, processingState, reporter)
 
 		pageNumber++
 	}
+	return objectCount
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -741,6 +739,9 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	return s.visitRoles(ctx, visitor)
 }
 
+// ChunkUnit implements SourceUnitChunker interface. This implementation scans
+// the given S3 bucket source unit and emits chunks for each object found.
+// It supports sub-unit resumption by utilizing the checkpointer to track progress.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 
 	s3unit, ok := unit.(S3SourceUnit)
@@ -754,6 +755,19 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		return fmt.Errorf("could not create s3 client for bucket %s and role %s: %w", bucket, s3unit.Role, err)
 	}
 
-	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, nil, nil)
+	s.checkpointer.SetIsUnitScan(true)
+
+	var startAfterPtr *string
+	startAfter := s.Progress.GetEncodedResumeInfoFor(bucket)
+	if startAfter != "" {
+		ctx.Logger().V(3).Info(
+			"Resuming bucket scan",
+			"start_after", startAfter,
+			"bucket", bucket,
+		)
+		startAfterPtr = &startAfter
+	}
+	defer s.Progress.ClearEncodedResumeInfoFor(bucket)
+	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, startAfterPtr)
 	return nil
 }

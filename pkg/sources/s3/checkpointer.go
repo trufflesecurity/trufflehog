@@ -56,6 +56,8 @@ type Checkpointer struct {
 	// progress holds the scan's overall progress state and enables persistence.
 	// The EncodedResumeInfo field stores the JSON-encoded ResumeInfo checkpoint.
 	progress *sources.Progress // Reference to source's Progress
+
+	isUnitScan bool // Indicates if scanning is done in unit scan mode
 }
 
 const defaultMaxObjectsPerPage = 1000
@@ -199,6 +201,12 @@ func (p *Checkpointer) advanceLowestIncompleteIdx() {
 // updateCheckpoint persists the current resumption state.
 // Must be called with lock held.
 func (p *Checkpointer) updateCheckpoint(bucket string, lastKey string) error {
+	if p.isUnitScan {
+		// track sub-unit resumption state
+		p.progress.SetEncodedResumeInfoFor(bucket, lastKey)
+		return nil
+	}
+
 	encoded, err := json.Marshal(&ResumeInfo{CurrentBucket: bucket, StartAfter: lastKey})
 	if err != nil {
 		return fmt.Errorf("failed to encode resume info: %w", err)
@@ -211,4 +219,12 @@ func (p *Checkpointer) updateCheckpoint(bucket string, lastKey string) error {
 		string(encoded),
 	)
 	return nil
+}
+
+// SetIsUnitScan sets whether the checkpointer is operating in unit scan mode.
+func (p *Checkpointer) SetIsUnitScan(isUnitScan bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.isUnitScan = isUnitScan
 }
