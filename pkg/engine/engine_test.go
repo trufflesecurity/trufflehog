@@ -1409,36 +1409,52 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
-	// Arrange: Create a minimal engine.
-	detector := &passthroughDetector{keywords: []string{"keyword"}}
-	e := &Engine{
-		AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
-		decoders:             []decoders.Decoder{passthroughDecoder{}},
-		detectableChunksChan: make(chan detectableChunk, 1),
-		sourceManager:        sources.NewManager(),
-		verify:               true,
+	testCases := []struct {
+		name         string
+		engineVerify bool
+		sourceVerify bool
+		wantVerify   bool
+	}{
+		{name: "engineVerify=false,sourceVerify=false", engineVerify: false, sourceVerify: false, wantVerify: false},
+		{name: "engineVerify=false,sourceVerify=true", engineVerify: false, sourceVerify: true, wantVerify: false},
+		{name: "engineVerify=true,sourceVerify=false", engineVerify: true, sourceVerify: false, wantVerify: false},
+		{name: "engineVerify=true,sourceVerify=true", engineVerify: true, sourceVerify: true, wantVerify: true},
 	}
 
-	// Arrange: Create a chunk to scan.
-	chunk := sources.Chunk{
-		Data:         []byte("keyword"),
-		SourceVerify: true,
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange: Create a minimal engine.
+			detector := &passthroughDetector{keywords: []string{"keyword"}}
+			e := &Engine{
+				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
+				decoders:             []decoders.Decoder{passthroughDecoder{}},
+				detectableChunksChan: make(chan detectableChunk, 1),
+				sourceManager:        sources.NewManager(),
+				verify:               tc.engineVerify,
+			}
 
-	// Arrange: Enqueue a chunk to be scanned.
-	e.sourceManager.ScanChunk(&chunk)
+			// Arrange: Create a chunk to scan.
+			chunk := sources.Chunk{
+				Data:         []byte("keyword"),
+				SourceVerify: tc.sourceVerify,
+			}
 
-	// Act
-	go e.scannerWorker(ctx)
+			// Arrange: Enqueue a chunk to be scanned.
+			e.sourceManager.ScanChunk(&chunk)
 
-	// Assert: Confirm that a chunk was generated, that its SourceVerify flag is unchanged, and that its verify flag is
-	// correctly set.
-	select {
-	case chunk := <-e.detectableChunksChan:
-		assert.True(t, chunk.verify)
-		assert.True(t, chunk.chunk.SourceVerify)
-	case <-time.After(1 * time.Second):
-		t.Errorf("expected a detectableChunk but did not get one")
+			// Act
+			go e.scannerWorker(ctx)
+
+			// Assert: Confirm that a chunk was generated, that its SourceVerify flag is unchanged, and that its verify
+			// flag is correctly set.
+			select {
+			case chunk := <-e.detectableChunksChan:
+				assert.Equal(t, tc.wantVerify, chunk.verify)
+				assert.Equal(t, tc.sourceVerify, chunk.chunk.SourceVerify)
+			case <-time.After(1 * time.Second):
+				t.Errorf("expected a detectableChunk but did not get one")
+			}
+		})
 	}
 }
 
