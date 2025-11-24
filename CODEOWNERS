@@ -2,7 +2,22 @@
 * @trufflesecurity/product-eng
 
 # Scanning
+pkg/sources/ @trufflesecurity/Scanning
 pkg/writers/ @trufflesecurity/Scanning
+
+# Integrations
+pkg/sources/circleci/ @trufflesecurity/Integrations
+pkg/sources/docker/ @trufflesecurity/Integrations
+pkg/sources/elasticsearch/ @trufflesecurity/Integrations
+pkg/sources/filesystem/ @trufflesecurity/Integrations
+pkg/sources/gcs/ @trufflesecurity/Integrations
+pkg/sources/git/ @trufflesecurity/Integrations
+pkg/sources/github/ @trufflesecurity/Integrations
+pkg/sources/gitlab/ @trufflesecurity/Integrations
+pkg/sources/jenkins/ @trufflesecurity/Integrations
+pkg/sources/postman/ @trufflesecurity/Integrations
+pkg/sources/s3/ @trufflesecurity/Integrations
+pkg/sources/travisci/ @trufflesecurity/Integrations
 
 # Shared
 pkg/decoders/ @trufflesecurity/Scanning @trufflesecurity/OSS
@@ -12,7 +27,6 @@ pkg/giturl/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/handlers/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/iobuf/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/sanitizer/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-pkg/sources/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 proto/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 
 # OSS
