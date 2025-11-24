@@ -1372,7 +1372,7 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	// Arrange: Create a chunk to detect.
 	chunk := detectableChunk{
 		chunk: sources.Chunk{
-			Verify: true,
+			SourceVerify: true,
 		},
 		detector: detectorMatches[0],
 		wgDoneFn: func() {},
@@ -1406,8 +1406,8 @@ func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) 
 
 	// Arrange: Create a chunk to scan.
 	chunk := sources.Chunk{
-		Data:   []byte("keyword"),
-		Verify: true,
+		Data:         []byte("keyword"),
+		SourceVerify: true,
 	}
 
 	// Arrange: Enqueue a chunk to be scanned.
@@ -1419,7 +1419,7 @@ func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) 
 	// Assert: Confirm that a chunk was generated and that it has the expected verify flag.
 	select {
 	case chunk := <-e.detectableChunksChan:
-		assert.True(t, chunk.chunk.Verify)
+		assert.True(t, chunk.chunk.SourceVerify)
 	case <-time.After(1 * time.Second):
 		t.Errorf("expected a detectableChunk but did not get one")
 	}
@@ -1450,8 +1450,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Arrange: Create a chunk to "scan."
 		chunk := sources.Chunk{
-			Data:   []byte("keyword ;oahpow8heg;blaisd"),
-			Verify: true,
+			Data:         []byte("keyword ;oahpow8heg;blaisd"),
+			SourceVerify: true,
 		}
 
 		// Arrange: Create overlapping detector matches. We can't create them directly, so we have to use a minimal A-H
@@ -1485,7 +1485,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		// CMR: There should be not be any of these chunks. However, due to what I believe is an unrelated bug, there
 		// are. This test ensures that even in that erroneous case, their Verify flag is correct.
 		for detectableChunk := range processedDetectableChunks {
-			assert.True(t, detectableChunk.chunk.Verify)
+			assert.True(t, detectableChunk.chunk.SourceVerify)
 		}
 	})
 	t.Run("no overlap", func(t *testing.T) {
@@ -1509,8 +1509,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Arrange: Create a chunk to "scan."
 		chunk := sources.Chunk{
-			Data:   []byte("keyword ;oahpow8heg;blaisd"),
-			Verify: true,
+			Data:         []byte("keyword ;oahpow8heg;blaisd"),
+			SourceVerify: true,
 		}
 
 		// Arrange: Create non-overlapping detector matches. We can't create them directly, so we have to use a minimal
@@ -1536,7 +1536,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
 		for detectableChunk := range processedDetectableChunks {
-			assert.True(t, detectableChunk.chunk.Verify)
+			assert.True(t, detectableChunk.chunk.SourceVerify)
 		}
 	})
 }
