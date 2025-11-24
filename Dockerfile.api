@@ -1,0 +1,49 @@
+# Multi-stage build for TruffleHog REST API
+
+# Stage 1: Builder
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build both CLI and API
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o trufflehog .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o trufflehog-api ./cmd/api
+
+# Stage 2: Runtime
+FROM alpine:latest
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates git
+
+# Copy binaries from builder
+COPY --from=builder /app/trufflehog /usr/local/bin/trufflehog
+COPY --from=builder /app/trufflehog-api /usr/local/bin/trufflehog-api
+
+# Copy migrations and documentation
+COPY --from=builder /app/pkg/api/db/migrations /app/pkg/api/db/migrations
+COPY --from=builder /app/docs /app/docs
+
+# Create non-root user
+RUN adduser -D -u 1000 trufflehog && \
+    chown -R trufflehog:trufflehog /app
+
+USER trufflehog
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+CMD ["trufflehog-api"]

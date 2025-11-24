@@ -1,65 +1,76 @@
-PROTOS_IMAGE ?= trufflesecurity/protos:1.22
+.PHONY: help build run test deploy clean docker-up docker-down swagger
 
-.PHONY: check
-.PHONY: lint
-.PHONY: test
-.PHONY: test-race
-.PHONY: run
-.PHONY: install
-.PHONY: protos
-.PHONY: protos-windows
-.PHONY: vendor
-.PHONY: dogfood
+help: ## Display this help message
+	@echo "TruffleHog REST API - Available Commands"
+	@echo "========================================"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-dogfood:
-	CGO_ENABLED=0 go run . git file://. --json --log-level=2
+build: ## Build the API server
+	@echo "Building API server..."
+	CGO_ENABLED=0 go build -o bin/trufflehog-api ./cmd/api
+	@echo "Build complete: bin/trufflehog-api"
 
-install:
-	CGO_ENABLED=0 go install .
+run: ## Run the API server locally
+	@echo "Starting API server..."
+	go run ./cmd/api/main.go
 
-check:
-	go fmt $(shell go list ./... | grep -v /vendor/)
-	go vet $(shell go list ./... | grep -v /vendor/)
+test: ## Run tests
+	@echo "Running tests..."
+	go test -v ./pkg/api/...
 
-lint:
-	golangci-lint run --enable bodyclose --enable copyloopvar --enable misspell --out-format=colored-line-number --timeout 10m
+test-integration: ## Run integration tests
+	@echo "Running integration tests..."
+	./scripts/test-api.sh
 
-test-failing:
-	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/) | grep FAIL
+docker-up: ## Start Docker containers (PostgreSQL, Redis)
+	@echo "Starting Docker containers..."
+	docker-compose up -d
+	@echo "Waiting for services to be ready..."
+	@sleep 5
+	@echo "Running database migrations..."
+	@docker exec -i trufflehog-postgres psql -U trufflehog -d trufflehog < pkg/api/db/migrations/001_initial_schema.sql || true
+	@echo "Docker containers are ready!"
 
-test:
-	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/)
+docker-down: ## Stop Docker containers
+	@echo "Stopping Docker containers..."
+	docker-compose down
 
-test-integration:
-	CGO_ENABLED=0 go test -timeout=5m -tags=integration $(shell go list ./... | grep -v /vendor/)
+docker-logs: ## View Docker container logs
+	docker-compose logs -f
 
-test-race:
-	CGO_ENABLED=1 go test -timeout=5m -race $(shell go list ./... | grep -v /vendor/)
+swagger: ## Generate Swagger documentation
+	@echo "Generating Swagger docs..."
+	@go install github.com/swaggo/swag/cmd/swag@latest
+	swag init -g pkg/api/server.go -o docs
 
-test-detectors:
-	CGO_ENABLED=0 go test -tags=detectors -timeout=5m $(shell go list ./... | grep pkg/detectors)
+deploy: ## Deploy to production (requires root)
+	@echo "Deploying to production..."
+	@sudo ./scripts/deploy.sh
 
-test-community:
-	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/sources | grep -v pkg/analyzer/analyzers)
+setup-nginx: ## Setup nginx reverse proxy (requires root)
+	@echo "Setting up nginx..."
+	@sudo ./scripts/setup-nginx.sh
 
-bench:
-	CGO_ENABLED=0 go test $(shell go list ./pkg/secrets/... | grep -v /vendor/) -benchmem -run=xxx -bench .
+setup-ssl: ## Setup Let's Encrypt SSL (requires root)
+	@echo "Setting up SSL..."
+	@sudo ./scripts/setup-ssl.sh
 
-run:
-	CGO_ENABLED=0 go run . git file://. --json
+clean: ## Clean build artifacts
+	@echo "Cleaning..."
+	rm -rf bin/
+	rm -rf docs/swagger.*
 
-run-debug:
-	CGO_ENABLED=0 go run . git file://. --json --log-level=2
+install-deps: ## Install Go dependencies
+	@echo "Installing dependencies..."
+	go mod download
+	go mod tidy
 
-protos:
-	docker run --rm -u "$(shell id -u)" -v "$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; /pwd/scripts/gen_proto.sh"
+dev: docker-up build run ## Start development environment
 
-protos-windows:
-	docker run --rm -v "$(shell cygpath -w $(shell pwd))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; ./scripts/gen_proto.sh"
+status: ## Check service status
+	@systemctl status trufflehog-api || echo "Service not installed"
 
-release-protos-image:
-	docker buildx build --push --platform=linux/amd64,linux/arm64 \
-	-t ${PROTOS_IMAGE} -f hack/Dockerfile.protos .
+logs: ## View service logs
+	@journalctl -u trufflehog-api -f
 
-test-release:
-	goreleaser release --clean --skip-publish --snapshot
+.DEFAULT_GOAL := help

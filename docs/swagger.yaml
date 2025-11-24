@@ -1,0 +1,610 @@
+definitions:
+  models.DetectorInfo:
+    properties:
+      keywords:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      type:
+        type: string
+      version:
+        type: integer
+    type: object
+  models.DetectorsResponse:
+    properties:
+      detectors:
+        items:
+          $ref: '#/definitions/models.DetectorInfo'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.ErrorResponse:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  models.HealthResponse:
+    properties:
+      services:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        type: string
+      version:
+        type: string
+    type: object
+  models.LoginRequest:
+    properties:
+      password:
+        example: admin123
+        type: string
+      username:
+        example: admin
+        type: string
+    type: object
+  models.LoginResponse:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user_id:
+        example: uuid
+        type: string
+      username:
+        example: admin
+        type: string
+    type: object
+  models.PageInfo:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  models.RegisterRequest:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: securepassword
+        type: string
+      username:
+        example: newuser
+        type: string
+    type: object
+  models.ScanJob:
+    properties:
+      bytes_scanned:
+        type: integer
+      chunks_scanned:
+        type: integer
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      error_message:
+        type: string
+      id:
+        type: string
+      options:
+        additionalProperties: true
+        type: object
+      progress:
+        type: integer
+      repo_url:
+        type: string
+      secrets_found:
+        type: integer
+      started_at:
+        type: string
+      status:
+        type: string
+      unverified_secrets:
+        type: integer
+      verified_secrets:
+        type: integer
+    type: object
+  models.ScanJobResponse:
+    properties:
+      job_id:
+        type: string
+      message:
+        type: string
+      status:
+        type: string
+    type: object
+  models.ScanJobStatusResponse:
+    properties:
+      job:
+        $ref: '#/definitions/models.ScanJob'
+      page:
+        $ref: '#/definitions/models.PageInfo'
+      results:
+        items:
+          $ref: '#/definitions/models.ScanResult'
+        type: array
+    type: object
+  models.ScanRequest:
+    properties:
+      branch:
+        type: string
+      exclude_detectors:
+        type: string
+      exclude_paths:
+        items:
+          type: string
+        type: array
+      include_detectors:
+        type: string
+      include_paths:
+        items:
+          type: string
+        type: array
+      max_depth:
+        type: integer
+      no_verification:
+        type: boolean
+      only_verified:
+        type: boolean
+      options:
+        additionalProperties: true
+        type: object
+      repo_url:
+        type: string
+      since_commit:
+        type: string
+    required:
+    - repo_url
+    type: object
+  models.ScanResult:
+    properties:
+      commit_hash:
+        type: string
+      created_at:
+        type: string
+      detector_name:
+        type: string
+      detector_type:
+        type: string
+      file_path:
+        type: string
+      id:
+        type: string
+      job_id:
+        type: string
+      line_number:
+        type: integer
+      raw_result:
+        additionalProperties: true
+        type: object
+      redacted_secret:
+        type: string
+      secret:
+        type: string
+      source_metadata:
+        additionalProperties: true
+        type: object
+      verification_error:
+        type: string
+      verified:
+        type: boolean
+    type: object
+  models.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  models.WebhookConfig:
+    properties:
+      api_key_id:
+        type: string
+      created_at:
+        type: string
+      events:
+        items:
+          type: string
+        type: array
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      id:
+        type: string
+      is_active:
+        type: boolean
+      retry_count:
+        type: integer
+      secret:
+        type: string
+      timeout_seconds:
+        type: integer
+      updated_at:
+        type: string
+      url:
+        type: string
+    type: object
+  models.WebhookCreateRequest:
+    properties:
+      events:
+        items:
+          type: string
+        minItems: 1
+        type: array
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      retry_count:
+        type: integer
+      secret:
+        minLength: 16
+        type: string
+      timeout_seconds:
+        type: integer
+      url:
+        type: string
+    required:
+    - events
+    - secret
+    - url
+    type: object
+  models.WebhookListResponse:
+    properties:
+      total:
+        type: integer
+      webhooks:
+        items:
+          $ref: '#/definitions/models.WebhookConfig'
+        type: array
+    type: object
+  models.WebhookUpdateRequest:
+    properties:
+      events:
+        items:
+          type: string
+        minItems: 1
+        type: array
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      is_active:
+        type: boolean
+      retry_count:
+        type: integer
+      secret:
+        minLength: 16
+        type: string
+      timeout_seconds:
+        type: integer
+      url:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and get JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: User login
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Register new user
+      tags:
+      - auth
+  /api/v1/detectors:
+    get:
+      description: Get a list of all available secret detectors including custom ones
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DetectorsResponse'
+      summary: List all available detectors
+      tags:
+      - detectors
+  /api/v1/scan:
+    post:
+      consumes:
+      - application/json
+      description: Initiate a new repository scan
+      parameters:
+      - description: Scan configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ScanRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/models.ScanJobResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Create a new scan job
+      tags:
+      - scans
+  /api/v1/scan/{jobId}:
+    delete:
+      description: Cancel a running or queued scan job
+      parameters:
+      - description: Job ID
+        in: path
+        name: jobId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Cancel a scan job
+      tags:
+      - scans
+    get:
+      description: Retrieve the status and results of a scan job
+      parameters:
+      - description: Job ID
+        in: path
+        name: jobId
+        required: true
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Results per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ScanJobStatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get scan job status
+      tags:
+      - scans
+  /api/v1/webhooks:
+    get:
+      description: Get all registered webhooks
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.WebhookListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: List webhooks
+      tags:
+      - webhooks
+    post:
+      consumes:
+      - application/json
+      description: Register a new webhook for scan events
+      parameters:
+      - description: Webhook configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.WebhookCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.WebhookConfig'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Create a webhook
+      tags:
+      - webhooks
+  /api/v1/webhooks/{webhookId}:
+    delete:
+      description: Delete a webhook
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: webhookId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Delete webhook
+      tags:
+      - webhooks
+    get:
+      description: Get a specific webhook by ID
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: webhookId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.WebhookConfig'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get webhook
+      tags:
+      - webhooks
+    put:
+      consumes:
+      - application/json
+      description: Update an existing webhook
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: webhookId
+        required: true
+        type: string
+      - description: Webhook updates
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.WebhookUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.WebhookConfig'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Update webhook
+      tags:
+      - webhooks
+  /health:
+    get:
+      description: Check the health status of the API and its dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.HealthResponse'
+      summary: Health check
+      tags:
+      - system
+swagger: "2.0"
