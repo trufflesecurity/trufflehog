@@ -33,6 +33,10 @@ import (
 // resuming from the correct bucket. The scan will continue from the last checkpointed object
 // in that bucket.
 //
+// Unit scans are also supported. The encoded resume info in this case tracks the last processed object
+// for each bucket (unit) separately by using the SetEncodedResumeInfoFor method on Progress. To use the
+// checkpointer for unit scans, call SetIsUnitScan(true) before starting the scan.
+//
 // For example, if scanning is interrupted after processing 1500 objects across 2 pages:
 // Page 1 (objects 0-999): Fully processed, checkpoint saved at object 999
 // Page 2 (objects 1000-1999): Partially processed through 1600, but only consecutive through 1499
