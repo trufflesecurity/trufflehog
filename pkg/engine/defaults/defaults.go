@@ -266,7 +266,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/everhour"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangerateapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangeratesapi"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exaai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exportsdk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/extractorapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/facebookoauth"
@@ -280,7 +279,6 @@ import (
 	figmapersonalaccesstokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/firecrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/findl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finnhub"
@@ -338,9 +336,7 @@ import (
 	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
 	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googlegemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleveo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
@@ -360,7 +356,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpscout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hereapi"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heygen"
 	heroku_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku/v1"
 	heroku_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hiveage"
@@ -472,7 +467,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metabase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metrilo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/midjourney"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/miro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mite"
@@ -525,7 +519,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openrouter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
@@ -543,7 +536,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/parsehub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/parsers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/parseur"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/perplexity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/partnerstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pastebin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paydirtapp"
@@ -631,7 +623,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/runrunit"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/runwayml"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saladcloudapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesblink"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salescookie"
@@ -1142,7 +1133,6 @@ func buildDetectorList() []detectors.Detector {
 		&everhour.Scanner{},
 		&exchangerateapi.Scanner{},
 		&exchangeratesapi.Scanner{},
-		&exaai.Scanner{},
 		&exportsdk.Scanner{},
 		&extractorapi.Scanner{},
 		&facebookoauth.Scanner{},
@@ -1156,7 +1146,6 @@ func buildDetectorList() []detectors.Detector {
 		&figmapersonalaccesstokenv2.Scanner{},
 		&fileio.Scanner{},
 		&finage.Scanner{},
-		&firecrawl.Scanner{},
 		&financialmodelingprep.Scanner{},
 		&findl.Scanner{},
 		&finnhub.Scanner{},
@@ -1217,9 +1206,7 @@ func buildDetectorList() []detectors.Detector {
 		&godaddyv1.Scanner{},
 		&godaddyv2.Scanner{},
 		&goodday.Scanner{},
-		&googlegemini.Scanner{},
 		&googleoauth2.Scanner{},
-		&googleveo.Scanner{},
 		&grafana.Scanner{},
 		&grafanaserviceaccount.Scanner{},
 		&graphcms.Scanner{},
@@ -1239,7 +1226,6 @@ func buildDetectorList() []detectors.Detector {
 		&helpcrunch.Scanner{},
 		&helpscout.Scanner{},
 		&hereapi.Scanner{},
-		&heygen.Scanner{},
 		&heroku_v1.Scanner{},
 		&heroku_v2.Scanner{},
 		// &hive.Scanner{},
@@ -1357,7 +1343,6 @@ func buildDetectorList() []detectors.Detector {
 		&metabase.Scanner{},
 		&metrilo.Scanner{},
 		&microsoftteamswebhook.Scanner{},
-		&midjourney.Scanner{},
 		&mindmeister.Scanner{},
 		&miro.Scanner{},
 		&mite.Scanner{},
@@ -1412,7 +1397,6 @@ func buildDetectorList() []detectors.Detector {
 		&oopspam.Scanner{},
 		&openai.Scanner{},
 		&opencagedata.Scanner{},
-		&openrouter.Scanner{},
 		&openuv.Scanner{},
 		&openvpn.Scanner{},
 		&openweather.Scanner{},
@@ -1430,7 +1414,6 @@ func buildDetectorList() []detectors.Detector {
 		&parsehub.Scanner{},
 		&parsers.Scanner{},
 		&parseur.Scanner{},
-		&perplexity.Scanner{},
 		&partnerstack.Scanner{},
 		&pastebin.Scanner{},
 		&paydirtapp.Scanner{},
@@ -1521,7 +1504,6 @@ func buildDetectorList() []detectors.Detector {
 		&rownd.Scanner{},
 		&rubygems.Scanner{},
 		&runrunit.Scanner{},
-		&runwayml.Scanner{},
 		&saladcloudapikey.Scanner{},
 		&salesblink.Scanner{},
 		&salescookie.Scanner{},
