@@ -42,6 +42,7 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 	conn := strings.TrimPrefix(subname, "//")
 
 	port := "1433"
+	user := "sa"
 	var password, host string
 
 	for i, param := range strings.Split(conn, ";") {
@@ -66,10 +67,20 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 			host = value
 		case "port":
 			port = value
+		case "user", "uid", "user id":
+			user = value
+
 		}
 	}
 
-	urlStr := fmt.Sprintf("sqlserver://sa:%s@%s:%s?database=master&connection+timeout=5", password, host, port)
+	if password == "" || host == "" {
+		ctx.Logger().WithName("jdbc").
+			V(2).
+			Info("Skipping invalid SQL Server URL - no password or host found")
+		return nil, fmt.Errorf("missing host or password in connection string")
+	}
+
+	urlStr := fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=master&connection+timeout=5", user, password, host, port)
 	jdbcUrl, err := url.Parse(urlStr)
 	if err != nil {
 		ctx.Logger().WithName("jdbc").
