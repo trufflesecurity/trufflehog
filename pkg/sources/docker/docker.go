@@ -135,7 +135,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			return fmt.Errorf("failed to list namespace: %s images: %w", registryNamespace, err)
 		}
 
-		dockerListImagesAPIDuration.WithLabelValues(s.name, jobIDStr).Observe(time.Since(start).Seconds())
+		dockerListImagesAPIDuration.WithLabelValues(s.name).Observe(time.Since(start).Seconds())
 
 		s.conn.Images = append(s.conn.Images, namespaceImages...)
 	}

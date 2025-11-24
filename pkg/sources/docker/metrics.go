@@ -65,5 +65,5 @@ var (
 			Help:      "Duration of Docker list images API calls.",
 			Buckets:   prometheus.DefBuckets,
 		},
-		[]string{"source_name", "job_id"})
+		[]string{"source_name"})
 )
