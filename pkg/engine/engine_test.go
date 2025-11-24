@@ -1449,8 +1449,8 @@ func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) 
 			// flag is correctly set.
 			select {
 			case chunk := <-e.detectableChunksChan:
-				assert.Equal(t, tc.wantVerify, chunk.verify)
 				assert.Equal(t, tc.sourceVerify, chunk.chunk.SourceVerify)
+				assert.Equal(t, tc.wantVerify, chunk.verify)
 			case <-time.After(1 * time.Second):
 				t.Errorf("expected a detectableChunk but did not get one")
 			}
@@ -1522,7 +1522,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its
 		// verify flag is correctly set.
 		// CMR: There should be not be any of these chunks. However, due to what I believe is an unrelated bug, there
-		// are. This test ensures that even in that erroneous case, their Verify flag is correct.
+		// are. This test ensures that even in that erroneous case, their contents are correct.
 		for detectableChunk := range processedDetectableChunks {
 			assert.True(t, detectableChunk.verify)
 			assert.True(t, detectableChunk.chunk.SourceVerify)
@@ -1576,8 +1576,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Assert: Confirm that SourceVerify flags are unchanged, and verify flags are correctly set.
 		for detectableChunk := range processedDetectableChunks {
-			assert.True(t, detectableChunk.verify)
 			assert.True(t, detectableChunk.chunk.SourceVerify)
+			assert.True(t, detectableChunk.verify)
 		}
 	})
 }
