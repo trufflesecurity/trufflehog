@@ -1371,10 +1371,8 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 
 	// Arrange: Create a chunk to detect.
 	chunk := detectableChunk{
-		chunk: sources.Chunk{
-			SourceVerify: true,
-		},
 		detector: detectorMatches[0],
+		verify:   true,
 		wgDoneFn: func() {},
 	}
 
@@ -1416,10 +1414,12 @@ func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) 
 	// Act
 	go e.scannerWorker(ctx)
 
-	// Assert: Confirm that a chunk was generated and that it has the expected verify flag.
+	// Assert: Confirm that a chunk was generated, that its SourceVerify flag is unchanged, and that its verify flag is
+	// correctly set.
 	select {
 	case chunk := <-e.detectableChunksChan:
 		assert.True(t, chunk.chunk.SourceVerify)
+		assert.True(t, chunk.verify)
 	case <-time.After(1 * time.Second):
 		t.Errorf("expected a detectableChunk but did not get one")
 	}
@@ -1481,11 +1481,13 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 			assert.False(t, result.Result.Verified)
 		}
 
-		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its
+		// verify flag is correctly set.
 		// CMR: There should be not be any of these chunks. However, due to what I believe is an unrelated bug, there
 		// are. This test ensures that even in that erroneous case, their Verify flag is correct.
 		for detectableChunk := range processedDetectableChunks {
 			assert.True(t, detectableChunk.chunk.SourceVerify)
+			assert.True(t, detectableChunk.verify)
 		}
 	})
 	t.Run("no overlap", func(t *testing.T) {
@@ -1534,9 +1536,10 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		close(e.detectableChunksChan)
 		close(processedDetectableChunks)
 
-		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		// Assert: Confirm that SourceVerify flags are unchanged, and verify flags are correctly set.
 		for detectableChunk := range processedDetectableChunks {
 			assert.True(t, detectableChunk.chunk.SourceVerify)
+			assert.True(t, detectableChunk.verify)
 		}
 	})
 }
