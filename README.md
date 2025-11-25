@@ -30,7 +30,7 @@ To learn more about TruffleHog and its features and capabilities, visit our [pro
 
 # :globe_with_meridians: TruffleHog Enterprise
 
-Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint, and more..** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
+Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint (and more)** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
 
@@ -38,11 +38,11 @@ We take the revenue from the enterprise product to fund more awesome open source
 
 # What is TruffleHog 🐽
 
-TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context, secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
+TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context, secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more.
 
 ## Discovery 🔍
 
-TruffleHog can look for secrets in many places including Git, chats, wikis, logs, API testing platforms, object stores, filesystems and more
+TruffleHog can look for secrets in many places including Git, chats, wikis, logs, API testing platforms, object stores, filesystems and more.
 
 ## Classification 📁
 
@@ -499,7 +499,7 @@ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 
 ## Configuration
 
-TruffleHog supports defining [custom regex detectors](#regex-detector-alpha)
+TruffleHog supports defining [custom regex detectors](#custom-regex-detector-alpha)
 and multiple sources in a configuration file provided via the `--config` flag.
 The regex detectors can be used with any subcommand, while the sources defined
 in configuration are only for the `multi-scan` subcommand.
@@ -675,7 +675,7 @@ TruffleHog can be used in a pre-commit hook to prevent credentials from leaking 
 
 See the [pre-commit hook documentation](PreCommit.md) for more information.
 
-## Regex Detector (alpha)
+## Custom Regex Detector (alpha)
 
 TruffleHog supports detection and verification of custom regular expressions.
 For detection, at least one **regular expression** and **keyword** is required.
@@ -696,6 +696,10 @@ your custom detector has multiple `regex` set (in this example `hogID`, and `hog
 ### Regex Detector Example
 [Here](/pkg/custom_detectors/CUSTOM_DETECTORS.md) is how to setup a custom regex detector with verification server.
 
+## Generic JWT Detection
+
+TruffleHog supports detection and verification of a subset of generic JWTs it finds.
+Specifically, if a JWT uses public-key cryptography rather than HMAC and the public key can be obtained, TruffleHog can determine whether the JWT is live or not.
 
 ## :mag: Analyze
 
