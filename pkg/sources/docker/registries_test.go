@@ -69,8 +69,7 @@ func TestDockerHubListImages_RateLimitError(t *testing.T) {
 	dockerhub := MakeRegistryFromNamespace("trufflesecurity") // no authentication
 
 	// Cast dockerhub to *DockerHub registry to override the HTTP client
-	dockerhub.(*DockerHub).Client = common.ConstantResponseHttpClient(http.StatusTooManyRequests, "{}")
-
+	dockerhub.WithClient(common.ConstantResponseHttpClient(http.StatusTooManyRequests, "{}"))
 	dockerImages, err := dockerhub.ListImages(context.Background(), "trufflesecurity") // namespace without any prefix defaults to dockerhub registry
 	assert.Error(t, err)
 	assert.Nil(t, dockerImages)
@@ -82,7 +81,7 @@ func TestQuayListImages_RateLimitError(t *testing.T) {
 	// Quay.io registry
 	quay := MakeRegistryFromNamespace("quay.io/truffledockerman") // no authentication
 	// Cast quay to *Quay registry to override the HTTP client
-	quay.(*Quay).Client = common.ConstantResponseHttpClient(http.StatusTooManyRequests, "{}")
+	quay.WithClient(common.ConstantResponseHttpClient(http.StatusTooManyRequests, "{}"))
 
 	quayImages, err := quay.ListImages(context.Background(), "quay.io/truffledockerman")
 	assert.Error(t, err)
@@ -95,7 +94,7 @@ func TestGHCRListImages_RateLimitError(t *testing.T) {
 	// GHCR registry
 	ghcr := MakeRegistryFromNamespace("ghcr.io/mongodb") // no authentication
 	// Cast ghcr to *GHCR registry to override the HTTP client
-	ghcr.(*GHCR).Client = common.ConstantResponseHttpClient(http.StatusTooManyRequests, "{}")
+	ghcr.WithClient(common.ConstantResponseHttpClient(http.StatusTooManyRequests, "{}"))
 
 	ghcrImages, err := ghcr.ListImages(context.Background(), "ghcr.io/mongodb")
 	assert.Error(t, err)
