@@ -16,6 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
@@ -394,6 +395,8 @@ func TestSourceChunksResumptionMultipleBucketsIgnoredBucket(t *testing.T) {
 }
 
 func TestSource_Enumerate(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -438,6 +441,8 @@ func TestSource_Enumerate(t *testing.T) {
 }
 
 func TestSource_ChunkUnit(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -484,7 +489,7 @@ func TestSource_ChunkUnit(t *testing.T) {
 func TestSource_ChunkUnit_Resumption(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	s := new(Source)
@@ -516,4 +521,66 @@ func TestSource_ChunkUnit_Resumption(t *testing.T) {
 
 	// Verify that we processed all remaining data on resume.
 	assert.Equal(t, 9638, len(reporter.Chunks), "Should have processed all remaining data on resume")
+}
+
+// TestSource_ChunkUnit_Resumption_MultipleBucketsConcurrent tests resumption across multiple buckets
+// with concurrent ChunkUnit processing.
+func TestSource_ChunkUnit_Resumption_MultipleBucketsConcurrent(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	src := new(Source)
+	connection := &sourcespb.S3{
+		Credential:       &sourcespb.S3_Unauthenticated{},
+		Buckets:          []string{"integration-resumption-tests", "trufflesec-ahrav-test-2"},
+		EnableResumption: true,
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+	err = src.Init(ctx, "test name", 0, 0, false, conn, 2)
+	require.NoError(t, err)
+
+	src.Progress = sources.Progress{
+		Message:           "Buckets: [integration-resumption-tests trufflesec-ahrav-test-2]",
+		EncodedResumeInfo: "{\"integration-resumption-tests\":\"test-dir\", \"trufflesec-ahrav-test-2\":\"test-dir/smmed_random_data.json.zip\"}",
+		SectionsCompleted: 0,
+		SectionsRemaining: 2,
+	}
+
+	reporter := sourcestest.SafeTestReporter{}
+	err = src.Enumerate(ctx, &reporter)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(reporter.Units), "Expected two source units from enumeration")
+
+	var wg sync.WaitGroup
+
+	for _, unit := range reporter.Units {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err = src.ChunkUnit(ctx, unit, &reporter)
+			assert.NoError(t, err, "Expected no error during ChunkUnit")
+		}()
+	}
+
+	wg.Wait()
+
+	bucketChunkCounts := map[string]int{
+		"integration-resumption-tests": 9638,
+		"trufflesec-ahrav-test-2":      2,
+	}
+	actualBucketChunkCounts := make(map[string]int)
+
+	for _, chunk := range reporter.Chunks {
+		metadata, _ := chunk.SourceMetadata.Data.(*source_metadatapb.MetaData_S3)
+		actualBucketChunkCounts[metadata.S3.Bucket]++
+	}
+
+	for bucket, wantCount := range bucketChunkCounts {
+		gotCount, ok := actualBucketChunkCounts[bucket]
+		require.True(t, ok, "Expected chunks for bucket %s", bucket)
+		assert.Equal(t, wantCount, gotCount, "Chunk count mismatch for bucket %s", bucket)
+	}
 }

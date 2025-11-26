@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -54,8 +55,6 @@ type Source struct {
 	errorCount    *sync.Map
 	jobPool       *errgroup.Group
 	maxObjectSize int64
-
-	sources.CommonSourceUnitUnmarshaller
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -699,22 +698,6 @@ func makeS3Link(bucket, region, key string) string {
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key)
 }
 
-type S3SourceUnit struct {
-	Bucket string
-	Role   string
-}
-
-func (s S3SourceUnit) SourceUnitID() (string, sources.SourceUnitKind) {
-	// The ID is the bucket name, and the kind is "s3_bucket".
-	return s.Bucket, "s3_bucket"
-}
-
-func (s S3SourceUnit) Display() string {
-	return s.Bucket
-}
-
-var _ sources.SourceUnit = S3SourceUnit{}
-
 // Enumerate implements SourceUnitEnumerator interface. This implementation visits
 // each configured role and passes each s3 bucket as a source unit
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
@@ -770,4 +753,16 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	defer s.Progress.ClearEncodedResumeInfoFor(bucket)
 	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, startAfterPtr)
 	return nil
+}
+
+func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	var unit S3SourceUnit
+	if err := json.Unmarshal(data, &unit); err != nil {
+		return nil, err
+	}
+	bucket, kind := unit.SourceUnitID()
+	if bucket == "" || kind != SourceUnitKindBucket {
+		return nil, fmt.Errorf("not an S3SourceUnit")
+	}
+	return unit, nil
 }
