@@ -6,7 +6,7 @@ labels: bug, needs triage
 assignees: trufflesecurity/product-eng
 ---
 
-Please review the [Community Note](https://github.com/trufflesecurity/trufflehog/blob/main/.github/community_note.md) before submitting
+Please Review the [Community Note](../community_note.md) before submitting
 
 ### TruffleHog Version
 <!--- Please run `trufflehog --version` to show the version. If you are not running the latest version, please upgrade because your issue may have already been fixed. --->
