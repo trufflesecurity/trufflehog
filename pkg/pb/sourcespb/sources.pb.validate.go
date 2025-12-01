@@ -3571,6 +3571,8 @@ func (m *JIRA) validate(all bool) error {
 
 	// no validation rules for InsecureSkipVerifyTls
 
+	// no validation rules for InstallationType
+
 	switch v := m.Credential.(type) {
 	case *JIRA_BasicAuth:
 		if v == nil {
