@@ -207,7 +207,7 @@ func tryRedactRegex(conn string) (string, bool) {
 }
 
 var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
-	"mysql":      parseMySQL,
+	"mysql":      ParseMySQL,
 	"postgresql": parsePostgres,
 	"sqlserver":  parseSqlServer,
 }
