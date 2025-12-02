@@ -11,21 +11,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+
 	"golang.org/x/time/rate"
 )
 
 // defaultHTTPClient defines a shared HTTP client with timeout for all registry requests.
-var defaultHTTPClient = &http.Client{Timeout: 10 * time.Second}
-
-// Image represents a container image or repository entry in a registry API response.
-type Image struct {
-	Name string `json:"name"`
-}
+var defaultHTTPClient = common.RetryableHTTPClientTimeout(10)
 
 // registryRateLimiter limits how quickly we make registry API calls across all registries.
 // We allow roughly 5 requests every ~7.5 seconds (one token every 1.5s) as a simple
 // safeguard against overloading upstream APIs.
 var registryRateLimiter = rate.NewLimiter(rate.Every(1500*time.Millisecond), 1)
+
+// Image represents a container image or repository entry in a registry API response.
+type Image struct {
+	Name string `json:"name"`
+}
 
 // Registry is an interface for any Docker/OCI registry implementation that can list all images under a given namespace.
 type Registry interface {
