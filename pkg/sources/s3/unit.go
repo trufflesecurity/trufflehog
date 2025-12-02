@@ -14,16 +14,10 @@ type S3SourceUnit struct {
 var _ sources.SourceUnit = S3SourceUnit{}
 
 func (s S3SourceUnit) SourceUnitID() (string, sources.SourceUnitKind) {
-	// if a role is specified, we include it in the ID
-	if s.Role != "" {
-		return s.Role + "/" + s.Bucket, SourceUnitKindBucket
-	}
-
-	// otherwise just return the bucket name
+	// The ID is the bucket name, and the kind is "bucket".
 	return s.Bucket, SourceUnitKindBucket
 }
 
 func (s S3SourceUnit) Display() string {
-	id, _ := s.SourceUnitID()
-	return id
+	return s.Bucket
 }

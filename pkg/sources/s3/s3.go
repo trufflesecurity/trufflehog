@@ -760,8 +760,8 @@ func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
 	if err := json.Unmarshal(data, &unit); err != nil {
 		return nil, err
 	}
-	_, kind := unit.SourceUnitID()
-	if unit.Bucket == "" || kind != SourceUnitKindBucket {
+	bucket, kind := unit.SourceUnitID()
+	if bucket == "" || kind != SourceUnitKindBucket {
 		return nil, fmt.Errorf("not an S3SourceUnit")
 	}
 	return unit, nil
