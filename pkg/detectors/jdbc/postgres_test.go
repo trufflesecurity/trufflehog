@@ -92,8 +92,8 @@ func TestParsePostgresUsernameRecognition(t *testing.T) {
 			}
 
 			pgConn := j.(*PostgresJDBC)
-			if pgConn.Params["user"] != tt.wantUsername {
-				t.Errorf("expected username '%s', got '%s'", tt.wantUsername, pgConn.Params["user"])
+			if pgConn.User != tt.wantUsername {
+				t.Errorf("expected username '%s', got '%s'", tt.wantUsername, pgConn.User)
 			}
 		})
 	}

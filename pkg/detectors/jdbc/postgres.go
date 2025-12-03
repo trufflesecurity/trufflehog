@@ -13,8 +13,11 @@ import (
 )
 
 type PostgresJDBC struct {
-	Conn   string
-	Params map[string]string
+	Host     string
+	User     string
+	Password string
+	Database string
+	Params   map[string]string
 }
 
 func (s *PostgresJDBC) ping(ctx context.Context) pingResult {
@@ -23,12 +26,9 @@ func (s *PostgresJDBC) ping(ctx context.Context) pingResult {
 	// user's name, which will fail in a way that looks like a determinate failure, thus terminating the waterfall. In
 	// contrast, when we build a connection string ourselves, if there's no username, we try 'postgres' instead, which
 	// actually has a chance of working.
-
-	// Always use default postgres database for ping
-	s.Params["dbname"] = "postgres"
 	return ping(ctx, "postgres", isPostgresErrorDeterminate,
-		BuildPostgresConnectionString(s.Params, true),
-		BuildPostgresConnectionString(s.Params, false),
+		BuildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, true),
+		BuildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, false),
 	)
 }
 
@@ -80,16 +80,20 @@ func ParsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 	}
 
 	params := map[string]string{
-		"host":            u.Host,
-		"dbname":          dbName,
 		"connect_timeout": "5",
 	}
 
+	postgresJDBC := &PostgresJDBC{
+		Host:     u.Host,
+		Database: dbName,
+		Params:   params,
+	}
+
 	if u.User != nil {
-		params["user"] = u.User.Username()
+		postgresJDBC.User = u.User.Username()
 		pass, set := u.User.Password()
 		if set {
-			params["password"] = pass
+			postgresJDBC.Password = pass
 		}
 	}
 
@@ -98,47 +102,45 @@ func ParsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 		// https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
 		case "disable", "allow", "prefer",
 			"require", "verify-ca", "verify-full":
-			params["sslmode"] = v[0]
+			postgresJDBC.Params["sslmode"] = v[0]
 		}
 	}
 
 	if v := u.Query().Get("user"); v != "" {
-		params["user"] = v
+		postgresJDBC.User = v
 	}
 
 	if v := u.Query().Get("password"); v != "" {
-		params["password"] = v
+		postgresJDBC.Password = v
 	}
 
-	if params["host"] == "" || params["password"] == "" {
+	if postgresJDBC.Host == "" || postgresJDBC.Password == "" {
 		ctx.Logger().WithName("jdbc").
 			V(2).
 			Info("Skipping invalid Postgres URL - no password or host found")
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
 
-	return &PostgresJDBC{subname[2:], params}, nil
+	return postgresJDBC, nil
 }
 
-func BuildPostgresConnectionString(params map[string]string, includeDbName bool) string {
+func BuildPostgresConnectionString(host string, user string, password string, dbName string, params map[string]string, includeDbName bool) string {
 	data := map[string]string{
-		// default user
-		"user": "postgres",
+		"host":     host,
+		"user":     user,
+		"password": password,
+	}
+	if h, p, found := strings.Cut(host, ":"); found {
+		data["host"] = h
+		data["port"] = p
 	}
 	for key, val := range params {
-		if key == "host" {
-			if h, p, found := strings.Cut(val, ":"); found {
-				data["host"] = h
-				data["port"] = p
-				continue
-			}
-		}
 		data[key] = val
 	}
 
 	if includeDbName {
 		data["dbname"] = "postgres"
-		if dbName, ok := params["dbname"]; ok {
+		if dbName != "" {
 			data["dbname"] = dbName
 		}
 	}
