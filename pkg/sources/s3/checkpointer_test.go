@@ -31,7 +31,7 @@ func TestCheckpointerResumption(t *testing.T) {
 
 	// Process first 6 objects.
 	for i := range 6 {
-		err := tracker.UpdateObjectCompletion(ctx, i, "test-bucket", firstPage.Contents)
+		err := tracker.UpdateObjectCompletion(ctx, i, "test-bucket", "", firstPage.Contents)
 		assert.NoError(t, err)
 	}
 
@@ -50,7 +50,7 @@ func TestCheckpointerResumption(t *testing.T) {
 
 	// Process remaining objects.
 	for i := range len(resumePage.Contents) {
-		err := resumeTracker.UpdateObjectCompletion(ctx, i, "test-bucket", resumePage.Contents)
+		err := resumeTracker.UpdateObjectCompletion(ctx, i, "test-bucket", "", resumePage.Contents)
 		assert.NoError(t, err)
 	}
 
@@ -244,7 +244,7 @@ func TestCheckpointerUpdate(t *testing.T) {
 				}
 			}
 
-			err := tracker.UpdateObjectCompletion(ctx, tt.completedIdx, "test-bucket", page.Contents)
+			err := tracker.UpdateObjectCompletion(ctx, tt.completedIdx, "test-bucket", "", page.Contents)
 			assert.NoError(t, err, "Unexpected error updating progress")
 
 			var info ResumeInfo
@@ -273,18 +273,18 @@ func TestCheckpointerUpdateUnitScan(t *testing.T) {
 	}
 
 	// Complete first object.
-	err := tracker.UpdateObjectCompletion(ctx, 0, "test-bucket", page.Contents)
+	err := tracker.UpdateObjectCompletion(ctx, 0, "test-bucket", "test-role", page.Contents)
 	assert.NoError(t, err, "Unexpected error updating progress")
 
 	var info map[string]string
 	err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
-	var gotBucket, gotStartAfter string
+	var gotUnitID, gotStartAfter string
 	for k, v := range info {
-		gotBucket = k
+		gotUnitID = k
 		gotStartAfter = v
 	}
 	assert.NoError(t, err, "Failed to decode resume info")
-	assert.Equal(t, "test-bucket", gotBucket, "Incorrect bucket")
+	assert.Equal(t, "test-role|test-bucket", gotUnitID, "Incorrect unit ID")
 	assert.Equal(t, "key-0", gotStartAfter, "Incorrect resume point")
 }
 

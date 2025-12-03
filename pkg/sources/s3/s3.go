@@ -225,6 +225,7 @@ func (s *Source) getBucketsToScan(ctx context.Context, client *s3.Client) ([]str
 // pageMetadata contains metadata about a single page of S3 objects being scanned.
 type pageMetadata struct {
 	bucket     string                  // The name of the S3 bucket being scanned
+	role       string                  // The AWS role ARN used for scanning
 	pageNumber int                     // Current page number in the pagination sequence
 	client     *s3.Client              // AWS S3 client configured for the appropriate region
 	page       *s3.ListObjectsV2Output // Contains the list of S3 objects in this page
@@ -398,6 +399,7 @@ func (s *Source) scanBucket(
 		}
 		pageMetadata := pageMetadata{
 			bucket:     bucket,
+			role:       role,
 			pageNumber: pageNumber,
 			client:     regionalClient,
 			page:       output,
@@ -465,7 +467,7 @@ func (s *Source) pageChunker(
 		if obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr {
 			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", obj.StorageClass)
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "storage_class", float64(*obj.Size))
-			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for glacier object")
 			}
 			continue
@@ -475,7 +477,7 @@ func (s *Source) pageChunker(
 		if *obj.Size > s.maxObjectSize {
 			ctx.Logger().V(5).Info("Skipping large file", "max_object_size", s.maxObjectSize)
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "size_limit", float64(*obj.Size))
-			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for large file")
 			}
 			continue
@@ -485,7 +487,7 @@ func (s *Source) pageChunker(
 		if *obj.Size == 0 {
 			ctx.Logger().V(5).Info("Skipping empty file")
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "empty_file", 0)
-			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for empty file")
 			}
 			continue
@@ -495,7 +497,7 @@ func (s *Source) pageChunker(
 		if common.SkipFile(*obj.Key) {
 			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "incompatible_extension", float64(*obj.Size))
-			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for incompatible file")
 			}
 			continue
@@ -607,7 +609,7 @@ func (s *Source) pageChunker(
 				state.errorCount.Store(prefix, 0)
 			}
 			// Update progress after successful processing.
-			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 			s.metricsCollector.RecordObjectScanned(metadata.bucket, float64(*obj.Size))
@@ -731,27 +733,27 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	if !ok {
 		return fmt.Errorf("expected *S3SourceUnit, got %T", unit)
 	}
-	bucket := s3unit.Bucket
-
+	// unitID is a combination of bucket name and role ARN
+	unitID, _ := s3unit.SourceUnitID()
 	defaultClient, err := s.newClient(ctx, defaultAWSRegion, s3unit.Role)
 	if err != nil {
-		return fmt.Errorf("could not create s3 client for bucket %s and role %s: %w", bucket, s3unit.Role, err)
+		return fmt.Errorf("could not create s3 client for bucket %s and role %s: %w", s3unit.Bucket, s3unit.Role, err)
 	}
 
 	s.checkpointer.SetIsUnitScan(true)
 
 	var startAfterPtr *string
-	startAfter := s.Progress.GetEncodedResumeInfoFor(bucket)
+	startAfter := s.Progress.GetEncodedResumeInfoFor(unitID)
 	if startAfter != "" {
 		ctx.Logger().V(3).Info(
-			"Resuming bucket scan",
+			"Resuming unit scan",
 			"start_after", startAfter,
-			"bucket", bucket,
+			"unitID", unitID,
 		)
 		startAfterPtr = &startAfter
 	}
-	defer s.Progress.ClearEncodedResumeInfoFor(bucket)
-	s.scanBucket(ctx, defaultClient, s3unit.Role, bucket, reporter, startAfterPtr)
+	defer s.Progress.ClearEncodedResumeInfoFor(unitID)
+	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr)
 	return nil
 }
 

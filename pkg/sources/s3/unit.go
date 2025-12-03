@@ -1,6 +1,8 @@
 package s3
 
 import (
+	"fmt"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -14,10 +16,21 @@ type S3SourceUnit struct {
 var _ sources.SourceUnit = S3SourceUnit{}
 
 func (s S3SourceUnit) SourceUnitID() (string, sources.SourceUnitKind) {
-	// The ID is the bucket name, and the kind is "bucket".
-	return s.Bucket, SourceUnitKindBucket
+	// ID is a combination of bucket and role (if any)
+	return constructS3SourceUnitID(s.Bucket, s.Role), SourceUnitKindBucket
 }
 
 func (s S3SourceUnit) Display() string {
+	if s.Role != "" {
+		return fmt.Sprintf("Role=%s Bucket=%s", s.Role, s.Bucket)
+	}
 	return s.Bucket
+}
+
+func constructS3SourceUnitID(bucket string, role string) string {
+	unitID := ""
+	if role != "" {
+		unitID += role + "|"
+	}
+	return unitID + bucket
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+// TODO [INS-207] Add role to legacy scan resumption info
+
 // Checkpointer maintains resumption state for S3 bucket scanning,
 // enabling resumable scans by tracking which objects have been successfully processed.
 // It provides checkpoints that can be used to resume interrupted scans without missing objects.
@@ -34,7 +36,7 @@ import (
 // in that bucket.
 //
 // Unit scans are also supported. The encoded resume info in this case tracks the last processed object
-// for each bucket (unit) separately by using the SetEncodedResumeInfoFor method on Progress. To use the
+// for each unit separately by using the SetEncodedResumeInfoFor method on Progress. To use the
 // checkpointer for unit scans, call SetIsUnitScan(true) before starting the scan.
 //
 // For example, if scanning is interrupted after processing 1500 objects across 2 pages:
@@ -159,9 +161,10 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	ctx context.Context,
 	completedIdx int,
 	bucket string,
+	role string,
 	pageContents []s3types.Object,
 ) error {
-	ctx = context.WithValues(ctx, "bucket", bucket, "completedIdx", completedIdx)
+	ctx = context.WithValues(ctx, "bucket", bucket, "role", role, "completedIdx", completedIdx)
 	ctx.Logger().V(5).Info("Updating progress")
 
 	if completedIdx >= len(p.completedObjects) {
@@ -190,7 +193,7 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	}
 	obj := pageContents[checkpointIdx]
 
-	return p.updateCheckpoint(bucket, *obj.Key)
+	return p.updateCheckpoint(bucket, role, *obj.Key)
 }
 
 // advanceLowestIncompleteIdx moves the lowest incomplete index forward to the next incomplete object.
@@ -204,10 +207,11 @@ func (p *Checkpointer) advanceLowestIncompleteIdx() {
 
 // updateCheckpoint persists the current resumption state.
 // Must be called with lock held.
-func (p *Checkpointer) updateCheckpoint(bucket string, lastKey string) error {
+func (p *Checkpointer) updateCheckpoint(bucket string, role string, lastKey string) error {
 	if p.isUnitScan {
+		unitID := constructS3SourceUnitID(bucket, role)
 		// track sub-unit resumption state
-		p.progress.SetEncodedResumeInfoFor(bucket, lastKey)
+		p.progress.SetEncodedResumeInfoFor(unitID, lastKey)
 		return nil
 	}
 
