@@ -137,7 +137,10 @@ func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string)
 }
 
 // AddSink extends an existing logr.Logger with a new sink. It returns the new
-// logr.Logger, a cleanup function, and an error.
+// logr.Logger, a cleanup function, and an error. Note that values added to the
+// existing logr.Logger via [logr.WithValues] before calling this function will
+// not be propogated to the new sink, but they will continue to be written to
+// the existing sink.
 func AddSink(l logr.Logger, sink logConfig) (logr.Logger, func() error, error) {
 	if sink.err != nil {
 		return l, nil, sink.err

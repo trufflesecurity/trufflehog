@@ -163,6 +163,27 @@ func TestAddSink(t *testing.T) {
 	assert.Contains(t, buf2.String(), "line 2")
 }
 
+// TestAddSinkDoesNotPropogateValues is a pinning test to document that the
+// existing functionality of AddSink will not propogate values added to the
+// logger.
+func TestAddSinkDoesNotPropogateValues(t *testing.T) {
+	var buf1, buf2 bytes.Buffer
+	logger, _ := New("service-name",
+		WithConsoleSink(&buf1),
+	)
+	logger = logger.WithValues("foo", "bar")
+	logger.Info("line 1")
+	logger, flush, err := AddSink(logger, WithConsoleSink(&buf2))
+	assert.Nil(t, err)
+	logger.Info("line 2")
+	assert.Nil(t, flush())
+
+	bufLines1 := strings.Split(buf1.String(), "\n")
+	assert.Contains(t, bufLines1[0], "foo")     // line1 contains "foo"
+	assert.Contains(t, bufLines1[1], "foo")     // line2 contains "foo"
+	assert.NotContains(t, buf2.String(), "foo") // "foo" not found anywhere in the added sink
+}
+
 func TestStaticLevelSink(t *testing.T) {
 	var buf1, buf2 bytes.Buffer
 	l1 := zap.NewAtomicLevel()
