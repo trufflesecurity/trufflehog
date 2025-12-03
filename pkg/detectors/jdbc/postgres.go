@@ -126,9 +126,13 @@ func ParsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 
 func BuildPostgresConnectionString(host string, user string, password string, dbName string, params map[string]string, includeDbName bool) string {
 	data := map[string]string{
-		"host":     host,
-		"user":     user,
+		// default user
+		"user":     "postgres",
 		"password": password,
+		"host":     host,
+	}
+	if user != "" {
+		data["user"] = user
 	}
 	if h, p, found := strings.Cut(host, ":"); found {
 		data["host"] = h
