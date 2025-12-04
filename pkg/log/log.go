@@ -136,13 +136,20 @@ func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string)
 	return AddSink(l, WithSentry(opts, tags))
 }
 
-// AddSink extends an existing logr.Logger with a new sink. It returns the new
-// logr.Logger, a cleanup function, and an error.
+// AddSink extends an existing logr.Logger with a new sink. It returns the new logr.Logger, a cleanup function, and an
+// error.
+//
+// The new sink will not inherit any of the existing logger's key-value pairs. Key-value pairs can be added to the new
+// sink specifically by passing them to this function.
 func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, func() error, error) {
 	if sink.err != nil {
 		return l, nil, sink.err
 	}
 
+	// New key-value pairs cannot be ergonomically added directly to cores. logr has code to do it, but that code is not
+	// exported. Rather than replicating it ourselves, we indirectly use it by creating a temporary logger for the new
+	// core, adding the key-value pairs to the temporary logger, and then extracting the temporary logger's modified
+	// core.
 	newSinkLogger := zapr.NewLogger(zap.New(sink.core))
 	newSinkLogger = newSinkLogger.WithValues(keysAndValues...)
 	newCoreLogger, err := getZapLogger(newSinkLogger)
