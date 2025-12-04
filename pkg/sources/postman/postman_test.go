@@ -13,6 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"gopkg.in/h2non/gock.v1"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -688,4 +689,48 @@ func TestSource_HeadersScanning(t *testing.T) {
 	} else {
 		t.Logf("Generated %d chunks from the mock data", chunksReceived)
 	}
+}
+
+func TestSource_ResponseID(t *testing.T) {
+	ctx := context.Background()
+
+	s := &Source{
+		DetectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: map[string]struct{}{
+			"keyword1": {},
+		},
+	}
+
+	chunksChan := make(chan *sources.Chunk, 1)
+
+	response := Response{
+		Uid:  "response-1234",
+		Name: "Test Response",
+		Body: "This is a test response body containing keyword1.",
+	}
+
+	go func() {
+		s.scanHTTPResponse(ctx, chunksChan, Metadata{}, response)
+		close(chunksChan)
+	}()
+
+	var gotChunk *sources.Chunk
+	for chunk := range chunksChan {
+		gotChunk = chunk
+	}
+
+	postmanMetadata, ok := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Postman)
+	if !ok {
+		t.Fatalf("expected Postman metadata, got: %T", gotChunk.SourceMetadata.Data)
+	}
+
+	if postmanMetadata.Postman.ResponseId != response.Uid {
+		t.Errorf("expected response ID: %s, got: %s", response.Uid, postmanMetadata.Postman.ResponseId)
+	}
+	if postmanMetadata.Postman.ResponseName != response.Name {
+		t.Errorf("expected response Name: %s, got: %s", response.Name, postmanMetadata.Postman.ResponseName)
+	}
+
 }

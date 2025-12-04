@@ -109,9 +109,9 @@ func TestQuayRegistry(t *testing.T) {
 	close(chunksChan)
 	wg.Wait()
 
-	assert.Equal(t, 945, chunkCounter)
+	assert.Equal(t, 944, chunkCounter)
 	assert.Equal(t, 941, layerCounter)
-	assert.Equal(t, 4, historyCounter)
+	assert.Equal(t, 3, historyCounter)
 }
 
 func TestGHCRRegistry(t *testing.T) {

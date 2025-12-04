@@ -27,7 +27,7 @@ pkg/giturl/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/handlers/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/iobuf/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/sanitizer/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-proto/ @trufflesecurity/Scanning  @trufflesecurity/OSS
+proto/ @trufflesecurity/Scanning  @trufflesecurity/Integrations
 
 # OSS
 pkg/detectors/ @trufflesecurity/OSS
