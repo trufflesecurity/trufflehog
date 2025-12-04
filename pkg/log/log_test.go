@@ -163,10 +163,10 @@ func TestAddSink(t *testing.T) {
 	assert.Contains(t, buf2.String(), "line 2")
 }
 
-// TestAddSinkDoesNotPropogateValues is a pinning test to document that the
-// existing functionality of AddSink will not propogate values added to the
+// TestAddSinkDoesNotPropagateValues is a pinning test to document that the
+// existing functionality of AddSink will not propagate values added to the
 // logger.
-func TestAddSinkDoesNotPropogateValues(t *testing.T) {
+func TestAddSinkDoesNotPropagateValues(t *testing.T) {
 	var buf1, buf2 bytes.Buffer
 	logger, _ := New("service-name",
 		WithConsoleSink(&buf1),
