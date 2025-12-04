@@ -33,11 +33,11 @@ func TestGcpOAuth2_Pattern(t *testing.T) {
 			},
 		},
 		{
-			name:  "typical pattern - multiline with both client_id and client_secret",
-			input: "oauth2_client_id = '1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.com'\noauth2_client_secret = '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'",
+			name: "typical pattern - multiline with both keywords",
+			input: `oauth2_client_id = '1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.com'
+			oauth2_client_secret = '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'`,
 			want: []string{
-				"1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.com",
-				"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",
+				"1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.comGOCSPX-5aBcD3fgHiJK_lMnOpQRstuVwXyZ",
 			},
 		},
 		{
