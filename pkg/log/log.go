@@ -138,16 +138,25 @@ func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string)
 
 // AddSink extends an existing logr.Logger with a new sink. It returns the new
 // logr.Logger, a cleanup function, and an error.
-func AddSink(l logr.Logger, sink logConfig) (logr.Logger, func() error, error) {
+func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, func() error, error) {
 	if sink.err != nil {
 		return l, nil, sink.err
 	}
+
+	newSinkLogger := zapr.NewLogger(zap.New(sink.core))
+	newSinkLogger = newSinkLogger.WithValues(keysAndValues...)
+	newCoreLogger, err := getZapLogger(newSinkLogger)
+	if err != nil {
+		return l, nil, fmt.Errorf("error setting up new key-value pairs: %w", err)
+	}
+	newSinkCore := newCoreLogger.Core()
+
 	zapLogger, err := getZapLogger(l)
 	if err != nil {
 		return l, nil, errors.New("unsupported logr implementation")
 	}
 	zapLogger = zapLogger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
-		return zapcore.NewTee(core, sink.core)
+		return zapcore.NewTee(core, newSinkCore)
 	}))
 	return zapr.NewLogger(zapLogger), firstErrorFunc(zapLogger.Sync, sink.cleanup), nil
 }
