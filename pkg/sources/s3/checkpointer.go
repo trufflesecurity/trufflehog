@@ -11,6 +11,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+// TODO [INS-207] Add role to legacy scan resumption info
+
 // Checkpointer maintains resumption state for S3 bucket scanning,
 // enabling resumable scans by tracking which objects have been successfully processed.
 // It provides checkpoints that can be used to resume interrupted scans without missing objects.
@@ -32,6 +34,10 @@ import (
 // When scanning multiple buckets, the current bucket is tracked in the checkpoint to enable
 // resuming from the correct bucket. The scan will continue from the last checkpointed object
 // in that bucket.
+//
+// Unit scans are also supported. The encoded resume info in this case tracks the last processed object
+// for each unit separately by using the SetEncodedResumeInfoFor method on Progress. To use the
+// checkpointer for unit scans, call SetIsUnitScan(true) before starting the scan.
 //
 // For example, if scanning is interrupted after processing 1500 objects across 2 pages:
 // Page 1 (objects 0-999): Fully processed, checkpoint saved at object 999
@@ -56,6 +62,8 @@ type Checkpointer struct {
 	// progress holds the scan's overall progress state and enables persistence.
 	// The EncodedResumeInfo field stores the JSON-encoded ResumeInfo checkpoint.
 	progress *sources.Progress // Reference to source's Progress
+
+	isUnitScan bool // Indicates if scanning is done in unit scan mode
 }
 
 const defaultMaxObjectsPerPage = 1000
@@ -153,9 +161,10 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	ctx context.Context,
 	completedIdx int,
 	bucket string,
+	role string,
 	pageContents []s3types.Object,
 ) error {
-	ctx = context.WithValues(ctx, "bucket", bucket, "completedIdx", completedIdx)
+	ctx = context.WithValues(ctx, "bucket", bucket, "role", role, "completedIdx", completedIdx)
 	ctx.Logger().V(5).Info("Updating progress")
 
 	if completedIdx >= len(p.completedObjects) {
@@ -184,7 +193,7 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	}
 	obj := pageContents[checkpointIdx]
 
-	return p.updateCheckpoint(bucket, *obj.Key)
+	return p.updateCheckpoint(bucket, role, *obj.Key)
 }
 
 // advanceLowestIncompleteIdx moves the lowest incomplete index forward to the next incomplete object.
@@ -198,7 +207,14 @@ func (p *Checkpointer) advanceLowestIncompleteIdx() {
 
 // updateCheckpoint persists the current resumption state.
 // Must be called with lock held.
-func (p *Checkpointer) updateCheckpoint(bucket string, lastKey string) error {
+func (p *Checkpointer) updateCheckpoint(bucket string, role string, lastKey string) error {
+	if p.isUnitScan {
+		unitID := constructS3SourceUnitID(bucket, role)
+		// track sub-unit resumption state
+		p.progress.SetEncodedResumeInfoFor(unitID, lastKey)
+		return nil
+	}
+
 	encoded, err := json.Marshal(&ResumeInfo{CurrentBucket: bucket, StartAfter: lastKey})
 	if err != nil {
 		return fmt.Errorf("failed to encode resume info: %w", err)
@@ -211,4 +227,12 @@ func (p *Checkpointer) updateCheckpoint(bucket string, lastKey string) error {
 		string(encoded),
 	)
 	return nil
+}
+
+// SetIsUnitScan sets whether the checkpointer is operating in unit scan mode.
+func (p *Checkpointer) SetIsUnitScan(isUnitScan bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.isUnitScan = isUnitScan
 }

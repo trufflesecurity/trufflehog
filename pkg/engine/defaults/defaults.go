@@ -329,6 +329,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/githubapp"
 	gitlabv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v1"
 	gitlabv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
+	gitlabv3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
@@ -399,6 +400,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jupiterone"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/juro"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jwt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanban"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanbantool"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/karmacrm"
@@ -1198,6 +1200,7 @@ func buildDetectorList() []detectors.Detector {
 		&githubv2.Scanner{},
 		&gitlabv1.Scanner{},
 		&gitlabv2.Scanner{},
+		&gitlabv3.Scanner{},
 		&gitter.Scanner{},
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},
@@ -1270,6 +1273,7 @@ func buildDetectorList() []detectors.Detector {
 		&jumpcloud.Scanner{},
 		&jupiterone.Scanner{},
 		&juro.Scanner{},
+		&jwt.Scanner{},
 		&kanban.Scanner{},
 		&kanbantool.Scanner{},
 		&karmacrm.Scanner{},

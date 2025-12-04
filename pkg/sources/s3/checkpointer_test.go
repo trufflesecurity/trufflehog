@@ -31,7 +31,7 @@ func TestCheckpointerResumption(t *testing.T) {
 
 	// Process first 6 objects.
 	for i := range 6 {
-		err := tracker.UpdateObjectCompletion(ctx, i, "test-bucket", firstPage.Contents)
+		err := tracker.UpdateObjectCompletion(ctx, i, "test-bucket", "", firstPage.Contents)
 		assert.NoError(t, err)
 	}
 
@@ -50,7 +50,7 @@ func TestCheckpointerResumption(t *testing.T) {
 
 	// Process remaining objects.
 	for i := range len(resumePage.Contents) {
-		err := resumeTracker.UpdateObjectCompletion(ctx, i, "test-bucket", resumePage.Contents)
+		err := resumeTracker.UpdateObjectCompletion(ctx, i, "test-bucket", "", resumePage.Contents)
 		assert.NoError(t, err)
 	}
 
@@ -244,7 +244,7 @@ func TestCheckpointerUpdate(t *testing.T) {
 				}
 			}
 
-			err := tracker.UpdateObjectCompletion(ctx, tt.completedIdx, "test-bucket", page.Contents)
+			err := tracker.UpdateObjectCompletion(ctx, tt.completedIdx, "test-bucket", "", page.Contents)
 			assert.NoError(t, err, "Unexpected error updating progress")
 
 			var info ResumeInfo
@@ -256,6 +256,36 @@ func TestCheckpointerUpdate(t *testing.T) {
 				"Incorrect lowest incomplete index")
 		})
 	}
+}
+
+func TestCheckpointerUpdateUnitScan(t *testing.T) {
+	ctx := context.Background()
+	progress := new(sources.Progress)
+	tracker := NewCheckpointer(ctx, progress)
+	tracker.SetIsUnitScan(true)
+
+	page := &s3.ListObjectsV2Output{
+		Contents: make([]s3types.Object, 3),
+	}
+	for i := range 3 {
+		key := fmt.Sprintf("key-%d", i)
+		page.Contents[i] = s3types.Object{Key: &key}
+	}
+
+	// Complete first object.
+	err := tracker.UpdateObjectCompletion(ctx, 0, "test-bucket", "test-role", page.Contents)
+	assert.NoError(t, err, "Unexpected error updating progress")
+
+	var info map[string]string
+	err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
+	var gotUnitID, gotStartAfter string
+	for k, v := range info {
+		gotUnitID = k
+		gotStartAfter = v
+	}
+	assert.NoError(t, err, "Failed to decode resume info")
+	assert.Equal(t, "test-role|test-bucket", gotUnitID, "Incorrect unit ID")
+	assert.Equal(t, "key-0", gotStartAfter, "Incorrect resume point")
 }
 
 func TestComplete(t *testing.T) {

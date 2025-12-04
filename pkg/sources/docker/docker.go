@@ -62,16 +62,22 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init initializes the source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
 	s.concurrency = concurrency
 
+	jobIDStr := fmt.Sprint(s.jobId)
+
 	// Reset metrics for this source at initialization time.
-	dockerImagesScanned.WithLabelValues(s.name).Set(0)
-	dockerLayersScanned.WithLabelValues(s.name).Set(0)
+	dockerImagesScanned.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerLayersScanned.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerLayersEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerHistoryEntriesEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerImagesEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerHistoryEntriesScanned.WithLabelValues(s.name, jobIDStr).Set(0)
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
@@ -115,9 +121,24 @@ type layerInfo struct {
 // Chunks emits data over a channel that is decoded and scanned for secrets.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	ctx = context.WithValues(ctx, "source_type", s.Type(), "source_name", s.name)
+	jobIDStr := fmt.Sprint(s.jobId)
 
 	workers := new(errgroup.Group)
 	workers.SetLimit(s.concurrency)
+
+	// if namespace is set and no images are specified, fetch all images in that namespace.
+	registryNamespace := s.conn.GetNamespace()
+	if registryNamespace != "" && len(s.conn.Images) == 0 {
+		start := time.Now()
+		namespaceImages, err := GetNamespaceImages(ctx, registryNamespace, s.conn.GetRegistryToken())
+		if err != nil {
+			return fmt.Errorf("failed to list namespace: %s images: %w", registryNamespace, err)
+		}
+
+		dockerListImagesAPIDuration.WithLabelValues(s.name).Observe(time.Since(start).Seconds())
+
+		s.conn.Images = append(s.conn.Images, namespaceImages...)
+	}
 
 	for _, image := range s.conn.GetImages() {
 		if common.IsDone(ctx) {
@@ -127,56 +148,58 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		imgInfo, err := s.processImage(ctx, image)
 		if err != nil {
 			ctx.Logger().Error(err, "error processing image", "image", image)
-			return nil
+			continue
 		}
 
-		ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
+		imageCtx := context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
 
-		ctx.Logger().V(2).Info("scanning image history")
+		imageCtx.Logger().V(2).Info("scanning image history")
 
 		layers, err := imgInfo.image.Layers()
 		if err != nil {
-			ctx.Logger().Error(err, "error getting image layers")
-			return nil
+			imageCtx.Logger().Error(err, "error getting image layers")
+			continue
 		}
+		dockerLayersEnumerated.WithLabelValues(s.name, jobIDStr).Add(float64(len(layers)))
 
 		// Get history entries and associate them with layers
-		historyEntries, err := getHistoryEntries(ctx, imgInfo, layers)
+		historyEntries, err := getHistoryEntries(imageCtx, imgInfo, layers)
 		if err != nil {
-			ctx.Logger().Error(err, "error getting image history entries")
-			return nil
+			imageCtx.Logger().Error(err, "error getting image history entries")
+			continue
 		}
+		dockerHistoryEntriesEnumerated.WithLabelValues(s.name, jobIDStr).Add(float64(len(historyEntries)))
 
 		// Scan each history entry for secrets in build commands
 		for _, historyEntry := range historyEntries {
-			if err := s.processHistoryEntry(ctx, historyEntry, chunksChan); err != nil {
-				ctx.Logger().Error(err, "error processing history entry")
-				return nil
+			if err := s.processHistoryEntry(imageCtx, historyEntry, chunksChan); err != nil {
+				imageCtx.Logger().Error(err, "error processing history entry")
+				continue
 			}
-			dockerHistoryEntriesScanned.WithLabelValues(s.name).Inc()
+			dockerHistoryEntriesScanned.WithLabelValues(s.name, jobIDStr).Inc()
 		}
 
-		ctx.Logger().V(2).Info("scanning image layers")
+		imageCtx.Logger().V(2).Info("scanning image layers")
 
 		// Process each layer concurrently
 		for _, layer := range layers {
 			workers.Go(func() error {
-				if err := s.processLayer(ctx, layer, imgInfo, chunksChan); err != nil {
-					ctx.Logger().Error(err, "error processing layer")
+				if err := s.processLayer(imageCtx, layer, imgInfo, chunksChan); err != nil {
+					imageCtx.Logger().Error(err, "error processing layer")
 					return nil
 				}
-				dockerLayersScanned.WithLabelValues(s.name).Inc()
+				dockerLayersScanned.WithLabelValues(s.name, jobIDStr).Inc()
 
 				return nil
 			})
 		}
 
 		if err := workers.Wait(); err != nil {
-			ctx.Logger().Error(err, "error processing layers")
-			return nil
+			imageCtx.Logger().Error(err, "error processing layers")
+			continue
 		}
 
-		dockerImagesScanned.WithLabelValues(s.name).Inc()
+		dockerImagesScanned.WithLabelValues(s.name, jobIDStr).Inc()
 	}
 
 	return nil
@@ -185,6 +208,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 // processImage processes an individual image and prepares it for further processing.
 // It handles three image source types: remote registry, local daemon, and tarball file.
 func (s *Source) processImage(ctx context.Context, image string) (imageInfo, error) {
+	ctx.Logger().V(5).Info("Processing individual Image")
 	var (
 		imgInfo   imageInfo
 		imageName name.Reference
@@ -261,6 +285,7 @@ func (*Source) extractImageNameTagDigest(image string) (imageInfo, name.Referenc
 // getHistoryEntries collates an image's configuration history together with the
 // corresponding layer digests for any non-empty layers.
 func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer) ([]historyEntryInfo, error) {
+	ctx.Logger().V(5).Info("Getting history entries")
 	config, err := imgInfo.image.ConfigFile()
 	if err != nil {
 		return nil, err
@@ -307,6 +332,7 @@ func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer
 // processHistoryEntry processes a history entry from the image configuration metadata.
 // It scans the CreatedBy field which contains the command used to create that layer.
 func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEntryInfo, chunksChan chan *sources.Chunk) error {
+	ctx.Logger().V(5).Info("Processing history entries")
 	// Create a descriptive identifier for this history entry
 	// There's no file name here, so we use a synthetic path
 	entryPath := fmt.Sprintf("image-metadata:history:%d:created-by", historyInfo.index)
@@ -337,6 +363,8 @@ func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEnt
 // processLayer processes an individual layer of an image.
 // It decompresses the layer and extracts all files for scanning.
 func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo imageInfo, chunksChan chan *sources.Chunk) error {
+	ctx.Logger().V(5).Info("Processing layer")
+
 	layerInfo := layerInfo{
 		base: imgInfo.base,
 		tag:  imgInfo.tag,
@@ -483,7 +511,7 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	}
 
 	var opts []remote.Option
-	opts = append(opts, remote.WithTransport(defaultTransport))
+	opts = append(opts, remote.WithTransport(common.NewInstrumentedTransport(common.NewCustomTransport(defaultTransport))))
 
 	// Configure authentication based on credential type
 	switch s.conn.GetCredential().(type) {
@@ -506,6 +534,28 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	}
 
 	return opts, nil
+}
+
+func GetNamespaceImages(ctx context.Context, namespace, registryToken string) ([]string, error) {
+	ctx.Logger().V(5).Info("Getting namespace images")
+
+	registry := MakeRegistryFromNamespace(namespace)
+
+	// attach the registry authentication token, if one is available.
+	if registryToken != "" {
+		registry.WithRegistryToken(registryToken)
+	}
+
+	ctx.Logger().Info(fmt.Sprintf("using registry: %s", registry.Name()))
+
+	namespaceImages, err := registry.ListImages(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list namespace images: %w", err)
+	}
+
+	ctx.Logger().Info(fmt.Sprintf("namespace: %s has %d images", namespace, len(namespaceImages)))
+
+	return namespaceImages, nil
 }
 
 // baseAndTagFromImage extracts the base name and tag/digest from an image reference string.
