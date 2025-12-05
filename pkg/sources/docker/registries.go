@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 
@@ -20,9 +19,11 @@ import (
 var defaultHTTPClient = common.RetryableHTTPClientTimeout(10)
 
 // registryRateLimiter limits how quickly we make registry API calls across all registries.
-// We allow roughly 5 requests every ~7.5 seconds (one token every 1.5s) as a simple
-// safeguard against overloading upstream APIs.
-var registryRateLimiter = rate.NewLimiter(rate.Every(1500*time.Millisecond), 1)
+// We allow roughly 1 event every 1.5s, with a burst of 2 as a simple safeguard against overloading upstream APIs.
+var registryRateLimiter = rate.NewLimiter(rate.Limit(2.0/3.0), 2)
+
+// maxRegistryPageSize defines the maximum number of images to request per page from a registry API.
+const maxRegistryPageSize = 100
 
 // Image represents a container image or repository entry in a registry API response.
 type Image struct {
@@ -93,7 +94,7 @@ func (d *DockerHub) ListImages(ctx context.Context, namespace string) ([]string,
 	}
 
 	query := baseURL.Query()
-	query.Set("page_size", "100") // fetch images in batches of 100 per page
+	query.Set("page_size", fmt.Sprint(maxRegistryPageSize))
 	baseURL.RawQuery = query.Encode()
 
 	allImages := []string{}
@@ -346,7 +347,7 @@ func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, erro
 		u := *baseURL
 		q := u.Query()
 		q.Set("package_type", "container")
-		q.Set("per_page", "100") // fetch images in batches of 100 per page
+		q.Set("per_page", fmt.Sprint(maxRegistryPageSize)) // fetch images in batches of 100 per page
 		u.RawQuery = q.Encode()
 		return u.String()
 	}()
