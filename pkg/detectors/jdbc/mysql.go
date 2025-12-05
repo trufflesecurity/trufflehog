@@ -12,20 +12,26 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-type mysqlJDBC struct {
-	conn     string
-	userPass string
-	host     string
-	params   string
+type MysqlJDBC struct {
+	Conn     string
+	User     string
+	Password string
+	Host     string
+	Params   string
+	Database string
 }
 
-func (s *mysqlJDBC) ping(ctx context.Context) pingResult {
+func (s *MysqlJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "mysql", isMySQLErrorDeterminate,
-		buildMySQLConnectionString(s.host, "", s.userPass, s.params))
+		BuildMySQLConnectionString(s.Host, "", s.User, s.Password, s.Params))
 }
 
-func buildMySQLConnectionString(host, database, userPass, params string) string {
+func BuildMySQLConnectionString(host, database, user, password, params string) string {
 	conn := host + "/" + database
+	userPass := user
+	if password != "" {
+		userPass = userPass + ":" + password
+	}
 	if userPass != "" {
 		conn = userPass + "@" + conn
 	}
@@ -51,7 +57,7 @@ func isMySQLErrorDeterminate(err error) bool {
 	return false
 }
 
-func parseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
+func ParseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected host to start with //")
@@ -70,11 +76,13 @@ func parseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
 			Info("Skipping invalid MySQL URL - no password or host found")
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
-	return &mysqlJDBC{
-		conn:     subname[2:],
-		userPass: cfg.User + ":" + cfg.Passwd,
-		host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
-		params:   "timeout=5s",
+	return &MysqlJDBC{
+		Conn:     subname[2:],
+		User:     cfg.User,
+		Password: cfg.Passwd,
+		Host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
+		Params:   "timeout=5s",
+		Database: cfg.DBName,
 	}, nil
 }
 
@@ -107,13 +115,19 @@ func parseMySQLURI(ctx logContext.Context, subname string) (jdbc, error) {
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
 
-	userAndPass := user + ":" + pass
+	// Parse database name
+	dbName := strings.TrimPrefix(u.Path, "/")
+	if dbName == "" {
+		dbName = "mysql" // default DB
+	}
 
-	return &mysqlJDBC{
-		conn:     subname[2:],
-		userPass: userAndPass,
-		host:     fmt.Sprintf("tcp(%s)", u.Host),
-		params:   "timeout=5s",
+	return &MysqlJDBC{
+		Conn:     subname[2:],
+		User:     user,
+		Password: pass,
+		Host:     fmt.Sprintf("tcp(%s)", u.Host),
+		Params:   "timeout=5s",
+		Database: dbName,
 	}, nil
 
 }

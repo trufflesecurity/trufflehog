@@ -207,9 +207,9 @@ func tryRedactRegex(conn string) (string, bool) {
 }
 
 var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
-	"mysql":      parseMySQL,
-	"postgresql": parsePostgres,
-	"sqlserver":  parseSqlServer,
+	"mysql":      ParseMySQL,
+	"postgresql": ParsePostgres,
+	"sqlserver":  ParseSqlServer,
 }
 
 type pingResult struct {
