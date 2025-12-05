@@ -163,6 +163,29 @@ func TestAddSink(t *testing.T) {
 	assert.Contains(t, buf2.String(), "line 2")
 }
 
+func TestAddSink_WithKeyValuePairs(t *testing.T) {
+	// Arrange: Create a logger with a key-value pair
+	var buf1 bytes.Buffer
+	logger, cleanup := New("service-name", WithConsoleSink(&buf1))
+	t.Cleanup(func() { _ = cleanup })
+	logger = logger.WithValues("sink 1 key", "sink 1 value")
+
+	// Arrange: Add a second sink with a new key-value pair
+	var buf2 bytes.Buffer
+	logger, flush, err := AddSink(logger, WithConsoleSink(&buf2), "sink 2 key", "sink 2 value")
+	require.NoError(t, err)
+
+	// Act
+	logger.Info("something")
+	require.NoError(t, flush())
+
+	// Assert: Confirm that each sink received only its own key-value pair
+	assert.Contains(t, buf1.String(), "sink 1")
+	assert.NotContains(t, buf1.String(), "sink 2")
+	assert.Contains(t, buf2.String(), "sink 2")
+	assert.NotContains(t, buf2.String(), "sink 1")
+}
+
 func TestStaticLevelSink(t *testing.T) {
 	var buf1, buf2 bytes.Buffer
 	l1 := zap.NewAtomicLevel()
