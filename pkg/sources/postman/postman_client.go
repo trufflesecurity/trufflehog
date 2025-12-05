@@ -345,6 +345,11 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 		return nil
 	}
 
+	if rateLimitTotalMonth == 0 {
+		ctx.Logger().V(2).Info("RateLimit-Limit-Month is zero, cannot compute usage percentage")
+		return nil
+	}
+
 	// failsafe to abandon scan if we are over the threshold of monthly API requests used
 	percentageUsed := float64(rateLimitTotalMonth-rateLimitRemainingMonth) / float64(rateLimitTotalMonth)
 	if percentageUsed > abortScanAPIReqLimitThreshold {
