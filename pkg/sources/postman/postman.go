@@ -694,6 +694,8 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	if response.Uid != "" {
 		m.Link = LINK_BASE_URL + "example/" + response.Uid
 		m.FullID = response.Uid
+		m.ResponseID = response.Uid
+		m.ResponseName = response.Name
 	}
 	originalType := m.Type
 
@@ -797,6 +799,8 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					FolderName:      metadata.FolderName,
 					FieldType:       metadata.FieldType,
 					LocationType:    metadata.LocationType,
+					ResponseId:      metadata.ResponseID,
+					ResponseName:    metadata.ResponseName,
 				},
 			},
 		},

@@ -329,6 +329,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/githubapp"
 	gitlabv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v1"
 	gitlabv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
+	gitlabv3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
@@ -1199,6 +1200,7 @@ func buildDetectorList() []detectors.Detector {
 		&githubv2.Scanner{},
 		&gitlabv1.Scanner{},
 		&gitlabv2.Scanner{},
+		&gitlabv3.Scanner{},
 		&gitter.Scanner{},
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},
