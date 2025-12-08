@@ -11,6 +11,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -496,6 +497,40 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			assert.Equal(t, tt.wantChunks, i)
 		})
 	}
+}
+
+func TestSource_ChunkUnit_RepoIgnored_NotScanned(t *testing.T) {
+	ctx := context.Background()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+	token := secret.MustGetField("GITLAB_TOKEN")
+
+	typedConn := &sourcespb.GitLab{
+		Credential: &sourcespb.GitLab_Token{
+			Token: token,
+		},
+		IgnoreRepos: []string{"https://gitlab.com/testermctestface/testy"},
+	}
+	conn, err := anypb.New(typedConn)
+	require.NoError(t, err)
+
+	s := &Source{}
+	require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
+
+	unit := sources.CommonSourceUnit{
+		Kind: "repo",
+		ID:   "https://gitlab.com/testermctestface/testy",
+	}
+
+	chunksChan := make(chan *sources.Chunk, 1024)
+	chunkReporter := sources.ChanReporter{chunksChan}
+
+	require.NoError(t, s.ChunkUnit(ctx, unit, chunkReporter))
+
+	assert.Empty(t, chunksChan)
 }
 
 func TestSource_InclusionGlobbing(t *testing.T) {
