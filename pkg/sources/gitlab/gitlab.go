@@ -39,13 +39,18 @@ type Source struct {
 	jobID    sources.JobID
 	verify   bool
 
-	authMethod   string
-	user         string
-	password     string
-	token        string
-	url          string
-	repos        []string
-	groupIds     []string
+	authMethod string
+	user       string
+	password   string
+	token      string
+	url        string
+	repos      []string
+	groupIds   []string
+
+	// These lists are checked both during enumeration and when ChunkUnit is called. This means that if they're modified
+	// between enumeration and individual unit scans, units will be scanned only if they pass the filter during
+	// enumeration and also if they pass the filter during unit scanning. This means that units can be "removed" from
+	// the enumerated list post-enumeration by modifying the filters, but they can never be added post-enumeration.
 	ignoreRepos  []string
 	includeRepos []string
 
