@@ -1086,6 +1086,14 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, _ := unit.SourceUnitID()
 
+	ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
+	})
+	if ignoreRepo(repoURL) {
+		ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+		return nil
+	}
+
 	var path string
 	var repo *gogit.Repository
 	var err error
