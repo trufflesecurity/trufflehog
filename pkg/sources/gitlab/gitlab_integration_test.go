@@ -499,7 +499,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 	}
 }
 
-func TestSource_ChunkUnit_RepoIgnored_NotScanned(t *testing.T) {
+func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 	ctx := context.Background()
 
 	secret, err := common.GetTestSecret(ctx)
@@ -508,29 +508,61 @@ func TestSource_ChunkUnit_RepoIgnored_NotScanned(t *testing.T) {
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
 
-	typedConn := &sourcespb.GitLab{
-		Credential: &sourcespb.GitLab_Token{
-			Token: token,
-		},
-		IgnoreRepos: []string{"https://gitlab.com/testermctestface/testy"},
-	}
-	conn, err := anypb.New(typedConn)
-	require.NoError(t, err)
-
-	s := &Source{}
-	require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
-
 	unit := sources.CommonSourceUnit{
 		Kind: "repo",
 		ID:   "https://gitlab.com/testermctestface/testy",
 	}
 
-	chunksChan := make(chan *sources.Chunk, 1024)
-	chunkReporter := sources.ChanReporter{chunksChan}
+	tests := []struct {
+		name          string
+		includeRepos  []string
+		ignoreRepos   []string
+		wantAnyChunks bool
+	}{
+		{
+			name:          "empty include, empty ignore",
+			wantAnyChunks: true,
+		},
+		{
+			name:          "unit matches include",
+			includeRepos:  []string{"https://gitlab.com/testermctestface/testy"},
+			wantAnyChunks: true,
+		},
+		{
+			name:          "unit does not match include",
+			includeRepos:  []string{"https://gitlab.com/testermctestface/something-else"},
+			wantAnyChunks: false,
+		},
+		{
+			name:          "unit matches ignore",
+			ignoreRepos:   []string{"https://gitlab.com/testermctestface/testy"},
+			wantAnyChunks: false,
+		},
+	}
 
-	require.NoError(t, s.ChunkUnit(ctx, unit, chunkReporter))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			typedConn := &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IncludeRepos: tt.includeRepos,
+				IgnoreRepos:  tt.ignoreRepos,
+			}
+			conn, err := anypb.New(typedConn)
+			require.NoError(t, err)
 
-	assert.Empty(t, chunksChan)
+			s := &Source{}
+			require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
+
+			chunksChan := make(chan *sources.Chunk, 1024)
+			chunkReporter := sources.ChanReporter{chunksChan}
+
+			require.NoError(t, s.ChunkUnit(ctx, unit, chunkReporter))
+
+			assert.Equal(t, tt.wantAnyChunks, len(chunksChan) > 0)
+		})
+	}
 }
 
 func TestSource_InclusionGlobbing(t *testing.T) {
