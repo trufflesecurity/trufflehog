@@ -18,12 +18,15 @@ import (
 )
 
 const (
-	WORKSPACE_URL      = "https://api.getpostman.com/workspaces/%s"
-	ENVIRONMENTS_URL   = "https://api.getpostman.com/environments/%s"
-	COLLECTIONS_URL    = "https://api.getpostman.com/collections/%s"
-	userAgent          = "PostmanRuntime/7.26.8"
-	defaultContentType = "*"
+	WORKSPACE_URL                 = "https://api.getpostman.com/workspaces/%s"
+	ENVIRONMENTS_URL              = "https://api.getpostman.com/environments/%s"
+	COLLECTIONS_URL               = "https://api.getpostman.com/collections/%s"
+	userAgent                     = "PostmanRuntime/7.26.8"
+	defaultContentType            = "*"
+	abortScanAPIReqLimitThreshold = 0.8 // Abort scan if 80% of monthly api request limit is reached
 )
+
+var errAbortScanDueToAPIRateLimit = fmt.Errorf("aborting scan due to Postman API monthly requests limit being used over %f%%", abortScanAPIReqLimitThreshold*100)
 
 type Workspace struct {
 	Id              string      `json:"id"`
@@ -284,22 +287,9 @@ func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString st
 
 	c.Metrics.apiRequests.WithLabelValues(urlString).Inc()
 
-	rateLimitRemainingMonthValue := resp.Header.Get("RateLimit-Remaining-Month")
-	if rateLimitRemainingMonthValue == "" {
-		rateLimitRemainingMonthValue = resp.Header.Get("X-RateLimit-Remaining-Month")
-	}
-
-	if rateLimitRemainingMonthValue != "" {
-		rateLimitRemainingMonth, err := strconv.Atoi(rateLimitRemainingMonthValue)
-		if err != nil {
-			ctx.Logger().Error(err, "Couldn't convert RateLimit-Remaining-Month to an int",
-				"header_value", rateLimitRemainingMonthValue,
-			)
-		} else {
-			c.Metrics.apiMonthlyRequestsRemaining.WithLabelValues().Set(
-				float64(rateLimitRemainingMonth),
-			)
-		}
+	err = c.handleRateLimits(ctx, resp)
+	if err != nil {
+		return nil, err
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -313,6 +303,60 @@ func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString st
 		return nil, err
 	}
 	return body, nil
+}
+
+// handleRateLimits processes the rate limit headers from the Postman API response
+// and updates the client's metrics accordingly. If the monthly rate limit usage exceeds
+// the set threshold, an error is returned to abort further processing.
+func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) error {
+	rateLimitRemainingMonthValue := resp.Header.Get("RateLimit-Remaining-Month")
+	if rateLimitRemainingMonthValue == "" {
+		rateLimitRemainingMonthValue = resp.Header.Get("X-RateLimit-Remaining-Month")
+	}
+	if rateLimitRemainingMonthValue == "" {
+		ctx.Logger().V(2).Info("RateLimit-Remaining-Month header not found in response")
+		return nil
+	}
+
+	rateLimitRemainingMonth, err := strconv.Atoi(rateLimitRemainingMonthValue)
+	if err != nil {
+		ctx.Logger().Error(err, "Couldn't convert RateLimit-Remaining-Month to an int",
+			"header_value", rateLimitRemainingMonthValue,
+		)
+		return nil
+	}
+	c.Metrics.apiMonthlyRequestsRemaining.WithLabelValues().Set(
+		float64(rateLimitRemainingMonth),
+	)
+
+	rateLimitTotalMonthValue := resp.Header.Get("RateLimit-Limit-Month")
+	if rateLimitTotalMonthValue == "" {
+		rateLimitTotalMonthValue = resp.Header.Get("X-RateLimit-Limit-Month")
+	}
+	if rateLimitTotalMonthValue == "" {
+		ctx.Logger().V(2).Info("RateLimit-Limit-Month header not found in response")
+		return nil
+	}
+	rateLimitTotalMonth, err := strconv.Atoi(rateLimitTotalMonthValue)
+	if err != nil {
+		ctx.Logger().Error(err, "Couldn't convert RateLimit-Limit-Month to an int",
+			"header_value", rateLimitTotalMonthValue,
+		)
+		return nil
+	}
+
+	if rateLimitTotalMonth == 0 {
+		ctx.Logger().V(2).Info("RateLimit-Limit-Month is zero, cannot compute usage percentage")
+		return nil
+	}
+
+	// failsafe to abandon scan if we are over the threshold of monthly API requests used
+	percentageUsed := float64(rateLimitTotalMonth-rateLimitRemainingMonth) / float64(rateLimitTotalMonth)
+	if percentageUsed > abortScanAPIReqLimitThreshold {
+		return errAbortScanDueToAPIRateLimit
+	}
+
+	return nil
 }
 
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
