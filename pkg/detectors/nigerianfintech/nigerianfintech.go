@@ -4,7 +4,6 @@ import (
     "context"
     "regexp"
 
-    "github.com/trufflesecurity/trufflehog/v3/pkg/common"
     "github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
     "github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
