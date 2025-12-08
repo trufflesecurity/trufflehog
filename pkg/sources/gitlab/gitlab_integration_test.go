@@ -502,12 +502,14 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 	ctx := context.Background()
 
+	// Arrange: Get test environment token
 	secret, err := common.GetTestSecret(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
 
+	// Arrange: Build a unit to scan
 	unit := sources.CommonSourceUnit{
 		Kind: "repo",
 		ID:   "https://gitlab.com/testermctestface/testy",
@@ -542,6 +544,7 @@ func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Arrange: Create the connection
 			typedConn := &sourcespb.GitLab{
 				Credential: &sourcespb.GitLab_Token{
 					Token: token,
@@ -552,14 +555,18 @@ func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 			conn, err := anypb.New(typedConn)
 			require.NoError(t, err)
 
+			// Arrange: Instantiate and initialize the source
 			s := &Source{}
 			require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
 
+			// Arrange: Build the chunk reporter
 			chunksChan := make(chan *sources.Chunk, 1024)
 			chunkReporter := sources.ChanReporter{chunksChan}
 
+			// Act: Scan the unit
 			require.NoError(t, s.ChunkUnit(ctx, unit, chunkReporter))
 
+			// Assert: Verify that chunk production was correct
 			assert.Equal(t, tt.wantAnyChunks, len(chunksChan) > 0)
 		})
 	}
