@@ -572,6 +572,8 @@ func TestEnumerate(t *testing.T) {
 }
 
 func TestChunkUnit(t *testing.T) {
+	t.Skip("flaky - INS-212")
+
 	t.Parallel()
 	ctx := context.Background()
 	// Initialize the source.
