@@ -11,6 +11,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,6 +23,40 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
+
+func TestClone_Timeout(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("an unset timeout should not cause a timeout", func(t *testing.T) {
+		_, _, err := CloneRepo(
+			ctx,
+			nil,
+			"https://github.com/dustin-decker/secretsandstuff.git",
+			"",
+			false)
+
+		// There shouldn't be an error - but if there is because of some other problem, we don't want this test to fail
+		if err != nil {
+			assert.NotContains(t, err.Error(), "timed out")
+		}
+	})
+
+	t.Run("a clone that times out should time out", func(t *testing.T) {
+		feature.GitGloneTimeoutSeconds.Store(1)
+		t.Cleanup(func() { feature.GitGloneTimeoutSeconds.Store(0) })
+
+		_, _, err := CloneRepo(
+			ctx,
+			nil,
+			"https://github.com/dustin-decker/secretsandstuff.git",
+			"",
+			false)
+
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "timed out")
+		}
+	})
+}
 
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
