@@ -448,6 +448,7 @@ type cloneParams struct {
 	args      []string
 	clonePath string
 	authInUrl bool
+	timeout   time.Duration
 }
 
 // CloneRepo orchestrates the cloning of a given Git repository, returning its local path
@@ -473,7 +474,10 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 		}
 	}
 
-	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl})
+	timeoutS := feature.GitGloneTimeoutSeconds.Load()
+	timeout := time.Duration(timeoutS) * time.Second
+
+	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl, timeout})
 	if err != nil {
 		// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
 		// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
@@ -529,8 +533,11 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Nanosecond)
-	defer cancel()
+	var cancel context.CancelFunc
+	if params.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, params.timeout)
+		defer cancel()
+	}
 
 	gitArgs = append(gitArgs, "--quiet")
 	gitArgs = append(gitArgs, params.args...)
