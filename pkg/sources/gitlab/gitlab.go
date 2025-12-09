@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -543,7 +544,7 @@ func (s *Source) getAllProjectRepos(
 			}
 			// Report the unit.
 			ctx.Logger().V(3).Info("accepting project")
-			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
+			unit := projectToGitUnit(proj)
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 			if err := reporter.UnitOk(ctx, unit); err != nil {
@@ -735,7 +736,7 @@ func (s *Source) getAllProjectReposV2(
 		// report the unit.
 		projCtx.Logger().V(3).Info("accepting project")
 
-		unit := git.SourceUnit{Kind: git.UnitRepo, ID: project.HTTPURLToRepo}
+		unit := projectToGitUnit(project)
 		gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 
 		if err := reporter.UnitOk(ctx, unit); err != nil {
@@ -837,7 +838,7 @@ func (s *Source) getAllProjectReposInGroups(
 				// report the unit.
 				projCtx.Logger().V(3).Info("accepting project")
 
-				unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
+				unit := projectToGitUnit(proj)
 				gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 				projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 
@@ -857,6 +858,21 @@ func (s *Source) getAllProjectReposInGroups(
 	ctx.Logger().Info("Enumerated GitLab group projects", "count", len(projectsWithNamespace))
 
 	return nil
+}
+
+func projectToGitUnit(proj *gitlab.Project) git.SourceUnit {
+	metadata := map[string]string{
+		"project_id":   fmt.Sprintf("%d", proj.ID),
+		"project_name": proj.NameWithNamespace,
+	}
+	if proj.Owner != nil {
+		metadata["project_owner"] = proj.Owner.Email
+	}
+	return git.SourceUnit{
+		Kind:     git.UnitRepo,
+		ID:       proj.HTTPURLToRepo,
+		Metadata: metadata,
+	}
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
@@ -1113,5 +1129,36 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
-	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
+	var projectIdInt int64
+	var projectOwner, projectName string
+	if gitUnit, ok := unit.(git.SourceUnit); ok && gitUnit.Metadata != nil {
+		if gitUnit.Metadata["project_id"] != "" {
+			projectId, err := strconv.Atoi(gitUnit.Metadata["project_id"])
+			if err != nil {
+				ctx.Logger().Error(err, "could not convert project_id metadata to int", "project_id", gitUnit.Metadata["project_id"])
+			} else {
+				projectIdInt = int64(projectId)
+			}
+		}
+		projectName = gitUnit.Metadata["project_name"]
+		projectOwner = gitUnit.Metadata["project_owner"]
+	}
+
+	chunkWithProjectReporter := sources.VisitorReporter{
+		VisitChunk: func(ctx context.Context, chunk sources.Chunk) error {
+			if chunk.SourceMetadata != nil {
+				if metadata, ok := chunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab); ok && metadata.Gitlab != nil {
+					metadata.Gitlab.ProjectId = projectIdInt
+					metadata.Gitlab.ProjectName = projectName
+					metadata.Gitlab.ProjectOwner = projectOwner
+				}
+			}
+			return reporter.ChunkOk(ctx, chunk)
+		},
+		VisitChunkErr: func(ctx context.Context, err error) error {
+			return reporter.ChunkErr(ctx, err)
+		},
+	}
+
+	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunkWithProjectReporter)
 }
