@@ -474,8 +474,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 		}
 	}
 
-	timeoutS := feature.GitGloneTimeoutSeconds.Load()
-	timeout := time.Duration(timeoutS) * time.Second
+	timeout := time.Duration(feature.GitGloneTimeoutDuration.Load())
 
 	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl, timeout})
 	if err != nil {

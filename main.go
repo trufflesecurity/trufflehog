@@ -88,7 +88,7 @@ var (
 	// Add feature flags
 	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
 	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
-	gitCloneTimeoutS   = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, in seconds.").Hidden().Int64()
+	gitCloneTimeout    = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 
@@ -452,8 +452,8 @@ func run(state overseer.State) {
 		feature.ForceSkipArchives.Store(true)
 	}
 
-	if gitCloneTimeoutS != nil {
-		feature.GitGloneTimeoutSeconds.Store(*gitCloneTimeoutS)
+	if gitCloneTimeout != nil {
+		feature.GitGloneTimeoutDuration.Store(int64(*gitCloneTimeout))
 	}
 
 	if *skipAdditionalRefs {

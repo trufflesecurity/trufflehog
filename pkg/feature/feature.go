@@ -1,11 +1,13 @@
 package feature
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 var (
 	ForceSkipBinaries              atomic.Bool
 	ForceSkipArchives              atomic.Bool
-	GitGloneTimeoutSeconds         atomic.Int64
+	GitGloneTimeoutDuration        atomic.Int64
 	SkipAdditionalRefs             atomic.Bool
 	EnableAPKHandler               atomic.Bool
 	UserAgentSuffix                AtomicString

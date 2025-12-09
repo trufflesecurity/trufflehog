@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
@@ -42,8 +43,8 @@ func TestClone_Timeout(t *testing.T) {
 	})
 
 	t.Run("a clone that times out should time out", func(t *testing.T) {
-		feature.GitGloneTimeoutSeconds.Store(1)
-		t.Cleanup(func() { feature.GitGloneTimeoutSeconds.Store(0) })
+		feature.GitGloneTimeoutDuration.Store(int64(1 * time.Nanosecond))
+		t.Cleanup(func() { feature.GitGloneTimeoutDuration.Store(0) })
 
 		_, _, err := CloneRepo(
 			ctx,
