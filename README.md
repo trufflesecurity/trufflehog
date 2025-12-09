@@ -556,6 +556,9 @@ Exit Codes:
 
 ## :octocat: TruffleHog Github Action
 
+TruffleHog requires only the following permission in GH Actions:
+`contents: read`
+
 ### General Usage
 
 ```
@@ -568,13 +571,18 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # Sets the scopes available to the github_token injected to the GH Actions runner
+    permissions:
+        contents: read
+
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - name: Secret Scanning
-      uses: trufflesecurity/trufflehog@main
+      uses: trufflesecurity/trufflehog@shaHashHereForLatestTagRelease
       with:
         extra_args: --results=verified,unknown
 ```
@@ -587,21 +595,55 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
 
 ```
 ...
-      - shell: bash
+      # Calculate the depth and branch for checkout optimization
+      - name: Calculate Checkout Depth and Branch
+        shell: bash
+        env:
+          # Untrusted inputs passed via env (prevents injection attacks via direct end user input via ${{ }}).
+          UNTRUST_PR_REF: ${{ github.event.pull_request.head.ref }}  # The pull request’s source branch name
+          UNTRUST_PR_COMMITS_COUNT: ${{ github.event.pull_request.commits }}  # Number of commits in the PR
+          UNTRUST_PUSH_COMMIT_LIST_JSON: ${{ toJson(github.event.commits) }}  # List of commits on a push (as JSON)
         run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 2))" >> $GITHUB_ENV
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
+          # Exit on error (-e), treat unset variables as errors (-u), and fail on pipeline errors (-o pipefail)
+          set -euo pipefail
+
+          # If this run was triggered by a push event
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            # Count how many commits are in the push event using jq (a JSON parser)
+            raw_depth=$(printf '%s' "$UNTRUST_PUSH_COMMIT_LIST_JSON" | jq 'length')
+            # Make sure the depth is a valid number; if not, default to 0
+            if ! [[ "$raw_depth" =~ ^[0-9]+$ ]]; then raw_depth=0; fi
+            # Add a small buffer (+2) so we have enough history for scanning
+            depth=$(( raw_depth + 2 ))
+            # Save the computed depth into the GitHub Actions environment for later steps
+            printf 'depth=%s\n' "$depth" | tr -d '\n\r' >> "$GITHUB_ENV"
+            # Use the branch name from the push event, cleaned of any stray characters
+            safe_branch=$(printf '%s' "$GITHUB_REF_NAME" | tr -d '\n\r')
+            # Save the branch name into the environment for later steps
+            printf 'branch=%s\n' "$safe_branch" >> "$GITHUB_ENV"
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # Read the number of commits in the PR; default to 0 if missing
+            pr_commits="${UNTRUST_PR_COMMITS_COUNT:-0}"
+            # Validate that the commit count is a number; if not, set to 0
+            if ! [[ "$pr_commits" =~ ^[0-9]+$ ]]; then pr_commits=0; fi
+            # Add a small buffer (+2) so we have enough history for scanning
+            depth=$(( pr_commits + 2 ))
+            # Use the incoming PR branch name, cleaned of any stray characters
+            safe_branch=$(printf '%s' "$UNTRUST_PR_REF" | tr -d '\n\r')
+            # Save the computed depth into the environment for later steps
+            printf 'depth=%s\n' "$depth" | tr -d '\n\r' >> "$GITHUB_ENV"
+            # Save the branch name into the environment for later steps
+            printf 'branch=%s\n' "$safe_branch" >> "$GITHUB_ENV"
           fi
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "depth=$((${{ github.event.pull_request.commits }}+2))" >> $GITHUB_ENV
-            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
-          fi
-      - uses: actions/checkout@v3
+
+      # Downloads the repo at the specified depth calculated previously
+      - uses: actions/checkout@5
         with:
           ref: ${{env.branch}}
           fetch-depth: ${{env.depth}}
-      - uses: trufflesecurity/trufflehog@main
+
+      # Run TruffleHog Scan against the downloaded repo
+      - uses: trufflesecurity/trufflehog@shaHashHereForLatestTagRelease
         with:
           extra_args: --results=verified,unknown
 ...
