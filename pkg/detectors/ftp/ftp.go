@@ -131,7 +131,10 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 	if err != nil {
 		return err
 	}
-	defer c.Quit()
+
+	defer func() {
+		_ = c.Quit()
+	}()
 	password, _ := u.User.Password()
 	return c.Login(u.User.Username(), password)
 }
