@@ -545,6 +545,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		"args", params.args,
 	)
 
+	logger.V(3).Info("executing git clone command")
 	outputBytes, err := cloneCmd.CombinedOutput()
 	var output string
 	if secretForRedaction != "" {
