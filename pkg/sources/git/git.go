@@ -529,10 +529,13 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		}
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Nanosecond)
+	defer cancel()
+
 	gitArgs = append(gitArgs, "--quiet")
 	gitArgs = append(gitArgs, params.args...)
 	gitArgs = append(gitArgs, cloneURL.String(), params.clonePath)
-	cloneCmd := exec.Command("git", gitArgs...)
+	cloneCmd := exec.CommandContext(ctx, "git", gitArgs...)
 
 	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
@@ -559,7 +562,9 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	}
 	logger.V(3).Info("git subcommand finished", "output", output)
 
-	if cloneCmd.ProcessState == nil {
+	if common.IsDone(ctx) {
+		return nil, fmt.Errorf("git clone timed out (after %s)", time.Since(start))
+	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
 		logger.V(1).Info("git clone failed", "error", err)
