@@ -490,6 +490,8 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
 // clonePath. It then opens the cloned repository, returning a git.Repository object.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
+	start := time.Now()
+
 	cloneURL, err := GitURLParse(params.gitURL)
 	if err != nil {
 		return nil, err
@@ -543,6 +545,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		"args", params.args,
 	)
 
+	logger.V(3).Info("executing git clone command")
 	outputBytes, err := cloneCmd.CombinedOutput()
 	var output string
 	if secretForRedaction != "" {
@@ -570,7 +573,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	if err != nil {
 		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-	logger.V(1).Info("successfully cloned repo")
+	logger.V(1).Info("successfully cloned repo", "time_seconds", time.Since(start).Seconds())
 
 	metricsInstance.RecordCloneOperation(statusSuccess, cloneSuccess, 0)
 
