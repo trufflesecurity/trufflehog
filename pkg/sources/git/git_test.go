@@ -43,8 +43,8 @@ func TestClone_Timeout(t *testing.T) {
 	})
 
 	t.Run("a clone that times out should time out", func(t *testing.T) {
-		feature.GitGloneTimeoutDuration.Store(int64(1 * time.Nanosecond))
-		t.Cleanup(func() { feature.GitGloneTimeoutDuration.Store(0) })
+		feature.GitCloneTimeoutDuration.Store(int64(1 * time.Nanosecond))
+		t.Cleanup(func() { feature.GitCloneTimeoutDuration.Store(0) })
 
 		_, _, err := CloneRepo(
 			ctx,

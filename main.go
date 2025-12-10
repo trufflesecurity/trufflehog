@@ -453,7 +453,7 @@ func run(state overseer.State) {
 	}
 
 	if gitCloneTimeout != nil {
-		feature.GitGloneTimeoutDuration.Store(int64(*gitCloneTimeout))
+		feature.GitCloneTimeoutDuration.Store(int64(*gitCloneTimeout))
 	}
 
 	if *skipAdditionalRefs {
