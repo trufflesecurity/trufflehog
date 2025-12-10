@@ -160,7 +160,7 @@ func TestGenerateLink(t *testing.T) {
 				file:   "main.go",
 				line:   int64(20),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=20&lineStartColumn=1",
+			want: "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=21&lineStartColumn=1",
 		},
 		{
 			name: "Azure link gen - no file",
@@ -288,10 +288,10 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 		{
 			name: "Update Azure link with line",
 			args: args{
-				link:    "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=20&lineStartColumn=1",
+				link:    "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=21&lineStartColumn=1",
 				newLine: int64(40),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo?line=40&lineEnd=40&lineStartColumn=1&path=%2Fmain.go&version=GCabcdef",
+			want: "https://dev.azure.com/org/project/_git/repo?line=40&lineEnd=41&lineStartColumn=1&path=%2Fmain.go&version=GCabcdef",
 		},
 		{
 			name: "Add line to github link without line",

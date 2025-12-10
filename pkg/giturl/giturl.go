@@ -130,7 +130,7 @@ func GenerateLink(repo, commit, file string, line int64) string {
 		return repo[:len(repo)-4] + "/commits/" + commit
 
 	case providerAzure:
-		// Azure Repos format: ?path=/file&version=GC<commit>&line=N&lineEnd=N&lineStartColumn=1
+		// Azure Repos format: ?path=/file&version=GC<commit>&line=N&lineEnd=N+1&lineStartColumn=1
 		// where GC prefix stands for "Git Commit" (vs GB for Git Branch, GT for Git Tag)
 		baseLink := repo + "?version=GC" + commit
 		if file != "" {
@@ -138,7 +138,8 @@ func GenerateLink(repo, commit, file string, line int64) string {
 		}
 		if line > 0 {
 			lineStr := strconv.FormatInt(line, 10)
-			baseLink += "&line=" + lineStr + "&lineEnd=" + lineStr + "&lineStartColumn=1"
+			lineEndStr := strconv.FormatInt(line+1, 10)
+			baseLink += "&line=" + lineStr + "&lineEnd=" + lineEndStr + "&lineStartColumn=1"
 		}
 		return baseLink
 
@@ -217,11 +218,12 @@ func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) strin
 		return link
 
 	case providerAzure:
-		// For Azure, line numbers use query parameters: ?line=N&lineEnd=N&lineStartColumn=1
+		// For Azure, line numbers use query parameters: ?line=N&lineEnd=N+1&lineStartColumn=1
 		query := parsedURL.Query()
 		lineStr := strconv.FormatInt(newLine, 10)
+		lineEndStr := strconv.FormatInt(newLine+1, 10)
 		query.Set("line", lineStr)
-		query.Set("lineEnd", lineStr)
+		query.Set("lineEnd", lineEndStr)
 		query.Set("lineStartColumn", "1")
 		parsedURL.RawQuery = query.Encode()
 
