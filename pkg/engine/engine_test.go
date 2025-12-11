@@ -889,7 +889,7 @@ func TestSetLink(t *testing.T) {
 			},
 			link:     "https://dev.azure.com/example",
 			line:     3,
-			wantLink: "https://dev.azure.com/example?line=3",
+			wantLink: "https://dev.azure.com/example?line=3&lineEnd=4&lineStartColumn=1",
 		},
 		{
 			name: "Unsupported metadata type",
