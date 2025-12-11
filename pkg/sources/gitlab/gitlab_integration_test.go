@@ -19,6 +19,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func TestSource_Scan(t *testing.T) {
@@ -604,5 +605,111 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 			assert.Equal(t, tt.wantReposScanned, len(repos))
 
 		})
+	}
+}
+
+func TestSource_Chunks_ProjectDetailsInChunkMetadata(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	token := secret.MustGetField("GITLAB_TOKEN")
+
+	s := Source{}
+
+	conn, err := anypb.New(&sourcespb.GitLab{
+		Credential: &sourcespb.GitLab_Token{
+			Token: token,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Init(ctx, "project details in chunkmetadata", 0, 0, false, conn, 10)
+	if err != nil {
+		t.Errorf("Source.Init() error = %v", err)
+		return
+	}
+	chunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunksCh)
+		err = s.Chunks(context.Background(), chunksCh)
+		if err != nil {
+			t.Errorf("Source.Chunks() error = %v", err)
+			return
+		}
+	}()
+	gotChunks := false
+	for gotChunk := range chunksCh {
+		gotChunks = true
+		metadata := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
+		if metadata.Gitlab.ProjectId == 0 || metadata.Gitlab.ProjectName == "" {
+			t.Errorf("Source.Chunks() missing project details in chunk metadata: %+v", metadata.Gitlab)
+		}
+	}
+	if !gotChunks {
+		t.Errorf("0 chunks scanned.")
+	}
+}
+
+func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	token := secret.MustGetField("GITLAB_TOKEN")
+
+	s := Source{}
+
+	conn, err := anypb.New(&sourcespb.GitLab{
+		Credential: &sourcespb.GitLab_Token{
+			Token: token,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Init(ctx, "project details in chunkmetadata", 0, 0, false, conn, 10)
+	if err != nil {
+		t.Errorf("Source.Init() error = %v", err)
+		return
+	}
+	testReporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &testReporter)
+	if err != nil {
+		t.Errorf("Source.Chunks() error = %v", err)
+		return
+	}
+	chunksCh := make(chan *sources.Chunk, 1)
+	chanReporter := sources.ChanReporter{Ch: chunksCh}
+	go func() {
+		defer close(chunksCh)
+		for _, unit := range testReporter.Units {
+			err := s.ChunkUnit(context.Background(), unit, chanReporter)
+			if err != nil {
+				t.Errorf("Source.ChunkUnit() error = %v", err)
+			}
+		}
+	}()
+	gotChunks := false
+	for gotChunk := range chunksCh {
+		gotChunks = true
+		metadata := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
+		if metadata.Gitlab.ProjectId == 0 || metadata.Gitlab.ProjectName == "" {
+			t.Errorf("Source.Chunks() missing project details in chunk metadata: %+v", metadata.Gitlab)
+		}
+	}
+	if !gotChunks {
+		t.Errorf("0 chunks scanned.")
 	}
 }
