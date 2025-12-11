@@ -22,17 +22,13 @@ func (ChanReporter) ChunkErr(ctx context.Context, err error) error {
 }
 
 var _ UnitReporter = (*VisitorReporter)(nil)
-var _ ChunkReporter = (*VisitorReporter)(nil)
 
-// VisitorReporter is a UnitReporter and ChunkReporter that will call the provided callbacks for
-// finding units/chunks and reporting errors. VisitErr and VisitChunkErr are optional; if unset it will
+// VisitorReporter is a UnitReporter that will call the provided callbacks for
+// finding units and reporting errors. VisitErr is optional; if unset it will
 // log the error.
 type VisitorReporter struct {
 	VisitUnit func(context.Context, SourceUnit) error
 	VisitErr  func(context.Context, error) error
-
-	VisitChunk    func(context.Context, Chunk) error
-	VisitChunkErr func(context.Context, error) error
 }
 
 func (v VisitorReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
@@ -45,16 +41,4 @@ func (v VisitorReporter) UnitErr(ctx context.Context, err error) error {
 		return ctx.Err()
 	}
 	return v.VisitErr(ctx, err)
-}
-
-func (v VisitorReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
-	return v.VisitChunk(ctx, chunk)
-}
-
-func (v VisitorReporter) ChunkErr(ctx context.Context, err error) error {
-	if v.VisitChunkErr == nil {
-		ctx.Logger().Error(err, "error chunking")
-		return ctx.Err()
-	}
-	return v.VisitChunkErr(ctx, err)
 }
