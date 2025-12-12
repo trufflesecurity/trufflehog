@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -77,6 +78,42 @@ type Source struct {
 	printLegacyJSON bool
 
 	projectsPerPage int
+
+	// cache of repo URL to project info, used when generating metadata for chunks
+	repoToProjCache repoToProjectCache
+}
+
+type project struct {
+	id    int
+	name  string
+	owner string
+}
+
+type repoToProjectCache struct {
+	sync.RWMutex
+
+	cache map[string]*project
+}
+
+func (r *repoToProjectCache) get(repo string) (*project, bool) {
+	r.RLock()
+	defer r.RUnlock()
+	proj, ok := r.cache[repo]
+	return proj, ok
+}
+
+func (r *repoToProjectCache) set(repo string, proj *project) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.cache[repo] = proj
+}
+
+func (r *repoToProjectCache) clear() {
+	r.Lock()
+	defer r.Unlock()
+
+	clear(r.cache)
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -227,18 +264,26 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
 		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+			gitlabMetadata := &source_metadatapb.Gitlab{
+				Commit:              sanitizer.UTF8(commit),
+				File:                sanitizer.UTF8(file),
+				Email:               sanitizer.UTF8(email),
+				Repository:          sanitizer.UTF8(repository),
+				RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+				Link:                giturl.GenerateLink(repository, commit, file, line),
+				Timestamp:           sanitizer.UTF8(timestamp),
+				Line:                line,
+			}
+			proj, ok := s.repoToProjCache.get(repository)
+			if ok {
+				gitlabMetadata.ProjectId = int64(proj.id)
+				gitlabMetadata.ProjectName = proj.name
+				gitlabMetadata.ProjectOwner = proj.owner
+			}
+
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{
-					Gitlab: &source_metadatapb.Gitlab{
-						Commit:              sanitizer.UTF8(commit),
-						File:                sanitizer.UTF8(file),
-						Email:               sanitizer.UTF8(email),
-						Repository:          sanitizer.UTF8(repository),
-						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
-						Link:                giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:           sanitizer.UTF8(timestamp),
-						Line:                line,
-					},
+					Gitlab: gitlabMetadata,
 				},
 			}
 		},
@@ -246,6 +291,10 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
+
+	s.repoToProjCache = repoToProjectCache{
+		cache: make(map[string]*project),
+	}
 
 	return nil
 }
@@ -290,6 +339,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 				return ctx.Err()
 			},
 		}
+
+		// Clear the repo to project cache when done.
+		defer s.repoToProjCache.clear()
 
 		if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
 			return err
@@ -548,7 +600,8 @@ func (s *Source) getAllProjectRepos(
 			}
 			// Report the unit.
 			ctx.Logger().V(3).Info("accepting project")
-			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
+			s.repoToProjCache.set(proj.HTTPURLToRepo, gitlabProjectToCacheProject(proj))
+			unit := projectToGitUnit(proj)
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 			if err := reporter.UnitOk(ctx, unit); err != nil {
@@ -740,7 +793,8 @@ func (s *Source) getAllProjectReposV2(
 		// report the unit.
 		projCtx.Logger().V(3).Info("accepting project")
 
-		unit := git.SourceUnit{Kind: git.UnitRepo, ID: project.HTTPURLToRepo}
+		s.repoToProjCache.set(project.HTTPURLToRepo, gitlabProjectToCacheProject(project))
+		unit := projectToGitUnit(project)
 		gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 
 		if err := reporter.UnitOk(ctx, unit); err != nil {
@@ -842,7 +896,8 @@ func (s *Source) getAllProjectReposInGroups(
 				// report the unit.
 				projCtx.Logger().V(3).Info("accepting project")
 
-				unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
+				s.repoToProjCache.set(proj.HTTPURLToRepo, gitlabProjectToCacheProject(proj))
+				unit := projectToGitUnit(proj)
 				gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 				projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 
@@ -862,6 +917,35 @@ func (s *Source) getAllProjectReposInGroups(
 	ctx.Logger().Info("Enumerated GitLab group projects", "count", len(projectsWithNamespace))
 
 	return nil
+}
+
+func gitlabProjectToCacheProject(proj *gitlab.Project) *project {
+	project := &project{
+		id:   proj.ID,
+		name: proj.NameWithNamespace,
+	}
+	if proj.Owner != nil {
+		project.owner = proj.Owner.Email
+		if project.owner == "" {
+			project.owner = proj.Owner.Username
+		}
+	}
+	return project
+}
+
+func projectToGitUnit(proj *gitlab.Project) git.SourceUnit {
+	metadata := map[string]string{
+		"project_id":   fmt.Sprintf("%d", proj.ID),
+		"project_name": proj.NameWithNamespace,
+	}
+	if proj.Owner != nil {
+		metadata["project_owner"] = proj.Owner.Email
+	}
+	return git.SourceUnit{
+		Kind:     git.UnitRepo,
+		ID:       proj.HTTPURLToRepo,
+		Metadata: metadata,
+	}
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
@@ -1124,6 +1208,23 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
 			defer os.RemoveAll(path)
 		}
+	}
+
+	// Cache project metadata if available.
+	if gitUnit, ok := unit.(git.SourceUnit); ok && gitUnit.Metadata != nil {
+		if gitUnit.Metadata["project_id"] != "" {
+			project := &project{}
+			projectId, err := strconv.Atoi(gitUnit.Metadata["project_id"])
+			if err != nil {
+				ctx.Logger().Error(err, "could not convert project_id metadata to int", "project_id", gitUnit.Metadata["project_id"])
+			} else {
+				project.id = projectId
+			}
+			project.name = gitUnit.Metadata["project_name"]
+			project.owner = gitUnit.Metadata["project_owner"]
+			s.repoToProjCache.set(repoURL, project)
+		}
+
 	}
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
