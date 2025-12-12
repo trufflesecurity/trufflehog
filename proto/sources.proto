@@ -311,6 +311,7 @@ message GoogleDrive {
     string refresh_token = 1;
     bool use_token_service = 2;
     credentials.Oauth2 oauth = 3; // on-prem scanning
+    credentials.GoogleDriveDWD dwd = 4; // Domain-Wide Delegation
   }
 }
 

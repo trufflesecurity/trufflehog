@@ -3276,6 +3276,47 @@ func (m *GoogleDrive) validate(all bool) error {
 			}
 		}
 
+	case *GoogleDrive_Dwd:
+		if v == nil {
+			err := GoogleDriveValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetDwd()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GoogleDriveValidationError{
+						field:  "Dwd",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GoogleDriveValidationError{
+						field:  "Dwd",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDwd()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GoogleDriveValidationError{
+					field:  "Dwd",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
