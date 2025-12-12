@@ -98,6 +98,7 @@ func (p *Checkpointer) Reset() {
 type ResumeInfo struct {
 	CurrentBucket string `json:"current_bucket"` // Current bucket being scanned
 	StartAfter    string `json:"start_after"`    // Last processed object key
+	Role          string `json:"role"`           // Role used for scanning
 }
 
 // ResumePoint retrieves the last saved checkpoint state if one exists.
@@ -121,7 +122,7 @@ func (p *Checkpointer) ResumePoint(ctx context.Context) (ResumeInfo, error) {
 		return resume, nil
 	}
 
-	return ResumeInfo{CurrentBucket: resumeInfo.CurrentBucket, StartAfter: resumeInfo.StartAfter}, nil
+	return ResumeInfo{CurrentBucket: resumeInfo.CurrentBucket, StartAfter: resumeInfo.StartAfter, Role: resumeInfo.Role}, nil
 }
 
 // Complete marks the entire scanning operation as finished and clears the resume state.
@@ -215,7 +216,7 @@ func (p *Checkpointer) updateCheckpoint(bucket string, role string, lastKey stri
 		return nil
 	}
 
-	encoded, err := json.Marshal(&ResumeInfo{CurrentBucket: bucket, StartAfter: lastKey})
+	encoded, err := json.Marshal(&ResumeInfo{CurrentBucket: bucket, StartAfter: lastKey, Role: role})
 	if err != nil {
 		return fmt.Errorf("failed to encode resume info: %w", err)
 	}
