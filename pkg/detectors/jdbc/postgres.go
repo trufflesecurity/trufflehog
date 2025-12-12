@@ -13,11 +13,7 @@ import (
 )
 
 type PostgresJDBC struct {
-	Host     string
-	User     string
-	Password string
-	Database string
-	Params   map[string]string
+	ConnectionInfo
 }
 
 func (s *PostgresJDBC) ping(ctx context.Context) pingResult {
@@ -84,9 +80,11 @@ func ParsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 	}
 
 	postgresJDBC := &PostgresJDBC{
-		Host:     u.Host,
-		Database: dbName,
-		Params:   params,
+		ConnectionInfo: ConnectionInfo{
+			Host:     u.Host,
+			Database: dbName,
+			Params:   params,
+		},
 	}
 
 	if u.User != nil {
@@ -134,7 +132,7 @@ func BuildPostgresConnectionString(host string, user string, password string, db
 	if user != "" {
 		data["user"] = user
 	}
-	if h, p, found := strings.Cut(host, ":"); found {
+	if h, p, ok := strings.Cut(host, ":"); ok {
 		data["host"] = h
 		data["port"] = p
 	}

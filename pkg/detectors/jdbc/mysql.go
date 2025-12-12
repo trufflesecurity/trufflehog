@@ -13,12 +13,7 @@ import (
 )
 
 type MysqlJDBC struct {
-	Conn     string
-	User     string
-	Password string
-	Host     string
-	Params   string
-	Database string
+	ConnectionInfo
 }
 
 func (s *MysqlJDBC) ping(ctx context.Context) pingResult {
@@ -26,7 +21,7 @@ func (s *MysqlJDBC) ping(ctx context.Context) pingResult {
 		BuildMySQLConnectionString(s.Host, "", s.User, s.Password, s.Params))
 }
 
-func BuildMySQLConnectionString(host, database, user, password, params string) string {
+func BuildMySQLConnectionString(host, database, user, password string, params map[string]string) string {
 	conn := host + "/" + database
 	userPass := user
 	if password != "" {
@@ -35,8 +30,12 @@ func BuildMySQLConnectionString(host, database, user, password, params string) s
 	if userPass != "" {
 		conn = userPass + "@" + conn
 	}
-	if params != "" {
-		conn = conn + "?" + params
+	if len(params) > 0 {
+		var paramList []string
+		for k, v := range params {
+			paramList = append(paramList, fmt.Sprintf("%s=%s", k, v))
+		}
+		conn = conn + "?" + strings.Join(paramList, "&")
 	}
 	return conn
 }
@@ -77,12 +76,13 @@ func ParseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
 	return &MysqlJDBC{
-		Conn:     subname[2:],
-		User:     cfg.User,
-		Password: cfg.Passwd,
-		Host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
-		Params:   "timeout=5s",
-		Database: cfg.DBName,
+		ConnectionInfo: ConnectionInfo{
+			User:     cfg.User,
+			Password: cfg.Passwd,
+			Host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
+			Params:   map[string]string{"timeout": "5s"},
+			Database: cfg.DBName,
+		},
 	}, nil
 }
 
@@ -122,12 +122,13 @@ func parseMySQLURI(ctx logContext.Context, subname string) (jdbc, error) {
 	}
 
 	return &MysqlJDBC{
-		Conn:     subname[2:],
-		User:     user,
-		Password: pass,
-		Host:     fmt.Sprintf("tcp(%s)", u.Host),
-		Params:   "timeout=5s",
-		Database: dbName,
+		ConnectionInfo: ConnectionInfo{
+			User:     user,
+			Password: pass,
+			Host:     fmt.Sprintf("tcp(%s)", u.Host),
+			Params:   map[string]string{"timeout": "5s"},
+			Database: dbName,
+		},
 	}, nil
 
 }

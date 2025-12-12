@@ -217,6 +217,15 @@ type pingResult struct {
 	determinate bool
 }
 
+// ConnectionInfo holds parsed connection information
+type ConnectionInfo struct {
+	Host     string // includes port if specified, e.g., "host:port"
+	Database string
+	User     string
+	Password string
+	Params   map[string]string
+}
+
 type jdbc interface {
 	ping(context.Context) pingResult
 }

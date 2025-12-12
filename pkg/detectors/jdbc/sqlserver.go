@@ -12,11 +12,7 @@ import (
 )
 
 type SqlServerJDBC struct {
-	Host     string
-	User     string
-	Password string
-	Database string
-	Params   map[string]string
+	ConnectionInfo
 }
 
 func (s *SqlServerJDBC) ping(ctx context.Context) pingResult {
@@ -87,11 +83,13 @@ func ParseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 	}
 
 	return &SqlServerJDBC{
-		Host:     host + ":" + port,
-		User:     user,
-		Password: password,
-		Database: database,
-		Params:   params,
+		ConnectionInfo: ConnectionInfo{
+			Host:     host + ":" + port,
+			User:     user,
+			Password: password,
+			Database: database,
+			Params:   params,
+		},
 	}, nil
 }
 
