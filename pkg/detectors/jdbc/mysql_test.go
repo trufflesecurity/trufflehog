@@ -2,7 +2,6 @@ package jdbc
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -59,7 +58,7 @@ func TestParseMySQLMissingCredentials(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := logContext.AddLogger(context.Background())
-			j, err := parseMySQL(ctx, tt.subname)
+			j, err := ParseMySQL(ctx, tt.subname)
 
 			if tt.shouldBeNil {
 				if j != nil {
@@ -103,15 +102,15 @@ func TestParseMySQLUsernameRecognition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := logContext.AddLogger(context.Background())
-			j, err := parseMySQL(ctx, tt.subname)
+			j, err := ParseMySQL(ctx, tt.subname)
 			if err != nil {
 				t.Fatalf("parseMySQL() error = %v", err)
 			}
 
-			mysqlConn := j.(*mysqlJDBC)
-			if !strings.Contains(mysqlConn.userPass, tt.wantUsername) {
+			mysqlConn := j.(*MysqlJDBC)
+			if mysqlConn.User != tt.wantUsername {
 				t.Errorf("Connection string does not contain expected username '%s'\nGot: %s\nExpected: %s",
-					tt.wantUsername, mysqlConn.userPass, tt.wantUsername)
+					tt.wantUsername, mysqlConn.User, tt.wantUsername)
 			}
 		})
 	}
