@@ -591,7 +591,7 @@ func (s *Source) pageChunker(
 						},
 					},
 				},
-				Verify: s.verify,
+				SourceVerify: s.verify,
 			}
 
 			if err := handlers.HandleFile(ctx, res.Body, chunkSkel, reporter); err != nil {
