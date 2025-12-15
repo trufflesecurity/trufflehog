@@ -104,6 +104,13 @@ func (r *repoToProjectCache) set(repo string, proj *project) {
 	r.cache[repo] = proj
 }
 
+func (r *repoToProjectCache) del(repo string) {
+	r.Lock()
+	defer r.Unlock()
+
+	delete(r.cache, repo)
+}
+
 func (r *repoToProjectCache) clear() {
 	r.Lock()
 	defer r.Unlock()
@@ -935,6 +942,9 @@ func projectToGitUnit(proj *gitlab.Project) git.SourceUnit {
 	}
 	if proj.Owner != nil {
 		metadata["project_owner"] = proj.Owner.Email
+		if metadata["project_owner"] == "" {
+			metadata["project_owner"] = proj.Owner.Username
+		}
 	}
 	return git.SourceUnit{
 		Kind:     git.UnitRepo,
@@ -1198,21 +1208,33 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 
 	// Cache project metadata if available.
-	if gitUnit, ok := unit.(git.SourceUnit); ok && gitUnit.Metadata != nil {
-		if gitUnit.Metadata["project_id"] != "" {
-			project := &project{}
-			projectId, err := strconv.Atoi(gitUnit.Metadata["project_id"])
-			if err != nil {
-				ctx.Logger().Error(err, "could not convert project_id metadata to int", "project_id", gitUnit.Metadata["project_id"])
-			} else {
-				project.id = projectId
-			}
-			project.name = gitUnit.Metadata["project_name"]
-			project.owner = gitUnit.Metadata["project_owner"]
-			s.repoToProjCache.set(repoURL, project)
-		}
-
-	}
+	s.cacheProjectFromUnit(ctx, unit)
+	// delete from cache when done.
+	defer s.repoToProjCache.del(repoURL)
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
+}
+
+func (s *Source) cacheProjectFromUnit(ctx context.Context, unit sources.SourceUnit) {
+	gitUnit, ok := unit.(git.SourceUnit)
+	if !ok {
+		return
+	}
+	if gitUnit.Metadata == nil {
+		return
+	}
+	if gitUnit.Metadata["project_id"] == "" {
+		return
+	}
+	project := &project{}
+	projectId, err := strconv.Atoi(gitUnit.Metadata["project_id"])
+	if err != nil {
+		ctx.Logger().Error(err, "could not convert project_id metadata to int", "project_id", gitUnit.Metadata["project_id"])
+		return
+	}
+	project.id = projectId
+	project.name = gitUnit.Metadata["project_name"]
+	project.owner = gitUnit.Metadata["project_owner"]
+	s.repoToProjCache.set(gitUnit.ID, project)
+
 }
