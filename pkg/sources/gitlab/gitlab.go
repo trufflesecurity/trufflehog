@@ -695,6 +695,9 @@ func (s *Source) getAllProjectReposV2(
 		return apiClient.Projects.ListProjects(projectQueryOptions, p, gitlab.WithContext(ctx))
 	})
 
+	// Track seen projects by ID to avoid reporting duplicates.
+	// Projects can appear multiple times in the API response (shared across groups, in subgroups, etc.)
+	seenProjects := make(map[int]struct{})
 	totalCount := 0
 
 	// process each project
@@ -714,6 +717,13 @@ func (s *Source) getAllProjectReposV2(
 		projCtx := context.WithValues(ctx,
 			"project_id", project.ID,
 			"project_name", project.NameWithNamespace)
+
+		// Skip projects we've already seen.
+		if _, exists := seenProjects[project.ID]; exists {
+			projCtx.Logger().V(3).Info("skipping project", "reason", "already processed")
+			continue
+		}
+		seenProjects[project.ID] = struct{}{}
 
 		// skip projects configured to be ignored.
 		if ignoreRepo(project.PathWithNamespace) {
@@ -748,7 +758,7 @@ func (s *Source) getAllProjectReposV2(
 		}
 	}
 
-	ctx.Logger().Info("Enumerated GitLab projects", "count", totalCount)
+	ctx.Logger().Info("Enumerated GitLab projects", "count", totalCount, "unique", len(seenProjects))
 
 	return nil
 }
