@@ -40,13 +40,18 @@ type Source struct {
 	jobID    sources.JobID
 	verify   bool
 
-	authMethod   string
-	user         string
-	password     string
-	token        string
-	url          string
-	repos        []string
-	groupIds     []string
+	authMethod string
+	user       string
+	password   string
+	token      string
+	url        string
+	repos      []string
+	groupIds   []string
+
+	// These lists are checked both during enumeration and when ChunkUnit is called. This means that if they're modified
+	// between enumeration and individual unit scans, units will be scanned only if they pass the filter during
+	// enumeration and also if they pass the filter during unit scanning. This means that units can be "removed" from
+	// the enumerated list post-enumeration by modifying the filters, but they can never be added post-enumeration.
 	ignoreRepos  []string
 	includeRepos []string
 
@@ -1169,6 +1174,14 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, _ := unit.SourceUnitID()
+
+	ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
+	})
+	if ignoreRepo(repoURL) {
+		ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+		return nil
+	}
 
 	var path string
 	var repo *gogit.Repository
