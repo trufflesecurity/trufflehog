@@ -130,9 +130,16 @@ func GenerateLink(repo, commit, file string, line int64) string {
 		return repo[:len(repo)-4] + "/commits/" + commit
 
 	case providerAzure:
-		baseLink := repo + "/commit/" + commit + "/" + file
+		// Azure Repos format: ?path=/file&version=GC<commit>&line=N&lineEnd=N+1&lineStartColumn=1
+		// where GC prefix stands for "Git Commit" (vs GB for Git Branch, GT for Git Tag)
+		baseLink := repo + "?version=GC" + commit
+		if file != "" {
+			baseLink = repo + "?path=/" + file + "&version=GC" + commit
+		}
 		if line > 0 {
-			baseLink += "?line=" + strconv.FormatInt(line, 10)
+			lineStr := strconv.FormatInt(line, 10)
+			lineEndStr := strconv.FormatInt(line+1, 10)
+			baseLink += "&line=" + lineStr + "&lineEnd=" + lineEndStr + "&lineStartColumn=1"
 		}
 		return baseLink
 
@@ -211,9 +218,13 @@ func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) strin
 		return link
 
 	case providerAzure:
-		// For Azure, line numbers are appended as ?line=<number>.
+		// For Azure, line numbers use query parameters: ?line=N&lineEnd=N+1&lineStartColumn=1
 		query := parsedURL.Query()
-		query.Set("line", strconv.FormatInt(newLine, 10))
+		lineStr := strconv.FormatInt(newLine, 10)
+		lineEndStr := strconv.FormatInt(newLine+1, 10)
+		query.Set("line", lineStr)
+		query.Set("lineEnd", lineEndStr)
+		query.Set("lineStartColumn", "1")
 		parsedURL.RawQuery = query.Encode()
 
 	case providerGithub, providerGitlab:

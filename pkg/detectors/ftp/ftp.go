@@ -78,8 +78,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			timeout := s.verificationTimeout
-			if timeout == 0 {
+			var timeout time.Duration
+			if s.verificationTimeout > 0 {
+				// Use to configure a simulate timeout for interation tests
+				timeout = s.verificationTimeout
+			} else if dl, ok := ctx.Deadline(); ok {
+				// Here we assign the remaining time before our context expires
+				// This help us cater the timelimit set through --detector-timeout flag
+				timeout = time.Until(dl)
+			} else {
 				timeout = defaultVerificationTimeout
 			}
 			verificationErr := verifyFTP(timeout, parsedURL)
@@ -126,6 +133,9 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 		return err
 	}
 
+	defer func() {
+		_ = c.Quit()
+	}()
 	password, _ := u.User.Password()
 	return c.Login(u.User.Username(), password)
 }
