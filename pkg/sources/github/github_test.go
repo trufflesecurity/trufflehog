@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1102,4 +1103,101 @@ func noopReporter() sources.UnitReporter {
 			return nil
 		},
 	}
+}
+
+func TestEnumerateDeduplication(t *testing.T) {
+	// Test that repositories are not reported multiple times when
+	// they appear in both explicit repos and organization enumeration
+	ctx := context.Background()
+
+	// Set up mocks for the API calls
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "test-user"})
+
+	// Mock the explicit repo fetch
+	gock.New("https://api.github.com").
+		Get("/repos/test-org/repo1").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "test-org/repo1",
+			"clone_url": "https://github.com/test-org/repo1.git",
+			"size":      100,
+		})
+
+	gock.New("https://api.github.com").
+		Get("/repos/test-org/repo2").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "test-org/repo2",
+			"clone_url": "https://github.com/test-org/repo2.git",
+			"size":      100,
+		})
+
+	// Mock the org repos endpoint - returns the same repos
+	var orgReposCalled atomic.Bool
+	gock.New("https://api.github.com").
+		Get("/orgs/test-org/repos").
+		MatchParam("per_page", "100").
+		AddMatcher(gock.MatchFunc(func(req *http.Request, greq *gock.Request) (bool, error) {
+			orgReposCalled.Store(true)
+			return true, nil
+		})).
+		Reply(200).
+		JSON([]map[string]any{
+			{
+				"full_name": "test-org/repo1",
+				"clone_url": "https://github.com/test-org/repo1.git",
+				"size":      100,
+			},
+			{
+				"full_name": "test-org/repo2",
+				"clone_url": "https://github.com/test-org/repo2.git",
+				"size":      100,
+			},
+		})
+
+	// Create a source with both explicit repos and organization specified
+	// The repos provided explicitly are ALSO in the organization
+	source := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "test-token",
+		},
+		Repositories: []string{
+			"test-org/repo1",
+			"test-org/repo2",
+		},
+		Organizations: []string{
+			"test-org", // This org contains the same repos
+		},
+	})
+
+	// Track reported units to verify deduplication
+	reportedUnits := make(map[string]int)
+	countingReporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
+			unitID, _ := unit.SourceUnitID()
+			reportedUnits[unitID]++
+			return nil
+		},
+	}
+
+	// Test the Enumerate method
+	err := source.Enumerate(ctx, countingReporter)
+	require.NoError(t, err)
+
+	// Check if there were any unmatched HTTP requests
+	if gock.HasUnmatchedRequest() {
+		t.Errorf("Had unmatched HTTP requests: %v", gock.GetUnmatchedRequests())
+	}
+
+	// Verify that each repo was only reported ONCE despite appearing in both explicit and org enumeration
+	repo1URL := "https://github.com/test-org/repo1.git"
+	repo2URL := "https://github.com/test-org/repo2.git"
+
+	assert.Equal(t, 1, reportedUnits[repo1URL], "repo1 should be reported exactly once, not %d times", reportedUnits[repo1URL])
+	assert.Equal(t, 1, reportedUnits[repo2URL], "repo2 should be reported exactly once, not %d times", reportedUnits[repo2URL])
+	assert.Len(t, reportedUnits, 2, "Should have exactly 2 unique repositories reported")
+	assert.True(t, orgReposCalled.Load(), "Organization repos endpoint should have been called")
 }

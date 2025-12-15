@@ -382,7 +382,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 // s.memberCache, s.totalRepoSize, s.orgsCache, and s.repos. Additionally,
 // repositories and gists are reported to the provided UnitReporter.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
-	seenUnits := make(map[sources.SourceUnit]struct{})
+	// Use SourceUnitID (URL) as the deduplication key instead of the full struct
+	// to handle cases where the same repo might be reported with slightly different URL formats
+	seenUnitIDs := make(map[string]struct{})
 	// Wrapper reporter to deduplicate and filter found units.
 	dedupeReporter := sources.VisitorReporter{
 		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
@@ -391,11 +393,12 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			if !s.filteredRepoCache.Exists(name) {
 				return ctx.Err()
 			}
-			// Only report a unit once.
-			if _, ok := seenUnits[su]; ok {
+			// Only report a unit once, using the SourceUnitID as the deduplication key.
+			unitID, _ := su.SourceUnitID()
+			if _, ok := seenUnitIDs[unitID]; ok {
 				return ctx.Err()
 			}
-			seenUnits[su] = struct{}{}
+			seenUnitIDs[unitID] = struct{}{}
 			return reporter.UnitOk(ctx, su)
 		},
 		VisitErr: reporter.UnitErr,
