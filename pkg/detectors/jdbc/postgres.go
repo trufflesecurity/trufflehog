@@ -12,20 +12,19 @@ import (
 	"github.com/lib/pq"
 )
 
-type postgresJDBC struct {
-	conn   string
-	params map[string]string
+type PostgresJDBC struct {
+	ConnectionInfo
 }
 
-func (s *postgresJDBC) ping(ctx context.Context) pingResult {
+func (s *PostgresJDBC) ping(ctx context.Context) pingResult {
 	// It is crucial that we try to build a connection string ourselves before using the one we found. This is because
 	// if the found connection string doesn't include a username, the driver will attempt to connect using the current
 	// user's name, which will fail in a way that looks like a determinate failure, thus terminating the waterfall. In
 	// contrast, when we build a connection string ourselves, if there's no username, we try 'postgres' instead, which
 	// actually has a chance of working.
 	return ping(ctx, "postgres", isPostgresErrorDeterminate,
-		buildPostgresConnectionString(s.params, true),
-		buildPostgresConnectionString(s.params, false),
+		BuildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, true),
+		BuildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, false),
 	)
 }
 
@@ -59,7 +58,7 @@ func joinKeyValues(m map[string]string, sep string) string {
 	return strings.Join(data, sep)
 }
 
-func parsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
+func ParsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 
 	if !strings.HasPrefix(subname, "//") {
@@ -77,16 +76,22 @@ func parsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 	}
 
 	params := map[string]string{
-		"host":            u.Host,
-		"dbname":          dbName,
 		"connect_timeout": "5",
 	}
 
+	postgresJDBC := &PostgresJDBC{
+		ConnectionInfo: ConnectionInfo{
+			Host:     u.Host,
+			Database: dbName,
+			Params:   params,
+		},
+	}
+
 	if u.User != nil {
-		params["user"] = u.User.Username()
+		postgresJDBC.User = u.User.Username()
 		pass, set := u.User.Password()
 		if set {
-			params["password"] = pass
+			postgresJDBC.Password = pass
 		}
 	}
 
@@ -95,46 +100,51 @@ func parsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 		// https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
 		case "disable", "allow", "prefer",
 			"require", "verify-ca", "verify-full":
-			params["sslmode"] = v[0]
+			postgresJDBC.Params["sslmode"] = v[0]
 		}
 	}
 
 	if v := u.Query().Get("user"); v != "" {
-		params["user"] = v
+		postgresJDBC.User = v
 	}
 
 	if v := u.Query().Get("password"); v != "" {
-		params["password"] = v
+		postgresJDBC.Password = v
 	}
 
-	if params["host"] == "" || params["password"] == "" {
+	if postgresJDBC.Host == "" || postgresJDBC.Password == "" {
 		ctx.Logger().WithName("jdbc").
 			V(2).
 			Info("Skipping invalid Postgres URL - no password or host found")
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
 
-	return &postgresJDBC{subname[2:], params}, nil
+	return postgresJDBC, nil
 }
 
-func buildPostgresConnectionString(params map[string]string, includeDbName bool) string {
+func BuildPostgresConnectionString(host string, user string, password string, dbName string, params map[string]string, includeDbName bool) string {
 	data := map[string]string{
 		// default user
-		"user": "postgres",
+		"user":     "postgres",
+		"password": password,
+		"host":     host,
+	}
+	if user != "" {
+		data["user"] = user
+	}
+	if h, p, ok := strings.Cut(host, ":"); ok {
+		data["host"] = h
+		data["port"] = p
 	}
 	for key, val := range params {
-		if key == "host" {
-			if h, p, found := strings.Cut(val, ":"); found {
-				data["host"] = h
-				data["port"] = p
-				continue
-			}
-		}
 		data[key] = val
 	}
 
-	if !includeDbName {
+	if includeDbName {
 		data["dbname"] = "postgres"
+		if dbName != "" {
+			data["dbname"] = dbName
+		}
 	}
 
 	connStr := joinKeyValues(data, " ")

@@ -207,14 +207,23 @@ func tryRedactRegex(conn string) (string, bool) {
 }
 
 var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
-	"mysql":      parseMySQL,
-	"postgresql": parsePostgres,
-	"sqlserver":  parseSqlServer,
+	"mysql":      ParseMySQL,
+	"postgresql": ParsePostgres,
+	"sqlserver":  ParseSqlServer,
 }
 
 type pingResult struct {
 	err         error
 	determinate bool
+}
+
+// ConnectionInfo holds parsed connection information
+type ConnectionInfo struct {
+	Host     string // includes port if specified, e.g., "host:port"
+	Database string
+	User     string
+	Password string
+	Params   map[string]string
 }
 
 type jdbc interface {
