@@ -23,8 +23,6 @@ var _ sources.SourceUnit = SourceUnit{}
 type SourceUnit struct {
 	Kind sources.SourceUnitKind `json:"kind"`
 	ID   string                 `json:"id"`
-	// Can contain additional platform-specific details like the gitlab project details.
-	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // Implement sources.SourceUnit interface.

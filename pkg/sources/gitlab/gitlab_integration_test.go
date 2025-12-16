@@ -1,6 +1,3 @@
-//go:build integration
-// +build integration
-
 package gitlab
 
 import (
@@ -693,41 +690,65 @@ func TestSource_Chunks_ProjectDetailsInChunkMetadata(t *testing.T) {
 
 	token := secret.MustGetField("GITLAB_TOKEN")
 
-	s := Source{}
-
-	conn, err := anypb.New(&sourcespb.GitLab{
-		Credential: &sourcespb.GitLab_Token{
-			Token: token,
+	tests := []struct {
+		name       string
+		connection *sourcespb.GitLab
+	}{
+		{
+			name: "project details in chunk metadata - No repos configured",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+			},
 		},
-	})
-	if err != nil {
-		t.Fatal(err)
+		{
+			name: "project details in chunk metadata - Repo configured",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IncludeRepos: []string{"https://gitlab.com/testermctestface/testy.git"},
+			},
+		},
 	}
 
-	err = s.Init(ctx, "project details in chunkmetadata", 0, 0, false, conn, 10)
-	if err != nil {
-		t.Errorf("Source.Init() error = %v", err)
-		return
-	}
-	chunksCh := make(chan *sources.Chunk, 1)
-	go func() {
-		defer close(chunksCh)
-		err = s.Chunks(context.Background(), chunksCh)
-		if err != nil {
-			t.Errorf("Source.Chunks() error = %v", err)
-			return
-		}
-	}()
-	gotChunks := false
-	for gotChunk := range chunksCh {
-		gotChunks = true
-		metadata := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
-		if metadata.Gitlab.ProjectId == 0 || metadata.Gitlab.ProjectName == "" {
-			t.Errorf("Source.Chunks() missing project details in chunk metadata: %+v", metadata.Gitlab)
-		}
-	}
-	if !gotChunks {
-		t.Errorf("0 chunks scanned.")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			s := Source{}
+
+			conn, err := anypb.New(tt.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.name, 0, 0, false, conn, 10)
+			if err != nil {
+				t.Errorf("Source.Init() error = %v", err)
+				return
+			}
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(context.Background(), chunksCh)
+				if err != nil {
+					t.Errorf("Source.Chunks() error = %v", err)
+					return
+				}
+			}()
+			gotChunks := false
+			for gotChunk := range chunksCh {
+				gotChunks = true
+				metadata := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
+				if metadata.Gitlab.ProjectId == 0 || metadata.Gitlab.ProjectName == "" {
+					t.Errorf("Source.Chunks() missing project details in chunk metadata: %+v", metadata.Gitlab)
+				}
+			}
+			if !gotChunks {
+				t.Errorf("0 chunks scanned.")
+			}
+		})
 	}
 }
 
@@ -766,6 +787,8 @@ func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
 	}
 	chunksCh := make(chan *sources.Chunk, 1)
 	chanReporter := sources.ChanReporter{Ch: chunksCh}
+	// Clear cache to force querying project details
+	s.repoToProjCache.clear()
 	go func() {
 		defer close(chunksCh)
 		for _, unit := range testReporter.Units {
