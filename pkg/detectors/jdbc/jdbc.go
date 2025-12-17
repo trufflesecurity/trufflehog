@@ -83,7 +83,7 @@ matchLoop:
 		}
 
 		if verify {
-			j, err := newJDBC(logCtx, jdbcConn)
+			j, err := NewJDBC(logCtx, jdbcConn)
 			if err != nil {
 				continue
 			}
@@ -206,31 +206,7 @@ func tryRedactRegex(conn string) (string, bool) {
 	return newConn, true
 }
 
-var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
-	"mysql":      ParseMySQL,
-	"postgresql": ParsePostgres,
-	"sqlserver":  ParseSqlServer,
-}
-
-type pingResult struct {
-	err         error
-	determinate bool
-}
-
-// ConnectionInfo holds parsed connection information
-type ConnectionInfo struct {
-	Host     string // includes port if specified, e.g., "host:port"
-	Database string
-	User     string
-	Password string
-	Params   map[string]string
-}
-
-type jdbc interface {
-	ping(context.Context) pingResult
-}
-
-func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
+func NewJDBC(ctx logContext.Context, conn string) (JDBC, error) {
 	// expected format: "jdbc:{subprotocol}:{subname}"
 	if !strings.HasPrefix(strings.ToLower(conn), "jdbc:") {
 		return nil, errors.New("expected jdbc prefix")
@@ -242,12 +218,23 @@ func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
 
-	// get the subprotocol parser
-	parser, ok := supportedSubprotocols[strings.ToLower(subprotocol)]
-	if !ok {
+	var jdbc JDBC
+	var err error
+	switch subprotocol {
+	case "mysql":
+		jdbc, err = parseMySQL(ctx, subname)
+	case "postgresql":
+		jdbc, err = parsePostgres(ctx, subname)
+	case "sqlserver":
+		jdbc, err = parseSqlServer(ctx, subname)
+	default:
 		return nil, errors.New("unsupported subprotocol")
 	}
-	return parser(ctx, subname)
+	if err != nil {
+		return nil, err
+	}
+
+	return jdbc, nil
 }
 
 func ping(ctx context.Context, driverName string, isDeterminate func(error) bool, candidateConns ...string) pingResult {
