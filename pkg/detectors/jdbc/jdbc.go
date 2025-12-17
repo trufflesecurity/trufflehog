@@ -206,6 +206,12 @@ func tryRedactRegex(conn string) (string, bool) {
 	return newConn, true
 }
 
+var supportedSubprotocols = map[string]func(logContext.Context, string) (JDBC, error){
+	"mysql":      parseMySQL,
+	"postgresql": parsePostgres,
+	"sqlserver":  parseSqlServer,
+}
+
 func NewJDBC(ctx logContext.Context, conn string) (JDBC, error) {
 	// expected format: "jdbc:{subprotocol}:{subname}"
 	if !strings.HasPrefix(strings.ToLower(conn), "jdbc:") {
@@ -218,23 +224,12 @@ func NewJDBC(ctx logContext.Context, conn string) (JDBC, error) {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
 
-	var jdbc JDBC
-	var err error
-	switch subprotocol {
-	case "mysql":
-		jdbc, err = parseMySQL(ctx, subname)
-	case "postgresql":
-		jdbc, err = parsePostgres(ctx, subname)
-	case "sqlserver":
-		jdbc, err = parseSqlServer(ctx, subname)
-	default:
-		return nil, errors.New("unsupported subprotocol")
-	}
-	if err != nil {
-		return nil, err
+	parser, ok := supportedSubprotocols[strings.ToLower(subprotocol)]
+	if !ok {
+		return nil, fmt.Errorf("unsupported subprotocol: %s", subprotocol)
 	}
 
-	return jdbc, nil
+	return parser(ctx, subname)
 }
 
 func ping(ctx context.Context, driverName string, isDeterminate func(error) bool, candidateConns ...string) pingResult {
