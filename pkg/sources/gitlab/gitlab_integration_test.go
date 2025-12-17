@@ -711,7 +711,7 @@ func TestSource_Chunks_ProjectDetailsInChunkMetadata(t *testing.T) {
 				Credential: &sourcespb.GitLab_Token{
 					Token: token,
 				},
-				IncludeRepos: []string{"https://gitlab.com/testermctestface/testy.git"},
+				Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
 			},
 		},
 	}
@@ -791,7 +791,7 @@ func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
 	chunksCh := make(chan *sources.Chunk, 1)
 	chanReporter := sources.ChanReporter{Ch: chunksCh}
 	// Clear cache to force querying project details
-	s.repoToProjCache.clear()
+	clear(s.repoToProjCache.cache)
 	go func() {
 		defer close(chunksCh)
 		for _, unit := range testReporter.Units {
