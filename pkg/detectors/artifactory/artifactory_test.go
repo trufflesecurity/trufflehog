@@ -120,6 +120,14 @@ func TestArtifactory_Pattern(t *testing.T) {
 			useFoundEndpoint: true,
 			want:             nil,
 		},
+		{
+			name: "valid pattern - basic auth uri",
+			input: `https://user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io/artifactory/api/pypi/pypi/simple`,
+			cloudEndpoint:    "https://cloudendpoint.jfrog.io",
+			useCloudEndpoint: false,
+			useFoundEndpoint: false,
+			want:  []string{"user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io"},
+		},
 	}
 
 	for _, test := range tests {
