@@ -18,149 +18,89 @@ func TestArtifactory_Pattern(t *testing.T) {
 	tests := []struct {
 		name             string
 		input            string
-		cloudEndpoint    string
-		useCloudEndpoint bool
-		useFoundEndpoint bool
 		want             []string
 	}{
-		{
-			name: "valid pattern",
+        {
+			name: "valid pattern - single valid basic auth uri",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				[INFO] rwxtOp.jfrog.io
+				[DEBUG] Some log line here
+				https://user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io/artifactory/api/pypi/pypi/simple
 				[INFO] Response received: 200 OK
 			`,
-			useCloudEndpoint: false,
-			useFoundEndpoint: true,
-			want:             []string{"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgrwxtOp.jfrog.io"},
-		},
-		{
-			name: "valid pattern - xml",
-			input: `
-				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
-  					<scope>GLOBAL</scope>
-  					<id>{artifactory}</id>
-  					<secret>{AQAAABAAA KUd8GOVfcXnIv1nJ5qmnNzrqkLvseoPRMuwsdDVr9QthonFogtMaoJ3pgtO4eHXC}</secret>
-					<domain>{HTTPnGQZ79vjWXze.jfrog.io}</domain>
-  					<description>configuration for production</description>
-					<creationDate>2023-05-18T14:32:10Z</creationDate>
-  					<owner>jenkins-admin</owner>
-				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
-			`,
-			useCloudEndpoint: false,
-			useFoundEndpoint: true,
-			want:             []string{"KUd8GOVfcXnIv1nJ5qmnNzrqkLvseoPRMuwsdDVr9QthonFogtMaoJ3pgtO4eHXCHTTPnGQZ79vjWXze.jfrog.io"},
-		},
-		{
-			name: "valid pattern - with cloud endpoints",
-			input: `
-				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				[INFO] Response received: 200 OK
-			`,
-			cloudEndpoint:    "cloudendpoint.jfrog.io",
-			useCloudEndpoint: true,
-			useFoundEndpoint: false,
-			want:             []string{"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io"},
-		},
-		{
-			name: "valid pattern - with cloud and found endpoints",
-			input: `
-				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				[INFO] rwxtOp.jfrog.io
-				[INFO] Response received: 200 OK
-			`,
-			cloudEndpoint:    "cloudendpoint.jfrog.io",
-			useCloudEndpoint: true,
-			useFoundEndpoint: true,
 			want: []string{
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgrwxtOp.jfrog.io",
+				"user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io",
 			},
 		},
 		{
-			name: "valid pattern - with disabled found endpoints",
+			name: "valid pattern - multiple basic auth uris with duplicates",
 			input: `
-				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				[INFO] rwxtOp.jfrog.io
-				[INFO] Response received: 200 OK
+				[INFO] artifactory logs
+				https://user123:token123@test.jfrog.io/artifactory/api/foo
+				https://user123:token123@test.jfrog.io/artifactory/api/foo  # duplicate
+				https://another:secret456@rwxtOp.jfrog.io/artifactory/api/bar
 			`,
-			cloudEndpoint:    "cloudendpoint.jfrog.io",
-			useCloudEndpoint: true,
-			useFoundEndpoint: false,
 			want: []string{
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
+				"user123:token123@test.jfrog.io",
+				"another:secret456@rwxtOp.jfrog.io",
 			},
 		},
 		{
-			name: "valid pattern - with https in configured endpoint",
+			name: "invalid pattern - invalid host (not jfrog.io)",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				[INFO] Response received: 200 OK
+				https://user123:token123@example.com/artifactory/api/ping
 			`,
-			cloudEndpoint:    "https://cloudendpoint.jfrog.io",
-			useCloudEndpoint: true,
-			useFoundEndpoint: false,
-			want: []string{
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
-			},
+			want: nil,
 		},
 		{
-			name: "invalid pattern",
+			name: "invalid pattern - missing password",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjEODA_1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				[INFO] rwxtOp.jfrog.io
-				[INFO] Response received: 200 OK
+				https://user123:@test.jfrog.io/artifactory/api/ping
 			`,
-			useFoundEndpoint: true,
-			want:             nil,
+			want: nil,
 		},
 		{
-			name: "valid pattern - basic auth uri",
-			input: `https://user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io/artifactory/api/pypi/pypi/simple`,
-			cloudEndpoint:    "https://cloudendpoint.jfrog.io",
-			useCloudEndpoint: false,
-			useFoundEndpoint: false,
-			want:  []string{"user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io"},
+			name: "invalid pattern - no basic auth uri present",
+			input: `
+				[INFO] artifactory request to https://test.jfrog.io/artifactory/api/ping
+				[DEBUG] Using header Authorization: Bearer sometoken
+			`,
+			want: nil,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// this detector use endpoint customizer interface so we need to enable them based on test case
-			d.UseFoundEndpoints(test.useFoundEndpoint)
-			d.UseCloudEndpoint(test.useCloudEndpoint)
-			// if test case provide cloud endpoint use it
-			if test.useCloudEndpoint && test.cloudEndpoint != "" {
-				d.SetCloudEndpoint(test.cloudEndpoint)
-			}
-
+			// Ensure the Aho-Corasick prefilter is triggered for positive cases.
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
-				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
-				return
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
+				t.Errorf("expected detector to be triggered for input containing Artifactory/jfrog keywords")
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			require.NoError(t, err)
 
+			if len(test.want) == 0 {
+				if len(results) != 0 {
+					t.Errorf("expected no results, got %d", len(results))
+				}
+				return
+			}
+
 			if len(results) != len(test.want) {
 				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
-				return
 			}
 
 			actual := make(map[string]struct{}, len(results))
 			for _, r := range results {
-				if len(r.RawV2) > 0 {
-					actual[string(r.RawV2)] = struct{}{}
-				} else {
-					actual[string(r.Raw)] = struct{}{}
+				// Prefer RawV2 (sanitized username:password@host) if present.
+				val := string(r.RawV2)
+				if val == "" {
+					val = string(r.Raw)
 				}
+				actual[val] = struct{}{}
 			}
 
 			expected := make(map[string]struct{}, len(test.want))
