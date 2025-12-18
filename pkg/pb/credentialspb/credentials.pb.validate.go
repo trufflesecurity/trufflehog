@@ -1562,3 +1562,107 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = SlackTokensValidationError{}
+
+// Validate checks the field values on GoogleDriveDWD with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *GoogleDriveDWD) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GoogleDriveDWD with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in GoogleDriveDWDMultiError,
+// or nil if none found.
+func (m *GoogleDriveDWD) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GoogleDriveDWD) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for ServiceAccountJson
+
+	// no validation rules for AdminEmail
+
+	if len(errors) > 0 {
+		return GoogleDriveDWDMultiError(errors)
+	}
+
+	return nil
+}
+
+// GoogleDriveDWDMultiError is an error wrapping multiple validation errors
+// returned by GoogleDriveDWD.ValidateAll() if the designated constraints
+// aren't met.
+type GoogleDriveDWDMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GoogleDriveDWDMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GoogleDriveDWDMultiError) AllErrors() []error { return m }
+
+// GoogleDriveDWDValidationError is the validation error returned by
+// GoogleDriveDWD.Validate if the designated constraints aren't met.
+type GoogleDriveDWDValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GoogleDriveDWDValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GoogleDriveDWDValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GoogleDriveDWDValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GoogleDriveDWDValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GoogleDriveDWDValidationError) ErrorName() string { return "GoogleDriveDWDValidationError" }
+
+// Error satisfies the builtin error interface
+func (e GoogleDriveDWDValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGoogleDriveDWD.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GoogleDriveDWDValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GoogleDriveDWDValidationError{}
