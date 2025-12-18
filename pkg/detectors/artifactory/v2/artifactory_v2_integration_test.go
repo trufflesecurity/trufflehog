@@ -24,9 +24,8 @@ func TestArtifactory_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ARTIFACTORY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("ARTIFACTORY_INACTIVE")
-	appURL := testSecrets.MustGetField("ARTIFACTORY_URL")
+	basicAuthValid := testSecrets.MustGetField("ARTIFACTORY_BASIC_AUTH_VALID")
+	basicAuthInactive := testSecrets.MustGetField("ARTIFACTORY_BASIC_AUTH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -44,8 +43,11 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s and domain %s", secret, appURL)),
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(
+					"You can find an Artifactory basic auth URL https://%s/artifactory/api/pypi/pypi/simple",
+					basicAuthValid,
+				)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -60,8 +62,11 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s but not valid on endpoint %s", inactiveSecret, appURL)), // the secret would satisfy the regex but not pass validation
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(
+					"You can find an Artifactory basic auth URL https://%s/artifactory/api/pypi/pypi/simple but it's not valid",
+					basicAuthInactive,
+				)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -77,7 +82,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
+				data:   []byte("You cannot find any Artifactory basic auth URL within this chunk"),
 				verify: true,
 			},
 			want:    nil,
@@ -86,15 +91,21 @@ func TestArtifactory_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.s.UseFoundEndpoints(true)
-
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Artifactory.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			if len(tt.want) == 0 {
+				if len(got) != 0 {
+					t.Fatalf("expected no results, got %d", len(got))
+				}
+				return
+			}
+
 			for i := range got {
-				if len(got[i].Raw) == 0 {
+				if len(got[i].Raw) == 0 && len(got[i].RawV2) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				gotErr := ""
@@ -106,7 +117,8 @@ func TestArtifactory_FromChunk(t *testing.T) {
 					wantErr = tt.want[i].VerificationError().Error()
 				}
 				if gotErr != wantErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+					t.Fatalf("wantVerificationError = %v, verification error = %v",
+						tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
