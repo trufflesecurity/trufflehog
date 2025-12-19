@@ -2,7 +2,6 @@ package gitlab
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -453,14 +452,24 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	// Initialize a new api instance.
 	switch s.authMethod {
 	case "OAUTH":
-		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
+		apiClient, err := gitlab.NewOAuthClient(
+			s.token,
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
 		}
 		return apiClient, nil
 
 	case "BASIC_AUTH":
-		apiClient, err := gitlab.NewBasicAuthClient(s.user, s.password, gitlab.WithBaseURL(s.url))
+		apiClient, err := gitlab.NewOAuthClient(
+			s.token,
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %q: %w", s.url, err)
 		}
@@ -473,7 +482,12 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		}
 		fallthrough
 	case "TOKEN":
-		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
+		apiClient, err := gitlab.NewOAuthClient(
+			s.token,
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
 		}
@@ -695,25 +709,15 @@ func (s *Source) getAllProjectReposV2(
 	// totalCount tracks the total number of projects processed by this enumeration.
 	// It includes all projects fetched from the API, even those later skipped by ignore rules.
 	totalCount := 0
-	maxRetries := 3
+
+	requestOptions := []gitlab.RequestOptionFunc{gitlab.WithContext(ctx)}
 
 	// Pagination loop: Continue fetching pages until the API indicates there are no more.
 	for {
 		// Fetch a page of projects from the GitLab API using the current query options.
-		projects, resp, err := apiClient.Projects.ListProjects(projectQueryOptions)
+		projects, resp, err := apiClient.Projects.ListProjects(projectQueryOptions, requestOptions...)
 		if err != nil {
-			if errResp, ok := err.(*gitlab.ErrorResponse); ok {
-				// check if it is a server side error and we have some retries left
-				if errResp.Response.StatusCode >= http.StatusInternalServerError && maxRetries > 0 {
-					maxRetries--
-					ctx.Logger().V(2).Info("retrying API call",
-						"retry_attempts_left", maxRetries)
-					// delay for 2 second between retries
-					time.Sleep(time.Second * 2)
-					continue
-				}
-			}
-			err = fmt.Errorf("received error on listing projects, you probably don't have permissions to do that: %w", err)
+			err = fmt.Errorf("received error on listing projects, you might not have permissions to do that: %w", err)
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
@@ -771,7 +775,10 @@ func (s *Source) getAllProjectReposV2(
 			break
 		}
 		// Only update the token for the next page if we have a valid, non-empty link.
-		projectQueryOptions.PageToken = resp.NextLink
+		requestOptions = []gitlab.RequestOptionFunc{
+			gitlab.WithContext(ctx),
+			gitlab.WithKeysetPaginationParameters(resp.NextLink),
+		}
 	}
 
 	ctx.Logger().Info("Enumerated GitLab projects", "count", totalCount)
