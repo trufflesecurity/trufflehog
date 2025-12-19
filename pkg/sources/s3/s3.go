@@ -533,7 +533,7 @@ func (s *Source) pageChunker(
 			}
 			// Make sure we use a separate context for the GetObjectWithContext call.
 			// This ensures that the timeout is isolated and does not affect any downstream operations. (e.g. HandleFile)
-			const getObjectTimeout = 30 * time.Minute
+			const getObjectTimeout = 30 * time.Second
 			objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
 			defer cancel()
 
