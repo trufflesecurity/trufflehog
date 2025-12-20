@@ -355,6 +355,85 @@ func TestSource_Validate(t *testing.T) {
 			},
 			wantErrCount: 1,
 		},
+		// Glob pattern tests for repositories field
+		{
+			name: "valid glob pattern in repositories field",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"testermctestface/*",
+				},
+			},
+			wantErrCount: 0,
+		},
+		{
+			name: "invalid glob pattern in repositories field",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"testermctestface/[", // malformed glob
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "glob pattern matches no repositories",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"nonexistent-org/*",
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "mixed glob patterns and explicit URLs in repositories",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"testermctestface/test*",                       // valid glob
+					"https://gitlab.com/tes1188/init.git",          // valid explicit URL
+					"https://gitlab.com/testermctestface/no-exist", // unreachable explicit URL
+				},
+			},
+			wantErrCount: 1, // 1 error for unreachable repo
+		},
+		{
+			name: "glob pattern in repositories with ignore patterns",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"tes1188/*",
+				},
+				IgnoreRepos: []string{
+					"tes1188/trufflehog", // ignore one specific repo
+				},
+			},
+			wantErrCount: 0,
+		},
+		{
+			name: "multiple invalid glob patterns in repositories field",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"testermctestface/[", // malformed
+					"tes1188/[a-]",       // malformed
+				},
+			},
+			wantErrCount: 2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -499,6 +578,141 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 	}
 }
 
+func TestSource_RepositoriesGlobbing(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	token := secret.MustGetField("GITLAB_TOKEN")
+
+	tests := []struct {
+		name             string
+		connection       *sourcespb.GitLab
+		wantReposScanned int
+	}{
+		{
+			name: "Repositories field with glob pattern should enumerate and filter",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{"testermctestface/*"},
+			},
+			// testermctestface has 'testy' repo
+			wantReposScanned: 1,
+		},
+		{
+			name: "Repositories field with explicit URL should work as before",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
+			},
+			wantReposScanned: 1,
+		},
+		{
+			name: "Repositories field with multiple globs",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{"testermctestface/test*", "tes1188/*"},
+			},
+			// testermctestface has 'testy', tes1188 has 5 repos
+			wantReposScanned: 6,
+		},
+		{
+			name: "Repositories field with character class pattern [ti]",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				// Matches repos starting with 't' or 'i': test-user-count, trufflehog, th-clone, init
+				Repositories: []string{"tes1188/[ti]*"},
+			},
+			wantReposScanned: 4,
+		},
+		{
+			name: "Repositories field with question mark pattern",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				// Matches exactly 4 character repos: 'init'
+				Repositories: []string{"tes1188/????"},
+			},
+			wantReposScanned: 1,
+		},
+		{
+			name: "Mixed glob and explicit URLs",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"testermctestface/test*",              // glob: matches 'testy'
+					"https://gitlab.com/tes1188/init.git", // explicit URL
+				},
+			},
+			wantReposScanned: 2,
+		},
+		{
+			name: "Glob pattern with IgnoreRepos filtering",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{"tes1188/*"},
+				IgnoreRepos:  []string{"tes1188/trufflehog"}, // ignore 1 repo
+			},
+			wantReposScanned: 4, // 5 tes1188 repos minus 1 ignored
+		},
+		{
+			name: "Negated character class pattern",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				// Matches repos NOT starting with 't': init, learn-gitlab
+				Repositories: []string{"tes1188/[!t]*"},
+			},
+			wantReposScanned: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := &Source{}
+			conn, err := anypb.New(tt.connection)
+			assert.NoError(t, err)
+
+			err = src.Init(ctx, tt.name, 0, 0, false, conn, 1)
+			assert.NoError(t, err)
+
+			// Collect enumerated repos without scanning them
+			var matchedRepos []string
+			reporter := sources.VisitorReporter{
+				VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
+					id, _ := unit.SourceUnitID()
+					matchedRepos = append(matchedRepos, id)
+					return nil
+				},
+			}
+
+			// Use Enumerate() instead of Chunks() - much faster, no repo scanning
+			err = src.Enumerate(ctx, reporter)
+			assert.NoError(t, err)
+
+			// Verify the correct number of repos were matched
+			assert.Equal(t, tt.wantReposScanned, len(matchedRepos))
+		})
+	}
+}
 func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 	ctx := context.Background()
 
@@ -507,6 +721,7 @@ func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
+
 	token := secret.MustGetField("GITLAB_TOKEN")
 
 	// Arrange: Build a unit to scan

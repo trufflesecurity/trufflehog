@@ -266,37 +266,27 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	}
 
 	gitlabReposScanned.WithLabelValues(s.name).Set(0)
-	// Get repo within target.
-	repos, errs := normalizeRepos(s.repos)
-	for _, repoErr := range errs {
-		ctx.Logger().Info("error normalizing repo", "error", repoErr)
+
+	var repos []string
+
+	// Create a collecting reporter to gather repository URLs into our local slice.
+	// This allows us to reuse resolveRepositories' logic while collecting repos for scanning,
+	// rather than reporting them externally (as Enumerate() does).
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
+			id, _ := unit.SourceUnitID()
+			repos = append(repos, id)
+			return ctx.Err()
+		},
 	}
 
-	// End early if we had errors getting specified repos but none were validated.
-	if len(errs) > 0 && len(repos) == 0 {
-		return fmt.Errorf("all specified repos had validation issues, ending scan")
-	}
-
-	// Get all repos if not specified.
-	if len(repos) == 0 {
-		ctx.Logger().Info("no repositories configured, enumerating")
-		ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
-			ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
-		})
-		reporter := sources.VisitorReporter{
-			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
-				id, _ := unit.SourceUnitID()
-				repos = append(repos, id)
-				return ctx.Err()
-			},
-		}
-
-		if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
-			return err
-		}
-
-	} else {
-		gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
+	// Determine which repositories to scan. This handles:
+	// - Glob patterns (e.g., "org/*") by enumerating and filtering
+	// - Explicit URLs by normalizing them
+	// - Empty repos list by enumerating all accessible projects
+	err = s.resolveRepositories(ctx, apiClient, reporter)
+	if err != nil {
+		return err
 	}
 
 	s.repos = repos
@@ -391,7 +381,66 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return []error{fmt.Errorf("gitlab authentication failed using method %v: %w", s.authMethod, err)}
 	}
 
-	explicitlyConfiguredRepos, errs := normalizeRepos(s.repos)
+	// Check if repos contain glob patterns
+	hasGlobPatterns := slices.ContainsFunc(s.repos, containsGlobPattern)
+
+	var errs []error
+
+	// CASE 1: Repos contain glob patterns - need to enumerate and validate
+	if hasGlobPatterns {
+		// Separate glob patterns from explicit URLs
+		globPatterns, explicitRepos := separateGlobsFromExplicit(s.repos)
+
+		// Validate that glob patterns compile correctly
+		_ = buildIgnorer(globPatterns, s.ignoreRepos, func(err error, pattern string) {
+			errs = append(errs, fmt.Errorf("could not compile repo pattern %q: %w", pattern, err))
+		})
+
+		// Validate and check reachability of explicit repos alongside globs
+		normalizedExplicit, normErrs := normalizeRepos(explicitRepos)
+		errs = append(errs, normErrs...)
+
+		user := s.user
+		if user == "" {
+			user = "placeholder"
+		}
+
+		for _, r := range normalizedExplicit {
+			if err := git.PingRepoUsingToken(ctx, s.token, r, user); err != nil {
+				errs = append(errs, fmt.Errorf("could not reach git repository %q: %w", r, err))
+			}
+		}
+
+		// Try to enumerate with globs to ensure at least one repo matches
+		var matchedRepos []string
+		visitor := sources.VisitorReporter{
+			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
+				id, _ := unit.SourceUnitID()
+				matchedRepos = append(matchedRepos, id)
+				return nil
+			},
+		}
+
+		ignoreRepo := buildIgnorer(globPatterns, s.ignoreRepos, func(err error, pattern string) {
+			// Errors already collected above
+		})
+
+		if err := s.listProjects(ctx, apiClient, ignoreRepo, visitor); err != nil {
+			errs = append(errs, err)
+			return errs
+		}
+
+		// Check that at least one repo was found (either from globs or explicit)
+		if len(matchedRepos) == 0 && len(normalizedExplicit) == 0 {
+			errs = append(errs, fmt.Errorf("glob patterns matched no repositories"))
+		}
+
+		return errs
+	}
+
+	// CASE 2: No glob patterns - traditional explicit repo validation
+	explicitlyConfiguredRepos, normErrs := normalizeRepos(s.repos)
+	errs = append(errs, normErrs...)
 
 	if len(explicitlyConfiguredRepos) > 0 {
 		user := s.user
@@ -404,8 +453,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 		// access isn't a local configuration issue.
 		for _, r := range explicitlyConfiguredRepos {
 			if err := git.PingRepoUsingToken(ctx, s.token, r, user); err != nil {
-				err = fmt.Errorf("could not reach git repository %q: %w", r, err)
-				errs = append(errs, err)
+				errs = append(errs, fmt.Errorf("could not reach git repository %q: %w", r, err))
 			}
 		}
 
@@ -421,6 +469,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return errs
 	}
 
+	// CASE 3: No repos configured - validate include/exclude patterns
 	ignoreProject := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
 		errs = append(errs, fmt.Errorf("could not compile include/exclude repo pattern %q: %w", pattern, err))
 	})
@@ -964,6 +1013,156 @@ func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
+// containsGlobPattern checks if a string contains glob pattern characters.
+func containsGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
+}
+
+// separateGlobsFromExplicit separates repository specifications into glob patterns
+// and explicit URLs. This is used by both resolveRepositories and Validate to
+// handle mixed repository configurations like ["org/*", "https://gitlab.com/team/repo.git"].
+func separateGlobsFromExplicit(repos []string) (globPatterns, explicitRepos []string) {
+	for _, repo := range repos {
+		if containsGlobPattern(repo) {
+			globPatterns = append(globPatterns, repo)
+		} else {
+			explicitRepos = append(explicitRepos, repo)
+		}
+	}
+
+	return globPatterns, explicitRepos
+}
+
+// resolveRepositories determines which repositories to scan based on s.repos configuration.
+// It handles three cases:
+// 1. Glob patterns (e.g., "org/*"): enumerates all projects and filters using patterns
+// 2. Explicit URLs: normalizes and reports directly without enumeration
+// 3. Empty: enumerates all projects using includeRepos/ignoreRepos filters
+//
+// All discovered repositories are reported via reporter.UnitOk().
+func (s *Source) resolveRepositories(
+	ctx context.Context,
+	apiClient *gitlab.Client,
+	reporter sources.UnitReporter,
+) error {
+	// Check if any configured repos contain glob pattern characters (*, ?, [).
+	// If found, we'll enumerate all projects and filter them.
+	hasGlobPatterns := slices.ContainsFunc(s.repos, containsGlobPattern)
+
+	// CASE 1: If configured repos contain glob patterns (e.g., "org/*", "team/test*"),
+	// we need to enumerate ALL projects and filter them using the patterns.
+	if hasGlobPatterns {
+		ctx.Logger().Info("repositories contain glob patterns, enumerating and filtering")
+
+		// Separate glob patterns from explicit URLs.
+		// Users can mix both: ["org/*", "https://gitlab.com/team/repo.git"]
+		globPatterns, explicitRepos := separateGlobsFromExplicit(s.repos)
+
+		// Normalize any explicit URLs that were provided alongside globs.
+		normalizedExplicit, normErrs := normalizeRepos(explicitRepos)
+		for _, repoErr := range normErrs {
+			ctx.Logger().Info("error normalizing repo", "error", repoErr)
+			if err := reporter.UnitErr(ctx, repoErr); err != nil {
+				return err
+			}
+		}
+
+		var compileErrs []error
+		ignoreRepo := buildIgnorer(globPatterns, s.ignoreRepos, func(err error, pattern string) {
+			ctx.Logger().Error(err, "could not compile repo glob", "glob", pattern)
+			compileErrs = append(compileErrs, fmt.Errorf("could not compile repo glob %q: %w", pattern, err))
+		})
+
+		for _, compileErr := range compileErrs {
+			if err := reporter.UnitErr(ctx, compileErr); err != nil {
+				return err
+			}
+		}
+
+		// Enumerate all projects and report those that pass the filter.
+		// Track reported repos to avoid duplicates when reporting explicit repos.
+		reportedRepos := make(map[string]bool)
+		trackingReporter := sources.VisitorReporter{
+			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
+				id, _ := unit.SourceUnitID()
+				reportedRepos[id] = true
+				return reporter.UnitOk(ctx, unit)
+			},
+		}
+
+		if err := s.listProjects(ctx, apiClient, ignoreRepo, trackingReporter); err != nil {
+			return err
+		}
+
+		// Report explicit repos that weren't already enumerated.
+		// Don't reset the metric - listProjects already incremented it for matched repos.
+		for _, repo := range normalizedExplicit {
+			if !reportedRepos[repo] {
+				unit := git.SourceUnit{Kind: git.UnitRepo, ID: repo}
+				if err := reporter.UnitOk(ctx, unit); err != nil {
+					return err
+				}
+				gitlabReposEnumerated.WithLabelValues(s.name).Inc()
+			}
+		}
+
+		return nil
+	}
+
+	// CASE 2: No glob patterns - repos are explicit URLs or the list is empty.
+	repos, errs := normalizeRepos(s.repos)
+	for _, repoErr := range errs {
+		ctx.Logger().Info("error normalizing repo", "error", repoErr)
+		if err := reporter.UnitErr(ctx, repoErr); err != nil {
+			return err
+		}
+	}
+
+	if len(errs) > 0 && len(repos) == 0 {
+		return fmt.Errorf("all configured repos had validation issues")
+	}
+
+	// CASE 2a: Explicit repos were configured and at least some passed validation.
+	// Report them directly without enumeration.
+	if len(repos) > 0 {
+		gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
+		for _, repo := range repos {
+			unit := git.SourceUnit{Kind: git.UnitRepo, ID: repo}
+			if err := reporter.UnitOk(ctx, unit); err != nil {
+				return err
+			}
+			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
+		}
+		return nil
+	}
+
+	// CASE 3: No repos configured (s.repos is empty) - enumerate ALL projects.
+	// This uses the includeRepos and ignoreRepos filters to determine which projects to scan.
+	ctx.Logger().Info("no repositories configured, enumerating")
+
+	// Build filter using s.includeRepos (repos to include) and s.ignoreRepos (repos to exclude).
+	// Collect compilation errors to report them properly.
+	var compileErrs []error
+	ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
+		compileErrs = append(compileErrs, fmt.Errorf("could not compile include/exclude repo glob %q: %w", pattern, err))
+	})
+
+	// Report all compilation errors
+	for _, compileErr := range compileErrs {
+		if err := reporter.UnitErr(ctx, compileErr); err != nil {
+			return err
+		}
+	}
+
+	// Enumerate all projects the user has access to, applying the include/exclude filters.
+	if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func buildIgnorer(include, exclude []string, onCompile func(err error, pattern string)) func(repo string) bool {
 
 	// compile and load globRepoFilter
@@ -1046,45 +1245,9 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		return err
 	}
 
-	// Get repos within target.
-	repos, errs := normalizeRepos(s.repos)
-	for _, repoErr := range errs {
-		ctx.Logger().Info("error normalizing repo", "error", repoErr)
-		if err := reporter.UnitErr(ctx, repoErr); err != nil {
-			return err
-		}
-	}
-
-	// End early if we had errors getting specified repos but none were validated.
-	if len(errs) > 0 && len(repos) == 0 {
-		return fmt.Errorf("all configured repos had validation issues")
-	}
-
-	// Report all repos if specified.
-	if len(repos) > 0 {
-		gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
-		for _, repo := range repos {
-			unit := git.SourceUnit{Kind: git.UnitRepo, ID: repo}
-			if err := reporter.UnitOk(ctx, unit); err != nil {
-				return err
-			}
-			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
-		}
-		return nil
-	}
-
-	// Otherwise, enumerate all repos.
-	ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
-		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
-		// TODO: Handle error returned from UnitErr.
-		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile include/exclude repo glob: %w", err))
-	})
-
-	if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
-		return err
-	}
-
-	return nil
+	// Resolve and report all repositories via the provided reporter.
+	// Each discovered repo is immediately reported through reporter.UnitOk().
+	return s.resolveRepositories(ctx, apiClient, reporter)
 }
 
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
