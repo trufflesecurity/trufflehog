@@ -156,6 +156,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 									setOrganizationInfo(serviceResponse.Included, &s1)
 								}
 							}
+							// break the loop once we've successfully validated the token against a baseURL
+							break
 						}
 					}
 				}
@@ -188,6 +190,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 							s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch}
+							// break the loop once we've successfully validated the token against a baseURL
+							break
 						}
 					}
 				}
