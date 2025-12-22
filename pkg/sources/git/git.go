@@ -759,7 +759,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           []byte(sb.String()),
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			if err := reporter.ChunkOk(ctx, chunk); err != nil {
 				return err
@@ -793,7 +793,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
@@ -842,7 +842,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           data,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
@@ -880,7 +880,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-					Verify:         s.verify,
+					SourceVerify:   s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -900,7 +900,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           line,
-					Verify:         s.verify,
+					SourceVerify:   s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -924,7 +924,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			SourceType:     s.sourceType,
 			SourceMetadata: metadata,
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-			Verify:         s.verify,
+			SourceVerify:   s.verify,
 		}
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
 			// TODO: Return error.
@@ -1024,7 +1024,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(err, "error handling binary file")
@@ -1054,7 +1054,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           data,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
