@@ -1352,7 +1352,11 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 
 				uriPath := strings.TrimPrefix(normalizedURI.String(), "file://")
 
-				uriPath = strings.TrimPrefix(uriPath, "/")
+				// on windows we get "/C:/path". We need to remove the leading slash.
+				// on unix/macintosh, we get "/path" which needs the leading slash preserved.
+				if len(uriPath) >= 3 && uriPath[0] == '/' && uriPath[2] == ':' {
+					uriPath = strings.TrimPrefix(uriPath, "/")
+				}
 
 				originalIndexPath := filepath.Join(uriPath, gitDirName, "index")
 
