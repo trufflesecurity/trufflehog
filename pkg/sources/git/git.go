@@ -434,9 +434,17 @@ func normalizeFileURI(uri *url.URL) (*url.URL, error) {
 		return nil, fmt.Errorf("failed to resolve absolute path for %q: %w", rawPath, err)
 	}
 
+	// Convert to forward slashes (for Windows compatibility)
+	normalizedPath := filepath.ToSlash(absPath)
+
+	// Ensure path starts with / for proper file:/// URI format
+	if !strings.HasPrefix(normalizedPath, "/") {
+		normalizedPath = "/" + normalizedPath
+	}
+
 	normalizedURI := &url.URL{
 		Scheme: "file",
-		Path:   absPath,
+		Path:   normalizedPath,
 	}
 
 	return normalizedURI, nil
@@ -1341,7 +1349,13 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 			if !isRepoBare(path) {
 				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
-				originalIndexPath := filepath.Join(strings.TrimPrefix(normalizedURI.String(), "file://"), gitDirName, "index")
+
+				uriPath := strings.TrimPrefix(normalizedURI.String(), "file://")
+
+				uriPath = strings.TrimPrefix(uriPath, "/")
+
+				originalIndexPath := filepath.Join(uriPath, gitDirName, "index")
+
 				clonedIndexPath := filepath.Join(path, gitDirName, "index")
 
 				indexData, err := os.ReadFile(originalIndexPath)
