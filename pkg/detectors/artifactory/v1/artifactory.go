@@ -37,6 +37,8 @@ var (
 	errNoHost = errors.New("no such host")
 )
 
+func (Scanner) Version() int { return 1 }
+
 func (Scanner) CloudEndpoint() string { return "" }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -86,6 +88,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
 				Raw:          []byte(token),
 				RawV2:        []byte(token + url),
+                ExtraData:    map[string]string{
+				    "version": fmt.Sprintf("%d", s.Version()),
+				},
 			}
 
 			if verify {
