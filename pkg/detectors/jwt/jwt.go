@@ -1,12 +1,10 @@
 package jwt
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,14 +15,11 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct {
-	client *http.Client
-}
+type Scanner struct{}
 
 // Ensure the Scanner satisfies expected interfaces at compile time.
 var _ interface {
@@ -78,12 +73,21 @@ var jwtOptions = []jwt.ParserOption{
 }
 
 var jwtParser = jwt.NewParser(jwtOptions...)
-
 var jwtValidator = jwt.NewValidator(jwtOptions...)
+var client *http.Client
 
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	client := cmp.Or(s.client, common.SaneHttpClient())
+	if client == nil {
+		// Use a client that disallows accessing local IPs.
+		// This avoids a potential blind SSRF.
+		client = detectors.NewDetectorHttpClient(
+			detectors.WithTransport(detectors.NewDetectorTransport(nil)),
+			detectors.WithTimeout(detectors.DefaultResponseTimeout),
+			detectors.WithNoLocalIP(),
+		)
+	}
+
 	seenMatches := make(map[string]struct{})
 
 	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
@@ -156,32 +160,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-// Does the URL's refer to a non-routing host?
-func isNonRoutingHost(url *url.URL) bool {
-	h := url.Hostname()
-	if h == "localhost" {
-		return true
-	}
-
-	ip := net.ParseIP(h)
-	if ip != nil {
-		return ip.IsPrivate()
-	}
-
-	return false
-}
-
-// Parse a string into a URL, check that it is an HTTPS URL, and that it doesn't refer to a non-routing host.
-func parseRoutableHttpsUrl(urlString string) (*url.URL, error) {
+// Parse a string into a URL and check that it is an HTTPS URL.
+func parseHttpsUrl(urlString string) (*url.URL, error) {
 	url, err := url.ParseRequestURI(urlString)
 	if err != nil {
 		return nil, err
 	}
 	if url.Scheme != "https" {
 		return nil, fmt.Errorf("only https scheme is supported")
-	}
-	if isNonRoutingHost(url) {
-		return nil, fmt.Errorf("only public hosts are supported")
 	}
 
 	return url, nil
@@ -225,7 +211,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 		// missing or invalid issuer
 		return false, nil
 	}
-	issuerURL, err := parseRoutableHttpsUrl(issuer)
+	issuerURL, err := parseHttpsUrl(issuer)
 	if err != nil {
 		// unsupported issuer
 		return false, nil
@@ -258,7 +244,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 		return false, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
 	}
 
-	jwksURL, err := parseRoutableHttpsUrl(discoveryDoc.JWKSUri)
+	jwksURL, err := parseHttpsUrl(discoveryDoc.JWKSUri)
 	if err != nil {
 		return false, fmt.Errorf("invalid JWKS URL: %w", err)
 	}
@@ -300,7 +286,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 		return false, nil
 	}
 
-		// signature valid and claims check out
+	// signature valid and claims check out
 	return true, nil
 }
 

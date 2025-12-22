@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -44,13 +45,11 @@ var overrideOnce sync.Once
 // It is guaranteed to only run once, subsequent calls will have no effect.
 // This should be called before any scans are started.
 func OverrideDetectorTimeout(timeout time.Duration) {
-    overrideOnce.Do(func() {
-        DetectorHttpClientWithLocalAddresses.Timeout = timeout
-        DetectorHttpClientWithNoLocalAddresses.Timeout = timeout
-    })
+	overrideOnce.Do(func() {
+		DetectorHttpClientWithLocalAddresses.Timeout = timeout
+		DetectorHttpClientWithNoLocalAddresses.Timeout = timeout
+	})
 }
-
-
 
 // ClientOption defines a function type that modifies an http.Client.
 type ClientOption func(*http.Client)
@@ -139,10 +138,8 @@ func WithNoLocalIP() ClientOption {
 				return nil, err
 			}
 
-			for _, ip := range ips {
-				if isLocalIP(ip) {
-					return nil, ErrNoLocalIP
-				}
+			if slices.ContainsFunc(ips, isLocalIP) {
+				return nil, ErrNoLocalIP
 			}
 
 			return originalDialContext(ctx, network, net.JoinHostPort(host, port))
