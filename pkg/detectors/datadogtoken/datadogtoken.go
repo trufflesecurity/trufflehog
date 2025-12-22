@@ -23,7 +23,16 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
 
-func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
+func (Scanner) CloudEndpoint() string { return "" }
+
+var datadogAPIBaseURLs = []string{
+	"https://api.us5.datadoghq.com/api", // Default domain
+	"https://api.app.datadoghq.com/api",
+	"https://api.us3.datadoghq.com/api",
+	"https://api.app.datadoghq.eu/api",
+	"https://api.app.ddog-gov.com/api",
+	"https://api.ap1.datadoghq.com/api",
+}
 
 var (
 	client = common.SaneHttpClient()
@@ -104,6 +113,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
 	apiMatches := apiPat.FindAllStringSubmatch(dataStr, -1)
+	endpoints := s.Endpoints(datadogAPIBaseURLs...)
 
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
@@ -121,7 +131,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				for _, baseURL := range s.Endpoints() {
+				for _, baseURL := range endpoints {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
 					if err != nil {
 						continue
@@ -165,7 +175,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				for _, baseURL := range s.Endpoints() {
+				for _, baseURL := range endpoints {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v1/validate", nil)
 					if err != nil {
 						continue
