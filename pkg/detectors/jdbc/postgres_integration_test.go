@@ -121,7 +121,7 @@ func TestPostgres(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			j, err := ParsePostgres(logContext.Background(), tt.input)
+			j, err := parsePostgres(logContext.Background(), tt.input)
 			if err != nil {
 				got := result{ParseErr: true}
 
