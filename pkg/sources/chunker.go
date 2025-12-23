@@ -48,7 +48,9 @@ func WithFileSize(size int) ConfigOption {
 // it contains the data and error of a chunk.
 type ChunkResult struct {
 	data []byte
-	err  error
+	// contentSize is the size of actual content, excluding peek data
+	contentSize int
+	err         error
 }
 
 // Bytes for a ChunkResult.
@@ -56,9 +58,22 @@ func (cr ChunkResult) Bytes() []byte {
 	return cr.data
 }
 
+// ContentSize returns the size of actual content, excluding peek data.
+// Use this when you need to process only the unique content of each chunk
+// without the overlapping peek portion.
+func (cr ChunkResult) ContentSize() int {
+	return cr.contentSize
+}
+
 // Error for a ChunkResult.
 func (cr ChunkResult) Error() error {
 	return cr.err
+}
+
+// NewChunkResult creates a ChunkResult with the given data and content size.
+// This is primarily used for testing to create mock chunk results.
+func NewChunkResult(data []byte, contentSize int) ChunkResult {
+	return ChunkResult{data: data, contentSize: contentSize}
 }
 
 const (
@@ -159,7 +174,9 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 			chunkBytes := make([]byte, config.totalSize)
 			chunkBytes = chunkBytes[:config.chunkSize]
 			n, err := io.ReadFull(chunkReader, chunkBytes)
+
 			if n > 0 {
+				chunkRes.contentSize = n
 				peekData, _ := chunkReader.Peek(config.totalSize - n)
 				chunkBytes = append(chunkBytes[:n], peekData...)
 				chunkRes.data = chunkBytes
