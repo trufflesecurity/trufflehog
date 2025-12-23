@@ -3,6 +3,7 @@ package datadogtoken
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -25,21 +26,15 @@ var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) CloudEndpoint() string { return "" }
 
-var datadogAPIBaseURLs = []string{
-	"https://api.us5.datadoghq.com/api", // Default domain
-	"https://api.app.datadoghq.com/api",
-	"https://api.us3.datadoghq.com/api",
-	"https://api.app.datadoghq.eu/api",
-	"https://api.app.ddog-gov.com/api",
-	"https://api.ap1.datadoghq.com/api",
-}
+const defaultDatadogAPIBaseURL = "https://api.datadoghq.com"
 
 var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
-	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
+	appPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
+	apiPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
+	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3})\b`)
 )
 
 type userServiceResponse struct {
@@ -104,7 +99,7 @@ func setOrganizationInfo(opt []*options, s1 *detectors.Result) {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"datadog"}
+	return []string{"datadog", "datadoghq", "ddog-gov"}
 }
 
 // FromData will find and optionally verify DatadogToken secrets in a given set of bytes.
@@ -113,7 +108,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
 	apiMatches := apiPat.FindAllStringSubmatch(dataStr, -1)
-	endpoints := s.Endpoints(datadogAPIBaseURLs...)
+
+	foundURLs := extractDatadogURLs(dataStr)
+	endpoints := s.confiureEndpoints(foundURLs...)
 
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
@@ -209,4 +206,31 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
+}
+
+func extractDatadogURLs(data string) []string {
+	var urls []string
+
+	for _, match := range datadogURLPat.FindAllStringSubmatch(data, -1) {
+		if len(match) >= 2 {
+			url := strings.TrimSpace(match[1])
+			if url != "" {
+				urls = append(urls, url)
+			}
+		}
+	}
+
+	return urls
+}
+
+func (s Scanner) confiureEndpoints(endpoints ...string) []string {
+	if len(endpoints) > 0 {
+		formattedEndpoints := make([]string, 0, len(endpoints))
+		for _, url := range endpoints {
+			formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
+		}
+		return s.Endpoints(formattedEndpoints...)
+	} else {
+		return s.Endpoints(defaultDatadogAPIBaseURL)
+	}
 }
