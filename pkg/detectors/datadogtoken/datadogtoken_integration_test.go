@@ -92,6 +92,9 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"Type": "APIKeyOnly",
 					},
+					AnalysisInfo: map[string]string{
+						"apiKey": apiKey,
+					},
 				},
 			},
 			wantErr: false,
@@ -115,6 +118,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			// use default cloud endpoint
 			s.UseCloudEndpoint(true)
 			s.SetCloudEndpoint(s.CloudEndpoint())
+			s.UseFoundEndpoints(true)
 
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
