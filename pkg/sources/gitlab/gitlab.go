@@ -484,8 +484,9 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		return apiClient, nil
 
 	case "BASIC_AUTH":
-		apiClient, err := gitlab.NewOAuthClient(
-			s.token,
+		apiClient, err := gitlab.NewBasicAuthClient(
+			s.user,
+			s.password,
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
