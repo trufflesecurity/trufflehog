@@ -2,7 +2,7 @@ package datadogtoken
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -163,20 +163,20 @@ func TestDataDogToken_InvalidSecrets(t *testing.T) {
 
 func Test_ConfigureEndpoints_WithEndpoints(t *testing.T) {
 	s := Scanner{}
-	customEndpoints := []string{
-		"api.app.datadoghq.eu",
-		"api.ap1.ddog-gov.com",
+	customEndpoints := map[string]struct{}{
+		"api.app.datadoghq.eu": struct{}{},
+		"api.ap1.ddog-gov.com": struct{}{},
 	}
 	s.UseFoundEndpoints(true)
 	s.UseCloudEndpoint(true)
 	s.SetCloudEndpoint(s.CloudEndpoint())
-	endpoints := s.confiureEndpoints(customEndpoints...)
+	endpoints := s.configureEndpoints(customEndpoints)
 	if len(endpoints) != len(customEndpoints) {
 		t.Errorf("expected %d endpoints, got %d", len(customEndpoints), len(endpoints))
 	}
 	for i, endpoint := range endpoints {
-		if endpoint != fmt.Sprintf("https://%s", customEndpoints[i]) {
-			t.Errorf("expected endpoint %s, got %s", customEndpoints[i], endpoint)
+		if _, exists := customEndpoints[strings.TrimPrefix(endpoint, "https://")]; !exists {
+			t.Errorf("unexpected endpoint at index %d: %s", i, endpoint)
 		}
 	}
 }
@@ -185,7 +185,8 @@ func Test_ConfigureEndpoints_WithoutEndpoints(t *testing.T) {
 	s.UseFoundEndpoints(true)
 	s.UseCloudEndpoint(true)
 	s.SetCloudEndpoint(s.CloudEndpoint())
-	endpoints := s.confiureEndpoints()
+	var uniqueFoundUrls = make(map[string]struct{})
+	endpoints := s.configureEndpoints(uniqueFoundUrls)
 	if len(endpoints) != 1 {
 		t.Errorf("expected 1 endpoint, got %d", len(endpoints))
 	}
