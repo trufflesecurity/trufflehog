@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v67/github"
+	"golang.org/x/time/rate"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/classic"
@@ -15,6 +16,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+// According to GitHub's rate limiting documentation, the default rate limit for
+// authenticated requests (PAT) is 5000 requests per hour. This equates to roughly 1.39
+// requests per second. To provide some buffer, we set the rate limit to 1.25
+// requests per second with a burst of 10.
+// https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28
+var rateLimiter = rate.NewLimiter(rate.Limit(1.25), 10)
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
@@ -132,7 +140,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*common.SecretInfo, err
 	if cfg == nil {
 		cfg = &config.Config{}
 	}
-	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg)).WithAuthToken(key)
+	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg, analyzers.WithRateLimiter(rateLimiter))).WithAuthToken(key)
 
 	md, err := common.GetTokenMetadata(key, client)
 	if err != nil {

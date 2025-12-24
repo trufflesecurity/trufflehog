@@ -231,7 +231,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
               "UnboundedResources": null,
               "Metadata": {
                 "owner": "sirdetectsalot",
-                "expiration": "2025-08-05T00:00:00-07:00",
+                "expiration": "2026-03-24T15:27:38+05:00",
                 "type": "Fine-Grained GitHub Personal Access Token"
               }
             }`,
