@@ -140,7 +140,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*common.SecretInfo, err
 	if cfg == nil {
 		cfg = &config.Config{}
 	}
-	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg)).WithAuthToken(key)
+	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg, analyzers.WithRateLimiter(rateLimiter))).WithAuthToken(key)
 
 	md, err := common.GetTokenMetadata(key, client)
 	if err != nil {
