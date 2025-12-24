@@ -34,7 +34,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	appPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
 	apiPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
-	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3})\b`)
+	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3}/api)\b`)
 )
 
 type userServiceResponse struct {
@@ -99,7 +99,7 @@ func setOrganizationInfo(opt []*options, s1 *detectors.Result) {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"datadog", "datadoghq", "ddog-gov"}
+	return []string{"datadog", "ddog-gov"}
 }
 
 // FromData will find and optionally verify DatadogToken secrets in a given set of bytes.
@@ -109,8 +109,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
 	apiMatches := apiPat.FindAllStringSubmatch(dataStr, -1)
 
-	foundURLs := extractDatadogURLs(dataStr)
-	endpoints := s.confiureEndpoints(foundURLs...)
+	var uniqueFoundUrls = make(map[string]struct{})
+	for _, matches := range datadogURLPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueFoundUrls[matches[1]] = struct{}{}
+	}
+	endpoints := s.configureEndpoints(uniqueFoundUrls)
 
 	// There are 4 cases to consider here:
 	// In case verify is false:
@@ -216,25 +219,13 @@ func (s Scanner) Description() string {
 	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
 }
 
-func extractDatadogURLs(data string) []string {
-	var urls []string
-
-	for _, match := range datadogURLPat.FindAllStringSubmatch(data, -1) {
-		if len(match) >= 2 {
-			url := strings.TrimSpace(match[1])
-			if url != "" {
-				urls = append(urls, url)
+func (s Scanner) configureEndpoints(uniqueFoundUrls map[string]struct{}) []string {
+	if len(uniqueFoundUrls) > 0 {
+		formattedEndpoints := make([]string, 0, len(uniqueFoundUrls))
+		for url := range uniqueFoundUrls {
+			if url == "" {
+				continue
 			}
-		}
-	}
-
-	return urls
-}
-
-func (s Scanner) confiureEndpoints(endpoints ...string) []string {
-	if len(endpoints) > 0 {
-		formattedEndpoints := make([]string, 0, len(endpoints))
-		for _, url := range endpoints {
 			formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
 		}
 		return s.Endpoints(formattedEndpoints...)
