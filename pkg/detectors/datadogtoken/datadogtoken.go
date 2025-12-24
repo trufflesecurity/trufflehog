@@ -112,12 +112,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	foundURLs := extractDatadogURLs(dataStr)
 	endpoints := s.confiureEndpoints(foundURLs...)
 
+	// There are 4 cases to consider here:
+	// In case verify is false:
+	// 1. both api key and app key found - we store only one result with both keys
+	// 2. only api key found - we store only api key result
+	// In case verify is true:
+	// 3. both api key and app key found - we store only one result with both keys and incase the appkey call fails we also also store apikey result
+	// 4. only api key found - we store only api key result
+
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
-		appIncluded := false
+		// This variable makes sure that we verify api key separately only when the api key check fails with an app key
+		apiKeyVerifiedWithAppKey := false
 		for _, appMatch := range appMatches {
 			resAppMatch := strings.TrimSpace(appMatch[1])
-
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_DatadogToken,
 				Raw:          []byte(resAppMatch),
@@ -140,6 +148,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err == nil {
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							apiKeyVerifiedWithAppKey = true
 							s1.Verified = true
 							s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "appKey": resAppMatch}
 							var serviceResponse userServiceResponse
@@ -159,11 +168,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 			}
-			appIncluded = true
 			results = append(results, s1)
 		}
 
-		if !appIncluded {
+		if !apiKeyVerifiedWithAppKey && (len(appMatches) == 0 || verify) {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_DatadogToken,
 				Raw:          []byte(resApiMatch),

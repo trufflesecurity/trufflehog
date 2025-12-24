@@ -54,6 +54,10 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"Type": "Application+APIKey",
 					},
+					AnalysisInfo: map[string]string{
+						"apiKey": apiKey,
+						"appKey": appKey,
+					},
 				},
 			},
 			wantErr: false,
@@ -72,6 +76,16 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"Type": "Application+APIKey",
+					},
+				},
+				{
+					DetectorType: detectorspb.DetectorType_DatadogToken,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"Type": "APIKeyOnly",
+					},
+					AnalysisInfo: map[string]string{
+						"apiKey": apiKey,
 					},
 				},
 			},
@@ -137,6 +151,65 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 				t.Errorf("DatadogToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestDatadogToken_AppKeyVerificationFailure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	s := Scanner{}
+
+	// use default cloud endpoint
+	s.UseCloudEndpoint(true)
+	s.SetCloudEndpoint(s.CloudEndpoint())
+	s.UseFoundEndpoints(true)
+
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
+	appKey := testSecrets.MustGetField("DATADOGTOKEN_APPKEY")
+
+	inputStr := fmt.Sprintf("dd_app:%s\ndd_api_secret:%s", appKey, apiKey)
+	got, err := s.FromData(ctx, true, []byte(inputStr))
+	if err != nil {
+		t.Fatalf("DatadogToken.FromData() error = %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected two results, got none")
+	}
+	result1 := got[0]
+	result2 := got[1]
+
+	expectedResult1 := detectors.Result{
+		DetectorType: detectorspb.DetectorType_DatadogToken,
+		Verified:     false,
+		Raw:          []byte(appKey),
+		RawV2:        []byte(appKey + apiKey),
+		ExtraData: map[string]string{
+			"Type": "Application+APIKey",
+		},
+	}
+	expectedResult2 := detectors.Result{
+		DetectorType: detectorspb.DetectorType_DatadogToken,
+		Verified:     true,
+		Raw:          []byte(apiKey),
+		RawV2:        []byte(apiKey),
+		ExtraData: map[string]string{
+			"Type": "APIKeyOnly",
+		},
+		AnalysisInfo: map[string]string{
+			"apiKey": apiKey,
+		},
+	}
+
+	// Deep compare both structs with their respective results
+	if diff := pretty.Compare(result1, expectedResult1); diff != "" {
+		t.Errorf("DatadogToken.FromData() result1 diff: (-got +want)\n%s", diff)
+	}
+	if diff := pretty.Compare(result2, expectedResult2); diff != "" {
+		t.Errorf("DatadogToken.FromData() result2 diff: (-got +want)\n%s", diff)
 	}
 }
 
