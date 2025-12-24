@@ -24,9 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
 
-func (Scanner) CloudEndpoint() string { return "" }
-
-const defaultDatadogAPIBaseURL = "https://api.datadoghq.com"
+func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
 
 var (
 	client = common.SaneHttpClient()
@@ -113,20 +111,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, matches := range datadogURLPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueFoundUrls[matches[1]] = struct{}{}
 	}
-	endpoints := s.configureEndpoints(uniqueFoundUrls)
-
-	// There are 4 cases to consider here:
-	// In case verify is false:
-	// 1. both api key and app key found - we store only one result with both keys
-	// 2. only api key found - we store only api key result
-	// In case verify is true:
-	// 3. both api key and app key found - we store only one result with both keys and incase the appkey call fails we also also store apikey result
-	// 4. only api key found - we store only api key result
+	var endpoints []string
+	if len(uniqueFoundUrls) == 0 {
+		// In case no endpoints were found in data, use the default cloud endpoint
+		s.UseCloudEndpoint(true)
+		endpoints = s.Endpoints()
+	} else {
+		// In case endpoints were found in data, use them
+		// also add cloud endpoint at the end so if not validated against found endpoints, try cloud endpoint as well
+		endpoints = s.configureEndpoints(uniqueFoundUrls)
+		endpoints = append(endpoints, s.CloudEndpoint())
+	}
 
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
-		// This variable makes sure that we verify api key separately only when the api key check fails with an app key
-		apiKeyVerifiedWithAppKey := false
 		for _, appMatch := range appMatches {
 			resAppMatch := strings.TrimSpace(appMatch[1])
 			s1 := detectors.Result{
@@ -140,7 +138,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				for _, baseURL := range endpoints {
-					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/v2/users", nil)
 					if err != nil {
 						continue
 					}
@@ -151,9 +149,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err == nil {
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							apiKeyVerifiedWithAppKey = true
 							s1.Verified = true
-							s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "appKey": resAppMatch}
+							s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "appKey": resAppMatch, "endpoint": baseURL}
 							var serviceResponse userServiceResponse
 							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
 								// setup emails
@@ -165,39 +162,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 									setOrganizationInfo(serviceResponse.Included, &s1)
 								}
 							}
-							// break the loop once we've successfully validated the token against a baseURL
-							break
-						}
-					}
-				}
-			}
-			results = append(results, s1)
-		}
-
-		if !apiKeyVerifiedWithAppKey && (len(appMatches) == 0 || verify) {
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_DatadogToken,
-				Raw:          []byte(resApiMatch),
-				RawV2:        []byte(resApiMatch),
-				ExtraData: map[string]string{
-					"Type": "APIKeyOnly",
-				},
-			}
-
-			if verify {
-				for _, baseURL := range endpoints {
-					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v1/validate", nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					req.Header.Add("DD-API-KEY", resApiMatch)
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch}
 							// break the loop once we've successfully validated the token against a baseURL
 							break
 						}
@@ -220,16 +184,14 @@ func (s Scanner) Description() string {
 }
 
 func (s Scanner) configureEndpoints(uniqueFoundUrls map[string]struct{}) []string {
-	if len(uniqueFoundUrls) > 0 {
-		formattedEndpoints := make([]string, 0, len(uniqueFoundUrls))
-		for url := range uniqueFoundUrls {
-			if url == "" {
-				continue
-			}
-			formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
+	formattedEndpoints := make([]string, 0, len(uniqueFoundUrls))
+	for url := range uniqueFoundUrls {
+		if url == "" {
+			continue
 		}
-		return s.Endpoints(formattedEndpoints...)
-	} else {
-		return s.Endpoints(defaultDatadogAPIBaseURL)
+		url = strings.TrimSuffix(url, "/api")
+		formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
 	}
+	return s.Endpoints(formattedEndpoints...)
+
 }
