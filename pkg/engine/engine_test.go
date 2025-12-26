@@ -1230,7 +1230,7 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	for _, det := range e.detectors {
 		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
 			id := config.GetDetectorID(det)
-			if len(endpoints.Endpoints()) == 0 && det.Type() != detectorspb.DetectorType_ArtifactoryAccessToken && det.Type() != detectorspb.DetectorType_TableauPersonalAccessToken && det.Type() != detectorspb.DetectorType_DatadogToken { // artifactory and tableau does not have any cloud endpoint and datadog has multiple endpoints
+			if len(endpoints.Endpoints()) == 0 && det.Type() != detectorspb.DetectorType_ArtifactoryAccessToken && det.Type() != detectorspb.DetectorType_TableauPersonalAccessToken { // artifactory and tableau does not have any cloud endpoint
 				t.Fatalf("detector %q Endpoints() is empty", id.String())
 			}
 			count++
