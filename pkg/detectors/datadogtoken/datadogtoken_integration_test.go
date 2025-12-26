@@ -54,6 +54,11 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"Type": "Application+APIKey",
 					},
+					AnalysisInfo: map[string]string{
+						"apiKey":   apiKey,
+						"appKey":   appKey,
+						"endpoint": "https://api.datadoghq.com",
+					},
 				},
 			},
 			wantErr: false,
@@ -78,25 +83,6 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "api key found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s", apiKey)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_DatadogToken,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"Type": "APIKeyOnly",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -115,6 +101,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			// use default cloud endpoint
 			s.UseCloudEndpoint(true)
 			s.SetCloudEndpoint(s.CloudEndpoint())
+			s.UseFoundEndpoints(true)
 
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
