@@ -31,7 +31,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	appPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
 	apiPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
-	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3}/api)\b`)
+	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3})\b`)
 )
 
 type userServiceResponse struct {
@@ -110,9 +110,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, matches := range datadogURLPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueFoundUrls["https://"+matches[1]] = struct{}{}
 	}
-	deduped := make([]string, 0, len(uniqueFoundUrls))
+	endpoints := make([]string, 0, len(uniqueFoundUrls))
 	for endpoint := range uniqueFoundUrls {
-		common.AddStringSliceItem(strings.TrimSuffix(endpoint, "/api"), &deduped)
+		endpoints = append(endpoints, endpoint)
 	}
 
 	for _, apiMatch := range apiMatches {
@@ -129,7 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				for _, baseURL := range s.Endpoints(deduped...) {
+				for _, baseURL := range s.Endpoints(endpoints...) {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
 					if err != nil {
 						continue
