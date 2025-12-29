@@ -111,17 +111,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, matches := range datadogURLPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueFoundUrls[matches[1]] = struct{}{}
 	}
-	var endpoints []string
-	if len(uniqueFoundUrls) == 0 {
-		// In case no endpoints were found in data, use the default cloud endpoint
-		s.UseCloudEndpoint(true)
-		endpoints = s.Endpoints()
-	} else {
-		// In case endpoints were found in data, use them
-		// also add cloud endpoint at the end so if not validated against found endpoints, try cloud endpoint as well
-		endpoints = s.configureEndpoints(uniqueFoundUrls)
-		endpoints = append(endpoints, s.CloudEndpoint())
-	}
 
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
@@ -137,7 +126,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				for _, baseURL := range endpoints {
+				for _, baseURL := range s.configureEndpoints(uniqueFoundUrls) {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/v2/users", nil)
 					if err != nil {
 						continue
@@ -184,14 +173,23 @@ func (s Scanner) Description() string {
 }
 
 func (s Scanner) configureEndpoints(uniqueFoundUrls map[string]struct{}) []string {
-	formattedEndpoints := make([]string, 0, len(uniqueFoundUrls))
-	for url := range uniqueFoundUrls {
-		if url == "" {
-			continue
+	if len(uniqueFoundUrls) > 0 {
+		// In case endpoints were found in data, use them
+		s.UseCloudEndpoint(false)
+		formattedEndpoints := make([]string, 0, len(uniqueFoundUrls))
+		for url := range uniqueFoundUrls {
+			if url == "" {
+				continue
+			}
+			url = strings.TrimSuffix(url, "/api")
+			formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
 		}
-		url = strings.TrimSuffix(url, "/api")
-		formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
+		// also add cloud endpoint at the end so if not validated against found endpoints, try cloud endpoint as well
+		formattedEndpoints = append(formattedEndpoints, s.CloudEndpoint())
+		fmt.Printf("Formatted eps are :%v\n", formattedEndpoints)
+		return s.Endpoints(formattedEndpoints...)
+	} else {
+		// In case no endpoints were found in data, use the default cloud endpoint
+		return s.Endpoints()
 	}
-	return s.Endpoints(formattedEndpoints...)
-
 }

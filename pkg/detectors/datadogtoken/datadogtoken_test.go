@@ -138,16 +138,18 @@ func TestDataDogToken_InvalidSecrets(t *testing.T) {
 func Test_ConfigureEndpoints_WithEndpoints(t *testing.T) {
 	s := Scanner{}
 	s.UseFoundEndpoints(true)
+	s.UseCloudEndpoint(true)
 	var uniqueFoundUrls = make(map[string]struct{})
 	uniqueFoundUrls["custom.datadoghq.com"] = struct{}{}
 	uniqueFoundUrls["api.us3.datadoghq.com"] = struct{}{}
 	endpoints := s.configureEndpoints(uniqueFoundUrls)
-	if len(endpoints) != 2 {
-		t.Errorf("expected 2 endpoints, got %d", len(endpoints))
+	if len(endpoints) != 3 {
+		t.Errorf("expected 3 endpoints, got %d", len(endpoints))
 	}
 	expectedEndpoints := map[string]struct{}{
 		"https://custom.datadoghq.com":  struct{}{},
 		"https://api.us3.datadoghq.com": struct{}{},
+		s.CloudEndpoint():               struct{}{},
 	}
 	for _, endpoint := range endpoints {
 		if _, exists := expectedEndpoints[endpoint]; !exists {
