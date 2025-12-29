@@ -186,7 +186,6 @@ func (s Scanner) configureEndpoints(uniqueFoundUrls map[string]struct{}) []strin
 		}
 		// also add cloud endpoint at the end so if not validated against found endpoints, try cloud endpoint as well
 		formattedEndpoints = append(formattedEndpoints, s.CloudEndpoint())
-		fmt.Printf("Formatted eps are :%v\n", formattedEndpoints)
 		return s.Endpoints(formattedEndpoints...)
 	} else {
 		// In case no endpoints were found in data, use the default cloud endpoint
