@@ -3,7 +3,6 @@ package datadogtoken
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -109,7 +108,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	var uniqueFoundUrls = make(map[string]struct{})
 	for _, matches := range datadogURLPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueFoundUrls[matches[1]] = struct{}{}
+		uniqueFoundUrls["https://"+matches[1]] = struct{}{}
+	}
+	deduped := make([]string, 0, len(uniqueFoundUrls))
+	for endpoint := range uniqueFoundUrls {
+		common.AddStringSliceItem(strings.TrimSuffix(endpoint, "/api"), &deduped)
 	}
 
 	for _, apiMatch := range apiMatches {
@@ -126,7 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				for _, baseURL := range s.configureEndpoints(uniqueFoundUrls) {
+				for _, baseURL := range s.Endpoints(deduped...) {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
 					if err != nil {
 						continue
@@ -170,25 +173,4 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
-}
-
-func (s Scanner) configureEndpoints(uniqueFoundUrls map[string]struct{}) []string {
-	if len(uniqueFoundUrls) > 0 {
-		// In case endpoints were found in data, use them
-		s.UseCloudEndpoint(false)
-		formattedEndpoints := make([]string, 0, len(uniqueFoundUrls))
-		for url := range uniqueFoundUrls {
-			if url == "" {
-				continue
-			}
-			url = strings.TrimSuffix(url, "/api")
-			formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
-		}
-		// also add cloud endpoint at the end so if not validated against found endpoints, try cloud endpoint as well
-		formattedEndpoints = append(formattedEndpoints, s.CloudEndpoint())
-		return s.Endpoints(formattedEndpoints...)
-	} else {
-		// In case no endpoints were found in data, use the default cloud endpoint
-		return s.Endpoints()
-	}
 }
