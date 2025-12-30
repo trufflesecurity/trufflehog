@@ -41,7 +41,7 @@ func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*ana
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Printf("SecretInfo: %+v\n", info)
 	return secretInfoToAnalyzerResult(info), nil
 }
 
@@ -124,7 +124,10 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	permissionBindings := secretInfoPermissionsToAnalyzerPermission(info.Permissions)
-	result.Bindings = analyzers.BindAllPermissions(*userResource, *permissionBindings...)
+
+	if userResource != nil && len(*permissionBindings) > 0 {
+		result.Bindings = analyzers.BindAllPermissions(*userResource, *permissionBindings...)
+	}
 
 	// Extract information from resources to create bindings
 	for _, resource := range info.Resources {
