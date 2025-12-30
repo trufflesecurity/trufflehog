@@ -212,7 +212,14 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	result := detectors.Result{
 		DetectorType: detectorspb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
-		ExtraData:    map[string]string{},
+		ExtraData:    make(map[string]string),
+	}
+
+	// Copy metadata from detector config to ExtraData
+	if metadata := c.GetMetadata(); metadata != nil {
+		for key, value := range metadata {
+			result.ExtraData[key] = value
+		}
 	}
 
 	var raw string
