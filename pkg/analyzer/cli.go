@@ -138,7 +138,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 	case "monday":
 		monday.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "datadog":
-		datadog.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["apiKey"], secretInfo.Parts["appKey"])
+		datadog.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["apiKey"], secretInfo.Parts["appKey"], secretInfo.Parts["endpoint"])
 	case "ngrok":
 		ngrok.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "mux":

@@ -2,7 +2,6 @@ package datadogapikey
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -29,7 +28,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	apiPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
-	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3}/api)\b`)
+	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,6 +46,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, matches := range datadogURLPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueFoundUrls[matches[1]] = struct{}{}
 	}
+	endpoints := make([]string, 0, len(uniqueFoundUrls))
+	for endpoint := range uniqueFoundUrls {
+		endpoints = append(endpoints, endpoint)
+	}
 
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
@@ -60,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			for _, baseURL := range s.configureEndpoints(uniqueFoundUrls) {
+			for _, baseURL := range s.Endpoints(endpoints...) {
 				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v1/validate", nil)
 				if err != nil {
 					continue
@@ -90,25 +93,4 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
-}
-
-func (s Scanner) configureEndpoints(uniqueFoundUrls map[string]struct{}) []string {
-	if len(uniqueFoundUrls) > 0 {
-		// In case endpoints were found in data, use them
-		s.UseCloudEndpoint(false)
-		formattedEndpoints := make([]string, 0, len(uniqueFoundUrls))
-		for url := range uniqueFoundUrls {
-			if url == "" {
-				continue
-			}
-			url = strings.TrimSuffix(url, "/api")
-			formattedEndpoints = append(formattedEndpoints, fmt.Sprintf("https://%s", url))
-		}
-		// also add cloud endpoint at the end so if not validated against found endpoints, try cloud endpoint as well
-		formattedEndpoints = append(formattedEndpoints, s.CloudEndpoint())
-		return s.Endpoints(formattedEndpoints...)
-	} else {
-		// In case no endpoints were found in data, use the default cloud endpoint
-		return s.Endpoints()
-	}
 }

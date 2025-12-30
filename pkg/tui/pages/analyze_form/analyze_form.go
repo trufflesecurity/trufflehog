@@ -106,6 +106,10 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Key:         "appKey",
 			Required:    true,
 			RedactInput: true,
+		}, {
+			Label:    "Endpoint (optional)",
+			Key:      "endpoint",
+			Required: false,
 		}}
 	case "mux":
 		inputs = []textinputs.InputConfig{{
