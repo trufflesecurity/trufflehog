@@ -26,6 +26,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
 	appKey := testSecrets.MustGetField("DATADOGTOKEN_APPKEY")
 	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
+	endpoint := "https://api.us5.datadoghq.com"
 
 	type args struct {
 		ctx    context.Context
@@ -44,7 +45,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within datadog %s", appKey, apiKey)),
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within datadog %s and endpoint %s", appKey, apiKey, endpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,7 +58,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					AnalysisInfo: map[string]string{
 						"apiKey":   apiKey,
 						"appKey":   appKey,
-						"endpoint": "https://api.datadoghq.com",
+						"endpoint": endpoint,
 					},
 				},
 			},
