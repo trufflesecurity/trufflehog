@@ -22,6 +22,7 @@ message CustomRegex {
   repeated string exclude_regexes_match = 9;
   string primary_regex_name = 10;
   map<string, ValidationConfig> validations = 11;
+  map<string, string> metadata = 12;
 }
 
 
