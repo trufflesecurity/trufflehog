@@ -2,8 +2,8 @@ package stripe
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"net/url"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -51,12 +51,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			client := common.SaneHttpClient()
 
+			params := url.Values{}
+			params.Add("limit", "3")
+
 			// test `read_user` scope
-			req, err := http.NewRequestWithContext(ctx, "GET", baseURL, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"?"+params.Encode(), nil)
 			if err != nil {
-				continue
+				panic(err)
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match))
+
+			// Basic auth with secret key as username and empty password
+			req.SetBasicAuth(match, "")
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

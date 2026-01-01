@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -134,7 +135,7 @@ type SecretInfo struct {
 	Permissions []PermissionsCategory
 }
 
-func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) (bool, error) {
+func (h *HttpStatusTest) RunTest(cfg *config.Config, key string) (bool, error) {
 	// If body data, marshal to JSON
 	var data io.Reader
 	if h.Payload != nil {
@@ -147,15 +148,13 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 
 	// Create new HTTP request
 	client := analyzers.NewAnalyzeClient(cfg)
+
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err
 	}
 
-	// Add custom headers if provided
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
+	req.SetBasicAuth(key, "")
 
 	// Execute HTTP Request
 	resp, err := client.Do(req)
@@ -170,11 +169,19 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 		return true, nil
 	case StatusContains(resp.StatusCode, h.InvalidStatuses):
 		return false, nil
+
 	default:
-		fmt.Println(h)
-		fmt.Println(resp.Body)
-		fmt.Println(resp.StatusCode)
-		return false, errors.New("error checking response status code")
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, fmt.Errorf("error reading response body: %w", err)
+		}
+
+		return false, fmt.Errorf(
+			"unexpected response for url %s: status code %d, body: %s",
+			h.Endpoint,
+			resp.StatusCode,
+			string(respBody),
+		)
 	}
 }
 
@@ -213,23 +220,27 @@ func checkKeyEnv(key string) (string, error) {
 func checkValidity(cfg *config.Config, key string) (bool, error) {
 	// Create a new request
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://api.stripe.com/v1/charges", nil)
+	baseURL := "https://api.stripe.com/v1/charges"
+
+	params := url.Values{}
+	params.Add("limit", "3")
+
+	// test `read_user` scope
+	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// Basic auth with secret key as username and empty password
+	req.SetBasicAuth(key, "")
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
 	if err != nil {
 		return false, err
 	}
-
-	// Add Authorization header
-	req.Header.Add("Authorization", "Bearer "+key)
-
-	// Send the request
-	resp, err := client.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
 
 	// Check the response. Valid is 200 (secret/restricted) or 403 (restricted)
-	if resp.StatusCode == 200 || resp.StatusCode == 403 {
+	if res.StatusCode == 200 || res.StatusCode == 403 {
 		return true, nil
 	}
 	return false, nil
@@ -331,10 +342,10 @@ func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCate
 					continue
 				}
 				testCount++
-				status, err := test.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key})
+				status, err := test.RunTest(cfg, key)
 				if err != nil {
 					color.Red("[x] Error running test: %s", err.Error())
-					return nil, err
+					continue
 				}
 				if status {
 					value = typ

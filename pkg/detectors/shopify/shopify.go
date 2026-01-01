@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Shopify,
 				Redacted:     domainRes,
-				Raw:          []byte(key + domainRes),
+				Raw:          []byte(key + ":" + domainRes),
 			}
 
 			// set key as the primary secret for engine to find the line number
