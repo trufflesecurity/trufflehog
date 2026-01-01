@@ -30,7 +30,7 @@ func TestRazorPay_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword razorpay",
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validSecret),
-			want:  []string{validKey + validSecret},
+			want:  []string{validKey + ":" + validSecret},
 		},
 		{
 			name:  "invalid pattern",
