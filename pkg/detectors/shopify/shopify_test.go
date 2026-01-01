@@ -30,7 +30,7 @@ func TestShopify_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword shopify",
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validDomain),
-			want:  []string{validKey + validDomain},
+			want:  []string{validKey + ":" + validDomain},
 		},
 		{
 			name:  "invalid pattern",

@@ -228,7 +228,7 @@ func checkValidity(cfg *config.Config, key string) (bool, error) {
 	// test `read_user` scope
 	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
 	// Basic auth with secret key as username and empty password

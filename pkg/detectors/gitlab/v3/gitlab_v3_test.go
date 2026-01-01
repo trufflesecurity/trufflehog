@@ -37,7 +37,7 @@ func TestGitLab_Pattern(t *testing.T) {
 					"method": "GET",
 					"deprecated": false
 				}]`,
-			want: []string{"glpat-3fZ1p5y4XWcCvMGVlfakeW86MQp1Oml3Ymg0Cw.01.1203afakehttps://gitlab.com"},
+			want: []string{"glpat-3fZ1p5y4XWcCvMGVlfakeW86MQp1Oml3Ymg0Cw.01.1203afake:https://gitlab.com"},
 		},
 	}
 

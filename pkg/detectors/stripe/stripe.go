@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// test `read_user` scope
 			req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"?"+params.Encode(), nil)
 			if err != nil {
-				panic(err)
+				continue
 			}
 
 			// Basic auth with secret key as username and empty password

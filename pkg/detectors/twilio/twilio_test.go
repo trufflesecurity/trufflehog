@@ -30,7 +30,7 @@ func TestTwilio_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword twilio",
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validSid, keyword, validKey),
-			want:  []string{validSid + validKey},
+			want:  []string{validSid + ":" + validKey},
 		},
 		{
 			name:  "invalid pattern",

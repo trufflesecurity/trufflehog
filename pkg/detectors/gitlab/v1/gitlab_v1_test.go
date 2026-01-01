@@ -38,12 +38,12 @@ func TestGitLab_Pattern(t *testing.T) {
 					"method": "GET",
 					"deprecated": false
 				}]`,
-			want: []string{"oXCt4JT2wf1_WlZl2OVGhttps://gitlab.com"},
+			want: []string{"oXCt4JT2wf1_WlZl2OVG:https://gitlab.com"},
 		},
 		{
 			name:  "valid pattern (with = before secret)",
 			input: "GITLAB_TOKEN=ABc123456789dEFghIJK",
-			want:  []string{"ABc123456789dEFghIJKhttps://gitlab.com"},
+			want:  []string{"ABc123456789dEFghIJK:https://gitlab.com"},
 		},
 	}
 
