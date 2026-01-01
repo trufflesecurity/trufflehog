@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mssql"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestSqlServer(t *testing.T) {
@@ -81,7 +82,8 @@ func TestSqlServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			j, err := parseSqlServer(tt.input)
+			ctx := logContext.AddLogger(context.Background())
+			j, err := ParseSqlServer(ctx, tt.input)
 
 			if err != nil {
 				got := result{parseErr: true}

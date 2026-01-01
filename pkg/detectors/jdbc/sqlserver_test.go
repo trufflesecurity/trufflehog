@@ -115,3 +115,41 @@ func TestParseSqlServerUserIgnoredBug2(t *testing.T) {
 		})
 	}
 }
+
+func TestParseSqlServerWithJdbcAndOdbcBridgeString(t *testing.T) {
+	subname := "//odbc:server=localhost;port=1433;database=testdb;password=testpassword"
+
+	wantHost := "localhost"
+	wantPort := "1433"
+	wantPassword := "testpassword"
+	wantDatabase := "testdb"
+
+	ctx := logContext.AddLogger(context.Background())
+
+	j, err := ParseSqlServer(ctx, subname)
+	if err != nil {
+		t.Fatalf("parseSqlServer() error = %v", err)
+	}
+
+	if j == nil {
+		t.Fatalf("parseSqlServer() returned nil, expected valid connection.")
+	}
+
+	sqlServerConn, ok := j.(*SqlServerJDBC)
+	if !ok {
+		t.Fatalf("parseSqlServer() returned unexpected type %T, expected *SqlServerJDBC", j)
+	}
+
+	if sqlServerConn.Host != wantHost+":"+wantPort {
+		t.Errorf("Host mismatch. Got: %s, Want: %s", sqlServerConn.Host, wantHost+":"+wantPort)
+	}
+
+	if sqlServerConn.Password != wantPassword {
+		t.Errorf("Password mismatch. Got: %s, Want: %s", sqlServerConn.Password, wantPassword)
+	}
+
+	if sqlServerConn.Database != wantDatabase {
+		t.Errorf("Database mismatch. Got: %s, Want: %s", sqlServerConn.Database, wantDatabase)
+	}
+
+}

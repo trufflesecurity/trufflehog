@@ -59,6 +59,11 @@ func ParseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 			continue
 		}
 
+		// incase there is a bridge between jdbc and odbc, and conn string looks like this odbc:server
+		if split := strings.Split(key, ":"); len(split) > 1 {
+			key = split[1]
+		}
+
 		switch strings.ToLower(key) {
 		case "password", "spring.datasource.password", "pwd":
 			password = value
