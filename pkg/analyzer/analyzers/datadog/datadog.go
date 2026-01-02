@@ -41,7 +41,6 @@ func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*ana
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("SecretInfo: %+v\n", info)
 	return secretInfoToAnalyzerResult(info), nil
 }
 
