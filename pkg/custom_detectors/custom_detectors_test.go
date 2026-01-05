@@ -595,10 +595,8 @@ func TestNewWebhookCustomRegex_Validation(t *testing.T) {
 		wantErrSubstr string // substring expected in error
 	}{
 		{
-			name: "Validate everything ok",
-			mutate: func(pb *custom_detectorspb.CustomRegex) {
-				return
-			},
+			name:   "Validate everything ok",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {},
 		},
 		{
 			name: "ValidateKeywords: no keywords",
@@ -689,7 +687,6 @@ func TestNewWebhookCustomRegex_Validation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
