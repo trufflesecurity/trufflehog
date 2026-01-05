@@ -107,7 +107,7 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Required:    true,
 			RedactInput: true,
 		}, {
-			Label:    "Endpoint",
+			Label:    "Endpoint Endpoint (press Enter to skip if unknown; TruffleHog will attempt to auto-detect)",
 			Key:      "endpoint",
 			Required: false,
 		}}
