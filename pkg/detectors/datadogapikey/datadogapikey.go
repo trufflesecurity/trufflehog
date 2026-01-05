@@ -2,8 +2,11 @@ package datadogapikey
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -12,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.EndpointSetter
 	detectors.DefaultMultiPartCredentialProvider
 }
@@ -37,6 +41,13 @@ func (s Scanner) Keywords() []string {
 	return []string{"datadog", "ddog-gov"}
 }
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return client
+}
+
 // FromData will find and optionally verify DatadogToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -48,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 	endpoints := make([]string, 0, len(uniqueFoundUrls))
 	for endpoint := range uniqueFoundUrls {
-		endpoints = append(endpoints, endpoint)
+		endpoints = append(endpoints, "https://"+endpoint)
 	}
 
 	for _, apiMatch := range apiMatches {
@@ -57,34 +68,58 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_DatadogApikey,
 			Raw:          []byte(resApiMatch),
 			RawV2:        []byte(resApiMatch),
-			ExtraData: map[string]string{
-				"Type": "APIKeyOnly",
-			},
 		}
 
 		if verify {
 			for _, baseURL := range s.Endpoints(endpoints...) {
-				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v1/validate", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("DD-API-KEY", resApiMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-						s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "endpoint": baseURL}
-						// break the loop once we've successfully validated the token against a baseURL
-						break
-					}
+				client := s.getClient()
+				isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, baseURL)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resApiMatch)
+				if isVerified {
+					s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "endpoint": baseURL}
+					// break the loop once we've successfully validated the token against a baseURL
+					break
 				}
 			}
 		}
 		results = append(results, s1)
 	}
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, apiKey, baseUrl string) (bool, error) {
+	// Reference: https://docs.datadoghq.com/api/latest/authentication/
+
+	timeout := 10 * time.Second
+	client.Timeout = timeout
+	url := baseUrl + "/api/v1/validate"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("DD-API-KEY", apiKey)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusForbidden:
+		return false, nil
+	case http.StatusTooManyRequests:
+		return false, fmt.Errorf("too many requests")
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

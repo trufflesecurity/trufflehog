@@ -25,7 +25,7 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 	}
 	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
 	invalidApiKey := "FKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
-
+	datdogEndpoint := "https://api.us5.datadoghq.com"
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -43,19 +43,16 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret within datadog %s", apiKey)),
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret within datadog %s and endpoint is %v", apiKey, datdogEndpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_DatadogApikey,
 					Verified:     true,
-					ExtraData: map[string]string{
-						"Type": "APIKeyOnly",
-					},
 					AnalysisInfo: map[string]string{
 						"apiKey":   apiKey,
-						"endpoint": "https://api.datadoghq.com",
+						"endpoint": datdogEndpoint,
 					},
 					Raw:   []byte(apiKey),
 					RawV2: []byte(apiKey),
@@ -68,18 +65,15 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret within datadog %s", invalidApiKey)),
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret within datadog %s and endpoint is %v", invalidApiKey, datdogEndpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_DatadogApikey,
 					Verified:     false,
-					ExtraData: map[string]string{
-						"Type": "APIKeyOnly",
-					},
-					Raw:   []byte(invalidApiKey),
-					RawV2: []byte(invalidApiKey),
+					Raw:          []byte(invalidApiKey),
+					RawV2:        []byte(invalidApiKey),
 				},
 			},
 			wantErr: false,

@@ -107,7 +107,7 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Required:    true,
 			RedactInput: true,
 		}, {
-			Label:    "Endpoint (optional)",
+			Label:    "Endpoint",
 			Key:      "endpoint",
 			Required: false,
 		}}
