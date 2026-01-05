@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -91,10 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, apiKey, baseUrl string) (bool, error) {
 	// Reference: https://docs.datadoghq.com/api/latest/authentication/
 
-	timeout := 10 * time.Second
-	client.Timeout = timeout
-	url := baseUrl + "/api/v1/validate"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseUrl+"/api/v1/validate", http.NoBody)
 	if err != nil {
 		return false, err
 	}
