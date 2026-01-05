@@ -1266,6 +1266,7 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	switch sourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB_REALTIME,
 		sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 		sourcespb.SourceType_SOURCE_TYPE_BITBUCKET,
 		sourcespb.SourceType_SOURCE_TYPE_GERRIT,

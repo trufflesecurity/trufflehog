@@ -245,6 +245,7 @@ type resumePosition struct {
 	startAfter string // The last processed object key within the bucket
 	isNewScan  bool   // True if we're starting a fresh scan
 	exactMatch bool   // True if we found the exact bucket we were previously processing
+	role       string // The role used during the previous scan
 }
 
 // determineResumePosition calculates where to resume scanning from based on the last saved checkpoint
@@ -282,6 +283,7 @@ func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets
 		startAfter: resumePoint.StartAfter,
 		index:      startIdx,
 		exactMatch: found,
+		role:       resumePoint.Role,
 	}
 }
 
@@ -306,12 +308,14 @@ func (s *Source) scanBuckets(
 			"Resume bucket no longer available, starting from closest position",
 			"original_bucket", pos.bucket,
 			"position", pos.index,
+			"role", pos.role,
 		)
 	default:
 		ctx.Logger().Info(
 			"Resuming scan from previous scan's bucket",
 			"bucket", pos.bucket,
 			"position", pos.index,
+			"role", pos.role,
 		)
 	}
 
@@ -327,7 +331,7 @@ func (s *Source) scanBuckets(
 		)
 
 		var startAfter *string
-		if bucket == pos.bucket && pos.startAfter != "" {
+		if bucket == pos.bucket && pos.startAfter != "" && role == pos.role {
 			startAfter = &pos.startAfter
 			ctx.Logger().V(3).Info(
 				"Resuming bucket scan",
