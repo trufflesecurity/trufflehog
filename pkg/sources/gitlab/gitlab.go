@@ -716,17 +716,17 @@ func (s *Source) getAllProjectReposV2(
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{
 		ListOptions: listOpts,
-		Membership:  gitlab.Ptr(true),
+		// Return only limited fields for each project
+		Simple: gitlab.Ptr(true),
 	}
 
-	// for non gitlab.com instances, include all available projects (public + membership).
-	if s.url != gitlabBaseURL {
-		projectQueryOptions.Membership = gitlab.Ptr(false)
+	// for gitlab.com instance, include only projects where the user is a member.
+	if s.url == gitlabBaseURL {
+		projectQueryOptions.Membership = gitlab.Ptr(true)
 	}
 
 	ctx.Logger().Info("starting projects enumeration",
-		"list_options", listOpts,
-		"all_available", *projectQueryOptions.Membership)
+		"list_options", listOpts)
 
 	// totalCount tracks the total number of projects processed by this enumeration.
 	// It includes all projects fetched from the API, even those later skipped by ignore rules.

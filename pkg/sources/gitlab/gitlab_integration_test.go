@@ -16,6 +16,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -811,5 +812,70 @@ func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
 	}
 	if !gotChunks {
 		t.Errorf("0 chunks scanned.")
+	}
+}
+
+func TestSource_Chunks_SimplifiedGitlabEnumeration(t *testing.T) {
+	// use simplified gitlab enumeration
+	feature.UseSimplifiedGitlabEnumeration.Store(true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	token := secret.MustGetField("GITLAB_TOKEN")
+
+	tests := []struct {
+		name       string
+		connection *sourcespb.GitLab
+	}{
+		{
+			name: "list projects - No repos configured",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+			conn, err := anypb.New(tt.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.name, 0, 0, false, conn, 10)
+			if err != nil {
+				t.Errorf("Source.Init() error = %v", err)
+				return
+			}
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(context.Background(), chunksCh)
+				if err != nil {
+					t.Errorf("Source.Chunks() error = %v", err)
+					return
+				}
+			}()
+			gotChunks := false
+			for gotChunk := range chunksCh {
+				gotChunks = true
+				metadata := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
+				if metadata.Gitlab.ProjectId == 0 || metadata.Gitlab.ProjectName == "" {
+					t.Errorf("Source.Chunks() missing project details in chunk metadata: %+v", metadata.Gitlab)
+				}
+			}
+			if !gotChunks {
+				t.Errorf("0 chunks scanned.")
+			}
+		})
 	}
 }
