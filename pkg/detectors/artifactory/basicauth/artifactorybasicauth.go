@@ -192,7 +192,7 @@ func verifyArtifactoryBasicAuth(ctx context.Context, client *http.Client, host, 
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ArtifactoryAccessToken
+	return detectorspb.DetectorType_ArtifactoryBasicAuth
 }
 
 func (s Scanner) Description() string {
