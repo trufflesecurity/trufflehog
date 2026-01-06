@@ -52,7 +52,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+					DetectorType: detectorspb.DetectorType_ArtifactoryBasicAuth,
 					Verified:     true,
 				},
 			},
@@ -71,7 +71,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+					DetectorType: detectorspb.DetectorType_ArtifactoryBasicAuth,
 					Verified:     false,
 				},
 			},
