@@ -44,7 +44,6 @@ var (
 	errNoHost = errors.New("no such host")
 )
 
-func (Scanner) Version() int { return 2 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -115,9 +114,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
 			Raw:          []byte(cred.raw),
 			RawV2:        []byte(cred.username + ":" + cred.password + "@" + cred.host),
-            ExtraData:    map[string]string{
-                "version": fmt.Sprintf("%d", s.Version()),
-            },
 		}
 
 		if verify {
