@@ -32,6 +32,26 @@ func ValidateRegex(regex map[string]string) error {
 	return nil
 }
 
+func ValidateRegexSlice(regex []string) error {
+	for i, reg := range regex {
+		if _, err := regexp.Compile(reg); err != nil {
+			return fmt.Errorf("regex '%d': %w", i+1, err)
+		}
+	}
+	return nil
+}
+
+// validates if a provided non-empty primary regex name exists in the map of regexes
+func ValidatePrimaryRegexName(primaryRegexName string, regexes map[string]string) error {
+	if primaryRegexName == "" {
+		return nil
+	}
+	if _, ok := regexes[primaryRegexName]; !ok {
+		return fmt.Errorf("unknown primary regex name: %q", primaryRegexName)
+	}
+	return nil
+}
+
 func ValidateVerifyEndpoint(endpoint string, unsafe bool) error {
 	if len(endpoint) == 0 {
 		return fmt.Errorf("no endpoint")

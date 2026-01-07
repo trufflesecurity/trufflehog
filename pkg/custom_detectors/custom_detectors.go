@@ -47,6 +47,15 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	if err := ValidateRegex(pb.Regex); err != nil {
 		return nil, err
 	}
+	if err := ValidateRegexSlice(pb.ExcludeRegexesCapture); err != nil {
+		return nil, err
+	}
+	if err := ValidateRegexSlice(pb.ExcludeRegexesMatch); err != nil {
+		return nil, err
+	}
+	if err := ValidatePrimaryRegexName(pb.PrimaryRegexName, pb.Regex); err != nil {
+		return nil, err
+	}
 
 	for _, verify := range pb.Verify {
 		if err := ValidateVerifyEndpoint(verify.Endpoint, verify.Unsafe); err != nil {
