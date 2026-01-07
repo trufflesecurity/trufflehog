@@ -71,9 +71,13 @@ func (cr ChunkResult) Error() error {
 }
 
 // NewChunkResult creates a ChunkResult with the given data and content size.
-// This is primarily used for testing to create mock chunk results.
 func NewChunkResult(data []byte, contentSize int) ChunkResult {
 	return ChunkResult{data: data, contentSize: contentSize}
+}
+
+// NewChunkResultError creates a ChunkResult containing an error.
+func NewChunkResultError(err error) ChunkResult {
+	return ChunkResult{err: err}
 }
 
 const (
@@ -163,33 +167,29 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 				} else {
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				chunkResultChan <- ChunkResult{
-					err: fmt.Errorf("panic error: %w", panicErr),
-				}
+				chunkResultChan <- NewChunkResultError(fmt.Errorf("panic error: %w", panicErr))
 			}
 		}()
 
 		for {
-			chunkRes := ChunkResult{}
 			chunkBytes := make([]byte, config.totalSize)
 			chunkBytes = chunkBytes[:config.chunkSize]
 			n, err := io.ReadFull(chunkReader, chunkBytes)
 
 			if n > 0 {
-				chunkRes.contentSize = n
 				peekData, _ := chunkReader.Peek(config.totalSize - n)
 				chunkBytes = append(chunkBytes[:n], peekData...)
-				chunkRes.data = chunkBytes
 			}
 
 			// If there is an error other than EOF, or if we have read some bytes, send the chunk.
 			// io.ReadFull will only return io.EOF when n == 0.
+			var chunkRes ChunkResult
 			switch {
 			case isErrAndNotEOF(err):
 				ctx.Logger().Error(err, "error reading chunk")
-				chunkRes.err = err
+				chunkRes = NewChunkResultError(err)
 			case n > 0:
-				chunkRes.err = nil
+				chunkRes = NewChunkResult(chunkBytes, n)
 			default:
 				return
 			}
