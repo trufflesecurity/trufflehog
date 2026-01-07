@@ -165,6 +165,8 @@ message Docker {
   }
   repeated string images = 5;
   repeated string exclude_paths = 6;
+  string namespace = 7;
+  string registry_token = 8;
 }
 
 message ECR {
@@ -264,7 +266,7 @@ message GitHub {
   string head = 9;
   string base = 10;
   repeated string ignore_repos = 11;
-  // DEPRECATED: include_repos is deprecated in favor of repositories. 
+  // DEPRECATED: include_repos is deprecated in favor of repositories.
   // It was used for filtering when the repositories field wasn't populating the UI-input results correctly
   // It can be removed when we no longer depend on it
   repeated string include_repos = 12 [deprecated = true];
@@ -307,6 +309,9 @@ message GitHubRealtime {
 message GoogleDrive {
   oneof credential {
     string refresh_token = 1;
+    bool use_token_service = 2;
+    credentials.Oauth2 oauth = 3; // on-prem scanning
+    credentials.GoogleDriveDWD dwd = 4; // Domain-Wide Delegation
   }
 }
 
@@ -334,6 +339,12 @@ message Huggingface {
   bool include_prs = 19;
 }
 
+enum JiraInstallationType {
+  JIRA_INSTALLATION_TYPE_AUTODETECT = 0;
+  JIRA_INSTALLATION_TYPE_CLOUD = 1;
+  JIRA_INSTALLATION_TYPE_DATA_CENTER = 2;
+}
+
 message JIRA {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
@@ -345,6 +356,10 @@ message JIRA {
   repeated string projects = 5;
   repeated string ignore_projects = 7;
   bool insecure_skip_verify_tls = 8;
+  
+  // Override autodetection of Jira installation type.
+  // Defaults to AUTODETECT which checks for cloud-only endpoints.
+  JiraInstallationType installation_type = 9;
 }
 
 message NPMUnauthenticatedPackage {

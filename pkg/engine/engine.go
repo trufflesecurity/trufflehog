@@ -832,7 +832,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 		dataSize := float64(len(chunk.Data))
 
-		scanBytesPerChunk.Observe(dataSize)
+		scanBytesPerChunk.WithLabelValues(chunk.SourceType.String()).Observe(dataSize)
 		jobBytesScanned.WithLabelValues(
 			chunk.SourceType.String(),
 			chunk.SourceName,
@@ -1170,6 +1170,12 @@ func (e *Engine) filterResults(
 	return results
 }
 
+// processResult generates a detectors.ResultWithMetadata from the provided chunk and result and puts it on the results
+// channel, unless the result exists on a line with an ignore tag, in which case no result is generated.
+//
+// CMR: The provided chunk is wrapped in a detectableChunk, but I'm pretty sure that's purely out of convenience
+// (because that's what this function's callers are using when they call this function). We're past detection at this
+// point in the engine, so we should probably refactor that parameter into a less confusing data type.
 func (e *Engine) processResult(
 	ctx context.Context,
 	data detectableChunk,
@@ -1260,6 +1266,7 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	switch sourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB_REALTIME,
 		sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 		sourcespb.SourceType_SOURCE_TYPE_BITBUCKET,
 		sourcespb.SourceType_SOURCE_TYPE_GERRIT,

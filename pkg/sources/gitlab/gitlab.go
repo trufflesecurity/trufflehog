@@ -39,13 +39,18 @@ type Source struct {
 	jobID    sources.JobID
 	verify   bool
 
-	authMethod   string
-	user         string
-	password     string
-	token        string
-	url          string
-	repos        []string
-	groupIds     []string
+	authMethod string
+	user       string
+	password   string
+	token      string
+	url        string
+	repos      []string
+	groupIds   []string
+
+	// These lists are checked both during enumeration and when ChunkUnit is called. This means that if they're modified
+	// between enumeration and individual unit scans, units will be scanned only if they pass the filter during
+	// enumeration and also if they pass the filter during unit scanning. This means that units can be "removed" from
+	// the enumerated list post-enumeration by modifying the filters, but they can never be added post-enumeration.
 	ignoreRepos  []string
 	includeRepos []string
 
@@ -72,6 +77,9 @@ type Source struct {
 	printLegacyJSON bool
 
 	projectsPerPage int
+
+	// cache of repo URL to project info, used when generating metadata for chunks
+	repoToProjCache repoToProjectCache
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -222,18 +230,26 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
 		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+			gitlabMetadata := &source_metadatapb.Gitlab{
+				Commit:              sanitizer.UTF8(commit),
+				File:                sanitizer.UTF8(file),
+				Email:               sanitizer.UTF8(email),
+				Repository:          sanitizer.UTF8(repository),
+				RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+				Link:                giturl.GenerateLink(repository, commit, file, line),
+				Timestamp:           sanitizer.UTF8(timestamp),
+				Line:                line,
+			}
+			proj, ok := s.repoToProjCache.get(repository)
+			if ok {
+				gitlabMetadata.ProjectId = int64(proj.id)
+				gitlabMetadata.ProjectName = proj.name
+				gitlabMetadata.ProjectOwner = proj.owner
+			}
+
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{
-					Gitlab: &source_metadatapb.Gitlab{
-						Commit:              sanitizer.UTF8(commit),
-						File:                sanitizer.UTF8(file),
-						Email:               sanitizer.UTF8(email),
-						Repository:          sanitizer.UTF8(repository),
-						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
-						Link:                giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:           sanitizer.UTF8(timestamp),
-						Line:                line,
-					},
+					Gitlab: gitlabMetadata,
 				},
 			}
 		},
@@ -241,6 +257,10 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
+
+	s.repoToProjCache = repoToProjectCache{
+		cache: make(map[string]*project),
+	}
 
 	return nil
 }
@@ -292,6 +312,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	} else {
 		gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
+		// ensure project details for specified repos are cached
+		// this is required to populate metadata during chunking
+		for _, repo := range repos {
+			s.ensureProjectInCache(ctx, repo)
+		}
 	}
 
 	s.repos = repos
@@ -543,6 +568,7 @@ func (s *Source) getAllProjectRepos(
 			}
 			// Report the unit.
 			ctx.Logger().V(3).Info("accepting project")
+			s.cacheGitlabProject(proj)
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
@@ -735,6 +761,7 @@ func (s *Source) getAllProjectReposV2(
 		// report the unit.
 		projCtx.Logger().V(3).Info("accepting project")
 
+		s.cacheGitlabProject(project)
 		unit := git.SourceUnit{Kind: git.UnitRepo, ID: project.HTTPURLToRepo}
 		gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 
@@ -837,6 +864,7 @@ func (s *Source) getAllProjectReposInGroups(
 				// report the unit.
 				projCtx.Logger().V(3).Info("accepting project")
 
+				s.cacheGitlabProject(proj)
 				unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 				gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 				projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
@@ -1086,6 +1114,14 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, _ := unit.SourceUnitID()
 
+	ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
+	})
+	if ignoreRepo(repoURL) {
+		ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+		return nil
+	}
+
 	var path string
 	var repo *gogit.Repository
 	var err error
@@ -1113,5 +1149,62 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
+	// ensure project details are cached
+	// this is required to populate metadata during chunking
+	s.ensureProjectInCache(ctx, repoURL)
+
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
+}
+
+// ensureProjectInCache checks if the project for the given repo URL is in the cache,
+// and if not, queries the GitLab API to fetch the project and adds it to the cache.
+func (s *Source) ensureProjectInCache(ctx context.Context, repoUrl string) {
+	// check if project is already in cache
+	if _, ok := s.repoToProjCache.get(repoUrl); ok {
+		return
+	}
+
+	// query project
+	proj, err := s.getGitlabProject(ctx, repoUrl)
+	if err != nil {
+		ctx.Logger().Error(err, "could not fetch project for repo", "repo", repoUrl)
+		return
+	}
+
+	// add to cache
+	s.cacheGitlabProject(proj)
+}
+
+func (s *Source) getGitlabProject(ctx context.Context, repoUrl string) (*gitlab.Project, error) {
+	apiClient, err := s.newClient()
+	if err != nil {
+		return nil, fmt.Errorf("could not create api client: %w", err)
+	}
+	// extract project path from repo URL
+	// https://gitlab.com/testermctestface/testy.git => testermctestface/testy
+	url, err := url.Parse(repoUrl)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse repo URL: %w", err)
+	}
+	repoPath := strings.TrimPrefix(strings.TrimSuffix(url.Path, ".git"), "/")
+
+	proj, _, err := apiClient.Projects.GetProject(repoPath, nil, gitlab.WithContext(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("could not query project metadata: %w", err)
+	}
+	return proj, nil
+}
+
+func (s *Source) cacheGitlabProject(gitlabProj *gitlab.Project) {
+	proj := &project{
+		id:   gitlabProj.ID,
+		name: gitlabProj.NameWithNamespace,
+	}
+	if gitlabProj.Owner != nil {
+		proj.owner = gitlabProj.Owner.Email
+		if proj.owner == "" {
+			proj.owner = gitlabProj.Owner.Username
+		}
+	}
+	s.repoToProjCache.set(gitlabProj.HTTPURLToRepo, proj)
 }

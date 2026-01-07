@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-errors/errors"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"gopkg.in/h2non/gock.v1"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -687,5 +689,113 @@ func TestSource_HeadersScanning(t *testing.T) {
 		t.Errorf("No chunks were generated from the mock data")
 	} else {
 		t.Logf("Generated %d chunks from the mock data", chunksReceived)
+	}
+}
+
+func TestSource_ResponseID(t *testing.T) {
+	ctx := context.Background()
+
+	s := &Source{
+		DetectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: map[string]struct{}{
+			"keyword1": {},
+		},
+	}
+
+	chunksChan := make(chan *sources.Chunk, 1)
+
+	response := Response{
+		Uid:  "response-1234",
+		Name: "Test Response",
+		Body: "This is a test response body containing keyword1.",
+	}
+
+	go func() {
+		s.scanHTTPResponse(ctx, chunksChan, Metadata{}, response)
+		close(chunksChan)
+	}()
+
+	var gotChunk *sources.Chunk
+	for chunk := range chunksChan {
+		gotChunk = chunk
+	}
+
+	postmanMetadata, ok := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Postman)
+	if !ok {
+		t.Fatalf("expected Postman metadata, got: %T", gotChunk.SourceMetadata.Data)
+	}
+
+	if postmanMetadata.Postman.ResponseId != response.Uid {
+		t.Errorf("expected response ID: %s, got: %s", response.Uid, postmanMetadata.Postman.ResponseId)
+	}
+	if postmanMetadata.Postman.ResponseName != response.Name {
+		t.Errorf("expected response Name: %s, got: %s", response.Name, postmanMetadata.Postman.ResponseName)
+	}
+
+}
+
+func TestSource_AbortScanRateLimitCrossedThreshold(t *testing.T) {
+	defer gock.Off()
+	// Mock the API response for getting collection
+	gock.New("https://api.getpostman.com").
+		Get("/collections/1234-abc1").
+		Reply(200).
+		AddHeader("X-RateLimit-Remaining-Month", "19").
+		AddHeader("X-RateLimit-Limit-Month", "100").
+		BodyString(`{"collection":{"info":{"_postman_id":"abc1","name":"test-collection-1","schema":"https://schema.postman.com/json/collection/v2.1.0/collection.json",
+		"updatedAt":"2025-03-21T17:39:25.000Z","createdAt":"2025-03-21T17:37:13.000Z","lastUpdatedBy":"1234","uid":"1234-abc1"},
+		"item":[]}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	_, err = s.client.GetCollection(ctx, "1234-abc1")
+	if !errors.Is(err, errAbortScanDueToAPIRateLimit) {
+		t.Errorf("expected abort scan error due to rate limit, got: %v", err)
+	}
+}
+
+func TestSource_AbortScanRateLimitBelowThreshold(t *testing.T) {
+	defer gock.Off()
+	// Mock the API response for getting collection
+	gock.New("https://api.getpostman.com").
+		Get("/collections/1234-abc1").
+		Reply(200).
+		AddHeader("X-RateLimit-Remaining-Month", "90").
+		AddHeader("X-RateLimit-Limit-Month", "100").
+		BodyString(`{"collection":{"info":{"_postman_id":"abc1","name":"test-collection-1","schema":"https://schema.postman.com/json/collection/v2.1.0/collection.json",
+		"updatedAt":"2025-03-21T17:39:25.000Z","createdAt":"2025-03-21T17:37:13.000Z","lastUpdatedBy":"1234","uid":"1234-abc1"},
+		"item":[]}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	_, err = s.client.GetCollection(ctx, "1234-abc1")
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
 	}
 }
