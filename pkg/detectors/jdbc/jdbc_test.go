@@ -60,7 +60,8 @@ func TestJdbc_Pattern(t *testing.T) {
 						"jdbc:sqlite:/data/test.db",
 						"jdbc:oracle:thin:@host:1521:db",
 						"jdbc:mysql://host:3306/db,other_param",
-						"jdbc:db2://host:50000/db?param=1"
+						"jdbc:db2://host:50000/db?param=1",
+						jdbc:mysql://mysqldev1234.example.com:1234/busmdbdev?user=busmdb_ro&password=abcdefg&useSSL=false
 					]
 				}`,
 			want: []string{
@@ -70,6 +71,7 @@ func TestJdbc_Pattern(t *testing.T) {
 				"jdbc:oracle:thin:@host:1521:db",
 				"jdbc:mysql://host:3306/db",
 				"jdbc:db2://host:50000/db?param=1",
+				"jdbc:mysql://mysqldev1234.example.com:1234/busmdbdev?user=busmdb_ro&password=abcdefg&useSSL=false",
 			},
 		},
 		{
