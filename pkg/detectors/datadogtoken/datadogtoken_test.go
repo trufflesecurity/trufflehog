@@ -38,6 +38,16 @@ func TestDataDogToken_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
+	longURLCommentBetweenKeywordAndKey := `
+class DATADOG {
+	// Use this link to find the API Key https://app.datadoghq.com/organization-settings/api-keys?filter=tray&id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+	static API_KEY = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1";
+	// Use this link to find the APP KEY https://app.datadoghq.com/organization-settings/application-keys?filter=tray&id=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+	static APP_KEY = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2";
+}
+`
+	longURLCommentBetweenKeywordAndKeySecret := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+
 	tests := []struct {
 		name  string
 		input string
@@ -47,6 +57,11 @@ func TestDataDogToken_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "keyword far due to long URL/comment tail",
+			input: longURLCommentBetweenKeywordAndKey,
+			want:  []string{longURLCommentBetweenKeywordAndKeySecret},
 		},
 	}
 
