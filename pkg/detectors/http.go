@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
@@ -162,13 +163,15 @@ func WithTimeout(timeout time.Duration) ClientOption {
 }
 
 func NewDetectorHttpClient(opts ...ClientOption) *http.Client {
-	httpClient := &http.Client{
+	client := &http.Client{
 		Transport: NewDetectorTransport(nil),
 		Timeout:   DefaultResponseTimeout,
 	}
 
 	for _, opt := range opts {
-		opt(httpClient)
+		opt(client)
 	}
-	return httpClient
+
+	client.Transport = common.NewInstrumentedTransport(client.Transport)
+	return client
 }
