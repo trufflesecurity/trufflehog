@@ -72,21 +72,10 @@ var jwtOptions = []jwt.ParserOption{
 	jwt.WithLeeway(time.Minute),
 }
 
-var jwtParser = jwt.NewParser(jwtOptions...)
-var jwtValidator = jwt.NewValidator(jwtOptions...)
-var client *http.Client
-
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	if client == nil {
-		// Use a client that disallows accessing local IPs.
-		// This avoids a potential blind SSRF.
-		client = detectors.NewDetectorHttpClient(
-			detectors.WithTransport(detectors.NewDetectorTransport(nil)),
-			detectors.WithTimeout(detectors.DefaultResponseTimeout),
-			detectors.WithNoLocalIP(),
-		)
-	}
+	jwtParser := jwt.NewParser(jwtOptions...)
+	client := detectors.DetectorHttpClientWithNoLocalAddresses
 
 	seenMatches := make(map[string]struct{})
 
@@ -199,6 +188,8 @@ func limitReader(reader io.Reader) io.Reader {
 // - If the JWT uses public key cryptography and the OIDC Discovery protocol, we can fetch the public key and perform signature verification
 // - In all cases, we can perform claims validation (e.g., checking expiration time) and sometimes get a definite answer that a JWT is *not* live
 func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, parsedToken *jwt.Token) (bool, error) {
+	jwtValidator := jwt.NewValidator(jwtOptions...)
+
 	if err := jwtValidator.Validate(parsedToken.Claims); err != nil {
 		// though we have not checked the signature, the token is definitely invalid
 		return false, nil
