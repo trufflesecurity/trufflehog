@@ -68,6 +68,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
+				} else if res.StatusCode == 403 {
+					err = fmt.Errorf("unauthorized: HTTP 403 returned %d", res.StatusCode)
+					s1.Verified = false
 				} else if res.StatusCode != 403 {
 					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					s1.SetVerificationError(err, resMatch)
