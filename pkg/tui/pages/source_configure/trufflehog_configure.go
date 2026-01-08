@@ -37,6 +37,14 @@ func GetTrufflehogConfiguration() truffleCmdModel {
 		Placeholder: "false",
 	}
 
+	markdownOutput := textinputs.InputConfig{
+		Label:       "Markdown output",
+		Key:         "markdown",
+		Required:    false,
+		Help:        "Output results to Markdown",
+		Placeholder: "false",
+	}
+
 	excludeDetectors := textinputs.InputConfig{
 		Label:       "Exclude detectors",
 		Key:         "exclude_detectors",
@@ -53,13 +61,17 @@ func GetTrufflehogConfiguration() truffleCmdModel {
 		Placeholder: strconv.Itoa(runtime.NumCPU()),
 	}
 
-	return truffleCmdModel{textinputs.New([]textinputs.InputConfig{jsonOutput, verification, verifiedResults, excludeDetectors, concurrency}).SetSkip(true)}
+	return truffleCmdModel{textinputs.New([]textinputs.InputConfig{jsonOutput, markdownOutput, verification, verifiedResults, excludeDetectors, concurrency}).SetSkip(true)}
 }
 
 func (m truffleCmdModel) Cmd() string {
 	var command []string
 	inputs := m.GetInputs()
 
+	if isTrue(inputs["markdown"].Value) {
+		command = append(command, "--markdown")
+	} 
+	
 	if isTrue(inputs["json"].Value) {
 		command = append(command, "--json")
 	}
@@ -86,7 +98,7 @@ func (m truffleCmdModel) Cmd() string {
 
 func (m truffleCmdModel) Summary() string {
 	summary := strings.Builder{}
-	keys := []string{"no-verification", "only-verified", "json", "exclude_detectors", "concurrency"}
+	keys := []string{"no-verification", "only-verified", "json", "markdown", "exclude_detectors", "concurrency"}
 
 	inputs := m.GetInputs()
 	labels := m.GetLabels()
