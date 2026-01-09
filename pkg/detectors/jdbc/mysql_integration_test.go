@@ -91,7 +91,7 @@ func TestMySQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			j, err := ParseMySQL(logContext.Background(), tt.input)
+			j, err := parseMySQL(logContext.Background(), tt.input)
 
 			if err != nil {
 				got := result{ParseErr: true}

@@ -16,6 +16,8 @@ type PostgresJDBC struct {
 	ConnectionInfo
 }
 
+var _ JDBC = (*PostgresJDBC)(nil)
+
 func (s *PostgresJDBC) ping(ctx context.Context) pingResult {
 	// It is crucial that we try to build a connection string ourselves before using the one we found. This is because
 	// if the found connection string doesn't include a username, the driver will attempt to connect using the current
@@ -23,9 +25,21 @@ func (s *PostgresJDBC) ping(ctx context.Context) pingResult {
 	// contrast, when we build a connection string ourselves, if there's no username, we try 'postgres' instead, which
 	// actually has a chance of working.
 	return ping(ctx, "postgres", isPostgresErrorDeterminate,
-		BuildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, true),
-		BuildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, false),
+		buildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, true),
+		buildPostgresConnectionString(s.Host, s.User, s.Password, "postgres", s.Params, false),
 	)
+}
+
+func (s *PostgresJDBC) GetDBType() DatabaseType {
+	return PostgreSQL
+}
+
+func (s *PostgresJDBC) GetConnectionInfo() *ConnectionInfo {
+	return &s.ConnectionInfo
+}
+
+func (s *PostgresJDBC) BuildConnectionString() string {
+	return buildPostgresConnectionString(s.Host, s.User, s.Password, s.Database, s.Params, true)
 }
 
 func isPostgresErrorDeterminate(err error) bool {
@@ -58,7 +72,7 @@ func joinKeyValues(m map[string]string, sep string) string {
 	return strings.Join(data, sep)
 }
 
-func ParsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
+func parsePostgres(ctx logContext.Context, subname string) (JDBC, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 
 	if !strings.HasPrefix(subname, "//") {
@@ -122,7 +136,7 @@ func ParsePostgres(ctx logContext.Context, subname string) (jdbc, error) {
 	return postgresJDBC, nil
 }
 
-func BuildPostgresConnectionString(host string, user string, password string, dbName string, params map[string]string, includeDbName bool) string {
+func buildPostgresConnectionString(host string, user string, password string, dbName string, params map[string]string, includeDbName bool) string {
 	data := map[string]string{
 		// default user
 		"user":     "postgres",

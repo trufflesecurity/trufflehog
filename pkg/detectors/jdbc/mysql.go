@@ -16,12 +16,26 @@ type MysqlJDBC struct {
 	ConnectionInfo
 }
 
+var _ JDBC = (*MysqlJDBC)(nil)
+
 func (s *MysqlJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "mysql", isMySQLErrorDeterminate,
-		BuildMySQLConnectionString(s.Host, "", s.User, s.Password, s.Params))
+		buildMySQLConnectionString(s.Host, "", s.User, s.Password, s.Params))
 }
 
-func BuildMySQLConnectionString(host, database, user, password string, params map[string]string) string {
+func (s *MysqlJDBC) GetDBType() DatabaseType {
+	return MySQL
+}
+
+func (s *MysqlJDBC) GetConnectionInfo() *ConnectionInfo {
+	return &s.ConnectionInfo
+}
+
+func (s *MysqlJDBC) BuildConnectionString() string {
+	return buildMySQLConnectionString(s.Host, s.Database, s.User, s.Password, s.Params)
+}
+
+func buildMySQLConnectionString(host, database, user, password string, params map[string]string) string {
 	conn := host + "/" + database
 	userPass := user
 	if password != "" {
@@ -56,7 +70,7 @@ func isMySQLErrorDeterminate(err error) bool {
 	return false
 }
 
-func ParseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
+func parseMySQL(ctx logContext.Context, subname string) (JDBC, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected host to start with //")
@@ -86,7 +100,7 @@ func ParseMySQL(ctx logContext.Context, subname string) (jdbc, error) {
 	}, nil
 }
 
-func parseMySQLURI(ctx logContext.Context, subname string) (jdbc, error) {
+func parseMySQLURI(ctx logContext.Context, subname string) (JDBC, error) {
 
 	// for standard URI format, which is all i've seen for JDBC
 	u, err := url.Parse(subname)
