@@ -26,10 +26,7 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 
 // Analyze performs the analysis of the Datadog API key and returns the analyzer result.
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	apiKey, exist := credInfo["apiKey"]
-	if !exist {
-		return nil, errors.New("API key not found in credentials info")
-	}
+	apiKey := credInfo["apiKey"]
 
 	// Get appKey if provided
 	appKey := credInfo["appKey"]
@@ -51,6 +48,11 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey, appKey, endpoint str
 		color.Red("[x] Error : %s", err.Error())
 	}
 
+	if info == nil {
+		color.Red("[x] No information retrieved")
+		return
+	}
+
 	color.Green("[i] Valid Datadog API Key\n")
 
 	printUser(info.User)
@@ -60,6 +62,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey, appKey, endpoint str
 
 // AnalyzePermissions will collect all the scopes assigned to token along with resource it can access
 func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*SecretInfo, error) {
+	if apiKey == "" {
+		return nil, errors.New("api key not found in credentials info")
+	}
+	if appKey == "" {
+		return nil, errors.New("app key not found in credentials info")
+	}
+
 	// create the http client
 	client := analyzers.NewAnalyzeClient(cfg)
 

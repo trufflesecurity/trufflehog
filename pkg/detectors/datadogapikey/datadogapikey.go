@@ -66,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_DatadogApikey,
 			Raw:          []byte(resApiMatch),
-			RawV2:        []byte(resApiMatch),
 		}
 
 		if verify {
