@@ -815,67 +815,76 @@ func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
 	}
 }
 
+// TestSource_Chunks_SimplifiedGitlabEnumeration enumerates GitLab projects
+// using a stored GitLab secret in GCP with the `UseSimplifiedGitlabEnumeration`
+// feature flag enabled. When enabled, the enumeration path is redirected to
+// `getAllProjectReposV2`, validating project listing via keyset pagination.
 func TestSource_Chunks_SimplifiedGitlabEnumeration(t *testing.T) {
-	// use simplified gitlab enumeration
+	// Preserve and restore the feature flag to avoid cross-test contamination
+	prev := feature.UseSimplifiedGitlabEnumeration.Load()
+	// enable the simplified gitlab enumeration flag
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
+	defer feature.UseSimplifiedGitlabEnumeration.Store(prev)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	// Create a bounded context for the entire test
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
+	// Retrieve test secret containing the GitLab token
 	secret, err := common.GetTestSecret(ctx)
-	if err != nil {
-		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
-	}
+	require.NoError(t, err, "failed to access test secret")
 
 	token := secret.MustGetField("GITLAB_TOKEN")
 
-	tests := []struct {
-		name       string
-		connection *sourcespb.GitLab
-	}{
-		{
-			name: "list projects - No repos configured",
-			connection: &sourcespb.GitLab{
-				Credential: &sourcespb.GitLab_Token{
-					Token: token,
-				},
-			},
+	// Initialize the GitLab source with token-based authentication
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.GitLab{
+		Credential: &sourcespb.GitLab_Token{
+			Token: token,
 		},
+	})
+	require.NoError(t, err)
+
+	err = s.Init(ctx, "enumerate gitlab projects with V2", 0, 0, false, conn, 10)
+	require.NoError(t, err, "failed during Source.Init")
+
+	// Enumerate GitLab projects
+	testReporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &testReporter)
+	require.NoError(t, err, "enumeration should not fail")
+
+	// Ensure enumeration actually produced units
+	require.NotEmpty(t, testReporter.Units, "enumeration returned no units")
+
+	// Clear project cache to force project-detail lookups during chunking
+	clear(s.repoToProjCache.cache)
+
+	// Channel-based reporter to capture emitted chunks
+	chunksCh := make(chan *sources.Chunk, 1)
+	chanReporter := sources.ChanReporter{Ch: chunksCh}
+
+	// Chunk all enumerated units asynchronously
+	go func() {
+		defer close(chunksCh)
+		for _, unit := range testReporter.Units {
+			if err := s.ChunkUnit(ctx, unit, chanReporter); err != nil {
+				t.Errorf("Source.ChunkUnit() error = %v", err)
+			}
+		}
+	}()
+
+	// Validate produced chunks and their GitLab metadata
+	gotChunks := false
+	for chunk := range chunksCh {
+		gotChunks = true
+
+		meta, ok := chunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
+		require.True(t, ok, "unexpected metadata type")
+
+		assert.NotZero(t, meta.Gitlab.ProjectId, "missing project ID in chunk metadata")
+		assert.NotEmpty(t, meta.Gitlab.ProjectName, "missing project name in chunk metadata")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Source{}
-			conn, err := anypb.New(tt.connection)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			err = s.Init(ctx, tt.name, 0, 0, false, conn, 10)
-			if err != nil {
-				t.Errorf("Source.Init() error = %v", err)
-				return
-			}
-			chunksCh := make(chan *sources.Chunk, 1)
-			go func() {
-				defer close(chunksCh)
-				err = s.Chunks(context.Background(), chunksCh)
-				if err != nil {
-					t.Errorf("Source.Chunks() error = %v", err)
-					return
-				}
-			}()
-			gotChunks := false
-			for gotChunk := range chunksCh {
-				gotChunks = true
-				metadata := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
-				if metadata.Gitlab.ProjectId == 0 || metadata.Gitlab.ProjectName == "" {
-					t.Errorf("Source.Chunks() missing project details in chunk metadata: %+v", metadata.Gitlab)
-				}
-			}
-			if !gotChunks {
-				t.Errorf("0 chunks scanned.")
-			}
-		})
-	}
+	// Ensure at least one chunk was produced
+	assert.True(t, gotChunks, "expected at least one chunk, got zero")
 }
