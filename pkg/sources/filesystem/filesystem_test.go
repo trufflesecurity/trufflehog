@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -85,12 +86,9 @@ func TestSource_Scan(t *testing.T) {
 			for chunk := range chunksCh {
 				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
 					counter++
-					assert.Truef(
-						t,
-						proto.Equal(chunk.SourceMetadata, tt.wantSourceMetadata),
-						"Source.Chunks() %s metadata mismatch: got %v, want %v",
-						tt.name, chunk.SourceMetadata, tt.wantSourceMetadata,
-					)
+					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" {
+						t.Errorf("Source.Chunks() %s metadata mismatch (-want +got):\n%s", tt.name, diff)
+					}
 				}
 			}
 			assert.Equal(t, 1, counter)
