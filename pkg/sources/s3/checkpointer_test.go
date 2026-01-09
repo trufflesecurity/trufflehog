@@ -19,7 +19,7 @@ func TestCheckpointerResumption(t *testing.T) {
 
 	// First scan - process 6 objects then interrupt.
 	initialProgress := &sources.Progress{}
-	tracker := NewCheckpointer(ctx, initialProgress)
+	tracker := NewCheckpointer(ctx, initialProgress, false)
 
 	firstPage := &s3.ListObjectsV2Output{
 		Contents: make([]s3types.Object, 12), // Total of 12 objects
@@ -42,7 +42,7 @@ func TestCheckpointerResumption(t *testing.T) {
 	assert.Equal(t, "key-5", resumeInfo.StartAfter)
 
 	// Resume scan with existing progress.
-	resumeTracker := NewCheckpointer(ctx, initialProgress)
+	resumeTracker := NewCheckpointer(ctx, initialProgress, false)
 
 	resumePage := &s3.ListObjectsV2Output{
 		Contents: firstPage.Contents[6:], // Remaining 6 objects
@@ -66,7 +66,7 @@ func TestCheckpointerResumptionWithRole(t *testing.T) {
 
 	// First scan - process 6 objects then interrupt.
 	initialProgress := &sources.Progress{}
-	tracker := NewCheckpointer(ctx, initialProgress)
+	tracker := NewCheckpointer(ctx, initialProgress, false)
 	role := "test-role"
 
 	firstPage := &s3.ListObjectsV2Output{
@@ -91,7 +91,7 @@ func TestCheckpointerResumptionWithRole(t *testing.T) {
 	assert.Equal(t, role, resumeInfo.Role)
 
 	// Resume scan with existing progress.
-	resumeTracker := NewCheckpointer(ctx, initialProgress)
+	resumeTracker := NewCheckpointer(ctx, initialProgress, false)
 
 	resumePage := &s3.ListObjectsV2Output{
 		Contents: firstPage.Contents[6:], // Remaining 6 objects
@@ -124,7 +124,7 @@ func TestCheckpointerReset(t *testing.T) {
 
 			ctx := context.Background()
 			progress := new(sources.Progress)
-			tracker := NewCheckpointer(ctx, progress)
+			tracker := NewCheckpointer(ctx, progress, false)
 
 			tracker.completedObjects[1] = true
 			tracker.completedObjects[2] = true
@@ -441,8 +441,7 @@ func TestCheckpointerUpdateWithRole(t *testing.T) {
 func TestCheckpointerUpdateUnitScan(t *testing.T) {
 	ctx := context.Background()
 	progress := new(sources.Progress)
-	tracker := NewCheckpointer(ctx, progress)
-	tracker.SetIsUnitScan(true)
+	tracker := NewCheckpointer(ctx, progress, true)
 
 	page := &s3.ListObjectsV2Output{
 		Contents: make([]s3types.Object, 3),
@@ -528,7 +527,7 @@ func TestComplete(t *testing.T) {
 				EncodedResumeInfo: tt.initialState.resumeInfo,
 				Message:           tt.initialState.message,
 			}
-			tracker := NewCheckpointer(ctx, progress)
+			tracker := NewCheckpointer(ctx, progress, false)
 
 			err := tracker.Complete(ctx, tt.completeMessage)
 			assert.NoError(t, err)
