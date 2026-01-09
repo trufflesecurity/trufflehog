@@ -111,7 +111,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+			DetectorType: detectorspb.DetectorType_ArtifactoryBasicAuth,
 			Raw:          []byte(cred.raw),
 			RawV2:        []byte(cred.username + ":" + cred.password + "@" + cred.host),
 		}
@@ -192,5 +192,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Artifactory is a repository manager that supports all major package formats. Artifactory access tokens can be used to authenticate and perform operations on repositories."
+	return "Artifactory is a repository manager that supports all major package formats. Artifactory Basic Auth credentials can be used to authenticate and perform operations on repositories."
 }
