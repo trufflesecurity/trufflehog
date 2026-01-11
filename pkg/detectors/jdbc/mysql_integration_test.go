@@ -12,6 +12,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestMySQL(t *testing.T) {
@@ -89,7 +91,7 @@ func TestMySQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			j, err := parseMySQL(tt.input)
+			j, err := parseMySQL(logContext.Background(), tt.input)
 
 			if err != nil {
 				got := result{ParseErr: true}

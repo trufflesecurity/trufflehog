@@ -15,6 +15,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestPostgres(t *testing.T) {
@@ -119,7 +121,7 @@ func TestPostgres(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			j, err := parsePostgres(tt.input)
+			j, err := parsePostgres(logContext.Background(), tt.input)
 			if err != nil {
 				got := result{ParseErr: true}
 

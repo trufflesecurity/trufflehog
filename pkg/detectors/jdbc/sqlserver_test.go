@@ -2,10 +2,10 @@ package jdbc
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -108,13 +108,115 @@ func TestParseSqlServerUserIgnoredBug2(t *testing.T) {
 				t.Fatalf("parseSqlServer() error = %v", err)
 			}
 
-			sqlServerConn := j.(*sqlServerJDBC)
-			expectedPrefix := fmt.Sprintf("sqlserver://%s:", tt.wantUsername)
+			sqlServerConn := j.(*SqlServerJDBC)
 
-			if !strings.Contains(sqlServerConn.connStr, expectedPrefix) {
+			if sqlServerConn.User != tt.wantUsername {
 				t.Errorf("Connection string does not contain expected username '%s'\nGot: %s\nExpected to contain: %s",
-					tt.wantUsername, sqlServerConn.connStr, expectedPrefix)
+					tt.wantUsername, sqlServerConn.User, tt.wantUsername)
 			}
+		})
+	}
+}
+
+func TestSQLServerHandler_ParseJDBCURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		jdbcURL  string
+		wantHost string
+		wantDB   string
+		wantUser string
+		wantPass string
+		wantErr  bool
+	}{
+		{
+			name:     "basic URL with semicolon params",
+			jdbcURL:  "jdbc:sqlserver://localhost:1433;database=testdb;user=sa;password=Pass123",
+			wantHost: "localhost:1433",
+			wantDB:   "testdb",
+			wantUser: "sa",
+			wantPass: "Pass123",
+		},
+		{
+			name:     "URL with default port and database",
+			jdbcURL:  "jdbc:sqlserver://dbhost;user=testuser;password=secret",
+			wantHost: "dbhost:1433",
+			wantDB:   "master",
+			wantUser: "testuser",
+			wantPass: "secret",
+		},
+		{
+			name:     "URL with port in host",
+			jdbcURL:  "jdbc:sqlserver://server.example.com:1434;databaseName=mydb;userId=admin;pwd=admin123",
+			wantHost: "server.example.com:1434",
+			wantDB:   "mydb",
+			wantUser: "admin",
+			wantPass: "admin123",
+		},
+		{
+			name:    "invalid URL - missing jdbc:sqlserver prefix",
+			jdbcURL: "jdbc:mysql://localhost/db",
+			wantErr: true,
+		},
+		{
+			name:    "invalid URL - missing //",
+			jdbcURL: "jdbc:sqlserver:localhost;database=test",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jdbc, err := NewJDBC(logContext.Background(), tt.jdbcURL)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			info := jdbc.GetConnectionInfo()
+			assert.Equal(t, tt.wantHost, info.Host)
+			assert.Equal(t, tt.wantDB, info.Database)
+			assert.Equal(t, tt.wantUser, info.User)
+			assert.Equal(t, tt.wantPass, info.Password)
+		})
+	}
+}
+
+func TestSQLServerHandler_BuildNativeConnectionString(t *testing.T) {
+	tests := []struct {
+		name     string
+		info     *ConnectionInfo
+		wantUser string
+		wantPass string
+		wantHost string
+		wantDB   string
+	}{
+		{
+			name: "basic connection",
+			info: &ConnectionInfo{
+				Host:     "localhost",
+				Database: "testdb",
+				User:     "sa",
+				Password: "Pass123",
+			},
+			wantUser: "sa",
+			wantPass: "Pass123",
+			wantHost: "localhost",
+			wantDB:   "testdb",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jdbc := &SqlServerJDBC{
+				ConnectionInfo: *tt.info,
+			}
+			connStr := jdbc.BuildConnectionString()
+
+			// SQL Server format: sqlserver://user:password@host:port?database=db&connection+timeout=10
+			assert.Contains(t, connStr, tt.wantUser)
+			assert.Contains(t, connStr, tt.wantPass)
+			assert.Contains(t, connStr, tt.wantHost)
+			assert.Contains(t, connStr, "database="+tt.wantDB)
 		})
 	}
 }

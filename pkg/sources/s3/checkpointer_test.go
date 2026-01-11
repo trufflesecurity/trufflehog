@@ -19,7 +19,7 @@ func TestCheckpointerResumption(t *testing.T) {
 
 	// First scan - process 6 objects then interrupt.
 	initialProgress := &sources.Progress{}
-	tracker := NewCheckpointer(ctx, initialProgress)
+	tracker := NewCheckpointer(ctx, initialProgress, false)
 
 	firstPage := &s3.ListObjectsV2Output{
 		Contents: make([]s3types.Object, 12), // Total of 12 objects
@@ -42,7 +42,7 @@ func TestCheckpointerResumption(t *testing.T) {
 	assert.Equal(t, "key-5", resumeInfo.StartAfter)
 
 	// Resume scan with existing progress.
-	resumeTracker := NewCheckpointer(ctx, initialProgress)
+	resumeTracker := NewCheckpointer(ctx, initialProgress, false)
 
 	resumePage := &s3.ListObjectsV2Output{
 		Contents: firstPage.Contents[6:], // Remaining 6 objects
@@ -61,6 +61,56 @@ func TestCheckpointerResumption(t *testing.T) {
 	assert.Equal(t, "key-11", finalResumeInfo.StartAfter)
 }
 
+func TestCheckpointerResumptionWithRole(t *testing.T) {
+	ctx := context.Background()
+
+	// First scan - process 6 objects then interrupt.
+	initialProgress := &sources.Progress{}
+	tracker := NewCheckpointer(ctx, initialProgress, false)
+	role := "test-role"
+
+	firstPage := &s3.ListObjectsV2Output{
+		Contents: make([]s3types.Object, 12), // Total of 12 objects
+	}
+	for i := range 12 {
+		key := fmt.Sprintf("key-%d", i)
+		firstPage.Contents[i] = s3types.Object{Key: &key}
+	}
+
+	// Process first 6 objects.
+	for i := range 6 {
+		err := tracker.UpdateObjectCompletion(ctx, i, "test-bucket", role, firstPage.Contents)
+		assert.NoError(t, err)
+	}
+
+	// Verify resume info is set correctly.
+	resumeInfo, err := tracker.ResumePoint(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "test-bucket", resumeInfo.CurrentBucket)
+	assert.Equal(t, "key-5", resumeInfo.StartAfter)
+	assert.Equal(t, role, resumeInfo.Role)
+
+	// Resume scan with existing progress.
+	resumeTracker := NewCheckpointer(ctx, initialProgress, false)
+
+	resumePage := &s3.ListObjectsV2Output{
+		Contents: firstPage.Contents[6:], // Remaining 6 objects
+	}
+
+	// Process remaining objects.
+	for i := range len(resumePage.Contents) {
+		err := resumeTracker.UpdateObjectCompletion(ctx, i, "test-bucket", role, resumePage.Contents)
+		assert.NoError(t, err)
+	}
+
+	// Verify final resume info.
+	finalResumeInfo, err := resumeTracker.ResumePoint(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "test-bucket", finalResumeInfo.CurrentBucket)
+	assert.Equal(t, "key-11", finalResumeInfo.StartAfter)
+	assert.Equal(t, role, finalResumeInfo.Role)
+}
+
 func TestCheckpointerReset(t *testing.T) {
 	tests := []struct {
 		name string
@@ -74,7 +124,7 @@ func TestCheckpointerReset(t *testing.T) {
 
 			ctx := context.Background()
 			progress := new(sources.Progress)
-			tracker := NewCheckpointer(ctx, progress)
+			tracker := NewCheckpointer(ctx, progress, false)
 
 			tracker.completedObjects[1] = true
 			tracker.completedObjects[2] = true
@@ -112,6 +162,13 @@ func TestGetResumePoint(t *testing.T) {
 			expectedResumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "test-key"},
 		},
 		{
+			name: "valid resume info with role",
+			progress: &sources.Progress{
+				EncodedResumeInfo: `{"current_bucket":"test-bucket","start_after":"test-key","role":"test-role"}`,
+			},
+			expectedResumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "test-key", Role: "test-role"},
+		},
+		{
 			name:     "empty encoded resume info",
 			progress: &sources.Progress{EncodedResumeInfo: ""},
 		},
@@ -120,6 +177,13 @@ func TestGetResumePoint(t *testing.T) {
 			progress: &sources.Progress{
 				EncodedResumeInfo: `{"current_bucket":"","start_after":"test-key"}`,
 			},
+		},
+		{
+			name: "no role in resume info",
+			progress: &sources.Progress{
+				EncodedResumeInfo: `{"current_bucket":"test-bucket","start_after":"test-key"}`,
+			},
+			expectedResumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "test-key", Role: ""},
 		},
 		{
 			name: "unmarshal error",
@@ -257,12 +321,127 @@ func TestCheckpointerUpdate(t *testing.T) {
 		})
 	}
 }
+func TestCheckpointerUpdateWithRole(t *testing.T) {
+	role := "test-role"
+	tests := []struct {
+		name                     string
+		description              string
+		completedIdx             int
+		pageSize                 int
+		preCompleted             []int
+		expectedKey              string
+		expectedRole             string
+		expectedLowestIncomplete int
+	}{
+		{
+			name:                     "first object completed",
+			description:              "Basic case - completing first object",
+			completedIdx:             0,
+			pageSize:                 3,
+			expectedKey:              "key-0",
+			expectedRole:             role,
+			expectedLowestIncomplete: 1,
+		},
+		{
+			name:                     "completing missing middle",
+			description:              "Completing object when previous is done",
+			completedIdx:             1,
+			pageSize:                 3,
+			preCompleted:             []int{0},
+			expectedKey:              "key-1",
+			expectedRole:             role,
+			expectedLowestIncomplete: 2,
+		},
+		{
+			name:                     "all objects completed in order",
+			description:              "Completing final object in sequence",
+			completedIdx:             2,
+			pageSize:                 3,
+			preCompleted:             []int{0, 1},
+			expectedKey:              "key-2",
+			expectedRole:             role,
+			expectedLowestIncomplete: 3,
+		},
+		{
+			name:                     "out of order completion before lowest",
+			description:              "Completing object before current lowest incomplete - should not affect checkpoint",
+			completedIdx:             1,
+			pageSize:                 4,
+			preCompleted:             []int{0, 2, 3},
+			expectedKey:              "key-3",
+			expectedRole:             role,
+			expectedLowestIncomplete: 4,
+		},
+		{
+			name:         "last index in max page",
+			description:  "Edge case - maximum page size boundary",
+			completedIdx: 999,
+			pageSize:     1000,
+			preCompleted: func() []int {
+				indices := make([]int, 999)
+				for i := range indices {
+					indices[i] = i
+				}
+				return indices
+			}(),
+			expectedKey:              "key-999",
+			expectedRole:             role,
+			expectedLowestIncomplete: 1000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			progress := new(sources.Progress)
+			tracker := &Checkpointer{
+				progress:            progress,
+				completedObjects:    make([]bool, tt.pageSize),
+				completionOrder:     make([]int, 0, tt.pageSize),
+				lowestIncompleteIdx: 0,
+			}
+
+			page := &s3.ListObjectsV2Output{Contents: make([]s3types.Object, tt.pageSize)}
+			for i := range tt.pageSize {
+				key := fmt.Sprintf("key-%d", i)
+				page.Contents[i] = s3types.Object{Key: &key}
+			}
+
+			// Setup pre-completed objects.
+			for _, idx := range tt.preCompleted {
+				tracker.completedObjects[idx] = true
+				tracker.completionOrder = append(tracker.completionOrder, idx)
+			}
+
+			// Find the correct lowest incomplete index after pre-completion.
+			for i := range tt.pageSize {
+				if !tracker.completedObjects[i] {
+					tracker.lowestIncompleteIdx = i
+					break
+				}
+			}
+
+			err := tracker.UpdateObjectCompletion(ctx, tt.completedIdx, "test-bucket", role, page.Contents)
+			assert.NoError(t, err, "Unexpected error updating progress")
+
+			var info ResumeInfo
+			err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
+			assert.NoError(t, err, "Failed to decode resume info")
+			assert.Equal(t, tt.expectedKey, info.StartAfter, "Incorrect resume point")
+			assert.Equal(t, tt.expectedRole, info.Role, "Incorrect role")
+
+			assert.Equal(t, tt.expectedLowestIncomplete, tracker.lowestIncompleteIdx,
+				"Incorrect lowest incomplete index")
+		})
+	}
+}
 
 func TestCheckpointerUpdateUnitScan(t *testing.T) {
 	ctx := context.Background()
 	progress := new(sources.Progress)
-	tracker := NewCheckpointer(ctx, progress)
-	tracker.SetIsUnitScan(true)
+	tracker := NewCheckpointer(ctx, progress, true)
 
 	page := &s3.ListObjectsV2Output{
 		Contents: make([]s3types.Object, 3),
@@ -348,7 +527,7 @@ func TestComplete(t *testing.T) {
 				EncodedResumeInfo: tt.initialState.resumeInfo,
 				Message:           tt.initialState.message,
 			}
-			tracker := NewCheckpointer(ctx, progress)
+			tracker := NewCheckpointer(ctx, progress, false)
 
 			err := tracker.Complete(ctx, tt.completeMessage)
 			assert.NoError(t, err)
