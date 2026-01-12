@@ -30,7 +30,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	apiPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
+	apiKeyPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
 	datadogURLPat = regexp.MustCompile(`\b(api(?:\.[a-z0-9-]+)?\.(?:datadoghq|ddog-gov)\.[a-z]{2,3})\b`)
 )
 
@@ -51,7 +51,7 @@ func (s Scanner) getClient() *http.Client {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	apiMatches := apiPat.FindAllStringSubmatch(dataStr, -1)
+	apiMatches := apiKeyPat.FindAllStringSubmatch(dataStr, -1)
 	var uniqueFoundUrls = make(map[string]struct{})
 	for _, matches := range datadogURLPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueFoundUrls[matches[1]] = struct{}{}
