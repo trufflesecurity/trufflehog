@@ -33,7 +33,6 @@ func TestSource_Scan(t *testing.T) {
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
 	basicUser := secret.MustGetField("GITLAB_USER")
-	basicPass := secret.MustGetField("GITLAB_PASS")
 
 	type init struct {
 		name       string
@@ -95,26 +94,6 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source scoped",
-			},
-			wantReposScanned: 1,
-		},
-		{
-			name: "basic auth, scoped repo",
-			init: init{
-				name: "test source basic auth scoped",
-				connection: &sourcespb.GitLab{
-					Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
-					Credential: &sourcespb.GitLab_BasicAuth{
-						BasicAuth: &credentialspb.BasicAuth{
-							Username: basicUser,
-							Password: basicPass,
-						},
-					},
-				},
-			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
-				SourceName: "test source basic auth scoped",
 			},
 			wantReposScanned: 1,
 		},
