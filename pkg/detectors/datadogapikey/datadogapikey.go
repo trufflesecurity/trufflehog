@@ -76,6 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr, resApiMatch)
 				if isVerified {
 					s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "endpoint": baseURL}
+					s1.ExtraData = map[string]string{"endpoint": baseURL}
 					// break the loop once we've successfully validated the token against a baseURL
 					break
 				}

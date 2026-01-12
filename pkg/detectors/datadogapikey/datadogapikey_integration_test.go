@@ -54,6 +54,9 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 						"apiKey":   apiKey,
 						"endpoint": datdogEndpoint,
 					},
+					ExtraData: map[string]string{
+						"endpoint": datdogEndpoint,
+					},
 					Raw: []byte(apiKey),
 				},
 			},
