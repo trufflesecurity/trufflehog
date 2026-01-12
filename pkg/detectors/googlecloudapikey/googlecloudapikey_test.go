@@ -1,4 +1,4 @@
-package googlegemini
+package googlecloudapikey
 
 import (
 	"context"
@@ -16,7 +16,7 @@ var (
 	invalidPattern = "AIzaSyDW1PXXav-TxriHUIrj1djZfHKIuInr7A"
 )
 
-func TestGoogleGemini_Pattern(t *testing.T) {
+func TestGoogleCloudAPIKey_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,12 +26,12 @@ func TestGoogleGemini_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("gemini api key = '%s'", validPattern),
+			input: fmt.Sprintf("google api key = '%s'", validPattern),
 			want:  []string{validPattern},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("gemini api key = '%s'", invalidPattern),
+			input: fmt.Sprintf("google api key = '%s'", invalidPattern),
 			want:  []string{},
 		},
 	}
