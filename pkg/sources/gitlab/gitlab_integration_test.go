@@ -33,6 +33,8 @@ func TestSource_Scan(t *testing.T) {
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
 	basicUser := secret.MustGetField("GITLAB_USER")
+	no2FaUser := secret.MustGetField("GITLAB_NO_2FA_USER")
+	no2FaPass := secret.MustGetField("GITLAB_NO_2FA_PASS")
 
 	type init struct {
 		name       string
@@ -94,6 +96,27 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source scoped",
+			},
+			wantReposScanned: 1,
+		},
+		{
+			name: "basic auth, scoped repo",
+			init: init{
+				name: "test source basic auth scoped",
+				connection: &sourcespb.GitLab{
+					Repositories: []string{"https://gitlab.com/trufflesec-detectors/test-project.git"},
+
+					Credential: &sourcespb.GitLab_BasicAuth{
+						BasicAuth: &credentialspb.BasicAuth{
+							Username: no2FaUser,
+							Password: no2FaPass,
+						},
+					},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+				SourceName: "test source basic auth scoped",
 			},
 			wantReposScanned: 1,
 		},
