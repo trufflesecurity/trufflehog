@@ -76,7 +76,7 @@ type Source struct {
 
 	printLegacyJSON bool
 
-	projectsPerPage int
+	projectsPerPage int64
 
 	// cache of repo URL to project info, used when generating metadata for chunks
 	repoToProjCache repoToProjectCache
@@ -182,7 +182,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
 	s.printLegacyJSON = conn.GetPrintLegacyJson()
-	s.projectsPerPage = int(feature.GitlabProjectsPerPage.Load())
+	s.projectsPerPage = feature.GitlabProjectsPerPage.Load()
 
 	if s.projectsPerPage > 100 {
 		return fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
@@ -531,7 +531,7 @@ func (s *Source) getAllProjectRepos(
 		return fmt.Errorf("unable to authenticate using %s: %w", s.authMethod, err)
 	}
 
-	uniqueProjects := make(map[int]*gitlab.Project)
+	uniqueProjects := make(map[int64]*gitlab.Project)
 	// Record the projectsWithNamespace for logging.
 	var projectsWithNamespace []string
 

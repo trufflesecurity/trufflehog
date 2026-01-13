@@ -564,7 +564,7 @@ func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 
 			// Arrange: Build the chunk reporter
 			chunksChan := make(chan *sources.Chunk, 1024)
-			chunkReporter := sources.ChanReporter{chunksChan}
+			chunkReporter := sources.ChanReporter{Ch: chunksChan}
 
 			// Act: Scan the unit
 			require.NoError(t, s.ChunkUnit(ctx, unit, chunkReporter))
