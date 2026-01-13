@@ -1350,11 +1350,11 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
 
-				uriPath := strings.TrimPrefix(normalizedURI.String(), "file://")
+				uriPath := normalizedURI.Path
 
 				// on windows we get "/C:/path". We need to remove the leading slash.
 				// on unix/macintosh, we get "/path" which needs the leading slash preserved.
-				if len(uriPath) >= 3 && uriPath[0] == '/' && uriPath[2] == ':' {
+				if runtime.GOOS == "windows" {
 					uriPath = strings.TrimPrefix(uriPath, "/")
 				}
 
