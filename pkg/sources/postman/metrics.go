@@ -24,7 +24,7 @@ var (
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "postman_api_monthly_requests_remaining",
-		Help:      "Total number Postman API requests remaining this month.",
+		Help:      "Total number of Postman API requests remaining this month.",
 	},
 		[]string{"source_name"})
 )
