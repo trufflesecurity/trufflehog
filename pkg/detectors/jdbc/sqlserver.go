@@ -15,9 +15,23 @@ type SqlServerJDBC struct {
 	ConnectionInfo
 }
 
+var _ JDBC = (*SqlServerJDBC)(nil)
+
 func (s *SqlServerJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "mssql", isSqlServerErrorDeterminate,
-		BuildSQLServerConnectionString(s.Host, s.User, s.Password, "master", map[string]string{"connection+timeout": "5"}))
+		buildSQLServerConnectionString(s.Host, s.User, s.Password, "master", map[string]string{"connection+timeout": "5"}))
+}
+
+func (s *SqlServerJDBC) GetDBType() DatabaseType {
+	return SQLServer
+}
+
+func (s *SqlServerJDBC) GetConnectionInfo() *ConnectionInfo {
+	return &s.ConnectionInfo
+}
+
+func (s *SqlServerJDBC) BuildConnectionString() string {
+	return buildSQLServerConnectionString(s.Host, s.User, s.Password, s.Database, s.Params)
 }
 
 func isSqlServerErrorDeterminate(err error) bool {
@@ -34,7 +48,7 @@ func isSqlServerErrorDeterminate(err error) bool {
 	return false
 }
 
-func ParseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
+func parseSqlServer(ctx logContext.Context, subname string) (JDBC, error) {
 	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected connection to start with //")
 	}
@@ -93,7 +107,7 @@ func ParseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 	}, nil
 }
 
-func BuildSQLServerConnectionString(host, user, password, database string, params map[string]string) string {
+func buildSQLServerConnectionString(host, user, password, database string, params map[string]string) string {
 	conn := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s", user, password, host, database)
 	if len(params) > 0 {
 		for k, v := range params {
