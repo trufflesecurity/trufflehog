@@ -16,6 +16,28 @@
 
 ---
 
+## Table of Contents
+
+- [What is TruffleHog](#what-is-trufflehog-)
+- [Join Our Community](#loudspeaker-join-our-community)
+- [Demo](#tv-demo)
+- [Installation](#floppy_disk-installation)
+- [Verifying the Artifacts](#closed_lock_with_key-verifying-the-artifacts)
+- [Quick Start](#rocket-quick-start)
+- [FAQ](#question-faq)
+- [What's New in v3](#newspaper-whats-new-in-v3)
+- [Usage](#memo-usage)
+- [TruffleHog GitHub Action](#octocat-trufflehog-github-action)
+- [TruffleHog GitLab CI](#trufflehog-gitlab-ci)
+- [Pre-commit Hook](#pre-commit-hook)
+- [Custom Regex Detector](#custom-regex-detector-alpha)
+- [Analyze](#mag-analyze)
+- [Contributors](#heart-contributors)
+- [Contributing](#computer-contributing)
+- [License](#license-change)
+
+---
+
 # :mag_right: _Now Scanning_
 
 <div align="center">
