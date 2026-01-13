@@ -128,7 +128,7 @@ func TestParseSqlServerWithJdbcAndOdbcBridgeString(t *testing.T) {
 
 	ctx := logContext.AddLogger(context.Background())
 
-	j, err := ParseSqlServer(ctx, subname)
+	j, err := parseSqlServer(ctx, subname)
 	if err != nil {
 		t.Fatalf("parseSqlServer() error = %v", err)
 	}
