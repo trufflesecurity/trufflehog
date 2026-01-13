@@ -207,8 +207,6 @@ type ResultWithMetadata struct {
 	// SourceName is the name of the Source.
 	SourceName string
 	Result
-	// Data from the sources.Chunk which this result was emitted for
-	Data []byte
 	// DetectorDescription is the description of the Detector.
 	DetectorDescription string
 	// DecoderType is the type of decoder that was used to generate this result's data.
@@ -225,7 +223,6 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
 		Result:         result,
-		Data:           chunk.Data,
 	}
 }
 
