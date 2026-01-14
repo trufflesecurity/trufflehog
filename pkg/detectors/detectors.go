@@ -93,7 +93,7 @@ type Result struct {
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
 	// Verified indicates whether the result was verified or not.
-	Verified     bool
+	Verified bool
 	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
 	// than an actual remote request.
 	VerificationFromCache bool
@@ -139,6 +139,10 @@ func (r *Result) SetVerificationError(err error, secrets ...string) {
 	if err != nil {
 		r.verificationError = redactSecrets(err, secrets...)
 	}
+}
+
+func (r *Result) ResetVerificationError() {
+	r.verificationError = nil
 }
 
 // Public accessors for the fields could also be provided if needed.
@@ -293,7 +297,7 @@ func MustGetBenchmarkData() map[string][]byte {
 	for key, size := range sizes {
 		// Generating a byte slice of a specific size with random data.
 		content := make([]byte, size)
-		for i := range(size) {
+		for i := range size {
 			randomByte, err := rand.Int(rand.Reader, big.NewInt(256))
 			if err != nil {
 				panic(err)

@@ -3,6 +3,8 @@ package datadogtoken
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -14,6 +16,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.EndpointSetter
 	detectors.DefaultMultiPartCredentialProvider
 }
@@ -93,6 +96,13 @@ func setOrganizationInfo(opt []*options, s1 *detectors.Result) {
 
 }
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return client
+}
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -130,33 +140,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				for _, baseURL := range s.Endpoints(endpoints...) {
-					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					req.Header.Add("DD-API-KEY", resApiMatch)
-					req.Header.Add("DD-APPLICATION-KEY", resAppMatch)
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "appKey": resAppMatch, "endpoint": baseURL}
-							var serviceResponse userServiceResponse
-							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
-								// setup emails
-								if len(serviceResponse.Data) > 0 {
-									setUserEmails(serviceResponse.Data, &s1)
-								}
-								// setup organizations
-								if len(serviceResponse.Included) > 0 {
-									setOrganizationInfo(serviceResponse.Included, &s1)
-								}
+					client := s.getClient()
+					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
+					fmt.Printf("isVerified:%v, verificationErr:%v", isVerified, verificationErr)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
+					if isVerified && res != nil {
+						s1.ResetVerificationError() // Reset verification error in case a secret is verified with an endpoint
+						s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "appKey": resAppMatch, "endpoint": baseURL}
+						var serviceResponse userServiceResponse
+						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
+							// setup emails
+							if len(serviceResponse.Data) > 0 {
+								setUserEmails(serviceResponse.Data, &s1)
 							}
-							// break the loop once we've successfully validated the token against a baseURL
-							break
+							// setup organizations
+							if len(serviceResponse.Included) > 0 {
+								setOrganizationInfo(serviceResponse.Included, &s1)
+							}
 						}
+						// break the loop once we've successfully validated the token against a baseURL
+						break
 					}
 				}
 			}
@@ -173,4 +177,41 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, apiKey, appKey, baseUrl string) (*http.Response, bool, error) {
+	// Reference: https://docs.datadoghq.com/api/latest/users/
+
+	req, err := http.NewRequestWithContext(ctx, "GET", baseUrl+"/api/v2/users", nil)
+	if err != nil {
+		return nil, false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("DD-API-KEY", apiKey)
+	req.Header.Add("DD-APPLICATION-KEY", appKey)
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return res, true, nil
+	case http.StatusBadRequest:
+		return nil, false, fmt.Errorf("bad request")
+	case http.StatusUnauthorized:
+		return nil, false, fmt.Errorf("invalid credentials")
+	case http.StatusForbidden:
+		return nil, false, fmt.Errorf("Insufficient permissions")
+	case http.StatusTooManyRequests:
+		return nil, false, fmt.Errorf("too many requests")
+	default:
+		return nil, false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
