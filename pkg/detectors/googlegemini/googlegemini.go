@@ -35,11 +35,12 @@ func (s Scanner) getClient() *http.Client {
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string { return []string{"AIzaSy"} }
+// We have added gemini here and not "AIzaSy" because we want to avoid
+// false positives from other Google API keys.
+func (s Scanner) Keywords() []string { return []string{"gemini"} }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GoogleGemini
+	return detectorspb.DetectorType_GoogleGeminiAPIKey
 }
 
 func (s Scanner) Description() string {
@@ -54,14 +55,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_GoogleGemini,
+			DetectorType: s.Type(),
 			Raw:          []byte(resMatch),
 			Redacted:     resMatch[:8] + "...",
 		}
 
 		if verify {
-			isVerified, verificationErr := s.verify(ctx, resMatch)
+			isVerified, extraData, verificationErr := s.verify(ctx, resMatch)
 			s1.Verified = isVerified
+			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
 		}
 
@@ -71,11 +73,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) verify(ctx context.Context, key string) (bool, error) {
+func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodGet, "https://generativelanguage.googleapis.com/v1/models", http.NoBody)
 	if err != nil {
-		return false, fmt.Errorf("error constructing request: %w", err)
+		return false, nil, fmt.Errorf("error constructing request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-goog-api-key", key)
@@ -83,7 +85,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, error) {
 	client := s.getClient()
 	res, err := client.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("error making request: %w", err)
+		return false, nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer func() {
 		_ = res.Body.Close()
@@ -92,10 +94,15 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, error) {
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, nil
+		// Key is valid and has access to gemini
+		return true, map[string]string{"active_google_key": "true"}, nil
+	case http.StatusForbidden:
+		// Key is valid but does not have access to gemini
+		return false, map[string]string{"active_google_key": "true"}, nil
 	case http.StatusBadRequest:
-		return false, nil
+		// Key is invalid (expired, revoked)
+		return false, nil, nil
 	default:
-		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 }

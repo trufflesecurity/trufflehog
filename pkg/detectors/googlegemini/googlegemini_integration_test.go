@@ -24,7 +24,8 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY")
+	keyGemini := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY")
+	keyNonGemini := testSecrets.MustGetField("GOOGLE_CLOUD_API_KEY")
 	keyInactive := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY_INACTIVE")
 
 	type args struct {
@@ -44,13 +45,35 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a google gemini api key %s within", key)),
+				data:   []byte(fmt.Sprintf("You can find a google gemini key %s within", keyGemini)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleGemini,
+					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"active_google_key": "true",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, unverified but valid google cloud api key",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyNonGemini)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"active_google_key": "true",
+					},
 				},
 			},
 			wantErr: false,
@@ -60,12 +83,12 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a google gemini api key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleGemini,
+					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
 					Verified:     false,
 				},
 			},
@@ -88,7 +111,7 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GoogleGemini.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GoogleGeminiAPIKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -102,7 +125,7 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 				got[i].Redacted = ""
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("GoogleGemini.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("GoogleGeminiAPIKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
