@@ -142,7 +142,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for _, baseURL := range s.Endpoints(endpoints...) {
 					client := s.getClient()
 					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
-					fmt.Printf("isVerified:%v, verificationErr:%v", isVerified, verificationErr)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
 					if isVerified && res != nil {
