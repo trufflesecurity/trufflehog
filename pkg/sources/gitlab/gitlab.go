@@ -471,6 +471,13 @@ func (s *Source) Validate(ctx context.Context) []error {
 func (s *Source) newClient() (*gitlab.Client, error) {
 	// Initialize a new api instance.
 	switch s.authMethod {
+	case "OAUTH":
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
+		apiClient, err := gitlab.NewAuthSourceClient(gitlab.OAuthTokenSource{TokenSource: ts}, gitlab.WithBaseURL(s.url))
+		if err != nil {
+			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
+		}
+		return apiClient, nil
 	case "BASIC_AUTH":
 		apiClient, err := gitlab.NewAuthSourceClient(&gitlab.PasswordCredentialsAuthSource{Username: s.user, Password: s.password}, gitlab.WithBaseURL(s.url))
 		if err != nil {
@@ -484,7 +491,7 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 			return apiClient, nil
 		}
 		fallthrough
-	case "TOKEN", "OAUTH":
+	case "TOKEN":
 		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
 		apiClient, err := gitlab.NewAuthSourceClient(gitlab.OAuthTokenSource{TokenSource: ts}, gitlab.WithBaseURL(s.url))
 		if err != nil {
