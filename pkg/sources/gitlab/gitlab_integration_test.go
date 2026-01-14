@@ -16,6 +16,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -814,4 +815,78 @@ func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
 	if !gotChunks {
 		t.Errorf("0 chunks scanned.")
 	}
+}
+
+// TestSource_Chunks_SimplifiedGitlabEnumeration enumerates GitLab projects
+// using a stored GitLab secret in GCP with the `UseSimplifiedGitlabEnumeration`
+// feature flag enabled. When enabled, the enumeration path is redirected to
+// `getAllProjectReposV2`, validating project listing via keyset pagination.
+func TestSource_Chunks_SimplifiedGitlabEnumeration(t *testing.T) {
+	// Preserve and restore the feature flag to avoid cross-test contamination
+	prev := feature.UseSimplifiedGitlabEnumeration.Load()
+	// enable the simplified gitlab enumeration flag
+	feature.UseSimplifiedGitlabEnumeration.Store(true)
+	defer feature.UseSimplifiedGitlabEnumeration.Store(prev)
+
+	// Create a bounded context for the entire test
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Retrieve test secret containing the GitLab token
+	secret, err := common.GetTestSecret(ctx)
+	require.NoError(t, err, "failed to access test secret")
+
+	token := secret.MustGetField("GITLAB_TOKEN")
+
+	// Initialize the GitLab source with token-based authentication
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.GitLab{
+		Credential: &sourcespb.GitLab_Token{
+			Token: token,
+		},
+	})
+	require.NoError(t, err)
+
+	err = s.Init(ctx, "enumerate gitlab projects with V2", 0, 0, false, conn, 10)
+	require.NoError(t, err, "failed during Source.Init")
+
+	// Enumerate GitLab projects
+	testReporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &testReporter)
+	require.NoError(t, err, "enumeration should not fail")
+
+	// Ensure enumeration actually produced units
+	require.NotEmpty(t, testReporter.Units, "enumeration returned no units")
+
+	// Clear project cache to force project-detail lookups during chunking
+	clear(s.repoToProjCache.cache)
+
+	// Channel-based reporter to capture emitted chunks
+	chunksCh := make(chan *sources.Chunk, 1)
+	chanReporter := sources.ChanReporter{Ch: chunksCh}
+
+	// Chunk all enumerated units asynchronously
+	go func() {
+		defer close(chunksCh)
+		for _, unit := range testReporter.Units {
+			if err := s.ChunkUnit(ctx, unit, chanReporter); err != nil {
+				t.Errorf("Source.ChunkUnit() error = %v", err)
+			}
+		}
+	}()
+
+	// Validate produced chunks and their GitLab metadata
+	gotChunks := false
+	for chunk := range chunksCh {
+		gotChunks = true
+
+		meta, ok := chunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Gitlab)
+		require.True(t, ok, "unexpected metadata type")
+
+		assert.NotZero(t, meta.Gitlab.ProjectId, "missing project ID in chunk metadata")
+		assert.NotEmpty(t, meta.Gitlab.ProjectName, "missing project name in chunk metadata")
+	}
+
+	// Ensure at least one chunk was produced
+	assert.True(t, gotChunks, "expected at least one chunk, got zero")
 }
