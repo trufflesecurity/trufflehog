@@ -148,15 +148,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.ResetVerificationError() // Reset verification error in case a secret is verified with an endpoint
 						s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "appKey": resAppMatch, "endpoint": baseURL}
 						var serviceResponse userServiceResponse
-						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
-							// setup emails
-							if len(serviceResponse.Data) > 0 {
-								setUserEmails(serviceResponse.Data, &s1)
-							}
-							// setup organizations
-							if len(serviceResponse.Included) > 0 {
-								setOrganizationInfo(serviceResponse.Included, &s1)
-							}
+						if len(serviceResponse.Data) > 0 {
+							setUserEmails(serviceResponse.Data, &s1)
+						}
+						if len(serviceResponse.Included) > 0 {
+							setOrganizationInfo(serviceResponse.Included, &s1)
 						}
 						// break the loop once we've successfully validated the token against a baseURL
 						break
@@ -178,7 +174,7 @@ func (s Scanner) Description() string {
 	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, apiKey, appKey, baseUrl string) (*http.Response, bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, apiKey, appKey, baseUrl string) (*userServiceResponse, bool, error) {
 	// Reference: https://docs.datadoghq.com/api/latest/users/
 
 	req, err := http.NewRequestWithContext(ctx, "GET", baseUrl+"/api/v2/users", nil)
@@ -201,7 +197,11 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, appKey, baseU
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return res, true, nil
+		var serviceResponse userServiceResponse
+		if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err != nil {
+			return nil, false, err
+		}
+		return &serviceResponse, true, nil
 	case http.StatusBadRequest:
 		return nil, false, fmt.Errorf("bad request")
 	case http.StatusUnauthorized:
