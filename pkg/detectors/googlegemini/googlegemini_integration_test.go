@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package googlecloudapikey
+package googlegemini
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestGoogleCloudAPIKey_FromChunk(t *testing.T) {
+func TestGoogleGemini_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
@@ -24,8 +24,7 @@ func TestGoogleCloudAPIKey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("GOOGLE_CLOUD_API_KEY")
-	keyGemini := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY")
+	key := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY")
 	keyInactive := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY_INACTIVE")
 
 	type args struct {
@@ -45,35 +44,13 @@ func TestGoogleCloudAPIKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a google api key %s within", key)),
+				data:   []byte(fmt.Sprintf("You can find a google gemini api key %s within", key)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleCloudAPIKey,
+					DetectorType: detectorspb.DetectorType_GoogleGemini,
 					Verified:     true,
-					ExtraData: map[string]string{
-						"gemini_enabled": "false",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, verified with gemini enabled",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyGemini)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_GoogleCloudAPIKey,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"gemini_enabled": "true",
-					},
 				},
 			},
 			wantErr: false,
@@ -83,12 +60,12 @@ func TestGoogleCloudAPIKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a google gemini api key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleCloudAPIKey,
+					DetectorType: detectorspb.DetectorType_GoogleGemini,
 					Verified:     false,
 				},
 			},
@@ -111,7 +88,7 @@ func TestGoogleCloudAPIKey_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GoogleCloudAPIKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GoogleGemini.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -125,7 +102,7 @@ func TestGoogleCloudAPIKey_FromChunk(t *testing.T) {
 				got[i].Redacted = ""
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("GoogleCloudAPIKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("GoogleGemini.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
