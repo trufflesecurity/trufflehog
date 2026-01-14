@@ -41,14 +41,35 @@ chmod +x ~/.git-hooks/pre-commit
 
 3. Add the following content to `~/.git-hooks/pre-commit`:
 
+- Using `TRUFFLEHOG_PRE_COMMIT` env variable (recommended):
 ```bash
 #!/bin/sh
+# Trufflehog auto-detects this and applies pre-commit settings
+export TRUFFLEHOG_PRE_COMMIT=1
+trufflehog git file://.
+```
 
-trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail
+- Manual configuration (only if you need custom behavior)
+Do NOT set `TRUFFLEHOG_PRE_COMMIT` if using manual configuration
+```bash
+#!bin/sh
+trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail --trust-local-git-config
 ```
 
 If you are using Docker, use this instead:
 
+- Using `TRUFFLEHOG_PRE_COMMIT` env variable (recommended):
+```bash
+#!/bin/sh
+# Set environment variable inside container (recommended)
+docker run --rm \
+  -v "$(pwd):/workdir" \
+  -e "TRUFFLEHOG_PRE_COMMIT=1" \
+  trufflesecurity/trufflehog:latest \
+  git file:///workdir
+```
+
+- Manual configuration (only if you need custom behavior)
 ```bash
 #!/bin/sh
 
@@ -95,7 +116,7 @@ repos:
       - id: trufflehog
         name: TruffleHog
         description: Detect secrets in your data.
-        entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail'
+        entry: bash -c 'trufflehog git file://.'
         language: system
         stages: ["pre-commit", "pre-push"]
 ```
@@ -134,7 +155,7 @@ npx husky init
 1. Add the following content to `.husky/pre-commit`:
 
 ```bash
-echo "trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail" > .husky/pre-commit
+echo "trufflehog git file://." > .husky/pre-commit
 ```
 
 3. For Docker users, use this content instead:
