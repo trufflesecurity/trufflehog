@@ -21,6 +21,8 @@ import (
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -152,6 +154,53 @@ func BenchmarkHandleFile(b *testing.B) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(b, err)
 	}
+}
+
+func TestHandleChunksWithErrorSetsFilesystemLine(t *testing.T) {
+	chunkCh := make(chan *sources.Chunk, 2)
+	reporter := sources.ChanReporter{Ch: chunkCh}
+
+	chunkSkel := &sources.Chunk{
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Filesystem{
+				Filesystem: &source_metadatapb.Filesystem{File: "test.txt"},
+			},
+		},
+	}
+
+	chunkSize := sources.DefaultChunkSize
+	peekSize := sources.DefaultPeekSize
+
+	chunkOneMain := bytes.Repeat([]byte("a\n"), chunkSize/2)
+	chunkOnePeek := bytes.Repeat([]byte("p\n"), peekSize/2)
+	chunkOne := append(chunkOneMain, chunkOnePeek...)
+
+	chunkTwo := bytes.Repeat([]byte("b\n"), 10)
+
+	dataErrChan := make(chan DataOrErr, 2)
+	dataErrChan <- DataOrErr{Data: chunkOne}
+	dataErrChan <- DataOrErr{Data: chunkTwo}
+	close(dataErrChan)
+
+	require.NoError(t, handleChunksWithError(context.Background(), dataErrChan, chunkSkel, reporter))
+
+	close(chunkCh)
+	var chunks []*sources.Chunk
+	for ch := range chunkCh {
+		chunks = append(chunks, ch)
+	}
+
+	require.Len(t, chunks, 2)
+
+	firstMeta := chunks[0].SourceMetadata.GetFilesystem()
+	require.NotNil(t, firstMeta)
+	require.Equal(t, int64(1), firstMeta.GetLine())
+
+	linesInFirstChunk := int64(bytes.Count(chunkOne[:chunkSize], []byte("\n")))
+	secondMeta := chunks[1].SourceMetadata.GetFilesystem()
+	require.NotNil(t, secondMeta)
+	require.Equal(t, linesInFirstChunk+1, secondMeta.GetLine())
 }
 
 func TestSkipArchive(t *testing.T) {
