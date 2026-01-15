@@ -35,9 +35,7 @@ func (s Scanner) getClient() *http.Client {
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
-// We have added gemini here and not "AIzaSy" because we want to avoid
-// false positives from other Google API keys.
-func (s Scanner) Keywords() []string { return []string{"gemini"} }
+func (s Scanner) Keywords() []string { return []string{"aizasy"} }
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoogleGeminiAPIKey
