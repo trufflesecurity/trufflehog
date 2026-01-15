@@ -193,12 +193,12 @@ You can run the TruffleHog pre-commit hook in an "audit" or "non-enforcement" mo
 
 Local Binary Version:
 ```bash
-trufflehog git file://. --since-commit HEAD --results=verified,unknown 2>/dev/null
+trufflehog git file://. --since-commit HEAD --results=verified,unknown --trust-local-git-config 2>/dev/null
 ```
 
 Docker Container Version:
 ```bash
-docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown 2>/dev/null
+docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown --trust-local-git-config 2>/dev/null
 ```
 
 This change does two things: (1) removes the `--fail` flag, which means the pre-commit hook will *always* pass, (2) suppresses `stderr` output, so only verified secrets are printed to the terminal output.
