@@ -91,7 +91,7 @@ func fetchBaseSchema(token string, baseID string) (*Schema, error) {
 	if !exists {
 		return nil, fmt.Errorf("endpoint for GetBaseSchemaEndpoint does not exist")
 	}
-	url := strings.Replace(endpoint.URL, "{baseID}", baseID, -1)
+	url := strings.ReplaceAll(endpoint.URL, "{baseID}", baseID)
 	resp, err := CallAirtableAPI(token, endpoint.Method, url)
 	if err != nil {
 		return nil, err

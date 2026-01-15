@@ -248,7 +248,7 @@ func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]
 }
 
 // parsePrivateKey parses a PEM-encoded private key
-func parsePrivateKey(privateKeyPEM string) (interface{}, error) {
+func parsePrivateKey(privateKeyPEM string) (any, error) {
 	block, _ := pem.Decode([]byte(privateKeyPEM))
 	if block == nil {
 		return nil, nil
