@@ -774,9 +774,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			gitCfg.TrustLocalGitConfig = true
 			gitCfg.BaseRef = "HEAD" // Only scan staged changes
 
-			// Override result filters for pre-commit hook context
-			// In hook mode, we only want to show verified secrets and unknown findings
-			*results = "verified,unknown"
+			// add result filters for pre-commit hook context if not set by user
+			// By default in hook mode, we only want to show verified secrets and unknown findings
+			// this allow users to not use default setting and set results while using TRUFFLEHOG_PRE_COMMIT env variable
+			if *results == "" {
+				*results = "verified,unknown"
+			}
 
 			// Override failure behavior for pre-commit hook context
 			// In hook mode, we want to fail the commit if any secrets are found
