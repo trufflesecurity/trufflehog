@@ -12,6 +12,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 func CallAirtableAPI(token string, method string, url string) (*http.Response, error) {
@@ -21,7 +22,7 @@ func CallAirtableAPI(token string, method string, url string) (*http.Response, e
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := detectors.DetectorHttpClientWithNoLocalAddresses.Do(req)
 	if err != nil {
 		return nil, err
 	}
