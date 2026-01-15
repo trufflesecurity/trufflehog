@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -48,6 +49,7 @@ func TestSource_Scan(t *testing.T) {
 				Data: &source_metadatapb.MetaData_Filesystem{
 					Filesystem: &source_metadatapb.Filesystem{
 						File: "filesystem.go",
+						Line: 1, // First chunk starts at line 1
 					},
 				},
 			},
@@ -84,8 +86,8 @@ func TestSource_Scan(t *testing.T) {
 			for chunk := range chunksCh {
 				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
 					counter++
-					if diff := pretty.Compare(chunk.SourceMetadata, tt.wantSourceMetadata); diff != "" {
-						t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" {
+						t.Errorf("Source.Chunks() %s metadata mismatch (-want +got):\n%s", tt.name, diff)
 					}
 				}
 			}

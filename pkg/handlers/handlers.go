@@ -11,6 +11,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archives"
+	"google.golang.org/protobuf/proto"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -184,6 +185,8 @@ func newFileReader(ctx context.Context, r io.Reader, options ...readerOption) (f
 type DataOrErr struct {
 	Data []byte
 	Err  error
+	// LineNumber is the 1-indexed starting line of this data within the file.
+	LineNumber int64
 }
 
 // FileHandler represents a handler for files.
@@ -403,6 +406,7 @@ func HandleFile(
 //
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
 // It returns nil upon successful processing of all data, or the first encountered fatal error.
+// Line numbers from DataOrErr are propagated to the chunk's source metadata for accurate reporting.
 func handleChunksWithError(
 	ctx logContext.Context,
 	dataErrChan <-chan DataOrErr,
@@ -427,6 +431,8 @@ func handleChunksWithError(
 			if len(dataOrErr.Data) > 0 {
 				chunk := *chunkSkel
 				chunk.Data = dataOrErr.Data
+				populateChunkLineNumber(&chunk, dataOrErr.LineNumber)
+
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					return fmt.Errorf("error reporting chunk: %w", err)
 				}
@@ -435,6 +441,37 @@ func handleChunksWithError(
 			return ctx.Err()
 		}
 	}
+}
+
+// populateChunkLineNumber sets the line number in the chunk's source metadata.
+// It clones the metadata to avoid sharing state between chunks, since chunk
+// skeletons reuse the same metadata pointer. Line number is expected to be 1-indexed.
+// If lineNumber is 0 or metadata is nil, no changes are made.
+func populateChunkLineNumber(chunk *sources.Chunk, lineNumber int64) {
+	if lineNumber == 0 || chunk.SourceMetadata == nil {
+		return
+	}
+
+	cloned := proto.CloneOf(chunk.SourceMetadata)
+	switch m := cloned.Data.(type) {
+	case *source_metadatapb.MetaData_Filesystem:
+		m.Filesystem.Line = lineNumber
+	case *source_metadatapb.MetaData_AzureRepos:
+		m.AzureRepos.Line = lineNumber
+	case *source_metadatapb.MetaData_Bitbucket:
+		m.Bitbucket.Line = lineNumber
+	case *source_metadatapb.MetaData_Gerrit:
+		m.Gerrit.Line = lineNumber
+	case *source_metadatapb.MetaData_Github:
+		m.Github.Line = lineNumber
+	case *source_metadatapb.MetaData_Gitlab:
+		m.Gitlab.Line = lineNumber
+	case *source_metadatapb.MetaData_Git:
+		m.Git.Line = lineNumber
+	case *source_metadatapb.MetaData_Huggingface:
+		m.Huggingface.Line = lineNumber
+	}
+	chunk.SourceMetadata = cloned
 }
 
 // isFatal determines whether the given error is a fatal error that should
