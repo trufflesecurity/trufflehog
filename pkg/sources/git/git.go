@@ -437,11 +437,6 @@ func normalizeFileURI(uri *url.URL) (*url.URL, error) {
 	// Convert to forward slashes (for Windows compatibility)
 	normalizedPath := filepath.ToSlash(absPath)
 
-	// Ensure path starts with / for proper file:/// URI format
-	if !strings.HasPrefix(normalizedPath, "/") {
-		normalizedPath = "/" + normalizedPath
-	}
-
 	normalizedURI := &url.URL{
 		Scheme: "file",
 		Path:   normalizedPath,
@@ -1349,14 +1344,7 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 			if !isRepoBare(path) {
 				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
-
 				uriPath := normalizedURI.Path
-
-				// on windows we get "/C:/path". We need to remove the leading slash.
-				// on unix/macintosh, we get "/path" which needs the leading slash preserved.
-				if runtime.GOOS == "windows" {
-					uriPath = strings.TrimPrefix(uriPath, "/")
-				}
 
 				originalIndexPath := filepath.Join(uriPath, gitDirName, "index")
 
