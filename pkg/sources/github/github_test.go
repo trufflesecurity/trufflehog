@@ -112,6 +112,36 @@ func TestAddReposByOrg(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestAddReposByOrg_Repositories(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/super-secret-org/repos").
+		Reply(200).
+		JSON(`[
+			{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git", "size": 1},
+			{"full_name": "super-secret-org/super-secret-repo2", "clone_url": "https://github.com/super-secret-org/super-secret-repo2.git", "size": 1},
+			{"full_name": "super-secret-org/not-super-secret-repo", "clone_url": "https://github.com/super-secret-org/not-super-secret-repo.git", "size": 1}
+		]`)
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		Repositories:  []string{"super-secret-org/super-secret-repo", "super-secret-org/super-secret-repo2"},
+		Organizations: []string{"super-secret-org"},
+	})
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
+	assert.True(t, ok)
+	ok = s.filteredRepoCache.Exists("super-secret-org/super-secret-repo2")
+	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 	defer gock.Off()
 
@@ -747,6 +777,30 @@ func BenchmarkEnumerate(b *testing.B) {
 		b.StartTimer()
 		_ = s.Enumerate(context.Background(), noopReporter())
 	}
+}
+
+func TestEnumerateWithToken_Repositories(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
+	s.repos = []string{"some-special-repo"}
+
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(s.repos))
+	assert.Equal(t, []string{"some-special-repo"}, s.repos)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
 }
 
 func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
