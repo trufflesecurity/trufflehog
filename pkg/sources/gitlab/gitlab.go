@@ -485,7 +485,12 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		}
 		return apiClient, nil
 	case "BASIC_AUTH":
-		apiClient, err := gitlab.NewAuthSourceClient(&gitlab.PasswordCredentialsAuthSource{Username: s.user, Password: s.password}, gitlab.WithBaseURL(s.url))
+		apiClient, err := gitlab.NewAuthSourceClient(
+			&gitlab.PasswordCredentialsAuthSource{Username: s.user, Password: s.password},
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %q: %w", s.url, err)
 		}
