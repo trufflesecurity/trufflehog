@@ -846,10 +846,10 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 			continue
 		}
 
-		var findings []finding
-		safeMatches := make(map[*ahocorasick.DetectorMatch]bool, len(matchingDetectors))
+		findings := make([]finding, 0, 8*len(matchingDetectors))
+		safeDetectors := make(map[*ahocorasick.DetectorMatch]bool, len(matchingDetectors))
 		for _, match := range matchingDetectors {
-			safeMatches[match] = true
+			safeDetectors[match] = true
 			for _, matchBytes := range match.Matches() {
 				candidates, err := match.Detector.FromData(ctx, false, matchBytes)
 				if err != nil {
@@ -867,23 +867,23 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 
 		for _, f1 := range findings {
 			for _, f2 := range findings {
-				if (safeMatches[f1.detector] || safeMatches[f2.detector]) && areFindingsDangerouslySimilar(f1, f2) {
-					safeMatches[f1.detector] = false
-					safeMatches[f2.detector] = false
+				if (safeDetectors[f1.detector] || safeDetectors[f2.detector]) && areFindingsDangerouslySimilar(f1, f2) {
+					safeDetectors[f1.detector] = false
+					safeDetectors[f2.detector] = false
 				}
 			}
 		}
 
-		for match, safe := range safeMatches {
+		for detector, safe := range safeDetectors {
 			if !safe {
 				continue
 			}
 
-			verify := e.shouldVerifyChunk(chunk.Verify, match.Detector, e.detectorVerificationOverrides)
-			for _, matchBytes := range match.Matches() {
+			verify := e.shouldVerifyChunk(chunk.Verify, detector.Detector, e.detectorVerificationOverrides)
+			for _, matchBytes := range detector.Matches() {
 				matchResults, err := e.verificationCache.FromData(
 					ctx,
-					match.Detector,
+					detector.Detector,
 					verify,
 					chunk.SecretID != 0,
 					matchBytes)
@@ -896,7 +896,7 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 		}
 
 		for _, f := range findings {
-			if safeMatches[f.detector] {
+			if safeDetectors[f.detector] {
 				continue
 			}
 
