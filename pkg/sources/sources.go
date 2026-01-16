@@ -46,6 +46,12 @@ type Chunk struct {
 
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
+
+	// UpdateLink is a source-specific function for updating line numbers in links.
+	// This function is provided by the source at initialization time and allows
+	// the engine to update links without knowing provider-specific formats.
+	// Can be nil for sources that don't support link updating.
+	SourceUpdateLink func(link string, line int64) string
 }
 
 // ChunkingTarget specifies criteria for a targeted chunking process.
