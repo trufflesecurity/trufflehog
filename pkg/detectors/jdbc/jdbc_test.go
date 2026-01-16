@@ -40,6 +40,8 @@ func TestJdbc_Pattern(t *testing.T) {
 							<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
 							<jdbc-url>jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false</jdbc-url>
 							<jdbc-url>jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks</jdbc-url>
+							<jdbc-url>(jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb)</jdbc-url>
+							<jdbc-url>jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser&</jdbc-url>
 							<working-dir>$ProjectFileDir$</working-dir>
 							</data-source>
 						</component>
@@ -50,6 +52,8 @@ func TestJdbc_Pattern(t *testing.T) {
 				"jdbc:mysql:localhost:3306/mydatabase",
 				"jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false",
 				"jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks",
+				"jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb",
+				"jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser",
 			},
 		},
 		{
@@ -64,8 +68,10 @@ func TestJdbc_Pattern(t *testing.T) {
 						"jdbc:oracle:thin:@host:1521:db",
 						"jdbc:mysql://host:3306/db,other_param",
 						"jdbc:db2://host:50000/db?param=1"
-					]
-				}`,
+						"jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser"
+						"jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb"
+						]
+						}`,
 			want: []string{
 				"jdbc:postgresql://localhost:5432/mydb",
 				"jdbc:mysql://user:pass@host:3306/db?param=1",
@@ -73,6 +79,8 @@ func TestJdbc_Pattern(t *testing.T) {
 				"jdbc:oracle:thin:@host:1521:db",
 				"jdbc:mysql://host:3306/db",
 				"jdbc:db2://host:50000/db?param=1",
+				"jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser",
+				"jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb",
 			},
 		},
 		{
