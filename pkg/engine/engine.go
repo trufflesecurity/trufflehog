@@ -16,6 +16,7 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -804,9 +805,7 @@ func newFinding(d *ahocorasick.DetectorMatch, r detectors.Result) finding {
 	}
 }
 
-func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detectors.Result {
-	var results []detectors.Result
-
+func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) {
 	for _, decoder := range e.decoders {
 		chunkCopy := *chunk
 		decoded := decoder.FromChunk(&chunkCopy)
@@ -822,6 +821,7 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 		if len(matchingDetectors) == 1 || e.verificationOverlap {
 			for _, match := range matchingDetectors {
 				verify := e.shouldVerifyChunk(chunk.Verify, match.Detector, e.detectorVerificationOverrides)
+				isFalsePositive := detectors.GetFalsePositiveCheck(match.Detector)
 				for _, matchBytes := range match.Matches() {
 					matchResults, err := e.verificationCache.FromData(
 						ctx,
@@ -833,7 +833,18 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 						continue
 					}
 					// Cleaning?
-					results = append(results, matchResults...)
+
+					for _, result := range matchResults {
+						e.processResult(
+							ctx,
+							detectableChunk{
+								detector: match,
+								chunk:    *chunk,
+								decoder:  decoder.Type(),
+							},
+							result,
+							isFalsePositive)
+					}
 				}
 			}
 			continue
@@ -890,6 +901,7 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 			}
 
 			verify := e.shouldVerifyChunk(chunk.Verify, detector.Detector, e.detectorVerificationOverrides)
+			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
 			for _, matchBytes := range detector.Matches() {
 				matchResults, err := e.verificationCache.FromData(
 					ctx,
@@ -901,27 +913,61 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 					continue
 				}
 				// Cleaning?
-				results = append(results, matchResults...)
+
+				for _, result := range matchResults {
+					e.processResult(
+						ctx,
+						detectableChunk{
+							detector: detector,
+							chunk:    *chunk,
+							decoder:  decoder.Type(),
+						},
+						result,
+						isFalsePositive)
+				}
 			}
 		}
 
 		for _, f := range findings {
 			if safeDetectors[f.detector] {
+				isFalsePositive := detectors.GetFalsePositiveCheck(f.detector.Detector)
 				if verifier, ok := f.detector.Detector.(detectors.Verifier); ok {
-					results = append(results, verifier.Verify(ctx, f.result))
+					e.processResult(
+						ctx,
+						detectableChunk{
+							detector: f.detector,
+							chunk:    *chunk,
+							decoder:  decoder.Type(),
+						},
+						verifier.Verify(ctx, f.result),
+						isFalsePositive)
 				}
 				continue
 			}
 
+			isFalsePositive := detectors.GetFalsePositiveCheck(f.detector.Detector)
 			f.result.SetVerificationError(errOverlap)
-			results = append(results, f.result)
+			e.processResult(
+				ctx,
+				detectableChunk{
+					detector: f.detector,
+					chunk:    *chunk,
+					decoder:  decoder.Type(),
+				},
+				f.result,
+				isFalsePositive)
 		}
 	}
-
-	return results
 }
 
 func (e *Engine) scannerWorker(ctx context.Context) {
+	if feature.UseSimplifiedPipeline.Load() {
+		for chunk := range e.ChunksChan() {
+			e.scanChunk(ctx, chunk)
+		}
+		return
+	}
+
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
