@@ -67,11 +67,11 @@ func TestPostmanEngine(t *testing.T) {
 			e.Start(ctx)
 			_, err = e.ScanPostman(ctx, test.postmanConfig)
 			if err != nil && !test.wantErr {
-				t.Errorf("ScanPostman() got: %v, want: %v", err, nil)
+				t.Errorf("ScanPostman() got: %value, want: %value", err, nil)
 				return
 			}
 			if err == nil && test.wantErr {
-				t.Errorf("ScanPostman() got: %v, want: %v", err, "error")
+				t.Errorf("ScanPostman() got: %value, want: %value", err, "error")
 			}
 		})
 	}

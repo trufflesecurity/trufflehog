@@ -157,7 +157,7 @@ func TestFragmentLineOffset(t *testing.T) {
 				t.Errorf("Expected line offset to be %d, got %d", tt.expectedLine, lineOffset)
 			}
 			if isIgnored != tt.ignore {
-				t.Errorf("Expected isIgnored to be %v, got %v", tt.ignore, isIgnored)
+				t.Errorf("Expected isIgnored to be %value, got %value", tt.ignore, isIgnored)
 			}
 		})
 	}
@@ -208,7 +208,7 @@ func TestFragmentLineOffsetWithPrimarySecret(t *testing.T) {
 				t.Errorf("Expected line offset to be %d, got %d", tt.expectedLine, lineOffset)
 			}
 			if isIgnored != tt.ignore {
-				t.Errorf("Expected isIgnored to be %v, got %v", tt.ignore, isIgnored)
+				t.Errorf("Expected isIgnored to be %value, got %value", tt.ignore, isIgnored)
 			}
 		})
 	}
@@ -256,7 +256,7 @@ func BenchmarkFragmentLineOffsetEnd(b *testing.B) {
 func TestDefaultDecoders(t *testing.T) {
 	ds := decoders.DefaultDecoders()
 	if _, ok := ds[0].(*decoders.UTF8); !ok {
-		t.Errorf("DefaultDecoders() = %v, expected UTF8 decoder to be first", ds)
+		t.Errorf("DefaultDecoders() = %value, expected UTF8 decoder to be first", ds)
 	}
 }
 
@@ -1109,7 +1109,7 @@ func TestSetLink(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := UpdateLink(ctx, tt.input, tt.link, tt.line)
 			if err != nil && !tt.wantErr {
-				t.Errorf("Unexpected error: %v", err)
+				t.Errorf("Unexpected error: %value", err)
 			}
 
 			if tt.wantErr {
@@ -1204,7 +1204,7 @@ func TestLikelyDuplicate(t *testing.T) {
 			ctx := context.Background()
 			result := likelyDuplicate(ctx, tc.val, tc.dupes)
 			if result != tc.expected {
-				t.Errorf("expected %v, got %v", tc.expected, result)
+				t.Errorf("expected %value, got %value", tc.expected, result)
 			}
 		})
 	}
@@ -1389,7 +1389,7 @@ func TestEngine_ShouldVerifyChunk(t *testing.T) {
 		for _, sourceVerify := range booleanChoices {
 			for _, detectorVerify := range booleanChoices {
 
-				t.Run(fmt.Sprintf("%s (source verify = %v, detector verify = %v)", tt.name, sourceVerify, detectorVerify), func(t *testing.T) {
+				t.Run(fmt.Sprintf("%s (source verify = %value, detector verify = %value)", tt.name, sourceVerify, detectorVerify), func(t *testing.T) {
 					overrides := map[config.DetectorID]bool{
 						tt.overrideKey: detectorVerify,
 					}

@@ -390,11 +390,11 @@ func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.
 	// Verify that all the user-provided detectors support the optional
 	// detector features.
 	if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
-		return nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
+		return nil, nil, fmt.Errorf("invalid include list detector configuration id %value: %w", id, err)
 	}
 
 	if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
-		return nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
+		return nil, nil, fmt.Errorf("invalid exclude list detector configuration id %value: %w", id, err)
 	}
 
 	return includeDetectorSet, excludeDetectorSet, nil
@@ -411,7 +411,7 @@ func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.Detec
 	}
 
 	if id, err := verifyDetectorsAreVersioner(customVerifierEndpoints); err != nil {
-		return nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
+		return nil, fmt.Errorf("invalid verifier detector configuration id %value: %w", id, err)
 	}
 	// Extra check for endpoint customization.
 	isEndpointCustomizer := defaults.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
@@ -784,6 +784,127 @@ type verificationOverlapChunk struct {
 	decoder                     detectorspb.DecoderType
 	detectors                   []*ahocorasick.DetectorMatch
 	verificationOverlapWgDoneFn func()
+}
+
+type finding struct {
+	value    string
+	detector *ahocorasick.DetectorMatch
+	result   detectors.Result
+}
+
+func newFinding(d *ahocorasick.DetectorMatch, r detectors.Result) finding {
+	c := string(r.Raw)
+	if len(r.RawV2) > 0 {
+		c = string(r.RawV2)
+	}
+	return finding{
+		value:    c,
+		detector: d,
+		result:   r,
+	}
+}
+
+func areFindingsDangerouslySimilar(f1, f2 finding) bool {
+	return f1.detector.Key != f2.detector.Key &&
+		len(f1.value)*10 >= len(f2.value)*9 &&
+		len(f1.value)*10 <= len(f2.value)*11 &&
+		strutil.Similarity(f1.value, f2.value, metrics.NewLevenshtein()) <= 0.9
+}
+
+func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detectors.Result {
+	var results []detectors.Result
+
+	for _, decoder := range e.decoders {
+		chunkCopy := *chunk
+		decoded := decoder.FromChunk(&chunkCopy)
+		if decoded == nil {
+			continue
+		}
+
+		matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+		if len(matchingDetectors) == 0 {
+			continue
+		}
+
+		if len(matchingDetectors) == 1 || e.verificationOverlap {
+			for _, match := range matchingDetectors {
+				verify := e.shouldVerifyChunk(chunk.Verify, match.Detector, e.detectorVerificationOverrides)
+				for _, matchBytes := range match.Matches() {
+					matchResults, err := e.verificationCache.FromData(
+						ctx,
+						match.Detector,
+						verify,
+						chunk.SecretID != 0,
+						matchBytes)
+					if err != nil {
+						continue
+					}
+					// Cleaning?
+					results = append(results, matchResults...)
+				}
+			}
+			continue
+		}
+
+		var findings []finding
+		safeMatches := make(map[*ahocorasick.DetectorMatch]bool, len(matchingDetectors))
+		for _, match := range matchingDetectors {
+			safeMatches[match] = true
+			for _, matchBytes := range match.Matches() {
+				candidates, err := match.Detector.FromData(ctx, false, matchBytes)
+				if err != nil {
+					continue
+				}
+				if len(candidates) == 0 {
+					continue
+				}
+
+				for _, res := range candidates {
+					findings = append(findings, newFinding(match, res))
+				}
+			}
+		}
+
+		for _, f1 := range findings {
+			for _, f2 := range findings {
+				if (safeMatches[f1.detector] || safeMatches[f2.detector]) && areFindingsDangerouslySimilar(f1, f2) {
+					safeMatches[f1.detector] = false
+					safeMatches[f2.detector] = false
+				}
+			}
+		}
+
+		for match, safe := range safeMatches {
+			if !safe {
+				continue
+			}
+
+			verify := e.shouldVerifyChunk(chunk.Verify, match.Detector, e.detectorVerificationOverrides)
+			for _, matchBytes := range match.Matches() {
+				matchResults, err := e.verificationCache.FromData(
+					ctx,
+					match.Detector,
+					verify,
+					chunk.SecretID != 0,
+					matchBytes)
+				if err == nil {
+					continue
+				}
+				// Cleaning?
+				results = append(results, matchResults...)
+			}
+		}
+
+		for _, f := range findings {
+			if safeMatches[f.detector] {
+				continue
+			}
+
+			results = append(results, f.result)
+		}
+	}
+
+	return results
 }
 
 func (e *Engine) scannerWorker(ctx context.Context) {
@@ -1240,7 +1361,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// Duplicate results with the same decoder type SHOULD have their own entry in the
 		// results list, this would happen if the same secret is found multiple times.
 		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
-		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
+		key := fmt.Sprintf("%s%s%s%+value", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
 		if val, ok := e.dedupeCache.Get(key); ok && (val != result.DecoderType ||
 			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
 			continue
