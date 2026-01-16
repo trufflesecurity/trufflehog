@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -473,7 +474,12 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	switch s.authMethod {
 	case "OAUTH":
 		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
-		apiClient, err := gitlab.NewAuthSourceClient(gitlab.OAuthTokenSource{TokenSource: ts}, gitlab.WithBaseURL(s.url))
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
 		}
@@ -493,7 +499,12 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		fallthrough
 	case "TOKEN":
 		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
-		apiClient, err := gitlab.NewAuthSourceClient(gitlab.OAuthTokenSource{TokenSource: ts}, gitlab.WithBaseURL(s.url))
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
 		}
