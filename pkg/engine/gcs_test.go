@@ -93,16 +93,16 @@ func TestScanGCS(t *testing.T) {
 
 			_, err = e.ScanGCS(ctx, test.gcsConfig)
 			if err != nil && !test.wantErr && !strings.Contains(err.Error(), "googleapi: Error 400: Bad Request") {
-				t.Errorf("ScanGCS() got: %value, want: %value", err, nil)
+				t.Errorf("ScanGCS() got: %v, want: %v", err, nil)
 				return
 			}
 			if err := e.Finish(ctx); err != nil && !test.wantErr && !strings.Contains(err.Error(), "googleapi: Error 400: Bad Request") {
-				t.Errorf("Finish() got: %value, want: %value", err, nil)
+				t.Errorf("Finish() got: %v, want: %v", err, nil)
 				return
 			}
 
 			if err == nil && test.wantErr {
-				t.Errorf("ScanGCS() got: %value, want: %value", err, "error")
+				t.Errorf("ScanGCS() got: %v, want: %v", err, "error")
 			}
 		})
 	}

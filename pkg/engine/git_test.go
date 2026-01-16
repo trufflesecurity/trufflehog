@@ -112,7 +112,7 @@ func TestGitEngine(t *testing.T) {
 						t.Errorf("%s: unexpected line number. Got: %d, Expected: %d", tName, result.SourceMetadata.GetGit().Line, tTest.expected[meta.Git.Commit].LineNumber)
 					}
 					if tTest.expected[meta.Git.Commit].Verified != result.Verified {
-						t.Errorf("%s: unexpected verification. Got: %value, Expected: %value", tName, result.Verified, tTest.expected[meta.Git.Commit].Verified)
+						t.Errorf("%s: unexpected verification. Got: %v, Expected: %v", tName, result.Verified, tTest.expected[meta.Git.Commit].Verified)
 					}
 				}
 

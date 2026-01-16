@@ -391,11 +391,11 @@ func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.
 	// Verify that all the user-provided detectors support the optional
 	// detector features.
 	if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
-		return nil, nil, fmt.Errorf("invalid include list detector configuration id %value: %w", id, err)
+		return nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
 	}
 
 	if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
-		return nil, nil, fmt.Errorf("invalid exclude list detector configuration id %value: %w", id, err)
+		return nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
 	}
 
 	return includeDetectorSet, excludeDetectorSet, nil
@@ -412,7 +412,7 @@ func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.Detec
 	}
 
 	if id, err := verifyDetectorsAreVersioner(customVerifierEndpoints); err != nil {
-		return nil, fmt.Errorf("invalid verifier detector configuration id %value: %w", id, err)
+		return nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
 	}
 	// Extra check for endpoint customization.
 	isEndpointCustomizer := defaults.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
@@ -1421,7 +1421,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// Duplicate results with the same decoder type SHOULD have their own entry in the
 		// results list, this would happen if the same secret is found multiple times.
 		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
-		key := fmt.Sprintf("%s%s%s%+value", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
+		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
 		if val, ok := e.dedupeCache.Get(key); ok && (val != result.DecoderType ||
 			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
 			continue
