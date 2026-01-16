@@ -2,6 +2,7 @@ package nvapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -67,6 +68,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
+type callerInfoResponse struct {
+	Type string `json:"type"`
+	User struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+		Roles []struct {
+			Org struct {
+				DisplayName string `json:"displayName"`
+			} `json:"org"`
+			OrgRoles []string `json:"orgRoles"`
+		} `json:"roles"`
+	} `json:"user"`
+}
+
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	data := url.Values{}
 	data.Set("credentials", token)
@@ -89,8 +104,47 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		// If the endpoint returns useful information, we can return it as a map.
-		return true, nil, nil
+		var response callerInfoResponse
+		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+			return true, nil, nil
+		}
+
+		extraData := map[string]string{
+			"type":       response.Type,
+			"user_name":  response.User.Name,
+			"user_email": response.User.Email,
+		}
+
+		// Collect distinct org display names and roles across all roles
+		orgDisplayNames := make(map[string]struct{})
+		orgRoles := make(map[string]struct{})
+
+		for _, role := range response.User.Roles {
+			if role.Org.DisplayName != "" {
+				orgDisplayNames[role.Org.DisplayName] = struct{}{}
+			}
+			for _, r := range role.OrgRoles {
+				orgRoles[r] = struct{}{}
+			}
+		}
+
+		if len(orgDisplayNames) > 0 {
+			names := make([]string, 0, len(orgDisplayNames))
+			for name := range orgDisplayNames {
+				names = append(names, name)
+			}
+			extraData["org_display_names"] = strings.Join(names, ", ")
+		}
+
+		if len(orgRoles) > 0 {
+			roles := make([]string, 0, len(orgRoles))
+			for role := range orgRoles {
+				roles = append(roles, role)
+			}
+			extraData["org_roles"] = strings.Join(roles, ", ")
+		}
+
+		return true, extraData, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
