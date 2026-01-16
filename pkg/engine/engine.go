@@ -804,13 +804,6 @@ func newFinding(d *ahocorasick.DetectorMatch, r detectors.Result) finding {
 	}
 }
 
-func areFindingsDangerouslySimilar(f1, f2 finding) bool {
-	return f1.detector.Key != f2.detector.Key &&
-		len(f1.value)*10 >= len(f2.value)*9 &&
-		len(f1.value)*10 <= len(f2.value)*11 &&
-		strutil.Similarity(f1.value, f2.value, metrics.NewLevenshtein()) <= 0.9
-}
-
 func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detectors.Result {
 	var results []detectors.Result
 
@@ -867,10 +860,24 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 
 		for _, f1 := range findings {
 			for _, f2 := range findings {
-				if (safeDetectors[f1.detector] || safeDetectors[f2.detector]) && areFindingsDangerouslySimilar(f1, f2) {
-					safeDetectors[f1.detector] = false
-					safeDetectors[f2.detector] = false
+				if f1.detector.Key == f2.detector.Key {
+					continue
 				}
+				if !safeDetectors[f1.detector] && !safeDetectors[f2.detector] {
+					continue
+				}
+				if len(f1.value)*10 < len(f2.value)*9 {
+					continue
+				}
+				if len(f1.value)*10 > len(f2.value)*11 {
+					continue
+				}
+				if strutil.Similarity(f1.value, f2.value, metrics.NewLevenshtein()) <= 0.9 {
+					continue
+				}
+
+				safeDetectors[f1.detector] = false
+				safeDetectors[f2.detector] = false
 			}
 		}
 
