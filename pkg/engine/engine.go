@@ -885,6 +885,9 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 			if !safe {
 				continue
 			}
+			if _, ok := detector.Detector.(detectors.Verifier); ok {
+				continue
+			}
 
 			verify := e.shouldVerifyChunk(chunk.Verify, detector.Detector, e.detectorVerificationOverrides)
 			for _, matchBytes := range detector.Matches() {
@@ -904,6 +907,9 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 
 		for _, f := range findings {
 			if safeDetectors[f.detector] {
+				if verifier, ok := f.detector.Detector.(detectors.Verifier); ok {
+					results = append(results, verifier.Verify(ctx, f.result))
+				}
 				continue
 			}
 
