@@ -29,6 +29,9 @@ type markdownRow struct {
 	File     string
 	Line     string
 	Redacted string
+
+	lineNum int
+	hasLine bool
 }
 
 // NewMarkdownPrinter builds a MarkdownPrinter that writes to out. When out is
@@ -45,6 +48,8 @@ func NewMarkdownPrinter(out io.Writer) *MarkdownPrinter {
 func (p *MarkdownPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	file := "n/a"
 	line := "n/a"
+	lineNum := 0
+	hasLine := false
 
 	meta, err := structToMap(r.SourceMetadata.Data)
 	if err != nil {
@@ -55,7 +60,9 @@ func (p *MarkdownPrinter) Print(_ context.Context, r *detectors.ResultWithMetada
 		for k, v := range data {
 			if k == "line" {
 				if l, ok := v.(float64); ok {
-					line = fmt.Sprintf("%d", int64(l))
+					lineNum = int(l)
+					line = fmt.Sprintf("%d", lineNum)
+					hasLine = true
 				}
 			}
 			if k == "file" {
@@ -67,10 +74,12 @@ func (p *MarkdownPrinter) Print(_ context.Context, r *detectors.ResultWithMetada
 	}
 
 	row := markdownRow{
-		Detector: r.DetectorType.String(),
-		File:     file,
-		Line:     line,
+		Detector: sanitize(r.DetectorType.String()),
+		File:     sanitize(file),
+		Line:     sanitize(line),
 		Redacted: sanitize(r.Redacted),
+		lineNum:  lineNum,
+		hasLine:  hasLine,
 	}
 
 	p.mu.Lock()
@@ -120,6 +129,12 @@ func renderMarkdown(verified, unverified []markdownRow) string {
 			if rows[i].File != rows[j].File {
 				return rows[i].File < rows[j].File
 			}
+			if rows[i].hasLine != rows[j].hasLine {
+				return rows[i].hasLine
+			}
+			if rows[i].lineNum != rows[j].lineNum {
+				return rows[i].lineNum < rows[j].lineNum
+			}
 			return rows[i].Line < rows[j].Line
 		})
 
@@ -138,6 +153,12 @@ func renderMarkdown(verified, unverified []markdownRow) string {
 	return strings.TrimRight(buf.String(), "\n") + "\n"
 }
 
-var sanitizer = strings.NewReplacer("\r", " ", "\n", " ", "|", "\\|")
+var sanitizer = strings.NewReplacer("\r", " ", "\n", " ", "|", "\\|", "	", " ")
 
-func sanitize(value string) string { return sanitizer.Replace(value) }
+func sanitize(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "n/a"
+	}
+	return sanitizer.Replace(value)
+}
