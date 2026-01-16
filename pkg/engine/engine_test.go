@@ -553,6 +553,79 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
 }
 
+func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
+	t.Fail()
+}
+
+func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
+	t.Fail()
+}
+
+func TestProcessResult_MetadataCopied(t *testing.T) {
+	t.Fail()
+}
+
+func TestProcessResult_FalsePositiveFlagSetCorrectly(t *testing.T) {
+	testcases := []struct {
+		name                string
+		verified            bool
+		isFalsePositive     bool
+		wantIsFalsePositive bool
+	}{
+		{
+			name:                "unverified/false positive",
+			verified:            false,
+			isFalsePositive:     true,
+			wantIsFalsePositive: true,
+		},
+		{
+			name:                "unverified/not false positive",
+			verified:            false,
+			isFalsePositive:     false,
+			wantIsFalsePositive: false,
+		},
+		{
+			name:                "verified/false positive",
+			verified:            true,
+			isFalsePositive:     true,
+			wantIsFalsePositive: false, // The false positive check should not be run for verified secrets
+		},
+		{
+			name:                "verified/not false positive",
+			verified:            true,
+			isFalsePositive:     false,
+			wantIsFalsePositive: false,
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange: Create an Engine
+			e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
+
+			// Arrange: Create a detectableChunk to process
+			// (It needs a DetectorMatch to avoid a panic.)
+			data := detectableChunk{detector: &ahocorasick.DetectorMatch{Detector: fakeDetectorV1{}}}
+
+			// Arrange: Create a Result to process
+			res := detectors.Result{
+				Raw:      []byte("something not nil"), // The false positive check is not run when Raw is nil
+				Verified: tt.verified,
+			}
+
+			// Arrange: Create the false positive check
+			isFalsePositive := func(_ detectors.Result) (bool, string) { return tt.isFalsePositive, "" }
+
+			// Act
+			e.processResult(context.AddLogger(t.Context()), data, res, isFalsePositive)
+
+			// Assert that the single generated result has the correct false positive flag
+			require.Len(t, e.results, 1)
+			assert.Equal(t, tt.wantIsFalsePositive, (<-e.results).IsWordlistFalsePositive)
+		})
+	}
+}
+
 func TestVerificationOverlapChunk(t *testing.T) {
 	ctx := context.Background()
 
