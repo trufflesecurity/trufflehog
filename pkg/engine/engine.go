@@ -913,6 +913,7 @@ func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) []detector
 				continue
 			}
 
+			f.result.SetVerificationError(errOverlap)
 			results = append(results, f.result)
 		}
 	}
