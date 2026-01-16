@@ -560,7 +560,36 @@ func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
 }
 
 func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
-	t.Fail()
+	// Arrange: Create an engine
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
+
+	// Arrange: Create a detectableChunk
+	data := detectableChunk{
+		chunk: sources.Chunk{
+			Data: []byte("swordfish trufflehog:ignore"),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{
+					Git: &source_metadatapb.Git{
+						Line: 1,
+					},
+				},
+			},
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+		},
+		detector: &ahocorasick.DetectorMatch{Detector: fakeDetectorV1{}},
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		Raw:      []byte("swordfish"),
+		Verified: true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), data, result, nil)
+
+	// Assert that no results were generated
+	assert.Empty(t, e.results)
 }
 
 func TestProcessResult_AllFieldsCopied(t *testing.T) {
