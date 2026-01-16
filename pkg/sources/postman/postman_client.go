@@ -345,6 +345,10 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 		return nil
 	}
 
+	c.Metrics.apiMonthlyRequestsLimit.WithLabelValues().Set(
+		float64(rateLimitTotalMonth),
+	)
+
 	if rateLimitTotalMonth == 0 {
 		ctx.Logger().V(2).Info("RateLimit-Limit-Month is zero, cannot compute usage percentage")
 		return nil

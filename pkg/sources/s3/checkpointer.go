@@ -70,7 +70,7 @@ const defaultMaxObjectsPerPage = 1000
 
 // NewCheckpointer creates a new checkpointer for S3 scanning operations.
 // The progress provides the underlying mechanism for persisting scan state.
-func NewCheckpointer(ctx context.Context, progress *sources.Progress) *Checkpointer {
+func NewCheckpointer(ctx context.Context, progress *sources.Progress, isUnitScan bool) *Checkpointer {
 	ctx.Logger().Info("Creating checkpointer")
 
 	return &Checkpointer{
@@ -78,6 +78,7 @@ func NewCheckpointer(ctx context.Context, progress *sources.Progress) *Checkpoin
 		completedObjects: make([]bool, defaultMaxObjectsPerPage),
 		completionOrder:  make([]int, 0, defaultMaxObjectsPerPage),
 		progress:         progress,
+		isUnitScan:       isUnitScan,
 	}
 }
 
@@ -192,6 +193,10 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	if checkpointIdx < 0 {
 		return nil // No completed objects yet
 	}
+	if checkpointIdx >= len(pageContents) {
+		// this should never happen
+		return fmt.Errorf("checkpoint index %d exceeds page contents size %d", checkpointIdx, len(pageContents))
+	}
 	obj := pageContents[checkpointIdx]
 
 	return p.updateCheckpoint(bucket, role, *obj.Key)
@@ -228,12 +233,4 @@ func (p *Checkpointer) updateCheckpoint(bucket string, role string, lastKey stri
 		string(encoded),
 	)
 	return nil
-}
-
-// SetIsUnitScan sets whether the checkpointer is operating in unit scan mode.
-func (p *Checkpointer) SetIsUnitScan(isUnitScan bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.isUnitScan = isUnitScan
 }
