@@ -556,7 +556,39 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 }
 
 func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
-	t.Fail()
+	// Arrange: Create an engine
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
+
+	// Arrange: Create a detectableChunk
+	data := detectableChunk{
+		chunk: sources.Chunk{
+			Data: []byte("abcde\nswordfish"),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Line: 1,
+						Link: "https://github.com/org/repo/blob/abcdef/file.txt#L1",
+					},
+				},
+			},
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+		},
+		detector: &ahocorasick.DetectorMatch{Detector: fakeDetectorV1{}},
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		Raw:      []byte("swordfish"),
+		Verified: true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), data, result, nil)
+
+	// Assert that the link has been correctly updated
+	require.Len(t, e.results, 1)
+	r := <-e.results
+	assert.Equal(t, "https://github.com/org/repo/blob/abcdef/file.txt#L2", r.SourceMetadata.GetGithub().GetLink())
 }
 
 func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
