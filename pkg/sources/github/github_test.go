@@ -112,7 +112,7 @@ func TestAddReposByOrg(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
-func TestAddReposByOrg_Repositories(t *testing.T) {
+func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 	defer gock.Off()
 
 	gock.New("https://api.github.com").
@@ -128,7 +128,7 @@ func TestAddReposByOrg_Repositories(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		Repositories:  []string{"super-secret-org/super-secret-repo", "super-secret-org/super-secret-repo2"},
+		IncludeRepos:  []string{"super-secret-org/super*"},
 		Organizations: []string{"super-secret-org"},
 	})
 	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
@@ -749,7 +749,7 @@ func BenchmarkEnumerate(b *testing.B) {
 	}
 }
 
-func TestEnumerateWithToken_Repositories(t *testing.T) {
+func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	defer gock.Off()
 
 	gock.New("https://api.github.com").
