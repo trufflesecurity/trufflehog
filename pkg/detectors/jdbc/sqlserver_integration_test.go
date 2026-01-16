@@ -10,7 +10,6 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/assert"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mssql"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -22,8 +21,8 @@ func TestSqlServer(t *testing.T) {
 	sqlServerPass := gofakeit.Password(true, true, true, false, false, 10)
 	sqlServerDB := "master"
 
-	mssqlContainer, err := mssql.RunContainer(ctx,
-		testcontainers.WithImage("mcr.microsoft.com/azure-sql-edge"),
+	mssqlContainer, err := mssql.Run(ctx,
+		"mcr.microsoft.com/azure-sql-edge",
 		mssql.WithAcceptEULA(),
 		mssql.WithPassword(sqlServerPass),
 	)
@@ -62,7 +61,7 @@ func TestSqlServer(t *testing.T) {
 			want: result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input: "//server=badhost;user id=sa;database=master;password=",
+			input: fmt.Sprintf("//server=badhost;user id=sa;database=master;password=%s", sqlServerPass),
 			want:  result{pingOk: false, pingDeterminate: false},
 		},
 		{

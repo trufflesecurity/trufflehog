@@ -6,7 +6,6 @@ package jdbc
 import (
 	"context"
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
@@ -34,8 +33,8 @@ func TestPostgres(t *testing.T) {
 	t.Log("dbName: ", dbName)
 
 	ctx := context.Background()
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:13-alpine"),
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:13-alpine",
 		postgres.WithDatabase(dbName),
 		postgres.WithUsername(user),
 		postgres.WithPassword(pass),
@@ -55,10 +54,6 @@ func TestPostgres(t *testing.T) {
 	port, err := postgresContainer.MappedPort(ctx, "5432")
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if err != nil {
-		log.Fatalf("failed to start container: %s", err)
 	}
 	defer postgresContainer.Terminate(ctx)
 
