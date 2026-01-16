@@ -10,7 +10,7 @@ func callAPIEndpoint(client *http.Client, token string, endpoint endpoint) (*htt
 		return nil, err
 	}
 	req.Header.Set("X-FIGMA-TOKEN", token)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -229,7 +229,7 @@ func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := detectors.DetectorHttpClientWithNoLocalAddresses.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]
 }
 
 // parsePrivateKey parses a PEM-encoded private key
-func parsePrivateKey(privateKeyPEM string) (interface{}, error) {
+func parsePrivateKey(privateKeyPEM string) (any, error) {
 	block, _ := pem.Decode([]byte(privateKeyPEM))
 	if block == nil {
 		return nil, nil
