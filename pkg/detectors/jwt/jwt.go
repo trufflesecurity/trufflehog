@@ -98,7 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		case "HS256", "HS384", "HS512":
 			// The JWT *might* be valid, but we can't in general do signature verification on HMAC-based algorithms.
 			// We don't have a suitable status to represent this situation in trufflehog.
-			// (The `unknown` status is intended to indicate that an error occurred to to external environment conditions, like trannsient network errors.)
+			// (The `unknown` status is intended to indicate that an error occurred to external environment conditions, like trannsient network errors.)
 			// So instead, to avoid possible false positives, totally skip HMAC-based JWTs; don't even create results for them.
 			continue
 		}
