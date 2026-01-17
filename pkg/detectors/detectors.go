@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"io"
 	"math/big"
+	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
@@ -13,6 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"golang.org/x/sync/singleflight"
 )
 
 // Detector defines an interface for scanning for and verifying secrets.
@@ -322,4 +325,40 @@ func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
 	parsedURL.Path = ""
 	parsedURL.RawQuery = ""
 	return parsedURL, nil
+}
+
+type VerificationResult struct {
+	StatusCode int
+	Body       []byte
+}
+
+var verificationGroup = new(singleflight.Group)
+
+func VerificationRequest(identifier string, request *http.Request, client *http.Client) (*VerificationResult, error) {
+	result, err, _ := verificationGroup.Do(identifier, func() (any, error) {
+		resp, err := client.Do(request)
+		if err != nil {
+			return nil, err
+		}
+
+		defer func() {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}()
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		return &VerificationResult{
+			StatusCode: resp.StatusCode,
+			Body:       bodyBytes,
+		}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result.(*VerificationResult), nil
 }
