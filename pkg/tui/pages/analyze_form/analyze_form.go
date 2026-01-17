@@ -106,6 +106,10 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Key:         "appKey",
 			Required:    true,
 			RedactInput: true,
+		}, {
+			Label:    "Endpoint (press Enter to skip if unknown; TruffleHog will attempt to auto-detect)",
+			Key:      "endpoint",
+			Required: false,
 		}}
 	case "mux":
 		inputs = []textinputs.InputConfig{{

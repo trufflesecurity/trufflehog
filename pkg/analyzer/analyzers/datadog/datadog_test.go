@@ -38,11 +38,12 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		apiKey  string
-		appKey  string
-		want    []byte // JSON string
-		wantErr bool
+		name     string
+		apiKey   string
+		appKey   string
+		endpoint string
+		want     []byte // JSON string
+		wantErr  bool
 	}{
 		{
 			name:    "valid datadog credentials",
@@ -50,6 +51,27 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			appKey:  appKey,
 			want:    expectedOutput,
 			wantErr: false,
+		},
+		{
+			name:     "valid datadog credentials with endpoint",
+			apiKey:   apiKey,
+			appKey:   appKey,
+			endpoint: "https://api.us5.datadoghq.com",
+			want:     expectedOutput,
+			wantErr:  false,
+		},
+		{
+			name:     "valid datadog credentials with invalid endpoint",
+			apiKey:   apiKey,
+			appKey:   appKey,
+			endpoint: "https://api.eu.datadoghq.com",
+			want: []byte(fmt.Sprintf(`{
+				"AnalyzerType": %s,
+				"Bindings": [],
+				"UnboundedResources": null,
+				"Metadata": {}
+			}`, analyzers.AnalyzerTypeDatadog)),
+			wantErr: true,
 		},
 		{
 			name:    "invalid credentials",
@@ -63,7 +85,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
-			got, err := a.Analyze(ctx, map[string]string{"apiKey": tt.apiKey, "appKey": tt.appKey})
+			got, err := a.Analyze(ctx, map[string]string{"apiKey": tt.apiKey, "appKey": tt.appKey, "endpoint": tt.endpoint})
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
