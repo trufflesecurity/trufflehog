@@ -10,85 +10,127 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Datadog Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			auth_type: "API-Key"
-			in: "Header"
-			dd_api_secret: "FKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
-			dd_app: "iHxNanzZ8vjrmbjXK7NJLrwpGw2czdSh90PKH6VL"
-			base_url: "https://api.example.com/v1/example"
-			response_code: 200
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secret = "iHxNanzZ8vjrmbjXK7NJLrwpGw2czdSh90PKH6VLFKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
-)
-
-func TestDataDogToken_Pattern(t *testing.T) {
+func TestDataDogToken_Pattern_WithValidAPIandAppKey(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
-	tests := []struct {
-		name  string
-		input string
-		want  []string
-	}{
-		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
-		},
+	input := `
+			dd_api_secret: "FKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
+			dd_app: "iHxNanzZ8vjrmbjXK7NJLrwpGw2czdSh90PKH6VL"
+			base_url1: "https://api.us5.datadoghq.com"
+			base_url2: "https://api.app.ddog-gov.com"
+	`
+	want := []string{"iHxNanzZ8vjrmbjXK7NJLrwpGw2czdSh90PKH6VLFKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"}
+	wantedResultType := "Application+APIKey"
+	matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(input))
+	if len(matchedDetectors) == 0 {
+		t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), input)
+		return
+	}
+	results, err := d.FromData(context.Background(), false, []byte(input))
+	if err != nil {
+		t.Errorf("error = %v", err)
+		return
+	}
+	if len(results) != len(want) {
+		if len(results) == 0 {
+			t.Errorf("did not receive result")
+		} else {
+			t.Errorf("expected %d results, only received %d", len(want), len(results))
+		}
+		return
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
-				return
-			}
+	actual := make(map[string]struct{}, len(results))
+	for _, r := range results {
+		if len(r.RawV2) > 0 {
+			actual[string(r.RawV2)] = struct{}{}
+		} else {
+			actual[string(r.Raw)] = struct{}{}
+		}
+		if r.ExtraData["Type"] != wantedResultType {
+			t.Errorf("expected result type %s, got %s", wantedResultType, r.ExtraData["Type"])
+		}
+	}
+	expected := make(map[string]struct{}, len(want))
+	for _, v := range want {
+		expected[v] = struct{}{}
+	}
 
-			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+	if diff := cmp.Diff(expected, actual); diff != "" {
+		t.Errorf("%s diff: (-want +got)\n%s", "TestDataDogToken_Pattern_WithValidAPIKeyOnly", diff)
+	}
+}
 
-			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
-				return
-			}
+func TestDataDogToken_Pattern_WithAPIKeyOnly(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
-			actual := make(map[string]struct{}, len(results))
-			for _, r := range results {
-				if len(r.RawV2) > 0 {
-					actual[string(r.RawV2)] = struct{}{}
-				} else {
-					actual[string(r.Raw)] = struct{}{}
-				}
-			}
-			expected := make(map[string]struct{}, len(test.want))
-			for _, v := range test.want {
-				expected[v] = struct{}{}
-			}
+	input := `
+			dd_api_secret: "FKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
+			base_url: "https://api.us5.datadoghq.com"
+			response_code: 200
+	`
+	matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(input))
+	if len(matchedDetectors) == 0 {
+		t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), input)
+		return
+	}
+	results, err := d.FromData(context.Background(), false, []byte(input))
+	if err != nil {
+		t.Errorf("error = %v", err)
+		return
+	}
 
-			if diff := cmp.Diff(expected, actual); diff != "" {
-				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
-			}
-		})
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, received %d", len(results))
+	}
+}
+
+func TestDataDogToken_NoSecrets(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
+	input := `
+			base_url1: "https://api.us5.datadoghq.com"
+			base_url2: "https://api.app.ddog-gov.com"
+	`
+	matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(input))
+	if len(matchedDetectors) == 0 {
+		t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), input)
+		return
+	}
+	results, err := d.FromData(context.Background(), false, []byte(input))
+	if err != nil {
+		t.Errorf("error = %v", err)
+		return
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, received %d", len(results))
+	}
+}
+
+func TestDataDogToken_InvalidSecrets(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
+	input := `
+			dd_api_secret: "@FKNwdbyfYTmGUm5DK3yHEuK"
+			dd_app: "iHxNanzZ8vjrmbjXK7NJLrwpGw2czdSh90PKH6VL"
+			base_url1: "https://api.us5.datadoghq.com"
+			base_url2: "https://api.app.ddog-gov.com"
+	`
+	matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(input))
+	if len(matchedDetectors) == 0 {
+		t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), input)
+		return
+	}
+	results, err := d.FromData(context.Background(), false, []byte(input))
+	if err != nil {
+		t.Errorf("error = %v", err)
+		return
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, received %d", len(results))
 	}
 }
