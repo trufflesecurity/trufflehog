@@ -1183,7 +1183,8 @@ func (e *Engine) processResult(
 	isFalsePositive func(detectors.Result) (bool, string),
 ) {
 	ignoreLinePresent := false
-	if SupportsLineNumbers(data.chunk.SourceType) {
+	if data.chunk.SourceUpdateLink != nil {
+		// Source provides its own link update function (e.g., GitHub)
 		copyChunk := data.chunk
 		copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
@@ -1191,6 +1192,27 @@ func (e *Engine) processResult(
 		}
 		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+
+		// Call source-specific update function
+		updatedLink := copyChunk.SourceUpdateLink(link, *mdLine)
+
+		if err := updateMetaDataLink(copyChunk.SourceMetadata, updatedLink); err != nil {
+			ctx.Logger().Error(err, "error setting link")
+			return
+		}
+		data.chunk = copyChunk
+	} else if SupportsLineNumbers(data.chunk.SourceType) {
+		// Fallback to centralized link updating for sources that haven't migrated yet
+		// (GitLab, Bitbucket, Azure Repos, etc.)
+		copyChunk := data.chunk
+		copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
+		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
+			copyChunk.SourceMetadata = copyMetaData
+		}
+		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
+		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+
+		// Use deprecated centralized UpdateLink function
 		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
 			ctx.Logger().Error(err, "error setting link")
 			return
@@ -1262,6 +1284,11 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 }
 
 // SupportsLineNumbers determines if a line number can be found for a source type.
+//
+// Deprecated: Prefer source-specific UpdateLink functions (chunk.SourceUpdateLink != nil).
+// This function is still used as a fallback for sources that haven't migrated to the
+// new pattern (GitLab, Bitbucket, Azure Repos, etc.). Once all sources provide their
+// own SourceUpdateLink function, this can be removed entirely.
 func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	switch sourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT,
@@ -1360,6 +1387,10 @@ func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragSta
 }
 
 // UpdateLink updates the link of the provided source metadata.
+//
+// Deprecated: This function is still used as a fallback for sources that don't provide
+// their own SourceUpdateLink function (GitLab, Bitbucket, Azure Repos, etc.). New sources
+// should implement their own link updating logic and provide it via SourceUpdateLink.
 func UpdateLink(ctx context.Context, metadata *source_metadatapb.MetaData, link string, line int64) error {
 	if metadata == nil {
 		return fmt.Errorf("metadata is nil when setting the link")
@@ -1372,17 +1403,22 @@ func UpdateLink(ctx context.Context, metadata *source_metadatapb.MetaData, link 
 
 	newLink := giturl.UpdateLinkLineNumber(ctx, link, line)
 
+	return updateMetaDataLink(metadata, newLink)
+}
+
+func updateMetaDataLink(metadata *source_metadatapb.MetaData, link string) error {
+	// Update the link in metadata
 	switch meta := metadata.GetData().(type) {
 	case *source_metadatapb.MetaData_Github:
-		meta.Github.Link = newLink
+		meta.Github.Link = link
 	case *source_metadatapb.MetaData_Gitlab:
-		meta.Gitlab.Link = newLink
+		meta.Gitlab.Link = link
 	case *source_metadatapb.MetaData_Bitbucket:
-		meta.Bitbucket.Link = newLink
+		meta.Bitbucket.Link = link
 	case *source_metadatapb.MetaData_Filesystem:
-		meta.Filesystem.Link = newLink
+		meta.Filesystem.Link = link
 	case *source_metadatapb.MetaData_AzureRepos:
-		meta.AzureRepos.Link = newLink
+		meta.AzureRepos.Link = link
 	default:
 		return fmt.Errorf("unsupported metadata type")
 	}

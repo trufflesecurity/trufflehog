@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -296,7 +297,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 						File:                sanitizer.UTF8(file),
 						Email:               sanitizer.UTF8(email),
 						Repository:          sanitizer.UTF8(repository),
-						Link:                giturl.GenerateLink(repository, commit, file, line),
+						Link:                s.generateLink(repository, commit, file, line),
 						Timestamp:           sanitizer.UTF8(timestamp),
 						Line:                line,
 						Visibility:          s.visibilityOf(aCtx, repository),
@@ -305,12 +306,141 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 				},
 			}
 		},
+		UpdateLinkFunc:         s.updateLink,
 		UseCustomContentWriter: s.useCustomContentWriter,
 		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
 
 	return nil
+}
+
+// generateLink creates a web link to a specific file and line in a GitHub repository.
+// Handles standard repos, gists, and wikis with their different URL formats.
+func (s *Source) generateLink(repo, commit, file string, line int64) string {
+	if giturl.IsGistURL(repo) {
+		return s.generateGistLink(repo, commit, file, line)
+	}
+	if giturl.IsWikiURL(repo) {
+		return s.generateWikiLink(repo, commit, file, line)
+	}
+	return s.generateStandardLink(repo, commit, file, line)
+}
+
+// generateGistLink creates a link for GitHub gists.
+// Format: https://gist.github.com/user/id/commit/#file-name-ext-Lline
+func (s *Source) generateGistLink(repo, commit, file string, line int64) string {
+	link := giturl.TrimGitSuffix(repo) + "/"
+	if commit != "" {
+		link += commit + "/"
+	}
+	if file != "" {
+		link += "#file-" + giturl.CleanGistFilename(file)
+	}
+	if line > 0 {
+		if strings.Contains(link, "#") {
+			link += "-L"
+		} else {
+			link += "#L"
+		}
+		link += strconv.FormatInt(line, 10)
+	}
+	return link
+}
+
+// generateWikiLink creates a link for GitHub wiki pages.
+// Format: https://github.com/owner/repo/wiki/PageName/commit#Lline
+func (s *Source) generateWikiLink(repo, commit, file string, line int64) string {
+	link := giturl.TrimWikiSuffix(repo) + "/wiki/"
+	if file != "" {
+		link += giturl.TrimFileExtension(file) + "/"
+	}
+	if commit != "" {
+		link += commit
+	}
+	if line > 0 {
+		link += "#L" + strconv.FormatInt(line, 10)
+	}
+	return link
+}
+
+// generateStandardLink creates a link for standard GitHub repositories.
+// Format: https://github.com/owner/repo/blob/commit/path/to/file.go#Lline
+// Or for commits without files: https://github.com/owner/repo/commit/hash
+func (s *Source) generateStandardLink(repo, commit, file string, line int64) string {
+	cleanRepo := giturl.TrimGitSuffix(repo)
+
+	if file == "" {
+		return cleanRepo + "/commit/" + commit
+	}
+
+	encodedFile := giturl.EncodeSpecialChars(file)
+	link := cleanRepo + "/blob/" + commit + "/" + encodedFile
+	if line > 0 {
+		link += "#L" + strconv.FormatInt(line, 10)
+	}
+	return link
+}
+
+// updateLink updates the line number in a GitHub link.
+// Handles standard repos, gists, and wikis with their different URL formats.
+func (s *Source) updateLink(link string, line int64) string {
+	if line <= 0 || link == "" {
+		return link
+	}
+
+	if strings.Contains(link, "gist.github.com") {
+		return s.updateGistLink(link, line)
+	}
+	if strings.Contains(link, "/wiki/") {
+		return s.updateWikiLink(link, line)
+	}
+	return s.updateStandardLink(link, line)
+}
+
+// updateGistLink updates line number in gist links.
+// Replaces -LXX or adds -LXX to the fragment.
+func (s *Source) updateGistLink(link string, line int64) string {
+	newLine := "-L" + strconv.FormatInt(line, 10)
+
+	// If link has -L already, replace it
+	if idx := strings.LastIndex(link, "-L"); idx != -1 {
+		return link[:idx] + newLine
+	}
+
+	// Otherwise append to fragment
+	if strings.Contains(link, "#") {
+		return link + newLine
+	}
+	return link + "#" + newLine
+}
+
+// updateWikiLink updates line number in wiki links.
+// Replaces #LXX or adds #LXX to the link.
+func (s *Source) updateWikiLink(link string, line int64) string {
+	newLine := "#L" + strconv.FormatInt(line, 10)
+
+	// If link has #L already, replace it
+	if idx := strings.Index(link, "#L"); idx != -1 {
+		return link[:idx] + newLine
+	}
+
+	// Otherwise append
+	return link + newLine
+}
+
+// updateStandardLink updates line number in standard GitHub links.
+// Replaces #LXX or adds #LXX to the link.
+func (s *Source) updateStandardLink(link string, line int64) string {
+	newLine := "#L" + strconv.FormatInt(line, 10)
+
+	// If link has #L already, replace it
+	if idx := strings.Index(link, "#L"); idx != -1 {
+		return link[:idx] + newLine
+	}
+
+	// Otherwise append
+	return link + newLine
 }
 
 // Validate is used by enterprise CLI to validate the GitHub config file.

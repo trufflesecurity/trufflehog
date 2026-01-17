@@ -118,6 +118,11 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 // GenerateLink crafts a link to the specific file from a commit.
 // Supports GitHub, GitLab, Bitbucket, and Azure Repos.
 // If the provider supports hyperlinks to specific lines, the line number will be included.
+//
+// Note: The GitHub source now implements its own link generation and updating via function
+// pointers (see pkg/sources/github/github.go). This pattern eliminates provider detection
+// since each source knows its own type. Other sources still use this function and it
+// remains fully supported.
 func GenerateLink(repo, commit, file string, line int64) string {
 	// Some paths contain '%' which breaks |url.Parse| if not encoded.
 	// https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding
@@ -195,7 +200,11 @@ func GenerateLink(repo, commit, file string, line int64) string {
 var linePattern = regexp.MustCompile(`L\d+`)
 
 // UpdateLinkLineNumber updates the line number in a repository link.
-// Used post-link generation to refine reported issue locations within large scanned blocks.
+// Used by sources that don't implement their own UpdateLink function pointer.
+//
+// Note: The GitHub source now handles link updating via its own UpdateLink function
+// attached to chunks. This provides source-specific logic without provider detection.
+// This function remains for sources that haven't migrated to the new pattern.
 func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
 	link = strings.Replace(link, "%", "%25", -1)
 	link = strings.Replace(link, "[", "%5B", -1)

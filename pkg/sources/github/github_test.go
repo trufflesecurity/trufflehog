@@ -1103,3 +1103,60 @@ func noopReporter() sources.UnitReporter {
 		},
 	}
 }
+
+func TestSource_generateLink(t *testing.T) {
+	tests := []struct {
+		name   string
+		repo   string
+		commit string
+		file   string
+		line   int64
+		want   string
+	}{
+		{"standard repo with line", "https://github.com/owner/repo.git", "abc123", "main.go", 42, "https://github.com/owner/repo/blob/abc123/main.go#L42"},
+		{"standard repo no line", "https://github.com/owner/repo.git", "abc123", "main.go", 0, "https://github.com/owner/repo/blob/abc123/main.go"},
+		{"commit only", "https://github.com/owner/repo.git", "abc123", "", 0, "https://github.com/owner/repo/commit/abc123"},
+		{"special chars", "https://github.com/owner/repo.git", "abc123", "path/[test]%file.go", 10, "https://github.com/owner/repo/blob/abc123/path/%5Btest%5D%25file.go#L10"},
+		{"gist with line", "https://gist.github.com/user/abc123.git", "def456", "config.yaml", 5, "https://gist.github.com/user/abc123/def456/#file-config-yaml-L5"},
+		{"gist no line", "https://gist.github.com/user/abc123.git", "def456", "README.md", 0, "https://gist.github.com/user/abc123/def456/#file-README-md"},
+		{"wiki with line", "https://github.com/owner/repo.wiki.git", "abc123", "Home.md", 10, "https://github.com/owner/repo/wiki/Home/abc123#L10"},
+		{"wiki no line", "https://github.com/owner/repo.wiki.git", "abc123", "Doc.md", 0, "https://github.com/owner/repo/wiki/Doc/abc123"},
+	}
+
+	s := &Source{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := s.generateLink(tt.repo, tt.commit, tt.file, tt.line)
+			if got != tt.want {
+				t.Errorf("generateLink() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSource_updateLink(t *testing.T) {
+	tests := []struct {
+		name    string
+		link    string
+		newLine int64
+		want    string
+	}{
+		{"standard update", "https://github.com/owner/repo/blob/abc/file.go#L10", 50, "https://github.com/owner/repo/blob/abc/file.go#L50"},
+		{"standard add", "https://github.com/owner/repo/blob/abc/file.go", 50, "https://github.com/owner/repo/blob/abc/file.go#L50"},
+		{"gist update", "https://gist.github.com/user/abc/def/#file-test-go-L5", 20, "https://gist.github.com/user/abc/def/#file-test-go-L20"},
+		{"gist add", "https://gist.github.com/user/abc/def/#file-test-go", 20, "https://gist.github.com/user/abc/def/#file-test-go-L20"},
+		{"wiki update", "https://github.com/owner/repo/wiki/Home/abc#L5", 30, "https://github.com/owner/repo/wiki/Home/abc#L30"},
+		{"wiki add", "https://github.com/owner/repo/wiki/Home/abc", 30, "https://github.com/owner/repo/wiki/Home/abc#L30"},
+		{"zero line", "https://github.com/owner/repo/blob/abc/file.go#L10", 0, "https://github.com/owner/repo/blob/abc/file.go#L10"},
+	}
+
+	s := &Source{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := s.updateLink(tt.link, tt.newLine)
+			if got != tt.want {
+				t.Errorf("updateLink() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

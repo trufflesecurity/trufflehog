@@ -63,6 +63,7 @@ type Git struct {
 	sourceID           sources.SourceID
 	jobID              sources.JobID
 	sourceMetadataFunc func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData
+	updateLink         func(link string, line int64) string
 	verify             bool
 	metrics            metricsCollector
 	concurrency        *semaphore.Weighted
@@ -77,6 +78,11 @@ type Git struct {
 type Config struct {
 	Concurrency        int
 	SourceMetadataFunc func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData
+
+	// UpdateLinkFunc is an optional source-specific function for updating line numbers in links.
+	// If nil, the engine will skip link updates for chunks from this source.
+	// Sources that support line number reporting (GitHub, GitLab, etc.) should provide this.
+	UpdateLinkFunc func(link string, line int64) string
 
 	SourceName   string
 	JobID        sources.JobID
@@ -110,6 +116,7 @@ func NewGit(config *Config) *Git {
 		sourceID:           config.SourceID,
 		jobID:              config.JobID,
 		sourceMetadataFunc: config.SourceMetadataFunc,
+		updateLink:         config.UpdateLinkFunc,
 		verify:             config.Verify,
 		metrics:            metricsInstance,
 		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
@@ -753,13 +760,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			sb.WriteString("\n")
 			sb.WriteString(commit.Message.String())
 			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           []byte(sb.String()),
-				Verify:         s.verify,
+				SourceName:       s.sourceName,
+				SourceID:         s.sourceID,
+				JobID:            s.jobID,
+				SourceType:       s.sourceType,
+				SourceMetadata:   metadata,
+				SourceUpdateLink: s.updateLink,
+				Data:             []byte(sb.String()),
+				Verify:           s.verify,
 			}
 			if err := reporter.ChunkOk(ctx, chunk); err != nil {
 				return err
@@ -788,12 +796,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, path, 0)
 			chunkSkel := &sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceName:       s.sourceName,
+				SourceID:         s.sourceID,
+				JobID:            s.jobID,
+				SourceType:       s.sourceType,
+				SourceMetadata:   metadata,
+				SourceUpdateLink: s.updateLink,
+				Verify:           s.verify,
 			}
 
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
@@ -836,13 +845,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				return nil
 			}
 			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           data,
-				Verify:         s.verify,
+				SourceName:       s.sourceName,
+				SourceID:         s.sourceID,
+				JobID:            s.jobID,
+				SourceType:       s.sourceType,
+				SourceMetadata:   metadata,
+				SourceUpdateLink: s.updateLink,
+				Data:             data,
+				Verify:           s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
@@ -874,13 +884,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 				// Send the existing fragment.
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+lastOffset))
 				chunk := sources.Chunk{
-					SourceName:     s.sourceName,
-					SourceID:       s.sourceID,
-					JobID:          s.jobID,
-					SourceType:     s.sourceType,
-					SourceMetadata: metadata,
-					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-					Verify:         s.verify,
+					SourceName:       s.sourceName,
+					SourceID:         s.sourceID,
+					JobID:            s.jobID,
+					SourceType:       s.sourceType,
+					SourceMetadata:   metadata,
+					SourceUpdateLink: s.updateLink,
+					Data:             append([]byte{}, newChunkBuffer.Bytes()...),
+					Verify:           s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -894,13 +905,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 				// Send the oversize line.
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+offset))
 				chunk := sources.Chunk{
-					SourceName:     s.sourceName,
-					SourceID:       s.sourceID,
-					JobID:          s.jobID,
-					SourceType:     s.sourceType,
-					SourceMetadata: metadata,
-					Data:           line,
-					Verify:         s.verify,
+					SourceName:       s.sourceName,
+					SourceID:         s.sourceID,
+					JobID:            s.jobID,
+					SourceType:       s.sourceType,
+					SourceMetadata:   metadata,
+					SourceUpdateLink: s.updateLink,
+					Data:             line,
+					Verify:           s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -918,13 +930,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 	if newChunkBuffer.Len() > 0 {
 		metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+lastOffset))
 		chunk := sources.Chunk{
-			SourceName:     s.sourceName,
-			SourceID:       s.sourceID,
-			JobID:          s.jobID,
-			SourceType:     s.sourceType,
-			SourceMetadata: metadata,
-			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-			Verify:         s.verify,
+			SourceName:       s.sourceName,
+			SourceID:         s.sourceID,
+			JobID:            s.jobID,
+			SourceType:       s.sourceType,
+			SourceMetadata:   metadata,
+			SourceUpdateLink: s.updateLink,
+			Data:             append([]byte{}, newChunkBuffer.Bytes()...),
+			Verify:           s.verify,
 		}
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
 			// TODO: Return error.
@@ -1019,12 +1032,13 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, path, 0)
 			chunkSkel := &sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceName:       s.sourceName,
+				SourceID:         s.sourceID,
+				JobID:            s.jobID,
+				SourceType:       s.sourceType,
+				SourceMetadata:   metadata,
+				SourceUpdateLink: s.updateLink,
+				Verify:           s.verify,
 			}
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(err, "error handling binary file")
@@ -1048,13 +1062,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				return nil
 			}
 			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           data,
-				Verify:         s.verify,
+				SourceName:       s.sourceName,
+				SourceID:         s.sourceID,
+				JobID:            s.jobID,
+				SourceType:       s.sourceType,
+				SourceMetadata:   metadata,
+				SourceUpdateLink: s.updateLink,
+				Data:             data,
+				Verify:           s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
