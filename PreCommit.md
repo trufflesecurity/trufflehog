@@ -39,16 +39,41 @@ touch ~/.git-hooks/pre-commit
 chmod +x ~/.git-hooks/pre-commit
 ```
 
-3. Add the following content to `~/.git-hooks/pre-commit`:
+3. Configure Git Hook Script
+
+### **Standard Installation**
+#### **Option A: Auto-configured (Recommended)**
+
+TruffleHog automatically detects the `TRUFFLEHOG_PRE_COMMIT` environment variable and applies optimal pre-commit settings.
 
 ```bash
 #!/bin/sh
-
-trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail
+export TRUFFLEHOG_PRE_COMMIT=1
+trufflehog git file://.
 ```
 
-If you are using Docker, use this instead:
+#### **Option B: Manual-configuration**
 
+Manual configuration (only if you need custom behavior). Do NOT set `TRUFFLEHOG_PRE_COMMIT` if using manual configuration.
+```bash
+#!bin/sh
+trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail --trust-local-git-config
+```
+
+### **Docker Installation**
+
+#### **Option A: Auto-configured (Recommended)**
+```bash
+#!/bin/sh
+# Set environment variable inside container (recommended)
+docker run --rm \
+  -v "$(pwd):/workdir" \
+  -e "TRUFFLEHOG_PRE_COMMIT=1" \
+  trufflesecurity/trufflehog:latest \
+  git file:///workdir
+```
+
+#### **Option B: Manual-configuration**
 ```bash
 #!/bin/sh
 
@@ -88,6 +113,7 @@ To set up TruffleHog as a pre-commit hook for a specific repository:
 
 1. Create a `.pre-commit-config.yaml` file in the root of your repository:
 
+TruffleHog automatically detects when running under the pre-commit.com framework and applies optimal settings. No additional configuration is needed.
 ```yaml
 repos:
   - repo: local
@@ -95,7 +121,7 @@ repos:
       - id: trufflehog
         name: TruffleHog
         description: Detect secrets in your data.
-        entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail'
+        entry: bash -c 'trufflehog git file://.'
         language: system
         stages: ["pre-commit", "pre-push"]
 ```
@@ -133,14 +159,15 @@ npx husky init
 
 1. Add the following content to `.husky/pre-commit`:
 
+TruffleHog automatically detects when running under the Husky framework and applies optimal settings. No additional configuration is needed.
 ```bash
-echo "trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail" > .husky/pre-commit
+echo "trufflehog git file://." > .husky/pre-commit
 ```
 
-3. For Docker users, use this content instead:
+2. For Docker users, use this content instead:
 
 ```bash
-echo 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown --fail' > .husky/pre-commit
+echo 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir' > .husky/pre-commit
 ```
 
 ## Best Practices
@@ -160,18 +187,18 @@ In rare cases, you may need to bypass pre-commit hooks:
 git commit --no-verify -m "Your commit message"
 ```
 
-### Running in Audit Mode
+### Running in Audit Mode (Without TRUFFLEHOG_PRE_COMMIT env variable)
 
 You can run the TruffleHog pre-commit hook in an "audit" or "non-enforcement" mode to test the git hook with the following commands:
 
 Local Binary Version:
 ```bash
-trufflehog git file://. --since-commit HEAD --results=verified,unknown 2>/dev/null
+trufflehog git file://. --since-commit HEAD --results=verified,unknown --trust-local-git-config 2>/dev/null
 ```
 
 Docker Container Version:
 ```bash
-docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown 2>/dev/null
+docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown --trust-local-git-config 2>/dev/null
 ```
 
 This change does two things: (1) removes the `--fail` flag, which means the pre-commit hook will *always* pass, (2) suppresses `stderr` output, so only verified secrets are printed to the terminal output.
