@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -861,7 +862,7 @@ func TestNormalizeFileURI(t *testing.T) {
 		{
 			name:     "absolute file URI unchanged",
 			input:    "file:///absolute/path",
-			expected: "file:///absolute/path",
+			expected: "",
 		},
 		{
 			name:     "relative file URI with current directory",
@@ -908,6 +909,15 @@ func TestNormalizeFileURI(t *testing.T) {
 
 			var expected string
 			switch tt.name {
+			case "absolute file URI unchanged":
+				// On Windows, absolute paths get drive letter prepended
+				// On Unix, they remain as-is
+				if runtime.GOOS == "windows" {
+					expectedPath, _ := filepath.Abs("/absolute/path")
+					expected = "file://" + expectedPath
+				} else {
+					expected = "file:///absolute/path"
+				}
 			case "relative file URI with current directory":
 				expected = "file://" + cwd
 			case "relative file URI with subdirectory":
@@ -920,7 +930,10 @@ func TestNormalizeFileURI(t *testing.T) {
 			default:
 				expected = tt.expected
 			}
-
+			// Normalize slashes for Windows comparison
+			if runtime.GOOS == "windows" {
+				expected = filepath.ToSlash(expected)
+			}
 			assert.Equal(t, expected, result.String())
 		})
 	}
