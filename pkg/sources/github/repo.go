@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -365,6 +366,15 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 	// If it's a repository name (contains / but not http), convert to full URL first
 	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
 		fullURL := "https://github.com/" + repo
+		// If using GitHub Enterprise, adjust the URL accordingly
+		if s.conn != nil && s.conn.Endpoint != "" {
+			u, err := url.Parse(s.conn.Endpoint)
+			if err != nil {
+				return "", fmt.Errorf("invalid enterprise endpoint: %w", err)
+			}
+			u.Path = "/" + repo
+			fullURL = u.String()
+		}
 		return giturl.NormalizeGithubRepo(fullURL)
 	}
 

@@ -459,6 +459,18 @@ func TestNormalizeRepo(t *testing.T) {
 	assert.Contains(t, err.Error(), "no repositories found")
 }
 
+func TestNormalizeRepo_Enterprise(t *testing.T) {
+	source := Source{
+		conn: &sourcespb.GitHub{
+			Endpoint: "https://example.com",
+		},
+	}
+
+	result, err := source.normalizeRepo("org/repo")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com/org/repo.git", result)
+}
+
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
 	ctx := context.Background()
