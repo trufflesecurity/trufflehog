@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"golang.org/x/time/rate"
 )
 
 type AnalyzeClient struct {
@@ -28,36 +29,44 @@ func CreateLogFileName(baseName string) string {
 	return logFileName
 }
 
+type ClientOption func(*http.Client)
+
 // This returns a client that is restricted and filters out unsafe requests returning a success status code.
-func NewAnalyzeClient(cfg *config.Config) *http.Client {
+func NewAnalyzeClient(cfg *config.Config, opts ...func(*http.Client)) *http.Client {
 	client := &http.Client{
 		Transport: AnalyzerRoundTripper{parent: http.DefaultTransport},
 	}
-	if cfg == nil || !cfg.LoggingEnabled {
-		return client
+	if cfg != nil && cfg.LoggingEnabled {
+		client = &http.Client{
+			Transport: LoggingRoundTripper{
+				parent:  client.Transport,
+				logFile: cfg.LogFile,
+			},
+		}
 	}
-	return &http.Client{
-		Transport: LoggingRoundTripper{
-			parent:  client.Transport,
-			logFile: cfg.LogFile,
-		},
+	for _, opt := range opts {
+		opt(client)
 	}
+	return client
 }
 
 // This returns a client that is unrestricted and does not filter out unsafe requests returning a success status code.
-func NewAnalyzeClientUnrestricted(cfg *config.Config) *http.Client {
+func NewAnalyzeClientUnrestricted(cfg *config.Config, opts ...ClientOption) *http.Client {
 	client := &http.Client{
 		Transport: http.DefaultTransport,
 	}
-	if cfg == nil || !cfg.LoggingEnabled {
-		return client
+	if cfg != nil && cfg.LoggingEnabled {
+		client = &http.Client{
+			Transport: LoggingRoundTripper{
+				parent:  client.Transport,
+				logFile: cfg.LogFile,
+			},
+		}
 	}
-	return &http.Client{
-		Transport: LoggingRoundTripper{
-			parent:  client.Transport,
-			logFile: cfg.LogFile,
-		},
+	for _, opt := range opts {
+		opt(client)
 	}
+	return client
 }
 
 type LoggingRoundTripper struct {
@@ -132,5 +141,31 @@ func IsMethodSafe(method string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+type RateLimitRoundTripper struct {
+	parent  http.RoundTripper
+	limiter *rate.Limiter
+}
+
+func (rt RateLimitRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if rt.parent == nil {
+		rt.parent = http.DefaultTransport
+	}
+	if rt.limiter != nil {
+		if err := rt.limiter.Wait(req.Context()); err != nil {
+			return nil, err
+		}
+	}
+	return rt.parent.RoundTrip(req)
+}
+
+func WithRateLimiter(l *rate.Limiter) ClientOption {
+	return func(c *http.Client) {
+		c.Transport = RateLimitRoundTripper{
+			parent:  c.Transport,
+			limiter: l,
+		}
 	}
 }
