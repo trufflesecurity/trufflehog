@@ -22,6 +22,10 @@ inputs:
     default: "latest"
     description: Scan with this trufflehog cli version.
     required: false
+  generate_step_summary:
+    default: "true"
+    description: Output results to the GitHub Actions step summary.
+    required: false
 branding:
   icon: "shield"
   color: "green"
@@ -29,78 +33,90 @@ branding:
 runs:
   using: "composite"
   steps:
-    - shell: bash
-      working-directory: ${{ inputs.path }}
-      env:
-        BASE: ${{ inputs.base }}
-        HEAD: ${{ inputs.head }}
-        ARGS: ${{ inputs.extra_args }}
-        COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
-        VERSION: ${{ inputs.version }}
-      run: |
-        ##########################################
-        ## ADVANCED USAGE                       ##
-        ## Scan by BASE & HEAD user inputs      ##
-        ## If BASE == HEAD, exit with error     ##
-        ##########################################
-        # Check if jq is installed, if not, install it
-        if ! command -v jq &> /dev/null
-        then
-          echo "jq could not be found, installing..."
-          apt-get -y update && apt-get install -y jq
-        fi
+  - shell: bash
+    working-directory: ${{ inputs.path }}
+    env:
+      BASE: ${{ inputs.base }}
+      HEAD: ${{ inputs.head }}
+      ARGS: ${{ inputs.extra_args }}
+      COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
+      VERSION: ${{ inputs.version }}
+      GITHUB_STEP_SUMMARY_ENABLED: ${{ inputs.generate_step_summary }}
+    run: |
+      ##########################################
+      ## ADVANCED USAGE                       ##
+      ## Scan by BASE & HEAD user inputs      ##
+      ## If BASE == HEAD, exit with error     ##
+      ##########################################
+      # Check if jq is installed, if not, install it
+      if ! command -v jq &> /dev/null
+      then
+        echo "jq could not be found, installing..."
+        apt-get -y update && apt-get install -y jq
+      fi
 
-        git status >/dev/null  # make sure we are in a git repository
-        if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
-          if [ -n "$BASE" ]; then
-            base_commit=$(git rev-parse "$BASE" 2>/dev/null) || true
-          else
-            base_commit=""
-          fi
-          if [ -n "$HEAD" ]; then
-            head_commit=$(git rev-parse "$HEAD" 2>/dev/null) || true
-          else
-            head_commit=""
-          fi
-          if [ "$base_commit" == "$head_commit" ] ; then
-            echo "::error::BASE and HEAD commits are the same. TruffleHog won't scan anything. Please see documentation (https://github.com/trufflesecurity/trufflehog#octocat-trufflehog-github-action)."
-            exit 1
-          fi
-        ##########################################
-        ## Scan commits based on event type     ##
-        ##########################################
+      git status >/dev/null  # make sure we are in a git repository
+      if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
+        if [ -n "$BASE" ]; then
+          base_commit=$(git rev-parse "$BASE" 2>/dev/null) || true
         else
-          if [ "${{ github.event_name }}" == "push" ]; then
-            COMMIT_LENGTH=$(printenv COMMIT_IDS | jq length)
-            if [ $COMMIT_LENGTH == "0" ]; then
-              echo "No commits to scan"
-              exit 0
-            fi
-            HEAD=${{ github.event.after }}
-            if [ ${{ github.event.before }} == "0000000000000000000000000000000000000000" ]; then
-              BASE=""
-            else
-              BASE=${{ github.event.before }}
-            fi
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]; then
-            BASE=""
-            HEAD=""
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            BASE=${{github.event.pull_request.base.sha}}
-            HEAD=${{github.event.pull_request.head.sha}}
-          fi
+          base_commit=""
         fi
-        ##########################################
-        ##          Run TruffleHog              ##
-        ##########################################
-        docker run --rm -v .:/tmp -w /tmp \
-        ghcr.io/trufflesecurity/trufflehog:${VERSION} \
-        git file:///tmp/ \
-        --since-commit \
-        ${BASE:-''} \
-        --branch \
-        ${HEAD:-''} \
-        --fail \
-        --no-update \
-        --github-actions \
-        ${ARGS:-''}
+        if [ -n "$HEAD" ]; then
+          head_commit=$(git rev-parse "$HEAD" 2>/dev/null) || true
+        else
+          head_commit=""
+        fi
+        if [ "$base_commit" == "$head_commit" ] ; then
+          echo "::error::BASE and HEAD commits are the same. TruffleHog won't scan anything. Please see documentation (https://github.com/trufflesecurity/trufflehog#octocat-trufflehog-github-action)."
+          exit 1
+        fi
+      ##########################################
+      ## Scan commits based on event type     ##
+      ##########################################
+      else
+        if [ "${{ github.event_name }}" == "push" ]; then
+          COMMIT_LENGTH=$(printenv COMMIT_IDS | jq length)
+          if [ $COMMIT_LENGTH == "0" ]; then
+            echo "No commits to scan"
+            exit 0
+          fi
+          HEAD=${{ github.event.after }}
+          if [ ${{ github.event.before }} == "0000000000000000000000000000000000000000" ]; then
+            BASE=""
+          else
+            BASE=${{ github.event.before }}
+          fi
+        elif [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+          BASE=""
+          HEAD=""
+        elif [ "${{ github.event_name }}" == "pull_request" ]; then
+          BASE=${{github.event.pull_request.base.sha}}
+          HEAD=${{github.event.pull_request.head.sha}}
+        fi
+      fi
+      ##########################################
+      ##          Run TruffleHog              ##
+      ##########################################
+      STEP_SUMMARY_FLAG=""
+      if [ "$GITHUB_STEP_SUMMARY_ENABLED" == "true" ]; then
+        STEP_SUMMARY_FLAG="--github-actions-step-summary"
+      fi
+      docker run --rm -v .:/tmp -w /tmp \
+      -e GITHUB_STEP_SUMMARY=/tmp/.step_summary \
+      ghcr.io/trufflesecurity/trufflehog:${VERSION} \
+      git file:///tmp/ \
+      --since-commit \
+      ${BASE:-''} \
+      --branch \
+      ${HEAD:-''} \
+      --fail \
+      --no-update \
+      --github-actions \
+      ${STEP_SUMMARY_FLAG} \
+      ${ARGS:-''}
+      # Append the step summary file if it exists
+      if [ -f ".step_summary" ]; then
+        cat .step_summary >> $GITHUB_STEP_SUMMARY
+        rm .step_summary
+      fi

@@ -47,20 +47,21 @@ var (
 	cli = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
 	cmd string
 	// https://github.com/trufflesecurity/trufflehog/blob/main/CONTRIBUTING.md#logging-in-trufflehog
-	logLevel            = cli.Flag("log-level", `Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".`).Default("0").Int()
-	debug               = cli.Flag("debug", "Run in debug mode.").Hidden().Bool()
-	trace               = cli.Flag("trace", "Run in trace mode.").Hidden().Bool()
-	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
-	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
-	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
-	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
-	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
-	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
+	logLevel                       = cli.Flag("log-level", `Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".`).Default("0").Int()
+	debug                          = cli.Flag("debug", "Run in debug mode.").Hidden().Bool()
+	trace                          = cli.Flag("trace", "Run in trace mode.").Hidden().Bool()
+	profile                        = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	localDev                       = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
+	jsonOut                        = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy                     = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat            = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	gitHubActionsStepSummaryFormat = cli.Flag("github-actions-step-summary", "Output a summary to the GitHub Actions step summary.").Bool()
+	concurrency                    = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification                 = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified                   = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
+	results                        = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
+	noColor                        = cli.Flag("no-color", "Disable colorized output").Bool()
+	noColour                       = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -510,6 +511,8 @@ func run(state overseer.State) {
 		printer = new(output.JSONPrinter)
 	case *gitHubActionsFormat:
 		printer = new(output.GitHubActionsPrinter)
+	case *gitHubActionsStepSummaryFormat:
+		printer = new(output.GitHubActionsStepSummaryPrinter)
 	default:
 		printer = new(output.PlainPrinter)
 	}
@@ -577,6 +580,13 @@ func run(state overseer.State) {
 	metrics, err := runSingleScan(ctx, cmd, engConf)
 	if err != nil {
 		logFatal(err, "error running scan")
+	}
+
+	// Finish the printer if it implements Finisher (e.g., for step summary output).
+	if dispatcher, ok := engConf.Dispatcher.(*engine.PrinterDispatcher); ok {
+		if err := dispatcher.Finish(); err != nil {
+			logger.Error(err, "error finishing printer")
+		}
 	}
 
 	verificationCacheMetricsSnapshot := struct {
