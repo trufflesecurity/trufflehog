@@ -1103,3 +1103,37 @@ func noopReporter() sources.UnitReporter {
 		},
 	}
 }
+
+// This tests reproduces a bug where both VisitUnit and VisitErr were called
+// for the same repository when caching the repository info failed.
+func TestFixBothUnitErrAndUnitOKCalled(t *testing.T) {
+	cache := simple.NewCache[string]()
+	cache.Set("myorg/myrepo", "an invalid url that will cause an error")
+	s := &Source{
+		filteredRepoCache: &filteredRepoCache{
+			Cache: cache,
+		},
+		conn: &sourcespb.GitHub{
+			Repositories: []string{"myorg/myrepo"},
+		},
+		orgsCache: simple.NewCache[string](),
+	}
+
+	var okCalled, errCalled bool
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			okCalled = true
+			return nil
+		},
+		VisitErr: func(ctx context.Context, err error) error {
+			errCalled = true
+			return nil
+		},
+	}
+	err := s.Enumerate(context.Background(), reporter)
+	require.NoError(t, err)
+
+	// expectation is that only VisitErr is called
+	assert.True(t, errCalled)
+	assert.False(t, okCalled)
+}
