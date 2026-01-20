@@ -774,6 +774,24 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			PrintLegacyJSON:     *jsonLegacy,
 			TrustLocalGitConfig: *gitTrustLocalGitConfig,
 		}
+
+		// detect if trufflehog is running git source as a pre-commit hook
+		if isPreCommitHook() {
+			ctx.Logger().Info("Running as a pre-commit hook, overriding default flags for hook context")
+
+			// Override git configuration for pre-commit hook context
+			gitCfg.TrustLocalGitConfig = true
+			gitCfg.BaseRef = "HEAD" // Only scan staged changes
+
+			// Override result filters for pre-commit hook context
+			// In hook mode, we only want to show verified secrets and unknown findings
+			*results = "verified,unknown"
+
+			// Override failure behavior for pre-commit hook context
+			// In hook mode, we want to fail the commit if any secrets are found
+			*fail = true
+		}
+
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		} else {
@@ -1224,4 +1242,41 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	}
 
 	return nil
+}
+
+// isPreCommitHook detects if trufflehog is running as a pre-commit hook
+func isPreCommitHook() bool {
+	// Pre-commit.com framework detection
+	// Docs: https://pre-commit.com/#pre-commit
+	// Sets PRE_COMMIT=1 environment variable when running hooks
+	if os.Getenv("PRE_COMMIT") == "1" {
+		return true
+	}
+
+	// Husky framework detection (modern versions)
+	// Docs: https://typicode.github.io/husky/get-started.html#disabling-hooks
+	// Sets HUSKY=1 environment variable for all hooks
+	if os.Getenv("HUSKY") == "1" {
+		return true
+	}
+
+	// Husky legacy detection (versions < 4.0)
+	// Sets HUSKY_GIT_PARAMS for git hooks, containing commit parameters
+	// Reference: https://github.com/typicode/husky/tree/v0.14.3
+	if os.Getenv("HUSKY_GIT_PARAMS") != "" {
+		return true
+	}
+
+	// Local Git hook detection (non-framework)
+	// Native Git hooks don't set specific environment variables by default.
+	// To detect local hooks without frameworks, we must explicitly set
+	// an environment variable in the hook script:
+	// Example in .git/hooks/pre-commit:
+	//   export TRUFFLEHOG_PRE_COMMIT=1
+	// Than we can detect it
+	if os.Getenv("TRUFFLEHOG_PRE_COMMIT") == "1" {
+		return true
+	}
+
+	return false
 }
