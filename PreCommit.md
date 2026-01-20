@@ -126,6 +126,19 @@ repos:
         stages: ["pre-commit", "pre-push"]
 ```
 
+If TruffleHog doesn't auto-detect your pre-commit.com environment, you can manually specify the recommended pre-commit settings:
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data.
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail --trust-local-git-config'
+        language: system
+        stages: ["pre-commit", "pre-push"]
+```
+
 2. Install the pre-commit hook:
 
 ```bash
@@ -162,6 +175,11 @@ npx husky init
 TruffleHog automatically detects when running under the Husky framework and applies optimal settings. No additional configuration is needed.
 ```bash
 echo "trufflehog git file://." > .husky/pre-commit
+```
+
+If TruffleHog doesn't auto-detect your husky framework, you can manually specify the recommended pre-commit settings:
+```bash
+echo "trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail --trust-local-git-config" > .husky/pre-commit
 ```
 
 2. For Docker users, use this content instead:
