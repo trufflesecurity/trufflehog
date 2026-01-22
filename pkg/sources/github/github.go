@@ -451,8 +451,8 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			repoName := repo
 			if strings.Contains(repo, "/") {
 				// Try to extract org/repo name from URL
-				if strings.Contains(repo, "github.com") {
-					parts := strings.Split(repo, "/")
+				if url, err := url.Parse(repo); err == nil {
+					parts := strings.Split(url.Path, "/")
 					if len(parts) >= 2 {
 						repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
 					}
