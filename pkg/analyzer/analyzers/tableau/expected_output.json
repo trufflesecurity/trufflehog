@@ -1,0 +1,768 @@
+{
+  "AnalyzerType": 44,
+  "Bindings": [
+    {
+      "Resource": {
+        "Name": "project",
+        "FullyQualifiedName": "project",
+        "Type": "project",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Read",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "project",
+        "FullyQualifiedName": "project",
+        "Type": "project",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Write",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Read",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Filter",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ViewComments",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "AddComment",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "DownloadImageandPdf",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "DownloadSummaryData",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "RunExplainData",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ShareCustomized",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "DownloadFullData",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "WebEdit",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "SaveACopy",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Write",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "CreateorRefreshMetrics",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Move",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Delete",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ChangePermissions",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "workbook",
+        "FullyQualifiedName": "workbook",
+        "Type": "workbook",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "RefreshExtracts",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Read",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Connect",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Download",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ChangePermissions",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Delete",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Write",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "RefreshExtracts",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datasource",
+        "FullyQualifiedName": "datasource",
+        "Type": "datasource",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "CreateMetricDefinition",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "dataRole",
+        "FullyQualifiedName": "dataRole",
+        "Type": "dataRole",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Read",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "dataRole",
+        "FullyQualifiedName": "dataRole",
+        "Type": "dataRole",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ChangePermissions",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "dataRole",
+        "FullyQualifiedName": "dataRole",
+        "Type": "dataRole",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Delete",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "dataRole",
+        "FullyQualifiedName": "dataRole",
+        "Type": "dataRole",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Write",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datalense",
+        "FullyQualifiedName": "datalense",
+        "Type": "datalense",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Move",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Read",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "DownloadFlow",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "RunFlow",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Move",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Delete",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ChangePermissions",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "WebEdit",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "flow",
+        "FullyQualifiedName": "flow",
+        "Type": "flow",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Write",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datalense",
+        "FullyQualifiedName": "datalense",
+        "Type": "datalense",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Read",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datalense",
+        "FullyQualifiedName": "datalense",
+        "Type": "datalense",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Move",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datalense",
+        "FullyQualifiedName": "datalense",
+        "Type": "datalense",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ChangePermissions",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datalense",
+        "FullyQualifiedName": "datalense",
+        "Type": "datalense",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Write",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "datalense",
+        "FullyQualifiedName": "datalense",
+        "Type": "datalense",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Delete",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "Administer",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ManageConnectedApps",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ManageGroups",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ManageLicenses",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ManageSchedules",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ManageSettings",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ManageUsers",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "OverrideContentOwnership",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "site",
+        "FullyQualifiedName": "site",
+        "Type": "site",
+        "Metadata": null,
+        "Parent": null
+      },
+      "Permission": {
+        "Value": "ViewAdminInsights",
+        "Parent": null
+      },
+      "Condition": ""
+    }
+  ],
+  "UnboundedResources": [],
+  "Metadata": {
+    "email": "muneeb.khan@trufflesec.com",
+    "fullName": "Muneeb Khan",
+    "id": "b4b38a7f-d8b8-497f-85fe-aca3b8b2fbed",
+    "role": "SiteAdministratorCreator"
+  }
+}

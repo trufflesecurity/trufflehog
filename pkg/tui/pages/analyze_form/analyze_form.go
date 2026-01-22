@@ -144,6 +144,21 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Required:    true,
 			RedactInput: true,
 		}}
+	case "tableau":
+		inputs = []textinputs.InputConfig{{
+			Label:    "Token Name",
+			Key:      "tokenName",
+			Required: true,
+		}, {
+			Label:       "PAT Secret",
+			Key:         "patSecret",
+			Required:    true,
+			RedactInput: true,
+		}, {
+			Label:    "Tableau endpoint e.g. 'abc.online.tableau.com'",
+			Key:      "endpoint",
+			Required: true,
+		}}
 	default:
 		inputs = []textinputs.InputConfig{{
 			Label:       "Secret",

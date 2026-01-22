@@ -1,0 +1,69 @@
+permissions:
+  # Project-level
+  - project:Read
+  - project:Write
+
+  # Workbook-level
+  - workbook:Read
+  - workbook:Filter
+  - workbook:ViewComments
+  - workbook:AddComment
+  - workbook:DownloadImageandPdf
+  - workbook:DownloadSummaryData
+  - workbook:RunExplainData
+  - workbook:ShareCustomized
+  - workbook:DownloadFullData
+  - workbook:WebEdit
+  - workbook:SaveACopy
+  - workbook:Write
+  - workbook:CreateorRefreshMetrics
+  - workbook:Move
+  - workbook:Delete
+  - workbook:ChangePermissions
+  - workbook:RefreshExtracts
+
+  # Datasource-level
+  - datasource:Read
+  - datasource:Connect
+  - datasource:Download
+  - datasource:Write
+  - datasource:CreateMetricDefinition
+  - datasource:Delete
+  - datasource:ChangePermissions
+  - datasource:RefreshExtracts
+
+  #DataRoles-level
+  - dataRole:Read
+  - dataRole:Write
+  - dataRole:Move
+  - dataRole:Delete
+  - dataRole:ChangePermissions
+
+  # Flow-level
+  - flow:Read
+  - flow:Write
+  - flow:DownloadFlow
+  - flow:WebEdit
+  - flow:RunFlow
+  - flow:Delete
+  - flow:Move
+  - flow:ChangePermissions
+
+  #Ask Data Lenses
+  - datalense:Read
+  - datalense:Write
+  - datalense:Delete
+  - datalense:Move
+  - datalense:ChangePermissions
+
+  # Site-level
+  - site:Administer
+  - site:ManageUsers
+  - site:ManageGroups
+  - site:ManageLicenses
+  - site:ManageSchedules
+  - site:ManageSettings
+  - site:ViewAdminInsights
+  - site:ManageConnectedApps
+  - site:OverrideContentOwnership
+
