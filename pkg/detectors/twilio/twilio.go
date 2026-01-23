@@ -23,7 +23,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.RetryableHTTPClient()
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
 )
