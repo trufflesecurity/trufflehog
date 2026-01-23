@@ -460,15 +460,35 @@ func TestNormalizeRepo(t *testing.T) {
 }
 
 func TestNormalizeRepo_Enterprise(t *testing.T) {
-	source := Source{
-		conn: &sourcespb.GitHub{
-			Endpoint: "https://example.com",
+	tests := []struct {
+		name       string
+		endpoint   string
+		wantResult string
+	}{
+		{
+			name:       "only host",
+			endpoint:   "https://example.com",
+			wantResult: "https://example.com/org/repo.git",
+		},
+		{
+			name:       "host with path",
+			endpoint:   "https://example.com/api/v3",
+			wantResult: "https://example.com/org/repo.git",
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := Source{
+				conn: &sourcespb.GitHub{
+					Endpoint: tt.endpoint,
+				},
+			}
 
-	result, err := source.normalizeRepo("org/repo")
-	assert.NoError(t, err)
-	assert.Equal(t, "https://example.com/org/repo.git", result)
+			result, err := source.normalizeRepo("org/repo")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantResult, result)
+		})
+	}
 }
 
 func TestHandleRateLimit(t *testing.T) {
