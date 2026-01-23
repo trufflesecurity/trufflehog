@@ -27,11 +27,7 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 // Analyze performs the analysis of the Datadog API key and returns the analyzer result.
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	apiKey := credInfo["apiKey"]
-
-	// Get appKey if provided
 	appKey := credInfo["appKey"]
-
-	// Endpoint
 	endpoint := credInfo["endpoint"]
 
 	info, err := AnalyzePermissions(a.Cfg, apiKey, appKey, endpoint)
