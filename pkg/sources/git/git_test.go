@@ -853,6 +853,113 @@ func TestPrepareRepoErrorPaths(t *testing.T) {
 	})
 }
 
+func TestResolveGitDir(t *testing.T) {
+	t.Parallel()
+
+	t.Run("regular repository with .git directory", func(t *testing.T) {
+		repoPath := setupTestRepo(t, "regular-repo")
+		addTestFileAndCommit(t, repoPath, "test.txt", "test content")
+
+		gitDir, err := resolveGitDir(repoPath)
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(repoPath, ".git"), gitDir)
+
+		// Verify it's actually a directory
+		info, err := os.Stat(gitDir)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("git worktree with .git file", func(t *testing.T) {
+		// Create main repository
+		mainRepoPath := setupTestRepo(t, "main-repo")
+		addTestFileAndCommit(t, mainRepoPath, "test.txt", "test content")
+
+		// Create a worktree
+		worktreePath := filepath.Join(filepath.Dir(mainRepoPath), "worktree")
+		err := exec.Command("git", "-C", mainRepoPath, "worktree", "add", worktreePath, "-b", "worktree-branch").Run()
+		assert.NoError(t, err)
+
+		// Verify .git is a file in the worktree
+		gitPath := filepath.Join(worktreePath, ".git")
+		info, err := os.Stat(gitPath)
+		assert.NoError(t, err)
+		assert.False(t, info.IsDir(), ".git should be a file in a worktree")
+
+		// Test resolveGitDir
+		gitDir, err := resolveGitDir(worktreePath)
+		assert.NoError(t, err)
+		assert.NotEqual(t, gitPath, gitDir, "resolved git dir should be different from .git file path")
+
+		// Verify the resolved path is a valid git directory (should contain index)
+		indexPath := filepath.Join(gitDir, "index")
+		_, err = os.Stat(indexPath)
+		assert.NoError(t, err, "resolved git dir should contain index file")
+	})
+
+	t.Run("nonexistent repository", func(t *testing.T) {
+		_, err := resolveGitDir("/nonexistent/path")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to stat .git")
+	})
+
+	t.Run("invalid .git file content", func(t *testing.T) {
+		tempDir := t.TempDir()
+		gitPath := filepath.Join(tempDir, ".git")
+
+		// Create an invalid .git file (not starting with "gitdir: ")
+		err := os.WriteFile(gitPath, []byte("invalid content"), 0644)
+		assert.NoError(t, err)
+
+		_, err = resolveGitDir(tempDir)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid .git file format")
+	})
+}
+
+func TestPrepareRepoWithWorktree(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Create main repository with staged changes
+	mainRepoPath := setupTestRepo(t, "main-repo-worktree")
+	addTestFileAndCommit(t, mainRepoPath, "test.txt", "initial content")
+
+	// Create a worktree
+	worktreePath := filepath.Join(filepath.Dir(mainRepoPath), "test-worktree")
+	err := exec.Command("git", "-C", mainRepoPath, "worktree", "add", worktreePath, "-b", "worktree-branch").Run()
+	assert.NoError(t, err)
+
+	// Stage some changes in the worktree
+	testFile := filepath.Join(worktreePath, "test.txt")
+	assert.NoError(t, os.WriteFile(testFile, []byte("modified content in worktree"), 0644))
+	assert.NoError(t, exec.Command("git", "-C", worktreePath, "add", "test.txt").Run())
+
+	// Verify staged changes exist in worktree
+	output, err := exec.Command("git", "-C", worktreePath, "diff", "--cached").Output()
+	assert.NoError(t, err)
+	assert.Contains(t, string(output), "modified content in worktree", "Staged changes should exist in worktree")
+
+	t.Run("PrepareRepo should work with git worktree", func(t *testing.T) {
+		fileURI := "file://" + worktreePath
+		preparedPath, isRemote, err := PrepareRepo(ctx, fileURI, "", false, false)
+
+		assert.NoError(t, err, "PrepareRepo should succeed with git worktree")
+		assert.False(t, isRemote)
+		assert.NotEmpty(t, preparedPath)
+
+		// Verify the cloned repo has the staged changes preserved
+		if preparedPath != "" {
+			defer os.RemoveAll(preparedPath)
+			stagedOutput, err := exec.Command("git", "-C", preparedPath, "diff", "--cached").Output()
+			if err == nil && len(stagedOutput) > 0 {
+				assert.Contains(t, string(stagedOutput), "modified content in worktree",
+					"Staged changes should be preserved when cloning from worktree")
+			}
+		}
+	})
+}
+
 func TestNormalizeFileURI(t *testing.T) {
 	tests := []struct {
 		name     string
