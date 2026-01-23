@@ -1535,7 +1535,35 @@ func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableC
 func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
 
 func TestEngine_DetectChunk_FalsePositivesPassedThrough(t *testing.T) {
-	t.Fail()
+	for _, tt := range []bool{true, false} {
+		t.Run(fmt.Sprintf("detectChunk passes false positives through (retainFalsePositives = %v)", tt), func(t *testing.T) {
+			// Arrange: Create an engine
+			e := Engine{
+				results:              make(chan detectors.ResultWithMetadata, 1),
+				retainFalsePositives: tt,
+				verificationCache:    verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+			}
+
+			// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+			ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"password"}}})
+			detectorMatches := ahcore.FindDetectorMatches([]byte("password"))
+			require.Len(t, detectorMatches, 1)
+
+			// Arrange: Create a detectableChunk
+			chunk := detectableChunk{
+				chunk:    sources.Chunk{Verify: false},
+				detector: detectorMatches[0],
+				wgDoneFn: func() {},
+			}
+
+			// Act
+			e.detectChunk(context.AddLogger(t.Context()), chunk)
+			close(e.results)
+
+			// Assert: Confirm that a result was generated
+			assert.Equal(t, 1, len(e.results))
+		})
+	}
 
 	// unverified result always sent to result chan
 	// e.retainFalsePositives: true, false
