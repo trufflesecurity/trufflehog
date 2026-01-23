@@ -559,7 +559,7 @@ func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
 
-	// Arrange: Create a chunk
+	// Arrange: Create a Chunk
 	chunk := sources.Chunk{
 		Data: []byte("abcde\nswordfish"),
 		SourceMetadata: &source_metadatapb.MetaData{
@@ -592,7 +592,7 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
 
-	// Arrange: Create a detectableChunk
+	// Arrange: Create a Chunk
 	chunk := sources.Chunk{
 		Data: []byte("swordfish trufflehog:ignore"),
 		SourceMetadata: &source_metadatapb.MetaData{
@@ -622,7 +622,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
 
-	// Arrange: Create a detectableChunk
+	// Arrange: Create a Chunk
 	chunk := sources.Chunk{
 		SourceName: "test source",
 		SourceID:   1,
