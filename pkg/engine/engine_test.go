@@ -1536,6 +1536,9 @@ func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.
 
 func TestEngine_DetectChunk_FalsePositivesPassedThrough(t *testing.T) {
 	t.Fail()
+
+	// unverified result always sent to result chan
+	// e.retainFalsePositives: true, false
 }
 
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
@@ -1576,6 +1579,9 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 
 func TestEngine_NotifierWorker_FalsePositivesDroppedWhenConfigured(t *testing.T) {
 	t.Fail()
+
+	// e.retainFalsePositives -> non-fp unverified result dispatched, fp unverified result dispatched
+	// !e.retainFalsePositives -> non-fp unverified result dispatched, fp unverified result not dispatched
 }
 
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
@@ -1730,4 +1736,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 func TestEngine_VerificationOverlapWorker_FalsePositivesPassedThrough(t *testing.T) {
 	t.Fail()
+
+	// standard fp always
+	// actual overlap: sent to results chan
+	// no overlap: sent to detectable chunks chan
 }
