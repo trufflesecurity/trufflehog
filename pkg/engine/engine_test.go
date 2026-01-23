@@ -559,18 +559,21 @@ func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
 
-	// Arrange: Create a Chunk
-	chunk := sources.Chunk{
-		Data: []byte("abcde\nswordfish"),
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Github{
-				Github: &source_metadatapb.Github{
-					Line: 1,
-					Link: "https://github.com/org/repo/blob/abcdef/file.txt#L1",
+	// Arrange: Create a detectableChunk
+	data := detectableChunk{
+		chunk: sources.Chunk{
+			Data: []byte("abcde\nswordfish"),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Line: 1,
+						Link: "https://github.com/org/repo/blob/abcdef/file.txt#L1",
+					},
 				},
 			},
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
 		},
-		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+		detector: &ahocorasick.DetectorMatch{Detector: fakeDetectorV1{}},
 	}
 
 	// Arrange: Create a Result
@@ -580,7 +583,7 @@ func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
 	}
 
 	// Act
-	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+	e.processResult(context.AddLogger(t.Context()), data, result, nil)
 
 	// Assert that the link has been correctly updated
 	require.Len(t, e.results, 1)
@@ -592,17 +595,20 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
 
-	// Arrange: Create a Chunk
-	chunk := sources.Chunk{
-		Data: []byte("swordfish trufflehog:ignore"),
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Git{
-				Git: &source_metadatapb.Git{
-					Line: 1,
+	// Arrange: Create a detectableChunk
+	data := detectableChunk{
+		chunk: sources.Chunk{
+			Data: []byte("swordfish trufflehog:ignore"),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{
+					Git: &source_metadatapb.Git{
+						Line: 1,
+					},
 				},
 			},
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
 		},
-		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+		detector: &ahocorasick.DetectorMatch{Detector: fakeDetectorV1{}},
 	}
 
 	// Arrange: Create a Result
@@ -612,7 +618,7 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 	}
 
 	// Act
-	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+	e.processResult(context.AddLogger(t.Context()), data, result, nil)
 
 	// Assert that no results were generated
 	assert.Empty(t, e.results)
@@ -622,23 +628,27 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
 
-	// Arrange: Create a Chunk
-	chunk := sources.Chunk{
-		SourceName: "test source",
-		SourceID:   1,
-		JobID:      2,
-		SecretID:   3,
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Docker{
-				Docker: &source_metadatapb.Docker{
-					File:  "file",
-					Image: "image",
-					Layer: "layer",
-					Tag:   "tag",
+	// Arrange: Create a detectableChunk
+	data := detectableChunk{
+		chunk: sources.Chunk{
+			SourceName: "test source",
+			SourceID:   1,
+			JobID:      2,
+			SecretID:   3,
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Docker{
+					Docker: &source_metadatapb.Docker{
+						File:  "file",
+						Image: "image",
+						Layer: "layer",
+						Tag:   "tag",
+					},
 				},
 			},
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_DOCKER,
 		},
-		SourceType: sourcespb.SourceType_SOURCE_TYPE_DOCKER,
+		decoder:  detectorspb.DecoderType_PLAIN,
+		detector: &ahocorasick.DetectorMatch{Detector: fakeDetectorV1{}},
 	}
 
 	// Arrange: Create a Result
@@ -652,12 +662,12 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	}
 
 	// Act
-	e.processResult(context.AddLogger(t.Context()), result, chunk, detectorspb.DecoderType_PLAIN, "a detector that detects", nil)
+	e.processResult(context.AddLogger(t.Context()), data, result, nil)
 
 	// Assert that the single generated result has the correct fields
 	require.Len(t, e.results, 1)
 	r := <-e.results
-	if diff := cmp.Diff(chunk.SourceMetadata, r.SourceMetadata, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(data.chunk.SourceMetadata, r.SourceMetadata, protocmp.Transform()); diff != "" {
 		t.Errorf("metadata mismatch (-want +got):\n%s", diff)
 	}
 	assert.Equal(t, map[string]string{"key": "value"}, r.ExtraData)
@@ -672,7 +682,6 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	assert.Equal(t, "test source", r.SourceName)
 	assert.Equal(t, sourcespb.SourceType_SOURCE_TYPE_DOCKER, r.SourceType)
 	assert.Equal(t, detectorspb.DecoderType_PLAIN, r.DecoderType)
-	assert.Equal(t, "a detector that detects", r.DetectorDescription)
 }
 
 func TestProcessResult_FalsePositiveFlagSetCorrectly(t *testing.T) {
@@ -713,6 +722,10 @@ func TestProcessResult_FalsePositiveFlagSetCorrectly(t *testing.T) {
 			// Arrange: Create an Engine
 			e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
 
+			// Arrange: Create a detectableChunk
+			// (It needs a DetectorMatch to avoid a panic.)
+			data := detectableChunk{detector: &ahocorasick.DetectorMatch{Detector: fakeDetectorV1{}}}
+
 			// Arrange: Create a Result
 			res := detectors.Result{
 				Raw:      []byte("something not nil"), // The false positive check is not run when Raw is nil
@@ -723,7 +736,7 @@ func TestProcessResult_FalsePositiveFlagSetCorrectly(t *testing.T) {
 			isFalsePositive := func(_ detectors.Result) (bool, string) { return tt.isFalsePositive, "" }
 
 			// Act
-			e.processResult(context.AddLogger(t.Context()), res, sources.Chunk{}, 0, "", isFalsePositive)
+			e.processResult(context.AddLogger(t.Context()), data, res, isFalsePositive)
 
 			// Assert that the single generated result has the correct false positive flag
 			require.Len(t, e.results, 1)
@@ -1534,6 +1547,10 @@ func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableC
 
 func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
 
+func TestEngine_DetectChunk_FalsePositivesPassedThrough(t *testing.T) {
+	t.Fail()
+}
+
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
@@ -1568,6 +1585,10 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	default:
 		t.Errorf("expected a result but did not get one")
 	}
+}
+
+func TestEngine_NotifierWorker_FalsePositivesDroppedWhenConfigured(t *testing.T) {
+	t.Fail()
 }
 
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
@@ -1718,4 +1739,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 			assert.True(t, detectableChunk.chunk.Verify)
 		}
 	})
+}
+
+func TestEngine_VerificationOverlapWorker_FalsePositivesPassedThrough(t *testing.T) {
+	t.Fail()
 }
