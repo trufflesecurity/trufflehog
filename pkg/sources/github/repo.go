@@ -372,6 +372,7 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 			if err != nil {
 				return "", fmt.Errorf("invalid enterprise endpoint: %w", err)
 			}
+			// we want to remove any path components from the endpoint and just use the host
 			u.Path = "/" + repo
 			fullURL = u.String()
 		}
