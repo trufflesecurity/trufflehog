@@ -950,7 +950,7 @@ func TestPrepareRepoWithWorktree(t *testing.T) {
 
 		// Verify the cloned repo has the staged changes preserved
 		if preparedPath != "" {
-			defer os.RemoveAll(preparedPath)
+			defer func() { _ = os.RemoveAll(preparedPath) }()
 			stagedOutput, err := exec.Command("git", "-C", preparedPath, "diff", "--cached").Output()
 			if err == nil && len(stagedOutput) > 0 {
 				assert.Contains(t, string(stagedOutput), "modified content in worktree",
