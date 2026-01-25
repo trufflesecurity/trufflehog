@@ -301,6 +301,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formsite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/foursquare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/frameio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/frameworksecret"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/freshbooks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/freshdesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/front"
@@ -1169,6 +1170,7 @@ func buildDetectorList() []detectors.Detector {
 		&formsite.Scanner{},
 		&foursquare.Scanner{},
 		&frameio.Scanner{},
+		&frameworksecret.Scanner{},
 		&freshbooks.Scanner{},
 		&freshdesk.Scanner{},
 		&front.Scanner{},
