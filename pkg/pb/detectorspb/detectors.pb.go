@@ -1152,6 +1152,7 @@ const (
 	DetectorType_ArtifactoryReferenceToken               DetectorType = 1042
 	DetectorType_DatadogApikey                           DetectorType = 1043
 	DetectorType_ShopifyOAuth                            DetectorType = 1044
+	DetectorType_FrameworkSecretKey                       DetectorType = 1045
 )
 
 // Enum value maps for DetectorType.
@@ -2198,6 +2199,7 @@ var (
 		1042: "ArtifactoryReferenceToken",
 		1043: "DatadogApikey",
 		1044: "ShopifyOAuth",
+		1045: "FrameworkSecretKey",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3241,6 +3243,7 @@ var (
 		"ArtifactoryReferenceToken":         1042,
 		"DatadogApikey":                     1043,
 		"ShopifyOAuth":                      1044,
+		"FrameworkSecretKey":                 1045,
 	}
 )
 
