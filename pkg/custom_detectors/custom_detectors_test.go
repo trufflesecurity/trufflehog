@@ -233,22 +233,58 @@ func TestDetectorPrimarySecret(t *testing.T) {
 }
 
 func TestDetectorPrimarySecretFullMatch(t *testing.T) {
-	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
-		Name:             "test",
-		Keywords:         []string{"secret"},
-		Regex:            map[string]string{"secret": `secret *= *"([^"\r\n]+)"`},
-		PrimaryRegexName: "secret",
-	})
+	tests := []struct {
+		name  string
+		input *custom_detectorspb.CustomRegex
+		chunk []byte
+		want  string
+	}{
+		{
+			name: "primary regex full match",
+			input: &custom_detectorspb.CustomRegex{
+				Name:             "test",
+				Keywords:         []string{"secret"},
+				Regex:            map[string]string{"secret": `secret *= *"([^"\r\n]+)"`},
+				PrimaryRegexName: "secret",
+			},
+			chunk: []byte(`
+			// some code
+			secret="mysecret"
+			// some code
+			`),
+			want: `secret="mysecret"`,
+		},
+		// Write a test case for a match which span multiple lines.
+		{
+			name: "primary regex full match multiline",
+			input: &custom_detectorspb.CustomRegex{
+				Name:             "test",
+				Keywords:         []string{"secret"},
+				Regex:            map[string]string{"secret": `secret *= *"([^"]+)"`},
+				PrimaryRegexName: "secret",
+			},
+			chunk: []byte(`
+			// some code
+			secret="mysecret
+			thatspansmultiplelines"
+			// some code
+			`),
+			want: `secret="mysecret
+			thatspansmultiplelines"`,
+		},
+	}
 
-	assert.NoError(t, err)
-	results, err := detector.FromData(context.Background(), false, []byte(`
-	// some code
-	secret="$existing_secret"
-	// some code
-	`))
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(results))
-	assert.Equal(t, `secret="$existing_secret"`, results[0].GetPrimarySecretValue())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detector, err := NewWebhookCustomRegex(tt.input)
+			assert.NoError(t, err)
+			results, err := detector.FromData(context.Background(), false, tt.chunk)
+			assert.NoError(t, err)
+			assert.Equal(t, 1, len(results))
+			assert.Equal(t, tt.want, results[0].GetPrimarySecretValue())
+		})
+	}
+
 }
 
 func TestDetectorValidations(t *testing.T) {

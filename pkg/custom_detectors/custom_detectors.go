@@ -240,6 +240,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 
 		// if the match is of the primary regex, set it's full match as primary secret value in result
 		if c.PrimaryRegexName == key {
+			// we're using the full match here to ensure correct line number reporting
 			result.SetPrimarySecretValue(fullMatch)
 		}
 	}
