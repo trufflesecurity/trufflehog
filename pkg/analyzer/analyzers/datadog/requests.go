@@ -173,6 +173,44 @@ func (h *HttpStatusTest) RunTest(client *http.Client, baseURL string, headers ma
 }
 
 // --------------------------------
+// Validate ApiKey
+// --------------------------------
+func ValidateApiKey(client *http.Client, baseURL, apiKey string) (bool, error) {
+	// Use a simple endpoint to test if the domain works
+	endpoint := baseURL + endpoints[ResourceTypeValidate]
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	// Create request
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	// Add required keys in the header
+	req.Header.Set(apiKeyHeader, apiKey)
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	// If we get a response that's not a connection error, this domain works
+	if resp.StatusCode == http.StatusOK {
+		return true, nil
+	}
+
+	return false, errors.New("unable to validate any provided DataDog API key")
+}
+
+// --------------------------------
 // Data capture functions
 // --------------------------------
 
@@ -238,16 +276,44 @@ func CapturePermissions(client *http.Client, baseURL, apiKey, appKey string, sec
 	}
 
 	for _, scope := range scopes {
-		status, err := scope.HttpTest.RunTest(client, baseURL, headers)
-		if err != nil {
-			return fmt.Errorf("running test for scope %s: %w", scope.Name, err)
-		}
+		if scope.HttpTest.Endpoint != "" {
+			status, err := scope.HttpTest.RunTest(client, baseURL, headers)
+			if err != nil {
+				return fmt.Errorf("running test for scope %s: %w", scope.Name, err)
+			}
 
+			metadata := map[string]string{
+				"Resource": scope.Resource,
+			}
+
+			if status {
+				permission := Permission{
+					Name:        scope.Name,
+					Title:       scope.Title,
+					Description: scope.Description,
+					MetaData:    metadata,
+				}
+				permissions = append(permissions, permission)
+			}
+		}
+	}
+
+	secretInfo.Permissions = permissions
+	return nil
+}
+
+// API key is not finely grained, so we assign some default permissions
+func CaptureApiKeyPermissions(client *http.Client, baseURL, apiKey, appKey string, secretInfo *SecretInfo) error {
+	scopes, err := readInScopes()
+	if err != nil {
+		return fmt.Errorf("reading in scopes: %w", err)
+	}
+	permissions := make([]Permission, 0)
+	for _, scope := range scopes {
 		metadata := map[string]string{
 			"Resource": scope.Resource,
 		}
-
-		if status {
+		if scope.HttpTest.Endpoint == "" {
 			permission := Permission{
 				Name:        scope.Name,
 				Title:       scope.Title,
@@ -257,8 +323,7 @@ func CapturePermissions(client *http.Client, baseURL, apiKey, appKey string, sec
 			permissions = append(permissions, permission)
 		}
 	}
-
-	secretInfo.Permissions = permissions
+	secretInfo.Permissions = append(secretInfo.Permissions, permissions...)
 	return nil
 }
 

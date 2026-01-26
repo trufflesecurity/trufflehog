@@ -50,7 +50,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey, appKey, endpoint str
 	}
 
 	color.Green("[i] Valid Datadog API Key\n")
-
 	printUser(info.User)
 	printResources(info.Resources)
 	printPermissions(info.Permissions)
@@ -60,9 +59,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey, appKey, endpoint str
 func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*SecretInfo, error) {
 	if apiKey == "" {
 		return nil, errors.New("api key not found in credentials info")
-	}
-	if appKey == "" {
-		return nil, errors.New("app key not found in credentials info")
 	}
 
 	// create the http client
@@ -83,6 +79,21 @@ func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*S
 		}
 	}
 
+	if appKey == "" {
+		// If no application key is provided, we can only validate the API key
+		isValidApiKey, err := ValidateApiKey(client, baseURL, apiKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate api key: %v", err)
+		}
+		if !isValidApiKey {
+			return nil, errors.New("invalid api key provided")
+		}
+		if err := CaptureApiKeyPermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
+			return nil, fmt.Errorf("failed to fetch permissions: %v", err)
+		}
+		return secretInfo, nil
+	}
+
 	// capture user information in secretInfo
 	// If the application key is scoped, user information cannot be retrieved even if all the permissions are granted
 	// This is a non-documented Endpoint and can lead to unexpected behavior in future updates
@@ -99,6 +110,10 @@ func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*S
 		return nil, fmt.Errorf("failed to fetch permissions: %v", err)
 	}
 
+	// Capture API key permissions
+	if err := CaptureApiKeyPermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
+		return nil, fmt.Errorf("failed to fetch permissions: %v", err)
+	}
 	return secretInfo, nil
 }
 
@@ -128,9 +143,16 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	permissionBindings := secretInfoPermissionsToAnalyzerPermission(info.Permissions)
-
 	if userResource != nil && len(*permissionBindings) > 0 {
 		result.Bindings = analyzers.BindAllPermissions(*userResource, *permissionBindings...)
+	}
+	if userResource == nil && len(*permissionBindings) > 0 {
+		result.Bindings = analyzers.BindAllPermissions(analyzers.Resource{
+			FullyQualifiedName: "Unknown User",
+			Name:               "Unknown User",
+			Type:               "User",
+			Metadata:           map[string]any{},
+		}, *permissionBindings...)
 	}
 
 	// Extract information from resources to create bindings
