@@ -1822,11 +1822,3 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		}
 	})
 }
-
-func TestEngine_VerificationOverlapWorker_FalsePositivesPassedThrough(t *testing.T) {
-	t.Fail()
-
-	// standard fp always
-	// actual overlap: sent to results chan
-	// no overlap: sent to detectable chunks chan
-}
