@@ -828,6 +828,80 @@ func (testDetectorV2) Type() detectorspb.DetectorType { return TestDetectorType2
 
 func (testDetectorV2) Description() string { return "" }
 
+func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
+	// Arrange: Generate the absolute path of the file to scan
+	secretsPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name                      string
+		detectors                 []detectors.Detector
+		retainFalsePositives      bool
+		wantUnverifiedSecretCount uint64
+	}{
+		{
+			name:                      "no overlap, retain false positives",
+			detectors:                 []detectors.Detector{testDetectorV1{}},
+			retainFalsePositives:      true,
+			wantUnverifiedSecretCount: 1,
+		},
+		{
+			name:                      "no overlap, do not retain false positives",
+			detectors:                 []detectors.Detector{testDetectorV1{}},
+			retainFalsePositives:      false,
+			wantUnverifiedSecretCount: 0,
+		},
+		{
+			name:                      "overlap, retain false positives",
+			detectors:                 []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
+			retainFalsePositives:      true,
+			wantUnverifiedSecretCount: 2,
+		},
+		{
+			name:                      "overlap, do not retain false positives",
+			detectors:                 []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
+			retainFalsePositives:      false,
+			wantUnverifiedSecretCount: 0,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.AddLogger(t.Context())
+
+			// Arrange: Generate a base engine config
+			engineConfig := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     tt.detectors,
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+				Results:       map[string]struct{}{"verified": {}, "unverified": {}, "unknown": {}},
+				SourceManager: sources.NewManager(sources.WithSourceUnits()),
+				Verify:        false,
+			}
+
+			// Arrange: Set the appropriate false positive flag
+			if tt.retainFalsePositives {
+				engineConfig.Results["filtered_unverified"] = struct{}{}
+			}
+
+			// Arrange: Create and start an engine
+			e, err := NewEngine(ctx, &engineConfig)
+			require.NoError(t, err)
+			e.Start(ctx)
+
+			// Act: Scan the file
+			cfg := sources.FilesystemConfig{Paths: []string{secretsPath}}
+			_, err = e.ScanFileSystem(ctx, cfg)
+			require.NoError(t, err)
+			require.NoError(t, e.Finish(ctx))
+
+			// Assert that the unverified secret count was expected
+			assert.Equal(t, tt.wantUnverifiedSecretCount, e.GetMetrics().UnverifiedSecretsFound)
+		})
+	}
+}
+
 func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	ctx := context.Background()
 
