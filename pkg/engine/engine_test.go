@@ -1565,9 +1565,6 @@ func TestEngine_DetectChunk_FalsePositivesPassedThrough(t *testing.T) {
 			assert.Equal(t, 1, len(e.results))
 		})
 	}
-
-	// unverified result always sent to result chan
-	// e.retainFalsePositives: true, false
 }
 
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
