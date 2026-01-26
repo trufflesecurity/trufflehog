@@ -176,6 +176,10 @@ func TestAnalyzer_Analyze_ApiKeyOnly(t *testing.T) {
 
 	a := Analyzer{Cfg: &config.Config{}}
 	got, err := a.Analyze(ctx, map[string]string{"apiKey": apiKey, "endpoint": "https://api.us5.datadoghq.com"})
+	if err != nil {
+		t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, false)
+		return
+	}
 
 	// For valid cases, verify we got a result
 	if got == nil {
