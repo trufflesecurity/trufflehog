@@ -840,26 +840,36 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		wantUnverifiedSecretCount uint64
 	}{
 		{
-			name:                      "no overlap, retain false positives",
-			detectors:                 []detectors.Detector{testDetectorV1{}},
+			name: "no overlap, retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+			},
 			retainFalsePositives:      true,
 			wantUnverifiedSecretCount: 1,
 		},
 		{
-			name:                      "no overlap, do not retain false positives",
-			detectors:                 []detectors.Detector{testDetectorV1{}},
+			name: "no overlap, do not retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
 		},
 		{
-			name:                      "overlap, retain false positives",
-			detectors:                 []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
+			name: "overlap, retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+			},
 			retainFalsePositives:      true,
 			wantUnverifiedSecretCount: 2,
 		},
 		{
-			name:                      "overlap, do not retain false positives",
-			detectors:                 []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
+			name: "overlap, do not retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
 		},
