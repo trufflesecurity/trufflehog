@@ -1209,16 +1209,16 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		startTime := time.Now()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
-			if result.VerificationError() != nil {
+			if result.IsWordlistFalsePositive && !e.retainFalsePositives {
+				// Skip false positives.
+				continue
+			} else if result.VerificationError() != nil {
 				if !e.notifyUnknownResults {
 					// Skip results with verification errors.
 					continue
 				}
 			} else if !e.notifyUnverifiedResults {
 				// Skip unverified results.
-				continue
-			} else if result.IsWordlistFalsePositive && !e.retainFalsePositives {
-				// Skip false positives.
 				continue
 			}
 		} else if !e.notifyVerifiedResults {
