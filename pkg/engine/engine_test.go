@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -54,7 +56,7 @@ func (f fakeDetectorV1) Keywords() []string             { return []string{fakeDe
 func (f fakeDetectorV1) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (f fakeDetectorV1) Version() int                   { return 1 }
 
-func (f fakeDetectorV1) Description() string { return "" }
+func (f fakeDetectorV1) Description() string { return "fake detector v1" }
 
 func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
@@ -70,7 +72,7 @@ func (f fakeDetectorV2) Keywords() []string             { return []string{fakeDe
 func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (f fakeDetectorV2) Version() int                   { return 2 }
 
-func (f fakeDetectorV2) Description() string { return "" }
+func (f fakeDetectorV2) Description() string { return "fake detector v2" }
 
 func TestFragmentLineOffset(t *testing.T) {
 	tests := []struct {
@@ -551,6 +553,183 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	// We should have 4 verified secrets, 2 for each custom detector.
 	want := uint64(4)
 	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
+}
+
+func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
+	// Arrange: Create an engine
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
+
+	// Arrange: Create a Chunk
+	chunk := sources.Chunk{
+		Data: []byte("abcde\nswordfish"),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{
+				Github: &source_metadatapb.Github{
+					Line: 1,
+					Link: "https://github.com/org/repo/blob/abcdef/file.txt#L1",
+				},
+			},
+		},
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		Raw:      []byte("swordfish"),
+		Verified: true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+
+	// Assert that the link has been correctly updated
+	require.Len(t, e.results, 1)
+	r := <-e.results
+	assert.Equal(t, "https://github.com/org/repo/blob/abcdef/file.txt#L2", r.SourceMetadata.GetGithub().GetLink())
+}
+
+func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
+	// Arrange: Create an engine
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
+
+	// Arrange: Create a Chunk
+	chunk := sources.Chunk{
+		Data: []byte("swordfish trufflehog:ignore"),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Git{
+				Git: &source_metadatapb.Git{
+					Line: 1,
+				},
+			},
+		},
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		Raw:      []byte("swordfish"),
+		Verified: true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+
+	// Assert that no results were generated
+	assert.Empty(t, e.results)
+}
+
+func TestProcessResult_AllFieldsCopied(t *testing.T) {
+	// Arrange: Create an engine
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
+
+	// Arrange: Create a Chunk
+	chunk := sources.Chunk{
+		SourceName: "test source",
+		SourceID:   1,
+		JobID:      2,
+		SecretID:   3,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Docker{
+				Docker: &source_metadatapb.Docker{
+					File:  "file",
+					Image: "image",
+					Layer: "layer",
+					Tag:   "tag",
+				},
+			},
+		},
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_DOCKER,
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		DetectorType: TestDetectorType,
+		ExtraData:    map[string]string{"key": "value"},
+		Raw:          []byte("something"),
+		RawV2:        []byte("something:else"),
+		Redacted:     "someth***",
+		Verified:     true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), result, chunk, detectorspb.DecoderType_PLAIN, "a detector that detects", nil)
+
+	// Assert that the single generated result has the correct fields
+	require.Len(t, e.results, 1)
+	r := <-e.results
+	if diff := cmp.Diff(chunk.SourceMetadata, r.SourceMetadata, protocmp.Transform()); diff != "" {
+		t.Errorf("metadata mismatch (-want +got):\n%s", diff)
+	}
+	assert.Equal(t, map[string]string{"key": "value"}, r.ExtraData)
+	assert.Equal(t, []byte("something"), r.Raw)
+	assert.Equal(t, []byte("something:else"), r.RawV2)
+	assert.Equal(t, "someth***", r.Redacted)
+	assert.True(t, r.Verified)
+	assert.Equal(t, detectorspb.DetectorType(TestDetectorType), r.DetectorType)
+	assert.Equal(t, sources.SourceID(1), r.SourceID)
+	assert.Equal(t, sources.JobID(2), r.JobID)
+	assert.Equal(t, int64(3), r.SecretID)
+	assert.Equal(t, "test source", r.SourceName)
+	assert.Equal(t, sourcespb.SourceType_SOURCE_TYPE_DOCKER, r.SourceType)
+	assert.Equal(t, detectorspb.DecoderType_PLAIN, r.DecoderType)
+	assert.Equal(t, "a detector that detects", r.DetectorDescription)
+}
+
+func TestProcessResult_FalsePositiveFlagSetCorrectly(t *testing.T) {
+	testcases := []struct {
+		name                string
+		verified            bool
+		isFalsePositive     bool
+		wantIsFalsePositive bool
+	}{
+		{
+			name:                "unverified/false positive",
+			verified:            false,
+			isFalsePositive:     true,
+			wantIsFalsePositive: true,
+		},
+		{
+			name:                "unverified/not false positive",
+			verified:            false,
+			isFalsePositive:     false,
+			wantIsFalsePositive: false,
+		},
+		{
+			name:                "verified/false positive",
+			verified:            true,
+			isFalsePositive:     true,
+			wantIsFalsePositive: false, // The false positive check should not be run for verified secrets
+		},
+		{
+			name:                "verified/not false positive",
+			verified:            true,
+			isFalsePositive:     false,
+			wantIsFalsePositive: false,
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange: Create an Engine
+			e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
+
+			// Arrange: Create a Result
+			res := detectors.Result{
+				Raw:      []byte("something not nil"), // The false positive check is not run when Raw is nil
+				Verified: tt.verified,
+			}
+
+			// Arrange: Create the false positive check
+			isFalsePositive := func(_ detectors.Result) (bool, string) { return tt.isFalsePositive, "" }
+
+			// Act
+			e.processResult(context.AddLogger(t.Context()), res, sources.Chunk{}, 0, "", isFalsePositive)
+
+			// Assert that the single generated result has the correct false positive flag
+			require.Len(t, e.results, 1)
+			assert.Equal(t, tt.wantIsFalsePositive, (<-e.results).IsWordlistFalsePositive)
+		})
+	}
 }
 
 func TestVerificationOverlapChunk(t *testing.T) {

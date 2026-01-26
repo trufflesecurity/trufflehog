@@ -3,6 +3,7 @@ package syslog
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -74,10 +75,17 @@ func TestSource_parseSyslogMetadata(t *testing.T) {
 			want: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Syslog{
 					Syslog: &source_metadatapb.Syslog{
-						Hostname:  "mymachine",
-						Timestamp: "2025-10-11 22:14:15 +0000 UTC",
-						Client:    "127.0.0.1:5140",
-						Facility:  "4",
+						Hostname: "mymachine",
+						Timestamp: time.Date(
+							time.Now().Year(),
+							time.October,
+							11,
+							22, 14, 15,
+							0,
+							time.UTC,
+						).String(),
+						Client:   "127.0.0.1:5140",
+						Facility: "4",
 					},
 				},
 			},
