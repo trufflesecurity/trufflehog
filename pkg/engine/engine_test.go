@@ -881,11 +881,6 @@ func TestRetainFalsePositives(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	confPath, err := filepath.Abs("./testdata/verificationoverlap_detectors_fp.yaml")
-	assert.NoError(t, err)
-	conf, err := config.Read(confPath)
-	assert.NoError(t, err)
-
 	const defaultOutputBufferSize = 64
 	opts := []func(*sources.SourceManager){
 		sources.WithSourceUnits(),
@@ -897,7 +892,7 @@ func TestRetainFalsePositives(t *testing.T) {
 	c := Config{
 		Concurrency:   1,
 		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     conf.Detectors,
+		Detectors:     []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
 		Verify:        false,
 		SourceManager: sourceManager,
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
