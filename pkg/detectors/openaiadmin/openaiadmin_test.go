@@ -10,6 +10,45 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
+func TestOpenAIAdmin_DoesNotMatchRegularKeys(t *testing.T) {
+	d := Scanner{}
+
+	regularKeys := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "legacy key",
+			input: `OPENAI_API_KEY = "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"`,
+		},
+		{
+			name:  "project key",
+			input: `OPENAI_API_KEY = "sk-proj-mpjtr05CFsJqs4TAeKlCT3BlbkFJsh1KtN0SUjTPeJiagE8K"`,
+		},
+		{
+			name:  "service account key",
+			input: `OPENAI_API_KEY = "sk-svcacct-IUXtc5gIZK-2cBfB-nTgEWbD8mi-fi-gc20oGtq8ve51sET3BlbkFJCg8iQkCVz_nmE_q1dCWlMpemoaoMqHzQ6D-FnWGqlz4C8A"`,
+		},
+		{
+			name:  "service account key (old format)",
+			input: `OPENAI_API_KEY = "sk-service-account-name-Ofbtr05CFsJqs4TAeKlCT3BlbkFJsh1KtN0SUjTPeJiaglyC"`,
+		},
+	}
+
+	for _, tc := range regularKeys {
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := d.FromData(context.Background(), false, []byte(tc.input))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(results) != 0 {
+				t.Errorf("openaiadmin detector should not match %s, but got %d results", tc.name, len(results))
+			}
+		})
+	}
+}
+
 func TestOpenAIAdmin_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})

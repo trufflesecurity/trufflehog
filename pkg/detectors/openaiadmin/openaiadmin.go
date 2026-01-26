@@ -33,7 +33,7 @@ var (
 func (s Scanner) Keywords() []string {
 	// Using both keywords for better detection coverage
 	// T3BlbkFJ is the OpenAI signature, sk-admin- is the specific prefix
-	return []string{"T3BlbkFJ", "sk-admin-"}
+	return []string{"sk-admin-"}
 }
 
 // FromData will find and optionally verify Openaiadmin secrets in a given set of bytes.
