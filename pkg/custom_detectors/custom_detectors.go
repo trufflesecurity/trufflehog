@@ -66,6 +66,9 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 		}
 	}
 
+	// Ensure primary regex name is set.
+	ensurePrimaryRegexNameSet(pb)
+
 	// TODO: Copy only necessary data out of pb.
 	return &CustomRegexWebhook{pb}, nil
 }
@@ -229,14 +232,15 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		values := match[key]
 		// values[0] contains the entire regex match.
 		secret := values[0]
+		fullMatch := values[0]
 		if len(values) > 1 {
 			secret = values[1]
 		}
 		raw += secret
 
-		// if the match is of the primary regex, set it's value as primary secret value in result
+		// if the match is of the primary regex, set it's full match as primary secret value in result
 		if c.PrimaryRegexName == key {
-			result.SetPrimarySecretValue(secret)
+			result.SetPrimarySecretValue(fullMatch)
 		}
 	}
 
@@ -393,4 +397,15 @@ func (c *CustomRegexWebhook) Description() string {
 		return defaultDescription
 	}
 	return c.GetDescription()
+}
+
+// ensurePrimaryRegexNameSet sets the PrimaryRegexName field to the first
+// regex name if it is not already set.
+func ensurePrimaryRegexNameSet(pb *custom_detectorspb.CustomRegex) {
+	if pb.PrimaryRegexName == "" {
+		for name := range pb.Regex {
+			pb.PrimaryRegexName = name
+			return
+		}
+	}
 }
