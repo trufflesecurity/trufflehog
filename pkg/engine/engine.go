@@ -1156,10 +1156,6 @@ func (e *Engine) filterResults(
 		results = clean(results)
 	}
 
-	if !e.retainFalsePositives {
-		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
-	}
-
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
@@ -1220,6 +1216,9 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 				}
 			} else if !e.notifyUnverifiedResults {
 				// Skip unverified results.
+				continue
+			} else if result.IsWordlistFalsePositive && !e.retainFalsePositives {
+				// Skip false positives.
 				continue
 			}
 		} else if !e.notifyVerifiedResults {
