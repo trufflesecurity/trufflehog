@@ -796,10 +796,10 @@ var _ detectors.Detector = (*testDetectorV1)(nil)
 
 type testDetectorV1 struct{}
 
-func (testDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+func (testDetectorV1) FromData(_ aCtx.Context, _ bool, data []byte) ([]detectors.Result, error) {
 	result := detectors.Result{
 		DetectorType: TestDetectorType,
-		Raw:          []byte("ssample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+		Raw:          data,
 	}
 	return []detectors.Result{result}, nil
 }
@@ -814,10 +814,10 @@ var _ detectors.Detector = (*testDetectorV2)(nil)
 
 type testDetectorV2 struct{}
 
-func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+func (testDetectorV2) FromData(_ aCtx.Context, _ bool, data []byte) ([]detectors.Result, error) {
 	result := detectors.Result{
 		DetectorType: TestDetectorType,
-		Raw:          []byte("sample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+		Raw:          data,
 	}
 	return []detectors.Result{result}, nil
 }
