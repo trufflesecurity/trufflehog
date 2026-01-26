@@ -238,9 +238,20 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		}
 		raw += secret
 
-		// if the match is of the primary regex, set it's full match as primary secret value in result
+		// We set the full regex match as the primary secret value.
+		// Reasoning:
+		// The engine calculates the line number using the match. When a primary secret is set, it uses that value instead of the raw secret.
+		// While the secret match itself is sufficient to calculate the line number, the same group match could appear elsewhere in the data.
+		// To avoid ambiguity, we store the full regex match as the primary secret value.
+		// This primary secret value is used only for identifying the exact line number and is not used anywhere else.
+
+		// Example:
+		// Full regex match: secret = ABC123
+		// Secret (raw): ABC123
+
+		// In this case, the primary secret value stores the full string `secret = ABC123`,
+		// allowing the engine to pinpoint the exact location and avoid matching redundant occurrences of `ABC123` in the data.
 		if c.PrimaryRegexName == key {
-			// we're using the full match here to ensure correct line number reporting
 			result.SetPrimarySecretValue(fullMatch)
 		}
 	}
