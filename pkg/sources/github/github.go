@@ -410,6 +410,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			if err := dedupeReporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
+			continue
 		}
 		if err := dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url}); err != nil {
 			return err
