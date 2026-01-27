@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -1534,6 +1535,38 @@ func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableC
 
 func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
 
+func TestEngine_DetectChunk_FalsePositivesPassedThrough(t *testing.T) {
+	for _, tt := range []bool{true, false} {
+		t.Run(fmt.Sprintf("detectChunk passes false positives through (retainFalsePositives = %v)", tt), func(t *testing.T) {
+			// Arrange: Create an engine
+			e := Engine{
+				results:              make(chan detectors.ResultWithMetadata, 1),
+				retainFalsePositives: tt,
+				verificationCache:    verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+			}
+
+			// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+			ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"password"}}})
+			detectorMatches := ahcore.FindDetectorMatches([]byte("password"))
+			require.Len(t, detectorMatches, 1)
+
+			// Arrange: Create a detectableChunk
+			chunk := detectableChunk{
+				chunk:    sources.Chunk{Verify: false},
+				detector: detectorMatches[0],
+				wgDoneFn: func() {},
+			}
+
+			// Act
+			e.detectChunk(context.AddLogger(t.Context()), chunk)
+			close(e.results)
+
+			// Assert: Confirm that a result was generated
+			assert.Equal(t, 1, len(e.results))
+		})
+	}
+}
+
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
@@ -1568,6 +1601,73 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	default:
 		t.Errorf("expected a result but did not get one")
 	}
+}
+
+type mockDispatcher struct {
+	dispatched []detectors.ResultWithMetadata
+}
+
+var _ ResultsDispatcher = (*mockDispatcher)(nil)
+
+func (m *mockDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	m.dispatched = append(m.dispatched, result)
+	return nil
+}
+
+func TestEngine_NotifierWorker_FalsePositivesDroppedWhenConfigured(t *testing.T) {
+	t.Run("false positives are retained when retainFalsePositives is true", func(t *testing.T) {
+		// Arrange: Create a dedupe cache (to avoid a panic)
+		dedupeCache, err := lru.New[string, detectorspb.DecoderType](1)
+		require.NoError(t, err)
+
+		// Arrange: Create an engine
+		e := Engine{
+			dedupeCache:             dedupeCache,
+			dispatcher:              &mockDispatcher{},
+			notifyUnverifiedResults: true,
+			results:                 make(chan detectors.ResultWithMetadata, 1),
+			retainFalsePositives:    true,
+		}
+
+		// Arrange: Enqueue a single result
+		e.results <- detectors.ResultWithMetadata{
+			IsWordlistFalsePositive: true,
+		}
+		close(e.results)
+
+		// Act
+		e.notifierWorker(context.AddLogger(t.Context()))
+
+		// Assert: Confirm that the result was dispatched
+		assert.Len(t, e.dispatcher.(*mockDispatcher).dispatched, 1)
+	})
+
+	t.Run("false positives are not retained when retainFalsePositives is false", func(t *testing.T) {
+		// Arrange: Create a dedupe cache (to avoid a panic)
+		dedupeCache, err := lru.New[string, detectorspb.DecoderType](1)
+		require.NoError(t, err)
+
+		// Arrange: Create an engine
+		e := Engine{
+			dedupeCache:             dedupeCache,
+			dispatcher:              &mockDispatcher{},
+			notifyUnverifiedResults: true,
+			results:                 make(chan detectors.ResultWithMetadata, 1),
+			retainFalsePositives:    false,
+		}
+
+		// Arrange: Enqueue a single result
+		e.results <- detectors.ResultWithMetadata{
+			IsWordlistFalsePositive: true,
+		}
+		close(e.results)
+
+		// Act
+		e.notifierWorker(context.AddLogger(t.Context()))
+
+		// Assert: Confirm that no result was dispatched
+		assert.Empty(t, e.dispatcher.(*mockDispatcher).dispatched)
+	})
 }
 
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
