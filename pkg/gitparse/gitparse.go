@@ -253,7 +253,7 @@ func (c *Parser) RepoPath(
 		args = append(args, "--", ".", ":(exclude)"+glob)
 	}
 
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	absPath, err := filepath.Abs(source)
 	if err == nil {
 		if !isBare {
@@ -281,7 +281,7 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 	// Provide the --cached flag to diff to get the diff of the staged changes.
 	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--date=iso-strict"}
 
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 
 	absPath, err := filepath.Abs(source)
 	if err == nil {
@@ -293,6 +293,8 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
 func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan *Diff, error) {
+	const waitDelay = 5 * time.Second // Give the command a chance to finish before the timeout
+
 	diffChan := make(chan *Diff, 64)
 
 	stdOut, err := cmd.StdoutPipe()
@@ -303,6 +305,9 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 	if err != nil {
 		return diffChan, err
 	}
+
+	// Set WaitDelay to give the command a grace period to finish before being killed
+	cmd.WaitDelay = waitDelay
 
 	err = cmd.Start()
 	if err != nil {
