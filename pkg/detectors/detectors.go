@@ -20,7 +20,7 @@ type Detector interface {
 	// FromData will scan bytes for results and optionally verify them.
 	//
 	// FromData can be called concurrently from multiple goroutines.
-	// Any modification to the receiver or to global variables will need to to use some kind of synchronization.
+	// Any modification to the receiver or to global variables will need to use some kind of synchronization.
 	FromData(ctx context.Context, verify bool, data []byte) ([]Result, error)
 
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.
@@ -213,8 +213,6 @@ type ResultWithMetadata struct {
 	// SourceName is the name of the Source.
 	SourceName string
 	Result
-	// Data from the sources.Chunk which this result was emitted for
-	Data []byte
 	// DetectorDescription is the description of the Detector.
 	DetectorDescription string
 	// DecoderType is the type of decoder that was used to generate this result's data.
@@ -231,7 +229,6 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
 		Result:         result,
-		Data:           chunk.Data,
 	}
 }
 
