@@ -54,6 +54,7 @@ enum SourceType {
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
   SOURCE_TYPE_SLACK_CONTINUOUS = 41;
+  SOURCE_TYPE_JSON_ENUMERATOR = 42;
 }
 
 message LocalSource {
@@ -550,4 +551,8 @@ message Stdin {}
 message SlackContinuous {
   string namespace = 1;
   string project_id = 2;
+}
+
+message JSONEnumerator {
+  repeated string paths = 1;
 }
