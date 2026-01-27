@@ -36,6 +36,9 @@ func newConnector(ctx context.Context, source *Source) (Connector, error) {
 		apiEndpoint = cloudV3Endpoint
 	}
 
+	// Ensure GitHub Enterprise Server endpoints include /api/v3 for proper API routing
+	apiEndpoint = normalizeGitHubEnterpriseEndpoint(apiEndpoint)
+
 	switch cred := source.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:
 		log.RedactGlobally(cred.GithubApp.GetPrivateKey())
@@ -89,4 +92,30 @@ func createGraphqlClient(ctx context.Context, client *http.Client, apiEndpoint s
 	ctx.Logger().V(2).Info("Creating GraphQL client", "url", graphqlEndpoint)
 
 	return githubv4.NewEnterpriseClient(graphqlEndpoint, client), nil
+}
+
+// normalizeGitHubEnterpriseEndpoint ensures GitHub Enterprise Server endpoints include /api/v3
+// This is required for libraries like ghinstallation that construct URLs like:
+// {BaseURL}/app/installations/{id}/access_tokens
+//
+// GitHub Enterprise Server requires: https://hostname/api/v3/app/installations/{id}/access_tokens
+// By default, the GitHub Enterprise URL format should be http(s)://[hostname]/api/v3/ or you will
+// always receive the 406 status code.
+// GitHub.com uses: https://api.github.com/app/installations/{id}/access_tokens
+func normalizeGitHubEnterpriseEndpoint(endpoint string) string {
+	endpoint = strings.TrimSuffix(endpoint, "/")
+
+	// GitHub.com endpoints (api.github.com) don't need /api/v3 appended
+	// They already use the correct format
+	if strings.Contains(endpoint, "api.github.com") {
+		return endpoint
+	}
+
+	// For GitHub Enterprise Server, ensure /api/v3 is present
+	// Example: https://github.company.com -> https://github.company.com/api/v3
+	if !strings.HasSuffix(endpoint, "/api/v3") {
+		endpoint = endpoint + "/api/v3"
+	}
+
+	return endpoint
 }
