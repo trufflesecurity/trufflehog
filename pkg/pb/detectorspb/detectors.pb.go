@@ -1146,6 +1146,7 @@ const (
 	DetectorType_PhraseAccessToken                       DetectorType = 1037
 	DetectorType_Photoroom                               DetectorType = 1038
 	DetectorType_JWT                                     DetectorType = 1039
+	DetectorType_RancherToken                            DetectorType = 1040
 )
 
 // Enum value maps for DetectorType.
@@ -2187,6 +2188,7 @@ var (
 		1037: "PhraseAccessToken",
 		1038: "Photoroom",
 		1039: "JWT",
+		1040: "RancherToken",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3225,6 +3227,7 @@ var (
 		"PhraseAccessToken":                 1037,
 		"Photoroom":                         1038,
 		"JWT":                               1039,
+		"RancherToken":                      1040,
 	}
 )
 
