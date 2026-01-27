@@ -1139,10 +1139,16 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 		repoURL.User = nil
 	}
 
+	// Use Host and Path directly instead of reconstructing via String().
+	// This preserves special characters like trailing hyphens in repo names
+	// that might be lost during URL reconstruction.
+	// See: https://github.com/trufflesecurity/trufflehog/issues/4679
+	host := repoURL.Host
+	path := strings.TrimPrefix(repoURL.Path, "/")
+	path = strings.TrimSuffix(path, ".git")
+
 	urlString := repoURL.String()
-	trimmedURL := strings.TrimPrefix(urlString, repoURL.Scheme+"://")
-	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
-	urlParts := strings.Split(trimmedURL, "/")
+	urlParts := append([]string{host}, strings.Split(path, "/")...)
 
 	// Validate
 	switch len(urlParts) {
