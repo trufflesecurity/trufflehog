@@ -239,6 +239,7 @@ func (c *Parser) RepoPath(
 		"--date=iso-strict",
 		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
 		"--notes",         // https://git-scm.com/docs/git-log#Documentation/git-log.txt---notesltrefgt
+		"--no-renames",    // Disable rename detection to ensure renamed/copied files show full content
 	}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -279,7 +280,8 @@ func (c *Parser) RepoPath(
 // Staged parses the output of the `git diff` command for the `source` path.
 func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) {
 	// Provide the --cached flag to diff to get the diff of the staged changes.
-	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--date=iso-strict"}
+	// --no-renames ensures renamed/copied files show full content instead of similarity index.
+	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--no-renames", "--date=iso-strict"}
 
 	cmd := exec.Command("git", args...)
 
