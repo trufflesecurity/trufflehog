@@ -448,14 +448,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		// filteredRepoCache have an entry in the repoInfoCache.
 		for _, repo := range s.filteredRepoCache.Values() {
 			// Extract the repository name from the URL for filtering
-			repoName := repo
-			// Try to extract org/repo name from URL
-			if u, err := url.Parse(repo); err == nil {
-				parts := strings.Split(u.Path, "/")
-				if len(parts) >= 2 {
-					repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
-				}
-			}
+			repoName := extractRepoNameFromUrl(repo)
 
 			// Final filter check - only include repositories that pass the filter
 			if s.filteredRepoCache.wantRepo(repoName) {

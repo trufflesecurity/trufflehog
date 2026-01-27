@@ -381,3 +381,15 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 
 	return "", fmt.Errorf("no repositories found for %s", repo)
 }
+
+// extractRepoNameFromUrl extracts the "owner/repo" name from a GitHub repository URL.
+// Example: http://github.com/owner/repo.git -> owner/repo
+// If an invalid URL is provided, it returns the original string.
+func extractRepoNameFromUrl(repoURL string) string {
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		return repoURL
+	}
+	cleanedPath := strings.Trim(u.Path, "/")
+	return strings.TrimSuffix(cleanedPath, ".git")
+}

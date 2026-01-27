@@ -1135,3 +1135,44 @@ func noopReporter() sources.UnitReporter {
 		},
 	}
 }
+
+func TestExtractRepoNameFromURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected string
+	}{
+		{
+			name:     "git URL",
+			url:      "https://github.com/org/repo.git",
+			expected: "org/repo",
+		},
+		{
+			name:     "git URL with trailing slash",
+			url:      "https://github.com/org/repo.git/",
+			expected: "org/repo",
+		},
+		{
+			name:     "git URL without .git",
+			url:      "https://github.com/org/repo",
+			expected: "org/repo",
+		},
+		{
+			name:     "git enterprise URL",
+			url:      "https://example-enterprise.com/org/repo.git",
+			expected: "org/repo",
+		},
+		{
+			name:     "just org/repo",
+			url:      "org/repo",
+			expected: "org/repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractRepoNameFromUrl(tt.url)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
