@@ -973,6 +973,52 @@ func TestGetRepoURLParts(t *testing.T) {
 	}
 }
 
+func TestGetRepoURLPartsWithTrailingHyphen(t *testing.T) {
+	// Test for https://github.com/trufflesecurity/trufflehog/issues/4679
+	// Repository names ending with a hyphen should be preserved correctly.
+	testCases := []struct {
+		name     string
+		url      string
+		expected []string
+	}{
+		{
+			name:     "https with trailing hyphen",
+			url:      "https://github.com/MYORG/my-repo-name-.git",
+			expected: []string{"github.com", "MYORG", "my-repo-name-"},
+		},
+		{
+			name:     "https with trailing hyphen no .git",
+			url:      "https://github.com/MYORG/my-repo-.git",
+			expected: []string{"github.com", "MYORG", "my-repo-"},
+		},
+		{
+			name:     "ssh with trailing hyphen",
+			url:      "ssh://git@github.com/MYORG/test-repo-.git",
+			expected: []string{"github.com", "MYORG", "test-repo-"},
+		},
+		{
+			name:     "multiple hyphens with trailing",
+			url:      "https://github.com/org-name/my-test-repo-.git",
+			expected: []string{"github.com", "org-name", "my-test-repo-"},
+		},
+		{
+			name:     "single trailing hyphen repo",
+			url:      "https://github.com/Org/-.git",
+			expected: []string{"github.com", "Org", "-"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, parts, err := getRepoURLParts(tc.url)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assert.Equal(t, tc.expected, parts)
+		})
+	}
+}
+
 func TestGetGistID(t *testing.T) {
 	tests := []struct {
 		trimmedURL []string
