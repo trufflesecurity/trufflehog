@@ -30,6 +30,9 @@ const (
 
 	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
 	defaultMaxCommitSize int64 = 2 * 1024 * 1024 * 1024 // 2GB
+
+	// defaultWaitDelay is the default time to wait after context cancellation before forcefully killing git processes.
+	defaultWaitDelay = 5 * time.Second
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -124,6 +127,7 @@ type Parser struct {
 	maxDiffSize   int64
 	maxCommitSize int64
 	dateFormat    string
+	waitDelay     time.Duration
 
 	useCustomContentWriter bool
 }
@@ -204,6 +208,14 @@ func WithMaxCommitSize(maxCommitSize int64) Option {
 	}
 }
 
+// WithWaitDelay sets the waitDelay option. This specifies how long to wait after
+// context cancellation before forcefully killing git processes.
+func WithWaitDelay(waitDelay time.Duration) Option {
+	return func(parser *Parser) {
+		parser.waitDelay = waitDelay
+	}
+}
+
 // Option is used for adding options to Config.
 type Option func(*Parser)
 
@@ -213,6 +225,7 @@ func NewParser(options ...Option) *Parser {
 		dateFormat:    defaultDateFormat,
 		maxDiffSize:   defaultMaxDiffSize,
 		maxCommitSize: defaultMaxCommitSize,
+		waitDelay:     defaultWaitDelay,
 	}
 	for _, option := range options {
 		option(parser)
@@ -273,7 +286,7 @@ func (c *Parser) RepoPath(
 		}
 	}
 
-	return c.executeCommand(ctx, cmd, false)
+	return c.executeCommand(ctx, cmd, false, c.waitDelay)
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
@@ -288,13 +301,12 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 		cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 	}
 
-	return c.executeCommand(ctx, cmd, true)
+	return c.executeCommand(ctx, cmd, true, c.waitDelay)
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
-func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan *Diff, error) {
-	const waitDelay = 5 * time.Second // Give the command a chance to finish before the timeout
-
+// waitDelay specifies how long to wait after context cancellation before forcefully killing the process.
+func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool, waitDelay time.Duration) (chan *Diff, error) {
 	diffChan := make(chan *Diff, 64)
 
 	stdOut, err := cmd.StdoutPipe()
@@ -306,7 +318,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 		return diffChan, err
 	}
 
-	// Set WaitDelay to give the command a grace period to finish before being killed
+	// Set WaitDelay to allow the command additional time to exit after context cancellation
 	cmd.WaitDelay = waitDelay
 
 	err = cmd.Start()
