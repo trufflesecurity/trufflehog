@@ -20,7 +20,7 @@ type Detector interface {
 	// FromData will scan bytes for results and optionally verify them.
 	//
 	// FromData can be called concurrently from multiple goroutines.
-	// Any modification to the receiver or to global variables will need to to use some kind of synchronization.
+	// Any modification to the receiver or to global variables will need to use some kind of synchronization.
 	FromData(ctx context.Context, verify bool, data []byte) ([]Result, error)
 
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.
