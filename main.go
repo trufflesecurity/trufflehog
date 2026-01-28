@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-
+	"time"
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
@@ -61,6 +61,7 @@ var (
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
 	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
 	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
+	logSync func() error //Package-level variable for sync function
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -354,6 +355,7 @@ func main() {
 		logFormat = log.WithJSONSink
 	}
 	logger, sync := log.New("trufflehog", logFormat(os.Stderr, log.WithGlobalRedaction()))
+	logSync = sync //
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 
@@ -412,6 +414,21 @@ func run(state overseer.State) {
 			logger.Error(err, "error cleaning temporary artifacts")
 		} else {
 			logger.Info("cleaned temporary artifacts")
+		}
+
+		// Flush logs with timeout to prevent hanging
+		if logSync != nil {
+			done := make(chan struct{})
+			go func() {
+				_ = logSync()
+				close(done)
+			}()
+			
+			select {
+			case <-done:
+			case <-time.After(100 * time.Millisecond):
+				logger.Info("Log flush timed out, exiting")
+			}
 		}
 		os.Exit(0)
 	}()
