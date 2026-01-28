@@ -1000,13 +1000,10 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						res.SetVerificationError(errOverlap)
 						e.processResult(
 							ctx,
-							detectableChunk{
-								chunk:    chunk.chunk,
-								detector: detector,
-								decoder:  chunk.decoder,
-								wgDoneFn: wgDetect.Done,
-							},
 							res,
+							chunk.chunk,
+							chunk.decoder,
+							detector.Detector.Description(),
 							isFalsePositive,
 						)
 
@@ -1133,7 +1130,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		}
 
 		for _, res := range results {
-			e.processResult(ctx, data, res, isFalsePositive)
+			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
 		}
 	}
 
@@ -1172,20 +1169,18 @@ func (e *Engine) filterResults(
 
 // processResult generates a detectors.ResultWithMetadata from the provided chunk and result and puts it on the results
 // channel, unless the result exists on a line with an ignore tag, in which case no result is generated.
-//
-// CMR: The provided chunk is wrapped in a detectableChunk, but I'm pretty sure that's purely out of convenience
-// (because that's what this function's callers are using when they call this function). We're past detection at this
-// point in the engine, so we should probably refactor that parameter into a less confusing data type.
 func (e *Engine) processResult(
 	ctx context.Context,
-	data detectableChunk,
 	res detectors.Result,
+	chunk sources.Chunk,
+	decoderType detectorspb.DecoderType,
+	detectorDescription string,
 	isFalsePositive func(detectors.Result) (bool, string),
 ) {
 	ignoreLinePresent := false
-	if SupportsLineNumbers(data.chunk.SourceType) {
-		copyChunk := data.chunk
-		copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
+	if SupportsLineNumbers(chunk.SourceType) {
+		copyChunk := chunk
+		copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 			copyChunk.SourceMetadata = copyMetaData
 		}
@@ -1195,15 +1190,15 @@ func (e *Engine) processResult(
 			ctx.Logger().Error(err, "error setting link")
 			return
 		}
-		data.chunk = copyChunk
+		chunk = copyChunk
 	}
 	if ignoreLinePresent {
 		return
 	}
 
-	secret := detectors.CopyMetadata(&data.chunk, res)
-	secret.DecoderType = data.decoder
-	secret.DetectorDescription = data.detector.Detector.Description()
+	secret := detectors.CopyMetadata(&chunk, res)
+	secret.DecoderType = decoderType
+	secret.DetectorDescription = detectorDescription
 
 	if !res.Verified && res.Raw != nil {
 		isFp, _ := isFalsePositive(res)
