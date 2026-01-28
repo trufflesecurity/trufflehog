@@ -142,6 +142,36 @@ func TestAddReposByOrg_Repositories(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestAddReposByOrg_IncludeRepos(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/super-secret-org/repos").
+		Reply(200).
+		JSON(`[
+			{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git", "size": 1},
+			{"full_name": "super-secret-org/super-secret-repo2", "clone_url": "https://github.com/super-secret-org/super-secret-repo2.git", "size": 1},
+			{"full_name": "super-secret-org/not-super-secret-repo", "clone_url": "https://github.com/super-secret-org/not-super-secret-repo.git", "size": 1}
+		]`)
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		IncludeRepos:  []string{"super-secret-org/super*"},
+		Organizations: []string{"super-secret-org"},
+	})
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
+	assert.True(t, ok)
+	ok = s.filteredRepoCache.Exists("super-secret-org/super-secret-repo2")
+	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func TestAddReposByUser(t *testing.T) {
 	defer gock.Off()
 
@@ -773,6 +803,30 @@ func TestEnumerateWithToken_Repositories(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
+	s.repos = []string{"some-special-repo"}
+
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(s.repos))
+	assert.Equal(t, []string{"some-special-repo"}, s.repos)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func TestEnumerateWithApp(t *testing.T) {
 	defer gock.Off()
 
@@ -1148,4 +1202,38 @@ func noopReporter() sources.UnitReporter {
 			return nil
 		},
 	}
+}
+
+// This tests reproduces a bug where both VisitUnit and VisitErr were called
+// for the same repository when caching the repository info failed.
+func TestFixBothUnitErrAndUnitOKCalled(t *testing.T) {
+	cache := simple.NewCache[string]()
+	cache.Set("myorg/myrepo", "an invalid url that will cause an error")
+	s := &Source{
+		filteredRepoCache: &filteredRepoCache{
+			Cache: cache,
+		},
+		conn: &sourcespb.GitHub{
+			Repositories: []string{"myorg/myrepo"},
+		},
+		orgsCache: simple.NewCache[string](),
+	}
+
+	var okCalled, errCalled bool
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			okCalled = true
+			return nil
+		},
+		VisitErr: func(ctx context.Context, err error) error {
+			errCalled = true
+			return nil
+		},
+	}
+	err := s.Enumerate(context.Background(), reporter)
+	require.NoError(t, err)
+
+	// expectation is that only VisitErr is called
+	assert.True(t, errCalled)
+	assert.False(t, okCalled)
 }
