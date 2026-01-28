@@ -769,15 +769,15 @@ func TestNewWebhookCustomRegex_EnsurePrimaryRegexNameSet(t *testing.T) {
 		Name:     "test",
 		Keywords: []string{"kw"},
 		Regex: map[string]string{
-			"first":  `first_regex`,
-			"second": `second_regex`,
+			"regex_a": `regex_a`,
+			"regex_b": `regex_b`,
 		},
 		// PrimaryRegexName is not set.
 	}
 
 	detector, err := NewWebhookCustomRegex(pb)
 	assert.NoError(t, err)
-	assert.Equal(t, "first", detector.GetPrimaryRegexName(), "expected PrimaryRegexName to be set to the first regex name")
+	assert.Equal(t, "regex_a", detector.GetPrimaryRegexName(), "expected PrimaryRegexName to be set to regex_a")
 }
 
 func BenchmarkProductIndices(b *testing.B) {

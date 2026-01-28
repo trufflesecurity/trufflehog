@@ -411,11 +411,12 @@ func (c *CustomRegexWebhook) Description() string {
 	return c.GetDescription()
 }
 
-// ensurePrimaryRegexNameSet sets the PrimaryRegexName field to the first
-// regex name if it is not already set.
+// ensurePrimaryRegexNameSet sets the PrimaryRegexName field to the
+// first regex name in sorted order if it is not already set.
+// We're sorting to ensure deterministic behavior.
 func ensurePrimaryRegexNameSet(pb *custom_detectorspb.CustomRegex) {
 	if pb.PrimaryRegexName == "" {
-		for name := range pb.Regex {
+		for _, name := range slices.Sorted(maps.Keys(pb.Regex)) {
 			pb.PrimaryRegexName = name
 			return
 		}
