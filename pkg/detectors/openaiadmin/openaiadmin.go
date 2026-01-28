@@ -31,8 +31,6 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
-	// Using both keywords for better detection coverage
-	// T3BlbkFJ is the OpenAI signature, sk-admin- is the specific prefix
 	return []string{"sk-admin-"}
 }
 
