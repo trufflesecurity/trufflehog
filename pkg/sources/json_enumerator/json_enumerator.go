@@ -135,16 +135,8 @@ func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *Source) chunkJSONEnumerator(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
-	ctx.Logger().V(3).Info("chunking JSON enumerator", "path", path)
-
-	enumeratorFile, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("unable to open file: %w", err)
-	}
-	defer enumeratorFile.Close()
-
-	decoder := json.NewDecoder(enumeratorFile)
+func (s *Source) chunkJSONEnumeratorReader(ctx context.Context, input io.Reader, chunksChan chan *sources.Chunk) error {
+	decoder := json.NewDecoder(input)
 	var entry jsonEntry
 	var entryNum int64 = 0
 
@@ -187,4 +179,16 @@ func (s *Source) chunkJSONEnumerator(ctx context.Context, path string, chunksCha
 
 		entryNum++
 	}
+}
+
+func (s *Source) chunkJSONEnumerator(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
+	ctx.Logger().V(3).Info("chunking JSON enumerator", "path", path)
+
+	enumeratorFile, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("unable to open file: %w", err)
+	}
+	defer enumeratorFile.Close()
+
+	return s.chunkJSONEnumeratorReader(ctx, enumeratorFile, chunksChan)
 }
