@@ -50,7 +50,9 @@ func NewMarkdownPrinter(out io.Writer) *MarkdownPrinter {
 		out = os.Stdout
 	}
 	return &MarkdownPrinter{
-		out: out,
+		out:            out,
+		seenVerified:   make(map[string]struct{}),
+		seenUnverified: make(map[string]struct{}),
 	}
 }
 
@@ -78,13 +80,6 @@ func (p *MarkdownPrinter) Print(_ context.Context, r *detectors.ResultWithMetada
 
 	key := row.key()
 
-	if p.seenVerified == nil {
-		p.seenVerified = make(map[string]struct{})
-	}
-	if p.seenUnverified == nil {
-		p.seenUnverified = make(map[string]struct{})
-	}
-
 	if r.Verified {
 		if _, ok := p.seenVerified[key]; ok {
 			return nil
@@ -107,7 +102,7 @@ func (p *MarkdownPrinter) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	doc := renderMarkdown(append([]markdownRow(nil), p.verified...), append([]markdownRow(nil), p.unverified...))
+	doc := renderMarkdown(p.verified, p.unverified)
 	if doc == "" {
 		return nil
 	}
