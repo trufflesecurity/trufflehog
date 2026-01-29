@@ -388,7 +388,7 @@ message SlackContinuous {
 }
 
 message JSONEnumerator {
-  string provenance = 1;
+  string metadata = 1;
 }
 
 message MetaData {

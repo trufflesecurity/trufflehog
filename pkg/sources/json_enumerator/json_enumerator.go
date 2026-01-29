@@ -78,31 +78,31 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 type jsonEntry struct {
-	Provenance json.RawMessage `json:"provenance"`
-	Content    []byte          `json:"-"`
+	Metadata json.RawMessage
+	Data     []byte
 }
 
 // jsonEntryAux is a helper struct to support marshalling the content to scan as either a UTF-8 string in `content` or a base64-encoded bytestring in `content_base64`.
 type jsonEntryAux struct {
-	Provenance *json.RawMessage `json:"provenance"`
-	Content    *string          `json:"content,omitempty"`
-	ContentB64 *[]byte          `json:"content_base64,omitempty"`
+	Metadata *json.RawMessage `json:"metadata"`
+	Data     *string          `json:"data,omitempty"`
+	DataB64  *[]byte          `json:"data_b64,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for envelope.
 // If Content is valid UTF-8, it's serialized as "content" (string).
 // If Content is not valid UTF-8, it's base64-encoded and serialized as "content_b64".
 func (e *jsonEntry) MarshalJSON() ([]byte, error) {
-	if utf8.Valid(e.Content) {
-		s := string(e.Content)
+	if utf8.Valid(e.Data) {
+		s := string(e.Data)
 		return json.Marshal(jsonEntryAux{
-			Provenance: &e.Provenance,
-			Content:    &s,
+			Metadata: &e.Metadata,
+			Data:     &s,
 		})
 	} else {
 		return json.Marshal(jsonEntryAux{
-			Provenance: &e.Provenance,
-			ContentB64: &e.Content,
+			Metadata: &e.Metadata,
+			DataB64:  &e.Data,
 		})
 	}
 }
@@ -111,23 +111,25 @@ func (e *jsonEntry) MarshalJSON() ([]byte, error) {
 // It handles both "content" (string) and "content_b64" (base64-encoded string) fields.
 func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 	var aux jsonEntryAux
-
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
-	if aux.Provenance == nil {
-		return fmt.Errorf("missing provenance")
+	if aux.Metadata == nil {
+		return fmt.Errorf("missing metadata")
 	}
-	if aux.Content == nil && aux.ContentB64 == nil {
-		return fmt.Errorf("missing content / content_base64")
+	if aux.Data == nil && aux.DataB64 == nil {
+		return fmt.Errorf("missing data / data_b64")
+	}
+	if aux.Data != nil && aux.DataB64 != nil {
+		return fmt.Errorf("missing data / data_b64")
 	}
 
-	e.Provenance = *aux.Provenance
-	if aux.ContentB64 != nil {
-		e.Content = *aux.ContentB64
+	e.Metadata = *aux.Metadata
+	if aux.DataB64 != nil {
+		e.Data = *aux.DataB64
 	} else {
-		e.Content = []byte(*aux.Content)
+		e.Data = []byte(*aux.Data)
 	}
 
 	return nil
@@ -151,14 +153,15 @@ func (s *Source) chunkJSONEnumerator(ctx context.Context, path string, chunksCha
 	for {
 		if err := decoder.Decode(&entry); err != nil {
 			if errors.Is(err, io.EOF) {
+				// enumerator file is done
 				return nil
 			}
 			return err
 		}
 
-		sourceJSON, err := entry.Provenance.MarshalJSON()
+		metadataJSON, err := entry.Metadata.MarshalJSON()
 		if err != nil {
-			ctx.Logger().V(2).Error(err, "failed to convert provenance to JSON")
+			ctx.Logger().V(2).Error(err, "failed to convert metadata to JSON")
 			continue
 		}
 
@@ -171,41 +174,17 @@ func (s *Source) chunkJSONEnumerator(ctx context.Context, path string, chunksCha
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_JsonEnumerator{
 					JsonEnumerator: &source_metadatapb.JSONEnumerator{
-						Provenance: string(sourceJSON),
+						Metadata: string(metadataJSON),
 					},
 				},
 			},
 		}
 
-		if err := handlers.HandleFile(ctx, bytes.NewReader(entry.Content), chunkSkel, reporter); err != nil {
-			ctx.Logger().V(2).Error(err, "failed to scan content")
+		if err := handlers.HandleFile(ctx, bytes.NewReader(entry.Data), chunkSkel, reporter); err != nil {
+			ctx.Logger().V(2).Error(err, "failed to scan data")
 			continue
 		}
 
 		entryNum++
 	}
 }
-
-/*
-// Enumerate implements SourceUnitEnumerator interface.
-func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
-	for _, path := range s.paths {
-		if _, err := os.Lstat(filepath.Clean(path)); err != nil {
-			if err := reporter.UnitErr(ctx, err); err != nil {
-				return err
-			}
-		} else {
-			if err := reporter.UnitOk(ctx, sources.CommonSourceUnit{ID: path}); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// ChunkUnit implements SourceUnitChunker interface.
-func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	// TODO
-	return nil
-}
-*/
