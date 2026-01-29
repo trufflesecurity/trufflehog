@@ -124,7 +124,6 @@ func TestGitEngine(t *testing.T) {
 }
 
 func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
-	t.Skip("INS-289")
 	ctx := context.Background()
 
 	parent, err := os.MkdirTemp("", "trufflehog-test-keys-*")
