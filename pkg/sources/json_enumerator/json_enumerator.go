@@ -119,10 +119,10 @@ func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("missing metadata")
 	}
 	if aux.Data == nil && aux.DataB64 == nil {
-		return fmt.Errorf("missing data / data_b64")
+		return fmt.Errorf("both data and data_b64 missing")
 	}
 	if aux.Data != nil && aux.DataB64 != nil {
-		return fmt.Errorf("missing data / data_b64")
+		return fmt.Errorf("both data and data_b64 present")
 	}
 
 	e.Metadata = *aux.Metadata
@@ -138,7 +138,6 @@ func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 func (s *Source) chunkJSONEnumeratorReader(ctx context.Context, input io.Reader, chunksChan chan *sources.Chunk) error {
 	decoder := json.NewDecoder(input)
 	var entry jsonEntry
-	var entryNum int64 = 0
 
 	reporter := sources.ChanReporter{Ch: chunksChan}
 
@@ -176,8 +175,6 @@ func (s *Source) chunkJSONEnumeratorReader(ctx context.Context, input io.Reader,
 			ctx.Logger().V(2).Error(err, "failed to scan data")
 			continue
 		}
-
-		entryNum++
 	}
 }
 
