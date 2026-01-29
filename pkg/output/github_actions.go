@@ -29,19 +29,12 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
 
-	for _, data := range meta {
-		for k, v := range data {
-			if k == "line" {
-				if line, ok := v.(float64); ok {
-					out.StartLine = int64(line)
-				}
-			}
-			if k == "file" {
-				if filename, ok := v.(string); ok {
-					out.Filename = filename
-				}
-			}
-		}
+	file, _, lineNum, hasLine := extractFileLine(meta)
+	if hasLine {
+		out.StartLine = int64(lineNum)
+	}
+	if file != "n/a" {
+		out.Filename = file
 	}
 
 	verifiedStatus := "unverified"

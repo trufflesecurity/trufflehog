@@ -17,10 +17,15 @@ import (
 // dedicated tables for verified and unverified secrets. It buffers the rows
 // while scanning and flushes the final report when Close is invoked.
 type MarkdownPrinter struct {
-	mu         sync.Mutex
-	out        io.Writer
+	mu sync.Mutex
+
+	out io.Writer
+
 	verified   []markdownRow
 	unverified []markdownRow
+
+	seenVerified   map[string]struct{}
+	seenUnverified map[string]struct{}
 }
 
 // markdownRow represents a single table entry in the Markdown report.
@@ -34,44 +39,30 @@ type markdownRow struct {
 	hasLine bool
 }
 
+func (r markdownRow) key() string {
+	return fmt.Sprintf("%s|%s|%s|%s", r.Detector, r.File, r.Line, r.Redacted)
+}
+
 // NewMarkdownPrinter builds a MarkdownPrinter that writes to out. When out is
 // nil, stdout is used.
 func NewMarkdownPrinter(out io.Writer) *MarkdownPrinter {
 	if out == nil {
 		out = os.Stdout
 	}
-	return &MarkdownPrinter{out: out}
+	return &MarkdownPrinter{
+		out: out,
+	}
 }
 
 // Print collects each result so the final Markdown doc can include per-section
 // counts and tables before the buffered results are rendered in Close.
 func (p *MarkdownPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
-	file := "n/a"
-	line := "n/a"
-	lineNum := 0
-	hasLine := false
-
 	meta, err := structToMap(r.SourceMetadata.Data)
 	if err != nil {
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
 
-	for _, data := range meta {
-		for k, v := range data {
-			if k == "line" {
-				if l, ok := v.(float64); ok {
-					lineNum = int(l)
-					line = fmt.Sprintf("%d", lineNum)
-					hasLine = true
-				}
-			}
-			if k == "file" {
-				if filename, ok := v.(string); ok {
-					file = filename
-				}
-			}
-		}
-	}
+	file, line, lineNum, hasLine := extractFileLine(meta)
 
 	row := markdownRow{
 		Detector: sanitize(r.DetectorType.String()),
@@ -85,9 +76,26 @@ func (p *MarkdownPrinter) Print(_ context.Context, r *detectors.ResultWithMetada
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	key := row.key()
+
+	if p.seenVerified == nil {
+		p.seenVerified = make(map[string]struct{})
+	}
+	if p.seenUnverified == nil {
+		p.seenUnverified = make(map[string]struct{})
+	}
+
 	if r.Verified {
+		if _, ok := p.seenVerified[key]; ok {
+			return nil
+		}
+		p.seenVerified[key] = struct{}{}
 		p.verified = append(p.verified, row)
 	} else {
+		if _, ok := p.seenUnverified[key]; ok {
+			return nil
+		}
+		p.seenUnverified[key] = struct{}{}
 		p.unverified = append(p.unverified, row)
 	}
 	return nil
@@ -99,7 +107,7 @@ func (p *MarkdownPrinter) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	doc := renderMarkdown(p.verified, p.unverified)
+	doc := renderMarkdown(append([]markdownRow(nil), p.verified...), append([]markdownRow(nil), p.unverified...))
 	if doc == "" {
 		return nil
 	}
@@ -162,3 +170,5 @@ func sanitize(value string) string {
 	}
 	return sanitizer.Replace(value)
 }
+
+
