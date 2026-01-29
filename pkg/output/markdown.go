@@ -155,8 +155,8 @@ func renderMarkdown(verified, unverified []markdownRow) string {
 		buf.WriteString("\n")
 	}
 
-	writeSection("Verified Findings", append([]markdownRow(nil), verified...))
-	writeSection("Unverified Findings", append([]markdownRow(nil), unverified...))
+	writeSection("Verified Findings", verified)
+	writeSection("Unverified Findings", unverified)
 
 	return strings.TrimRight(buf.String(), "\n") + "\n"
 }
