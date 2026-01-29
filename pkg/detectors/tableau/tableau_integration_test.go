@@ -69,6 +69,11 @@ func TestTableau_FromChunk(t *testing.T) {
 						"verification_status":   "valid",
 						"auth_token_received":   "true",
 					},
+					AnalysisInfo: map[string]string{
+						"endpoint":  tableauURL,
+						"patSecret": tokenSecret,
+						"tokenName": tokenName,
+					},
 				},
 			},
 			wantErr: false,
@@ -254,7 +259,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			}
 
 			ignoreOpts := []cmp.Option{
-				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData"),
+				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "AnalysisInfo"),
 				cmpopts.IgnoreUnexported(detectors.Result{}),
 			}
 
