@@ -254,7 +254,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
 		simple.NewCache[string](),
-		s.conn.GetRepositories(),
+		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
 	s.repos = s.conn.Repositories
@@ -410,6 +410,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			if err := dedupeReporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
+			continue
 		}
 		if err := dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url}); err != nil {
 			return err
@@ -1138,10 +1139,16 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 		repoURL.User = nil
 	}
 
+	// Use Host and Path directly instead of reconstructing via String().
+	// This preserves special characters like trailing hyphens in repo names
+	// that might be lost during URL reconstruction.
+	// See: https://github.com/trufflesecurity/trufflehog/issues/4679
+	host := repoURL.Host
+	path := strings.TrimPrefix(repoURL.Path, "/")
+	path = strings.TrimSuffix(path, ".git")
+
 	urlString := repoURL.String()
-	trimmedURL := strings.TrimPrefix(urlString, repoURL.Scheme+"://")
-	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
-	urlParts := strings.Split(trimmedURL, "/")
+	urlParts := append([]string{host}, strings.Split(path, "/")...)
 
 	// Validate
 	switch len(urlParts) {

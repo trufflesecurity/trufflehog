@@ -29,8 +29,8 @@ func TestJdbcVerified(t *testing.T) {
 	postgresUser := gofakeit.Username()
 	postgresPass := gofakeit.Password(true, true, true, false, false, 10)
 	postgresDB := gofakeit.Word()
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:13-alpine"),
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:13-alpine",
 		postgres.WithDatabase(postgresDB),
 		postgres.WithUsername(postgresUser),
 		postgres.WithPassword(postgresPass),
@@ -56,8 +56,8 @@ func TestJdbcVerified(t *testing.T) {
 	mysqlUser := gofakeit.Username()
 	mysqlPass := gofakeit.Password(true, true, true, false, false, 10)
 	mysqlDatabase := gofakeit.Word()
-	mysqlC, err := mysql.RunContainer(ctx,
-		mysql.WithDatabase(mysqlDatabase),
+	mysqlC, err := mysql.Run(ctx,
+		"mysql:8.0.36",
 		mysql.WithUsername(mysqlUser),
 		mysql.WithPassword(mysqlPass),
 	)
@@ -79,8 +79,8 @@ func TestJdbcVerified(t *testing.T) {
 	sqlServerPass := gofakeit.Password(true, true, true, false, false, 10)
 	sqlServerDatabase := "master"
 
-	mssqlContainer, err := mssql.RunContainer(ctx,
-		testcontainers.WithImage("mcr.microsoft.com/azure-sql-edge"),
+	mssqlContainer, err := mssql.Run(ctx,
+		"mcr.microsoft.com/azure-sql-edge",
 		mssql.WithAcceptEULA(),
 		mssql.WithPassword(sqlServerPass),
 	)
@@ -125,6 +125,10 @@ func TestJdbcVerified(t *testing.T) {
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
 						postgresHost, postgresPort.Port(), postgresDB, strings.Repeat("*", len(postgresPass)), postgresUser),
+					AnalysisInfo: map[string]string{
+						"connection_string": fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
+							postgresHost, postgresPort.Port(), postgresDB, postgresPass, postgresUser),
+					},
 				},
 			},
 			wantErr: false,
@@ -143,6 +147,10 @@ func TestJdbcVerified(t *testing.T) {
 					Verified:     true,
 					Redacted: fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
 						mysqlUser, strings.Repeat("*", len(mysqlPass)), mysqlHost, mysqlPort.Port(), mysqlDatabase),
+					AnalysisInfo: map[string]string{
+						"connection_string": fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
+							mysqlUser, mysqlPass, mysqlHost, mysqlPort.Port(), mysqlDatabase),
+					},
 				},
 			},
 			wantErr: false,
@@ -161,6 +169,10 @@ func TestJdbcVerified(t *testing.T) {
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
 						sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, strings.Repeat("*", len(sqlServerPass))),
+					AnalysisInfo: map[string]string{
+						"connection_string": fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
+							sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, sqlServerPass),
+					},
 				},
 			},
 			wantErr: false,
