@@ -29,11 +29,11 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
 
-	file, _, lineNum, hasLine := extractFileLine(meta)
+	file, hasFile, _, lineNum, hasLine := extractFileLine(meta)
 	if hasLine {
 		out.StartLine = int64(lineNum)
 	}
-	if file != "n/a" {
+	if hasFile {
 		out.Filename = file
 	}
 

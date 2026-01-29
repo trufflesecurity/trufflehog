@@ -64,7 +64,11 @@ func (p *MarkdownPrinter) Print(_ context.Context, r *detectors.ResultWithMetada
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
 
-	file, line, lineNum, hasLine := extractFileLine(meta)
+	file, hasFile, line, lineNum, hasLine := extractFileLine(meta)
+
+	if !hasFile {
+		file = "n/a"
+	}
 
 	row := markdownRow{
 		Detector: sanitize(r.DetectorType.String()),

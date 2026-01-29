@@ -5,11 +5,7 @@ import "fmt"
 // extractFileLine walks over the metadata map created by structToMap and
 // extracts the file name and line number when present. This logic is shared by
 // multiple printers so that they stay consistent.
-func extractFileLine(meta map[string]map[string]any) (file string, line string, lineNum int, hasLine bool) {
-	if len(meta) == 0 {
-		return "n/a", "n/a", 0, false
-	}
-
+func extractFileLine(meta map[string]map[string]any) (file string, hasFile bool, line string, lineNum int, hasLine bool) {
 	file = "n/a"
 	line = "n/a"
 
@@ -25,6 +21,7 @@ func extractFileLine(meta map[string]map[string]any) (file string, line string, 
 			if k == "file" {
 				if filename, ok := v.(string); ok {
 					file = filename
+					hasFile = true
 				}
 			}
 		}
