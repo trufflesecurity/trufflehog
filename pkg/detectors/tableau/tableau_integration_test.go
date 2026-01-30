@@ -179,57 +179,6 @@ func TestTableau_FromChunk(t *testing.T) {
 			want:    nil, // Should not find due to invalid secret format
 			wantErr: false,
 		},
-		{
-			name: "found multiple, mixed verification results with URLs",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
-					name1 = '%s'
-					name2 = '%s'
-					secret = '%s'
-					secret2 = '%s'
-					server1 = '%s'
-					server2 = '%s'
-				`, tokenName, inactiveTokenName, tokenSecret, inactiveTokenSecret, tableauURL, invalidURL)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     true, // tokenName + tokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // tokenName + tokenSecret + invalid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // tokenName + inactiveTokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // tokenName + inactiveTokenSecret + invalid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + tokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + tokenSecret + invalid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + inactiveTokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + inactiveTokenSecret + invalid URL
-				},
-			},
-			wantErr: false,
-		},
 	}
 
 	for _, tt := range tests {
@@ -259,7 +208,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			}
 
 			ignoreOpts := []cmp.Option{
-				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "AnalysisInfo"),
+				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData"),
 				cmpopts.IgnoreUnexported(detectors.Result{}),
 			}
 
@@ -267,5 +216,65 @@ func TestTableau_FromChunk(t *testing.T) {
 				t.Errorf("Tableau.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestTableau_FromChunk_MultipleMixedVerificationResults(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
+	tokenName := testSecrets.MustGetField("TABLEAU_TOKEN_NAME")
+	tokenSecret := testSecrets.MustGetField("TABLEAU_TOKEN_SECRET")
+	inactiveTokenName := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_NAME")
+	inactiveTokenSecret := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_SECRET")
+	tableauURL := testSecrets.MustGetField("TABLEAU_VALID_POD_NAME")
+	invalidURL := testSecrets.MustGetField("TABLEAU_INVALID_POD_NAME")
+
+	scanner := Scanner{}
+	scanner.UseFoundEndpoints(true)
+
+	data := []byte(fmt.Sprintf(`
+		name1 = '%s'
+		name2 = '%s'
+		secret = '%s'
+		secret2 = '%s'
+		server1 = '%s'
+		server2 = '%s'
+	`, tokenName, inactiveTokenName, tokenSecret, inactiveTokenSecret, tableauURL, invalidURL))
+
+	got, err := scanner.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("Tableau.FromData() unexpected error: %v", err)
+	}
+
+	if len(got) != 8 {
+		t.Fatalf("expected 8 results, got %d", len(got))
+	}
+	expectedVerified := []bool{
+		true,  // valid token + valid URL
+		false, // valid token + invalid URL
+		false, // inactive secret + valid URL
+		false, // inactive secret + invalid URL
+		false,
+		false,
+		false,
+		false,
+	}
+
+	for i, res := range got {
+		if res.DetectorType != detectorspb.DetectorType_TableauPersonalAccessToken {
+			t.Errorf("unexpected detector type at index %d: %v", i, res.DetectorType)
+		}
+		if res.Verified != expectedVerified[i] {
+			t.Errorf("result %d verified = %v, want %v", i, res.Verified, expectedVerified[i])
+		}
+		if len(res.Raw) == 0 {
+			t.Errorf("result %d has empty raw secret", i)
+		}
 	}
 }
