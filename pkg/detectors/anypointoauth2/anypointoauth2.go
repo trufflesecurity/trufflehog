@@ -86,6 +86,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// Anypoint client IDs and secrets are mapped one-to-one, so if a pair
 				// is verified, we can remove that secret from the uniqueSecrets map.
 				delete(uniqueSecrets, secret)
+				s1.AnalysisInfo = map[string]string{
+					"id":     id,
+					"secret": secret,
+				}
 				break
 			}
 		}
