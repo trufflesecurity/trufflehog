@@ -1156,10 +1156,6 @@ func (e *Engine) filterResults(
 		results = clean(results)
 	}
 
-	if !e.retainFalsePositives {
-		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
-	}
-
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
@@ -1213,7 +1209,10 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		startTime := time.Now()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
-			if result.VerificationError() != nil {
+			if result.IsWordlistFalsePositive && !e.retainFalsePositives {
+				// Skip false positives
+				continue
+			} else if result.VerificationError() != nil {
 				if !e.notifyUnknownResults {
 					// Skip results with verification errors.
 					continue
