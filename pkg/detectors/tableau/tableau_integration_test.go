@@ -247,34 +247,63 @@ func TestTableau_FromChunk_MultipleMixedVerificationResults(t *testing.T) {
 		server2 = '%s'
 	`, tokenName, inactiveTokenName, tokenSecret, inactiveTokenSecret, tableauURL, invalidURL))
 
+	want := []detectors.Result{
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     true, // tokenName + tokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // tokenName + tokenSecret + invalid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // tokenName + inactiveTokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // tokenName + inactiveTokenSecret + invalid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + tokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + tokenSecret + invalid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + inactiveTokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + inactiveTokenSecret + invalid URL
+		},
+	}
+
 	got, err := scanner.FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("Tableau.FromData() unexpected error: %v", err)
 	}
 
-	if len(got) != 8 {
-		t.Fatalf("expected 8 results, got %d", len(got))
+	if len(got) != len(want) {
+		t.Errorf("Tableau.FromData() got %d results, want %d", len(got), len(want))
 	}
-	expectedVerified := []bool{
-		true,  // valid token + valid URL
-		false, // valid token + invalid URL
-		false, // inactive secret + valid URL
-		false, // inactive secret + invalid URL
-		false,
-		false,
-		false,
-		false,
+	for i := range got {
+		if len(got[i].Raw) == 0 {
+			t.Fatalf("no raw secret present: \n %+v", got[i])
+		}
+		if (got[i].VerificationError() != nil) != false {
+			t.Errorf("Tableau.FromData() verificationError = %v, wantVerificationErr %v", got[i].VerificationError(), false)
+		}
+	}
+	ignoreOpts := []cmp.Option{
+		cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "AnalysisInfo"),
+		cmpopts.IgnoreUnexported(detectors.Result{}),
 	}
 
-	for i, res := range got {
-		if res.DetectorType != detectorspb.DetectorType_TableauPersonalAccessToken {
-			t.Errorf("unexpected detector type at index %d: %v", i, res.DetectorType)
-		}
-		if res.Verified != expectedVerified[i] {
-			t.Errorf("result %d verified = %v, want %v", i, res.Verified, expectedVerified[i])
-		}
-		if len(res.Raw) == 0 {
-			t.Errorf("result %d has empty raw secret", i)
-		}
+	if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+		t.Errorf("Tableau.FromData() diff: (-got +want)\n%s", diff)
 	}
 }
