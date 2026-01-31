@@ -29,8 +29,10 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
-	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
+	// Datadog keys are often documented next to long URLs; allow a larger span so the keyword isn't "pushed away"
+	// by comment/URL tails.
+	appPat = regexp.MustCompile(detectors.PrefixRegexWithMaxDistance([]string{"datadog", "dd"}, 200) + `\b([a-zA-Z-0-9]{40})\b`)
+	apiPat = regexp.MustCompile(detectors.PrefixRegexWithMaxDistance([]string{"datadog", "dd"}, 200) + `\b([a-zA-Z-0-9]{32})\b`)
 )
 
 type userServiceResponse struct {
