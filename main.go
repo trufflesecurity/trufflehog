@@ -61,7 +61,6 @@ var (
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
 	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
 	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
-	logSync func() error //Package-level variable for sync function
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -348,6 +347,24 @@ func init() {
 	}
 }
 
+// syncLogsWithTimeout flushes logs with a timeout to prevent hanging.
+func syncLogsWithTimeout(syncFn func() error, timeout time.Duration) {
+	if syncFn == nil {
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		_ = syncFn()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		// Log flush timed out, continue with exit
+	}
+}
+
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -355,20 +372,21 @@ func main() {
 		logFormat = log.WithJSONSink
 	}
 	logger, sync := log.New("trufflehog", logFormat(os.Stderr, log.WithGlobalRedaction()))
-	logSync = sync //
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 
 	if *localDev {
-		run(overseer.State{})
+		run(overseer.State{}, sync)
 		os.Exit(0)
 	}
 
-	defer func() { _ = sync() }()
 	logFatal := logFatalFunc(logger)
 
 	updateCfg := overseer.Config{
-		Program:       run,
+		Program: func(s overseer.State) {
+
+			run(s, sync)
+		},
 		Debug:         *debug,
 		RestartSignal: syscall.SIGTERM,
 		// TODO: Eventually add a PreUpgrade func for signature check w/ x509 PKCS1v15
@@ -389,10 +407,12 @@ func main() {
 	}
 }
 
-func run(state overseer.State) {
-
+func run(state overseer.State, logSync func() error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
+	defer func() {
+		syncLogsWithTimeout(logSync, 100*time.Millisecond)
+	}()
 
 	go func() {
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
@@ -416,20 +436,7 @@ func run(state overseer.State) {
 			logger.Info("cleaned temporary artifacts")
 		}
 
-		// Flush logs with timeout to prevent hanging
-		if logSync != nil {
-			done := make(chan struct{})
-			go func() {
-				_ = logSync()
-				close(done)
-			}()
-			
-			select {
-			case <-done:
-			case <-time.After(100 * time.Millisecond):
-				logger.Info("Log flush timed out, exiting")
-			}
-		}
+		syncLogsWithTimeout(logSync, 100*time.Millisecond)
 		os.Exit(0)
 	}()
 
@@ -623,6 +630,7 @@ func run(state overseer.State) {
 
 	if metrics.hasFoundResults && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
+		syncLogsWithTimeout(logSync, 100*time.Millisecond)
 		os.Exit(183)
 	}
 }
