@@ -1049,6 +1049,7 @@ enum DetectorType {
   PhraseAccessToken = 1037;
   Photoroom = 1038;
   JWT = 1039;
+  TestMuAI = 1040;
 }
 
 message Result {
