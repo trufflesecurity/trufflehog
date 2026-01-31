@@ -214,6 +214,21 @@ func TestFragmentLineOffsetWithPrimarySecret(t *testing.T) {
 	}
 }
 
+func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
+	result := &detectors.Result{
+		Raw: []byte("secret here"),
+	}
+	result.SetPrimarySecretValue("secret:\nsecret here")
+
+	chunk := &sources.Chunk{
+		Data: []byte("line1\nline2\nsecret:\nsecret here\nline5"),
+	}
+	lineOffset, isIgnored := FragmentLineOffset(chunk, result)
+	assert.False(t, isIgnored)
+	// offset 2 means line 3
+	assert.Equal(t, int64(2), lineOffset)
+}
+
 func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *detectors.Result) {
 	data := make([]byte, 0, 4096)
 	needle := []byte("needle")
