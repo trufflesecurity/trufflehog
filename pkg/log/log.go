@@ -168,6 +168,18 @@ func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, 
 	return zapr.NewLogger(zapLogger), firstErrorFunc(zapLogger.Sync, sink.cleanup), nil
 }
 
+func SuppressCallerEmission(l logr.Logger) (logr.Logger, error) {
+	zapLogger, err := getZapLogger(l)
+	if err != nil {
+		return l, err
+	}
+
+	zapLogger = zapLogger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		return &suppressCallerCore{Core: core}
+	}))
+	return zapr.NewLogger(zapLogger), nil
+}
+
 // getZapLogger is a helper function that gets the underlying zap logger from a
 // logr.Logger interface.
 func getZapLogger(l logr.Logger) (*zap.Logger, error) {
