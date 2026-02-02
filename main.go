@@ -61,6 +61,7 @@ var (
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
 	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
 	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
+	customHeaders       = cli.Flag("header", "Custom header to add to all outbound HTTP requests; repeatable. Format 'Name: value' or 'Name=value'.").Strings()
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -510,6 +511,36 @@ func run(state overseer.State, logSync func() error) {
 
 	if *userAgentSuffix != "" {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
+	}
+
+	// Parse and set any custom headers specified via --header
+	if customHeaders != nil && len(*customHeaders) > 0 {
+		hdr := http.Header{}
+		for _, h := range *customHeaders {
+			var key, val string
+			colonIdx := strings.Index(h, ":")
+			equalsIdx := strings.Index(h, "=")
+			switch {
+			case colonIdx == -1 && equalsIdx == -1:
+				logger.V(1).Info("skipping invalid --header format; expected 'Name: value' or 'Name=value'", "header", h)
+				continue
+			case colonIdx == -1 || (equalsIdx != -1 && equalsIdx < colonIdx):
+				key = strings.TrimSpace(h[:equalsIdx])
+				val = strings.TrimSpace(h[equalsIdx+1:])
+			default:
+				key = strings.TrimSpace(h[:colonIdx])
+				val = strings.TrimSpace(h[colonIdx+1:])
+			}
+			if key == "" || val == "" {
+				logger.V(1).Info("skipping invalid --header with empty key or value", "header", h)
+				continue
+			}
+			hdr.Add(key, val)
+		}
+		if len(hdr) > 0 {
+			feature.CustomHeaders.Store(hdr)
+			logger.V(2).Info("custom headers configured", "count", len(hdr))
+		}
 	}
 
 	// OSS Default APK handling on

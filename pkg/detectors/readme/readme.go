@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.SetBasicAuth(resMatch, "")
 			req.Header.Add("accept", "application/json")
-			res, err := http.DefaultClient.Do(req)
+			res, err := detectors.DetectorHttpClientWithLocalAddresses.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

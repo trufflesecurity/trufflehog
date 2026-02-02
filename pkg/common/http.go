@@ -96,8 +96,20 @@ func UserAgent() string {
 	return "TruffleHog"
 }
 
+// ApplyCustomHeaders adds any globally configured custom headers to req.
+func ApplyCustomHeaders(req *http.Request) {
+	if hdr := feature.CustomHeaders.Load(); hdr != nil {
+		for k, vals := range hdr {
+			for _, v := range vals {
+				req.Header.Add(k, v)
+			}
+		}
+	}
+}
+
 func (t *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Add("User-Agent", UserAgent())
+	ApplyCustomHeaders(req)
 	return t.T.RoundTrip(req)
 }
 
