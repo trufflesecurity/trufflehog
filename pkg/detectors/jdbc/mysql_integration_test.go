@@ -23,7 +23,8 @@ func TestMySQL(t *testing.T) {
 
 	ctx := context.Background()
 
-	mysqlC, err := mysql.RunContainer(ctx,
+	mysqlC, err := mysql.Run(ctx,
+		"mysql:8.0.36",
 		mysql.WithDatabase(mysqlDatabase),
 		mysql.WithUsername(mysqlUser),
 		mysql.WithPassword(mysqlPass),
@@ -91,7 +92,7 @@ func TestMySQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			j, err := ParseMySQL(logContext.Background(), tt.input)
+			j, err := parseMySQL(logContext.Background(), tt.input)
 
 			if err != nil {
 				got := result{ParseErr: true}
