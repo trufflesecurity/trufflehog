@@ -168,6 +168,9 @@ func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, 
 	return zapr.NewLogger(zapLogger), firstErrorFunc(zapLogger.Sync, sink.cleanup), nil
 }
 
+// SuppressCallerEmission wraps the provided logger's Zap.Core with a new Zap.Core that removes caller information
+// (including any stack traces) from logs before they're written. This change is made at the core level so that this
+// logger's core can be teed together with other logger cores that do not remove caller information.
 func SuppressCallerEmission(l logr.Logger) (logr.Logger, error) {
 	zapLogger, err := getZapLogger(l)
 	if err != nil {
