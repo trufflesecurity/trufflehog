@@ -9,7 +9,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/go-errors/errors"
-	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -27,10 +26,8 @@ type Source struct {
 	name        string
 	sourceId    sources.SourceID
 	jobId       sources.JobID
-	concurrency int
 	verify      bool
 	paths       []string
-	log         logr.Logger
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -39,16 +36,11 @@ type Source struct {
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 
-// var _ sources.SourceUnitEnumChunker = (*Source)(nil)
-
 func (s *Source) Type() sourcespb.SourceType { return SourceType }
 func (s *Source) SourceID() sources.SourceID { return s.sourceId }
 func (s *Source) JobID() sources.JobID       { return s.jobId }
 
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	s.log = aCtx.Logger()
-	s.concurrency = concurrency
-
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -56,7 +48,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	var conn sourcespb.JSONEnumerator
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
-		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 	s.paths = conn.Paths
 
@@ -152,7 +144,7 @@ func (s *Source) chunkJSONEnumeratorReader(ctx context.Context, input io.Reader,
 
 		metadataJSON, err := entry.Metadata.MarshalJSON()
 		if err != nil {
-			ctx.Logger().V(2).Error(err, "failed to convert metadata to JSON")
+			ctx.Logger().Error(err, "failed to convert metadata to JSON")
 			continue
 		}
 
@@ -172,7 +164,7 @@ func (s *Source) chunkJSONEnumeratorReader(ctx context.Context, input io.Reader,
 		}
 
 		if err := handlers.HandleFile(ctx, bytes.NewReader(entry.Data), chunkSkel, reporter); err != nil {
-			ctx.Logger().V(2).Error(err, "failed to scan data")
+			ctx.Logger().Error(err, "failed to scan data")
 			continue
 		}
 	}
