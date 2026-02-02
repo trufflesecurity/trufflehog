@@ -40,7 +40,7 @@ func New(service string, configs ...logConfig) (logr.Logger, func() error) {
 		}
 	}
 	// create logger
-	zapLogger := zap.New(zapcore.NewTee(cores...))
+	zapLogger := zap.New(zapcore.NewTee(cores...), zap.AddCaller())
 	cleanupFuncs = append(cleanupFuncs, zapLogger.Sync)
 	logger := zapr.NewLogger(zapLogger).WithName(service)
 
