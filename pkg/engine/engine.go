@@ -213,7 +213,7 @@ type Engine struct {
 	verify bool
 
 	// Note: bad hack only used for testing.
-	verificationOverlapTracker *verificationOverlapTracker
+	verificationOverlapTracker *atomic.Int32
 
 	// detectorWorkerMultiplier is used to calculate the number of detector workers.
 	detectorWorkerMultiplier int
@@ -532,17 +532,6 @@ func (e *Engine) initialize(ctx context.Context) error {
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
-}
-
-type verificationOverlapTracker struct {
-	verificationOverlapDuplicateCount int
-	mu                                sync.Mutex
-}
-
-func (r *verificationOverlapTracker) increment() {
-	r.mu.Lock()
-	r.verificationOverlapDuplicateCount++
-	r.mu.Unlock()
 }
 
 const ignoreTag = "trufflehog:ignore"
@@ -995,7 +984,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						// This indicates that the same secret was found by multiple detectors.
 						// We should NOT VERIFY this chunk's data.
 						if e.verificationOverlapTracker != nil {
-							e.verificationOverlapTracker.increment()
+							e.verificationOverlapTracker.Add(1)
 						}
 						res.SetVerificationError(errOverlap)
 						e.processResult(
