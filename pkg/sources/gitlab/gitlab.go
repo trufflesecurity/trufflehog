@@ -244,6 +244,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			// check for project metadata in the cache
 			project, ok := s.projectMetadataCache.get(repository)
 			if ok {
+				ctx.Logger().V(5).Info("cache hit inside source metadata func: found project metadata in the cache", "cache_key", repository)
 				gitlabMetadata.ProjectId = project.id
 				gitlabMetadata.ProjectName = project.name
 				gitlabMetadata.ProjectOwner = project.owner
