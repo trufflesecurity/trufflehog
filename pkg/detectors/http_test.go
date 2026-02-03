@@ -34,6 +34,18 @@ func TestWithNoLocalIP(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNoLocalIP)
 	})
 
+	t.Run("Prevents dialing IPv6 wildcard IP", func(t *testing.T) {
+		client := &http.Client{}
+		WithNoLocalIP()(client)
+
+		transport, ok := client.Transport.(*http.Transport)
+		assert.True(t, ok, "Expected transport to be *http.Transport")
+
+		_, err := transport.DialContext(context.Background(), "tcp", "[::]:8080")
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrNoLocalIP)
+	})
+
 	t.Run("Allows dialing non-local host", func(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
