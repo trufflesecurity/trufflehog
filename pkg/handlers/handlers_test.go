@@ -17,9 +17,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -290,6 +292,30 @@ func TestHandleFileAR(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, 0, len(reporter.Ch))
+	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
+
+func TestHandleFileMSG(t *testing.T) {
+	wantChunkCount := 5
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/test.msg")
+	require.NoError(t, err)
+
+	assert.Empty(t, reporter.Ch)
+	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
+
+func TestHandleFileDOC(t *testing.T) {
+	wantChunkCount := 3
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/test.doc")
+	require.NoError(t, err)
+
+	assert.Empty(t, reporter.Ch)
 	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
@@ -856,6 +882,111 @@ func TestHandleChunksWithError(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.expectedReportedChunks, reporter.reportedChunks, "should have reported the expected number of chunks")
+		})
+	}
+}
+
+// mockChunkReader creates a ChunkReader that returns predefined chunks.
+// Each chunk has data and contentSize (contentSize is used to determine
+// how many newlines to count for line tracking).
+func mockChunkReader(chunks []sources.ChunkResult) sources.ChunkReader {
+	return func(ctx context.Context, reader io.Reader) <-chan sources.ChunkResult {
+		ch := make(chan sources.ChunkResult, len(chunks))
+		for _, c := range chunks {
+			ch <- c
+		}
+		close(ch)
+		return ch
+	}
+}
+
+// TestPopulateChunkLineNumber verifies that populateChunkLineNumber correctly clones
+// metadata and sets line numbers for different metadata types.
+func TestPopulateChunkLineNumber(t *testing.T) {
+	tests := []struct {
+		name       string
+		metadata   *source_metadatapb.MetaData
+		lineNumber int64
+		getLine    func(*source_metadatapb.MetaData) int64
+	}{
+		{
+			name: "Filesystem metadata",
+			metadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Filesystem{
+					Filesystem: &source_metadatapb.Filesystem{File: "test.txt"},
+				},
+			},
+			lineNumber: 42,
+			getLine: func(m *source_metadatapb.MetaData) int64 {
+				return m.Data.(*source_metadatapb.MetaData_Filesystem).Filesystem.Line
+			},
+		},
+		{
+			name: "Git metadata",
+			metadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{
+					Git: &source_metadatapb.Git{File: "test.go"},
+				},
+			},
+			lineNumber: 100,
+			getLine: func(m *source_metadatapb.MetaData) int64 {
+				return m.Data.(*source_metadatapb.MetaData_Git).Git.Line
+			},
+		},
+		{
+			name: "Github metadata",
+			metadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{File: "test.py"},
+				},
+			},
+			lineNumber: 200,
+			getLine: func(m *source_metadatapb.MetaData) int64 {
+				return m.Data.(*source_metadatapb.MetaData_Github).Github.Line
+			},
+		},
+		{
+			name:       "nil metadata",
+			metadata:   nil,
+			lineNumber: 10,
+			getLine:    func(m *source_metadatapb.MetaData) int64 { return 0 },
+		},
+		{
+			name: "zero line number",
+			metadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Filesystem{
+					Filesystem: &source_metadatapb.Filesystem{File: "test.txt"},
+				},
+			},
+			lineNumber: 0,
+			getLine: func(m *source_metadatapb.MetaData) int64 {
+				return m.Data.(*source_metadatapb.MetaData_Filesystem).Filesystem.Line
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			chunk := &sources.Chunk{SourceMetadata: tc.metadata}
+			originalMetadata := tc.metadata
+
+			populateChunkLineNumber(chunk, tc.lineNumber)
+
+			if tc.metadata == nil || tc.lineNumber == 0 {
+				// Metadata should remain unchanged
+				assert.Equal(t, originalMetadata, chunk.SourceMetadata)
+				return
+			}
+
+			// Verify the line number is set correctly
+			actualLine := tc.getLine(chunk.SourceMetadata)
+			assert.Equal(t, tc.lineNumber, actualLine,
+				"line number should be set to %d, got %d", tc.lineNumber, actualLine)
+
+			// Verify the original is not modified (metadata was cloned)
+			originalLine := tc.getLine(tc.metadata)
+			assert.Equal(t, int64(0), originalLine,
+				"original metadata should not be modified, but line is %d", originalLine)
 		})
 	}
 }

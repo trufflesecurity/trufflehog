@@ -1140,6 +1140,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for SkipHistory
 
+	// no validation rules for IncludeComments
+
 	switch v := m.Credential.(type) {
 	case *Confluence_Unauthenticated:
 		if v == nil {
@@ -1336,6 +1338,10 @@ func (m *Docker) validate(all bool) error {
 	}
 
 	var errors []error
+
+	// no validation rules for Namespace
+
+	// no validation rules for RegistryToken
 
 	switch v := m.Credential.(type) {
 	case *Docker_Unauthenticated:
@@ -2086,6 +2092,8 @@ func (m *Git) validate(all bool) error {
 	// no validation rules for NoCleanup
 
 	// no validation rules for PrintLegacyJson
+
+	// no validation rules for TrustLocalGitConfig
 
 	switch v := m.Credential.(type) {
 	case *Git_BasicAuth:
@@ -3215,6 +3223,100 @@ func (m *GoogleDrive) validate(all bool) error {
 			errors = append(errors, err)
 		}
 		// no validation rules for RefreshToken
+	case *GoogleDrive_UseTokenService:
+		if v == nil {
+			err := GoogleDriveValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for UseTokenService
+	case *GoogleDrive_Oauth:
+		if v == nil {
+			err := GoogleDriveValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetOauth()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GoogleDriveValidationError{
+						field:  "Oauth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GoogleDriveValidationError{
+						field:  "Oauth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetOauth()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GoogleDriveValidationError{
+					field:  "Oauth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GoogleDrive_Dwd:
+		if v == nil {
+			err := GoogleDriveValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetDwd()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GoogleDriveValidationError{
+						field:  "Dwd",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GoogleDriveValidationError{
+						field:  "Dwd",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDwd()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GoogleDriveValidationError{
+					field:  "Dwd",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -3509,6 +3611,8 @@ func (m *JIRA) validate(all bool) error {
 	}
 
 	// no validation rules for InsecureSkipVerifyTls
+
+	// no validation rules for InstallationType
 
 	switch v := m.Credential.(type) {
 	case *JIRA_BasicAuth:

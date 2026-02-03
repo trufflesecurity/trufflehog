@@ -6,7 +6,6 @@ package jdbc
 import (
 	"context"
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
@@ -15,6 +14,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestPostgres(t *testing.T) {
@@ -32,8 +33,8 @@ func TestPostgres(t *testing.T) {
 	t.Log("dbName: ", dbName)
 
 	ctx := context.Background()
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:13-alpine"),
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:13-alpine",
 		postgres.WithDatabase(dbName),
 		postgres.WithUsername(user),
 		postgres.WithPassword(pass),
@@ -53,10 +54,6 @@ func TestPostgres(t *testing.T) {
 	port, err := postgresContainer.MappedPort(ctx, "5432")
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if err != nil {
-		log.Fatalf("failed to start container: %s", err)
 	}
 	defer postgresContainer.Terminate(ctx)
 
@@ -119,7 +116,7 @@ func TestPostgres(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			j, err := parsePostgres(tt.input)
+			j, err := parsePostgres(logContext.Background(), tt.input)
 			if err != nil {
 				got := result{ParseErr: true}
 

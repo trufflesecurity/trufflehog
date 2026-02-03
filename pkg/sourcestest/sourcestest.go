@@ -2,6 +2,7 @@ package sourcestest
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -58,4 +59,33 @@ func (ErrReporter) ChunkOk(context.Context, sources.Chunk) error {
 }
 func (ErrReporter) ChunkErr(context.Context, error) error {
 	return fmt.Errorf("ErrReporter: ChunkErr error")
+}
+
+// SafeTestReporter is a helper struct that implements both UnitReporter and
+// ChunkReporter by recording the values passed in the methods with thread safety.
+type SafeTestReporter struct {
+	TestReporter
+
+	mu sync.Mutex
+}
+
+func (t *SafeTestReporter) UnitOk(_ context.Context, unit sources.SourceUnit) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.TestReporter.UnitOk(nil, unit)
+}
+func (t *SafeTestReporter) UnitErr(_ context.Context, err error) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.TestReporter.UnitErr(nil, err)
+}
+func (t *SafeTestReporter) ChunkOk(_ context.Context, chunk sources.Chunk) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.TestReporter.ChunkOk(nil, chunk)
+}
+func (t *SafeTestReporter) ChunkErr(_ context.Context, err error) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.TestReporter.ChunkErr(nil, err)
 }

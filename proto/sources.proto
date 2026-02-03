@@ -153,6 +153,7 @@ message Confluence {
   repeated string ignore_spaces = 8;
   bool include_attachments = 9;
   bool skip_history = 10;
+  bool include_comments = 11;
 }
 
 message Docker {
@@ -164,6 +165,8 @@ message Docker {
   }
   repeated string images = 5;
   repeated string exclude_paths = 6;
+  string namespace = 7;
+  string registry_token = 8;
 }
 
 message ECR {
@@ -225,6 +228,7 @@ message Git {
   string clone_path = 16;
   bool no_cleanup = 17;
   bool print_legacy_json = 18;
+  bool trust_local_git_config = 19; // Trust local git configurations
 }
 
 message GitLab {
@@ -302,6 +306,9 @@ message GitHubRealtime {
 message GoogleDrive {
   oneof credential {
     string refresh_token = 1;
+    bool use_token_service = 2;
+    credentials.Oauth2 oauth = 3; // on-prem scanning
+    credentials.GoogleDriveDWD dwd = 4; // Domain-Wide Delegation
   }
 }
 
@@ -329,6 +336,12 @@ message Huggingface {
   bool include_prs = 19;
 }
 
+enum JiraInstallationType {
+  JIRA_INSTALLATION_TYPE_AUTODETECT = 0;
+  JIRA_INSTALLATION_TYPE_CLOUD = 1;
+  JIRA_INSTALLATION_TYPE_DATA_CENTER = 2;
+}
+
 message JIRA {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
@@ -340,6 +353,10 @@ message JIRA {
   repeated string projects = 5;
   repeated string ignore_projects = 7;
   bool insecure_skip_verify_tls = 8;
+  
+  // Override autodetection of Jira installation type.
+  // Defaults to AUTODETECT which checks for cloud-only endpoints.
+  JiraInstallationType installation_type = 9;
 }
 
 message NPMUnauthenticatedPackage {

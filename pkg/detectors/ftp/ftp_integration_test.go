@@ -149,7 +149,7 @@ func TestFTP_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("FTP.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

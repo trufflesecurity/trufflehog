@@ -150,7 +150,7 @@ func TestGenerateLink(t *testing.T) {
 				commit: "abcdef",
 				file:   "main.go",
 			},
-			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go",
+			want: "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef",
 		},
 		{
 			name: "Azure link gen with line",
@@ -160,7 +160,16 @@ func TestGenerateLink(t *testing.T) {
 				file:   "main.go",
 				line:   int64(20),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
+			want: "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=21&lineStartColumn=1",
+		},
+		{
+			name: "Azure link gen - no file",
+			args: args{
+				repo:   "https://dev.azure.com/org/project/_git/repo",
+				commit: "abcdef",
+				file:   "",
+			},
+			want: "https://dev.azure.com/org/project/_git/repo?version=GCabcdef",
 		},
 		{
 			name: "Unknown provider on-prem instance",
@@ -210,6 +219,33 @@ func TestGenerateLink(t *testing.T) {
 			},
 			want: "https://github.com/GeekMasher/tree-sitter-hcl/blob/a7f23cc5795769262f5515e52902f86c1b768994/example/real_world_stuff/coreos/coreos%25tectonic-installer%25installer%25frontend%25ui-tests%25output%25metal.tfvars#L1",
 		},
+		{
+			name: "github wiki link gen",
+			args: args{
+				repo:   "https://github.com/hxnyk/hxnyk.wiki.git",
+				commit: "e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+				file:   "Home.md",
+				line:   int64(5),
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87#L5",
+		},
+		{
+			name: "github wiki link gen - no line",
+			args: args{
+				repo:   "https://github.com/hxnyk/hxnyk.wiki.git",
+				commit: "e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+				file:   "Home.md",
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/e5fdc764d6d405fc0e4e90e4bcf192357b1a1a87",
+		},
+		{
+			name: "github wiki link gen - no commit no line",
+			args: args{
+				repo: "https://github.com/hxnyk/hxnyk.wiki.git",
+				file: "Home.md",
+			},
+			want: "https://github.com/hxnyk/hxnyk/wiki/Home/",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -252,10 +288,10 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 		{
 			name: "Update Azure link with line",
 			args: args{
-				link:    "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
+				link:    "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=21&lineStartColumn=1",
 				newLine: int64(40),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=40",
+			want: "https://dev.azure.com/org/project/_git/repo?line=40&lineEnd=41&lineStartColumn=1&path=%2Fmain.go&version=GCabcdef",
 		},
 		{
 			name: "Add line to github link without line",

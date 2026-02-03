@@ -2,9 +2,13 @@ package postmark
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -43,18 +47,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.postmarkapp.com/deliverystats", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/json")
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-Postmark-Server-Token", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
+			valid, extraData, err := verifyKey(ctx, client, resMatch)
+			s1.Verified = valid
+			s1.ExtraData = extraData
+			s1.SetVerificationError(err)
+
+			if valid {
+				s1.AnalysisInfo = map[string]string{
+					"key": resMatch,
 				}
 			}
 		}
@@ -63,6 +63,87 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+// verifyKey verifies a Postmark key by making requests to the Postmark API.
+// It tries both server and account API key verification.
+func verifyKey(ctx context.Context, client *http.Client, key string) (bool, map[string]string, error) {
+	errs := make([]error, 0, 2)
+
+	// Try verifying as server API key first
+	valid, err := verifyServerAPIKey(ctx, client, key)
+	if valid {
+		// If valid as server API key, return immediately
+		return true, map[string]string{"type": "server"}, nil
+	}
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Try verifying as account API key next
+	valid, err = verifyAccountAPIKey(ctx, client, key)
+	if valid {
+		// If valid as account API key, return immediately
+		return true, map[string]string{"type": "account"}, nil
+	}
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		// If there were errors during verification, return them
+		return false, nil, errors.Join(errs...)
+	}
+	return false, nil, nil
+}
+
+// verifyServerAPIKey verifies a Postmark server API key by making a request to the Postmark API.
+func verifyServerAPIKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	return verifyKeyWithOptions(
+		ctx,
+		client,
+		key,
+		"/deliverystats",
+		"X-Postmark-Server-Token",
+	)
+}
+
+// verifyAccountAPIKey verifies a Postmark account API key by making a request to the Postmark API.
+func verifyAccountAPIKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	return verifyKeyWithOptions(
+		ctx,
+		client,
+		key,
+		"/domains?count=10&offset=0",
+		"X-Postmark-Account-Token",
+	)
+}
+
+// verifyKeyWithOptions is a generic function to verify a Postmark key with given endpoint and header.
+func verifyKeyWithOptions(ctx context.Context, client *http.Client, key, endpoint, authHeader string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.postmarkapp.com"+endpoint, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add(authHeader, key)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

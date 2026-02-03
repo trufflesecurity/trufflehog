@@ -145,7 +145,7 @@ func (s *Source) withScanOptions(scanOptions *ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
-// Init returns an initialized GitHub source.
+// Init returns an initialized Git source.
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceID = sourceId
@@ -161,7 +161,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	}
 
 	if uri := conn.GetUri(); uri != "" {
-		repoPath, _, err := prepareRepoSinceCommit(aCtx, uri, conn.GetClonePath(), conn.GetBase())
+		repoPath, _, err := prepareRepoSinceCommit(aCtx, uri, conn.GetClonePath(), conn.GetBase(), conn.GetTrustLocalGitConfig(), conn.GetBare())
 		if err != nil || repoPath == "" {
 			return fmt.Errorf("error preparing repo: %w", err)
 		}
@@ -344,13 +344,11 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		return nil
 	}
 
-	// Check if the directory exists
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 		return fmt.Errorf("directory does not exist: %s", gitDir)
 	}
 
-	// try paths instead of url
-	repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
+	repo, err := RepoFromPath(gitDir)
 	if err != nil {
 		return reporter.ChunkErr(ctx, err)
 	}
@@ -372,7 +370,15 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 	return nil
 }
 
-func RepoFromPath(path string, isBare bool) (*git.Repository, error) {
+// RepoFromPath opens a git repository from a given path.
+// If the repository is bare (--mirror or --bare), the directory referenced by the path variable
+// will contain the contents of the git directory (ex: path/HEAD, path/config, etc.). In this case,
+// detectDotGit and enableDotGitCommonDir need to be false.
+// Otherwise, they need to be true so git can find the git directory (path/.git)
+//
+// See: https://git-scm.com/docs/gitrepository-layout#_description
+func RepoFromPath(path string) (*git.Repository, error) {
+	isBare := isRepoBare(path)
 	options := &git.PlainOpenOptions{}
 	if !isBare {
 		options.DetectDotGit = true
@@ -403,12 +409,49 @@ func GitURLParse(gitURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
+// normalizeFileURI converts relative file URIs to absolute paths.
+// This ensures that file:// URIs work correctly with git clone operations.
+func normalizeFileURI(uri *url.URL) (*url.URL, error) {
+	if uri.Scheme != "file" {
+		return uri, nil
+	}
+
+	var rawPath string
+	if uri.Host != "" {
+		// Handle cases like file://. or file://./relative/path
+		if uri.Path == "" {
+			rawPath = uri.Host
+		} else {
+			rawPath = filepath.Join(uri.Host, uri.Path)
+		}
+	} else {
+		// Handle cases like file:///absolute/path
+		rawPath = uri.Path
+	}
+
+	absPath, err := filepath.Abs(rawPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve absolute path for %q: %w", rawPath, err)
+	}
+
+	// Convert to forward slashes (for Windows compatibility)
+	normalizedPath := filepath.ToSlash(absPath)
+
+	normalizedURI := &url.URL{
+		Scheme: "file",
+		Path:   normalizedPath,
+	}
+
+	return normalizedURI, nil
+}
+
 type cloneParams struct {
 	userInfo  *url.Userinfo
 	gitURL    string
 	args      []string
 	clonePath string
 	authInUrl bool
+	timeout   time.Duration
 }
 
 // CloneRepo orchestrates the cloning of a given Git repository, returning its local path
@@ -422,7 +465,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 
 	// If --clone-path is set, create a subdirectory <clonePath>/trufflehog-<repo-name> with permissions 0755.
 	if clonePath != "" {
-		path = filepath.Join(clonePath, "trufflehog-"+strings.TrimSuffix(filepath.Base(gitURL), ".git"))
+		path = filepath.Join(clonePath, "trufflehog-"+strings.TrimSuffix(filepath.Base(gitURL), gitDirName))
 		if err = os.MkdirAll(path, 0755); err != nil {
 			return "", nil, fmt.Errorf("failed to create clone path %s: %w", clonePath, err)
 		}
@@ -434,7 +477,9 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 		}
 	}
 
-	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl})
+	timeout := time.Duration(feature.GitCloneTimeoutDuration.Load())
+
+	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl, timeout})
 	if err != nil {
 		// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
 		// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
@@ -451,6 +496,8 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
 // clonePath. It then opens the cloned repository, returning a git.Repository object.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
+	start := time.Now()
+
 	cloneURL, err := GitURLParse(params.gitURL)
 	if err != nil {
 		return nil, err
@@ -476,31 +523,28 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 			gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
 		}
 	}
-	// append clone argument
+
 	gitArgs = append(gitArgs, "clone")
-	var dstGitDir string
-	if feature.UseGitMirror.Load() {
-		gitArgs = append(gitArgs,
-			"--mirror",
-		)
-		dstGitDir = filepath.Join(params.clonePath, gitDirName) // <tmp>/.git
+	if feature.UseGitMirror.Load() && cloneURL.Scheme != "file" {
+		gitArgs = append(gitArgs, "--mirror")
 	} else {
 		if !feature.SkipAdditionalRefs.Load() {
 			gitArgs = append(gitArgs,
 				"-c",
 				"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
 		}
-		dstGitDir = params.clonePath
 	}
 
-	gitArgs = append(gitArgs,
-		cloneURL.String(),
-		dstGitDir,
-		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
-	)
+	var cancel context.CancelFunc
+	if params.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, params.timeout)
+		defer cancel()
+	}
 
+	gitArgs = append(gitArgs, "--quiet")
 	gitArgs = append(gitArgs, params.args...)
-	cloneCmd := exec.Command("git", gitArgs...)
+	gitArgs = append(gitArgs, cloneURL.String(), params.clonePath)
+	cloneCmd := exec.CommandContext(ctx, "git", gitArgs...)
 
 	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
@@ -513,7 +557,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		"args", params.args,
 	)
 
-	// Execute command and wait for the stdout / stderr.
+	logger.V(3).Info("executing git clone command")
 	outputBytes, err := cloneCmd.CombinedOutput()
 	var output string
 	if secretForRedaction != "" {
@@ -527,25 +571,24 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	}
 	logger.V(3).Info("git subcommand finished", "output", output)
 
-	if cloneCmd.ProcessState == nil {
+	if common.IsDone(ctx) {
+		return nil, fmt.Errorf("git clone timed out (after %s)", time.Since(start))
+	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
 		logger.V(1).Info("git clone failed", "error", err)
-		// Record the clone failure with the appropriate reason and exit code
 		failureReason := ClassifyCloneError(output)
 		exitCode := cloneCmd.ProcessState.ExitCode()
 		metricsInstance.RecordCloneOperation(statusFailure, failureReason, exitCode)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
-	options := &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
-	repo, err := git.PlainOpenWithOptions(params.clonePath, options)
+	repo, err := RepoFromPath(params.clonePath)
 	if err != nil {
 		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-	logger.V(1).Info("successfully cloned repo")
+	logger.V(1).Info("successfully cloned repo", "time_seconds", time.Since(start).Seconds())
 
-	// Record the successful clone operation
 	metricsInstance.RecordCloneOperation(statusSuccess, cloneSuccess, 0)
 
 	return repo, nil
@@ -602,11 +645,11 @@ func CloneRepoUsingUnauthenticated(ctx context.Context, url, clonePath string, a
 // CloneRepoUsingSSH clones a repo using SSH.
 func CloneRepoUsingSSH(ctx context.Context, gitURL string, args ...string) (string, *git.Repository, error) {
 	if isCodeCommitURL(gitURL) {
-		return CloneRepo(ctx, nil, gitURL, "", false, args...)
+		return CloneRepo(ctx, nil, gitURL, "", true, args...)
 	}
 
 	userInfo := url.User("git")
-	return CloneRepo(ctx, userInfo, gitURL, "", false, args...)
+	return CloneRepo(ctx, userInfo, gitURL, "", true, args...)
 }
 
 var codeCommitRE = regexp.MustCompile(`ssh://git-codecommit\.[\w-]+\.amazonaws\.com`)
@@ -625,8 +668,9 @@ const gitDirName = ".git"
 // exists in the ".git" directory at the root of the working tree.
 //
 // See: https://git-scm.com/docs/gitrepository-layout#_description
-func getGitDir(path string, options *ScanOptions) string {
-	if options.Bare {
+func getGitDir(path string) string {
+	isBare := isRepoBare(path)
+	if isBare {
 		return path
 	} else {
 		return filepath.Join(path, gitDirName)
@@ -660,7 +704,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isRepoBare(path))
 	if err != nil {
 		return err
 	}
@@ -671,7 +715,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	logger.Info("scanning repo", logValues...)
 
 	var (
-		gitDir         = getGitDir(path, scanOptions)
+		gitDir         = getGitDir(path)
 		depth          int64
 		lastCommitHash string
 	)
@@ -741,7 +785,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
 				logger.V(5).Info("skipping binary file",
 					"commit", commitHash.String()[:7],
-					"path", path)
+					"path", fileName)
 				continue
 			}
 
@@ -922,7 +966,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	var (
 		reachedBase    = false
-		gitDir         = getGitDir(path, scanOptions)
+		gitDir         = getGitDir(path)
 		depth          int64
 		lastCommitHash string
 	)
@@ -972,7 +1016,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
 				logger.V(5).Info("skipping binary file",
 					"commit", commitHash.String()[:7],
-					"path", path)
+					"path", fileName)
 				continue
 			}
 
@@ -1041,7 +1085,8 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		s.metrics.RecordRepoScanned(statusFailure)
 		return err
 	}
-	if !scanOptions.Bare {
+	// Skip staged scanning for mirror/bare clones
+	if !isRepoBare(repoPath) {
 		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter); err != nil {
 			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 		}
@@ -1192,9 +1237,9 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 }
 
 // prepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
-func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHash string) (string, bool, error) {
+func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHash string, trustLocalGitConfig bool, isBare bool) (string, bool, error) {
 	if commitHash == "" {
-		return PrepareRepo(ctx, uriString, clonePath)
+		return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 	}
 	// TODO: refactor with PrepareRepo to remove duplicated logic
 
@@ -1209,13 +1254,13 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 	}
 
 	if uri.Scheme == "file" || uri.Host != "github.com" {
-		return PrepareRepo(ctx, uriString, "")
+		return PrepareRepo(ctx, uriString, "", trustLocalGitConfig, isBare)
 	}
 
 	uriPath := strings.TrimPrefix(uri.Path, "/")
 	owner, repoName, found := strings.Cut(uriPath, "/")
 	if !found {
-		return PrepareRepo(ctx, uriString, clonePath)
+		return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 	}
 
 	client := github.NewClient(nil)
@@ -1229,13 +1274,13 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 
 	commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
 	if err != nil {
-		return PrepareRepo(ctx, uriString, clonePath)
+		return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 	}
 	var timestamp string
 	{
 		author := commit.GetAuthor()
 		if author == nil {
-			return PrepareRepo(ctx, uriString, clonePath)
+			return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 		}
 		timestamp = author.GetDate().Format(time.RFC3339)
 	}
@@ -1252,13 +1297,13 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 
 		path, _, err = CloneRepoUsingToken(ctx, password, remotePath, clonePath, uri.User.Username(), true, "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
+			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %w", uri.Redacted(), err)
 		}
 	default:
 		ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
 		path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath, clonePath, "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %w", remotePath, err)
 		}
 	}
 
@@ -1267,7 +1312,8 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 }
 
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
-func PrepareRepo(ctx context.Context, uriString, clonePath string) (string, bool, error) {
+// isBare and trustLocalGitConfig are only used for file:// URIs.
+func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGitConfig bool, isBare bool) (string, bool, error) {
 	var path string
 	uri, err := GitURLParse(uriString)
 	if err != nil {
@@ -1277,7 +1323,42 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string) (string, bool
 	remote := false
 	switch uri.Scheme {
 	case "file":
-		path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
+		switch {
+		case trustLocalGitConfig:
+			path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
+		default:
+			normalizedURI, err := normalizeFileURI(uri)
+			if err != nil {
+				return "", remote, fmt.Errorf("failed to normalize file URI (%s): %w", uriString, err)
+			}
+
+			args := []string{}
+			if isBare {
+				args = append(args, "--bare")
+			}
+			path, _, err = CloneRepo(ctx, uri.User, normalizedURI.String(), clonePath, false, args...)
+			if err != nil {
+				return path, remote, fmt.Errorf("failed to clone file Git repo (%s): %w", normalizedURI.String(), err)
+			}
+
+			if !isRepoBare(path) {
+				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
+				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
+				uriPath := normalizedURI.Path
+
+				originalIndexPath := filepath.Join(uriPath, gitDirName, "index")
+
+				clonedIndexPath := filepath.Join(path, gitDirName, "index")
+
+				indexData, err := os.ReadFile(originalIndexPath)
+				if err != nil {
+					return path, remote, fmt.Errorf("failed to read index file: %w", err)
+				}
+				if err := os.WriteFile(clonedIndexPath, indexData, 0644); err != nil {
+					return path, remote, fmt.Errorf("failed to write index file: %w", err)
+				}
+			}
+		}
 	case "http", "https":
 		remotePath := uri.String()
 		remote = true
@@ -1291,13 +1372,13 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string) (string, bool
 
 			path, _, err = CloneRepoUsingToken(ctx, password, remotePath, clonePath, uri.User.Username(), true)
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
+				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %w", uri.Redacted(), err)
 			}
 		default:
 			ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
 			path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath, clonePath)
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %w", remotePath, err)
 			}
 		}
 	case "ssh":
@@ -1305,7 +1386,7 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string) (string, bool
 		remote = true
 		path, _, err = CloneRepoUsingSSH(ctx, remotePath)
 		if err != nil {
-			return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+			return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %w", remotePath, err)
 		}
 	default:
 		return "", remote, fmt.Errorf("unsupported Git URI: %s", uriString)
@@ -1456,4 +1537,11 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 
 func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
 	return UnmarshalUnit(data)
+}
+
+// isRepoBare returns true if the repo path does NOT contain a .git directory.
+// This is a helper function used outside of the source struct.
+func isRepoBare(repoPath string) bool {
+	_, err := os.Stat(filepath.Join(repoPath, gitDirName))
+	return os.IsNotExist(err)
 }

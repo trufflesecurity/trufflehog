@@ -637,6 +637,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for User
 
+	// no validation rules for CommentId
+
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}
@@ -3444,6 +3446,10 @@ func (m *Postman) validate(all bool) error {
 	// no validation rules for FieldType
 
 	// no validation rules for LocationType
+
+	// no validation rules for ResponseId
+
+	// no validation rules for ResponseName
 
 	if len(errors) > 0 {
 		return PostmanMultiError(errors)

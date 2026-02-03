@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-errors/errors"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"gopkg.in/h2non/gock.v1"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -158,6 +160,205 @@ func TestSource_ScanCollection(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSource_ScanCollectionWithFolders(t *testing.T) {
+	ctx := context.Background()
+	s := &Source{
+		DetectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: map[string]struct{}{
+			"keyword1": {},
+		},
+	}
+	testCollection := Collection{
+		Info: Info{
+			PostmanID: "col1",
+			Name:      "Test Collection with Folders",
+		},
+		Items: []Item{
+			{
+				Name: "Folder 1",
+				Items: []Item{
+					{
+						Uid:  "1",
+						Name: "Request 1",
+						Request: Request{
+							URL: URL{
+								Protocol: "https",
+								Host:     []string{"example.com"},
+								Path:     []string{"api", "endpoint"},
+								Raw:      "https://example.com/api/endpoint",
+							},
+							Method: "GET",
+						},
+					},
+					{
+						Uid:  "2",
+						Name: "Folder 2",
+						Items: []Item{
+							{
+								Uid:  "3",
+								Name: "Request 2",
+								Request: Request{
+									URL: URL{
+										Protocol: "https",
+										Host:     []string{"test.com"},
+										Path:     []string{"api", "endpoint"},
+										Raw:      "https://test.com/api/endpoint",
+									},
+									Method: "POST",
+									Auth: Auth{
+										Type: "bearer",
+										Bearer: []KeyValue{
+											{
+												Key:   "token",
+												Value: "abcdef123456",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expectedChunks := []string{
+		"keyword1:https://example.com/api/endpoint\n",
+		"keyword1:https://test.com/api/endpoint\n",
+		"keyword1:token:abcdef123456\n",
+	}
+
+	chunksChan := make(chan *sources.Chunk, len(expectedChunks))
+	metadata := Metadata{
+		CollectionInfo: testCollection.Info,
+	}
+
+	go s.scanCollection(ctx, chunksChan, metadata, testCollection)
+
+	for _, expectedData := range expectedChunks {
+		chunk := <-chunksChan
+		got := strings.Split(strings.TrimSpace(string(chunk.Data)), "\n")
+		expected := strings.Split(strings.TrimSpace(expectedData), "\n")
+		sort.Strings(got)
+		sort.Strings(expected)
+
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("expected chunk data from collection: \n%sgot: \n%s", expectedData, chunk.Data)
+		}
+	}
+}
+
+func TestSource_ScanSingleItem(t *testing.T) {
+	ctx := context.Background()
+	s := &Source{
+		DetectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: map[string]struct{}{
+			"keyword1": {},
+		},
+	}
+	testItem := Item{
+		Name: "Request 1",
+		Request: Request{
+			URL: URL{
+				Protocol: "https",
+				Host:     []string{"example.com"},
+				Path:     []string{"api", "endpoint"},
+				Raw:      "https://example.com/api/endpoint",
+			},
+			Method: "GET",
+		},
+	}
+	expectedChunks := []string{
+		"keyword1:https://example.com/api/endpoint\n",
+	}
+	chunksChan := make(chan *sources.Chunk, len(expectedChunks))
+	metadata := Metadata{}
+	s.scanItem(ctx, chunksChan, Collection{}, metadata, testItem, "", map[string]struct{}{})
+	for _, expectedData := range expectedChunks {
+		chunk := <-chunksChan
+		got := strings.Split(strings.TrimSpace(string(chunk.Data)), "\n")
+		expected := strings.Split(strings.TrimSpace(expectedData), "\n")
+		sort.Strings(got)
+		sort.Strings(expected)
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("expected chunk data from collection: \n%sgot: \n%s", expectedData, chunk.Data)
+		}
+	}
+}
+
+func TestSource_ScanNestedItems(t *testing.T) {
+	ctx := context.Background()
+	s := &Source{
+		DetectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: map[string]struct{}{
+			"keyword1": {},
+		},
+	}
+	testItem := Item{
+		Name: "Folder 1",
+		Items: []Item{
+			{
+				Name: "Request 1",
+				Uid:  "1",
+				Request: Request{
+					URL: URL{
+						Protocol: "https",
+						Host:     []string{"example.com"},
+						Path:     []string{"api", "endpoint"},
+						Raw:      "https://example.com/api/endpoint",
+					},
+					Method: "GET",
+				},
+			},
+			{
+				Name: "Folder 2",
+				Uid:  "2",
+				Items: []Item{
+					{
+						Uid:  "3",
+						Name: "Request 2",
+						Request: Request{
+							URL: URL{
+								Protocol: "https",
+								Host:     []string{"test.com"},
+								Path:     []string{"api", "endpoint"},
+								Raw:      "https://test.com/api/endpoint",
+							},
+							Method: "POST",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expectedChunks := []string{
+		"keyword1:https://example.com/api/endpoint\n",
+		"keyword1:https://test.com/api/endpoint\n",
+	}
+
+	chunksChan := make(chan *sources.Chunk, len(expectedChunks))
+	metadata := Metadata{}
+	s.scanItem(ctx, chunksChan, Collection{}, metadata, testItem, "", map[string]struct{}{})
+	for _, expectedData := range expectedChunks {
+		chunk := <-chunksChan
+		got := strings.Split(strings.TrimSpace(string(chunk.Data)), "\n")
+		expected := strings.Split(strings.TrimSpace(expectedData), "\n")
+		sort.Strings(got)
+		sort.Strings(expected)
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("expected chunk data from collection: \n%sgot: \n%s", expectedData, chunk.Data)
+		}
 	}
 }
 
@@ -687,5 +888,113 @@ func TestSource_HeadersScanning(t *testing.T) {
 		t.Errorf("No chunks were generated from the mock data")
 	} else {
 		t.Logf("Generated %d chunks from the mock data", chunksReceived)
+	}
+}
+
+func TestSource_ResponseID(t *testing.T) {
+	ctx := context.Background()
+
+	s := &Source{
+		DetectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: map[string]struct{}{
+			"keyword1": {},
+		},
+	}
+
+	chunksChan := make(chan *sources.Chunk, 1)
+
+	response := Response{
+		Uid:  "response-1234",
+		Name: "Test Response",
+		Body: "This is a test response body containing keyword1.",
+	}
+
+	go func() {
+		s.scanHTTPResponse(ctx, chunksChan, Metadata{}, response)
+		close(chunksChan)
+	}()
+
+	var gotChunk *sources.Chunk
+	for chunk := range chunksChan {
+		gotChunk = chunk
+	}
+
+	postmanMetadata, ok := gotChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Postman)
+	if !ok {
+		t.Fatalf("expected Postman metadata, got: %T", gotChunk.SourceMetadata.Data)
+	}
+
+	if postmanMetadata.Postman.ResponseId != response.Uid {
+		t.Errorf("expected response ID: %s, got: %s", response.Uid, postmanMetadata.Postman.ResponseId)
+	}
+	if postmanMetadata.Postman.ResponseName != response.Name {
+		t.Errorf("expected response Name: %s, got: %s", response.Name, postmanMetadata.Postman.ResponseName)
+	}
+
+}
+
+func TestSource_AbortScanRateLimitCrossedThreshold(t *testing.T) {
+	defer gock.Off()
+	// Mock the API response for getting collection
+	gock.New("https://api.getpostman.com").
+		Get("/collections/1234-abc1").
+		Reply(200).
+		AddHeader("X-RateLimit-Remaining-Month", "19").
+		AddHeader("X-RateLimit-Limit-Month", "100").
+		BodyString(`{"collection":{"info":{"_postman_id":"abc1","name":"test-collection-1","schema":"https://schema.postman.com/json/collection/v2.1.0/collection.json",
+		"updatedAt":"2025-03-21T17:39:25.000Z","createdAt":"2025-03-21T17:37:13.000Z","lastUpdatedBy":"1234","uid":"1234-abc1"},
+		"item":[]}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	_, err = s.client.GetCollection(ctx, "1234-abc1")
+	if !errors.Is(err, errAbortScanDueToAPIRateLimit) {
+		t.Errorf("expected abort scan error due to rate limit, got: %v", err)
+	}
+}
+
+func TestSource_AbortScanRateLimitBelowThreshold(t *testing.T) {
+	defer gock.Off()
+	// Mock the API response for getting collection
+	gock.New("https://api.getpostman.com").
+		Get("/collections/1234-abc1").
+		Reply(200).
+		AddHeader("X-RateLimit-Remaining-Month", "90").
+		AddHeader("X-RateLimit-Limit-Month", "100").
+		BodyString(`{"collection":{"info":{"_postman_id":"abc1","name":"test-collection-1","schema":"https://schema.postman.com/json/collection/v2.1.0/collection.json",
+		"updatedAt":"2025-03-21T17:39:25.000Z","createdAt":"2025-03-21T17:37:13.000Z","lastUpdatedBy":"1234","uid":"1234-abc1"},
+		"item":[]}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	_, err = s.client.GetCollection(ctx, "1234-abc1")
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
 	}
 }

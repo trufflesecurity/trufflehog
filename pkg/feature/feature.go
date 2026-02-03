@@ -1,16 +1,20 @@
 package feature
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 var (
 	ForceSkipBinaries              atomic.Bool
 	ForceSkipArchives              atomic.Bool
+	GitCloneTimeoutDuration        atomic.Int64
 	SkipAdditionalRefs             atomic.Bool
 	EnableAPKHandler               atomic.Bool
 	UserAgentSuffix                AtomicString
 	UseSimplifiedGitlabEnumeration atomic.Bool
 	UseGitMirror                   atomic.Bool
 	GitlabProjectsPerPage          atomic.Int64
+	UseGithubGraphQLAPI            atomic.Bool // use github graphql api to fetch issues, pr's and comments
 )
 
 type AtomicString struct {

@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
@@ -106,6 +107,36 @@ func TestAddReposByOrg(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+func TestAddReposByOrg_Repositories(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/super-secret-org/repos").
+		Reply(200).
+		JSON(`[
+			{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git", "size": 1},
+			{"full_name": "super-secret-org/super-secret-repo2", "clone_url": "https://github.com/super-secret-org/super-secret-repo2.git", "size": 1},
+			{"full_name": "super-secret-org/not-super-secret-repo", "clone_url": "https://github.com/super-secret-org/not-super-secret-repo.git", "size": 1}
+		]`)
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		Repositories:  []string{"super-secret-org/super-secret-repo", "super-secret-org/super-secret-repo2"},
+		Organizations: []string{"super-secret-org"},
+	})
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
+	assert.True(t, ok)
+	ok = s.filteredRepoCache.Exists("super-secret-org/super-secret-repo2")
 	assert.True(t, ok)
 	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
@@ -748,6 +779,30 @@ func BenchmarkEnumerate(b *testing.B) {
 	}
 }
 
+func TestEnumerateWithToken_Repositories(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
+	s.repos = []string{"some-special-repo"}
+
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(s.repos))
+	assert.Equal(t, []string{"some-special-repo"}, s.repos)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	defer gock.Off()
 
@@ -972,6 +1027,52 @@ func TestGetRepoURLParts(t *testing.T) {
 	}
 }
 
+func TestGetRepoURLPartsWithTrailingHyphen(t *testing.T) {
+	// Test for https://github.com/trufflesecurity/trufflehog/issues/4679
+	// Repository names ending with a hyphen should be preserved correctly.
+	testCases := []struct {
+		name     string
+		url      string
+		expected []string
+	}{
+		{
+			name:     "https with trailing hyphen",
+			url:      "https://github.com/MYORG/my-repo-name-.git",
+			expected: []string{"github.com", "MYORG", "my-repo-name-"},
+		},
+		{
+			name:     "https with trailing hyphen no .git",
+			url:      "https://github.com/MYORG/my-repo-.git",
+			expected: []string{"github.com", "MYORG", "my-repo-"},
+		},
+		{
+			name:     "ssh with trailing hyphen",
+			url:      "ssh://git@github.com/MYORG/test-repo-.git",
+			expected: []string{"github.com", "MYORG", "test-repo-"},
+		},
+		{
+			name:     "multiple hyphens with trailing",
+			url:      "https://github.com/org-name/my-test-repo-.git",
+			expected: []string{"github.com", "org-name", "my-test-repo-"},
+		},
+		{
+			name:     "single trailing hyphen repo",
+			url:      "https://github.com/Org/-.git",
+			expected: []string{"github.com", "Org", "-"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, parts, err := getRepoURLParts(tc.url)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assert.Equal(t, tc.expected, parts)
+		})
+	}
+}
+
 func TestGetGistID(t *testing.T) {
 	tests := []struct {
 		trimmedURL []string
@@ -1046,10 +1147,93 @@ func TestRepositoryFiltering(t *testing.T) {
 	assert.False(t, cache5.wantRepo("other/repo1"))
 }
 
+func TestExplicitRepositoryBypass(t *testing.T) {
+	// Test that explicit repositories are included in enumeration
+	ctx := context.Background()
+
+	// Set up mocks for the API calls
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "test-user"})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/explicit-repo").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/explicit-repo",
+			"clone_url": "https://github.com/org/explicit-repo.git",
+			"size":      1,
+		})
+
+	gock.New("https://api.github.com").
+		Get("/repos/org/another-explicit").
+		Reply(200).
+		JSON(map[string]any{
+			"full_name": "org/another-explicit",
+			"clone_url": "https://github.com/org/another-explicit.git",
+			"size":      1,
+		})
+
+	// Create a source with explicit repositories
+	source := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		Repositories: []string{
+			"https://github.com/org/explicit-repo.git",
+			"https://github.com/org/another-explicit.git",
+		},
+	})
+
+	// Test the Enumerate method
+	err := source.Enumerate(ctx, noopReporter())
+	require.NoError(t, err)
+
+	// Verify that explicit repositories are included in the enumeration
+	assert.Len(t, source.repos, 2, "Should have 2 explicit repositories")
+	assert.Contains(t, source.repos, "https://github.com/org/explicit-repo.git")
+	assert.Contains(t, source.repos, "https://github.com/org/another-explicit.git")
+}
+
 func noopReporter() sources.UnitReporter {
 	return sources.VisitorReporter{
 		VisitUnit: func(context.Context, sources.SourceUnit) error {
 			return nil
 		},
 	}
+}
+
+// This tests reproduces a bug where both VisitUnit and VisitErr were called
+// for the same repository when caching the repository info failed.
+func TestFixBothUnitErrAndUnitOKCalled(t *testing.T) {
+	cache := simple.NewCache[string]()
+	cache.Set("myorg/myrepo", "an invalid url that will cause an error")
+	s := &Source{
+		filteredRepoCache: &filteredRepoCache{
+			Cache: cache,
+		},
+		conn: &sourcespb.GitHub{
+			Repositories: []string{"myorg/myrepo"},
+		},
+		orgsCache: simple.NewCache[string](),
+	}
+
+	var okCalled, errCalled bool
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			okCalled = true
+			return nil
+		},
+		VisitErr: func(ctx context.Context, err error) error {
+			errCalled = true
+			return nil
+		},
+	}
+	err := s.Enumerate(context.Background(), reporter)
+	require.NoError(t, err)
+
+	// expectation is that only VisitErr is called
+	assert.True(t, errCalled)
+	assert.False(t, okCalled)
 }

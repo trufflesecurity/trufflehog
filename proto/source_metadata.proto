@@ -66,6 +66,7 @@ message Confluence {
   string location = 7;
   string file = 8;
   string user = 9;
+  string comment_id = 10;
 }
 
 message Docker {
@@ -315,6 +316,8 @@ message Postman {
   string folder_name = 12;
   string field_type = 13; // Do not use this field for transport. It is only used for output to STDOUT.
   PostmanLocationType location_type = 16;
+  string response_id = 17;
+  string response_name = 18;
 }
 
 enum PostmanLocationType {
