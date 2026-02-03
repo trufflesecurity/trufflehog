@@ -94,7 +94,7 @@ func NewDetectorTransport(T http.RoundTripper) http.RoundTripper {
 }
 
 func isLocalIP(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate() {
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate() || ip.IsUnspecified() {
 		return true
 	}
 
