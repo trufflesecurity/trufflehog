@@ -85,10 +85,11 @@ func WithSentry(opts sentry.ClientOptions, tags map[string]string) logConfig {
 }
 
 type sinkConfig struct {
-	encoder  zapcore.Encoder
-	sink     zapcore.WriteSyncer
-	level    levelSetter
-	redactor *dynamicRedactor
+	encoder        zapcore.Encoder
+	sink           zapcore.WriteSyncer
+	level          levelSetter
+	redactor       *dynamicRedactor
+	suppressCaller bool
 }
 
 // WithJSONSink adds a JSON encoded output to the logger.
@@ -168,21 +169,6 @@ func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, 
 	return zapr.NewLogger(zapLogger), firstErrorFunc(zapLogger.Sync, sink.cleanup), nil
 }
 
-// SuppressCallerEmission wraps the provided logger's Zap.Core with a new Zap.Core that removes caller information
-// (including any stack traces) from logs before they're written. This change is made at the core level so that this
-// logger's core can be teed together with other logger cores that do not remove caller information.
-func SuppressCallerEmission(l logr.Logger) (logr.Logger, error) {
-	zapLogger, err := getZapLogger(l)
-	if err != nil {
-		return l, err
-	}
-
-	zapLogger = zapLogger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
-		return &suppressCallerCore{Core: core}
-	}))
-	return zapr.NewLogger(zapLogger), nil
-}
-
 // getZapLogger is a helper function that gets the underlying zap logger from a
 // logr.Logger interface.
 func getZapLogger(l logr.Logger) (*zap.Logger, error) {
@@ -214,6 +200,14 @@ func WithLeveler(leveler levelSetter) func(*sinkConfig) {
 func WithGlobalRedaction() func(*sinkConfig) {
 	return func(conf *sinkConfig) {
 		conf.redactor = globalRedactor
+	}
+}
+
+// WithSuppressCaller prevents caller information from being logged by the core being configured, irrespective of any
+// logger settings.
+func WithSuppressCaller() func(*sinkConfig) {
+	return func(conf *sinkConfig) {
+		conf.suppressCaller = true
 	}
 }
 
@@ -266,9 +260,13 @@ func newCoreConfig(
 		conf.level,
 	)
 
-	if conf.redactor == nil {
-		return logConfig{core: core}
+	if conf.redactor != nil {
+		core = NewRedactionCore(core, conf.redactor)
 	}
 
-	return logConfig{core: NewRedactionCore(core, conf.redactor)}
+	if conf.suppressCaller {
+		core = &suppressCallerCore{Core: core}
+	}
+
+	return logConfig{core: core}
 }
