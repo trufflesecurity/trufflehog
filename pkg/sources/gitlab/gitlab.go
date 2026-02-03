@@ -481,7 +481,7 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 			gitlab.WithCustomRetryMax(3),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
+			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
 		}
 		return apiClient, nil
 	case "BASIC_AUTH":
