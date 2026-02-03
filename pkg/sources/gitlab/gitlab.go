@@ -1121,9 +1121,14 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
+	normalizedRepoUrl, err := giturl.NormalizeGitlabRepo(repoURL)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to normalize GitLab Repo", "repo", repoURL)
+		return err
+	}
 	// ensure project details are cached
 	// this is required to populate metadata during chunking
-	s.ensureProjectInCache(ctx, repoURL)
+	s.ensureProjectInCache(ctx, normalizedRepoUrl)
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 }
