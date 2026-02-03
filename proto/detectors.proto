@@ -1048,8 +1048,9 @@ enum DetectorType {
   HashiCorpVaultAuth = 1036;
   PhraseAccessToken = 1037;
   Photoroom = 1038;
-  MakeApiToken = 1039;
-  MakeMcpToken = 1040;
+  JWT = 1039;
+  MakeApiToken = 1040;
+  MakeMcpToken = 1041;
 }
 
 message Result {
