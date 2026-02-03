@@ -69,6 +69,11 @@ func TestTableau_FromChunk(t *testing.T) {
 						"verification_status":   "valid",
 						"auth_token_received":   "true",
 					},
+					AnalysisInfo: map[string]string{
+						"endpoint":  tableauURL,
+						"patSecret": tokenSecret,
+						"tokenName": tokenName,
+					},
 				},
 			},
 			wantErr: false,
@@ -174,57 +179,6 @@ func TestTableau_FromChunk(t *testing.T) {
 			want:    nil, // Should not find due to invalid secret format
 			wantErr: false,
 		},
-		{
-			name: "found multiple, mixed verification results with URLs",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
-					name1 = '%s'
-					name2 = '%s'
-					secret = '%s'
-					secret2 = '%s'
-					server1 = '%s'
-					server2 = '%s'
-				`, tokenName, inactiveTokenName, tokenSecret, inactiveTokenSecret, tableauURL, invalidURL)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     true, // tokenName + tokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // tokenName + tokenSecret + invalid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // tokenName + inactiveTokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // tokenName + inactiveTokenSecret + invalid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + tokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + tokenSecret + invalid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + inactiveTokenSecret + valid URL
-				},
-				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
-					Verified:     false, // inactiveTokenName + inactiveTokenSecret + invalid URL
-				},
-			},
-			wantErr: false,
-		},
 	}
 
 	for _, tt := range tests {
@@ -262,5 +216,94 @@ func TestTableau_FromChunk(t *testing.T) {
 				t.Errorf("Tableau.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestTableau_FromChunk_MultipleMixedVerificationResults(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
+	tokenName := testSecrets.MustGetField("TABLEAU_TOKEN_NAME")
+	tokenSecret := testSecrets.MustGetField("TABLEAU_TOKEN_SECRET")
+	inactiveTokenName := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_NAME")
+	inactiveTokenSecret := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_SECRET")
+	tableauURL := testSecrets.MustGetField("TABLEAU_VALID_POD_NAME")
+	invalidURL := testSecrets.MustGetField("TABLEAU_INVALID_POD_NAME")
+
+	scanner := Scanner{}
+	scanner.UseFoundEndpoints(true)
+
+	data := []byte(fmt.Sprintf(`
+		name1 = '%s'
+		name2 = '%s'
+		secret = '%s'
+		secret2 = '%s'
+		server1 = '%s'
+		server2 = '%s'
+	`, tokenName, inactiveTokenName, tokenSecret, inactiveTokenSecret, tableauURL, invalidURL))
+
+	want := []detectors.Result{
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     true, // tokenName + tokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // tokenName + tokenSecret + invalid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // tokenName + inactiveTokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // tokenName + inactiveTokenSecret + invalid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + tokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + tokenSecret + invalid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + inactiveTokenSecret + valid URL
+		},
+		{
+			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			Verified:     false, // inactiveTokenName + inactiveTokenSecret + invalid URL
+		},
+	}
+
+	got, err := scanner.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("Tableau.FromData() unexpected error: %v", err)
+	}
+
+	if len(got) != len(want) {
+		t.Errorf("Tableau.FromData() got %d results, want %d", len(got), len(want))
+	}
+	for i := range got {
+		if len(got[i].Raw) == 0 {
+			t.Fatalf("no raw secret present: \n %+v", got[i])
+		}
+		if (got[i].VerificationError() != nil) != false {
+			t.Errorf("Tableau.FromData() verificationError = %v, wantVerificationErr %v", got[i].VerificationError(), false)
+		}
+	}
+	ignoreOpts := []cmp.Option{
+		cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "AnalysisInfo"),
+		cmpopts.IgnoreUnexported(detectors.Result{}),
+	}
+
+	if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+		t.Errorf("Tableau.FromData() diff: (-got +want)\n%s", diff)
 	}
 }
