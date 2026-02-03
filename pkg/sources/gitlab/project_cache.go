@@ -3,7 +3,7 @@ package gitlab
 import "sync"
 
 type project struct {
-	id    int
+	id    int64
 	name  string
 	owner string
 }
