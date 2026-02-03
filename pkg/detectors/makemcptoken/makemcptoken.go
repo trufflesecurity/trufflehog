@@ -3,7 +3,6 @@ package makemcptoken
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -75,10 +74,7 @@ func verifyMatch(ctx context.Context, client *http.Client, url string) (bool, er
 	if err != nil {
 		return false, err
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
+	res.Body.Close()
 
 	switch res.StatusCode {
 	case http.StatusOK:
