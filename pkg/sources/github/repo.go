@@ -367,7 +367,7 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
 		fullURL := "https://github.com/" + repo
 		// If using GitHub Enterprise, adjust the URL accordingly
-		if s.conn != nil && s.conn.Endpoint != "" {
+		if s.conn != nil && s.conn.Endpoint != "" && !endsWithGithub.MatchString(s.conn.Endpoint) {
 			u, err := url.Parse(s.conn.Endpoint)
 			if err != nil {
 				return "", fmt.Errorf("invalid enterprise endpoint: %w", err)
