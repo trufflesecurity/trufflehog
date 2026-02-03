@@ -141,24 +141,24 @@ func Test_normalizeGitlabEndpoint(t *testing.T) {
 		wantErr        bool
 	}{
 		"the cloud url should return the cloud url": {
-			inputEndpoint:  gitlabBaseURL,
-			outputEndpoint: gitlabBaseURL,
+			inputEndpoint:  gitlabCloudBaseUrl,
+			outputEndpoint: gitlabCloudBaseUrl,
 		},
 		"empty string should return the cloud url": {
 			inputEndpoint:  "",
-			outputEndpoint: gitlabBaseURL,
+			outputEndpoint: gitlabCloudBaseUrl,
 		},
 		"no scheme cloud url should return the cloud url": {
 			inputEndpoint:  "gitlab.com",
-			outputEndpoint: gitlabBaseURL,
+			outputEndpoint: gitlabCloudBaseUrl,
 		},
 		"no scheme cloud url with trailing slash should return the cloud url": {
 			inputEndpoint:  "gitlab.com/",
-			outputEndpoint: gitlabBaseURL,
+			outputEndpoint: gitlabCloudBaseUrl,
 		},
 		"http scheme cloud url with organization should return the cloud url": {
 			inputEndpoint:  "http://gitlab.com/trufflesec",
-			outputEndpoint: gitlabBaseURL,
+			outputEndpoint: gitlabCloudBaseUrl,
 		},
 		// On-prem endpoint testing.
 		"on-prem url should be unchanged": {
