@@ -22,6 +22,18 @@ func TestWithNoLocalIP(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNoLocalIP)
 	})
 
+	t.Run("Prevents dialing wildcard IP", func(t *testing.T) {
+		client := &http.Client{}
+		WithNoLocalIP()(client)
+
+		transport, ok := client.Transport.(*http.Transport)
+		assert.True(t, ok, "Expected transport to be *http.Transport")
+
+		_, err := transport.DialContext(context.Background(), "tcp", "0.0.0.0:8080")
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrNoLocalIP)
+	})
+
 	t.Run("Allows dialing non-local host", func(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
@@ -81,6 +93,8 @@ func TestIsLocalIP(t *testing.T) {
 		{"Loopback IPv6", net.ParseIP("::1"), true},
 		{"Private IPv4", net.ParseIP("192.168.1.1"), true},
 		{"Private IPv6", net.ParseIP("fd00::1"), true},
+		{"Unspecified IPv4", net.ParseIP("0.0.0.0"), true},
+		{"Unspecified IPv6", net.ParseIP("::"), true},
 		{"Public IPv4", net.ParseIP("8.8.8.8"), false},
 		{"Public IPv6", net.ParseIP("2001:4860:4860::8888"), false},
 	}
