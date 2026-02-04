@@ -34,7 +34,8 @@ func TestSource_Scan(t *testing.T) {
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
 	basicUser := secret.MustGetField("GITLAB_USER")
-	basicPass := secret.MustGetField("GITLAB_PASS")
+	no2FaUser := secret.MustGetField("GITLAB_NO_2FA_USER")
+	no2FaPass := secret.MustGetField("GITLAB_NO_2FA_PASS")
 
 	type init struct {
 		name       string
@@ -104,11 +105,12 @@ func TestSource_Scan(t *testing.T) {
 			init: init{
 				name: "test source basic auth scoped",
 				connection: &sourcespb.GitLab{
-					Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
+					Repositories: []string{"https://gitlab.com/trufflesec-detectors/test-project.git"},
+
 					Credential: &sourcespb.GitLab_BasicAuth{
 						BasicAuth: &credentialspb.BasicAuth{
-							Username: basicUser,
-							Password: basicPass,
+							Username: no2FaUser,
+							Password: no2FaPass,
 						},
 					},
 				},
@@ -563,7 +565,7 @@ func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 
 			// Arrange: Build the chunk reporter
 			chunksChan := make(chan *sources.Chunk, 1024)
-			chunkReporter := sources.ChanReporter{chunksChan}
+			chunkReporter := sources.ChanReporter{Ch: chunksChan}
 
 			// Act: Scan the unit
 			require.NoError(t, s.ChunkUnit(ctx, unit, chunkReporter))
