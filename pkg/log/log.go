@@ -28,6 +28,13 @@ type SinkOption func(*sinkConfig)
 // are provided, a no-op sink will be used. Returns the logger and a cleanup
 // function that should be executed before the program exits.
 func New(service string, configs ...logConfig) (logr.Logger, func() error) {
+	return NewWithCaller(service, false, configs...)
+}
+
+// NewWithCaller creates a new logger named after the specified service with the provided sink configurations. If
+// addCaller is true, call site information will be attached to each emitted log message. (This behavior can be disabled
+// on a per-sink basis using WithSuppressCaller.)
+func NewWithCaller(service string, addCaller bool, configs ...logConfig) (logr.Logger, func() error) {
 	var cores []zapcore.Core
 	var cleanupFuncs []func() error
 
@@ -42,7 +49,7 @@ func New(service string, configs ...logConfig) (logr.Logger, func() error) {
 		}
 	}
 	// create logger
-	zapLogger := zap.New(zapcore.NewTee(cores...), zap.AddCaller())
+	zapLogger := zap.New(zapcore.NewTee(cores...), zap.WithCaller(addCaller))
 	cleanupFuncs = append(cleanupFuncs, zapLogger.Sync)
 	logger := zapr.NewLogger(zapLogger).WithName(service)
 
