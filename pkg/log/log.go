@@ -22,6 +22,8 @@ type logConfig struct {
 	err     error
 }
 
+type SinkOption func(*sinkConfig)
+
 // New creates a new log object with the provided configurations. If no sinks
 // are provided, a no-op sink will be used. Returns the logger and a cleanup
 // function that should be executed before the program exits.
@@ -93,7 +95,7 @@ type sinkConfig struct {
 }
 
 // WithJSONSink adds a JSON encoded output to the logger.
-func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
+func WithJSONSink(sink io.Writer, opts ...SinkOption) logConfig {
 	return newCoreConfig(
 		zapcore.NewJSONEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -103,7 +105,7 @@ func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
 }
 
 // WithConsoleSink adds a console-style output to the logger.
-func WithConsoleSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
+func WithConsoleSink(sink io.Writer, opts ...SinkOption) logConfig {
 	return newCoreConfig(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -180,7 +182,7 @@ func getZapLogger(l logr.Logger) (*zap.Logger, error) {
 
 // WithLevel sets the sink's level to a static level. This option prevents
 // changing the log level for this sink later on.
-func WithLevel(level int8) func(*sinkConfig) {
+func WithLevel(level int8) SinkOption {
 	return WithLeveler(
 		// Zap's levels get more verbose as the number gets smaller, as explained
 		// by zapr here: https://github.com/go-logr/zapr#increasing-verbosity
@@ -190,22 +192,22 @@ func WithLevel(level int8) func(*sinkConfig) {
 }
 
 // WithLeveler sets the sink's level enabler to leveler.
-func WithLeveler(leveler levelSetter) func(*sinkConfig) {
+func WithLeveler(leveler levelSetter) SinkOption {
 	return func(conf *sinkConfig) {
 		conf.level = leveler
 	}
 }
 
 // WithGlobalRedaction adds values to be redacted from logs.
-func WithGlobalRedaction() func(*sinkConfig) {
+func WithGlobalRedaction() SinkOption {
 	return func(conf *sinkConfig) {
 		conf.redactor = globalRedactor
 	}
 }
 
-// WithSuppressCaller prevents caller information from being logged by the core being configured, irrespective of any
+// WithSuppressCaller prevents the sink being configured from logging any caller information, irrespective of any other
 // logger settings.
-func WithSuppressCaller() func(*sinkConfig) {
+func WithSuppressCaller() SinkOption {
 	return func(conf *sinkConfig) {
 		conf.suppressCaller = true
 	}
@@ -244,7 +246,7 @@ func newCoreConfig(
 	defaultEncoder zapcore.Encoder,
 	defaultSink zapcore.WriteSyncer,
 	defaultLevel levelSetter,
-	opts ...func(*sinkConfig),
+	opts ...SinkOption,
 ) logConfig {
 	conf := sinkConfig{
 		encoder: defaultEncoder,
