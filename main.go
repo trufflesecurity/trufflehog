@@ -397,9 +397,7 @@ func main() {
 func run(state overseer.State, logSync func() error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
-	defer func() {
-		syncLogs(logSync)
-	}()
+	defer syncLogs(logSync)
 
 	go func() {
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
