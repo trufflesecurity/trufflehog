@@ -347,8 +347,8 @@ func init() {
 	}
 }
 
-// syncLogsWithTimeout flushes logs with a timeout to prevent hanging.
-func syncLogsWithTimeout(syncFn func() error, timeout time.Duration) {
+// syncLogs flushes logs when the program exits.
+func syncLogs(syncFn func() error) {
 	if syncFn == nil {
 		return
 	}
@@ -357,12 +357,7 @@ func syncLogsWithTimeout(syncFn func() error, timeout time.Duration) {
 		_ = syncFn()
 		close(done)
 	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		// Log flush timed out, continue with exit
-	}
+	<-done
 }
 
 func main() {
@@ -384,7 +379,6 @@ func main() {
 
 	updateCfg := overseer.Config{
 		Program: func(s overseer.State) {
-
 			run(s, sync)
 		},
 		Debug:         *debug,
@@ -411,7 +405,7 @@ func run(state overseer.State, logSync func() error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
 	defer func() {
-		syncLogsWithTimeout(logSync, 100*time.Millisecond)
+		syncLogs(logSync)
 	}()
 
 	go func() {
@@ -436,7 +430,7 @@ func run(state overseer.State, logSync func() error) {
 			logger.Info("cleaned temporary artifacts")
 		}
 
-		syncLogsWithTimeout(logSync, 100*time.Millisecond)
+		syncLogs(logSync)
 		os.Exit(0)
 	}()
 
@@ -630,7 +624,7 @@ func run(state overseer.State, logSync func() error) {
 
 	if metrics.hasFoundResults && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
-		syncLogsWithTimeout(logSync, 100*time.Millisecond)
+		syncLogs(logSync)
 		os.Exit(183)
 	}
 }
