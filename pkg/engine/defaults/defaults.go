@@ -1328,7 +1328,7 @@ func buildDetectorList() []detectors.Detector {
 		&mailjetsms.Scanner{},
 		&mailmodo.Scanner{},
 		&mailsac.Scanner{},
-		&makapitoken.Scanner{},
+		&makeapitoken.Scanner{},
 		&makemcptoken.Scanner{},
 		&mandrill.Scanner{},
 		// &manifest.Scanner{},

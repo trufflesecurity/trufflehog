@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package make
+package makeapitoken
 
 import (
 	"context"
