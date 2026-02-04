@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -643,7 +644,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 
 	// Arrange: Create a Result
 	result := detectors.Result{
-		DetectorType: TestDetectorType,
+		DetectorType: detectorspb.DetectorType(-1),
 		ExtraData:    map[string]string{"key": "value"},
 		Raw:          []byte("something"),
 		RawV2:        []byte("something:else"),
@@ -665,7 +666,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	assert.Equal(t, []byte("something:else"), r.RawV2)
 	assert.Equal(t, "someth***", r.Redacted)
 	assert.True(t, r.Verified)
-	assert.Equal(t, detectorspb.DetectorType(TestDetectorType), r.DetectorType)
+	assert.Equal(t, detectorspb.DetectorType(-1), r.DetectorType)
 	assert.Equal(t, sources.SourceID(1), r.SourceID)
 	assert.Equal(t, sources.JobID(2), r.JobID)
 	assert.Equal(t, int64(3), r.SecretID)
@@ -767,7 +768,7 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	e, err := NewEngine(ctx, &c)
 	assert.NoError(t, err)
 
-	e.verificationOverlapTracker = new(verificationOverlapTracker)
+	e.verificationOverlapTracker = &atomic.Int32{}
 
 	e.Start(ctx)
 
@@ -783,141 +784,92 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 
 	// We want 0 because these are custom detectors and verification should still occur.
-	wantDupe := 0
-	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
+	wantDupe := int32(0)
+	assert.Equal(t, wantDupe, e.verificationOverlapTracker.Load())
 }
 
-const (
-	TestDetectorType  = -1
-	TestDetectorType2 = -2
-)
+func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
+	// Arrange: Generate the absolute path of the file to scan
+	secretsPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
+	require.NoError(t, err)
 
-var _ detectors.Detector = (*testDetectorV1)(nil)
-
-type testDetectorV1 struct{}
-
-func (testDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
-	result := detectors.Result{
-		DetectorType: TestDetectorType,
-		Raw:          []byte("ssample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
-	}
-	return []detectors.Result{result}, nil
-}
-
-func (testDetectorV1) Keywords() []string { return []string{"sample"} }
-
-func (testDetectorV1) Type() detectorspb.DetectorType { return TestDetectorType }
-
-func (testDetectorV1) Description() string { return "" }
-
-var _ detectors.Detector = (*testDetectorV2)(nil)
-
-type testDetectorV2 struct{}
-
-func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
-	result := detectors.Result{
-		DetectorType: TestDetectorType,
-		Raw:          []byte("sample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
-	}
-	return []detectors.Result{result}, nil
-}
-
-func (testDetectorV2) Keywords() []string { return []string{"ample"} }
-
-func (testDetectorV2) Type() detectorspb.DetectorType { return TestDetectorType2 }
-
-func (testDetectorV2) Description() string { return "" }
-
-func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
-	ctx := context.Background()
-
-	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
-	assert.NoError(t, err)
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	const defaultOutputBufferSize = 64
-	opts := []func(*sources.SourceManager){
-		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultOutputBufferSize),
+	testCases := []struct {
+		name                      string
+		detectors                 []detectors.Detector
+		retainFalsePositives      bool
+		wantUnverifiedSecretCount uint64
+	}{
+		{
+			name: "no overlap, retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+			},
+			retainFalsePositives:      true,
+			wantUnverifiedSecretCount: 1,
+		},
+		{
+			name: "no overlap, do not retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+			},
+			retainFalsePositives:      false,
+			wantUnverifiedSecretCount: 0,
+		},
+		{
+			name: "overlap, retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+			},
+			retainFalsePositives:      true,
+			wantUnverifiedSecretCount: 2,
+		},
+		{
+			name: "overlap, do not retain false positives",
+			detectors: []detectors.Detector{
+				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+			},
+			retainFalsePositives:      false,
+			wantUnverifiedSecretCount: 0,
+		},
 	}
 
-	sourceManager := sources.NewManager(opts...)
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.AddLogger(t.Context())
 
-	c := Config{
-		Concurrency:   1,
-		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
-		Verify:        false,
-		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+			// Arrange: Generate a base engine config
+			engineConfig := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     tt.detectors,
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+				Results:       map[string]struct{}{"verified": {}, "unverified": {}, "unknown": {}},
+				SourceManager: sources.NewManager(sources.WithSourceUnits()),
+				Verify:        false,
+			}
+
+			// Arrange: Set the appropriate false positive flag
+			if tt.retainFalsePositives {
+				engineConfig.Results["filtered_unverified"] = struct{}{}
+			}
+
+			// Arrange: Create and start an engine
+			e, err := NewEngine(ctx, &engineConfig)
+			require.NoError(t, err)
+			e.Start(ctx)
+
+			// Act: Scan the file
+			cfg := sources.FilesystemConfig{Paths: []string{secretsPath}}
+			_, err = e.ScanFileSystem(ctx, cfg)
+			require.NoError(t, err)
+			require.NoError(t, e.Finish(ctx))
+
+			// Assert that the unverified secret count was expected
+			assert.Equal(t, tt.wantUnverifiedSecretCount, e.GetMetrics().UnverifiedSecretsFound)
+		})
 	}
-
-	e, err := NewEngine(ctx, &c)
-	assert.NoError(t, err)
-
-	e.verificationOverlapTracker = new(verificationOverlapTracker)
-
-	e.Start(ctx)
-
-	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	_, err = e.ScanFileSystem(ctx, cfg)
-	assert.NoError(t, err)
-
-	// Wait for all the chunks to be processed.
-	assert.NoError(t, e.Finish(ctx))
-	// We want 0 because the secret is a false positive.
-	want := uint64(0)
-	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
-}
-
-func TestRetainFalsePositives(t *testing.T) {
-	ctx := context.Background()
-
-	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
-	assert.NoError(t, err)
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	confPath, err := filepath.Abs("./testdata/verificationoverlap_detectors_fp.yaml")
-	assert.NoError(t, err)
-	conf, err := config.Read(confPath)
-	assert.NoError(t, err)
-
-	const defaultOutputBufferSize = 64
-	opts := []func(*sources.SourceManager){
-		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultOutputBufferSize),
-	}
-
-	sourceManager := sources.NewManager(opts...)
-
-	c := Config{
-		Concurrency:   1,
-		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     conf.Detectors,
-		Verify:        false,
-		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
-		Results:       map[string]struct{}{"filtered_unverified": {}},
-	}
-
-	e, err := NewEngine(ctx, &c)
-	assert.NoError(t, err)
-
-	e.Start(ctx)
-
-	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	_, err = e.ScanFileSystem(ctx, cfg)
-	assert.NoError(t, err)
-
-	// Wait for all the chunks to be processed.
-	assert.NoError(t, e.Finish(ctx))
-	// We want 1 because the secret is a false positive and we are retaining it.
-	want := uint64(1)
-	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
 func TestFragmentFirstLineAndLink(t *testing.T) {
