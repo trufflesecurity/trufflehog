@@ -348,15 +348,9 @@ func init() {
 
 // syncLogs flushes logs when the program exits.
 func syncLogs(syncFn func() error) {
-	if syncFn == nil {
-		return
-	}
-	done := make(chan struct{})
-	go func() {
+	if syncFn != nil {
 		_ = syncFn()
-		close(done)
-	}()
-	<-done
+	}
 }
 
 func main() {
@@ -374,7 +368,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, sync)
 
 	updateCfg := overseer.Config{
 		Program: func(s overseer.State) {
@@ -414,7 +408,7 @@ func run(state overseer.State, logSync func() error) {
 	}()
 
 	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, logSync)
 
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -1183,9 +1177,10 @@ func parseResults(input *string) (map[string]struct{}, error) {
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
 // function will terminate the program without cleanup.
-func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+func logFatalFunc(logger logr.Logger, logSync func() error) func(error, string, ...any) {
 	return func(err error, message string, keyAndVals ...any) {
 		logger.Error(err, message, keyAndVals...)
+		syncLogs(logSync)
 		if err != nil {
 			os.Exit(1)
 			return
