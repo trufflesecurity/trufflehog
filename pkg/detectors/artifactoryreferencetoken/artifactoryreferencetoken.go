@@ -78,7 +78,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for token := range uniqueTokens {
 		for url := range uniqueUrls {
 			if invalidHosts.Exists(url) {
-				delete(uniqueUrls, url)
 				continue
 			}
 
