@@ -489,6 +489,38 @@ func TestNormalizeRepo(t *testing.T) {
 	assert.Contains(t, err.Error(), "no repositories found")
 }
 
+func TestNormalizeRepo_Enterprise(t *testing.T) {
+	tests := []struct {
+		name       string
+		endpoint   string
+		wantResult string
+	}{
+		{
+			name:       "only host",
+			endpoint:   "https://example.com",
+			wantResult: "https://example.com/org/repo.git",
+		},
+		{
+			name:       "host with path",
+			endpoint:   "https://example.com/api/v3",
+			wantResult: "https://example.com/org/repo.git",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := Source{
+				conn: &sourcespb.GitHub{
+					Endpoint: tt.endpoint,
+				},
+			}
+
+			result, err := source.normalizeRepo("org/repo")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantResult, result)
+		})
+	}
+}
+
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
 	ctx := context.Background()
@@ -1236,4 +1268,45 @@ func TestFixBothUnitErrAndUnitOKCalled(t *testing.T) {
 	// expectation is that only VisitErr is called
 	assert.True(t, errCalled)
 	assert.False(t, okCalled)
+}
+
+func TestExtractRepoNameFromURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected string
+	}{
+		{
+			name:     "git URL",
+			url:      "https://github.com/org/repo.git",
+			expected: "org/repo",
+		},
+		{
+			name:     "git URL with trailing slash",
+			url:      "https://github.com/org/repo.git/",
+			expected: "org/repo",
+		},
+		{
+			name:     "git URL without .git",
+			url:      "https://github.com/org/repo",
+			expected: "org/repo",
+		},
+		{
+			name:     "git enterprise URL",
+			url:      "https://example-enterprise.com/org/repo.git",
+			expected: "org/repo",
+		},
+		{
+			name:     "just org/repo",
+			url:      "org/repo",
+			expected: "org/repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractRepoNameFromUrl(tt.url)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
