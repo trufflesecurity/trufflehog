@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
