@@ -165,10 +165,21 @@ func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, 
 	if err != nil {
 		return l, nil, errors.New("unsupported logr implementation")
 	}
-	zapLogger = zapLogger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
-		return zapcore.NewTee(core, newSinkCore)
-	}))
-	return zapr.NewLogger(zapLogger), firstErrorFunc(zapLogger.Sync, sink.cleanup), nil
+
+	newLoggerOptions := []zap.Option{
+		// Tee the new core together with the original core
+		zap.WrapCore(func(core zapcore.Core) zapcore.Core { return zapcore.NewTee(core, newSinkCore) }),
+
+		// CMR: zapr.NewLogger, for whatever reason, assumes that the passed-in logger doesn't have its caller frame
+		// adjustment already set up, so it adds a frame skip of 2. However, that assumption doesn't hold here because
+		// we're adding a core to an existing logger rather than creating a new one. I can't figure out a way to disable
+		// this automatic frame adjustment, so we compensate for it with the hamfisted kludge of a compensating offset.
+		zap.AddCallerSkip(-2),
+	}
+
+	zapLogger = zapLogger.WithOptions(newLoggerOptions...)
+	newLogger := zapr.NewLogger(zapLogger)
+	return newLogger, firstErrorFunc(zapLogger.Sync, sink.cleanup), nil
 }
 
 // getZapLogger is a helper function that gets the underlying zap logger from a
