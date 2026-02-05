@@ -19,7 +19,11 @@ func (c *suppressCallerCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) 
 		return ce
 	}
 
-	if wrapped := c.Core.Check(ent, ce); wrapped != nil {
+	// Check to see whether the wrapped core would write, and if so, add this core to the CheckedEntry. We do not pass
+	// the CheckedEntry directly to the wrapped core, because if we do, the wrapped core will probably add itself as a
+	// side effect, which would result in the wrapped core executing its own writes, which would be both duplicative and
+	// without caller suppression.
+	if wrapped := c.Core.Check(ent, nil); wrapped != nil {
 		// If we add the wrapped core, then that core will generate its own writes - which won't have caller information
 		// suppressed! Instead, we only add this core, which will delegate its (caller-suppressed) writes to the wrapped
 		// core.
