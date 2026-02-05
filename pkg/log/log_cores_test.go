@@ -205,6 +205,29 @@ func (ts *TestSuite) TestSuppressCallerCore_RespectsWrappedCheckLogic() {
 	ts.Assert().Empty(msg)
 }
 
+// This test confirms that our custom caller suppression core suppresses caller information.
+func (ts *TestSuite) TestSuppressCallerCore_SuppressesCaller() {
+	// Arrange: Create a testable log sink
+	var buf bytes.Buffer
+	baseCore := zapcore.NewCore(
+		zapcore.NewJSONEncoder(defaultEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(&buf)),
+		globalLogLevel)
+
+	// Arrange: Set up a core stack
+	core := &suppressCallerCore{baseCore}
+
+	// Arrange: Create a logger
+	logger := zapr.NewLogger(zap.New(core, zap.AddCaller()))
+
+	// Act
+	logger.Info("message")
+
+	// Assert that caller information was suppressed
+	msg := buf.String()
+	ts.Assert().NotContains(msg, "caller")
+}
+
 func BenchmarkLoggerRedact(b *testing.B) {
 	msg := "this is a message with 'foo' in it"
 	logKvps := []any{"key", "value", "foo", "bar", "bar", "baz", "longval", "84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa"}

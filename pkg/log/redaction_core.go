@@ -25,7 +25,7 @@ func (c *redactionCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapc
 	}
 
 	if wrapped := c.Core.Check(ent, ce); wrapped != nil {
-		return wrapped.AddCore(ent, c)
+		return ce.AddCore(ent, c)
 	}
 
 	return ce
