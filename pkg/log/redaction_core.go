@@ -17,20 +17,24 @@ func NewRedactionCore(core zapcore.Core, redactor *dynamicRedactor) zapcore.Core
 	return &redactionCore{core, redactor}
 }
 
-// Check overrides the embedded zapcore.Core Check() method to add the
-// redactionCore to the zapcore.CheckedEntry.
+// Check determines whether the supplied Entry should be logged and, if it should, adds the core to the entry. It does
+// not do anything interesting and is only implemented at all because of the way zap works.
 func (c *redactionCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
 	if !c.Enabled(ent.Level) {
 		return ce
 	}
 
 	if wrapped := c.Core.Check(ent, ce); wrapped != nil {
+		// If we add the wrapped core, then that core will generate its own writes - which won't be redacted! Instead,
+		// we only add this core, which will delegate its (redacted) writes to the wrapped core.
 		return ce.AddCore(ent, c)
 	}
 
 	return ce
 }
 
+// With adds structured context to the Core. It does not do anything interesting and is only implemented at all because
+// of the way zap works.
 func (c *redactionCore) With(fields []zapcore.Field) zapcore.Core {
 	return NewRedactionCore(c.Core.With(fields), c.redactor)
 }

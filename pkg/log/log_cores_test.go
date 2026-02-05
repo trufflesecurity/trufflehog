@@ -52,12 +52,13 @@ func TestCustomCores(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }
 
-// This test confirms that when our custom redaction core wraps our custom caller suppression core, redaction occurs.
+// This test confirms that when our custom redaction core wraps our custom caller suppression core, both redaction and
+// caller suppression occur.
 func (ts *TestSuite) TestCoreComposition_RedactionWrappingCallerSuppression() {
 	// Arrange: Create a testable log sink
 	var buf bytes.Buffer
 	baseCore := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
+		zapcore.NewJSONEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(&buf)),
 		globalLogLevel)
 
@@ -66,7 +67,7 @@ func (ts *TestSuite) TestCoreComposition_RedactionWrappingCallerSuppression() {
 	RedactGlobally("sensitive")
 
 	// Arrange: Create a logger
-	logger := zapr.NewLogger(zap.New(core))
+	logger := zapr.NewLogger(zap.New(core, zap.AddCaller()))
 
 	// Act
 	logger.Info("sensitive message")
@@ -75,14 +76,16 @@ func (ts *TestSuite) TestCoreComposition_RedactionWrappingCallerSuppression() {
 	msg := buf.String()
 	ts.Assert().Contains(msg, "message")
 	ts.Assert().NotContains(msg, "sensitive")
+	ts.Assert().NotContains(msg, "caller")
 }
 
-// This test confirms that when our custom caller suppression core wraps our custom redaction core, redaction occurs.
+// This test confirms that when our custom caller suppression core wraps our custom redaction core, both redaction and
+// caller suppression occur.
 func (ts *TestSuite) TestCoreComposition_CallerSuppressionWrappingRedaction() {
 	// Arrange: Create a testable log sink
 	var buf bytes.Buffer
 	baseCore := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
+		zapcore.NewJSONEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(&buf)),
 		globalLogLevel)
 
@@ -91,7 +94,7 @@ func (ts *TestSuite) TestCoreComposition_CallerSuppressionWrappingRedaction() {
 	RedactGlobally("sensitive")
 
 	// Arrange: Create a logger
-	logger := zapr.NewLogger(zap.New(core))
+	logger := zapr.NewLogger(zap.New(core, zap.AddCaller()))
 
 	// Act
 	logger.Info("sensitive message")
@@ -100,6 +103,7 @@ func (ts *TestSuite) TestCoreComposition_CallerSuppressionWrappingRedaction() {
 	msg := buf.String()
 	ts.Assert().Contains(msg, "message")
 	ts.Assert().NotContains(msg, "sensitive")
+	ts.Assert().NotContains(msg, "caller")
 }
 
 // This test confirms that the redaction logic executes correctly for console sinks.
