@@ -16,60 +16,33 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type logConfig struct {
-	core    zapcore.Core
-	cleanup func() error
-	err     error
-}
-
 type SinkOption func(*sinkConfig)
 
 // New creates a new log object with the provided configurations. If no sinks
 // are provided, a no-op sink will be used. Returns the logger and a cleanup
 // function that should be executed before the program exits.
-func New(service string, configs ...logConfig) (logr.Logger, func() error) {
-	return NewWithCaller(service, false, configs...)
+func New(service string, cores ...zapcore.Core) (logr.Logger, func() error) {
+	return NewWithCaller(service, false, cores...)
 }
 
 // NewWithCaller creates a new logger named after the specified service with the provided sink configurations. If
 // addCaller is true, call site information will be attached to each emitted log message. (This behavior can be disabled
 // on a per-sink basis using WithSuppressCaller.)
-func NewWithCaller(service string, addCaller bool, configs ...logConfig) (logr.Logger, func() error) {
-	var cores []zapcore.Core
-	var cleanupFuncs []func() error
-
-	// create cores for the logger
-	for _, config := range configs {
-		if config.err != nil {
-			continue
-		}
-		cores = append(cores, config.core)
-		if config.cleanup != nil {
-			cleanupFuncs = append(cleanupFuncs, config.cleanup)
-		}
-	}
+func NewWithCaller(service string, addCaller bool, cores ...zapcore.Core) (logr.Logger, func() error) {
 	// create logger
 	zapLogger := zap.New(zapcore.NewTee(cores...), zap.WithCaller(addCaller))
-	cleanupFuncs = append(cleanupFuncs, zapLogger.Sync)
 	logger := zapr.NewLogger(zapLogger).WithName(service)
 
-	// report the errors we encountered in the configs
-	for _, config := range configs {
-		if config.err != nil {
-			logger.Error(config.err, "error configuring logger")
-		}
-	}
-
-	return logger, firstErrorFunc(cleanupFuncs...)
+	return logger, zapLogger.Sync
 }
 
 // WithSentry adds sentry integration to the logger. This configuration may
 // fail, in which case, sentry will not be added and execution will continue
 // normally.
-func WithSentry(opts sentry.ClientOptions, tags map[string]string) logConfig {
+func WithSentry(opts sentry.ClientOptions, tags map[string]string) zapcore.Core {
 	client, err := sentry.NewClient(opts)
 	if err != nil {
-		return logConfig{err: err}
+		return nil
 	}
 
 	// create sentry core
@@ -81,16 +54,10 @@ func WithSentry(opts sentry.ClientOptions, tags map[string]string) logConfig {
 	}
 	core, err := zapsentry.NewCore(cfg, zapsentry.NewSentryClientFromClient(client))
 	if err != nil {
-		return logConfig{err: err}
+		return nil
 	}
 
-	return logConfig{
-		core: core,
-		cleanup: func() error {
-			sentry.Flush(5 * time.Second)
-			return nil
-		},
-	}
+	return core
 }
 
 type sinkConfig struct {
@@ -102,7 +69,7 @@ type sinkConfig struct {
 }
 
 // WithJSONSink adds a JSON encoded output to the logger.
-func WithJSONSink(sink io.Writer, opts ...SinkOption) logConfig {
+func WithJSONSink(sink io.Writer, opts ...SinkOption) zapcore.Core {
 	return newCoreConfig(
 		zapcore.NewJSONEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -112,7 +79,7 @@ func WithJSONSink(sink io.Writer, opts ...SinkOption) logConfig {
 }
 
 // WithConsoleSink adds a console-style output to the logger.
-func WithConsoleSink(sink io.Writer, opts ...SinkOption) logConfig {
+func WithConsoleSink(sink io.Writer, opts ...SinkOption) zapcore.Core {
 	return newCoreConfig(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -136,8 +103,8 @@ func defaultEncoderConfig() zapcore.EncoderConfig {
 }
 
 // WithCore adds any user supplied zap core to the logger.
-func WithCore(core zapcore.Core) logConfig {
-	return logConfig{core: core}
+func WithCore(core zapcore.Core) zapcore.Core {
+	return core
 }
 
 // AddSentry initializes a sentry client and extends an existing
@@ -151,16 +118,12 @@ func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string)
 //
 // The new sink will not inherit any of the existing logger's key-value pairs. Key-value pairs can be added to the new
 // sink specifically by passing them to this function.
-func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, func() error, error) {
-	if sink.err != nil {
-		return l, nil, sink.err
-	}
-
+func AddSink(l logr.Logger, core zapcore.Core, keysAndValues ...any) (logr.Logger, func() error, error) {
 	// New key-value pairs cannot be ergonomically added directly to cores. logr has code to do it, but that code is not
 	// exported. Rather than replicating it ourselves, we indirectly use it by creating a temporary logger for the new
 	// core, adding the key-value pairs to the temporary logger, and then extracting the temporary logger's modified
 	// core.
-	newSinkLogger := zapr.NewLogger(zap.New(sink.core))
+	newSinkLogger := zapr.NewLogger(zap.New(core))
 	newSinkLogger = newSinkLogger.WithValues(keysAndValues...)
 	newCoreLogger, err := getZapLogger(newSinkLogger)
 	if err != nil {
@@ -186,7 +149,7 @@ func AddSink(l logr.Logger, sink logConfig, keysAndValues ...any) (logr.Logger, 
 
 	zapLogger = zapLogger.WithOptions(newLoggerOptions...)
 	newLogger := zapr.NewLogger(zapLogger)
-	return newLogger, firstErrorFunc(zapLogger.Sync, sink.cleanup), nil
+	return newLogger, zapLogger.Sync, nil
 }
 
 // getZapLogger is a helper function that gets the underlying zap logger from a
@@ -241,23 +204,6 @@ func ToSlogger(l logr.Logger) *slog.Logger {
 	return slog.New(logr.ToSlogHandler(l))
 }
 
-// firstErrorFunc is a helper function that returns a function that executes
-// all provided args and returns the first error, if any.
-func firstErrorFunc(fs ...func() error) func() error {
-	return func() error {
-		var firstErr error = nil
-		for _, f := range fs {
-			if f == nil {
-				continue
-			}
-			if err := f(); err != nil && firstErr == nil {
-				firstErr = err
-			}
-		}
-		return firstErr
-	}
-}
-
 // newCoreConfig is a helper function that creates a default sinkConfig,
 // applies the options, then creates a zapcore.Core.
 func newCoreConfig(
@@ -265,7 +211,7 @@ func newCoreConfig(
 	defaultSink zapcore.WriteSyncer,
 	defaultLevel levelSetter,
 	opts ...SinkOption,
-) logConfig {
+) zapcore.Core {
 	conf := sinkConfig{
 		encoder: defaultEncoder,
 		sink:    defaultSink,
@@ -288,5 +234,5 @@ func newCoreConfig(
 		core = &suppressCallerCore{Core: core}
 	}
 
-	return logConfig{core: core}
+	return core
 }
