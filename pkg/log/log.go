@@ -38,15 +38,8 @@ func NewWithCaller(service string, addCaller bool, cores ...zapcore.Core) (logr.
 	return logger, zapLogger.Sync
 }
 
-// WithSentry adds sentry integration to the logger. This configuration may
-// fail, in which case, sentry will not be added and execution will continue
-// normally.
-func WithSentry(opts sentry.ClientOptions, tags map[string]string) zapcore.Core {
-	client, err := sentry.NewClient(opts)
-	if err != nil {
-		return nil
-	}
-
+// WithSentry adds sentry integration to the logger.
+func WithSentry(client *sentry.Client, tags map[string]string) zapcore.Core {
 	// create sentry core
 	cfg := zapsentry.Configuration{
 		Tags:              tags,
@@ -56,7 +49,11 @@ func WithSentry(opts sentry.ClientOptions, tags map[string]string) zapcore.Core 
 	}
 	core, err := zapsentry.NewCore(cfg, zapsentry.NewSentryClientFromClient(client))
 	if err != nil {
-		return nil
+		// NewCore should never fail because NewSentryClientFromClient
+		// never returns an error and NewCore only returns an error if
+		// the zapsentry.Configuration is invalid, which would indicate
+		// a programmer error.
+		panic(err)
 	}
 
 	return core
@@ -111,8 +108,8 @@ func WithCore(core zapcore.Core) zapcore.Core {
 
 // AddSentry initializes a sentry client and extends an existing
 // logr.Logger with the hook.
-func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string) (logr.Logger, SyncFunc, error) {
-	return AddSink(l, WithSentry(opts, tags))
+func AddSentry(l logr.Logger, client *sentry.Client, tags map[string]string) (logr.Logger, SyncFunc, error) {
+	return AddSink(l, WithSentry(client, tags))
 }
 
 // AddSink extends an existing logr.Logger with a new sink. It returns the new logr.Logger, a cleanup function, and an

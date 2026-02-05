@@ -101,42 +101,18 @@ func TestSetLevel(t *testing.T) {
 	assert.Equal(t, true, logger.GetSink().Enabled(2))
 }
 
-func TestWithSentryFailure(t *testing.T) {
-	var buffer bytes.Buffer
-	logger, flush := New("service-name",
-		WithSentry(sentry.ClientOptions{Dsn: "fail"}, nil),
-		WithConsoleSink(&buffer),
-	)
-	logger.Info("yay")
-	assert.Nil(t, flush())
-
-	assert.Contains(t, buffer.String(), "error configuring logger")
-	assert.Contains(t, buffer.String(), "yay")
-}
-
-func TestAddSentryFailure(t *testing.T) {
-	var buffer bytes.Buffer
-	logger, flush := New("service-name", WithConsoleSink(&buffer))
-	logger, _, err := AddSentry(logger, sentry.ClientOptions{Dsn: "fail"}, nil)
-	assert.NotNil(t, err)
-	assert.NotContains(t, err.Error(), "unsupported")
-
-	logger.Info("yay")
-	assert.Nil(t, flush())
-
-	assert.Contains(t, buffer.String(), "yay")
-}
-
 func TestAddSentry(t *testing.T) {
 	var buffer bytes.Buffer
 	var sentryMessage string
-	logger, _ := New("service-name", WithConsoleSink(&buffer))
-	logger, flush, err := AddSentry(logger, sentry.ClientOptions{
+	client, err := sentry.NewClient(sentry.ClientOptions{
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			sentryMessage = event.Message
 			return nil
 		},
-	}, nil)
+	})
+	assert.Nil(t, err)
+	logger, _ := New("service-name", WithConsoleSink(&buffer))
+	logger, flush, err := AddSentry(logger, client, nil)
 	assert.Nil(t, err)
 
 	logger.Error(nil, "oops")
@@ -151,14 +127,16 @@ func TestAddSentry(t *testing.T) {
 func TestWithSentry(t *testing.T) {
 	var buffer bytes.Buffer
 	var sentryMessage string
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			sentryMessage = event.Message
+			return nil
+		},
+	})
+	assert.Nil(t, err)
 	logger, flush := New("service-name",
 		WithConsoleSink(&buffer),
-		WithSentry(sentry.ClientOptions{
-			BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-				sentryMessage = event.Message
-				return nil
-			},
-		}, nil),
+		WithSentry(client, nil),
 	)
 	logger.Info("yay")
 	logger.Error(nil, "oops")
