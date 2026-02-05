@@ -69,7 +69,7 @@ type sinkConfig struct {
 
 // WithJSONSink adds a JSON encoded output to the logger.
 func WithJSONSink(sink io.Writer, opts ...SinkOption) zapcore.Core {
-	return newCoreConfig(
+	return newCore(
 		zapcore.NewJSONEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
 		globalLogLevel,
@@ -79,7 +79,7 @@ func WithJSONSink(sink io.Writer, opts ...SinkOption) zapcore.Core {
 
 // WithConsoleSink adds a console-style output to the logger.
 func WithConsoleSink(sink io.Writer, opts ...SinkOption) zapcore.Core {
-	return newCoreConfig(
+	return newCore(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
 		globalLogLevel,
@@ -203,9 +203,9 @@ func ToSlogger(l logr.Logger) *slog.Logger {
 	return slog.New(logr.ToSlogHandler(l))
 }
 
-// newCoreConfig is a helper function that creates a default sinkConfig,
+// newCore is a helper function that creates a default sinkConfig,
 // applies the options, then creates a zapcore.Core.
-func newCoreConfig(
+func newCore(
 	defaultEncoder zapcore.Encoder,
 	defaultSink zapcore.WriteSyncer,
 	defaultLevel levelSetter,
