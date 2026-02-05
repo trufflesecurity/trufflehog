@@ -11,7 +11,48 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
+
+// testCore implement zapcore.Core with custom methods.
+type testCore struct {
+	check   func(zapcore.Entry, *zapcore.CheckedEntry) *zapcore.CheckedEntry
+	enabled func(zapcore.Level) bool
+	sync    func() error
+	with    func([]zapcore.Field) zapcore.Core
+	write   func(zapcore.Entry, []zapcore.Field) error
+}
+
+func (t *testCore) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if t.check != nil {
+		return t.check(e, ce)
+	}
+	return ce
+}
+func (t *testCore) Enabled(l zapcore.Level) bool {
+	if t.enabled != nil {
+		return t.enabled(l)
+	}
+	return true
+}
+func (t *testCore) Sync() error {
+	if t.sync != nil {
+		return t.sync()
+	}
+	return nil
+}
+func (t *testCore) With(fields []zapcore.Field) zapcore.Core {
+	if t.with != nil {
+		return t.with(fields)
+	}
+	return t
+}
+func (t *testCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	if t.write != nil {
+		return t.write(ent, fields)
+	}
+	return nil
+}
 
 func TestNew(t *testing.T) {
 	var jsonBuffer, consoleBuffer bytes.Buffer
@@ -290,4 +331,38 @@ func TestToSlogger(t *testing.T) {
 		},
 		parsedJSON,
 	)
+}
+
+func TestSyncFunc(t *testing.T) {
+	var syncCalled bool
+	core := testCore{
+		sync: func() error {
+			syncCalled = true
+			return nil
+		},
+	}
+	_, flush := New("service-name", &core)
+	assert.NoError(t, flush())
+	assert.True(t, syncCalled)
+}
+
+func TestAddSinkStillSyncs(t *testing.T) {
+	var syncCalled [2]bool
+	core := testCore{
+		sync: func() error {
+			syncCalled[0] = true
+			return nil
+		},
+	}
+	l, _ := New("service-name", &core)
+	_, flush, err := AddSink(l, &testCore{
+		sync: func() error {
+			syncCalled[1] = true
+			return nil
+		},
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, flush())
+	assert.True(t, syncCalled[0])
+	assert.True(t, syncCalled[1])
 }

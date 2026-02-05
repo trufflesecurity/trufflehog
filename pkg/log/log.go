@@ -16,19 +16,21 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type SyncFunc func() error
+
 type SinkOption func(*sinkConfig)
 
 // New creates a new log object with the provided configurations. If no sinks
 // are provided, a no-op sink will be used. Returns the logger and a cleanup
 // function that should be executed before the program exits.
-func New(service string, cores ...zapcore.Core) (logr.Logger, func() error) {
+func New(service string, cores ...zapcore.Core) (logr.Logger, SyncFunc) {
 	return NewWithCaller(service, false, cores...)
 }
 
 // NewWithCaller creates a new logger named after the specified service with the provided sink configurations. If
 // addCaller is true, call site information will be attached to each emitted log message. (This behavior can be disabled
 // on a per-sink basis using WithSuppressCaller.)
-func NewWithCaller(service string, addCaller bool, cores ...zapcore.Core) (logr.Logger, func() error) {
+func NewWithCaller(service string, addCaller bool, cores ...zapcore.Core) (logr.Logger, SyncFunc) {
 	// create logger
 	zapLogger := zap.New(zapcore.NewTee(cores...), zap.WithCaller(addCaller))
 	logger := zapr.NewLogger(zapLogger).WithName(service)
@@ -109,7 +111,7 @@ func WithCore(core zapcore.Core) zapcore.Core {
 
 // AddSentry initializes a sentry client and extends an existing
 // logr.Logger with the hook.
-func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string) (logr.Logger, func() error, error) {
+func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string) (logr.Logger, SyncFunc, error) {
 	return AddSink(l, WithSentry(opts, tags))
 }
 
@@ -118,7 +120,7 @@ func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string)
 //
 // The new sink will not inherit any of the existing logger's key-value pairs. Key-value pairs can be added to the new
 // sink specifically by passing them to this function.
-func AddSink(l logr.Logger, core zapcore.Core, keysAndValues ...any) (logr.Logger, func() error, error) {
+func AddSink(l logr.Logger, core zapcore.Core, keysAndValues ...any) (logr.Logger, SyncFunc, error) {
 	// New key-value pairs cannot be ergonomically added directly to cores. logr has code to do it, but that code is not
 	// exported. Rather than replicating it ourselves, we indirectly use it by creating a temporary logger for the new
 	// core, adding the key-value pairs to the temporary logger, and then extracting the temporary logger's modified
