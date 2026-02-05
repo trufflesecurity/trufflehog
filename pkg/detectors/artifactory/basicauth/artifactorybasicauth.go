@@ -145,6 +145,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
+}
+
 func verifyArtifactoryBasicAuth(ctx context.Context, client *http.Client, host, username, password string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+host+"/artifactory/api/system/ping", nil)
 	if err != nil {
