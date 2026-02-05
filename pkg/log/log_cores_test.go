@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// ignoreEverythingCore is a zap core that rejects all log entries. It is used to test that our custom cores respect
+// wrapped core check logic.
 type ignoreEverythingCore struct {
 	zapcore.Core
 }
@@ -50,44 +52,57 @@ func TestCustomCores(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }
 
+// This test confirms that when our custom redaction core wraps our custom caller suppression core, redaction occurs.
 func (ts *TestSuite) TestCoreComposition_RedactionWrappingCallerSuppression() {
+	// Arrange: Create a testable log sink
 	var buf bytes.Buffer
 	baseCore := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(&buf)),
 		globalLogLevel)
 
+	// Arrange: Create a core stack and set up redaction
 	core := NewRedactionCore(&suppressCallerCore{baseCore}, globalRedactor)
-
 	RedactGlobally("sensitive")
 
+	// Arrange: Create a logger
 	logger := zapr.NewLogger(zap.New(core))
+
+	// Act
 	logger.Info("sensitive message")
 
+	// Assert that redaction executed correctly
 	msg := buf.String()
 	ts.Assert().Contains(msg, "message")
 	ts.Assert().NotContains(msg, "sensitive")
 }
 
+// This test confirms that when our custom caller suppression core wraps our custom redaction core, redaction occurs.
 func (ts *TestSuite) TestCoreComposition_CallerSuppressionWrappingRedaction() {
+	// Arrange: Create a testable log sink
 	var buf bytes.Buffer
 	baseCore := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(&buf)),
 		globalLogLevel)
 
+	// Arrange: Create a core stack and set up redaction
 	core := &suppressCallerCore{NewRedactionCore(baseCore, globalRedactor)}
-
 	RedactGlobally("sensitive")
 
+	// Arrange: Create a logger
 	logger := zapr.NewLogger(zap.New(core))
+
+	// Act
 	logger.Info("sensitive message")
 
+	// Assert that redaction executed correctly
 	msg := buf.String()
 	ts.Assert().Contains(msg, "message")
 	ts.Assert().NotContains(msg, "sensitive")
 }
 
+// This test confirms that the redaction logic executes correctly for console sinks.
 func (ts *TestSuite) TestGlobalRedaction_Console() {
 	var buf bytes.Buffer
 	logger, flush := New("console-redaction-test",
@@ -112,6 +127,7 @@ func (ts *TestSuite) TestGlobalRedaction_Console() {
 	ts.Assert().Equal(wantParts, gotParts)
 }
 
+// This test confirms that the redaction logic executes correctly for JSON sinks.
 func (ts *TestSuite) TestGlobalRedaction_JSON() {
 	var jsonBuffer bytes.Buffer
 	logger, flush := New("json-redaction-test",
@@ -143,34 +159,48 @@ func (ts *TestSuite) TestGlobalRedaction_JSON() {
 	)
 }
 
+// This test confirms that our custom redaction core respects the "check" logic of any cores it wraps.
 func (ts *TestSuite) TestRedactionCore_RespectsWrappedCheckLogic() {
+	// Arrange: Create a testable log sink
 	var buf bytes.Buffer
 	baseCore := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(&buf)),
 		globalLogLevel)
 
+	// Arrange: Set up a core stack
 	core := NewRedactionCore(&ignoreEverythingCore{baseCore}, globalRedactor)
 
+	// Arrange: Create a logger
 	logger := zapr.NewLogger(zap.New(core))
+
+	// Act
 	logger.Info("message")
 
+	// Assert that the wrapped core's check logic was respected
 	msg := buf.String()
 	ts.Assert().Empty(msg)
 }
 
+// This test confirms that our custom caller suppression core respects the "check" logic of any cores it wraps.
 func (ts *TestSuite) TestSuppressCallerCore_RespectsWrappedCheckLogic() {
+	// Arrange: Create a testable log sink
 	var buf bytes.Buffer
 	baseCore := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(&buf)),
 		globalLogLevel)
 
+	// Arrange: Set up a core stack
 	core := &suppressCallerCore{&ignoreEverythingCore{baseCore}}
 
+	// Arrange: Create a logger
 	logger := zapr.NewLogger(zap.New(core))
+
+	// Act
 	logger.Info("message")
 
+	// Assert that the wrapped core's check logic was respected
 	msg := buf.String()
 	ts.Assert().Empty(msg)
 }
