@@ -21,7 +21,7 @@ type ignoreEverythingCore struct {
 }
 
 func (t *ignoreEverythingCore) With(fields []zapcore.Field) zapcore.Core {
-	return t.Core.With(fields)
+	return &ignoreEverythingCore{t.Core.With(fields)}
 }
 
 func (t *ignoreEverythingCore) Check(entry zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
