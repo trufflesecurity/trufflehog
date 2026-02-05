@@ -12,8 +12,7 @@ type suppressCallerCore struct {
 	zapcore.Core
 }
 
-// Check determines whether the supplied Entry should be logged and, if it should, adds the core to the entry. It does
-// not do anything interesting and is only implemented at all because of the way zap works.
+// Check determines whether the supplied Entry should be logged and, if it should, adds the core to the entry.
 func (c *suppressCallerCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
 	if !c.Enabled(ent.Level) {
 		return ce
