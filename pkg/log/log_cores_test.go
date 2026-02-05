@@ -7,9 +7,26 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-logr/zapr"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
+
+type ignoreEverythingCore struct {
+	zapcore.Core
+}
+
+func (t *ignoreEverythingCore) With(fields []zapcore.Field) zapcore.Core {
+	return t.Core.With(fields)
+}
+
+func (t *ignoreEverythingCore) Check(entry zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	return ce
+}
+
+var _ zapcore.Core = (*ignoreEverythingCore)(nil)
 
 type TestSuite struct {
 	suite.Suite
@@ -22,6 +39,7 @@ func (ts *TestSuite) SetupTest() {
 	globalRedactor = &dynamicRedactor{
 		denySet: make(map[string]struct{}),
 	}
+	globalRedactor.replacer.Store(strings.NewReplacer())
 }
 
 func (ts *TestSuite) TearDownTest() {
@@ -30,6 +48,44 @@ func (ts *TestSuite) TearDownTest() {
 
 func TestCustomCores(t *testing.T) {
 	suite.Run(t, new(TestSuite))
+}
+
+func (ts *TestSuite) TestCoreComposition_RedactionWrappingCallerSuppression() {
+	var buf bytes.Buffer
+	baseCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(&buf)),
+		globalLogLevel)
+
+	core := NewRedactionCore(&suppressCallerCore{baseCore}, globalRedactor)
+
+	RedactGlobally("sensitive")
+
+	logger := zapr.NewLogger(zap.New(core))
+	logger.Info("sensitive message")
+
+	msg := buf.String()
+	ts.Assert().Contains(msg, "message")
+	ts.Assert().NotContains(msg, "sensitive")
+}
+
+func (ts *TestSuite) TestCoreComposition_CallerSuppressionWrappingRedaction() {
+	var buf bytes.Buffer
+	baseCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(&buf)),
+		globalLogLevel)
+
+	core := &suppressCallerCore{NewRedactionCore(baseCore, globalRedactor)}
+
+	RedactGlobally("sensitive")
+
+	logger := zapr.NewLogger(zap.New(core))
+	logger.Info("sensitive message")
+
+	msg := buf.String()
+	ts.Assert().Contains(msg, "message")
+	ts.Assert().NotContains(msg, "sensitive")
 }
 
 func (ts *TestSuite) TestGlobalRedaction_Console() {
@@ -63,7 +119,7 @@ func (ts *TestSuite) TestGlobalRedaction_JSON() {
 	)
 	RedactGlobally("foo")
 	RedactGlobally("bar")
-	
+
 	logger.Info("this foo is :bar",
 		"foo", "bar",
 		"array", []string{"foo", "bar", "baz"},
@@ -85,6 +141,38 @@ func (ts *TestSuite) TestGlobalRedaction_JSON() {
 		},
 		parsedJSON,
 	)
+}
+
+func (ts *TestSuite) TestRedactionCore_RespectsWrappedCheckLogic() {
+	var buf bytes.Buffer
+	baseCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(&buf)),
+		globalLogLevel)
+
+	core := NewRedactionCore(&ignoreEverythingCore{baseCore}, globalRedactor)
+
+	logger := zapr.NewLogger(zap.New(core))
+	logger.Info("message")
+
+	msg := buf.String()
+	ts.Assert().Empty(msg)
+}
+
+func (ts *TestSuite) TestSuppressCallerCore_RespectsWrappedCheckLogic() {
+	var buf bytes.Buffer
+	baseCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(&buf)),
+		globalLogLevel)
+
+	core := &suppressCallerCore{&ignoreEverythingCore{baseCore}}
+
+	logger := zapr.NewLogger(zap.New(core))
+	logger.Info("message")
+
+	msg := buf.String()
+	ts.Assert().Empty(msg)
 }
 
 func BenchmarkLoggerRedact(b *testing.B) {
