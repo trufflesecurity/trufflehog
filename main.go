@@ -354,7 +354,6 @@ func main() {
 		logFormat = log.WithJSONSink
 	}
 	logger, sync := log.New("trufflehog", logFormat(os.Stderr, log.WithGlobalRedaction()))
-
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 
