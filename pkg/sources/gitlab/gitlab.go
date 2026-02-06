@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -80,7 +81,7 @@ type Source struct {
 	projectsPerPage int64
 
 	// cache of repo URL to project info, used when generating metadata for chunks
-	*projectMetadataCache
+	projectMetadataCache *projectMetadataCache
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -248,6 +249,9 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 				gitlabMetadata.ProjectId = project.id
 				gitlabMetadata.ProjectName = project.name
 				gitlabMetadata.ProjectOwner = project.owner
+			} else {
+				ctx.Logger().Error(errors.New("failed to get repo metadata from cache"),
+					"cache miss: not found project metadata in the cache", "cache_key", repository)
 			}
 
 			return &source_metadatapb.MetaData{
