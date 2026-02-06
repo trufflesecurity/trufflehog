@@ -37,6 +37,8 @@ type Source struct {
 	skipBinaries bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+	followSymlinks bool
+	visitedPaths   map[string]struct{}
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -80,6 +82,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return fmt.Errorf("unable to create filter: %w", err)
 	}
 	s.filter = filter
+	s.followSymlinks = conn.GetFollowSymlink()
+	s.visitedPaths = make(map[string]struct{})
 
 	return nil
 }
@@ -100,8 +104,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			continue
 		}
 
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			logger.Info("skipping, not a regular file", "path", cleanPath)
+		// If the file or directory is a symlink but the followSymlinks is disable ignore the path
+		if fileInfo.Mode()&os.ModeSymlink != 0 && !s.followSymlinks {
+			logger.Info("skipping, following symlinks is not enabled", "path", cleanPath)
 			continue
 		}
 
@@ -120,6 +125,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	return nil
 }
+
+var errSymlinkLoop = errors.New("symlink loop detected")
+
 func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
@@ -130,13 +138,38 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 	startState := s.GetEncodedResumeInfoFor(path)
 	resuming := startState != ""
 
-	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
+	resolvedRoot, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		if errors.Is(err, errSymlinkLoop) {
+			ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
+		} else {
+			ctx.Logger().Error(err, "Err resolving path", "path", path)
+		}
+		return err
+	}
+	resolvedRoot = filepath.Clean(resolvedRoot)
+
+	if _, seen := s.visitedPaths[resolvedRoot]; seen {
+		// Return if the direcory has already been visited
+		return nil
+	}
+	s.visitedPaths[resolvedRoot] = struct{}{}
+
+	return fs.WalkDir(os.DirFS(resolvedRoot), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			ctx.Logger().Error(err, "error walking directory")
 			return nil
 		}
 
-		fullPath := filepath.Join(path, relativePath)
+		fullPath := filepath.Join(resolvedRoot, relativePath)
+		ctx.Logger().V(5).Info("Full path found is", "fullPath", fullPath)
+
+		// scanDir only adds directory to visitedPaths
+		// scanFile handles adding files to visitedPaths
+		if d.IsDir() {
+			ctx.Logger().V(5).Info("Full path is a directory, adding full path to visistedPaths")
+			s.visitedPaths[fullPath] = struct{}{}
+		}
 
 		// check if the full path is not matching any pattern in include FilterRuleSet and matching any exclude FilterRuleSet.
 		if s.filter != nil && !s.filter.Pass(fullPath) {
@@ -146,6 +179,52 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			}
 
 			return nil // skip the file
+		}
+
+		if d.Type()&os.ModeSymlink != 0 {
+			if s.followSymlinks {
+				ctx.Logger().V(5).Info("Directory/File found is a symlink", "path", path)
+				// if the found directory or file is symlink resolve the symlink
+				resolved, err := filepath.EvalSymlinks(fullPath)
+				if err != nil {
+					// Broken or looping symlink, just skip
+					if errors.Is(err, errSymlinkLoop) {
+						ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
+					} else {
+						ctx.Logger().Error(err, "skipping broken symlink", "path", fullPath)
+					}
+					return err
+				}
+				resolved = filepath.Clean(resolved)
+				ctx.Logger().V(5).Info("Symlink is resolved to path", "path", resolved)
+				if _, seen := s.visitedPaths[resolved]; seen {
+					ctx.Logger().V(3).Info("Resolved symlink is already scanned", "path", resolved)
+					return fs.SkipDir
+				}
+
+				info, err := os.Stat(resolved)
+				if err != nil {
+					ctx.Logger().Error(err, "Failed to get file info", "path", resolved)
+					return nil
+				}
+				// If symlink resolves to a file then scan it
+				if !info.IsDir() {
+					ctx.Logger().V(5).Info("Resolved symlink is a file", "path", resolved)
+					workerPool.Go(func() error {
+						if err := s.scanFile(ctx, resolved, chunksChan); err != nil {
+							ctx.Logger().Error(err, "error scanning file", "path", resolved)
+						}
+						s.SetEncodedResumeInfoFor(path, resolved)
+						return nil
+					})
+				}
+
+				// If symlink resolves to directory scan that directory
+				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolved)
+				return s.scanDir(ctx, resolved, chunksChan)
+			}
+			// Skip symlinks if followSymlinks is false
+			return nil
 		}
 
 		// Skip over non-regular files. We do this check here to suppress noisy
@@ -185,17 +264,32 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
 	}
-	if fileStat.Mode()&os.ModeSymlink != 0 {
-		return skipSymlinkErr
+	if fileStat.Mode()&os.ModeSymlink != 0 && !s.followSymlinks {
+		ctx.Logger().Info("skipping, following symlinks is not enabled", "path", path)
+		return nil
 	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		if errors.Is(err, errSymlinkLoop) {
+			ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
+		} else {
+			ctx.Logger().Error(err, "skipping broken symlink", "path", path)
+		}
+		return err
+	}
+	if _, seen := s.visitedPaths[resolved]; seen {
+		ctx.Logger().V(3).Info("Resolved symlink is already scanned", "path", resolved)
+		return nil
+	}
+	s.visitedPaths[resolved] = struct{}{}
 
 	// Check if file is binary and should be skipped
-	if (s.skipBinaries || feature.ForceSkipBinaries.Load()) && common.IsBinary(path) {
-		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
+	if (s.skipBinaries || feature.ForceSkipBinaries.Load()) && common.IsBinary(resolved) {
+		fileCtx.Logger().V(5).Info("skipping binary file", "path", resolved)
 		return nil
 	}
 
-	inputFile, err := os.Open(path)
+	inputFile, err := os.Open(resolved)
 	if err != nil {
 		return fmt.Errorf("unable to open file: %w", err)
 	}
@@ -226,11 +320,15 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // filepath or a directory.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		_, err := os.Lstat(filepath.Clean(path))
+		fileInfo, err := os.Lstat(filepath.Clean(path))
 		if err != nil {
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
+			continue
+		}
+		if fileInfo.Mode()&os.ModeSymlink != 0 && !s.followSymlinks {
+			ctx.Logger().Info("skipping, following symlinks is not enabled", "path", path)
 			continue
 		}
 		item := sources.CommonSourceUnit{ID: path}
