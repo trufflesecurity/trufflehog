@@ -81,3 +81,18 @@ func TestPostgres_Pattern(t *testing.T) {
 		})
 	}
 }
+
+func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
+	s := New(
+		WithIgnorePattern([]string{
+			`1\.2\.3\.4`,
+		}))
+	got, err := s.FromData(context.Background(), false, []byte(validUriPattern))
+	if err != nil {
+		t.Errorf("FromData() error = %v", err)
+		return
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no results, but got %d", len(got))
+	}
+}
