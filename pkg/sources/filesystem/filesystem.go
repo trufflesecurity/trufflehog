@@ -126,7 +126,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-var errSymlinkLoop = errors.New("symlink loop detected")
+var errSymlinkLoop = errors.New("EvalSymlinks: too many links")
 
 func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	workerPool := new(errgroup.Group)
