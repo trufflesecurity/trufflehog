@@ -17,6 +17,9 @@ import (
 //go:embed expected_output.json
 var expectedOutput []byte
 
+//go:embed expected_output_apikey.json
+var expectedOutputAPIKey []byte
+
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
@@ -38,11 +41,12 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		apiKey  string
-		appKey  string
-		want    []byte // JSON string
-		wantErr bool
+		name     string
+		apiKey   string
+		appKey   string
+		endpoint string
+		want     []byte // JSON string
+		wantErr  bool
 	}{
 		{
 			name:    "valid datadog credentials",
@@ -50,6 +54,27 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			appKey:  appKey,
 			want:    expectedOutput,
 			wantErr: false,
+		},
+		{
+			name:     "valid datadog credentials with endpoint",
+			apiKey:   apiKey,
+			appKey:   appKey,
+			endpoint: "https://api.us5.datadoghq.com",
+			want:     expectedOutput,
+			wantErr:  false,
+		},
+		{
+			name:     "valid datadog credentials with invalid endpoint",
+			apiKey:   apiKey,
+			appKey:   appKey,
+			endpoint: "https://api.eu.datadoghq.com",
+			want: []byte(fmt.Sprintf(`{
+				"AnalyzerType": %s,
+				"Bindings": [],
+				"UnboundedResources": null,
+				"Metadata": {}
+			}`, analyzers.AnalyzerTypeDatadog)),
+			wantErr: true,
 		},
 		{
 			name:    "invalid credentials",
@@ -63,7 +88,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
-			got, err := a.Analyze(ctx, map[string]string{"apiKey": tt.apiKey, "appKey": tt.appKey})
+			got, err := a.Analyze(ctx, map[string]string{"apiKey": tt.apiKey, "appKey": tt.appKey, "endpoint": tt.endpoint})
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
@@ -96,8 +121,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Fatalf("could not marshal got to JSON: %s", err)
 			}
 
-			fmt.Println(string(gotJSON))
-
 			// Parse the expected JSON string
 			var wantObj analyzers.AnalyzerResult
 			if err := json.Unmarshal(tt.want, &wantObj); err != nil {
@@ -128,6 +151,85 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Errorf("Analyzer.Analyze() = %s, want %s", gotIndented, wantIndented)
 			}
 		})
+	}
+}
+
+func TestAnalyzer_Analyze_ApiKeyOnly(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	defer cancel()
+
+	// Get API keys from GCP
+	var apiKey string
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "analyzers1")
+	if err != nil {
+		t.Fatalf("Could not get test secrets from GCP: %s", err)
+	}
+
+	// Get the required credentials
+	apiKey = testSecrets.MustGetField("DATADOG_API_KEY")
+
+	// Fail if credentials are not available
+	if apiKey == "" {
+		t.Fatalf("Datadog credentials are required for this test")
+	}
+	want := expectedOutputAPIKey
+
+	a := Analyzer{Cfg: &config.Config{}}
+	got, err := a.Analyze(ctx, map[string]string{"apiKey": apiKey, "endpoint": "https://api.us5.datadoghq.com"})
+	if err != nil {
+		t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, false)
+		return
+	}
+
+	// For valid cases, verify we got a result
+	if got == nil {
+		t.Errorf("Analyzer.Analyze() = nil, want non-nil")
+		return
+	}
+
+	// Verify type is correct
+	if got.AnalyzerType != analyzers.AnalyzerTypeDatadog {
+		t.Errorf("Analyzer.Analyze() returned wrong analyzer type, got %d want %d",
+			got.AnalyzerType, analyzers.AnalyzerTypeDatadog)
+	}
+
+	// Bindings need to be in the same order to be comparable
+	sortBindings(got.Bindings)
+
+	// Marshal the actual result to JSON
+	gotJSON, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("could not marshal got to JSON: %s", err)
+	}
+
+	// Parse the expected JSON string
+	var wantObj analyzers.AnalyzerResult
+	if err := json.Unmarshal(want, &wantObj); err != nil {
+		t.Fatalf("could not unmarshal want JSON string: %s", err)
+	}
+
+	// Bindings need to be in the same order to be comparable
+	sortBindings(wantObj.Bindings)
+
+	// Marshal the expected result to JSON (to normalize)
+	wantJSON, err := json.Marshal(wantObj)
+	if err != nil {
+		t.Fatalf("could not marshal want to JSON: %s", err)
+	}
+
+	// Compare the JSON strings
+	if string(gotJSON) != string(wantJSON) {
+		// Pretty-print both JSON strings for easier comparison
+		var gotIndented, wantIndented []byte
+		gotIndented, err = json.MarshalIndent(got, "", " ")
+		if err != nil {
+			t.Fatalf("could not marshal got to indented JSON: %s", err)
+		}
+		wantIndented, err = json.MarshalIndent(wantObj, "", " ")
+		if err != nil {
+			t.Fatalf("could not marshal want to indented JSON: %s", err)
+		}
+		t.Errorf("Analyzer.Analyze() = %s, want %s", gotIndented, wantIndented)
 	}
 }
 
