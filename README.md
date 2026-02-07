@@ -450,6 +450,8 @@ Flags:
   -j, --json                Output in JSON format.
       --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
       --github-actions      Output in GitHub Actions format.
+      --github-actions-step-summary
+                            Output a summary to the GitHub Actions step summary.
       --concurrency=20           Number of concurrent workers.
       --no-verification     Don't verify the results.
       --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to all types.
