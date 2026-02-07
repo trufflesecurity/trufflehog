@@ -2,9 +2,11 @@ package jumpcloud
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -13,8 +15,11 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (Scanner) Version() int { return 1 }
 
 var (
 	client = common.SaneHttpClient()
@@ -40,6 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Jumpcloud,
 			Raw:          []byte(resMatch),
+			ExtraData: map[string]string{
+				"version": fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
@@ -51,10 +59,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				}
+			} else {
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 
