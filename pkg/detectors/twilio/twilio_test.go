@@ -3,6 +3,7 @@ package twilio
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -37,11 +38,76 @@ func TestTwilio_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidSid, keyword, invalidKey),
 			want:  []string{},
 		},
+		{
+			name:  "valid pattern - with keyword twilio",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validSid, keyword, validKey),
+			want:  []string{validSid + validKey},
+		},
+		{
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidSid, keyword, invalidKey),
+			want:  []string{},
+		},
+
+		// "sid" alone should NOT trigger detector
+		{
+			name:  "sid keyword alone should not trigger detector",
+			input: fmt.Sprintf("sid = '%s'\ntoken = '%s'\n", validSid, validKey),
+			want:  []string{}, // detector won't even run without "twilio" keyword
+		},
+
+		// True positives that MUST still work
+		{
+			name:  "valid pattern - environment variable style",
+			input: fmt.Sprintf("TWILIO_ACCOUNT_SID=%s\nTWILIO_AUTH_TOKEN=%s\n", validSid, validKey),
+			want:  []string{validSid + validKey},
+		},
+		{
+			name:  "valid pattern - JSON format",
+			input: fmt.Sprintf(`{"twilio": {"accountSid": "%s", "authToken": "%s"}}`, validSid, validKey),
+			want:  []string{validSid + validKey},
+		},
+		{
+			name:  "valid pattern - customer reported format (name/value pairs)",
+			input: fmt.Sprintf(`twilio config: {"name": "accountSid", "value": "%s"}, {"name": "authToken", "value": "%s"}`, validSid, validKey),
+			want:  []string{validSid + validKey},
+		},
+		{
+			name:  "valid pattern - Postman variable style",
+			input: fmt.Sprintf(`{"name": "Twilio API", "values": [{"key": "account_sid", "value": "%s"}, {"key": "auth_token", "value": "%s"}]}`, validSid, validKey),
+			want:  []string{validSid + validKey},
+		},
+
+		// False positive prevention - these should NOT create results
+		{
+			name: "false positive - generic hex strings with non-twilio context",
+			input: `twilio_enabled: true
+			aws_secret: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+			stripe_key: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5
+			random_token: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6`,
+			want: []string{}, // No AC-prefixed SID, so no matches
+		},
+		{
+			name: "false positive - MD5 hashes should not match as keys without twilio auth context",
+			input: fmt.Sprintf(`twilio_enabled: true
+			account_sid: %s
+			file_checksum: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+			content_hash: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3`, validSid),
+			want: []string{}, // hex strings lack twilio/auth/token context
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			// For tests expecting no results due to keyword mismatch, verify detector doesn't trigger
+			if len(test.want) == 0 && !strings.Contains(strings.ToLower(test.input), "twilio") {
+				if len(matchedDetectors) > 0 {
+					t.Errorf("detector should not have triggered without 'twilio' keyword")
+				}
+				return
+			}
+
 			if len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
