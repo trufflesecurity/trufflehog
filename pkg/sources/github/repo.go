@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -365,8 +366,30 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 	// If it's a repository name (contains / but not http), convert to full URL first
 	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
 		fullURL := "https://github.com/" + repo
+		// If using GitHub Enterprise, adjust the URL accordingly
+		if s.conn != nil && s.conn.Endpoint != "" && !endsWithGithub.MatchString(s.conn.Endpoint) {
+			u, err := url.Parse(s.conn.Endpoint)
+			if err != nil {
+				return "", fmt.Errorf("invalid enterprise endpoint: %w", err)
+			}
+			// we want to remove any path components from the endpoint and just use the host
+			u.Path = "/" + repo
+			fullURL = u.String()
+		}
 		return giturl.NormalizeGithubRepo(fullURL)
 	}
 
 	return "", fmt.Errorf("no repositories found for %s", repo)
+}
+
+// extractRepoNameFromUrl extracts the "owner/repo" name from a GitHub repository URL.
+// Example: http://github.com/owner/repo.git -> owner/repo
+// If an invalid URL is provided, it returns the original string.
+func extractRepoNameFromUrl(repoURL string) string {
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		return repoURL
+	}
+	cleanedPath := strings.Trim(u.Path, "/")
+	return strings.TrimSuffix(cleanedPath, ".git")
 }
