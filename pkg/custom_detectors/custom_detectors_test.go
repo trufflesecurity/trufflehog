@@ -232,6 +232,60 @@ func TestDetectorPrimarySecret(t *testing.T) {
 	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
 }
 
+func TestDetectorPrimarySecretFullMatch(t *testing.T) {
+	tests := []struct {
+		name  string
+		input *custom_detectorspb.CustomRegex
+		chunk []byte
+		want  string
+	}{
+		{
+			name: "primary regex full match",
+			input: &custom_detectorspb.CustomRegex{
+				Name:             "test",
+				Keywords:         []string{"secret"},
+				Regex:            map[string]string{"secret": `secret *= *"([^"\r\n]+)"`},
+				PrimaryRegexName: "secret",
+			},
+			chunk: []byte(`
+			// some code
+			secret="mysecret"
+			// some code
+			`),
+			want: `secret="mysecret"`,
+		},
+		{
+			name: "primary regex full match multiline",
+			input: &custom_detectorspb.CustomRegex{
+				Name:             "test",
+				Keywords:         []string{"secret"},
+				Regex:            map[string]string{"secret": `secret *= *"([^"]+)"`},
+				PrimaryRegexName: "secret",
+			},
+			chunk: []byte(`
+			// some code
+			secret="mysecret
+			thatspansmultiplelines"
+			// some code
+			`),
+			want: `secret="mysecret
+			thatspansmultiplelines"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detector, err := NewWebhookCustomRegex(tt.input)
+			assert.NoError(t, err)
+			results, err := detector.FromData(context.Background(), false, tt.chunk)
+			assert.NoError(t, err)
+			assert.Equal(t, 1, len(results))
+			assert.Equal(t, tt.want, results[0].GetPrimarySecretValue())
+		})
+	}
+
+}
+
 func TestDetectorValidations(t *testing.T) {
 	type args struct {
 		CustomRegex *custom_detectorspb.CustomRegex
@@ -705,6 +759,24 @@ func TestNewWebhookCustomRegex_Validation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewWebhookCustomRegex_EnsurePrimaryRegexNameSet(t *testing.T) {
+	t.Parallel()
+
+	pb := &custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"kw"},
+		Regex: map[string]string{
+			"regex_a": `regex_a`,
+			"regex_b": `regex_b`,
+		},
+		// PrimaryRegexName is not set.
+	}
+
+	detector, err := NewWebhookCustomRegex(pb)
+	assert.NoError(t, err)
+	assert.Equal(t, "regex_a", detector.GetPrimaryRegexName(), "expected PrimaryRegexName to be set to regex_a")
 }
 
 func BenchmarkProductIndices(b *testing.B) {
