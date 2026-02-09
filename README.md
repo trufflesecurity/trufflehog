@@ -627,6 +627,8 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     base:
     # Scan commits until here (usually dev branch).
     head: # optional
+    # Docker image to use for scanning, defaults to ghcr.io/trufflesecurity/trufflehog.
+    image: # optional
     # Extra args to be passed to the trufflehog cli.
     extra_args: --log-level=2 --results=verified,unknown
 ```
