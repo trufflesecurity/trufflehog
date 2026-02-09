@@ -254,7 +254,6 @@ func TestDetectorPrimarySecretFullMatch(t *testing.T) {
 			`),
 			want: `secret="mysecret"`,
 		},
-		// Write a test case for a match which span multiple lines.
 		{
 			name: "primary regex full match multiline",
 			input: &custom_detectorspb.CustomRegex{
