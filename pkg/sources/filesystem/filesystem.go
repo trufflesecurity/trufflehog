@@ -211,6 +211,14 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 				// If symlink resolves to a file then scan it
 				if !info.IsDir() {
 					ctx.Logger().V(5).Info("Resolved symlink is a file", "path", resolved)
+					if resuming {
+						// Since we store the resolved file path in encodeResumeInfo
+						// so we match the resolved with startState
+						if resolved == startState {
+							resuming = false
+						}
+						return nil
+					}
 					workerPool.Go(func() error {
 						if err := s.scanFile(ctx, resolved, chunksChan); err != nil {
 							ctx.Logger().Error(err, "error scanning file", "path", resolved)
@@ -218,6 +226,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 						s.SetEncodedResumeInfoFor(path, resolved)
 						return nil
 					})
+					return nil
 				}
 
 				// If symlink resolves to directory scan that directory

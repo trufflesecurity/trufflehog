@@ -86,12 +86,12 @@ func TestSource_Scan(t *testing.T) {
 			for chunk := range chunksCh {
 				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
 					counter++
-					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" {
+					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" && counter == 1 { // First chunk should start at line 1
 						t.Errorf("Source.Chunks() %s metadata mismatch (-want +got):\n%s", tt.name, diff)
 					}
 				}
 			}
-			assert.Equal(t, 1, counter)
+			assert.Equal(t, 2, counter)
 		})
 	}
 }
@@ -107,7 +107,9 @@ func TestScanFile(t *testing.T) {
 	assert.Nil(t, err)
 	defer cleanup()
 
-	source := &Source{}
+	source := &Source{
+		visitedPaths: make(map[string]struct{}),
+	}
 	chunksChan := make(chan *sources.Chunk, 2)
 
 	ctx := context.WithLogger(context.Background(), logr.Discard())
@@ -137,7 +139,9 @@ func TestScanBinaryFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, tmpfile.Close())
 
-	source := &Source{}
+	source := &Source{
+		visitedPaths: make(map[string]struct{}),
+	}
 	chunksChan := make(chan *sources.Chunk, 2)
 	errChan := make(chan error, 1)
 
@@ -435,6 +439,7 @@ func TestSkipBinaries(t *testing.T) {
 		paths:        []string{textFile, binaryFile}, // Test individual files
 		skipBinaries: true,
 		log:          logr.Discard(),
+		visitedPaths: make(map[string]struct{}),
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
@@ -499,4 +504,266 @@ func createTempDir(dir string, contents ...string) (string, func(), error) {
 		}
 	}
 	return tmpdir, func() { _ = os.RemoveAll(tmpdir) }, nil
+}
+
+func TestScanDir_VisitedPath_PreventInfiniteRecursion(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	baseDir, cleanup, err := createTempDir("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	// Skip if symlinks unsupported
+	probe := filepath.Join(baseDir, "symlink-probe")
+	if err := os.Symlink("x", probe); err != nil {
+		t.Skip("symlinks not supported")
+	}
+	_ = os.Remove(probe)
+
+	dirA := filepath.Join(baseDir, "A")
+	dirB := filepath.Join(baseDir, "B")
+	err = os.Mkdir(dirA, 0755)
+	err = os.Mkdir(dirB, 0755)
+	if err != nil {
+		t.Fatalf("Unable to create directories %v", err)
+	}
+
+	// We create
+	// A/linkToB -> /B
+	// B/linkToA -> /A
+	err = os.Symlink(dirB, filepath.Join(dirA, "linkToB"))
+	err = os.Symlink(dirA, filepath.Join(dirB, "linkToA"))
+	if err != nil {
+		t.Fatalf("Unable to create symlink %v", err)
+	}
+
+	src := &Source{
+		followSymlinks: true,
+		visitedPaths:   make(map[string]struct{}),
+		concurrency:    1,
+	}
+	err = src.scanDir(ctx, filepath.Join(dirA, "linkToB"), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Assert both directories were visited exactly once
+	if _, ok := src.visitedPaths[filepath.Clean(dirA)]; !ok {
+		t.Fatalf("expected dirA to be visited")
+	}
+	if _, ok := src.visitedPaths[filepath.Clean(dirB)]; !ok {
+		t.Fatalf("expected dirB to be visited")
+	}
+}
+
+func TestScanDir_NestedSymlinkLoop(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	baseDir, cleanup, err := createTempDir("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	probe := filepath.Join(baseDir, "symlink-probe")
+	if err := os.Symlink("x", probe); err != nil {
+		t.Skip("symlinks not supported")
+	}
+	_ = os.Remove(probe)
+
+	// We Create
+	// /A->/B
+	// /B->/A
+	err = os.Symlink(filepath.Join(baseDir, "B"), filepath.Join(baseDir, "A"))
+	err = os.Symlink(filepath.Join(baseDir, "A"), filepath.Join(baseDir, "B"))
+	if err != nil {
+		t.Fatalf("Unable to create symlink %v", err)
+	}
+
+	src := &Source{
+		followSymlinks: true,
+		visitedPaths:   make(map[string]struct{}),
+		concurrency:    1,
+	}
+	err = src.scanDir(ctx, baseDir, nil)
+
+	if err == nil {
+		t.Fatal("expected symlink loop error, got nil")
+	}
+	if err.Error() != errSymlinkLoop.Error() {
+		t.Fatalf("expected %v, got %v", errSymlinkLoop.Error(), err.Error())
+	}
+}
+
+func TestScanDir_ValidSymlink(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Create a temporary base directory
+	baseDir, cleanup, err := createTempDir("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	// Probe symlink support
+	probe := filepath.Join(baseDir, "symlink-probe")
+	if err := os.Symlink("x", probe); err != nil {
+		t.Skip("symlinks not supported")
+	}
+	_ = os.Remove(probe)
+
+	// Create a real file
+	dirA := filepath.Join(baseDir, "A")
+	err = os.Mkdir(dirA, 0755)
+	dirB := filepath.Join(baseDir, "B")
+	err = os.Mkdir(dirB, 0755)
+	if err != nil {
+		t.Fatalf("Unable to create directories %v", err)
+	}
+
+	data := "Hello world!"
+	file, cleanupFile, err := createTempFile(dirA, data)
+	assert.NoError(t, err)
+	defer cleanupFile()
+
+	// we create
+	// /B/link.txt->/A/trufflehogtest*
+	linkFile := filepath.Join(dirB, "link.txt")
+	if err := os.Symlink(file.Name(), linkFile); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	src := &Source{
+		followSymlinks: true,
+		visitedPaths:   make(map[string]struct{}),
+		concurrency:    1,
+	}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunksCh)
+		err = src.scanDir(ctx, dirB, chunksCh)
+		if err != nil {
+			t.Error("Did not expect err")
+			return
+		}
+	}()
+	if err != nil {
+		t.Fatalf("unexpected error scanning symlink: %v", err)
+	}
+
+	for chunk := range chunksCh {
+		if string(chunk.Data) != data {
+			t.Fatalf("expected chunk.Data: %v to be equal to %v", string(chunk.Data), data)
+		}
+	}
+}
+
+func TestScanFile_ValidSymlink(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Create a temporary base directory
+	baseDir, cleanup, err := createTempDir("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	// Probe symlink support
+	probe := filepath.Join(baseDir, "symlink-probe")
+	if err := os.Symlink("x", probe); err != nil {
+		t.Skip("symlinks not supported")
+	}
+	_ = os.Remove(probe)
+
+	// Create a real file
+	dirA := filepath.Join(baseDir, "A")
+	err = os.Mkdir(dirA, 0755)
+	dirB := filepath.Join(baseDir, "B")
+	err = os.Mkdir(dirB, 0755)
+	if err != nil {
+		t.Fatalf("Unable to create directories %v", err)
+	}
+
+	data := "Hello world!"
+	file, cleanupFile, err := createTempFile(dirA, data)
+	assert.NoError(t, err)
+	defer cleanupFile()
+
+	// we create
+	// /B/link.txt->/A/trufflehogtest*
+	linkFile := filepath.Join(dirB, "link.txt")
+	if err := os.Symlink(file.Name(), linkFile); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	src := &Source{
+		followSymlinks: true,
+		visitedPaths:   make(map[string]struct{}),
+		concurrency:    1,
+	}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+
+	go func() {
+		defer close(chunksCh)
+		err = src.scanFile(ctx, linkFile, chunksCh)
+		if err != nil {
+			t.Errorf("src.scanFile() error=%v", err)
+		}
+	}()
+
+	if err != nil {
+		t.Fatalf("unexpected error scanning symlink: %v", err)
+	}
+
+	for chunk := range chunksCh {
+		if string(chunk.Data) != data {
+			t.Fatalf("expected chunk.Data: %v to be equal to %v", string(chunk.Data), data)
+		}
+	}
+}
+
+func TestScanFile_NestedSymlinkLoop(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	baseDir, cleanup, err := createTempDir("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	probe := filepath.Join(baseDir, "symlink-probe")
+	if err := os.Symlink("x", probe); err != nil {
+		t.Skip("symlinks not supported")
+	}
+	_ = os.Remove(probe)
+
+	// We Create
+	// /fileA->/fileB
+	// /fileB->/fileA
+	fileA := filepath.Join(baseDir, "fileA.txt")
+	fileB := filepath.Join(baseDir, "fileB.txt")
+	err = os.Symlink(fileA, fileB)
+	err = os.Symlink(fileB, fileA)
+	if err != nil {
+		t.Fatalf("Unable to create symlink %v", err)
+	}
+
+	src := &Source{
+		followSymlinks: true,
+		visitedPaths:   make(map[string]struct{}),
+		concurrency:    1,
+	}
+	err = src.scanFile(ctx, fileA, nil)
+
+	if err == nil {
+		t.Fatal("expected symlink loop error, got nil")
+	}
+	if err.Error() != errSymlinkLoop.Error() {
+		t.Fatalf("expected %v, got %v", errSymlinkLoop.Error(), err.Error())
+	}
 }
