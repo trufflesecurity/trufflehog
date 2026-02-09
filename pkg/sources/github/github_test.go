@@ -364,6 +364,51 @@ func TestAddReposByApp(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+// TestAppConnector_EnterpriseBaseURL verifies that GitHub App authentication
+// correctly sets the BaseURL on the internal AppsTransport for token refresh.
+// This is critical for GitHub Enterprise Server and GHEC with Data Residency.
+// Without this fix, token refresh requests would go to api.github.com instead
+// of the configured enterprise endpoint.
+func TestAppConnector_EnterpriseBaseURL(t *testing.T) {
+	privateKey := createPrivateKey()
+	enterpriseEndpoint := "https://api.example.ghe.com"
+
+	connector, err := NewAppConnector(
+		context.Background(),
+		enterpriseEndpoint,
+		&credentialspb.GitHubApp{
+			PrivateKey:     privateKey,
+			InstallationId: "1337",
+			AppId:          "4141",
+		})
+	require.NoError(t, err)
+
+	appConn, ok := connector.(*appConnector)
+	require.True(t, ok, "connector should be an appConnector")
+
+	// Get the HTTP client's transport, which should be a ghinstallation.Transport
+	transport := appConn.apiClient.Client().Transport
+
+	// Use reflection to access the Transport's BaseURL field
+	transportVal := reflect.ValueOf(transport).Elem()
+	baseURLField := transportVal.FieldByName("BaseURL")
+	require.True(t, baseURLField.IsValid(), "Transport should have a BaseURL field")
+	assert.Equal(t, enterpriseEndpoint, baseURLField.String(),
+		"Transport.BaseURL should be set to enterprise endpoint")
+
+	// Use reflection to access the internal appsTransport and verify its BaseURL
+	// This is the critical check - the internal AppsTransport is used for token refresh
+	appsTransportField := transportVal.FieldByName("appsTransport")
+	require.True(t, appsTransportField.IsValid(), "Transport should have an appsTransport field")
+
+	// Access the BaseURL of the internal AppsTransport
+	appsTransportVal := appsTransportField.Elem()
+	appsBaseURLField := appsTransportVal.FieldByName("BaseURL")
+	require.True(t, appsBaseURLField.IsValid(), "AppsTransport should have a BaseURL field")
+	assert.Equal(t, enterpriseEndpoint, appsBaseURLField.String(),
+		"AppsTransport.BaseURL should be set to enterprise endpoint")
+}
+
 func TestAddOrgsByUser(t *testing.T) {
 	defer gock.Off()
 

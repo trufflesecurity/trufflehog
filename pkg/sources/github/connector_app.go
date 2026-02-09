@@ -54,15 +54,11 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 		return nil, fmt.Errorf("could not create installation client: %w", err)
 	}
 
-	apiTransport, err := ghinstallation.New(
-		httpClient.Transport,
-		appID,
-		installationID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, fmt.Errorf("could not create API client transport: %w", err)
-	}
-	apiTransport.BaseURL = apiEndpoint
+	// Use NewFromAppsTransport to ensure the apiTransport inherits the correct BaseURL
+	// from installationTransport. Using ghinstallation.New() would create a new internal
+	// AppsTransport with the default BaseURL (api.github.com), causing APIs that rely on the BaseURL
+	// (like token refresh) to fail for GitHub Enterprise or GHEC with Data Residency.
+	apiTransport := ghinstallation.NewFromAppsTransport(installationTransport, installationID)
 
 	httpClient.Transport = apiTransport
 	apiClient, err := github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
