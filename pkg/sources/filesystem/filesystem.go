@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -140,7 +141,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 	resolvedRoot, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		if errors.Is(err, errSymlinkLoop) {
+		if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
 			ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
 		} else {
 			ctx.Logger().Error(err, "Err resolving path", "path", path)
@@ -188,7 +189,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 				resolved, err := filepath.EvalSymlinks(fullPath)
 				if err != nil {
 					// Broken or looping symlink, just skip
-					if errors.Is(err, errSymlinkLoop) {
+					if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
 						ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
 					} else {
 						ctx.Logger().Error(err, "skipping broken symlink", "path", fullPath)
@@ -270,7 +271,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		if errors.Is(err, errSymlinkLoop) {
+		if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
 			ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
 		} else {
 			ctx.Logger().Error(err, "skipping broken symlink", "path", path)
