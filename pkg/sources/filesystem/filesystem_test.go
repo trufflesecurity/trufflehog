@@ -524,15 +524,21 @@ func TestScanDir_VisitedPath_PreventInfiniteRecursion(t *testing.T) {
 	dirA := filepath.Join(baseDir, "A")
 	dirB := filepath.Join(baseDir, "B")
 	err = os.Mkdir(dirA, 0755)
+	if err != nil {
+		t.Fatalf("Unable to create directory A %v", err)
+	}
 	err = os.Mkdir(dirB, 0755)
 	if err != nil {
-		t.Fatalf("Unable to create directories %v", err)
+		t.Fatalf("Unable to create directory B %v", err)
 	}
 
 	// We create
 	// A/linkToB -> /B
 	// B/linkToA -> /A
 	err = os.Symlink(dirB, filepath.Join(dirA, "linkToB"))
+	if err != nil {
+		t.Fatalf("Unable to create symlink %v", err)
+	}
 	err = os.Symlink(dirA, filepath.Join(dirB, "linkToA"))
 	if err != nil {
 		t.Fatalf("Unable to create symlink %v", err)
@@ -576,6 +582,9 @@ func TestScanDir_NestedSymlinkLoop(t *testing.T) {
 	// /A->/B
 	// /B->/A
 	err = os.Symlink(filepath.Join(baseDir, "B"), filepath.Join(baseDir, "A"))
+	if err != nil {
+		t.Fatalf("Unable to create symlink %v", err)
+	}
 	err = os.Symlink(filepath.Join(baseDir, "A"), filepath.Join(baseDir, "B"))
 	if err != nil {
 		t.Fatalf("Unable to create symlink %v", err)
@@ -617,10 +626,13 @@ func TestScanDir_ValidSymlink(t *testing.T) {
 	// Create a real file
 	dirA := filepath.Join(baseDir, "A")
 	err = os.Mkdir(dirA, 0755)
+	if err != nil {
+		t.Fatalf("Unable to create directory A %v", err)
+	}
 	dirB := filepath.Join(baseDir, "B")
 	err = os.Mkdir(dirB, 0755)
 	if err != nil {
-		t.Fatalf("Unable to create directories %v", err)
+		t.Fatalf("Unable to create directory B %v", err)
 	}
 
 	data := "Hello world!"
@@ -682,10 +694,13 @@ func TestScanFile_ValidSymlink(t *testing.T) {
 	// Create a real file
 	dirA := filepath.Join(baseDir, "A")
 	err = os.Mkdir(dirA, 0755)
+	if err != nil {
+		t.Fatalf("Unable to create directory A %v", err)
+	}
 	dirB := filepath.Join(baseDir, "B")
 	err = os.Mkdir(dirB, 0755)
 	if err != nil {
-		t.Fatalf("Unable to create directories %v", err)
+		t.Fatalf("Unable to create directory B %v", err)
 	}
 
 	data := "Hello world!"
@@ -748,6 +763,9 @@ func TestScanFile_NestedSymlinkLoop(t *testing.T) {
 	fileA := filepath.Join(baseDir, "fileA.txt")
 	fileB := filepath.Join(baseDir, "fileB.txt")
 	err = os.Symlink(fileA, fileB)
+	if err != nil {
+		t.Fatalf("Unable to create symlink %v", err)
+	}
 	err = os.Symlink(fileB, fileA)
 	if err != nil {
 		t.Fatalf("Unable to create symlink %v", err)
