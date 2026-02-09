@@ -18,7 +18,35 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	ignorePatterns []*regexp.Regexp
+}
+
+func New(opts ...func(*Scanner)) *Scanner {
+	scanner := &Scanner{
+		ignorePatterns: []*regexp.Regexp{},
+	}
+	for _, opt := range opts {
+		opt(scanner)
+	}
+
+	return scanner
+}
+
+func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
+	return func(s *Scanner) {
+		var ignorePatterns []*regexp.Regexp
+		for _, ignoreString := range ignoreStrings {
+			ignorePattern, err := regexp.Compile(ignoreString)
+			if err != nil {
+				panic(fmt.Sprintf("%s is not a valid regex, error received: %v", ignoreString, err))
+			}
+			ignorePatterns = append(ignorePatterns, ignorePattern)
+		}
+
+		s.ignorePatterns = ignorePatterns
+	}
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -38,6 +66,9 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	matches := pattern.FindAllStringSubmatch(string(data), -1)
 	for _, match := range matches {
+		if shouldIgnore(match[1], s.ignorePatterns) {
+			continue
+		}
 		paramsUnsafe, err := msdsn.Parse(match[1])
 		if err != nil {
 			continue
@@ -78,6 +109,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func shouldIgnore(uri string, ignorePatterns []*regexp.Regexp) bool {
+	for _, ignore := range ignorePatterns {
+		if ignore.MatchString(uri) {
+			return true
+		}
+	}
+	return false
 }
 
 var ping = func(ctx context.Context, config msdsn.Config) (bool, error) {
