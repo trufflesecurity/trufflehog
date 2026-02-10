@@ -118,7 +118,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			continue
 		}
 
-		var resolvedSymlinkInfo os.FileInfo
+		// This will always be the FileInfo we use to decide dir vs file
+		targetInfo := fileInfo
+
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			if !s.followSymlinks {
 				// If the file or directory is a symlink but the followSymlinks is disable ignore the path
@@ -126,15 +128,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 				continue
 			}
 			// if the root path is a symlink resolve the path and check if it resolves to a dir or file
-			// if resolvedSymlinkInfo is a dir then call scanDir otherwise call scanFile
-			resolvedSymlinkInfo, err = os.Stat(cleanPath)
+			// if targetInfo is a dir then call scanDir otherwise call scanFile
+			targetInfo, err = os.Stat(cleanPath)
 			if err != nil {
 				logger.Error(err, "unable to get symlink info")
 				continue
 			}
 		}
 
-		if fileInfo.IsDir() || resolvedSymlinkInfo.IsDir() {
+		if targetInfo.IsDir() {
 			err = s.scanDir(ctx, cleanPath, chunksChan)
 		} else {
 			err = s.scanFile(ctx, cleanPath, chunksChan)
@@ -309,7 +311,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		}
 		return err
 	}
-	if !s.checkAndMarkVisited(resolved) {
+	if s.checkAndMarkVisited(resolved) {
 		ctx.Logger().V(3).Info("Resolved symlink is already scanned", "path", resolved)
 		return nil
 	}
@@ -380,7 +382,8 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	if err != nil {
 		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get file info: %w", err))
 	}
-	var resolvedSymlinkInfo os.FileInfo
+	// This will always be the FileInfo we use to decide dir vs file
+	targetInfo := fileInfo
 	if fileInfo.Mode()&os.ModeSymlink != 0 {
 		if !s.followSymlinks {
 			// If the file or directory is a symlink but the followSymlinks is disable ignore the path
@@ -389,7 +392,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 		// if the root path is a symlink resolve the path and check if it resolves to a dir or file
 		// if resolvedSymlinkInfo is a dir then call scanDir otherwise call scanFile
-		resolvedSymlinkInfo, err = os.Stat(cleanPath)
+		targetInfo, err = os.Stat(cleanPath)
 		if err != nil {
 			logger.Error(err, "unable to get symlink info")
 			return nil
@@ -400,7 +403,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	var scanErr error
 	go func() {
 		defer close(ch)
-		if fileInfo.IsDir() || resolvedSymlinkInfo.IsDir() {
+		if targetInfo.IsDir() {
 			// TODO: Finer grain error tracking of individual chunks.
 			scanErr = s.scanDir(ctx, cleanPath, ch)
 		} else {
