@@ -26,47 +26,72 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 
 // Analyze performs the analysis of the Datadog API key and returns the analyzer result.
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	apiKey, exist := credInfo["apiKey"]
-	if !exist {
-		return nil, errors.New("API key not found in credentials info")
-	}
-
-	// Get appKey if provided
+	apiKey := credInfo["apiKey"]
 	appKey := credInfo["appKey"]
+	endpoint := credInfo["endpoint"]
 
-	info, err := AnalyzePermissions(a.Cfg, apiKey, appKey)
+	info, err := AnalyzePermissions(a.Cfg, apiKey, appKey, endpoint)
 	if err != nil {
 		return nil, err
 	}
-
 	return secretInfoToAnalyzerResult(info), nil
 }
 
-func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string, appKey string) {
-	info, err := AnalyzePermissions(cfg, apiKey, appKey)
+func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey, appKey, endpoint string) {
+	info, err := AnalyzePermissions(cfg, apiKey, appKey, endpoint)
 	if err != nil {
 		// just print the error in cli and continue as a partial success
 		color.Red("[x] Error : %s", err.Error())
 	}
 
-	color.Green("[i] Valid Datadog API Key\n")
+	if info == nil {
+		color.Red("[x] No information retrieved")
+		return
+	}
 
+	color.Green("[i] Valid Datadog API Key\n")
 	printUser(info.User)
 	printResources(info.Resources)
 	printPermissions(info.Permissions)
 }
 
 // AnalyzePermissions will collect all the scopes assigned to token along with resource it can access
-func AnalyzePermissions(cfg *config.Config, apiKey string, appKey string) (*SecretInfo, error) {
+func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*SecretInfo, error) {
+	if apiKey == "" {
+		return nil, errors.New("api key not found in credentials info")
+	}
+
 	// create the http client
 	client := analyzers.NewAnalyzeClient(cfg)
 
 	var secretInfo = &SecretInfo{}
 
-	// First detect which DataDog domain works with this API key
-	baseURL, err := DetectDomain(client, apiKey, appKey)
-	if err != nil {
-		return nil, fmt.Errorf("[x] %v", err)
+	var baseURL string
+	var err error
+
+	// If endpoint is provided, use it directly; otherwise detect domain
+	if endpoint != "" {
+		baseURL = endpoint + "/api"
+	} else {
+		baseURL, err = DetectDomain(client, apiKey, appKey)
+		if err != nil {
+			return nil, fmt.Errorf("[x] %v", err)
+		}
+	}
+
+	if appKey == "" {
+		// If no application key is provided, we can only validate the API key
+		isValidApiKey, err := ValidateApiKey(client, baseURL, apiKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate api key: %v", err)
+		}
+		if !isValidApiKey {
+			return nil, errors.New("invalid api key provided")
+		}
+		if err := CaptureApiKeyPermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
+			return nil, fmt.Errorf("failed to fetch permissions: %v", err)
+		}
+		return secretInfo, nil
 	}
 
 	// capture user information in secretInfo
@@ -85,6 +110,10 @@ func AnalyzePermissions(cfg *config.Config, apiKey string, appKey string) (*Secr
 		return nil, fmt.Errorf("failed to fetch permissions: %v", err)
 	}
 
+	// Capture API key permissions
+	if err := CaptureApiKeyPermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
+		return nil, fmt.Errorf("failed to fetch permissions: %v", err)
+	}
 	return secretInfo, nil
 }
 
@@ -114,7 +143,17 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	permissionBindings := secretInfoPermissionsToAnalyzerPermission(info.Permissions)
-	result.Bindings = analyzers.BindAllPermissions(*userResource, *permissionBindings...)
+	if userResource != nil && len(*permissionBindings) > 0 {
+		result.Bindings = analyzers.BindAllPermissions(*userResource, *permissionBindings...)
+	}
+	if userResource == nil && len(*permissionBindings) > 0 {
+		result.Bindings = analyzers.BindAllPermissions(analyzers.Resource{
+			FullyQualifiedName: "Unknown User",
+			Name:               "Unknown User",
+			Type:               "User",
+			Metadata:           map[string]any{},
+		}, *permissionBindings...)
+	}
 
 	// Extract information from resources to create bindings
 	for _, resource := range info.Resources {
