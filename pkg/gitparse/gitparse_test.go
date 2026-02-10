@@ -1478,6 +1478,26 @@ func TestMaxCommitSize(t *testing.T) {
 	}
 
 }
+func TestWaitDelay(t *testing.T) {
+	// Test that WithWaitDelay sets the waitDelay correctly
+	customDelay := 10 * time.Second
+	parser := NewParser(WithWaitDelay(customDelay))
+	if parser.waitDelay != customDelay {
+		t.Errorf("waitDelay not set correctly. Got: %v, expected: %v", parser.waitDelay, customDelay)
+	}
+
+	// Test that default waitDelay is used when not specified
+	defaultParser := NewParser()
+	if defaultParser.waitDelay != defaultWaitDelay {
+		t.Errorf("default waitDelay not set correctly. Got: %v, expected: %v", defaultParser.waitDelay, defaultWaitDelay)
+	}
+
+	// Test that zero value is allowed (caller can set to 0 if they want no delay)
+	zeroDelayParser := NewParser(WithWaitDelay(0))
+	if zeroDelayParser.waitDelay != 0 {
+		t.Errorf("zero waitDelay not set correctly. Got: %v, expected: 0", zeroDelayParser.waitDelay)
+	}
+}
 
 const commitLog = `commit e50b135fd29e91b2fbb25923797f5ecffe59f359
 Author: lionzxy <nikita@kulikof.ru>
