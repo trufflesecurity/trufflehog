@@ -7,9 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"encoding/json"
-	"os"
-	"log"
 
 	regexp "github.com/wasilibs/go-re2"
 
