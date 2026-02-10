@@ -476,7 +476,7 @@ type ElasticsearchConfig struct {
 type StdinConfig struct{}
 
 // JSONEnumeratorConfig defines the configuration for a JSON enumerator source.
-type JSONEnumeratorConfig struct{
+type JSONEnumeratorConfig struct {
 	// Paths is the list of JSON enumerator files to scan.
 	Paths []string
 }
