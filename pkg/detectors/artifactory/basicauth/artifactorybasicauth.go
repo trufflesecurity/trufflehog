@@ -7,6 +7,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"encoding/json"
+	"os"
+	"log"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -179,12 +182,14 @@ func verifyArtifactoryBasicAuth(ctx context.Context, client *http.Client, host, 
 			return false, err
 		}
 
-		if strings.Contains(string(body), "OK") {
-			return true, nil
-		}
+        if strings.TrimSpace(string(body)) == "OK" {
+            return true, nil
+        }
 
 		return false, nil
-	case http.StatusUnauthorized, http.StatusForbidden, http.StatusFound:
+	case http.StatusForbidden:
+        return true, nil
+	case http.StatusUnauthorized, http.StatusFound:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
