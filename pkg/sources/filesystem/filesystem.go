@@ -222,7 +222,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 				}
 				resolved = filepath.Clean(resolved)
 				ctx.Logger().V(5).Info("Symlink is resolved to path", "path", resolved)
-				if !s.checkAndMarkVisited(resolved) {
+				if s.checkAndMarkVisited(resolved) {
 					ctx.Logger().V(3).Info("Resolved symlink is already scanned", "path", resolved)
 					return nil
 				}
