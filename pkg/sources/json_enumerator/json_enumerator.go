@@ -3,12 +3,12 @@ package json_enumerator
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"unicode/utf8"
 
-	"github.com/go-errors/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -23,11 +23,11 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_JSON_ENUMERATOR
 
 type Source struct {
-	name        string
-	sourceId    sources.SourceID
-	jobId       sources.JobID
-	verify      bool
-	paths       []string
+	name     string
+	sourceId sources.SourceID
+	jobId    sources.JobID
+	verify   bool
+	paths    []string
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
