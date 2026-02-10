@@ -31,7 +31,7 @@ var (
 	// Matches: legacy keys (sk-{alnum}T3BlbkFJ...), project keys (sk-proj-...),
 	//          service account keys (sk-svcacct-... or sk-service-...)
 	// Does NOT match: admin keys (sk-admin-...)
-	keyPat = regexp.MustCompile(`\b(sk-(?:(?:proj|svcacct|service)-[[:alnum:]_-]+|[a-zA-Z0-9]+)T3BlbkFJ[[:alnum:]_-]+)\b`)
+	keyPat = regexp.MustCompile(`\b(sk-(?:(?:proj|svcacct|service)-[A-Za-z0-9_-]+|[a-zA-Z0-9]+)T3BlbkFJ[A-Za-z0-9_-]+)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
