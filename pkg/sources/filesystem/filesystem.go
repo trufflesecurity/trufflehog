@@ -166,7 +166,8 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 	resolvedRoot := filepath.Clean(path)
 	if s.followSymlinks {
-		resolvedRoot, err := filepath.EvalSymlinks(path)
+		var err error
+		resolvedRoot, err = filepath.EvalSymlinks(path)
 		if err != nil {
 			if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
 				ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
@@ -258,7 +259,10 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 				// If symlink resolves to directory scan that directory
 				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolved)
-				s.scanDir(ctx, resolved, chunksChan)
+				err = s.scanDir(ctx, resolved, chunksChan)
+				if err != nil {
+					ctx.Logger().Error(err, "error occurred in nested recursive scanDir call")
+				}
 				return nil
 			}
 			// Skip symlinks if followSymlinks is false
