@@ -40,7 +40,15 @@ func (s *Source) Type() sourcespb.SourceType { return SourceType }
 func (s *Source) SourceID() sources.SourceID { return s.sourceId }
 func (s *Source) JobID() sources.JobID       { return s.jobId }
 
-func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(
+	aCtx context.Context,
+	name string,
+	jobId sources.JobID,
+	sourceId sources.SourceID,
+	verify bool,
+	connection *anypb.Any,
+	concurrency int,
+) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -55,7 +63,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	return nil
 }
 
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(
+	ctx context.Context,
+	chunksChan chan *sources.Chunk,
+	_ ...sources.ChunkingTarget,
+) error {
 	for i, path := range s.paths {
 		if common.IsDone(ctx) {
 			return nil
@@ -74,7 +86,8 @@ type jsonEntry struct {
 	Data     []byte
 }
 
-// jsonEntryAux is a helper struct to support marshalling the content to scan as either a UTF-8 string in `content` or a base64-encoded bytestring in `content_base64`.
+// jsonEntryAux is a helper struct to support marshalling the content to scan as either
+// a UTF-8 string in `content` or a base64-encoded bytestring in `content_base64`.
 type jsonEntryAux struct {
 	Metadata *json.RawMessage `json:"metadata"`
 	Data     *string          `json:"data,omitempty"`
@@ -127,7 +140,11 @@ func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *Source) chunkJSONEnumeratorReader(ctx context.Context, input io.Reader, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkJSONEnumeratorReader(
+	ctx context.Context,
+	input io.Reader,
+	chunksChan chan *sources.Chunk,
+) error {
 	decoder := json.NewDecoder(input)
 	var entry jsonEntry
 
@@ -163,14 +180,19 @@ func (s *Source) chunkJSONEnumeratorReader(ctx context.Context, input io.Reader,
 			},
 		}
 
-		if err := handlers.HandleFile(ctx, bytes.NewReader(entry.Data), chunkSkel, reporter); err != nil {
+		err = handlers.HandleFile(ctx, bytes.NewReader(entry.Data), chunkSkel, reporter)
+		if err != nil {
 			ctx.Logger().Error(err, "failed to scan data")
 			continue
 		}
 	}
 }
 
-func (s *Source) chunkJSONEnumerator(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkJSONEnumerator(
+	ctx context.Context,
+	path string,
+	chunksChan chan *sources.Chunk,
+) error {
 	ctx.Logger().V(3).Info("chunking JSON enumerator", "path", path)
 
 	enumeratorFile, err := os.Open(path)

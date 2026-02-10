@@ -13,7 +13,10 @@ import (
 )
 
 // ScanJSONEnumeratorInput scans input that is in JSON Enumerator format
-func (e *Engine) ScanJSONEnumeratorInput(ctx context.Context, c sources.JSONEnumeratorConfig) (sources.JobProgressRef, error) {
+func (e *Engine) ScanJSONEnumeratorInput(
+	ctx context.Context,
+	c sources.JSONEnumeratorConfig,
+) (sources.JobProgressRef, error) {
 	connection := &sourcespb.JSONEnumerator{
 		Paths: c.Paths,
 	}
@@ -32,7 +35,8 @@ func (e *Engine) ScanJSONEnumeratorInput(ctx context.Context, c sources.JSONEnum
 	}
 
 	source := &json_enumerator.Source{}
-	if err := source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	err = source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU())
+	if err != nil {
 		return sources.JobProgressRef{}, err
 	}
 	return e.sourceManager.EnumerateAndScan(ctx, sourceName, source)

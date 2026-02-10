@@ -21,7 +21,12 @@ const secretPart2 string = "SPLIT"
 // Split the secret into two parts and pad the rest of the chunk with A's.
 func makeStringData(t *testing.T, chunkSize int) []byte {
 	t.Helper()
-	data := []byte(strings.Repeat("A", chunkSize-len(secretPart1)) + secretPart1 + secretPart2 + strings.Repeat("A", chunkSize-len(secretPart2)))
+	data := []byte(strings.Join([]string{
+		strings.Repeat("A", chunkSize-len(secretPart1)),
+		secretPart1,
+		secretPart2,
+		strings.Repeat("A", chunkSize-len(secretPart2)),
+	}, ""))
 	assert.True(t, utf8.Valid(data))
 	return data
 }
@@ -29,7 +34,12 @@ func makeStringData(t *testing.T, chunkSize int) []byte {
 // Split the secret into two parts and pad the rest of the chunk with invalid unicode
 func makeBase64Data(t *testing.T, chunkSize int) []byte {
 	t.Helper()
-	data := []byte(strings.Repeat("\xff", chunkSize-len(secretPart1)) + secretPart1 + secretPart2 + strings.Repeat("\xf0", chunkSize-len(secretPart2)))
+	data := []byte(strings.Join([]string{
+		strings.Repeat("\xff", chunkSize-len(secretPart1)),
+		secretPart1,
+		secretPart2,
+		strings.Repeat("\xf0", chunkSize-len(secretPart2)),
+	}, ""))
 	assert.False(t, utf8.Valid(data))
 	return data
 }
@@ -96,7 +106,10 @@ func TestScanEnumerator(t *testing.T) {
 			}()
 
 			enc := json.NewEncoder(writeJSON)
-			require.NoError(t, enc.Encode(&jsonEntry{Data: testCase.data, Metadata: testCase.metadata}))
+			require.NoError(t, enc.Encode(&jsonEntry{
+				Data:     testCase.data,
+				Metadata: testCase.metadata,
+			}))
 			require.NoError(t, writeJSON.Close())
 
 			foundSecret := ""
@@ -113,5 +126,4 @@ func TestScanEnumerator(t *testing.T) {
 			}
 		})
 	}
-
 }
