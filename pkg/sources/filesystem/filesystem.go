@@ -164,16 +164,19 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 	startState := s.GetEncodedResumeInfoFor(path)
 	resuming := startState != ""
 
-	resolvedRoot, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
-			ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
-		} else {
-			ctx.Logger().Error(err, "Err resolving path", "path", path)
+	resolvedRoot := filepath.Clean(path)
+	if s.followSymlinks {
+		resolvedRoot, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
+				ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
+			} else {
+				ctx.Logger().Error(err, "Err resolving path", "path", path)
+			}
+			return err
 		}
-		return err
+		resolvedRoot = filepath.Clean(resolvedRoot)
 	}
-	resolvedRoot = filepath.Clean(resolvedRoot)
 
 	if s.checkAndMarkVisited(resolvedRoot) {
 		// Return if the direcory has already been visited
@@ -255,7 +258,8 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 				// If symlink resolves to directory scan that directory
 				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolved)
-				return s.scanDir(ctx, resolved, chunksChan)
+				s.scanDir(ctx, resolved, chunksChan)
+				return nil
 			}
 			// Skip symlinks if followSymlinks is false
 			return nil
@@ -302,14 +306,17 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		ctx.Logger().Info("skipping, following symlinks is not enabled", "path", path)
 		return nil
 	}
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
-			ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
-		} else {
-			ctx.Logger().Error(err, "skipping broken symlink", "path", path)
+	resolved := path
+	if fileStat.Mode()&os.ModeSymlink != 0 {
+		resolved, err = filepath.EvalSymlinks(path)
+		if err != nil {
+			if strings.Contains(err.Error(), errSymlinkLoop.Error()) {
+				ctx.Logger().Error(err, "Symlink loop encountered", "path", path)
+			} else {
+				ctx.Logger().Error(err, "skipping broken symlink", "path", path)
+			}
+			return err
 		}
-		return err
 	}
 	if s.checkAndMarkVisited(resolved) {
 		ctx.Logger().V(3).Info("Resolved symlink is already scanned", "path", resolved)
