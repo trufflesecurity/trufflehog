@@ -13,6 +13,7 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
@@ -81,7 +82,14 @@ type Source struct {
 	projectsPerPage int64
 
 	// cache of repo URL to project info, used when generating metadata for chunks
-	projectMetadataCache *projectMetadataCache
+	projectMetadataCache *expirable.LRU[string, *projectMetadata]
+}
+
+// projectMetadata represents GitLab project metadata.
+type projectMetadata struct {
+	id    int64
+	name  string
+	owner string
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -243,7 +251,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 				Line:                line,
 			}
 			// check for project metadata in the cache
-			project, ok := s.projectMetadataCache.get(repository)
+			project, ok := s.projectMetadataCache.Get(repository)
 			if ok {
 				ctx.Logger().V(5).Info("cache hit inside source metadata func: found project metadata in the cache", "cache_key", repository)
 				gitlabMetadata.ProjectId = project.id
@@ -265,7 +273,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	}
 	s.git = git.NewGit(cfg)
 
-	s.projectMetadataCache = NewProjectMetadataCache()
+	s.projectMetadataCache = expirable.NewLRU[string, *projectMetadata](
+		15000, // upto 15000 entries
+		nil,
+		60*time.Minute, // time-based expiration - 1 hour
+	)
 
 	return nil
 }
@@ -1142,7 +1154,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 // and stores it in the cache.
 func (s *Source) ensureProjectInCache(ctx context.Context, repoURL string) {
 	// Check if the project is already cached.
-	if _, ok := s.projectMetadataCache.get(repoURL); ok {
+	if _, ok := s.projectMetadataCache.Get(repoURL); ok {
 		ctx.Logger().V(5).Info("cache hit: found project metadata in the cache", "cache_key", repoURL)
 		return
 	}
@@ -1181,7 +1193,7 @@ func (s *Source) getGitlabProject(ctx context.Context, repoUrl string) (*gitlab.
 // cacheGitlabProjectMetadata caches GitLab project metadata keyed by the
 // normalized GitLab repository URL.
 func (s *Source) cacheGitlabProjectMetadata(ctx context.Context, glProject *gitlab.Project) {
-	proj := &project{
+	proj := &projectMetadata{
 		id:   int64(glProject.ID),
 		name: glProject.NameWithNamespace,
 	}
@@ -1201,7 +1213,7 @@ func (s *Source) cacheGitlabProjectMetadata(ctx context.Context, glProject *gitl
 	}
 
 	ctx.Logger().V(5).Info("cache set: added project metadata in the cache", "cache_key", repoURL)
-	s.projectMetadataCache.set(repoURL, proj)
+	s.projectMetadataCache.Add(repoURL, proj)
 }
 
 func buildIgnorer(include, exclude []string, onCompile func(err error, pattern string)) func(repo string) bool {
