@@ -34,7 +34,7 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
 
 // Base URL for GitLab Cloud (hosted at gitlab.com)
-const gitlabCloudBaseUrl = "https://gitlab.com/"
+const gitlabCloudBaseURL = "https://gitlab.com/"
 
 type Source struct {
 	name     string
@@ -638,7 +638,7 @@ func (s *Source) getAllProjectRepos(
 		Owned:        gitlab.Ptr(false),
 	}
 
-	if s.url != gitlabCloudBaseUrl {
+	if s.url != gitlabCloudBaseURL {
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
@@ -730,7 +730,7 @@ func (s *Source) getAllProjectReposV2(
 	}
 
 	// for gitlab.com instance, include only projects where the user is a member.
-	if s.url == gitlabCloudBaseUrl {
+	if s.url == gitlabCloudBaseURL {
 		projectQueryOptions.Membership = gitlab.Ptr(true)
 	}
 
@@ -847,7 +847,7 @@ func (s *Source) getAllProjectReposInGroups(
 	}
 
 	// For non gitlab.com instances, you might want to adjust access levels
-	if s.url != gitlabCloudBaseUrl {
+	if s.url != gitlabCloudBaseURL {
 		projectOpts.MinAccessLevel = gitlab.Ptr(gitlab.GuestPermissions)
 	}
 
@@ -1125,14 +1125,14 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
-	normalizedRepoUrl, err := giturl.NormalizeGitlabRepo(repoURL)
+	normalizedRepoURL, err := giturl.NormalizeGitlabRepo(repoURL)
 	if err != nil {
 		ctx.Logger().Error(err, "failed to normalize GitLab Repo", "repo", repoURL)
 		return err
 	}
 	// ensure project details are cached
 	// this is required to populate metadata during chunking
-	s.ensureProjectInCache(ctx, normalizedRepoUrl)
+	s.ensureProjectInCache(ctx, normalizedRepoURL)
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 }
@@ -1241,7 +1241,7 @@ func normalizeRepos(repos []string) ([]string, []error) {
 // Otherwise, it ensures we are using https as our protocol, if none was provided.
 func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
 	if gitlabEndpoint == "" {
-		return gitlabCloudBaseUrl, nil
+		return gitlabCloudBaseURL, nil
 	}
 
 	gitlabURL, err := url.Parse(gitlabEndpoint)
@@ -1259,7 +1259,7 @@ func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
 
 	// If the host is gitlab.com, this is the cloud version, which has only one valid endpoint.
 	if gitlabURL.Host == "gitlab.com" {
-		return gitlabCloudBaseUrl, nil
+		return gitlabCloudBaseURL, nil
 	}
 
 	// Beyond here, on-prem gitlab is being used, so we have to mostly leave things as-is.
