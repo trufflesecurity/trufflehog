@@ -8,6 +8,20 @@ import (
 	"testing"
 )
 
+func TestOpenAI_DoesNotMatchAdminKeys(t *testing.T) {
+	d := Scanner{}
+	adminKey := `OPENAI_ADMIN_KEY = "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"`
+
+	results, err := d.FromData(context.Background(), false, []byte(adminKey))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("openai detector should not match admin keys, but got %d results", len(results))
+	}
+}
+
 func TestOpenAI_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
