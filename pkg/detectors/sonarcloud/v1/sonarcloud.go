@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_SonarCloud,
 			Raw:          []byte(match),
 			ExtraData: map[string]string{
-				"Version": fmt.Sprintf("%d", s.Version()),
+				"version": fmt.Sprintf("%d", s.Version()),
 			},
 		}
 
