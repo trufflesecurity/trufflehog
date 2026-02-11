@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -212,6 +213,21 @@ func TestFragmentLineOffsetWithPrimarySecret(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
+	result := &detectors.Result{
+		Raw: []byte("secret here"),
+	}
+	result.SetPrimarySecretValue("secret:\nsecret here")
+
+	chunk := &sources.Chunk{
+		Data: []byte("line1\nline2\nsecret:\nsecret here\nline5"),
+	}
+	lineOffset, isIgnored := FragmentLineOffset(chunk, result)
+	assert.False(t, isIgnored)
+	// offset 2 means line 3
+	assert.Equal(t, int64(2), lineOffset)
 }
 
 func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *detectors.Result) {
@@ -767,7 +783,7 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	e, err := NewEngine(ctx, &c)
 	assert.NoError(t, err)
 
-	e.verificationOverlapTracker = new(verificationOverlapTracker)
+	e.verificationOverlapTracker = &atomic.Int32{}
 
 	e.Start(ctx)
 
@@ -783,8 +799,8 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 
 	// We want 0 because these are custom detectors and verification should still occur.
-	wantDupe := 0
-	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
+	wantDupe := int32(0)
+	assert.Equal(t, wantDupe, e.verificationOverlapTracker.Load())
 }
 
 func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
