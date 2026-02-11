@@ -104,10 +104,11 @@ func (s Scanner) verify(url string) (bool, error) {
 	}
 	// Check if this is a determinate authentication failure
 	errMsg := err.Error()
-	if strings.Contains(errMsg, "403") ||
-		strings.Contains(errMsg, "username or password not allowed") ||
-		strings.Contains(errMsg, "ACCESS_REFUSED") ||
-		strings.Contains(errMsg, "access_refused") {
+	has403 := strings.Contains(errMsg, "403")
+	hasAccessRefused := strings.Contains(errMsg, "ACCESS_REFUSED") || strings.Contains(errMsg, "access_refused")
+	hasUsernamePasswordError := strings.Contains(errMsg, "username or password not allowed")
+	
+	if (has403 && hasAccessRefused) || hasUsernamePasswordError {
 		return false, nil
 	}
 	return false, err
