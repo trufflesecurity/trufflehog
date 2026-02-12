@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -37,12 +38,19 @@ type Source struct {
 	skipBinaries bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+	followSymlinks      bool
+	maxSymlinkDepth     int
+	visitedSymlinkPaths map[string]struct{}
+	visitedmu           sync.Mutex
 }
 
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 var _ sources.SourceUnitEnumChunker = (*Source)(nil)
+
+// max symlink depth allowed
+const DEFAULT_MAX_SYMLINK_DEPTH_ALLOWED = 40
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -80,8 +88,43 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return fmt.Errorf("unable to create filter: %w", err)
 	}
 	s.filter = filter
+	s.maxSymlinkDepth = int(conn.GetMaxSymlinkDepth())
+	if s.maxSymlinkDepth > DEFAULT_MAX_SYMLINK_DEPTH_ALLOWED {
+		err := fmt.Errorf("Specified symlink depth %v exceeds the allowed max allowed symlink depth of %v", s.maxSymlinkDepth, DEFAULT_MAX_SYMLINK_DEPTH_ALLOWED)
+		return err
+	}
+	if s.maxSymlinkDepth > 0 {
+		s.followSymlinks = true
+	}
+	s.visitedSymlinkPaths = make(map[string]struct{})
 
 	return nil
+}
+
+func (s *Source) resolveSymLink(ctx context.Context, symlinkPath string) (os.FileInfo, string, error) {
+	var fileInfo os.FileInfo
+	var err error
+	resolvedPath := symlinkPath
+	resolvedFilePath := symlinkPath
+	for depth := 0; depth < s.maxSymlinkDepth; depth++ {
+		resolvedFilePath, err = os.Readlink(resolvedPath)
+		if !filepath.IsAbs(resolvedFilePath) {
+			resolvedFilePath = filepath.Join(
+				filepath.Dir(resolvedPath),
+				resolvedFilePath,
+			)
+		}
+		fileInfo, err = os.Lstat(resolvedFilePath)
+		if err != nil {
+			return nil, "", fmt.Errorf("Error in retrieving info: %v", err)
+		}
+		if fileInfo.Mode()&os.ModeSymlink == 0 {
+			ctx.Logger().V(5).Info("Symlink has been resolved", "symlinkPath", symlinkPath, "resolvedPath", resolvedFilePath, "depth", depth+1)
+			return fileInfo, filepath.Clean(resolvedFilePath), nil
+		}
+		resolvedPath = filepath.Clean(resolvedFilePath)
+	}
+	return nil, "", fmt.Errorf("Unable to resolve symlink %s for the specified depth %d", symlinkPath, s.maxSymlinkDepth)
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -100,15 +143,29 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			continue
 		}
 
+		// This will always be the FileInfo we use to decide dir vs file
+		targetInfo := fileInfo
+		targetInfoPath := cleanPath
+
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			logger.Info("skipping, not a regular file", "path", cleanPath)
-			continue
+			if !s.followSymlinks {
+				// If the file or directory is a symlink but the followSymlinks is disable ignore the path
+				logger.Info("skipping, following symlinks is not allowed", "path", cleanPath)
+				continue
+			}
+			// if the root path is a symlink resolve the path and check if it resolves to a dir or file
+			// if targetInfo is a dir then call scanDir otherwise call scanFile
+			targetInfo, targetInfoPath, err = s.resolveSymLink(ctx, path)
+			if err != nil {
+				logger.Error(err, err.Error())
+				continue
+			}
 		}
 
-		if fileInfo.IsDir() {
-			err = s.scanDir(ctx, cleanPath, chunksChan)
+		if targetInfo.IsDir() {
+			err = s.scanDir(ctx, targetInfoPath, chunksChan)
 		} else {
-			err = s.scanFile(ctx, cleanPath, chunksChan)
+			err = s.scanFile(ctx, targetInfoPath, chunksChan)
 		}
 
 		if err != nil && !errors.Is(err, io.EOF) {
@@ -120,6 +177,19 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	return nil
 }
+
+func (s *Source) checkAndMarkVistiedSymlink(resolvedpath string) bool {
+	cleanedPath := filepath.Clean(resolvedpath)
+	s.visitedmu.Lock()
+	defer s.visitedmu.Unlock()
+
+	if _, seen := s.visitedSymlinkPaths[cleanedPath]; seen {
+		return true
+	}
+	s.visitedSymlinkPaths[cleanedPath] = struct{}{}
+	return false
+}
+
 func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
@@ -129,7 +199,6 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 	}()
 	startState := s.GetEncodedResumeInfoFor(path)
 	resuming := startState != ""
-
 	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			ctx.Logger().Error(err, "error walking directory")
@@ -137,6 +206,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 		}
 
 		fullPath := filepath.Join(path, relativePath)
+		ctx.Logger().V(5).Info("Full path found is", "fullPath", fullPath)
 
 		// check if the full path is not matching any pattern in include FilterRuleSet and matching any exclude FilterRuleSet.
 		if s.filter != nil && !s.filter.Pass(fullPath) {
@@ -146,6 +216,54 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			}
 
 			return nil // skip the file
+		}
+
+		if d.Type()&os.ModeSymlink != 0 {
+			if s.followSymlinks {
+				ctx.Logger().V(5).Info("Directory/File found is a symlink", "path", path)
+				// if the found directory or file is symlink resolve the symlink
+				resolved, resolvedPath, err := s.resolveSymLink(ctx, fullPath)
+				if err != nil {
+					ctx.Logger().Error(err, err.Error(), "path", fullPath)
+					return nil
+				}
+				// If symlink resolves to a file then scan it
+				if !resolved.IsDir() {
+					ctx.Logger().V(5).Info("Resolved symlink is a file", "path", resolvedPath)
+					if resuming {
+						// Since we store the resolved file path in encodeResumeInfo
+						// so we match the resolved with startState
+						if resolvedPath == startState {
+							resuming = false
+						}
+						return nil
+					}
+					workerPool.Go(func() error {
+						if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
+							ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
+						}
+						s.SetEncodedResumeInfoFor(path, resolvedPath)
+						return nil
+					})
+					return nil
+				}
+				// This check is to avoid loopy scenarios like A/linkToB->B and B/linkToA->A
+				// We are going to maintain the map of symlinks resolved to a directory
+				// as this case won't happen in symlinks resolved to file
+				if s.checkAndMarkVistiedSymlink(resolvedPath) {
+					ctx.Logger().V(5).Info("Resolved path is already visited", "path", resolvedPath)
+					return nil
+				}
+				// If symlink resolves to directory scan that directory
+				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolvedPath)
+				err = s.scanDir(ctx, resolvedPath, chunksChan)
+				if err != nil {
+					ctx.Logger().Error(err, "error occurred in nested recursive scanDir call")
+				}
+				return nil
+			}
+			// Skip symlinks if followSymlinks is false
+			return nil
 		}
 
 		// Skip over non-regular files. We do this check here to suppress noisy
@@ -251,18 +369,35 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	if err != nil {
 		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get file info: %w", err))
 	}
+	// This will always be the FileInfo we use to decide dir vs file
+	targetInfo := fileInfo
+	targetInfoPath := cleanPath
+	if fileInfo.Mode()&os.ModeSymlink != 0 {
+		if !s.followSymlinks {
+			// If the file or directory is a symlink but the followSymlinks is disable ignore the path
+			logger.Info("skipping, following symlinks is not enabled", "path", cleanPath)
+			return nil
+		}
+		// if the root path is a symlink resolve the path and check if it resolves to a dir or file
+		// if resolvedSymlinkInfo is a dir then call scanDir otherwise call scanFile
+		targetInfo, targetInfoPath, err = s.resolveSymLink(ctx, cleanPath)
+		if err != nil {
+			logger.Error(err, "unable to get symlink info")
+			return nil
+		}
+	}
 
 	ch := make(chan *sources.Chunk)
 	var scanErr error
 	go func() {
 		defer close(ch)
-		if fileInfo.IsDir() {
+		if targetInfo.IsDir() {
 			// TODO: Finer grain error tracking of individual chunks.
-			scanErr = s.scanDir(ctx, cleanPath, ch)
+			scanErr = s.scanDir(ctx, targetInfoPath, ch)
 		} else {
 			// TODO: Finer grain error tracking of individual
 			// chunks (in the case of archives).
-			scanErr = s.scanFile(ctx, cleanPath, ch)
+			scanErr = s.scanFile(ctx, targetInfoPath, ch)
 		}
 	}()
 

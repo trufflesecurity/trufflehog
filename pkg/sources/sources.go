@@ -389,6 +389,8 @@ type FilesystemConfig struct {
 	IncludePathsFile string
 	// ExcludePathsFile is the path to a file containing a list of regexps to exclude from the scan.
 	ExcludePathsFile string
+	// MaxSymlinkDepth enables following symlink upto the depth specified with max depth of 40
+	MaxSymlinkDepth int32
 }
 
 // S3Config defines the optional configuration for an S3 source.

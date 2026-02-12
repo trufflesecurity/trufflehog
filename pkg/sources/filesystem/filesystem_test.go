@@ -86,12 +86,12 @@ func TestSource_Scan(t *testing.T) {
 			for chunk := range chunksCh {
 				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
 					counter++
-					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" {
+					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" && counter == 1 { // First chunk should start at line 1
 						t.Errorf("Source.Chunks() %s metadata mismatch (-want +got):\n%s", tt.name, diff)
 					}
 				}
 			}
-			assert.Equal(t, 1, counter)
+			assert.Equal(t, 2, counter)
 		})
 	}
 }

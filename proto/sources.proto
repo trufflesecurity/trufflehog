@@ -184,6 +184,7 @@ message Filesystem {
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
   bool skip_binaries = 5; // allows skipping binary files from the scan
+  int32 max_symlink_depth = 6; // allows following symlinks upto specified max depth
 }
 
 message GCS {
