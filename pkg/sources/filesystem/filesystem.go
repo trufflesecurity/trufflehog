@@ -181,7 +181,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-func (s *Source) checkAndMarkVistiedSymlink(resolvedpath string) bool {
+func (s *Source) checkVisitedSymlink(resolvedpath string) bool {
 	cleanedPath := filepath.Clean(resolvedpath)
 	s.visitedmu.Lock()
 	defer s.visitedmu.Unlock()
@@ -189,8 +189,13 @@ func (s *Source) checkAndMarkVistiedSymlink(resolvedpath string) bool {
 	if _, seen := s.visitedSymlinkPaths[cleanedPath]; seen {
 		return true
 	}
-	s.visitedSymlinkPaths[cleanedPath] = struct{}{}
 	return false
+}
+func (s *Source) markVisitedPath(resolvedpath string) {
+	cleanedPath := filepath.Clean(resolvedpath)
+	s.visitedmu.Lock()
+	defer s.visitedmu.Unlock()
+	s.visitedSymlinkPaths[cleanedPath] = struct{}{}
 }
 
 func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
@@ -202,10 +207,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 	}()
 	startState := s.GetEncodedResumeInfoFor(path)
 	resuming := startState != ""
-	if s.checkAndMarkVistiedSymlink(path) {
-		ctx.Logger().V(5).Info("Directory already visited", "path", path)
-		return nil
-	}
+	s.markVisitedPath(path)
 	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			ctx.Logger().Error(err, "error walking directory")
@@ -257,7 +259,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 				// This check is to avoid loopy scenarios like A/linkToB->B and B/linkToA->A
 				// We are going to maintain the map of symlinks resolved to a directory
 				// as this case won't happen in symlinks resolved to file
-				if s.checkAndMarkVistiedSymlink(resolvedPath) {
+				if s.checkVisitedSymlink(resolvedPath) {
 					ctx.Logger().V(5).Info("Resolved path is already visited", "path", resolvedPath)
 					return nil
 				}
