@@ -32,13 +32,33 @@ func TestArtifactory_Pattern(t *testing.T) {
 				"user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io",
 			},
 		},
+        {
+			name: "valid pattern - single valid basic auth uri with no http prefix",
+			input: `
+				[INFO] artifactory request to https://test.jfrog.io/artifactory/api/ping
+				simpleuser123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io/artifactory/api/pypi/pypi/simple
+			`,
+			want: []string{
+				"simpleuser123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io",
+			},
+		},
+        {
+			name: "valid pattern - single valid basic auth uri with postfix",
+			input: `
+				https://user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io?x=1
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{
+				"user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io",
+			},
+		},
 		{
 			name: "valid pattern - multiple basic auth uris with duplicates",
 			input: `
 				[INFO] artifactory logs
 				https://user123:token123@test.jfrog.io/artifactory/api/foo
 				https://user123:token123@test.jfrog.io/artifactory/api/foo  # duplicate
-				https://another:secret456@rwxtOp.jfrog.io/artifactory/api/bar
+				http://another:secret456@rwxtOp.jfrog.io/artifactory/api/bar
 			`,
 			want: []string{
 				"user123:token123@test.jfrog.io",
@@ -57,7 +77,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 			name: "invalid pattern - missing password",
 			input: `
 				[INFO] Sending request to the artifactory API
-				https://user123:@test.jfrog.io/artifactory/api/ping
+				http://user123:@test.jfrog.io/artifactory/api/ping
 			`,
 			want: nil,
 		},
@@ -66,6 +86,30 @@ func TestArtifactory_Pattern(t *testing.T) {
 			input: `
 				[INFO] artifactory request to https://test.jfrog.io/artifactory/api/ping
 				[DEBUG] Using header Authorization: Bearer sometoken
+			`,
+			want: nil,
+		},
+        {
+			name: "invalid pattern - one character subdomain",
+			input: `
+				[INFO] artifactory logs
+				https://user123:token123@a.jfrog.io/artifactory/api/foo
+			`,
+			want: nil,
+		},
+        {
+			name: "invalid pattern - domain starts with -",
+			input: `
+				[INFO] artifactory logs
+				https://user123:token123@-test.jfrog.io/artifactory/api/foo
+			`,
+			want: nil,
+		},
+        {
+			name: "invalid pattern - domain ends with -",
+			input: `
+				[INFO] artifactory logs
+				https://user123:token123@test-.jfrog.io/artifactory/api/foo
 			`,
 			want: nil,
 		},

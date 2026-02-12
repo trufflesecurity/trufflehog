@@ -18,7 +18,6 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
-	detectors.EndpointSetter
 }
 
 type basicArtifactoryCredential struct {
@@ -31,12 +30,12 @@ type basicArtifactoryCredential struct {
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
 	_ detectors.Detector           = (*Scanner)(nil)
-	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	basicAuthURLPattern = regexp.MustCompile(
-		`https?://(?P<username>[^:@\s]+):(?P<password>[^@\s]+)@(?P<host>[A-Za-z0-9][A-Za-z0-9\-]{0,61}[A-Za-z0-9]\.jfrog\.io)(?P<path>/[^\s"'<>]*)?`,
+		`(?P<prefix>https?://)?(?P<username>[^:@\s]+):(?P<password>[^:@\s]+)@(?P<host>[A-Za-z0-9][A-Za-z0-9\-]{0,61}[A-Za-z0-9]\.jfrog\.io)(?P<path>/[^\s"'<>]*)?`,
 	)
 
 	invalidHosts = simple.NewCache[struct{}]()
