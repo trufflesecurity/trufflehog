@@ -105,9 +105,12 @@ func (s *Source) resolveSymLink(ctx context.Context, symlinkPath string) (os.Fil
 	var fileInfo os.FileInfo
 	var err error
 	resolvedPath := symlinkPath
-	resolvedFilePath := symlinkPath
+	var resolvedFilePath string
 	for depth := 0; depth < s.maxSymlinkDepth; depth++ {
 		resolvedFilePath, err = os.Readlink(resolvedPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("Error in resolving symlink: %v", err)
+		}
 		if !filepath.IsAbs(resolvedFilePath) {
 			resolvedFilePath = filepath.Join(
 				filepath.Dir(resolvedPath),
