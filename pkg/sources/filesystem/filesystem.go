@@ -158,7 +158,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			}
 			// if the root path is a symlink resolve the path and check if it resolves to a dir or file
 			// if targetInfo is a dir then call scanDir otherwise call scanFile
-			targetInfo, targetInfoPath, err = s.resolveSymLink(ctx, path)
+			targetInfo, targetInfoPath, err = s.resolveSymLink(ctx, cleanPath)
 			if err != nil {
 				logger.Error(err, err.Error())
 				continue
@@ -202,6 +202,10 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 	}()
 	startState := s.GetEncodedResumeInfoFor(path)
 	resuming := startState != ""
+	if s.checkAndMarkVistiedSymlink(path) {
+		ctx.Logger().V(5).Info("Directory already visited", "path", path)
+		return nil
+	}
 	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			ctx.Logger().Error(err, "error walking directory")

@@ -94,10 +94,11 @@ func TestChunks_DirectorySymlinkLoop(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
-		maxSymlinkDepth: 20,
-		concurrency:     1,
-		paths:           []string{filepath.Join(baseDir, "B")},
+		followSymlinks:      true,
+		maxSymlinkDepth:     20,
+		concurrency:         1,
+		paths:               []string{filepath.Join(baseDir, "B")},
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
@@ -183,10 +184,11 @@ func TestChunks_FileSymlinkLoop(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
-		maxSymlinkDepth: 20,
-		concurrency:     1,
-		paths:           []string{fileA},
+		followSymlinks:      true,
+		maxSymlinkDepth:     20,
+		concurrency:         1,
+		paths:               []string{fileA},
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
@@ -286,10 +288,11 @@ func TestChunks_ValidDirectorySymlink(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
-		concurrency:     1,
-		paths:           []string{dirB},
-		maxSymlinkDepth: 20,
+		followSymlinks:      true,
+		concurrency:         1,
+		paths:               []string{dirB},
+		maxSymlinkDepth:     20,
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	chunksCh := make(chan *sources.Chunk, 1)
@@ -396,10 +399,11 @@ func TestChunks_ValidFileSymlink(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
-		concurrency:     1,
-		maxSymlinkDepth: 20,
-		paths:           []string{linkFile},
+		followSymlinks:      true,
+		concurrency:         1,
+		maxSymlinkDepth:     20,
+		paths:               []string{linkFile},
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	chunksCh := make(chan *sources.Chunk, 1)
@@ -498,9 +502,10 @@ func TestResolveSymlink_NoError(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
-		concurrency:     1,
-		maxSymlinkDepth: 5,
+		followSymlinks:      true,
+		concurrency:         1,
+		maxSymlinkDepth:     5,
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 	var path string
 	_, path, err = src.resolveSymLink(ctx, filepath.Join(baseDir, "A"))
@@ -538,9 +543,10 @@ func TestResolveSymlink_MaxDepthExceeded(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
-		concurrency:     1,
-		maxSymlinkDepth: 2,
+		followSymlinks:      true,
+		concurrency:         1,
+		maxSymlinkDepth:     2,
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 	_, _, err = src.resolveSymLink(ctx, filepath.Join(baseDir, "A"))
 	require.NotNil(t, err)
@@ -568,8 +574,9 @@ func TestResolveSymlink_FileTarget(t *testing.T) {
 	require.NoError(t, err)
 
 	src := &Source{
-		followSymlinks:  true,
-		maxSymlinkDepth: 5,
+		followSymlinks:      true,
+		maxSymlinkDepth:     5,
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	info, resolved, err := src.resolveSymLink(ctx, symlinkPath)
@@ -593,8 +600,9 @@ func TestResolveSymlink_SelfLoop(t *testing.T) {
 	require.NoError(t, err)
 
 	src := &Source{
-		followSymlinks:  true,
-		maxSymlinkDepth: 5,
+		followSymlinks:      true,
+		maxSymlinkDepth:     5,
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	_, _, err = src.resolveSymLink(ctx, symlinkPath)
@@ -617,8 +625,9 @@ func TestResolveSymlink_BrokenSymlink(t *testing.T) {
 	require.NoError(t, err)
 
 	src := &Source{
-		followSymlinks:  true,
-		maxSymlinkDepth: 5,
+		followSymlinks:      true,
+		maxSymlinkDepth:     5,
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	_, _, err = src.resolveSymLink(ctx, symlinkPath)
@@ -644,8 +653,9 @@ func TestResolveSymlink_TwoFileLoop(t *testing.T) {
 	require.NoError(t, os.Symlink(fileA, fileB))
 
 	src := &Source{
-		followSymlinks:  true,
-		maxSymlinkDepth: 5,
+		followSymlinks:      true,
+		maxSymlinkDepth:     5,
+		visitedSymlinkPaths: make(map[string]struct{}),
 	}
 
 	_, _, err = src.resolveSymLink(ctx, fileA)
