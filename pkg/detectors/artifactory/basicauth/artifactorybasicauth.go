@@ -35,7 +35,7 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	basicAuthURLPattern = regexp.MustCompile(
-		`(?P<prefix>https?://)?(?P<username>[^:@\s]+):(?P<password>[^:@\s]+)@(?P<host>[A-Za-z0-9][A-Za-z0-9\-]{0,61}[A-Za-z0-9]\.jfrog\.io)(?P<path>/[^\s"'<>]*)?`,
+		`(?P<username>[^:@\s\/]+):(?P<password>[^:@\s\/]+)@(?P<host>[A-Za-z0-9][A-Za-z0-9\-]{0,61}[A-Za-z0-9]\.jfrog\.io)(?P<path>/[^\s"'<>]*)?`,
 	)
 
 	invalidHosts = simple.NewCache[struct{}]()
@@ -124,7 +124,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					invalidHosts.Set(cred.host, struct{}{})
 					continue
 				}
-				r.SetVerificationError(vErr, cred.username, cred.host)
+				r.SetVerificationError(vErr, cred.username, cred.password)
 			}
 
 			if isVerified {
