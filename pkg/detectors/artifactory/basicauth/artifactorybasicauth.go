@@ -184,6 +184,16 @@ func verifyArtifactoryBasicAuth(ctx context.Context, client *http.Client, host, 
 
 		return false, nil
 	case http.StatusForbidden:
+        body, err := io.ReadAll(resp.Body)
+        if err != nil {
+            return false, err
+        }
+
+        // Ignore rate-limit / temporary block 403s
+        if strings.Contains(strings.ToLower(string(body)), "blocked due to recurrent request failures") {
+            return false, nil
+        }
+
         return true, nil
 	case http.StatusUnauthorized, http.StatusFound:
 		return false, nil
