@@ -1373,12 +1373,22 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	assert.NoError(t, err)
 
 	var count int
+	noCloudEndpointDetectors := map[detectorspb.DetectorType]struct{}{
+		detectorspb.DetectorType_ArtifactoryAccessToken:     {},
+		detectorspb.DetectorType_ArtifactoryReferenceToken:  {},
+		detectorspb.DetectorType_TableauPersonalAccessToken: {},
+		// these do not have any cloud endpoint
+	}
+
 	for _, det := range e.detectors {
 		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
 			id := config.GetDetectorID(det)
-			if len(endpoints.Endpoints()) == 0 && det.Type() != detectorspb.DetectorType_ArtifactoryAccessToken && det.Type() != detectorspb.DetectorType_TableauPersonalAccessToken { // artifactory and tableau does not have any cloud endpoint
-				t.Fatalf("detector %q Endpoints() is empty", id.String())
+			if len(endpoints.Endpoints()) == 0 {
+				if _, ok := noCloudEndpointDetectors[det.Type()]; !ok {
+					t.Fatalf("detector %q Endpoints() is empty", id.String())
+				}
 			}
+
 			count++
 		}
 	}
