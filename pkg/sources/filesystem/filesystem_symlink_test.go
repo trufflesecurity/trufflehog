@@ -64,10 +64,19 @@ func TestScanDir_VisitedPath_PreventInfiniteRecursion(t *testing.T) {
 		maxSymlinkDepth:     20,
 		visitedSymlinkPaths: make(map[string]struct{}),
 	}
-	err = src.scanDir(ctx, filepath.Join(dirA, "linkToB"), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// err = src.scanDir(ctx, filepath.Join(dirA, "linkToB"), nil)
+	chunks := make(chan *sources.Chunk, 10)
+	go func() {
+		err := src.Chunks(ctx, chunks)
+		require.NoError(t, err)
+		close(chunks)
+	}()
+	var chunkCount int
+	for range chunks {
+		chunkCount++
 	}
+	// Assert no chunks were emitted due to the infinite symlink loop
+	require.Equal(t, 0, chunkCount, "No chunks should be processed due to infinite symlink loop")
 }
 
 func TestChunks_DirectorySymlinkLoop(t *testing.T) {

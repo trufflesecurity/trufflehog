@@ -166,7 +166,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 
 		if targetInfo.IsDir() {
-			err = s.scanDir(ctx, targetInfoPath, chunksChan)
+			workerPool := new(errgroup.Group)
+			workerPool.SetLimit(s.concurrency)
+			err = s.scanDir(ctx, targetInfoPath, chunksChan, workerPool)
+			_ = workerPool.Wait()
+			s.ClearEncodedResumeInfoFor(path)
 		} else {
 			err = s.scanFile(ctx, targetInfoPath, chunksChan)
 		}
@@ -198,13 +202,7 @@ func (s *Source) markVisitedPath(resolvedpath string) {
 	s.visitedSymlinkPaths[cleanedPath] = struct{}{}
 }
 
-func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(s.concurrency)
-	defer func() {
-		_ = workerPool.Wait()
-		s.ClearEncodedResumeInfoFor(path)
-	}()
+func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk, workerPool *errgroup.Group) error {
 	startState := s.GetEncodedResumeInfoFor(path)
 	resuming := startState != ""
 	s.markVisitedPath(path)
@@ -265,7 +263,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 				}
 				// If symlink resolves to directory scan that directory
 				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolvedPath)
-				err = s.scanDir(ctx, resolvedPath, chunksChan)
+				err = s.scanDir(ctx, resolvedPath, chunksChan, workerPool)
 				if err != nil {
 					ctx.Logger().Error(err, "error occurred in nested recursive scanDir call")
 				}
@@ -401,8 +399,12 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	go func() {
 		defer close(ch)
 		if targetInfo.IsDir() {
+			workerPool := new(errgroup.Group)
+			workerPool.SetLimit(s.concurrency)
 			// TODO: Finer grain error tracking of individual chunks.
-			scanErr = s.scanDir(ctx, targetInfoPath, ch)
+			scanErr = s.scanDir(ctx, targetInfoPath, ch, workerPool)
+			_ = workerPool.Wait()
+			s.ClearEncodedResumeInfoFor(path)
 		} else {
 			// TODO: Finer grain error tracking of individual
 			// chunks (in the case of archives).
