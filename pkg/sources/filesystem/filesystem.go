@@ -166,7 +166,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initalDepth := 0
 			err = s.scanDir(ctx, targetInfoPath, chunksChan, workerPool, initalDepth, targetInfoPath)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(targetInfoPath)
+			s.ClearEncodedResumeContainingId(targetInfoPath)
 		} else {
 			err = s.scanFile(ctx, targetInfoPath, chunksChan)
 		}
@@ -383,7 +383,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			// TODO: Finer grain error tracking of individual chunks.
 			scanErr = s.scanDir(ctx, targetInfoPath, ch, workerPool, intialDepth, targetInfoPath)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(targetInfoPath)
+			s.ClearEncodedResumeContainingId(targetInfoPath)
 		} else {
 			// TODO: Finer grain error tracking of individual
 			// chunks (in the case of archives).
