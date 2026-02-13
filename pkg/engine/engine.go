@@ -153,6 +153,12 @@ type Config struct {
 
 	VerificationResultCache  verificationcache.ResultCache
 	VerificationCacheMetrics verificationcache.MetricsReporter
+
+	// MaxDecodeDepth is the maximum number of iterative decoding passes per chunk.
+	// When a decoder transforms data, all decoders are re-run on the output up to this limit.
+	// 1 = single pass (no chaining), 2+ = chained (e.g., base64 inside UTF-16).
+	// Default: 5.
+	MaxDecodeDepth int
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -221,6 +227,8 @@ type Engine struct {
 	notificationWorkerMultiplier int
 	// verificationOverlapWorkerMultiplier is used to calculate the number of verification overlap workers.
 	verificationOverlapWorkerMultiplier int
+
+	maxDecodeDepth int
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.
@@ -245,6 +253,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
+		maxDecodeDepth:                      cfg.MaxDecodeDepth,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -352,6 +361,10 @@ func (e *Engine) setDefaults(ctx context.Context) {
 
 	if e.verificationOverlapWorkerMultiplier < 1 {
 		e.verificationOverlapWorkerMultiplier = 1
+	}
+
+	if e.maxDecodeDepth < 1 {
+		e.maxDecodeDepth = 1
 	}
 
 	// Default decoders handle common encoding formats.
@@ -775,48 +788,92 @@ type verificationOverlapChunk struct {
 	verificationOverlapWgDoneFn func()
 }
 
+// decodeInput is a chunk of data waiting to be decoded at a given depth.
+type decodeInput struct {
+	data []byte
+}
+
 func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
+	maxDepth := e.maxDecodeDepth
+	if maxDepth < 1 {
+		maxDepth = 1
+	}
+
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
-		for _, decoder := range e.decoders {
-			decodeStart := time.Now()
-			// This copy is needed to preserve the original chunk.Data across multiple decoders.
-			chunkCopy := *chunk
-			decoded := decoder.FromChunk(&chunkCopy)
-			decodeTime := time.Since(decodeStart).Microseconds()
-			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
-			if decoded == nil {
-				// This means that the decoder didn't understand this chunk and isn't applicable to it.
-				continue
-			}
+		// Iterative decoding: apply all decoders, then re-decode any new output
+		// until no transformations occur or maxDepth is reached.
+		// The PLAIN decoder is skipped at depth > 0 (it's a passthrough).
+		currentInputs := []decodeInput{{data: chunk.Data}}
+		var seen [][]byte
 
-			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
-			if len(matchingDetectors) > 1 && !e.verificationOverlap {
-				wgVerificationOverlap.Add(1)
-				e.verificationOverlapChunksChan <- verificationOverlapChunk{
-					chunk:                       *decoded.Chunk,
-					detectors:                   matchingDetectors,
-					decoder:                     decoded.DecoderType,
-					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+		for depth := 0; depth < maxDepth; depth++ {
+			var nextInputs []decodeInput
+
+			for _, input := range currentInputs {
+				for _, decoder := range e.decoders {
+					if depth > 0 && decoder.Type() == detectorspb.DecoderType_PLAIN {
+						continue
+					}
+
+					decodeStart := time.Now()
+					chunkCopy := *chunk
+					chunkCopy.Data = input.data
+					decoded := decoder.FromChunk(&chunkCopy)
+					decodeTime := time.Since(decodeStart).Microseconds()
+					decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
+
+					if decoded == nil {
+						continue
+					}
+
+					decoderType := decoded.DecoderType
+
+					// Enqueue for next depth before dispatching (must run
+					// regardless of the verification-overlap branch below).
+					if depth+1 < maxDepth &&
+						decoder.Type() != detectorspb.DecoderType_PLAIN &&
+						!bytes.Equal(decoded.Chunk.Data, input.data) &&
+						!byteSliceSeen(seen, decoded.Chunk.Data) {
+
+						seen = append(seen, decoded.Chunk.Data)
+						nextInputs = append(nextInputs, decodeInput{data: decoded.Chunk.Data})
+					}
+
+					matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+					if len(matchingDetectors) > 1 && !e.verificationOverlap {
+						wgVerificationOverlap.Add(1)
+						e.verificationOverlapChunksChan <- verificationOverlapChunk{
+							chunk:                       *decoded.Chunk,
+							detectors:                   matchingDetectors,
+							decoder:                     decoderType,
+							verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+						}
+						continue
+					}
+
+					for _, detector := range matchingDetectors {
+						decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
+						wgDetect.Add(1)
+						e.detectableChunksChan <- detectableChunk{
+							chunk:    *decoded.Chunk,
+							detector: detector,
+							decoder:  decoderType,
+							wgDoneFn: wgDetect.Done,
+						}
+					}
 				}
-				continue
 			}
 
-			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
-				wgDetect.Add(1)
-				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
-					detector: detector,
-					decoder:  decoded.DecoderType,
-					wgDoneFn: wgDetect.Done,
-				}
+			if len(nextInputs) == 0 {
+				break
 			}
+			currentInputs = nextInputs
 		}
 
 		dataSize := float64(len(chunk.Data))
@@ -839,6 +896,16 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	wgVerificationOverlap.Wait()
 	wgDetect.Wait()
 	ctx.Logger().V(4).Info("finished scanning chunks")
+}
+
+// byteSliceSeen reports whether data has already been recorded in the seen list.
+func byteSliceSeen(seen [][]byte, data []byte) bool {
+	for _, s := range seen {
+		if bytes.Equal(s, data) {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Engine) shouldVerifyChunk(

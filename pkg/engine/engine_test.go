@@ -1686,3 +1686,104 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		}
 	})
 }
+
+func TestEngine_IterativeDecoding(t *testing.T) {
+	t.Parallel()
+
+	// base64(base64("my-secret-key-test-value"))
+	const (
+		doubleEncoded   = "YlhrdGMyVmpjbVYwTFd0bGVTMTBaWE4wTFhaaGJIVmw="
+		detectorKeyword = "my-secret"
+	)
+
+	// "token: bXktc2VjcmV0LWtleS10ZXN0LXZhbHVl end" as UTF-16LE
+	utf16ContainingBase64 := []byte{
+		116, 0, 111, 0, 107, 0, 101, 0, 110, 0, 58, 0, 32, 0,
+		98, 0, 88, 0, 107, 0, 116, 0, 99, 0, 50, 0, 86, 0, 106, 0,
+		99, 0, 109, 0, 86, 0, 48, 0, 76, 0, 87, 0, 116, 0, 108, 0,
+		101, 0, 83, 0, 49, 0, 48, 0, 90, 0, 88, 0, 78, 0, 48, 0,
+		76, 0, 88, 0, 90, 0, 104, 0, 98, 0, 72, 0, 86, 0, 108, 0,
+		32, 0, 101, 0, 110, 0, 100, 0,
+	}
+
+	tests := []struct {
+		name        string
+		input       []byte
+		depth       int
+		wantKeyword bool
+	}{
+		{
+			name:        "double base64, depth=1, miss",
+			input:       []byte("token: " + doubleEncoded),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "double base64, depth=2, found",
+			input:       []byte("token: " + doubleEncoded),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "utf16+base64, depth=1, miss",
+			input:       utf16ContainingBase64,
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "utf16+base64, depth=2, found",
+			input:       utf16ContainingBase64,
+			depth:       2,
+			wantKeyword: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			detector := &passthroughDetector{
+				keywords:     []string{detectorKeyword},
+				detectorType: detectorspb.DetectorType(9999),
+			}
+			e := &Engine{
+				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
+				decoders:             decoders.DefaultDecoders(),
+				detectableChunksChan: make(chan detectableChunk, 64),
+				sourceManager:        sources.NewManager(),
+				maxDecodeDepth:       tt.depth,
+			}
+
+			e.sourceManager.ScanChunk(&sources.Chunk{Data: tt.input})
+			go e.scannerWorker(ctx)
+
+			var found bool
+			timeout := time.After(2 * time.Second)
+		Loop:
+			for {
+				select {
+				case dc := <-e.detectableChunksChan:
+					dc.wgDoneFn()
+					found = true
+					for {
+						select {
+						case dc2 := <-e.detectableChunksChan:
+							dc2.wgDoneFn()
+						case <-time.After(200 * time.Millisecond):
+							break Loop
+						}
+					}
+				case <-timeout:
+					break Loop
+				}
+			}
+
+			if tt.wantKeyword {
+				assert.True(t, found, "expected detector match")
+			} else {
+				assert.False(t, found, "unexpected detector match")
+			}
+		})
+	}
+}
