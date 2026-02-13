@@ -241,10 +241,9 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 					ctx.Logger().V(5).Info("Max depth of recursion reached", "depth", depth, "allowedMaxDepth", s.maxSymlinkDepth, "path", resolvedPath)
 					return nil
 				}
-				depth++
 				// If symlink resolves to directory scan that directory
 				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolvedPath)
-				err = s.scanDir(ctx, resolvedPath, chunksChan, workerPool, depth)
+				err = s.scanDir(ctx, resolvedPath, chunksChan, workerPool, depth+1)
 				if err != nil {
 					ctx.Logger().Error(err, "error occurred in nested recursive scanDir call")
 				}
