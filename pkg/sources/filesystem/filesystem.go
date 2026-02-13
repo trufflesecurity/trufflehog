@@ -164,8 +164,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
 			initalDepth := 0
-			err = s.scanDir(ctx, targetInfoPath, chunksChan, workerPool, initalDepth)
+			err = s.scanDir(ctx, targetInfoPath, chunksChan, workerPool, initalDepth, targetInfoPath)
 			_ = workerPool.Wait()
+			s.ClearEncodedResumeInfoFor(targetInfoPath)
 		} else {
 			err = s.scanFile(ctx, targetInfoPath, chunksChan)
 		}
@@ -180,11 +181,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk, workerPool *errgroup.Group, depth int) error {
-	defer func() {
-		s.ClearEncodedResumeInfoFor(path)
-	}()
-	startState := s.GetEncodedResumeInfoFor(path)
+func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk, workerPool *errgroup.Group, depth int, rootPath string) error {
+	startState := s.GetEncodedResumeInfoFor(rootPath + path)
 	resuming := startState != ""
 	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -229,7 +227,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 						if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
 							ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
 						}
-						s.SetEncodedResumeInfoFor(path, resolvedPath)
+						s.SetEncodedResumeInfoFor(rootPath+path, resolvedPath)
 						return nil
 					})
 					return nil
@@ -243,7 +241,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 				}
 				// If symlink resolves to directory scan that directory
 				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolvedPath)
-				err = s.scanDir(ctx, resolvedPath, chunksChan, workerPool, depth+1)
+				err = s.scanDir(ctx, resolvedPath, chunksChan, workerPool, depth+1, rootPath)
 				if err != nil {
 					ctx.Logger().Error(err, "error occurred in nested recursive scanDir call")
 				}
@@ -274,7 +272,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			if err = s.scanFile(ctx, fullPath, chunksChan); err != nil {
 				ctx.Logger().Error(err, "error scanning file", "path", fullPath, "error", err)
 			}
-			s.SetEncodedResumeInfoFor(path, fullPath)
+			s.SetEncodedResumeInfoFor(rootPath+path, fullPath)
 			return nil
 		})
 
@@ -383,9 +381,9 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			workerPool.SetLimit(s.concurrency)
 			intialDepth := 0
 			// TODO: Finer grain error tracking of individual chunks.
-			scanErr = s.scanDir(ctx, targetInfoPath, ch, workerPool, intialDepth)
+			scanErr = s.scanDir(ctx, targetInfoPath, ch, workerPool, intialDepth, targetInfoPath)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(path)
+			s.ClearEncodedResumeInfoFor(targetInfoPath)
 		} else {
 			// TODO: Finer grain error tracking of individual
 			// chunks (in the case of archives).

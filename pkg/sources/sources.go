@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"runtime"
+	"strings"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -584,6 +585,22 @@ func (p *Progress) ClearEncodedResumeInfoFor(id string) {
 	defer p.mut.Unlock()
 	p.ensureEncodedResumeInfoByID()
 	delete(p.encodedResumeInfoByID, id)
+	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+}
+
+// ClearEncodedResumeContainingId removes the encoded resume information
+// entries that contain the id
+func (p *Progress) ClearEncodedResumeContainingId(id string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	p.ensureEncodedResumeInfoByID()
+
+	for key := range p.encodedResumeInfoByID {
+		if strings.Contains(key, id) {
+			delete(p.encodedResumeInfoByID, key)
+		}
+	}
+
 	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
 }
 
