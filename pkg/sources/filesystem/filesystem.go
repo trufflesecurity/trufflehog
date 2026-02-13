@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -38,10 +37,8 @@ type Source struct {
 	skipBinaries bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
-	followSymlinks      bool
-	maxSymlinkDepth     int
-	visitedSymlinkPaths map[string]struct{}
-	visitedmu           sync.Mutex
+	followSymlinks  bool
+	maxSymlinkDepth int
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -96,8 +93,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	if s.maxSymlinkDepth > 0 {
 		s.followSymlinks = true
 	}
-	s.visitedSymlinkPaths = make(map[string]struct{})
-
 	return nil
 }
 
@@ -168,9 +163,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if targetInfo.IsDir() {
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
-			err = s.scanDir(ctx, targetInfoPath, chunksChan, workerPool)
+			initalDepth := 0
+			err = s.scanDir(ctx, targetInfoPath, chunksChan, workerPool, initalDepth)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(path)
 		} else {
 			err = s.scanFile(ctx, targetInfoPath, chunksChan)
 		}
@@ -185,27 +180,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-func (s *Source) checkVisitedSymlink(resolvedpath string) bool {
-	cleanedPath := filepath.Clean(resolvedpath)
-	s.visitedmu.Lock()
-	defer s.visitedmu.Unlock()
-
-	if _, seen := s.visitedSymlinkPaths[cleanedPath]; seen {
-		return true
-	}
-	return false
-}
-func (s *Source) markVisitedPath(resolvedpath string) {
-	cleanedPath := filepath.Clean(resolvedpath)
-	s.visitedmu.Lock()
-	defer s.visitedmu.Unlock()
-	s.visitedSymlinkPaths[cleanedPath] = struct{}{}
-}
-
-func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk, workerPool *errgroup.Group) error {
+func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk, workerPool *errgroup.Group, depth int) error {
+	defer func() {
+		s.ClearEncodedResumeInfoFor(path)
+	}()
 	startState := s.GetEncodedResumeInfoFor(path)
 	resuming := startState != ""
-	s.markVisitedPath(path)
 	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			ctx.Logger().Error(err, "error walking directory")
@@ -255,15 +235,16 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 					return nil
 				}
 				// This check is to avoid loopy scenarios like A/linkToB->B and B/linkToA->A
-				// We are going to maintain the map of symlinks resolved to a directory
-				// as this case won't happen in symlinks resolved to file
-				if s.checkVisitedSymlink(resolvedPath) {
-					ctx.Logger().V(5).Info("Resolved path is already visited", "path", resolvedPath)
+				// We are going to maintain a counter of each time scanDir is called recursively
+				// The counter helps us in creating a base case(depth >= s.maxSymlinkDepth) for recursion
+				if depth >= s.maxSymlinkDepth {
+					ctx.Logger().V(5).Info("Max depth of recursion reached", "depth", depth, "allowedMaxDepth", s.maxSymlinkDepth, "path", resolvedPath)
 					return nil
 				}
+				depth++
 				// If symlink resolves to directory scan that directory
 				ctx.Logger().V(5).Info("Resolved symlink is a directory", "path", resolvedPath)
-				err = s.scanDir(ctx, resolvedPath, chunksChan, workerPool)
+				err = s.scanDir(ctx, resolvedPath, chunksChan, workerPool, depth)
 				if err != nil {
 					ctx.Logger().Error(err, "error occurred in nested recursive scanDir call")
 				}
@@ -401,8 +382,9 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		if targetInfo.IsDir() {
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
+			intialDepth := 0
 			// TODO: Finer grain error tracking of individual chunks.
-			scanErr = s.scanDir(ctx, targetInfoPath, ch, workerPool)
+			scanErr = s.scanDir(ctx, targetInfoPath, ch, workerPool, intialDepth)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeInfoFor(path)
 		} else {

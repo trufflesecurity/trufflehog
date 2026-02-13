@@ -107,9 +107,7 @@ func TestScanFile(t *testing.T) {
 	assert.Nil(t, err)
 	defer cleanup()
 
-	source := &Source{
-		visitedSymlinkPaths: make(map[string]struct{}),
-	}
+	source := &Source{}
 	chunksChan := make(chan *sources.Chunk, 2)
 
 	ctx := context.WithLogger(context.Background(), logr.Discard())
@@ -139,9 +137,7 @@ func TestScanBinaryFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, tmpfile.Close())
 
-	source := &Source{
-		visitedSymlinkPaths: make(map[string]struct{}),
-	}
+	source := &Source{}
 	chunksChan := make(chan *sources.Chunk, 2)
 	errChan := make(chan error, 1)
 
@@ -436,10 +432,9 @@ func TestSkipBinaries(t *testing.T) {
 
 	// Test with skipBinaries = true
 	source := &Source{
-		paths:               []string{textFile, binaryFile}, // Test individual files
-		skipBinaries:        true,
-		log:                 logr.Discard(),
-		visitedSymlinkPaths: make(map[string]struct{}),
+		paths:        []string{textFile, binaryFile}, // Test individual files
+		skipBinaries: true,
+		log:          logr.Discard(),
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
