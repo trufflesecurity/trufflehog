@@ -16,6 +16,7 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -775,7 +776,187 @@ type verificationOverlapChunk struct {
 	verificationOverlapWgDoneFn func()
 }
 
+type finding struct {
+	value    string
+	detector *ahocorasick.DetectorMatch
+	result   detectors.Result
+}
+
+func newFinding(d *ahocorasick.DetectorMatch, r detectors.Result) finding {
+	c := string(r.Raw)
+	if len(r.RawV2) > 0 {
+		c = string(r.RawV2)
+	}
+	return finding{
+		value:    c,
+		detector: d,
+		result:   r,
+	}
+}
+
+func (e *Engine) scanChunk(ctx context.Context, chunk *sources.Chunk) {
+	for _, decoder := range e.decoders {
+		chunkCopy := *chunk
+		decoded := decoder.FromChunk(&chunkCopy)
+		if decoded == nil {
+			continue
+		}
+
+		matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+		if len(matchingDetectors) == 0 {
+			continue
+		}
+
+		if len(matchingDetectors) == 1 || e.verificationOverlap {
+			for _, match := range matchingDetectors {
+				verify := e.shouldVerifyChunk(chunk.Verify, match.Detector, e.detectorVerificationOverrides)
+				isFalsePositive := detectors.GetFalsePositiveCheck(match.Detector)
+				for _, matchBytes := range match.Matches() {
+					matchResults, err := e.verificationCache.FromData(
+						ctx,
+						match.Detector,
+						verify,
+						chunk.SecretID != 0,
+						matchBytes)
+					if err != nil {
+						continue
+					}
+					// Cleaning?
+
+					for _, result := range matchResults {
+						e.processResult(
+							ctx,
+							detectableChunk{
+								detector: match,
+								chunk:    *chunk,
+								decoder:  decoder.Type(),
+							},
+							result,
+							isFalsePositive)
+					}
+				}
+			}
+			continue
+		}
+
+		findings := make([]finding, 0, 8*len(matchingDetectors))
+		safeDetectors := make(map[*ahocorasick.DetectorMatch]bool, len(matchingDetectors))
+		for _, match := range matchingDetectors {
+			safeDetectors[match] = true
+			for _, matchBytes := range match.Matches() {
+				candidates, err := match.Detector.FromData(ctx, false, matchBytes)
+				if err != nil {
+					continue
+				}
+				if len(candidates) == 0 {
+					continue
+				}
+
+				for _, res := range candidates {
+					findings = append(findings, newFinding(match, res))
+				}
+			}
+		}
+
+		for _, f1 := range findings {
+			for _, f2 := range findings {
+				if f1.detector.Key == f2.detector.Key {
+					continue
+				}
+				if !safeDetectors[f1.detector] && !safeDetectors[f2.detector] {
+					continue
+				}
+				if len(f1.value)*10 < len(f2.value)*9 {
+					continue
+				}
+				if len(f1.value)*10 > len(f2.value)*11 {
+					continue
+				}
+				if strutil.Similarity(f1.value, f2.value, metrics.NewLevenshtein()) <= 0.9 {
+					continue
+				}
+
+				safeDetectors[f1.detector] = false
+				safeDetectors[f2.detector] = false
+			}
+		}
+
+		for detector, safe := range safeDetectors {
+			if !safe {
+				continue
+			}
+			if _, ok := detector.Detector.(detectors.Verifier); ok {
+				continue
+			}
+
+			verify := e.shouldVerifyChunk(chunk.Verify, detector.Detector, e.detectorVerificationOverrides)
+			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
+			for _, matchBytes := range detector.Matches() {
+				matchResults, err := e.verificationCache.FromData(
+					ctx,
+					detector.Detector,
+					verify,
+					chunk.SecretID != 0,
+					matchBytes)
+				if err == nil {
+					continue
+				}
+				// Cleaning?
+
+				for _, result := range matchResults {
+					e.processResult(
+						ctx,
+						detectableChunk{
+							detector: detector,
+							chunk:    *chunk,
+							decoder:  decoder.Type(),
+						},
+						result,
+						isFalsePositive)
+				}
+			}
+		}
+
+		for _, f := range findings {
+			if safeDetectors[f.detector] {
+				isFalsePositive := detectors.GetFalsePositiveCheck(f.detector.Detector)
+				if verifier, ok := f.detector.Detector.(detectors.Verifier); ok {
+					e.processResult(
+						ctx,
+						detectableChunk{
+							detector: f.detector,
+							chunk:    *chunk,
+							decoder:  decoder.Type(),
+						},
+						verifier.Verify(ctx, f.result),
+						isFalsePositive)
+				}
+				continue
+			}
+
+			isFalsePositive := detectors.GetFalsePositiveCheck(f.detector.Detector)
+			f.result.SetVerificationError(errOverlap)
+			e.processResult(
+				ctx,
+				detectableChunk{
+					detector: f.detector,
+					chunk:    *chunk,
+					decoder:  decoder.Type(),
+				},
+				f.result,
+				isFalsePositive)
+		}
+	}
+}
+
 func (e *Engine) scannerWorker(ctx context.Context) {
+	if feature.UseSimplifiedPipeline.Load() {
+		for chunk := range e.ChunksChan() {
+			e.scanChunk(ctx, chunk)
+		}
+		return
+	}
+
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
