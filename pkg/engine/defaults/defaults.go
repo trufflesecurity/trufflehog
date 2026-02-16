@@ -520,6 +520,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openaiadmin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
@@ -1400,6 +1401,7 @@ func buildDetectorList() []detectors.Detector {
 		&onfleet.Scanner{},
 		&oopspam.Scanner{},
 		&openai.Scanner{},
+		&openaiadmin.Scanner{},
 		&opencagedata.Scanner{},
 		&openuv.Scanner{},
 		&openvpn.Scanner{},

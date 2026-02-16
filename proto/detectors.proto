@@ -1049,7 +1049,8 @@ enum DetectorType {
   PhraseAccessToken = 1037;
   Photoroom = 1038;
   JWT = 1039;
-  GoogleGeminiAPIKey = 1040;
+  OpenAIAdmin = 1040;
+  GoogleGeminiAPIKey = 1041;
 }
 
 message Result {
