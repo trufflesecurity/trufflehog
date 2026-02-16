@@ -86,8 +86,8 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		return false, nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer func() {
-		_ = res.Body.Close()
 		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
 	}()
 
 	switch res.StatusCode {
