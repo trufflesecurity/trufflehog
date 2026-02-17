@@ -387,6 +387,10 @@ message SlackContinuous {
   string location = 9;
 }
 
+message JSONEnumerator {
+  string metadata = 1;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -424,5 +428,6 @@ message MetaData {
     Sentry sentry = 33;
     Stdin stdin = 34;
     SlackContinuous slackContinuous = 35;
+    JSONEnumerator jsonEnumerator = 36;
   }
 }
