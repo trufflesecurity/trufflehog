@@ -101,11 +101,6 @@ func defaultEncoderConfig() zapcore.EncoderConfig {
 	return conf
 }
 
-// WithCore adds any user supplied zap core to the logger.
-func WithCore(core zapcore.Core) zapcore.Core {
-	return core
-}
-
 // AddSentry initializes a sentry client and extends an existing
 // logr.Logger with the hook.
 func AddSentry(l logr.Logger, client *sentry.Client, tags map[string]string) (logr.Logger, SyncFunc, error) {
