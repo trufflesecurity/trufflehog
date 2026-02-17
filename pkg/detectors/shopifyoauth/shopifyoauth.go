@@ -84,14 +84,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					isVerified, verificationErr := s.verifyMatch(ctx, s.getClient(), domain, clientId, secret)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, secret)
-
-					if isVerified {
-						s1.AnalysisInfo = map[string]string{
-							"domain":        domain,
-							"client_id":     clientId,
-							"client_secret": secret,
-						}
-					}
 				}
 
 				results = append(results, s1)
