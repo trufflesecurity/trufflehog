@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
@@ -350,6 +349,13 @@ func init() {
 	}
 }
 
+// syncLogs flushes logs when the program exits.
+func syncLogs(syncFn func() error) {
+	if syncFn != nil {
+		_ = syncFn()
+	}
+}
+
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -361,15 +367,16 @@ func main() {
 	context.SetDefaultLogger(logger)
 
 	if *localDev {
-		run(overseer.State{})
+		run(overseer.State{}, sync)
 		os.Exit(0)
 	}
 
-	defer func() { _ = sync() }()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, sync)
 
 	updateCfg := overseer.Config{
-		Program:       run,
+		Program: func(s overseer.State) {
+			run(s, sync)
+		},
 		Debug:         *debug,
 		RestartSignal: syscall.SIGTERM,
 		// TODO: Eventually add a PreUpgrade func for signature check w/ x509 PKCS1v15
@@ -390,10 +397,10 @@ func main() {
 	}
 }
 
-func run(state overseer.State) {
-
+func run(state overseer.State, logSync func() error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
+	defer syncLogs(logSync)
 
 	go func() {
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
@@ -402,7 +409,7 @@ func run(state overseer.State) {
 	}()
 
 	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, logSync)
 
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -416,6 +423,8 @@ func run(state overseer.State) {
 		} else {
 			logger.Info("cleaned temporary artifacts")
 		}
+
+		syncLogs(logSync)
 		os.Exit(0)
 	}()
 
@@ -609,6 +618,7 @@ func run(state overseer.State) {
 
 	if metrics.hasFoundResults && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
+		syncLogs(logSync)
 		os.Exit(183)
 	}
 }
@@ -1175,9 +1185,10 @@ func parseResults(input *string) (map[string]struct{}, error) {
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
 // function will terminate the program without cleanup.
-func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+func logFatalFunc(logger logr.Logger, logSync func() error) func(error, string, ...any) {
 	return func(err error, message string, keyAndVals ...any) {
 		logger.Error(err, message, keyAndVals...)
+		syncLogs(logSync)
 		if err != nil {
 			os.Exit(1)
 			return
