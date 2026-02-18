@@ -44,7 +44,6 @@ func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
 		return s.client
 	}
-	s.client = defaultClient
 	return defaultClient
 }
 
