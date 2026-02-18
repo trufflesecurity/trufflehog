@@ -35,7 +35,7 @@ var (
 
 	// Cloudinary API secrets are typically 27 characters long and may contain
 	// uppercase letters, lowercase letters, digits, underscores, or hyphens.
-	apiSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudinary"}) + `\b([A-Za-z0-9_-]{27})\b`)
+	apiSecretPat = regexp.MustCompile(`\b([A-Za-z0-9_-]{27})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -93,7 +93,7 @@ func verifyToken(ctx context.Context, client *http.Client, cloudName, apiKey, ap
 		Host:   "api.cloudinary.com",
 		Path:   path.Join("v1_1", cloudName, "usage"),
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return false, err
 	}
