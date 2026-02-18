@@ -31,11 +31,11 @@ var (
 	cloudnamePat = regexp.MustCompile(`(?i:cloudinary)(?:.|[\n\r]){0,47}?` + `(?i:name|@)(?:.){0,10}?` + `\b([a-zA-Z][a-zA-Z0-9-]{2,49})\b`)
 
 	// Cloudinary API keys are numeric and typically 15 digits long.
-	apiKeyPat = regexp.MustCompile(`\b(\d{15})\b`)
+	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudinary"}) + `\b(\d{15})\b`)
 
 	// Cloudinary API secrets are typically 27 characters long and may contain
 	// uppercase letters, lowercase letters, digits, underscores, or hyphens.
-	apiSecretPat = regexp.MustCompile(`\b([A-Za-z0-9_-]{27})\b`)
+	apiSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudinary"}) + `\b([A-Za-z0-9_-]{27})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
