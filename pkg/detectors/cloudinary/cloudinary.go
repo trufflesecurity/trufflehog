@@ -17,6 +17,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -25,12 +26,15 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// Cloudinary cloud names are typically 9 lowercase letters.
+	// Cloudinary cloud names are typically b/w 3-49 characters.
+	// This regex matches cloud names that appear near the word "cloudinary" and either the keyword "name" or "@" (as in URLs).
+	cloudnamePat = regexp.MustCompile(`(?i:cloudinary)(?:.|[\n\r]){0,47}?` + `(?i:name|@)(?:.){0,10}?` + `\b([a-zA-Z][a-zA-Z0-9-]{3,49})\b`)
+
 	// Cloudinary API keys are numeric and typically 15 digits long.
+	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudinary"}) + `\b(\d{15})\b`)
+
 	// Cloudinary API secrets are typically 27 characters long and may contain
 	// uppercase letters, lowercase letters, digits, underscores, or hyphens.
-	cloudnamePat = regexp.MustCompile(`(?i:cloudinary)(?:.|[\n\r]){0,47}?` + `\b([a-z]{9})\b`)
-	apiKeyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudinary"}) + `\b(\d{15})\b`)
 	apiSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudinary"}) + `\b([A-Za-z0-9_-]{27})\b`)
 )
 
@@ -50,12 +54,16 @@ func (s Scanner) getClient() *http.Client {
 // FromData will find and optionally verify DeepSeek secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
+	fmt.Printf("Data is %v\n", dataStr)
 
 	uniqueCloudNames := make(map[string]struct{})
 	uniqueApiKeys := make(map[string]struct{})
 	uniqueApiSecret := make(map[string]struct{})
 	for _, match := range cloudnamePat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueCloudNames[match[1]] = struct{}{}
+		fmt.Printf("entroypt is %v, match %v\n", detectors.StringShannonEntropy(match[1]), match[1])
+		if detectors.StringShannonEntropy(match[1]) > 2 {
+			uniqueCloudNames[match[1]] = struct{}{}
+		}
 	}
 	for _, match := range apiKeyPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueApiKeys[match[1]] = struct{}{}
@@ -63,6 +71,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range apiSecretPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueApiSecret[match[1]] = struct{}{}
 	}
+	fmt.Printf("apiKeys found: %v\n", uniqueApiKeys)
+	fmt.Printf("apiSecrets found: %v\n", uniqueApiSecret)
+	fmt.Printf("cloudNames found: %v\n", uniqueCloudNames)
 
 	for cloudName := range uniqueCloudNames {
 		for apiKey := range uniqueApiKeys {
@@ -81,7 +92,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-
+	// fmt.Printf("Results are %+v\n", results)
 	return
 }
 
