@@ -26,9 +26,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// Cloudinary cloud names are typically b/w 3-49 characters.
+	// Cloudinary cloud names are typically b/w 3-50 characters.
 	// This regex matches cloud names that appear near the word "cloudinary" and either the keyword "name" or "@" (as in URLs).
-	cloudnamePat = regexp.MustCompile(`(?i:cloudinary)(?:.|[\n\r]){0,47}?` + `(?i:name|@)(?:.){0,10}?` + `\b([a-zA-Z][a-zA-Z0-9-]{3,49})\b`)
+	cloudnamePat = regexp.MustCompile(`(?i:cloudinary)(?:.|[\n\r]){0,47}?` + `(?i:name|@)(?:.){0,10}?` + `\b([a-zA-Z][a-zA-Z0-9-]{2,49})\b`)
 
 	// Cloudinary API keys are numeric and typically 15 digits long.
 	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudinary"}) + `\b(\d{15})\b`)
