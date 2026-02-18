@@ -125,7 +125,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerAnthropic,
 		Metadata:     map[string]any{"Valid_Key": info.Valid},
-		Bindings:     make([]analyzers.Binding, len(info.AnthropicResources)),
+		Bindings:     make([]analyzers.Binding, 0, len(info.AnthropicResources)), // pre-allocate with zero length
 	}
 
 	// extract information to create bindings and append to result bindings
