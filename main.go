@@ -270,6 +270,9 @@ var (
 	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
 	multiScanScan  = cli.Command("multi-scan", "Find credentials in multiple sources defined in configuration.")
 
+	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
+	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
@@ -1111,6 +1114,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		cfg := sources.StdinConfig{}
 		if ref, err := eng.ScanStdinInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
+	case jsonEnumeratorScan.FullCommand():
+		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
+		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
