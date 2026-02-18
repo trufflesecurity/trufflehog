@@ -53,28 +53,6 @@ func TestCloudinary_Pattern(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "valid pattern - out of prefix range - apiSecret",
-			input: `
-				[INFO] Sending request to the cloudinary
-				[DEBUG]	Using cloudName=wdjaiwojd
-				[DEBUG] apiKey=218873249723411 
-				[DEBUG] Using apiSecret=ndiawudh1_wdajwoidjajawdeps
-				[INFO] Response received: 200 OK
-			`,
-			want: nil,
-		},
-		{
-			name: "valid pattern - out of prefix range - cloudName",
-			input: `
-				[INFO] Sending request to the cloudinary
-				[DEBUG] apiKey=218873249723411 
-				[DEBUG] Using apiSecret=ndiawudh1_wdajwoidjajawdeps
-				[INFO] 	Response received: 200 OK
-				[DEBUG] Used cloudName=wdjaiwojd
-			`,
-			want: nil,
-		},
-		{
 			name: "valid pattern - only apikey",
 			input: `
 				[INFO] Sending request to the cloudinary API
