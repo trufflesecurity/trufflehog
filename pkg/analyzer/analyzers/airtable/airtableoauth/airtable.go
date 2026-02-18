@@ -22,12 +22,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeAir
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, ok := credInfo["token"]
 	if !ok {
-		return nil, errors.New("token not found in credInfo")
+		return nil, analyzers.NewAnalysisError("AirtableOAuth", "validate_credentials", "config", "", errors.New("token not found in credInfo"))
 	}
 
 	userInfo, err := common.FetchAirtableUserInfo(token)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("AirtableOAuth", "analyze_permissions", "API", "", err)
 	}
 
 	var basesInfo *common.AirtableBases

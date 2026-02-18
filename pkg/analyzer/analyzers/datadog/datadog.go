@@ -33,7 +33,7 @@ func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*ana
 
 	info, err := AnalyzePermissions(a.Cfg, apiKey, appKey, endpoint)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Datadog", "analyze_permissions", "API", "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
