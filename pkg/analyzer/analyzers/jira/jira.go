@@ -28,20 +28,20 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, exist := credInfo["token"]
 	if !exist {
-		return nil, fmt.Errorf("token not found in credential info")
+		return nil, analyzers.NewAnalysisError("Jira", "validate_credentials", "config", "", fmt.Errorf("token not found in credential info"))
 	}
 	domain, exist := credInfo["domain"]
 	if !exist {
-		return nil, fmt.Errorf("domain not found in credential info")
+		return nil, analyzers.NewAnalysisError("Jira", "validate_credentials", "config", "", fmt.Errorf("domain not found in credential info"))
 	}
 	email, exist := credInfo["email"]
 	if !exist {
-		return nil, fmt.Errorf("email not found in credential info")
+		return nil, analyzers.NewAnalysisError("Jira", "validate_credentials", "config", "", fmt.Errorf("email not found in credential info"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, token, domain, email)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Jira", "analyze_permissions", "API", "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil

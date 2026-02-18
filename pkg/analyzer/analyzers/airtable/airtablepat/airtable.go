@@ -36,12 +36,12 @@ func getScopeEndpoint(scope string) (common.Endpoint, bool) {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, ok := credInfo["token"]
 	if !ok {
-		return nil, errors.New("token not found in credInfo")
+		return nil, analyzers.NewAnalysisError("AirtablePat", "validate_credentials", "config", "", errors.New("token not found in credInfo"))
 	}
 
 	userInfo, err := common.FetchAirtableUserInfo(token)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("AirtablePat", "analyze_permissions", "API", "", err)
 	}
 
 	scopeStatusMap[common.PermissionStrings[common.UserEmailRead]] = userInfo.Email != nil
@@ -49,17 +49,17 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	var basesInfo *common.AirtableBases
 	granted, err := determineScope(token, common.SchemaBasesRead, nil)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("AirtablePat", "analyze_permissions", "API", "", err)
 	}
 	if granted {
 		basesInfo, err = common.FetchAirtableBases(token)
 		if err != nil {
-			return nil, err
+			return nil, analyzers.NewAnalysisError("AirtablePat", "analyze_permissions", "API", "", err)
 		}
 		// If bases are fetched, determine the token scopes
 		err := determineScopes(token, basesInfo)
 		if err != nil {
-			return nil, err
+			return nil, analyzers.NewAnalysisError("AirtablePat", "analyze_permissions", "API", "", err)
 		}
 	}
 
