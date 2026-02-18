@@ -63,11 +63,11 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeBit
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError("Bitbucket", "validate_credentials", "config", "", errors.New("key not found in credentialInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Bitbucket", "analyze_permissions", "API", "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }

@@ -34,17 +34,17 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSho
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError("Shopify", "validate_credentials", "config", "", errors.New("key not found in credentialInfo"))
 	}
 
 	storeUrl, ok := credInfo["store_url"]
 	if !ok {
-		return nil, errors.New("store_url not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError("Shopify", "validate_credentials", "config", "", errors.New("store_url not found in credentialInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key, storeUrl)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Shopify", "analyze_permissions", "API", "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }

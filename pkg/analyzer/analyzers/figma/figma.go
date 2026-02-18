@@ -41,11 +41,11 @@ const (
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, ok := credInfo["token"]
 	if !ok {
-		return nil, errors.New("token not found in credInfo")
+		return nil, analyzers.NewAnalysisError("Figma", "validate_credentials", "config", "", errors.New("token not found in credInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, token)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Figma", "analyze_permissions", "API", "", err)
 	}
 	return MapToAnalyzerResult(info), nil
 }

@@ -34,7 +34,7 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeGit
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError("GitLab", "validate_credentials", "config", "", errors.New("key not found in credentialInfo"))
 	}
 	host, ok := credInfo["host"]
 	if !ok {
@@ -43,7 +43,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 
 	info, err := AnalyzePermissions(a.Cfg, key, host)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("GitLab", "analyze_permissions", "API", "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }

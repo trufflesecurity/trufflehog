@@ -44,12 +44,12 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, errors.New("key not found in credentials info")
+		return nil, analyzers.NewAnalysisError("Monday", "validate_credentials", "config", "", errors.New("key not found in credentials info"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Monday", "analyze_permissions", "API", "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil
