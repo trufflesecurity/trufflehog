@@ -28,12 +28,16 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeAsa
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credInfo")
+		return nil, analyzers.NewAnalysisError(
+			"Asana", "validate_credentials", "config", "", errors.New("key not found in credInfo"),
+		)
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(
+			"Asana", "analyze_permissions", "API", "", err,
+		)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil
