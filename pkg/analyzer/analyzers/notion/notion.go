@@ -30,11 +30,15 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeNot
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("missing key in credInfo")
+		return nil, analyzers.NewAnalysisError(
+			"Notion", "validate_credentials", "config", "", errors.New("missing key in credInfo"),
+		)
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(
+			"Notion", "analyze_permissions", "API", "", err,
+		)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
