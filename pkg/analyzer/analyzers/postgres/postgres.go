@@ -30,12 +30,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePos
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	uri, ok := credInfo["connection_string"]
 	if !ok {
-		return nil, errors.New("connection string not found in credInfo")
+		return nil, analyzers.NewAnalysisError("Postgres", "validate_credentials", "config", "", errors.New("connection string not found in credInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, uri)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Postgres", "analyze_permissions", "Database", "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -404,20 +404,20 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 
 func getDBPrivs(db *sql.DB) (string, []DB, error) {
 	query := `
-        SELECT 
+        SELECT
             d.datname AS database_name,
             u.usename AS owner,
             current_user AS current_user,
             has_database_privilege(current_user, d.datname, 'CONNECT') AS can_connect,
             has_database_privilege(current_user, d.datname, 'CREATE') AS can_create,
             has_database_privilege(current_user, d.datname, 'TEMP') AS can_create_temporary_tables
-        FROM 
+        FROM
             pg_database d
-        JOIN 
+        JOIN
             pg_user u ON d.datdba = u.usesysid
-        WHERE 
+        WHERE
             NOT d.datistemplate
-        ORDER BY 
+        ORDER BY
             d.datname;
     `
 	// Originally had WHERE NOT d.datistemplate  AND d.datallowconn

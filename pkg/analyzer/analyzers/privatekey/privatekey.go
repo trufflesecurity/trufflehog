@@ -32,12 +32,12 @@ func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*ana
 	// token will be already normalized by the time it reaches here
 	token, ok := credInfo["token"]
 	if !ok {
-		return nil, errors.New("token not found in credInfo")
+		return nil, analyzers.NewAnalysisError("PrivateKey", "validate_credentials", "config", "", errors.New("token not found in credInfo"))
 	}
 
 	info, err := AnalyzePermissions(ctx, a.Cfg, token)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("PrivateKey", "analyze_permissions", "crypto", "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil

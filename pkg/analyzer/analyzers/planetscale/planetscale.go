@@ -31,15 +31,15 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePla
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	id, ok := credInfo["id"]
 	if !ok {
-		return nil, errors.New("missing id in credInfo")
+		return nil, analyzers.NewAnalysisError("PlanetScale", "validate_credentials", "config", "", errors.New("missing id in credInfo"))
 	}
 	key, ok := credInfo["token"]
 	if !ok {
-		return nil, errors.New("missing key in credInfo")
+		return nil, analyzers.NewAnalysisError("PlanetScale", "validate_credentials", "config", "", errors.New("missing key in credInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, id, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("PlanetScale", "analyze_permissions", "API", "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
