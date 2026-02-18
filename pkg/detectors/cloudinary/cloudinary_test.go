@@ -29,7 +29,7 @@ func TestCloudinary_Pattern(t *testing.T) {
 				[DEBUG] Using cloudinary_cloudName=wdjaiwojd
 				[INFO] Response received: 200 OK
 			`,
-			want: []string{"218873249723411" + "ndiawudh1_wdajwoidjajawdeps"},
+			want: []string{"wdjaiwojd" + ":" + "218873249723411" + ":" + "ndiawudh1_wdajwoidjajawdeps"},
 		},
 		{
 			name: "valid pattern - cloudinary api environment variable",
@@ -38,7 +38,7 @@ func TestCloudinary_Pattern(t *testing.T) {
 				[DEBUG] Using url=cloudinary://715268876851676:V-fwwRhcp3VrRPAqaFkLq3rpa60@fakwfpoaj
 				[INFO] Response received: 200 OK
 			`,
-			want: []string{"715268876851676" + "V-fwwRhcp3VrRPAqaFkLq3rpa60"},
+			want: []string{"fakwfpoaj" + ":" + "715268876851676" + ":" + "V-fwwRhcp3VrRPAqaFkLq3rpa60"},
 		},
 
 		{

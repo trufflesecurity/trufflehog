@@ -54,16 +54,12 @@ func (s Scanner) getClient() *http.Client {
 // FromData will find and optionally verify DeepSeek secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	fmt.Printf("Data is %v\n", dataStr)
 
 	uniqueCloudNames := make(map[string]struct{})
 	uniqueApiKeys := make(map[string]struct{})
 	uniqueApiSecret := make(map[string]struct{})
 	for _, match := range cloudnamePat.FindAllStringSubmatch(dataStr, -1) {
-		fmt.Printf("entroypt is %v, match %v\n", detectors.StringShannonEntropy(match[1]), match[1])
-		if detectors.StringShannonEntropy(match[1]) > 2 {
-			uniqueCloudNames[match[1]] = struct{}{}
-		}
+		uniqueCloudNames[match[1]] = struct{}{}
 	}
 	for _, match := range apiKeyPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueApiKeys[match[1]] = struct{}{}
@@ -71,17 +67,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range apiSecretPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueApiSecret[match[1]] = struct{}{}
 	}
-	fmt.Printf("apiKeys found: %v\n", uniqueApiKeys)
-	fmt.Printf("apiSecrets found: %v\n", uniqueApiSecret)
-	fmt.Printf("cloudNames found: %v\n", uniqueCloudNames)
-
 	for cloudName := range uniqueCloudNames {
 		for apiKey := range uniqueApiKeys {
 			for apiSecret := range uniqueApiSecret {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Cloudinary,
 					Raw:          []byte(apiKey),
-					RawV2:        []byte(apiKey + apiSecret),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", cloudName, apiKey, apiSecret)),
 				}
 				if verify {
 					verified, verificationErr := verifyToken(ctx, s.getClient(), cloudName, apiKey, apiSecret)
@@ -92,7 +84,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-	// fmt.Printf("Results are %+v\n", results)
 	return
 }
 
