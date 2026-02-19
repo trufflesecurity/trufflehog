@@ -27,13 +27,16 @@ func TestArtifactory_Pattern(t *testing.T) {
 			name: "valid pattern",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[DEBUG] Using Key=AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE
 				[INFO] rwxtOp.jfrog.io
 				[INFO] Response received: 200 OK
 			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: true,
-			want:             []string{"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgrwxtOp.jfrog.io"},
+			want: []string{
+				"AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE" +
+					"rwxtOp.jfrog.io",
+			},
 		},
 		{
 			name: "valid pattern - xml",
@@ -41,7 +44,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
   					<scope>GLOBAL</scope>
   					<id>{artifactory}</id>
-  					<secret>{AQAAABAAA KUd8GOVfcXnIv1nJ5qmnNzrqkLvseoPRMuwsdDVr9QthonFogtMaoJ3pgtO4eHXC}</secret>
+  					<secret>AKCp8budTFpbypBqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM</secret>
 					<domain>{HTTPnGQZ79vjWXze.jfrog.io}</domain>
   					<description>configuration for production</description>
 					<creationDate>2023-05-18T14:32:10Z</creationDate>
@@ -50,25 +53,31 @@ func TestArtifactory_Pattern(t *testing.T) {
 			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: true,
-			want:             []string{"KUd8GOVfcXnIv1nJ5qmnNzrqkLvseoPRMuwsdDVr9QthonFogtMaoJ3pgtO4eHXCHTTPnGQZ79vjWXze.jfrog.io"},
+			want: []string{
+				"AKCp8budTFpbypBqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM" +
+					"HTTPnGQZ79vjWXze.jfrog.io",
+			},
 		},
 		{
 			name: "valid pattern - with cloud endpoints",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[DEBUG] Using Key=AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE
 				[INFO] Response received: 200 OK
 			`,
 			cloudEndpoint:    "cloudendpoint.jfrog.io",
 			useCloudEndpoint: true,
 			useFoundEndpoint: false,
-			want:             []string{"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io"},
+			want: []string{
+				"AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE" +
+					"cloudendpoint.jfrog.io",
+			},
 		},
 		{
 			name: "valid pattern - with cloud and found endpoints",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[DEBUG] Using Key=AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE
 				[INFO] rwxtOp.jfrog.io
 				[INFO] Response received: 200 OK
 			`,
@@ -76,15 +85,17 @@ func TestArtifactory_Pattern(t *testing.T) {
 			useCloudEndpoint: true,
 			useFoundEndpoint: true,
 			want: []string{
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgrwxtOp.jfrog.io",
+				"AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE" +
+					"cloudendpoint.jfrog.io",
+				"AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE" +
+					"rwxtOp.jfrog.io",
 			},
 		},
 		{
 			name: "valid pattern - with disabled found endpoints",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[DEBUG] Using Key=AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE
 				[INFO] rwxtOp.jfrog.io
 				[INFO] Response received: 200 OK
 			`,
@@ -92,28 +103,41 @@ func TestArtifactory_Pattern(t *testing.T) {
 			useCloudEndpoint: true,
 			useFoundEndpoint: false,
 			want: []string{
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
+				"AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE" +
+					"cloudendpoint.jfrog.io",
 			},
 		},
 		{
 			name: "valid pattern - with https in configured endpoint",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[DEBUG] Using Key=AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE
 				[INFO] Response received: 200 OK
 			`,
 			cloudEndpoint:    "https://cloudendpoint.jfrog.io",
 			useCloudEndpoint: true,
 			useFoundEndpoint: false,
 			want: []string{
-				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
+				"AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE" +
+					"cloudendpoint.jfrog.io",
 			},
 		},
 		{
-			name: "invalid pattern",
+			name: "invalid pattern - wrong prefix",
 			input: `
 				[INFO] Sending request to the artifactory API
-				[DEBUG] Using Key=cmVmdGtuOjAxOjEODA_1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[DEBUG] Using Key=XYZp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmdsY8ghxFGgehZcK3UGNgy5TxHWdE
+				[INFO] rwxtOp.jfrog.io
+				[INFO] Response received: 200 OK
+			`,
+			useFoundEndpoint: true,
+			want:             nil,
+		},
+		{
+			name: "invalid pattern - too short",
+			input: `
+				[INFO] Sending request to the artifactory API
+				[DEBUG] Using Key=AKCp5e2gMx8TtJNDtrsuPq7Jz24Rqjkjf1d1iiy1GuEjmd
 				[INFO] rwxtOp.jfrog.io
 				[INFO] Response received: 200 OK
 			`,
@@ -124,10 +148,10 @@ func TestArtifactory_Pattern(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// this detector use endpoint customizer interface so we need to enable them based on test case
+			// this detector uses endpoint customizer interface so we need to enable them based on test case
 			d.UseFoundEndpoints(test.useFoundEndpoint)
 			d.UseCloudEndpoint(test.useCloudEndpoint)
-			// if test case provide cloud endpoint use it
+			// if the test case provides cloud endpoint, then use it
 			if test.useCloudEndpoint && test.cloudEndpoint != "" {
 				d.SetCloudEndpoint(test.cloudEndpoint)
 			}

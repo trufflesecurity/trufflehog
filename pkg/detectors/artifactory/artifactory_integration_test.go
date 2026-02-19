@@ -7,26 +7,21 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestArtifactory_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("ARTIFACTORY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("ARTIFACTORY_INACTIVE")
-	appURL := testSecrets.MustGetField("ARTIFACTORY_URL")
+	// NOTE: Using mock secrets because JFrog deprecated AKCp API keys (disabled creation end of Q3 2024).
+	// Real AKCp keys can no longer be generated, so we cannot test actual verification scenarios.
+	// These mock keys follow the correct format: AKCp + 69 alphanumeric characters = 73 total
+	// Reference: https://jfrog.com/help/r/jfrog-release-information/artifactory-7.47.10-cloud-self-hosted
+	mockSecret := "AKCp5bueTFpfypEqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM"
+	appURL := "trufflehog.jfrog.io"
 
 	type args struct {
 		ctx    context.Context
@@ -41,28 +36,12 @@ func TestArtifactory_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, unverified - mock key (cannot verify deprecated AKCp format)",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s and domain %s", secret, appURL)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s but not valid on endpoint %s", inactiveSecret, appURL)), // the secret would satisfy the regex but not pass validation
-				verify: true,
+				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s and domain %s", mockSecret, appURL)),
+				verify: false, // Cannot verify - AKCp API keys are deprecated and no valid keys available
 			},
 			want: []detectors.Result{
 				{
