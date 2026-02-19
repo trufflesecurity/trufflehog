@@ -461,6 +461,7 @@ type PostmanConfig struct {
 	Filter *common.Filter
 }
 
+// ElasticsearchConfig defines the configuration for an ElasticSearch source.
 type ElasticsearchConfig struct {
 	Nodes          []string
 	Username       string
@@ -474,7 +475,14 @@ type ElasticsearchConfig struct {
 	BestEffortScan bool
 }
 
+// StdinConfig defines the configuration for a stdin source.
 type StdinConfig struct{}
+
+// JSONEnumeratorConfig defines the configuration for a JSON enumerator source.
+type JSONEnumeratorConfig struct {
+	// Paths is the list of JSON enumerator files to scan.
+	Paths []string
+}
 
 // Progress is used to update job completion progress across sources.
 type Progress struct {
