@@ -39,6 +39,7 @@ dockers:
     - --label=org.opencontainers.image.version={{ .Version }}
     - --label=org.opencontainers.image.revision={{ .FullCommit }}
     - --label=org.opencontainers.image.licenses=AGPL-3.0
+    - --provenance=false
   - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8"]
     goarch: arm64
     dockerfile: Dockerfile.goreleaser
@@ -54,6 +55,7 @@ dockers:
     - --label=org.opencontainers.image.version={{ .Version }}
     - --label=org.opencontainers.image.revision={{ .FullCommit }}
     - --label=org.opencontainers.image.licenses=AGPL-3.0
+    - --provenance=false
   - image_templates: ["ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
     dockerfile: Dockerfile.goreleaser
     extra_files:
@@ -68,6 +70,7 @@ dockers:
     - --label=org.opencontainers.image.version={{ .Version }}
     - --label=org.opencontainers.image.revision={{ .FullCommit }}
     - --label=org.opencontainers.image.licenses=AGPL-3.0
+    - --provenance=false
   - image_templates: ["ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8"]
     goarch: arm64
     dockerfile: Dockerfile.goreleaser
@@ -83,6 +86,7 @@ dockers:
     - --label=org.opencontainers.image.version={{ .Version }}
     - --label=org.opencontainers.image.revision={{ .FullCommit }}
     - --label=org.opencontainers.image.licenses=AGPL-3.0
+    - --provenance=false
 docker_manifests:
   - name_template: trufflesecurity/{{ .ProjectName }}:{{ .Version }}
     image_templates:
