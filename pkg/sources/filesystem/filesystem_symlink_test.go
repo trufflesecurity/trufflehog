@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -59,11 +60,9 @@ func TestScanDir_VisitedPath_PreventInfiniteRecursion(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
 		concurrency:     1,
 		maxSymlinkDepth: 20,
 	}
-	// err = src.scanDir(ctx, filepath.Join(dirA, "linkToB"), nil)
 	chunks := make(chan *sources.Chunk, 10)
 	go func() {
 		err := src.Chunks(ctx, chunks)
@@ -102,7 +101,6 @@ func TestChunks_DirectorySymlinkLoop(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
 		maxSymlinkDepth: 20,
 		concurrency:     1,
 		paths:           []string{filepath.Join(baseDir, "B")},
@@ -191,7 +189,6 @@ func TestChunks_FileSymlinkLoop(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
 		maxSymlinkDepth: 20,
 		concurrency:     1,
 		paths:           []string{fileA},
@@ -294,7 +291,6 @@ func TestChunks_ValidDirectorySymlink(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
 		concurrency:     1,
 		paths:           []string{dirB},
 		maxSymlinkDepth: 20,
@@ -404,7 +400,6 @@ func TestChunks_ValidFileSymlink(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
 		concurrency:     1,
 		maxSymlinkDepth: 20,
 		paths:           []string{linkFile},
@@ -475,7 +470,7 @@ func TestChunkUnit_ValidFileSymlink(t *testing.T) {
 	require.Equal(t, data, string(reporter.Chunks[0].Data))
 }
 
-func TestResolveSymlink_NoError(t *testing.T) {
+func TestScanSymlink_NoError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
@@ -506,16 +501,26 @@ func TestResolveSymlink_NoError(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
 		concurrency:     1,
-		maxSymlinkDepth: 5,
+		maxSymlinkDepth: 20,
 	}
-	var path string
-	_, path, err = src.resolveSymLink(ctx, filepath.Join(baseDir, "A"))
-	require.Nil(t, err)
-	require.Equal(t, dirD, path)
+	chunks := make(chan *sources.Chunk, 10)
+	go func() {
+		workerPool := new(errgroup.Group)
+		workerPool.SetLimit(src.concurrency)
+		err := src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, workerPool, 0, filepath.Join(baseDir, "A"))
+		_ = workerPool.Wait()
+		require.NoError(t, err)
+		close(chunks)
+	}()
+	var chunkCount int
+	for range chunks {
+		chunkCount++
+	}
+	require.Equal(t, 0, chunkCount, "No chunks should be because dir D has no file")
 }
-func TestResolveSymlink_MaxDepthExceeded(t *testing.T) {
+
+func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
@@ -526,8 +531,8 @@ func TestResolveSymlink_MaxDepthExceeded(t *testing.T) {
 
 	probeSymlinkSupport(t, baseDir)
 
-	dirB := filepath.Join(baseDir, "D")
-	err = os.Mkdir(dirB, 0755)
+	dirD := filepath.Join(baseDir, "D")
+	err = os.Mkdir(dirD, 0755)
 	if err != nil {
 		t.Fatalf("Unable to create directory D %v", err)
 	}
@@ -546,17 +551,28 @@ func TestResolveSymlink_MaxDepthExceeded(t *testing.T) {
 	}
 
 	src := &Source{
-		followSymlinks:  true,
 		concurrency:     1,
 		maxSymlinkDepth: 2,
 	}
-	_, _, err = src.resolveSymLink(ctx, filepath.Join(baseDir, "A"))
-	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "Unable to resolve symlink")
-	require.Contains(t, err.Error(), "for the specified depth 2")
+	chunks := make(chan *sources.Chunk, 10)
+	workerPool := new(errgroup.Group)
+	workerPool.SetLimit(src.concurrency)
+
+	err = src.scanSymlink(
+		ctx,
+		filepath.Join(baseDir, "A"),
+		chunks,
+		workerPool,
+		0,
+		filepath.Join(baseDir, "A"),
+	)
+	_ = workerPool.Wait()
+	close(chunks)
+	require.Error(t, err)
+	require.EqualError(t, err, "max symlink depth reached")
 }
 
-func TestResolveSymlink_FileTarget(t *testing.T) {
+func TestScanSymlink_FileTarget(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -576,17 +592,35 @@ func TestResolveSymlink_FileTarget(t *testing.T) {
 	require.NoError(t, err)
 
 	src := &Source{
-		followSymlinks:  true,
 		maxSymlinkDepth: 5,
+		concurrency:     1,
 	}
 
-	info, resolved, err := src.resolveSymLink(ctx, symlinkPath)
+	chunks := make(chan *sources.Chunk, 10)
+	workerPool := new(errgroup.Group)
+	workerPool.SetLimit(src.concurrency)
+
+	err = src.scanSymlink(
+		ctx,
+		symlinkPath,
+		chunks,
+		workerPool,
+		0,
+		symlinkPath,
+	)
+	_ = workerPool.Wait()
 	require.NoError(t, err)
-	require.False(t, info.IsDir())
-	require.Equal(t, filePath, resolved)
+	close(chunks)
+	var chunkCount int
+	for chunk := range chunks {
+		require.Equal(t, "data", string(chunk.Data))
+		chunkCount++
+	}
+	require.Equal(t, 1, chunkCount, "Expected 1 chunk")
+
 }
 
-func TestResolveSymlink_SelfLoop(t *testing.T) {
+func TestScanSymlink_SelfLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -601,16 +635,28 @@ func TestResolveSymlink_SelfLoop(t *testing.T) {
 	require.NoError(t, err)
 
 	src := &Source{
-		followSymlinks:  true,
 		maxSymlinkDepth: 5,
 	}
 
-	_, _, err = src.resolveSymLink(ctx, symlinkPath)
+	chunks := make(chan *sources.Chunk, 10)
+	workerPool := new(errgroup.Group)
+	workerPool.SetLimit(src.concurrency)
+
+	err = src.scanSymlink(
+		ctx,
+		symlinkPath,
+		chunks,
+		workerPool,
+		0,
+		symlinkPath,
+	)
+	_ = workerPool.Wait()
+	close(chunks)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Unable to resolve symlink")
+	require.EqualError(t, err, "max symlink depth reached")
 }
 
-func TestResolveSymlink_BrokenSymlink(t *testing.T) {
+func TestScanSymlink_BrokenSymlink(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -625,16 +671,28 @@ func TestResolveSymlink_BrokenSymlink(t *testing.T) {
 	require.NoError(t, err)
 
 	src := &Source{
-		followSymlinks:  true,
 		maxSymlinkDepth: 5,
 	}
 
-	_, _, err = src.resolveSymLink(ctx, symlinkPath)
+	chunks := make(chan *sources.Chunk, 10)
+	workerPool := new(errgroup.Group)
+	workerPool.SetLimit(src.concurrency)
+
+	err = src.scanSymlink(
+		ctx,
+		symlinkPath,
+		chunks,
+		workerPool,
+		0,
+		symlinkPath,
+	)
+	_ = workerPool.Wait()
+	close(chunks)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Error in retrieving info")
+	require.Contains(t, err.Error(), "lstat error")
 }
 
-func TestResolveSymlink_TwoFileLoop(t *testing.T) {
+func TestScanSymlink_TwoFileLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -652,11 +710,23 @@ func TestResolveSymlink_TwoFileLoop(t *testing.T) {
 	require.NoError(t, os.Symlink(fileA, fileB))
 
 	src := &Source{
-		followSymlinks:  true,
 		maxSymlinkDepth: 5,
 	}
 
-	_, _, err = src.resolveSymLink(ctx, fileA)
+	chunks := make(chan *sources.Chunk, 10)
+	workerPool := new(errgroup.Group)
+	workerPool.SetLimit(src.concurrency)
+
+	err = src.scanSymlink(
+		ctx,
+		fileA,
+		chunks,
+		workerPool,
+		0,
+		fileB,
+	)
+	_ = workerPool.Wait()
+	close(chunks)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Unable to resolve symlink")
+	require.EqualError(t, err, "max symlink depth reached")
 }
