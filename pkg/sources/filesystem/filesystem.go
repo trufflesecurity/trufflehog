@@ -107,43 +107,6 @@ func (s *Source) canFollowSymlinks() bool {
 	return s.maxSymlinkDepth > 0
 }
 
-// func (s *Source) resolveSymLink(
-// 	ctx context.Context,
-// 	symlinkPath string,
-// ) (os.FileInfo, string, error) {
-
-// 	var fileInfo os.FileInfo
-// 	var err error
-// 	resolvedPath := symlinkPath
-// 	var resolvedFilePath string
-// 	for depth := 0; depth < s.maxSymlinkDepth; depth++ {
-// 		resolvedFilePath, err = os.Readlink(resolvedPath)
-// 		if err != nil {
-// 			return nil, "", fmt.Errorf("Error in resolving symlink: %v", err)
-// 		}
-// 		if !filepath.IsAbs(resolvedFilePath) {
-// 			resolvedFilePath = filepath.Join(
-// 				filepath.Dir(resolvedPath),
-// 				resolvedFilePath,
-// 			)
-// 		}
-// 		fileInfo, err = os.Lstat(resolvedFilePath)
-// 		if err != nil {
-// 			return nil, "", fmt.Errorf("Error in retrieving info: %v", err)
-// 		}
-// 		if fileInfo.Mode()&os.ModeSymlink == 0 {
-// 			ctx.Logger().V(5).Info("Symlink has been resolved",
-// 				"symlinkPath", symlinkPath,
-// 				"resolvedPath", resolvedFilePath,
-// 				"depth", depth+1,
-// 			)
-// 			return fileInfo, filepath.Clean(resolvedFilePath), nil
-// 		}
-// 		resolvedPath = filepath.Clean(resolvedFilePath)
-// 	}
-// 	return nil, "", fmt.Errorf("Unable to resolve symlink %s for the specified depth %d", symlinkPath, s.maxSymlinkDepth)
-// }
-
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	for i, path := range s.paths {
@@ -290,11 +253,16 @@ func (s *Source) scanDir(
 		entryPath := filepath.Join(path, entry.Name())
 		if s.filter != nil && !s.filter.Pass(entryPath) {
 			if !entry.IsDir() {
-				return nil
+				continue
 			}
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
 			ctx.Logger().V(5).Info("Entry found is a symlink", "path", entryPath)
+			if !s.canFollowSymlinks() {
+				// If the file or directory is a symlink but the followSymlinks is disable ignore the path
+				ctx.Logger().Info("skipping, following symlinks is not allowed", "path", entryPath)
+				continue
+			}
 			if err := s.scanSymlink(ctx, entryPath, chunksChan, workerPool, depth+1, rootPath); err != nil {
 				ctx.Logger().Error(err, "error scanning symlink", "path", entryPath)
 			}
@@ -406,6 +374,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			if !s.canFollowSymlinks() {
 				// If the file or directory is a symlink but the followSymlinks is disable ignore the path
 				logger.Info("skipping, following symlinks is not allowed", "path", cleanPath)
+				return
 			}
 			// if the root path is a symlink we scan the symlink
 			ctx.Logger().V(5).Info("Root path is a symlink", "path", cleanPath)
