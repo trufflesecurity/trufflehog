@@ -1548,6 +1548,7 @@ func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) 
 		detectableChunksChan: make(chan detectableChunk, 1),
 		sourceManager:        sources.NewManager(),
 		verify:               true,
+		maxDecodeDepth:       1,
 	}
 
 	// Arrange: Create a chunk to scan.

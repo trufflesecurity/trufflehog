@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -788,96 +789,95 @@ type verificationOverlapChunk struct {
 	verificationOverlapWgDoneFn func()
 }
 
-// decodeInput is a chunk of data waiting to be decoded at a given depth.
-type decodeInput struct {
-	data []byte
+// iterativeDecode applies all decoders to data, then re-applies them to any
+// new output, up to maxDepth passes. Each pass skips the PLAIN (UTF-8) decoder
+// because all other decoders already produce valid UTF-8/ASCII output, so
+// re-running PLAIN would only duplicate work without changing the data.
+//
+// The returned chunks include results from every depth level -- intermediate
+// decoded forms are scanned, not just the final one, because a secret may only
+// be recognizable at a particular decoding stage.
+func iterativeDecode(chunk *sources.Chunk, allDecoders []decoders.Decoder, maxDepth int) []*decoders.DecodableChunk {
+	var results []*decoders.DecodableChunk
+
+	currentInputs := [][]byte{chunk.Data}
+	var seen [][]byte
+
+	for depth := 0; depth < maxDepth; depth++ {
+		var nextInputs [][]byte
+
+		for _, data := range currentInputs {
+			for _, decoder := range allDecoders {
+				// The PLAIN (UTF-8) decoder always returns non-nil and only transforms
+				// invalid UTF-8 via extractSubstrings. All other decoders already produce
+				// valid UTF-8/ASCII output, so re-running PLAIN at depth > 0 would just
+				// duplicate detector work without ever changing the data.
+				if depth > 0 && decoder.Type() == detectorspb.DecoderType_PLAIN {
+					continue
+				}
+
+				chunkCopy := *chunk
+				chunkCopy.Data = data
+				decoded := decoder.FromChunk(&chunkCopy)
+				if decoded == nil {
+					continue
+				}
+
+				results = append(results, decoded)
+
+				if depth+1 < maxDepth &&
+					decoder.Type() != detectorspb.DecoderType_PLAIN &&
+					!bytes.Equal(decoded.Chunk.Data, data) &&
+					!slices.ContainsFunc(seen, func(s []byte) bool { return bytes.Equal(s, decoded.Chunk.Data) }) {
+
+					seen = append(seen, decoded.Chunk.Data)
+					nextInputs = append(nextInputs, decoded.Chunk.Data)
+				}
+			}
+		}
+
+		if len(nextInputs) == 0 {
+			break
+		}
+		currentInputs = nextInputs
+	}
+
+	return results
 }
 
 func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
-	maxDepth := e.maxDecodeDepth
-	if maxDepth < 1 {
-		maxDepth = 1
-	}
-
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
 
-		// Iterative decoding: apply all decoders, then re-decode any new output
-		// until no transformations occur or maxDepth is reached.
-		// The PLAIN decoder is skipped at depth > 0 (it's a passthrough).
-		currentInputs := []decodeInput{{data: chunk.Data}}
-		var seen [][]byte
+		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
-		for depth := 0; depth < maxDepth; depth++ {
-			var nextInputs []decodeInput
+		for _, d := range decoded {
+			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Chunk.Data)
+			if len(matchingDetectors) > 1 && !e.verificationOverlap {
+				wgVerificationOverlap.Add(1)
+				e.verificationOverlapChunksChan <- verificationOverlapChunk{
+					chunk:                       *d.Chunk,
+					detectors:                   matchingDetectors,
+					decoder:                     d.DecoderType,
+					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+				}
+				continue
+			}
 
-			for _, input := range currentInputs {
-				for _, decoder := range e.decoders {
-					// The PLAIN (UTF-8) decoder always returns non-nil and only transforms
-				// invalid UTF-8 via extractSubstrings. All other decoders already produce
-				// valid UTF-8/ASCII output, so re-running PLAIN at depth > 0 would just
-				// duplicate detector work without ever changing the data.
-				if depth > 0 && decoder.Type() == detectorspb.DecoderType_PLAIN {
-						continue
-					}
-
-					decodeStart := time.Now()
-					chunkCopy := *chunk
-					chunkCopy.Data = input.data
-					decoded := decoder.FromChunk(&chunkCopy)
-					decodeTime := time.Since(decodeStart).Microseconds()
-					decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
-
-					if decoded == nil {
-						continue
-					}
-
-					decoderType := decoded.DecoderType
-
-					// Enqueue for next depth before dispatching (must run
-					// regardless of the verification-overlap branch below).
-					if depth+1 < maxDepth &&
-						decoder.Type() != detectorspb.DecoderType_PLAIN &&
-						!bytes.Equal(decoded.Chunk.Data, input.data) &&
-						!byteSliceSeen(seen, decoded.Chunk.Data) {
-
-						seen = append(seen, decoded.Chunk.Data)
-						nextInputs = append(nextInputs, decodeInput{data: decoded.Chunk.Data})
-					}
-
-					matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
-					if len(matchingDetectors) > 1 && !e.verificationOverlap {
-						wgVerificationOverlap.Add(1)
-						e.verificationOverlapChunksChan <- verificationOverlapChunk{
-							chunk:                       *decoded.Chunk,
-							detectors:                   matchingDetectors,
-							decoder:                     decoderType,
-							verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
-						}
-						continue
-					}
-
-					for _, detector := range matchingDetectors {
-						decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
-						wgDetect.Add(1)
-						e.detectableChunksChan <- detectableChunk{
-							chunk:    *decoded.Chunk,
-							detector: detector,
-							decoder:  decoderType,
-							wgDoneFn: wgDetect.Done,
-						}
-					}
+			for _, detector := range matchingDetectors {
+				d.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
+				wgDetect.Add(1)
+				e.detectableChunksChan <- detectableChunk{
+					chunk:    *d.Chunk,
+					detector: detector,
+					decoder:  d.DecoderType,
+					wgDoneFn: wgDetect.Done,
 				}
 			}
-
-			if len(nextInputs) == 0 {
-				break
-			}
-			currentInputs = nextInputs
 		}
 
 		dataSize := float64(len(chunk.Data))
@@ -900,16 +900,6 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	wgVerificationOverlap.Wait()
 	wgDetect.Wait()
 	ctx.Logger().V(4).Info("finished scanning chunks")
-}
-
-// byteSliceSeen reports whether data has already been recorded in the seen list.
-func byteSliceSeen(seen [][]byte, data []byte) bool {
-	for _, s := range seen {
-		if bytes.Equal(s, data) {
-			return true
-		}
-	}
-	return false
 }
 
 func (e *Engine) shouldVerifyChunk(
