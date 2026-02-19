@@ -256,7 +256,11 @@ func (s *Source) scanDir(
 				continue
 			}
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
+		if resuming {
+			if entryPath == startState {
+				resuming = false
+			}
+		} else if entry.Type()&os.ModeSymlink != 0 {
 			ctx.Logger().V(5).Info("Entry found is a symlink", "path", entryPath)
 			if !s.canFollowSymlinks() {
 				// If the file or directory is a symlink but the followSymlinks is disable ignore the path
@@ -270,10 +274,6 @@ func (s *Source) scanDir(
 			ctx.Logger().V(5).Info("Entry found is a directory", "path", entryPath)
 			if err := s.scanDir(ctx, entryPath, chunksChan, workerPool, depth, rootPath); err != nil {
 				ctx.Logger().Error(err, "error scanning file", "path", entryPath)
-			}
-		} else if resuming {
-			if entryPath == startState {
-				resuming = false
 			}
 		} else {
 			ctx.Logger().V(5).Info("Entry found is a file", "path", entryPath)
