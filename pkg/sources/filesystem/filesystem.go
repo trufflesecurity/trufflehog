@@ -133,7 +133,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			ctx.Logger().V(5).Info("Root path is a symlink", "path", cleanPath)
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
-			initialDepth := 0
+			initialDepth := 1
 			err = s.scanSymlink(ctx, cleanPath, chunksChan, workerPool, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeContainingId(cleanPath)
@@ -147,6 +147,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeContainingId(cleanPath)
 		} else {
+			if !fileInfo.Mode().IsRegular() {
+				logger.Info("skipping non-regular file", "path", cleanPath)
+				continue
+			}
 			ctx.Logger().V(5).Info("Root path is a file", "path", cleanPath)
 			err = s.scanFile(ctx, cleanPath, chunksChan)
 		}
@@ -169,7 +173,7 @@ func (s *Source) scanSymlink(
 	depth int,
 	rootPath string,
 ) error {
-	if depth >= s.maxSymlinkDepth {
+	if depth > s.maxSymlinkDepth {
 		return errors.New("max symlink depth reached")
 	}
 	path = filepath.Clean(path)
@@ -273,10 +277,13 @@ func (s *Source) scanDir(
 			}
 		} else if entry.IsDir() {
 			ctx.Logger().V(5).Info("Entry found is a directory", "path", entryPath)
-			if err := s.scanDir(ctx, entryPath, chunksChan, workerPool, depth, rootPath); err != nil {
-				ctx.Logger().Error(err, "error scanning file", "path", entryPath)
+			if err := s.scanDir(ctx, entryPath, chunksChan, workerPool, depth+1, rootPath); err != nil {
+				ctx.Logger().Error(err, "error scanning directory", "path", entryPath)
 			}
 		} else {
+			if !entry.Type().IsRegular() {
+				continue
+			}
 			ctx.Logger().V(5).Info("Entry found is a file", "path", entryPath)
 			workerPool.Go(func() error {
 				if err := s.scanFile(ctx, entryPath, chunksChan); err != nil {
@@ -381,7 +388,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			ctx.Logger().V(5).Info("Root path is a symlink", "path", cleanPath)
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
-			initialDepth := 0
+			initialDepth := 1
 			scanErr = s.scanSymlink(ctx, cleanPath, ch, workerPool, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeContainingId(cleanPath)
@@ -390,9 +397,9 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			ctx.Logger().V(5).Info("Root path is a dir", "path", cleanPath)
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
-			intialDepth := 0
+			initialDepth := 0
 			// TODO: Finer grain error tracking of individual chunks.
-			scanErr = s.scanDir(ctx, cleanPath, ch, workerPool, intialDepth, cleanPath)
+			scanErr = s.scanDir(ctx, cleanPath, ch, workerPool, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeContainingId(cleanPath)
 		} else {
