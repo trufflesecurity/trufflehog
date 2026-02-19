@@ -4167,6 +4167,8 @@ func (m *SlackContinuous) validate(all bool) error {
 
 	// no validation rules for Location
 
+	// no validation rules for WorkspaceId
+
 	if len(errors) > 0 {
 		return SlackContinuousMultiError(errors)
 	}
