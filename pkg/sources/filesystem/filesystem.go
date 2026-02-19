@@ -217,6 +217,10 @@ func (s *Source) scanSymlink(
 		return nil
 	}
 	workerPool.Go(func() error {
+		if !fileInfo.Mode().Type().IsRegular() {
+			ctx.Logger().V(5).Info("skipping non-regular file", "path", resolvedPath)
+			return nil
+		}
 		if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
 		}
