@@ -204,7 +204,7 @@ func (s *Source) scanSymlink(
 			"depth", depth,
 		)
 
-		return s.scanDir(ctx, resolvedPath, chunksChan, workerPool, depth, rootPath)
+		return s.scanDir(ctx, resolvedPath, chunksChan, workerPool, depth+1, rootPath)
 	}
 	ctx.Logger().V(5).Info(
 		"found symlink to file",
@@ -267,7 +267,7 @@ func (s *Source) scanDir(
 				ctx.Logger().Info("skipping, following symlinks is not allowed", "path", entryPath)
 				continue
 			}
-			if err := s.scanSymlink(ctx, entryPath, chunksChan, workerPool, depth+1, rootPath); err != nil {
+			if err := s.scanSymlink(ctx, entryPath, chunksChan, workerPool, depth, rootPath); err != nil {
 				ctx.Logger().Error(err, "error scanning symlink", "path", entryPath)
 			}
 		} else if entry.IsDir() {
