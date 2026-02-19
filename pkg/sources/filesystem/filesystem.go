@@ -252,10 +252,11 @@ func (s *Source) scanDir(
 	for _, entry := range entries {
 		entryPath := filepath.Join(path, entry.Name())
 		if s.filter != nil && !s.filter.Pass(entryPath) {
-			if !entry.IsDir() {
+			if !entry.IsDir() && entry.Type()&os.ModeSymlink == 0 {
 				continue
 			}
 		}
+
 		if resuming {
 			if entryPath == startState {
 				resuming = false
