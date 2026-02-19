@@ -817,7 +817,11 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 			for _, input := range currentInputs {
 				for _, decoder := range e.decoders {
-					if depth > 0 && decoder.Type() == detectorspb.DecoderType_PLAIN {
+					// The PLAIN (UTF-8) decoder always returns non-nil and only transforms
+				// invalid UTF-8 via extractSubstrings. All other decoders already produce
+				// valid UTF-8/ASCII output, so re-running PLAIN at depth > 0 would just
+				// duplicate detector work without ever changing the data.
+				if depth > 0 && decoder.Type() == detectorspb.DecoderType_PLAIN {
 						continue
 					}
 
