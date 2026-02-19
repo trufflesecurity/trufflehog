@@ -1050,6 +1050,7 @@ enum DetectorType {
   Photoroom = 1038;
   JWT = 1039;
   OpenAIAdmin = 1040;
+  ArtifactoryBasicAuth = 1041;
 }
 
 message Result {
