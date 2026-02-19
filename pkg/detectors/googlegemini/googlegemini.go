@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b(AIzaSy[A-Za-z0-9_-]{33})\b`)
+	keyPat        = regexp.MustCompile(`(AIzaSy[A-Za-z0-9_-]{33})`)
 )
 
 func (s Scanner) getClient() *http.Client {
