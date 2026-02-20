@@ -8,17 +8,6 @@ import (
 )
 
 var (
-	decodeLatency = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Namespace: common.MetricsNamespace,
-			Subsystem: common.MetricsSubsystem,
-			Name:      "decode_latency",
-			Help:      "Time spent decoding a chunk in microseconds",
-			Buckets:   prometheus.ExponentialBuckets(50, 2, 20),
-		},
-		[]string{"decoder_type", "source_name"},
-	)
-
 	// Detector metrics.
 	detectorExecutionCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
