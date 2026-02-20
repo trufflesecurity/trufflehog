@@ -1050,7 +1050,8 @@ enum DetectorType {
   Photoroom = 1038;
   JWT = 1039;
   OpenAIAdmin = 1040;
-  ShopifyOAuth = 1041;
+  GoogleGeminiAPIKey = 1041;
+  ShopifyOAuth = 1042;
 }
 
 message Result {
