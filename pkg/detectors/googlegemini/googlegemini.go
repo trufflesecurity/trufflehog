@@ -23,7 +23,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`(AIzaSy[A-Za-z0-9_-]{33})`)
+	// A trailing word boundary is not added because the key can end
+	// with a hyphen, and having a trailing \b will not match such a key
+	keyPat = regexp.MustCompile(`\b(AIzaSy[A-Za-z0-9_-]{33})`)
 )
 
 func (s Scanner) getClient() *http.Client {
