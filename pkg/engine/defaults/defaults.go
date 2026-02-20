@@ -163,6 +163,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflarecakey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudimage"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudinary"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudmersive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudplan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudsmith"
@@ -1030,6 +1031,7 @@ func buildDetectorList() []detectors.Detector {
 		&cloudflarecakey.Scanner{},
 		&cloudflareglobalapikey.Scanner{},
 		&cloudimage.Scanner{},
+		&cloudinary.Scanner{},
 		&cloudmersive.Scanner{},
 		&cloudplan.Scanner{},
 		&cloudsmith.Scanner{},
