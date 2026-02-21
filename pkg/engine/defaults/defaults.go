@@ -398,7 +398,8 @@ import (
 	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud"
+	jumpcloudv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud/v1"
+	jumpcloudv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jupiterone"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/juro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jwt"
@@ -1273,7 +1274,8 @@ func buildDetectorList() []detectors.Detector {
 		&jiratokenv1.Scanner{},
 		&jiratokenv2.Scanner{},
 		&jotform.Scanner{},
-		&jumpcloud.Scanner{},
+		&jumpcloudv1.Scanner{},
+		&jumpcloudv2.Scanner{},
 		&jupiterone.Scanner{},
 		&juro.Scanner{},
 		&jwt.Scanner{},
