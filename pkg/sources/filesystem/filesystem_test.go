@@ -347,7 +347,8 @@ func TestSkipDir(t *testing.T) {
 	defer cleanupDir()
 
 	// create an ExcludePathsFile that contains the ignoreDir path
-	excludeFile, cleanupFile, err := createTempFile("", ignoreDir+"\n")
+	// In windows path contains \ so we escape it by replacing it with \\ in ignoreDir
+	excludeFile, cleanupFile, err := createTempFile("", strings.ReplaceAll(ignoreDir, `\`, `\\`)+"\n")
 	require.NoError(t, err)
 	defer cleanupFile()
 
@@ -390,7 +391,7 @@ func TestScanSubDirFile(t *testing.T) {
 	defer cleanupFile()
 
 	// create an IncludePathsFile that contains the file path
-	includeFile, cleanupFile, err := createTempFile("", file.Name()+"\n")
+	includeFile, cleanupFile, err := createTempFile("", strings.ReplaceAll(file.Name(), `\`, `\\`)+"\n")
 	require.NoError(t, err)
 	defer cleanupFile()
 
