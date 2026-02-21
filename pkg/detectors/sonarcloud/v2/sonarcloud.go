@@ -2,7 +2,6 @@ package sonarcloud
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,18 +19,21 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (Scanner) Version() int { return 2 }
 
 var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sonar"}) + `(?:^|[^@])\b([0-9a-z]{40})\b`)
+	keyPat = regexp.MustCompile(`\b(sqco_[[:alnum:]]{59})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sonar"}
+	return []string{"sqco_"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -55,6 +57,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SonarCloud,
 			Raw:          []byte(match),
+			ExtraData: map[string]string{
+				"version": fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
@@ -71,13 +76,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 // verifyMatch attempts to validate a SonarCloud token.
 func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
-	url := "https://sonarcloud.io/api/authentication/validate"
+	organizationKey := "~dummy~" // Dummy key that won't match a real organization key
+	url := fmt.Sprintf("https://sonarcloud.io/api/projects/search?organization=%s", organizationKey)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return false, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.SetBasicAuth(token, "")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+
 	res, err := client.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("failed to perform request: %w", err)
@@ -88,27 +97,14 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, token str
 		_ = res.Body.Close()
 	}()
 
-	// The SonarCloud API always returns 200 OK, even for invalid tokens,
-	// with the validity indicated in the JSON body.
-	if res.StatusCode != http.StatusOK {
-		// Treat any non-200 status as a failed attempt to verify.
+	switch res.StatusCode {
+	case http.StatusNotFound:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
-
-	bodyBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		return false, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	var resp struct {
-		Valid bool `json:"valid"`
-	}
-
-	if err := json.Unmarshal(bodyBytes, &resp); err != nil {
-		return false, fmt.Errorf("invalid JSON: %w", err)
-	}
-
-	return resp.Valid, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
