@@ -308,12 +308,12 @@ func init() {
 			os.Exit(0)
 		}
 
-		binary, err := exec.LookPath("sh")
+		binary, err := exec.LookPath(os.Args[0])
 		if err == nil {
 			// On success, this call will never return. On failure, fallthrough
 			// to overwriting os.Args.
-			cmd := strings.Join(append(os.Args[:1], args...), " ")
-			_ = syscall.Exec(binary, []string{"sh", "-c", cmd}, append(os.Environ(), "TUI_PARENT=true"))
+			execArgs := append([]string{binary}, args...)
+			_ = syscall.Exec(binary, execArgs, append(os.Environ(), "TUI_PARENT=true"))
 		}
 
 		// Overwrite the Args slice so overseer works properly.
