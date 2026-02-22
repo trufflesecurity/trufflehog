@@ -3,6 +3,8 @@ package github
 import (
 	"context"
 	"fmt"
+	"hash/crc32"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -39,6 +41,8 @@ var (
 	// https://developer.github.com/v3/#oauth2-keysecret
 )
 
+var classicTokenPrefixes = []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_"}
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -55,6 +59,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		// First match is entire regex, second is the first group.
 
 		token := match[1]
+		if isClassicGitHubToken(token) && !hasValidClassicGitHubChecksum(token) {
+			continue
+		}
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
@@ -93,4 +100,51 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
+}
+
+func isClassicGitHubToken(token string) bool {
+	if len(token) != 40 {
+		return false
+	}
+	for _, prefix := range classicTokenPrefixes {
+		if strings.HasPrefix(token, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasValidClassicGitHubChecksum(token string) bool {
+	// Format: <prefix><30-char body><6-char checksum>, total length 40.
+	body := token[4:34]
+	actualChecksum := token[34:]
+	expectedChecksum := base62EncodePadded(uint64(crc32.ChecksumIEEE([]byte(body))), 6)
+	return actualChecksum == expectedChecksum
+}
+
+func base62EncodePadded(value uint64, width int) string {
+	const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	if width <= 0 {
+		width = 1
+	}
+
+	var encoded string
+	if value == 0 {
+		encoded = "0"
+	} else {
+		out := make([]byte, 0, 11)
+		for value > 0 {
+			out = append(out, alphabet[value%62])
+			value /= 62
+		}
+		for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+			out[i], out[j] = out[j], out[i]
+		}
+		encoded = string(out)
+	}
+
+	if len(encoded) >= width {
+		return encoded
+	}
+	return strings.Repeat("0", width-len(encoded)) + encoded
 }
