@@ -1,40 +1,42 @@
-<p align="center">
-  <img alt="GoReleaser Logo" src="https://storage.googleapis.com/trufflehog-static-sources/pixel_pig.png" height="140" />
-  <h2 align="center">TruffleHog</h2>
-  <p align="center">Find leaked credentials.</p>
-</p>
+
+
+## TruffleHog
+
+Find leaked credentials.
+
+
 
 ---
 
-<div align="center">
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
-[![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
 
-</div>
+[Go Report Card](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
+[License](/LICENSE)
+[Total Detectors](/pkg/detectors)
+
+
 
 ---
 
-# :mag_right: _Now Scanning_
+# :mag_right: *Now Scanning*
 
-<div align="center">
 
-<img src="assets/scanning_logos.svg">
+
+
 
 **...and more**
 
 To learn more about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
 
-</div>
+
 
 # :globe_with_meridians: TruffleHog Enterprise
 
-Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint (and more)** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
+Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint (and more)** for credentials? We have an enterprise product that can help! Learn more at [https://trufflesecurity.com/trufflehog-enterprise](https://trufflesecurity.com/trufflehog-enterprise).
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
 
-</div>
+
 
 # What is TruffleHog 🐽
 
@@ -66,7 +68,7 @@ Join the [Secret Scanning Discord](https://discord.gg/8Hzbrnkr7E)
 
 # :tv: Demo
 
-![GitHub scanning demo](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
+GitHub scanning demo
 
 ```bash
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
@@ -84,27 +86,27 @@ brew install trufflehog
 
 ### Docker:
 
-<sub><i>_Ensure Docker engine is running before executing the following commands:_</i></sub>
+*_Ensure Docker engine is running before executing the following commands:_*
 
-#### &nbsp;&nbsp;&nbsp;&nbsp;Unix
+#### Unix
 
 ```bash
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-#### &nbsp;&nbsp;&nbsp;&nbsp;Windows Command Prompt
+#### Windows Command Prompt
 
 ```bash
 docker run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-#### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
+#### Windows PowerShell
 
 ```bash
 docker run --rm -it -v "${PWD}:/pwd" trufflesecurity/trufflehog github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-#### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
+#### M1 and M2 Mac
 
 ```bash
 docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
@@ -152,26 +154,21 @@ You need the following tool to verify signature:
 Verification steps are as follows:
 
 1. Download the artifact files you want, and the following files from the [releases](https://github.com/trufflesecurity/trufflehog/releases) page.
-
-   - trufflehog\_{version}\_checksums.txt
-   - trufflehog\_{version}\_checksums.txt.pem
-   - trufflehog\_{version}\_checksums.txt.sig
-
+  - trufflehog{version}checksums.txt
+  - trufflehog{version}checksums.txt.pem
+  - trufflehog{version}checksums.txt.sig
 2. Verify the signature:
-
-   ```shell
+  ```shell
    cosign verify-blob <path to trufflehog_{version}_checksums.txt> \
    --certificate <path to trufflehog_{version}_checksums.txt.pem> \
    --signature <path to trufflehog_{version}_checksums.txt.sig> \
    --certificate-identity-regexp 'https://github\.com/trufflesecurity/trufflehog/\.github/workflows/.+' \
    --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-   ```
-
+  ```
 3. Once the signature is confirmed as valid, you can proceed to validate that the SHA256 sums align with the downloaded artifact:
-
-   ```shell
+  ```shell
    sha256sum --ignore-missing -c trufflehog_{version}_checksums.txt
-   ```
+  ```
 
 Replace `{version}` with the downloaded files version
 
@@ -260,13 +257,15 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ## 9: Scan a local git repo
 
 Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
+
 ```bash
-$ git clone git@github.com:trufflesecurity/test_keys.git
+git clone git@github.com:trufflesecurity/test_keys.git
 ```
 
 Run trufflehog from the parent directory (outside the git repo).
+
 ```bash
-$ trufflehog git file://test_keys --results=verified,unknown
+trufflehog git file://test_keys --results=verified,unknown
 ```
 
 To guard against malicious git configs in local scanning (see CVE-2025-41390), TruffleHog clones local git repositories to a temporary directory prior to scanning. This follows [Git's security best practices](https://git-scm.com/docs/git#_security). If you want to specify a custom path to clone the repository to (instead of tmp), you can use the `--clone-path` flag. If you'd like to skip the local cloning process and scan the repository directly (only do this for trusted repos), you can use the `--trust-local-git-config` flag.
@@ -439,56 +438,133 @@ Each subcommand can have options that you can see with the `--help` flag provide
 
 ```
 $ trufflehog git --help
-usage: TruffleHog git [<flags>] <uri>
+usage: TruffleHog [<flags>] <command> [<args> ...]
 
-Find credentials in git repositories.
+TruffleHog is a tool for finding credentials.
+
 
 Flags:
-  -h, --help                Show context-sensitive help (also try --help-long and --help-man).
-      --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
-      --profile             Enables profiling and sets a pprof and fgprof server on :18066.
-  -j, --json                Output in JSON format.
-      --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
-      --github-actions      Output in GitHub Actions format.
-      --concurrency=20           Number of concurrent workers.
-      --no-verification     Don't verify the results.
-      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to all types.
-      --allow-verification-overlap
+  -h, --[no-]help                Show context-sensitive help (also try --help-long and --help-man).
+      --log-level=0              Logging verbosity on a scale of 0 (info) to 5 (trace). Can be
+                                 disabled with "-1".
+      --[no-]profile             Enables profiling and sets a pprof and fgprof server on :18066.
+  -j, --[no-]json                Output in JSON format.
+      --[no-]json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab,
+                                 and github sources.
+      --[no-]github-actions      Output in GitHub Actions format.
+      --concurrency=12           Number of concurrent workers.
+      --[no-]no-verification     Don't verify the results.
+      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed
+                                 valid by API), unknown (verification failed due to error),
+                                 unverified (detected but not verified), filtered_unverified
+                                 (unverified but would have been filtered out). Defaults to
+                                 verified,unverified,unknown.
+      --[no-]no-color            Disable colorized output
+      --[no-]allow-verification-overlap
                                  Allow verification of similar credentials across detectors
-      --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
+      --[no-]filter-unverified   Only output first unverified result per chunk per detector if there
+                                 are more than one results.
       --filter-entropy=FILTER-ENTROPY
                                  Filter unverified results with Shannon entropy. Start with 3.0.
       --config=CONFIG            Path to configuration file.
-      --print-avg-detector-time
+      --[no-]print-avg-detector-time
                                  Print the average time spent on each detector.
-      --no-update           Don't check for updates.
-      --fail                Exit with code 183 if results are found.
+      --[no-]no-update           Don't check for updates.
+      --[no-]fail                Exit with code 183 if results are found.
+      --[no-]fail-on-scan-errors
+                                 Exit with non-zero error code if an error occurs during the scan.
       --verifier=VERIFIER ...    Set custom verification endpoints.
-      --custom-verifiers-only   Only use custom verification endpoints.
+      --[no-]custom-verifiers-only
+                                 Only use custom verification endpoints.
+      --detector-timeout=DETECTOR-TIMEOUT
+                                 Maximum time to spend scanning chunks per detector (e.g., 30s).
       --archive-max-size=ARCHIVE-MAX-SIZE
                                  Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
       --archive-max-depth=ARCHIVE-MAX-DEPTH
                                  Maximum depth of archive to scan.
       --archive-timeout=ARCHIVE-TIMEOUT
                                  Maximum time to spend extracting an archive.
-      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.
+      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or
+                                 IDs may be used, as well as ranges.
       --exclude-detectors=EXCLUDE-DETECTORS
-                                 Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.
-      --version             Show application version.
-  -i, --include-paths=INCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to include in scan.
-  -x, --exclude-paths=EXCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to exclude in scan.
-      --exclude-globs=EXCLUDE-GLOBS
-                                 Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.
-      --since-commit=SINCE-COMMIT
-                                 Commit to start scan from.
-      --branch=BRANCH            Branch to scan.
-      --max-depth=MAX-DEPTH      Maximum depth of commits to scan.
-      --bare                Scan bare repository (e.g. useful while using in pre-receive hooks)
+                                 Comma separated list of detector types to exclude. Protobuf name
+                                 or IDs may be used, as well as ranges. IDs defined here take
+                                 precedence over the include list.
+      --[no-]no-verification-cache
+                                 Disable verification caching
+      --[no-]force-skip-binaries
+                                 Force skipping binaries.
+      --[no-]force-skip-archives
+                                 Force skipping archives.
+      --[no-]skip-additional-refs
+                                 Skip additional references.
+      --user-agent-suffix=USER-AGENT-SUFFIX
+                                 Suffix to add to User-Agent.
+      --[no-]version             Show application version.
 
-Args:
-  <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
+Commands:
+help [<command>...]
+    Show help.
+
+git [<flags>] <uri>
+
+    Find credentials in git repositories.
+
+github [<flags>]
+    Find credentials in GitHub repositories.
+
+github-experimental --repo=REPO [<flags>]
+    Run an experimental GitHub scan. Must specify at least one experimental sub-module to run:
+    object-discovery.
+
+gitlab --token=TOKEN [<flags>]
+    Find credentials in GitLab repositories.
+
+filesystem [<flags>] [<path>...]
+    Find credentials in a filesystem.
+
+s3 [<flags>]
+    Find credentials in S3 buckets.
+
+gcs [<flags>]
+    Find credentials in GCS buckets.
+
+syslog --format=FORMAT [<flags>]
+    Scan syslog
+
+circleci --token=TOKEN
+    Scan CircleCI
+
+docker [<flags>]
+    Scan Docker Image
+
+
+travisci --token=TOKEN
+    Scan TravisCI
+
+postman [<flags>]
+    Scan Postman
+
+elasticsearch [<flags>]
+    Scan Elasticsearch
+
+jenkins --url=URL [<flags>]
+    Scan Jenkins
+
+huggingface [<flags>]
+    Find credentials in HuggingFace datasets, models and spaces.
+
+stdin
+    Find credentials from stdin.
+
+multi-scan
+    Find credentials in multiple sources defined in configuration.
+
+json-enumerator [<path>...]
+    Find credentials from a JSON enumerator input.
+
+analyze
+    Analyze API keys for fine-grained permissions information.
 ```
 
 For example, to scan a `git` repository, start with
@@ -613,7 +689,7 @@ Depending on the event type (push or PR), we calculate the number of commits pre
 
 TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/).
 
-![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
+image
 
 ### Advanced Usage
 
@@ -694,6 +770,7 @@ your custom detector has multiple `regex` set (in this example `hogID`, and `hog
 **NB:** This feature is alpha and subject to change.
 
 ### Regex Detector Example
+
 [Here](/pkg/custom_detectors/CUSTOM_DETECTORS.md) is how to setup a custom regex detector with verification server.
 
 ## Generic JWT Detection
@@ -713,9 +790,7 @@ trufflehog analyze
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
 
-<a href="https://github.com/trufflesecurity/trufflehog/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=trufflesecurity/trufflehog" />
-</a>
+
 
 # :computer: Contributing
 
@@ -734,4 +809,4 @@ the stability of the public APIs at this time.
 
 # License Change
 
-Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
+Since v3.0, TruffleHog is released under a AGPL 3 license, included in `[LICENSE](LICENSE)`. TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
