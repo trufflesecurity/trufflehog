@@ -1,42 +1,40 @@
-
-
-## TruffleHog
-
-Find leaked credentials.
-
-
+<p align="center">
+  <img alt="GoReleaser Logo" src="https://storage.googleapis.com/trufflehog-static-sources/pixel_pig.png" height="140" />
+  <h2 align="center">TruffleHog</h2>
+  <p align="center">Find leaked credentials.</p>
+</p>
 
 ---
 
+<div align="center">
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
+[![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
 
-[Go Report Card](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
-[License](/LICENSE)
-[Total Detectors](/pkg/detectors)
-
-
+</div>
 
 ---
 
-# :mag_right: *Now Scanning*
+# :mag_right: _Now Scanning_
 
+<div align="center">
 
-
-
+<img src="assets/scanning_logos.svg">
 
 **...and more**
 
 To learn more about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
 
-
+</div>
 
 # :globe_with_meridians: TruffleHog Enterprise
 
-Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint (and more)** for credentials? We have an enterprise product that can help! Learn more at [https://trufflesecurity.com/trufflehog-enterprise](https://trufflesecurity.com/trufflehog-enterprise).
+Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint (and more)** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
 
-
+</div>
 
 # What is TruffleHog 🐽
 
@@ -68,7 +66,7 @@ Join the [Secret Scanning Discord](https://discord.gg/8Hzbrnkr7E)
 
 # :tv: Demo
 
-GitHub scanning demo
+![GitHub scanning demo](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
 
 ```bash
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
@@ -86,27 +84,27 @@ brew install trufflehog
 
 ### Docker:
 
-*_Ensure Docker engine is running before executing the following commands:_*
+<sub><i>_Ensure Docker engine is running before executing the following commands:_</i></sub>
 
-#### Unix
+#### &nbsp;&nbsp;&nbsp;&nbsp;Unix
 
 ```bash
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-#### Windows Command Prompt
+#### &nbsp;&nbsp;&nbsp;&nbsp;Windows Command Prompt
 
 ```bash
 docker run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-#### Windows PowerShell
+#### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
 
 ```bash
 docker run --rm -it -v "${PWD}:/pwd" trufflesecurity/trufflehog github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-#### M1 and M2 Mac
+#### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
 
 ```bash
 docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
@@ -154,21 +152,26 @@ You need the following tool to verify signature:
 Verification steps are as follows:
 
 1. Download the artifact files you want, and the following files from the [releases](https://github.com/trufflesecurity/trufflehog/releases) page.
-  - trufflehog{version}checksums.txt
-  - trufflehog{version}checksums.txt.pem
-  - trufflehog{version}checksums.txt.sig
+
+   - trufflehog\_{version}\_checksums.txt
+   - trufflehog\_{version}\_checksums.txt.pem
+   - trufflehog\_{version}\_checksums.txt.sig
+
 2. Verify the signature:
-  ```shell
+
+   ```shell
    cosign verify-blob <path to trufflehog_{version}_checksums.txt> \
    --certificate <path to trufflehog_{version}_checksums.txt.pem> \
    --signature <path to trufflehog_{version}_checksums.txt.sig> \
    --certificate-identity-regexp 'https://github\.com/trufflesecurity/trufflehog/\.github/workflows/.+' \
    --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-  ```
+   ```
+
 3. Once the signature is confirmed as valid, you can proceed to validate that the SHA256 sums align with the downloaded artifact:
-  ```shell
+
+   ```shell
    sha256sum --ignore-missing -c trufflehog_{version}_checksums.txt
-  ```
+   ```
 
 Replace `{version}` with the downloaded files version
 
@@ -257,13 +260,11 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ## 9: Scan a local git repo
 
 Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
-
 ```bash
 git clone git@github.com:trufflesecurity/test_keys.git
 ```
 
 Run trufflehog from the parent directory (outside the git repo).
-
 ```bash
 trufflehog git file://test_keys --results=verified,unknown
 ```
@@ -689,7 +690,7 @@ Depending on the event type (push or PR), we calculate the number of commits pre
 
 TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/).
 
-image
+![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
 
 ### Advanced Usage
 
@@ -770,7 +771,6 @@ your custom detector has multiple `regex` set (in this example `hogID`, and `hog
 **NB:** This feature is alpha and subject to change.
 
 ### Regex Detector Example
-
 [Here](/pkg/custom_detectors/CUSTOM_DETECTORS.md) is how to setup a custom regex detector with verification server.
 
 ## Generic JWT Detection
@@ -790,7 +790,9 @@ trufflehog analyze
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
 
-
+<a href="https://github.com/trufflesecurity/trufflehog/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=trufflesecurity/trufflehog" />
+</a>
 
 # :computer: Contributing
 
@@ -809,4 +811,4 @@ the stability of the public APIs at this time.
 
 # License Change
 
-Since v3.0, TruffleHog is released under a AGPL 3 license, included in `[LICENSE](LICENSE)`. TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
+Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
