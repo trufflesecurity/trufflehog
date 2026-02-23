@@ -22,6 +22,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"golang.org/x/oauth2/google"
 )
 
 const (
@@ -143,7 +144,14 @@ func withAPIKey(ctx context.Context, apiKey string) gcsManagerOption {
 
 // withJSONServiceAccount uses the provided JSON service account when creating a new GCS client.
 func withJSONServiceAccount(ctx context.Context, jsonServiceAccount []byte) gcsManagerOption {
-	client, err := storage.NewClient(ctx, option.WithCredentialsJSON(jsonServiceAccount), option.WithScopes(storage.ScopeReadOnly))
+	creds, err := google.CredentialsFromJSON(ctx, jsonServiceAccount, storage.ScopeReadOnly)
+	if err != nil {
+		return func(m *gcsManager) error {
+			return fmt.Errorf("failed to load credentials: %w", err)
+		}
+	}
+
+	client, err := storage.NewClient(ctx, option.WithCredentials(creds))
 	return func(m *gcsManager) error {
 		if err != nil {
 			return err
