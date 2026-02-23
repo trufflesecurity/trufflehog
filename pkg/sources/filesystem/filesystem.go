@@ -144,6 +144,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initialDepth := 1
 			err = s.scanDir(ctx, cleanPath, chunksChan, workerPool, initialDepth)
 			_ = workerPool.Wait()
+			s.ClearEncodedResumeInfoFor(path)
 		} else {
 			if !fileInfo.Mode().IsRegular() {
 				logger.Info("skipping non-regular file", "path", cleanPath)
@@ -243,7 +244,6 @@ func (s *Source) scanDir(
 		return nil
 	}
 	startState := s.GetEncodedResumeInfoFor(path)
-	defer s.ClearEncodedResumeInfoFor(path)
 	resuming := startState != ""
 
 	ctx.Logger().V(5).Info("Full path found is", "fullPath", path)
@@ -400,10 +400,15 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			// TODO: Finer grain error tracking of individual chunks.
 			scanErr = s.scanDir(ctx, cleanPath, ch, workerPool, initialDepth)
 			_ = workerPool.Wait()
+			s.ClearEncodedResumeInfoFor(path)
 		} else {
 			ctx.Logger().V(5).Info("Root path is a file", "path", cleanPath)
 			// TODO: Finer grain error tracking of individual
 			// chunks (in the case of archives).
+			if !fileInfo.Mode().IsRegular() {
+				logger.Info("skipping non-regular file", "path", cleanPath)
+				return
+			}
 			scanErr = s.scanFile(ctx, cleanPath, ch)
 		}
 	}()
