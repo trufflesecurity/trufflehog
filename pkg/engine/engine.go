@@ -204,6 +204,8 @@ type Engine struct {
 	wgDetectorWorkers             sync.WaitGroup
 	WgNotifier                    sync.WaitGroup
 
+	activeDetections atomic.Int64 // tracks in-flight detectChunk calls
+
 	// Runtime information.
 	metrics runtimeMetrics
 	// numFoundResults is used to keep track of the number of results found.
@@ -675,13 +677,17 @@ func (e *Engine) startWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startScannerWorkers(ctx context.Context) {
-	ctx.Logger().V(2).Info("starting scanner workers", "count", e.concurrency)
+	ctx.Logger().Info("[BENCH-DEBUG] starting scanner workers", "count", e.concurrency)
 	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.workersWg.Add(1)
+		workerID := worker
 		go func() {
 			ctx := context.WithValue(ctx, "scanner_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
-			defer e.workersWg.Done()
+			defer func() {
+				ctx.Logger().Info("[BENCH-DEBUG] scanner worker exiting", "worker_id", workerID)
+				e.workersWg.Done()
+			}()
 			e.scannerWorker(ctx)
 		}()
 	}
@@ -690,13 +696,17 @@ func (e *Engine) startScannerWorkers(ctx context.Context) {
 func (e *Engine) startDetectorWorkers(ctx context.Context) {
 	numWorkers := e.concurrency * e.detectorWorkerMultiplier
 
-	ctx.Logger().V(2).Info("starting detector workers", "count", numWorkers)
+	ctx.Logger().Info("[BENCH-DEBUG] starting detector workers", "count", numWorkers)
 	for worker := 0; worker < numWorkers; worker++ {
 		e.wgDetectorWorkers.Add(1)
+		workerID := worker
 		go func() {
 			ctx := context.WithValue(ctx, "detector_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
-			defer e.wgDetectorWorkers.Done()
+			defer func() {
+				ctx.Logger().Info("[BENCH-DEBUG] detector worker exiting", "worker_id", workerID)
+				e.wgDetectorWorkers.Done()
+			}()
 			e.detectorWorker(ctx)
 		}()
 	}
@@ -737,23 +747,107 @@ func (e *Engine) startNotifierWorkers(ctx context.Context) {
 // more sources may be scanned by the engine.
 func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
+	logger := ctx.Logger()
+
+	// Periodic status reporter during Finish
+	finishDone := make(chan struct{})
+	defer close(finishDone)
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-finishDone:
+				return
+			case <-ticker.C:
+				logger.Info("[BENCH-DEBUG] Finish() status",
+					"active_detections", e.activeDetections.Load(),
+					"goroutines", runtime.NumGoroutine())
+			}
+		}
+	}()
+
+	logger.Info("[BENCH-DEBUG] Finish() called, waiting for sourceManager.Wait()...")
+	t0 := time.Now()
+
 	// Wait for the sources to finish putting chunks onto the chunks channel.
 	err := e.sourceManager.Wait()
+	logger.Info("[BENCH-DEBUG] sourceManager.Wait() done", "elapsed", time.Since(t0).Round(time.Millisecond))
 
-	e.workersWg.Wait() // Wait for the workers to finish scanning chunks.
+	logger.Info("[BENCH-DEBUG] waiting for workersWg (scanner workers)...")
+	t1 := time.Now()
+	waitDone(logger, "workersWg", &e.workersWg)
+	logger.Info("[BENCH-DEBUG] workersWg done", "elapsed", time.Since(t1).Round(time.Millisecond))
 
+	logger.Info("[BENCH-DEBUG] closing verificationOverlapChunksChan...")
 	close(e.verificationOverlapChunksChan)
-	e.verificationOverlapWg.Wait()
+	logger.Info("[BENCH-DEBUG] waiting for verificationOverlapWg...")
+	t2 := time.Now()
+	waitDone(logger, "verificationOverlapWg", &e.verificationOverlapWg)
+	logger.Info("[BENCH-DEBUG] verificationOverlapWg done", "elapsed", time.Since(t2).Round(time.Millisecond))
 
+	logger.Info("[BENCH-DEBUG] closing detectableChunksChan...")
 	close(e.detectableChunksChan)
-	e.wgDetectorWorkers.Wait() // Wait for the detector workers to finish detecting chunks.
+	logger.Info("[BENCH-DEBUG] waiting for wgDetectorWorkers...")
+	t3 := time.Now()
+	waitDone(logger, "wgDetectorWorkers", &e.wgDetectorWorkers)
+	logger.Info("[BENCH-DEBUG] wgDetectorWorkers done", "elapsed", time.Since(t3).Round(time.Millisecond))
 
-	close(e.results)    // Detector workers are done, close the results channel and call it a day.
-	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
+	logger.Info("[BENCH-DEBUG] closing results channel...")
+	close(e.results)
+	logger.Info("[BENCH-DEBUG] waiting for WgNotifier...")
+	t4 := time.Now()
+	waitDone(logger, "WgNotifier", &e.WgNotifier)
+	logger.Info("[BENCH-DEBUG] WgNotifier done", "elapsed", time.Since(t4).Round(time.Millisecond))
 
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
+	logger.Info("[BENCH-DEBUG] Finish() complete", "total_elapsed", time.Since(t0).Round(time.Millisecond))
 	return err
+}
+
+// waitDone waits on a WaitGroup but logs every 30s if it's still waiting.
+// After 60s, it dumps all goroutine stacks once.
+func waitDone(logger interface{ Info(string, ...any) }, name string, wg *sync.WaitGroup) {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	start := time.Now()
+	dumped := false
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			waited := time.Since(start)
+			logger.Info("[BENCH-DEBUG] still waiting", "waitgroup", name, "waiting_for", waited.Round(time.Second))
+			if waited > 60*time.Second && !dumped {
+				dumped = true
+				dumpGoroutines(logger, name)
+			}
+		}
+	}
+}
+
+func dumpGoroutines(logger interface{ Info(string, ...any) }, reason string) {
+	buf := make([]byte, 1<<20) // 1MB
+	n := runtime.Stack(buf, true)
+	stack := string(buf[:n])
+	const chunkSize = 4000
+	logger.Info("[BENCH-DEBUG] === GOROUTINE DUMP START ===", "reason", reason, "total_bytes", n)
+	for i := 0; i < len(stack); i += chunkSize {
+		end := i + chunkSize
+		if end > len(stack) {
+			end = len(stack)
+		}
+		logger.Info("[BENCH-DEBUG] goroutine dump chunk", "offset", i, "data", stack[i:end])
+	}
+	logger.Info("[BENCH-DEBUG] === GOROUTINE DUMP END ===")
 }
 
 func (e *Engine) ChunksChan() <-chan *sources.Chunk {
@@ -897,8 +991,16 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		atomic.AddUint64(&e.metrics.BytesScanned, uint64(dataSize))
 	}
 
+	ctx.Logger().Info("[BENCH-DEBUG] scannerWorker: all chunks consumed, waiting for verificationOverlap local wg...")
+	t0 := time.Now()
 	wgVerificationOverlap.Wait()
+	ctx.Logger().Info("[BENCH-DEBUG] scannerWorker: verificationOverlap done", "elapsed", time.Since(t0).Round(time.Millisecond))
+
+	ctx.Logger().Info("[BENCH-DEBUG] scannerWorker: waiting for detect local wg...")
+	t1 := time.Now()
 	wgDetect.Wait()
+	ctx.Logger().Info("[BENCH-DEBUG] scannerWorker: detect done", "elapsed", time.Since(t1).Round(time.Millisecond))
+
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
@@ -1105,6 +1207,18 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if e.printAvgDetectorTime {
 		start = time.Now()
 	}
+	chunkStart := time.Now()
+	detectorName := data.detector.Key.Type().String()
+	e.activeDetections.Add(1)
+	defer func() {
+		e.activeDetections.Add(-1)
+		elapsed := time.Since(chunkStart)
+		if elapsed > 15*time.Second {
+			ctx.Logger().Info("[BENCH-DEBUG] SLOW detectChunk",
+				"detector", detectorName,
+				"elapsed", elapsed.Round(time.Millisecond))
+		}
+	}()
 	defer common.Recover(ctx)
 
 	ctx = context.WithValues(ctx,
@@ -1130,8 +1244,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
 
 		ctx, cancel := context.WithTimeout(ctx, detectionTimeout)
+		fromDataStart := time.Now()
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
-			ctx.Logger().Error(nil, "a detector ignored the context timeout")
+			ctx.Logger().Error(nil, "[BENCH-DEBUG] TIMEOUT IGNORED by detector",
+				"detector", detectorName,
+				"match_idx", matchCount,
+				"elapsed", time.Since(fromDataStart).Round(time.Millisecond))
 		})
 		results, err := e.verificationCache.FromData(
 			ctx,
@@ -1139,8 +1257,15 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			data.chunk.Verify,
 			data.chunk.SecretID != 0,
 			matchBytes)
+		fromDataElapsed := time.Since(fromDataStart)
 		t.Stop()
 		cancel()
+		if fromDataElapsed > 5*time.Second {
+			ctx.Logger().Info("[BENCH-DEBUG] slow FromData",
+				"detector", detectorName,
+				"elapsed", fromDataElapsed.Round(time.Millisecond),
+				"match_idx", matchCount)
+		}
 		if err != nil {
 			ctx.Logger().Error(err, "error finding results in chunk")
 			continue

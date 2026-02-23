@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
@@ -1131,9 +1132,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 
 	// Wait for all workers to finish.
+	ctx.Logger().Info("[BENCH-DEBUG] calling eng.Finish()...")
+	finishStart := time.Now()
 	if err = eng.Finish(ctx); err != nil {
 		return scanMetrics, fmt.Errorf("engine failed to finish execution: %v", err)
 	}
+	ctx.Logger().Info("[BENCH-DEBUG] eng.Finish() returned", "elapsed", time.Since(finishStart).Round(time.Millisecond))
 
 	// Print any non-fatal errors reported during the scan.
 	var retErr error
