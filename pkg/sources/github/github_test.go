@@ -1355,3 +1355,182 @@ func TestExtractRepoNameFromURL(t *testing.T) {
 		})
 	}
 }
+
+func TestIsGHECloud(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     bool
+	}{
+		// GHE.com endpoints — should return true
+		{"api subdomain", "https://api.company.ghe.com", true},
+		{"web subdomain", "https://company.ghe.com", true},
+		{"api subdomain trailing slash", "https://api.company.ghe.com/", true},
+		{"web subdomain trailing slash", "https://company.ghe.com/", true},
+		{"uppercase", "https://API.company.GHE.COM", true},
+		{"mixed case", "https://Api.company.Ghe.Com/", true},
+		{"deep subdomain", "https://api.team.company.ghe.com", true},
+
+		// GHES endpoints — should return false
+		{"ghes custom domain", "https://github.mycompany.com", false},
+		{"ghes with path", "https://github.mycompany.com/api/v3", false},
+		{"ghes internal", "https://github.internal.corp.com", false},
+
+		// github.com — should return false
+		{"cloud api", "https://api.github.com", false},
+		{"cloud web", "https://github.com", false},
+
+		// Edge cases — should return false
+		{"empty string", "", false},
+		{"localhost", "http://localhost:8080", false},
+		{"malicious suffix", "https://notghe.com", false},
+		{"partial match", "https://api.fakeghe.com.evil.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isGHECloud(tt.endpoint)
+			if got != tt.want {
+				t.Errorf("isGHECloud(%q) = %v, want %v", tt.endpoint, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeGHECloudAPIEndpoint(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:  "web URL to API URL",
+			input: "https://company.ghe.com",
+			want:  "https://api.company.ghe.com/",
+		},
+		{
+			name:  "web URL with trailing slash",
+			input: "https://company.ghe.com/",
+			want:  "https://api.company.ghe.com/",
+		},
+		{
+			name:  "api URL already correct",
+			input: "https://api.company.ghe.com",
+			want:  "https://api.company.ghe.com/",
+		},
+		{
+			name:  "api URL with trailing slash",
+			input: "https://api.company.ghe.com/",
+			want:  "https://api.company.ghe.com/",
+		},
+		{
+			name:  "preserves port",
+			input: "http://company.ghe.com:8080",
+			want:  "http://api.company.ghe.com:8080/",
+		},
+		{
+			name:  "api with port",
+			input: "http://api.company.ghe.com:8080",
+			want:  "http://api.company.ghe.com:8080/",
+		},
+		{
+			name:  "strips path",
+			input: "https://company.ghe.com/some/path",
+			want:  "https://api.company.ghe.com/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeGHECloudAPIEndpoint(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("normalizeGHECloudAPIEndpoint(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("normalizeGHECloudAPIEndpoint(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateAPIClient_GHECloud_NoAPIV3(t *testing.T) {
+	// The most critical test: GHE.com clients must NOT have /api/v3/ in their BaseURL.
+	endpoints := []string{
+		"https://api.company.ghe.com",
+		"https://company.ghe.com",
+		"https://api.company.ghe.com/",
+		"https://company.ghe.com/",
+	}
+
+	for _, endpoint := range endpoints {
+		t.Run(endpoint, func(t *testing.T) {
+			client, err := createGHECloudClient(http.DefaultClient, endpoint)
+			if err != nil {
+				t.Fatalf("createGHECloudClient(%q) unexpected error: %v", endpoint, err)
+			}
+
+			baseURL := client.BaseURL.String()
+
+			// Must NOT contain /api/v3
+			if strings.Contains(baseURL, "/api/v3") {
+				t.Errorf("GHE.com client BaseURL must not contain /api/v3/, got: %s", baseURL)
+			}
+
+			// Must point to api.company.ghe.com
+			if client.BaseURL.Hostname() != "api.company.ghe.com" {
+				t.Errorf("expected hostname api.company.ghe.com, got: %s", client.BaseURL.Hostname())
+			}
+
+			// Must have trailing slash
+			if !strings.HasSuffix(baseURL, "/") {
+				t.Errorf("BaseURL must have trailing slash, got: %s", baseURL)
+			}
+		})
+	}
+}
+
+func TestCreateGraphqlClient_GHECloud(t *testing.T) {
+	// GHE.com GraphQL should be at /graphql, NOT /api/graphql.
+	// We can't easily inspect the URL from the githubv4.Client,
+	// so we test the URL construction logic indirectly by checking
+	// the normalized endpoint.
+	apiURL, err := normalizeGHECloudAPIEndpoint("https://company.ghe.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	graphqlURL := strings.TrimRight(apiURL, "/") + "/graphql"
+	expected := "https://api.company.ghe.com/graphql"
+
+	if graphqlURL != expected {
+		t.Errorf("GHE.com GraphQL URL = %q, want %q", graphqlURL, expected)
+	}
+}
+
+func TestCreateAPIClient_GHES_HasAPIV3(t *testing.T) {
+	// GHES clients SHOULD have /api/v3/ — make sure we didn't break that.
+	// Note: WithEnterpriseURLs returns an error for invalid URLs, but for
+	// valid ones it appends /api/v3/.
+	client, err := createAPIClient(context.Background(), http.DefaultClient, "https://github.mycompany.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(client.BaseURL.String(), "/api/v3") {
+		t.Errorf("GHES client BaseURL should contain /api/v3/, got: %s", client.BaseURL.String())
+	}
+}
+
+func TestCreateAPIClient_CloudGitHub(t *testing.T) {
+	// Regular github.com should use the default client (api.github.com).
+	client, err := createAPIClient(context.Background(), http.DefaultClient, cloudV3Endpoint)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if client.BaseURL.String() != "https://api.github.com/" {
+		t.Errorf("expected https://api.github.com/, got: %s", client.BaseURL.String())
+	}
+}

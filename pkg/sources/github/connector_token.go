@@ -49,11 +49,16 @@ func NewTokenConnector(ctx context.Context, apiEndpoint, token, clonePath string
 		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
 	}
 
+	// Treat both GHES and GHE.com as "enterprise" for enumeration purposes.
+	// GHE.com (GHEC with data residency) is a dedicated enterprise environment
+	// with EMU, so enterprise-level enumeration (e.g., addAllVisibleOrgs) applies.
+	isEnterprise := !strings.EqualFold(apiEndpoint, cloudV3Endpoint)
+
 	return &tokenConnector{
 		apiClient:          apiClient,
 		graphqlClient:      graphqlClient,
 		token:              token,
-		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudV3Endpoint),
+		isGitHubEnterprise: isEnterprise,
 		handleRateLimit:    handleRateLimit,
 		authInUrl:          authInUrl,
 		clonePath:          clonePath,
