@@ -129,13 +129,12 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 		host = host + ":21"
 	}
 
-	deadline := time.Now().Add(timeout)
 	c, err := ftp.Dial(host, ftp.DialWithDialFunc(func(network, address string) (net.Conn, error) {
-		conn, err := net.DialTimeout(network, address, time.Until(deadline))
+		conn, err := net.DialTimeout(network, address, timeout)
 		if err != nil {
 			return nil, err
 		}
-		if err := conn.SetDeadline(deadline); err != nil {
+		if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
 			conn.Close()
 			return nil, err
 		}
