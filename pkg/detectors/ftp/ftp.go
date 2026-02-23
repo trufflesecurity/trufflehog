@@ -137,7 +137,10 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 		if err != nil {
 			return nil, err
 		}
-		conn.SetDeadline(time.Now().Add(timeout))
+		if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+			conn.Close()
+			return nil, err
+		}
 		return conn, nil
 	}))
 	if err != nil {
