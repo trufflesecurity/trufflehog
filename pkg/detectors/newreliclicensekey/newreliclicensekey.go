@@ -26,7 +26,7 @@ var (
 	// https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/#license-key
 	// US region keys are 40 characters hexadecimal strings ending with "FFFFNRAL"
 	// EU region keys have the same format but first 6 characters are "eu01xx"
-	keyPat = regexp.MustCompile(`\b([0-9a-x]{6}[0-9a-f]{26}FFFFNRAL)\b`)
+	keyPat = regexp.MustCompile(`\b(([0-9a-f]{32}|eu01xx[0-9a-f]{26})FFFFNRAL)\b`)
 )
 
 func (s Scanner) getClient() *http.Client {
