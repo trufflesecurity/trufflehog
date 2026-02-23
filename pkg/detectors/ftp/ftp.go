@@ -129,15 +129,13 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 		host = host + ":21"
 	}
 
-	// Use a custom dial function that sets a deadline on the connection so that
-	// the FTP banner read and login are also bounded by the timeout. Without this,
-	// a server that accepts TCP but never sends a banner will block indefinitely.
+	deadline := time.Now().Add(timeout)
 	c, err := ftp.Dial(host, ftp.DialWithDialFunc(func(network, address string) (net.Conn, error) {
-		conn, err := net.DialTimeout(network, address, timeout)
+		conn, err := net.DialTimeout(network, address, time.Until(deadline))
 		if err != nil {
 			return nil, err
 		}
-		if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		if err := conn.SetDeadline(deadline); err != nil {
 			conn.Close()
 			return nil, err
 		}
