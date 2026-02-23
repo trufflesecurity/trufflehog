@@ -99,7 +99,19 @@ func (s Scanner) verify(url string) (bool, error) {
 			_ = conn.Close()
 		}
 	}()
-	return err == nil, err
+	if err == nil {
+		return true, nil
+	}
+	// Check if this is a determinate authentication failure
+	errStr := strings.ToLower(err.Error())
+
+	if (strings.Contains(errStr, "403") &&
+		strings.Contains(errStr, "access_refused")) ||
+		strings.Contains(errStr, "username or password not allowed") {
+		// make secret as rotated
+		return false, nil
+	}
+	return false, err
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
