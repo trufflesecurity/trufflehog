@@ -219,7 +219,7 @@ func (s *Source) scanSymlink(
 	}
 	startState := s.GetEncodedResumeInfoFor(rootPath + path)
 	resuming := startState != ""
-	if resuming || startState == resolvedPath {
+	if resuming && startState == resolvedPath {
 		ctx.Logger().V(5).Info("skipping symlink, already scanned", "path", resolvedPath)
 		return nil
 	}
