@@ -136,7 +136,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initialDepth := 1
 			err = s.scanSymlink(ctx, cleanPath, chunksChan, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path)
+			s.ClearEncodedResumeContainingId(path + "#")
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root path is a dir", "path", cleanPath)
 			workerPool := new(errgroup.Group)
@@ -144,7 +144,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initialDepth := 1
 			err = s.scanDir(ctx, cleanPath, chunksChan, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path)
+			s.ClearEncodedResumeContainingId(path + "#")
 		} else {
 			if !fileInfo.Mode().IsRegular() {
 				logger.Info("skipping non-regular file", "path", cleanPath)
@@ -217,7 +217,8 @@ func (s *Source) scanSymlink(
 	if s.filter != nil && !s.filter.Pass(resolvedPath) {
 		return nil
 	}
-	startState := s.GetEncodedResumeInfoFor(rootPath + path)
+	resumptionKey := rootPath + "#" + path
+	startState := s.GetEncodedResumeInfoFor(resumptionKey)
 	resuming := startState != ""
 	if resuming && startState == resolvedPath {
 		ctx.Logger().V(5).Info("skipping symlink, already scanned", "path", resolvedPath)
@@ -231,7 +232,7 @@ func (s *Source) scanSymlink(
 		if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
 		}
-		s.SetEncodedResumeInfoFor(rootPath+path, resolvedPath)
+		s.SetEncodedResumeInfoFor(resumptionKey, resolvedPath)
 		return nil
 	})
 
@@ -248,10 +249,11 @@ func (s *Source) scanDir(
 ) error {
 	// check if the full path is not matching any pattern in include
 	// FilterRuleSet and matching any exclude FilterRuleSet.
+	resumptionKey := rootPath + "#" + path
 	if s.filter != nil && s.filter.ShouldExclude(path) {
 		return nil
 	}
-	startState := s.GetEncodedResumeInfoFor(rootPath + path)
+	startState := s.GetEncodedResumeInfoFor(resumptionKey)
 	resuming := startState != ""
 
 	ctx.Logger().V(5).Info("Full path found is", "fullPath", path)
@@ -297,7 +299,7 @@ func (s *Source) scanDir(
 				if err := s.scanFile(ctx, entryPath, chunksChan); err != nil {
 					ctx.Logger().Error(err, "error scanning file", "path", entryPath)
 				}
-				s.SetEncodedResumeInfoFor(rootPath+path, entryPath)
+				s.SetEncodedResumeInfoFor(resumptionKey, entryPath)
 				return nil
 			})
 		}
@@ -399,7 +401,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			initialDepth := 1
 			scanErr = s.scanSymlink(ctx, cleanPath, ch, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path)
+			s.ClearEncodedResumeContainingId(path + "#")
 
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root path is a dir", "path", cleanPath)
@@ -409,7 +411,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			// TODO: Finer grain error tracking of individual chunks.
 			scanErr = s.scanDir(ctx, cleanPath, ch, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path)
+			s.ClearEncodedResumeContainingId(path + "#")
 		} else {
 			ctx.Logger().V(5).Info("Root path is a file", "path", cleanPath)
 			// TODO: Finer grain error tracking of individual
