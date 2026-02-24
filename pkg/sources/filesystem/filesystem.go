@@ -188,7 +188,6 @@ func (s *Source) scanSymlink(
 	if err != nil {
 		return fmt.Errorf("lstat error: %w", err)
 	}
-
 	if fileInfo.Mode()&os.ModeSymlink != 0 {
 		ctx.Logger().V(5).Info(
 			"found symlink to symlink",
@@ -218,6 +217,12 @@ func (s *Source) scanSymlink(
 	if s.filter != nil && !s.filter.Pass(resolvedPath) {
 		return nil
 	}
+	startState := s.GetEncodedResumeInfoFor(rootPath + path)
+	resuming := startState != ""
+	if resuming || startState == resolvedPath {
+		ctx.Logger().V(5).Info("skipping symlink, already scanned", "path", resolvedPath)
+		return nil
+	}
 	workerPool.Go(func() error {
 		if !fileInfo.Mode().Type().IsRegular() {
 			ctx.Logger().V(5).Info("skipping non-regular file", "path", resolvedPath)
@@ -226,6 +231,7 @@ func (s *Source) scanSymlink(
 		if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
 		}
+		s.SetEncodedResumeInfoFor(rootPath+path, resolvedPath)
 		return nil
 	})
 
