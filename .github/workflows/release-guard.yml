@@ -1,0 +1,18 @@
+name: Release Guard
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  unset-latest:
+    runs-on: ubuntu-latest
+    if: github.event.release.is_latest == true
+    steps:
+      - name: Unset latest flag
+        run: gh release edit ${{ github.event.release.tag_name }} --latest=false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
