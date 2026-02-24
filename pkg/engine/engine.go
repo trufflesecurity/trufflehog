@@ -39,7 +39,7 @@ var detectionTimeout = detectors.DefaultResponseTimeout
 
 var errOverlap = errors.New(
 	"More than one detector has found this result. For your safety, verification has been disabled." +
-		"You can override this behavior by using the --allow-verification-overlap flag.",
+		" This behavior is enabled by the --disallow-verification-overlap flag.",
 )
 
 // Metrics for the scan engine for external consumption.
@@ -138,10 +138,10 @@ type Config struct {
 	// and should be avoided unless specified by the user.
 	PrintAvgDetectorTime bool
 
-	// VerificationOverlap determines whether the scanner will attempt to verify candidate secrets
-	// that have been detected by multiple detectors.
-	// By default, it is set to true.
-	VerificationOverlap bool
+	// DisableVerificationOverlap, when true, prevents verification of secrets that have been
+	// detected by multiple detectors. By default this is false, meaning all detectors are
+	// allowed to verify their findings independently.
+	DisableVerificationOverlap bool
 
 	// DetectorWorkerMultiplier is used to determine the number of detector workers to spawn.
 	DetectorWorkerMultiplier int
@@ -184,9 +184,9 @@ type Engine struct {
 	notifyVerifiedResults   bool
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
-	retainFalsePositives    bool
-	verificationOverlap     bool
-	printAvgDetectorTime    bool
+	retainFalsePositives       bool
+	disableVerificationOverlap bool
+	printAvgDetectorTime       bool
 	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
 	// If this flag is set to true, the engine will scan the entire chunk.
 	scanEntireChunk bool
@@ -247,7 +247,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		filterEntropy:                       cfg.FilterEntropy,
 		printAvgDetectorTime:                cfg.PrintAvgDetectorTime,
 		retainFalsePositives:                cfg.LogFilteredUnverified,
-		verificationOverlap:                 cfg.VerificationOverlap,
+		disableVerificationOverlap:          cfg.DisableVerificationOverlap,
 		sourceManager:                       cfg.SourceManager,
 		scanEntireChunk:                     cfg.ShouldScanEntireChunk,
 		detectorVerificationOverrides:       cfg.DetectorVerificationOverrides,
@@ -857,7 +857,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 		for _, d := range decoded {
 			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Chunk.Data)
-			if len(matchingDetectors) > 1 && !e.verificationOverlap {
+			if len(matchingDetectors) > 1 && e.disableVerificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
 					chunk:                       *d.Chunk,
