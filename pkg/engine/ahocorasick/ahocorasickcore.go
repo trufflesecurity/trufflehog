@@ -2,6 +2,8 @@ package ahocorasick
 
 import (
 	"bytes"
+	"cmp"
+	"slices"
 	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
@@ -280,6 +282,16 @@ func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 
 		uniqueDetectors = append(uniqueDetectors, detectorMatch)
 	}
+
+	slices.SortFunc(uniqueDetectors, func(a, b *DetectorMatch) int {
+		if c := cmp.Compare(a.Key.detectorType, b.Key.detectorType); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Key.version, b.Key.version); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Key.customDetectorName, b.Key.customDetectorName)
+	})
 
 	return uniqueDetectors
 }
