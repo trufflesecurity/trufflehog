@@ -18,6 +18,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 		Paths:            c.Paths,
 		IncludePathsFile: c.IncludePathsFile,
 		ExcludePathsFile: c.ExcludePathsFile,
+		MaxSymlinkDepth:  c.MaxSymlinkDepth,
 	}
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
