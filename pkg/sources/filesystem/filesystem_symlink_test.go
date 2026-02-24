@@ -508,7 +508,7 @@ func TestScanSymlink_NoError(t *testing.T) {
 	go func() {
 		workerPool := new(errgroup.Group)
 		workerPool.SetLimit(src.concurrency)
-		err := src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, workerPool, 1)
+		err := src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, workerPool, 1, filepath.Join(baseDir, "A"))
 		_ = workerPool.Wait()
 		require.NoError(t, err)
 		close(chunks)
@@ -564,6 +564,7 @@ func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
 		chunks,
 		workerPool,
 		1,
+		filepath.Join(baseDir, "A"),
 	)
 	_ = workerPool.Wait()
 	close(chunks)
@@ -605,6 +606,7 @@ func TestScanSymlink_FileTarget(t *testing.T) {
 		chunks,
 		workerPool,
 		1,
+		symlinkPath,
 	)
 	_ = workerPool.Wait()
 	require.NoError(t, err)
@@ -646,6 +648,7 @@ func TestScanSymlink_SelfLoop(t *testing.T) {
 		chunks,
 		workerPool,
 		1,
+		symlinkPath,
 	)
 	_ = workerPool.Wait()
 	close(chunks)
@@ -681,6 +684,7 @@ func TestScanSymlink_BrokenSymlink(t *testing.T) {
 		chunks,
 		workerPool,
 		0,
+		symlinkPath,
 	)
 	_ = workerPool.Wait()
 	close(chunks)
@@ -719,6 +723,7 @@ func TestScanSymlink_TwoFileLoop(t *testing.T) {
 		chunks,
 		workerPool,
 		0,
+		fileA,
 	)
 	_ = workerPool.Wait()
 	close(chunks)
