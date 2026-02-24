@@ -773,10 +773,11 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector *ahocorasick.DetectorMatch
-	chunk    sources.Chunk
-	decoder  detectorspb.DecoderType
-	wgDoneFn func()
+	detector       *ahocorasick.DetectorMatch
+	chunk          sources.Chunk
+	decoder        detectorspb.DecoderType
+	wgDoneFn       func()
+	overlapSecrets map[string]struct{}
 }
 
 // verificationOverlapChunk is a decoded chunk that has multiple detectors that match it.
@@ -992,6 +993,8 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
+		overlapEmitted := make(map[ahocorasick.DetectorKey]map[string]struct{})
+
 		for _, detector := range chunk.detectors {
 			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
 
@@ -1057,10 +1060,13 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 							isFalsePositive,
 						)
 
-						// Remove the detector key from the list of detector keys with results.
-						// This is to ensure that the chunk is not reprocessed with verification enabled
-						// for this detector.
-						delete(detectorKeysWithResults, detector.Key)
+						// Track this specific secret as already emitted so detectChunk
+						// can skip it, but keep the detector in detectorKeysWithResults
+						// so its other non-duplicate results are still processed.
+						if _, ok := overlapEmitted[detector.Key]; !ok {
+							overlapEmitted[detector.Key] = make(map[string]struct{})
+						}
+						overlapEmitted[detector.Key][string(val)] = struct{}{}
 					}
 					chunkSecrets[key] = struct{}{}
 				}
@@ -1069,12 +1075,17 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
-			chunk.chunk.Verify = e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
+			verify := e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
+			if _, hadOverlap := overlapEmitted[detector.Key]; hadOverlap {
+				verify = false
+			}
+			chunk.chunk.Verify = verify
 			e.detectableChunksChan <- detectableChunk{
-				chunk:    chunk.chunk,
-				detector: detector,
-				decoder:  chunk.decoder,
-				wgDoneFn: wgDetect.Done,
+				chunk:          chunk.chunk,
+				detector:       detector,
+				decoder:        chunk.decoder,
+				wgDoneFn:       wgDetect.Done,
+				overlapSecrets: overlapEmitted[detector.Key],
 			}
 		}
 
@@ -1180,6 +1191,15 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		}
 
 		for _, res := range results {
+			if data.overlapSecrets != nil {
+				raw := string(res.Raw)
+				if res.RawV2 != nil {
+					raw = string(res.RawV2)
+				}
+				if _, ok := data.overlapSecrets[raw]; ok {
+					continue
+				}
+			}
 			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
 		}
 	}
