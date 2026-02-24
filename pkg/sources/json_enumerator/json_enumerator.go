@@ -87,16 +87,16 @@ type jsonEntry struct {
 }
 
 // jsonEntryAux is a helper struct to support marshalling the content to scan as either
-// a UTF-8 string in `content` or a base64-encoded bytestring in `content_base64`.
+// a UTF-8 string in `data` or a base64-encoded bytestring in `data_b64`.
 type jsonEntryAux struct {
 	Metadata *json.RawMessage `json:"metadata"`
 	Data     *string          `json:"data,omitempty"`
 	DataB64  *[]byte          `json:"data_b64,omitempty"`
 }
 
-// MarshalJSON implements custom JSON marshaling for envelope.
-// If Content is valid UTF-8, it's serialized as "content" (string).
-// If Content is not valid UTF-8, it's base64-encoded and serialized as "content_b64".
+// MarshalJSON implements custom JSON marshaling for jsonEntry.
+// If Data is valid UTF-8, it's serialized as a `data` string field.
+// If Data is not valid UTF-8, it's serialized as a `data_b64` base64-encoded string field.
 func (e *jsonEntry) MarshalJSON() ([]byte, error) {
 	if utf8.Valid(e.Data) {
 		s := string(e.Data)
@@ -112,8 +112,7 @@ func (e *jsonEntry) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for envelope.
-// It handles both "content" (string) and "content_b64" (base64-encoded string) fields.
+// UnmarshalJSON implements custom JSON unmarshaling for jsonEntry.
 func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 	var aux jsonEntryAux
 	if err := json.Unmarshal(data, &aux); err != nil {
