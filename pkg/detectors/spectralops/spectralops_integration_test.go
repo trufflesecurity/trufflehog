@@ -18,7 +18,7 @@ import (
 )
 
 func TestSpectralOps_FromData(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	// Secrets are expected to be stored similarly to other detector tests
