@@ -3,9 +3,11 @@ package ldap
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	ldap "github.com/mariduv/ldap-verify"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -82,5 +84,27 @@ func TestLdap_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+func Test_isErrDeterminate(t *testing.T) {
+	if isErrDeterminate(fmt.Errorf("anything")) != true {
+		t.Errorf("general errors should be determinate")
+	}
+
+	if isErrDeterminate(&ldap.Error{Err: fmt.Errorf("anything")}) != true {
+		t.Errorf("ldap general errors should be determinate")
+	}
+
+	if isErrDeterminate(&ldap.Error{Err: &net.OpError{}}) == true {
+		t.Errorf("ldap net.OpError{} should be indeterminate")
+	}
+
+	if isErrDeterminate(&ldap.Error{Err: context.DeadlineExceeded}) == true {
+		t.Errorf("ldap context deadline should be indeterminate")
+	}
+
+	if isErrDeterminate(&ldap.Error{Err: context.Canceled}) == true {
+		t.Errorf("ldap context deadline should be indeterminate")
 	}
 }
