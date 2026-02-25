@@ -103,7 +103,7 @@ func VerifyAuthToken(
 	client *http.Client,
 	host, ikey, skey string,
 ) (bool, error) {
-
+	// Docs: https://duo.com/docs/authapi#check
 	return verifyDuoRequest(
 		ctx,
 		client,
@@ -120,7 +120,7 @@ func VerifyAdminToken(
 	client *http.Client,
 	host, ikey, skey string,
 ) (bool, error) {
-
+	// Docs: https://duo.com/docs/adminapi#account-info
 	return verifyDuoRequest(
 		ctx,
 		client,
