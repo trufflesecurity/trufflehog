@@ -66,6 +66,7 @@ var (
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
+	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
 	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
@@ -159,8 +160,9 @@ var (
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Strings()
 	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive = filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
-	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanIncludePaths    = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	filesystemScanExcludePaths    = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanMaxSymlinkDepth = filesystemScan.Flag("max-symlink-depth", "Maximum depth to follow symlinks during filesystem scan.").Short('s').Int32()
 
 	s3Scan              = cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey           = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
@@ -271,6 +273,9 @@ var (
 	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
 	multiScanScan  = cli.Command("multi-scan", "Find credentials in multiple sources defined in configuration.")
 
+	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
+	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
@@ -347,6 +352,13 @@ func init() {
 	}
 }
 
+// syncLogs flushes logs when the program exits.
+func syncLogs(syncFn func() error) {
+	if syncFn != nil {
+		_ = syncFn()
+	}
+}
+
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -358,15 +370,16 @@ func main() {
 	context.SetDefaultLogger(logger)
 
 	if *localDev {
-		run(overseer.State{})
+		run(overseer.State{}, sync)
 		os.Exit(0)
 	}
 
-	defer func() { _ = sync() }()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, sync)
 
 	updateCfg := overseer.Config{
-		Program:       run,
+		Program: func(s overseer.State) {
+			run(s, sync)
+		},
 		Debug:         *debug,
 		RestartSignal: syscall.SIGTERM,
 		// TODO: Eventually add a PreUpgrade func for signature check w/ x509 PKCS1v15
@@ -387,10 +400,10 @@ func main() {
 	}
 }
 
-func run(state overseer.State) {
-
+func run(state overseer.State, logSync func() error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
+	defer syncLogs(logSync)
 
 	go func() {
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
@@ -399,7 +412,7 @@ func run(state overseer.State) {
 	}()
 
 	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, logSync)
 
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -413,6 +426,8 @@ func run(state overseer.State) {
 		} else {
 			logger.Info("cleaned temporary artifacts")
 		}
+
+		syncLogs(logSync)
 		os.Exit(0)
 	}()
 
@@ -550,6 +565,7 @@ func run(state overseer.State) {
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
 		ShouldScanEntireChunk:    *scanEntireChunk,
+		MaxDecodeDepth:           *maxDecodeDepth,
 		VerificationCacheMetrics: &verificationCacheMetrics,
 	}
 
@@ -606,6 +622,7 @@ func run(state overseer.State) {
 
 	if metrics.hasFoundResults && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
+		syncLogs(logSync)
 		os.Exit(183)
 	}
 }
@@ -891,6 +908,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Paths:            paths,
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
+			MaxSymlinkDepth:  *filesystemScanMaxSymlinkDepth,
 		}
 		if ref, err := eng.ScanFileSystem(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
@@ -1104,6 +1122,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
+	case jsonEnumeratorScan.FullCommand():
+		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
+		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
 	}
@@ -1165,9 +1190,10 @@ func parseResults(input *string) (map[string]struct{}, error) {
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
 // function will terminate the program without cleanup.
-func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+func logFatalFunc(logger logr.Logger, logSync func() error) func(error, string, ...any) {
 	return func(err error, message string, keyAndVals ...any) {
 		logger.Error(err, message, keyAndVals...)
+		syncLogs(logSync)
 		if err != nil {
 			os.Exit(1)
 			return

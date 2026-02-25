@@ -1,4 +1,4 @@
-package postgres
+package googlegemini
 
 import (
 	"context"
@@ -12,14 +12,11 @@ import (
 )
 
 var (
-	validUriPattern           = "postgres://sN19x:d7N8bs@1.2.3.4:5432"
-	invalidUriPattern         = "?ostgres://sN19x:d7N8bs@1.2.3.4:5432"
-	validConnStrPartPattern   = "gVmMTdkwLwmZljcIOXhEmuZ='.jD#=-;|9tD!r^6('"
-	invalidConnStrPartPattern = "gVmMTdkwLwmZljcIOXhEmu?='.jD#=-;|9tD!r^6('"
-	keyword                   = "postgres"
+	validPattern   = "AIzaSyDW1PXXav-TxriHUIrj1djZfHKIuInr7Aw"
+	invalidPattern = "AIzaSyDW1PXXav-TxriHUIrj1djZfHKIuInr7A"
 )
 
-func TestPostgres_Pattern(t *testing.T) {
+func TestGoogleGemini_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -28,13 +25,13 @@ func TestPostgres_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword postgres",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validUriPattern, keyword, validConnStrPartPattern),
-			want:  []string{validUriPattern},
+			name:  "valid pattern",
+			input: fmt.Sprintf("gemini api key = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidUriPattern, keyword, invalidConnStrPartPattern),
+			input: fmt.Sprintf("gemini api key = '%s'", invalidPattern),
 			want:  []string{},
 		},
 	}
@@ -79,20 +76,5 @@ func TestPostgres_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
-	}
-}
-
-func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
-	s := New(
-		WithIgnorePattern([]string{
-			`1\.2\.3\.4`,
-		}))
-	got, err := s.FromData(context.Background(), false, []byte(validUriPattern))
-	if err != nil {
-		t.Errorf("FromData() error = %v", err)
-		return
-	}
-	if len(got) != 0 {
-		t.Errorf("expected no results, but got %d", len(got))
 	}
 }

@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package openai
+package googlegemini
 
 import (
 	"context"
@@ -10,29 +10,29 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestOpenAI_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+func TestGoogleGemini_FromChunk(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	oaiUnverified := testSecrets.MustGetField("OPENAI_UNVERIFIED")
-	oaiVerified := testSecrets.MustGetField("OPENAI_VERIFIED")
+	keyGemini := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY")
+	keyNonGemini := testSecrets.MustGetField("GOOGLE_CLOUD_API_KEY")
+	keyInactive := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
-
 	tests := []struct {
 		name    string
 		s       Scanner
@@ -41,35 +41,55 @@ func TestOpenAI_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Found, unverified OpenAI token sk-",
+			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find an OpenAI secret %s within", oaiUnverified)),
+				data:   []byte(fmt.Sprintf("You can find a google gemini key %s within", keyGemini)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAI,
-					Redacted:     "sk-...gOPc",
-					Verified:     false,
+					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"active_google_key": "true",
+					},
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "Found, verified OpenAI token sk-",
+			name: "found, unverified but valid google cloud api key",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find an OpenAI secret %s within", oaiVerified)),
+				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyNonGemini)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAI,
-					Verified:     true,
-					Redacted:     "sk-...gOPb",
+					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"active_google_key": "true",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
+					Verified:     false,
 				},
 			},
 			wantErr: false,
@@ -91,19 +111,21 @@ func TestOpenAI_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("OpenAI.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GoogleGeminiAPIKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].ExtraData = nil
-				got[i].AnalysisInfo = nil
+				if len(got[i].Redacted) == 0 {
+					t.Fatalf("no redacted secret present: \n %+v", got[i])
+				}
+				got[i].Redacted = ""
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("OpenAI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("GoogleGeminiAPIKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
