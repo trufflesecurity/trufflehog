@@ -11,7 +11,6 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -27,7 +26,7 @@ var (
 	_ detectors.Detector           = (*Scanner)(nil)
 	_ detectors.EndpointCustomizer = (*Scanner)(nil)
 
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Reference tokens are base64-encoded strings starting with "reftkn:01|<version>:<expiry>:<random>"
 	// The base64 encoding of "reftkn" is "cmVmdGtu", total length is always 64 characters
