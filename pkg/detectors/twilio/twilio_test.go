@@ -38,17 +38,6 @@ func TestTwilio_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidSid, keyword, invalidKey),
 			want:  []string{},
 		},
-		{
-			name:  "valid pattern - with keyword twilio",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validSid, keyword, validKey),
-			want:  []string{validSid + validKey},
-		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidSid, keyword, invalidKey),
-			want:  []string{},
-		},
-
 		// "sid" alone should NOT trigger detector
 		{
 			name:  "sid keyword alone should not trigger detector",
