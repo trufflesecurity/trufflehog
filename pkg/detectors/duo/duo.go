@@ -137,8 +137,7 @@ func verifyDuoRequest(
 	path string,
 ) (bool, error) {
 
-	// Duo-required timestamp (RFC1123, UTC, literal GMT)
-	timestamp := time.Now().UTC().Format(time.RFC1123)
+	timestamp := time.Now().UTC().Format(http.TimeFormat)
 
 	// Canonical request string
 	canonical := strings.Join([]string{
