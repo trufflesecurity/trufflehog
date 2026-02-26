@@ -1063,7 +1063,6 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						// This is to ensure that the chunk is not reprocessed with verification enabled
 						// for this detector.
 						delete(detectorKeysWithResults, detector.Key)
-						delete(unverifiedFindings, detector.Key)
 					}
 					unverifiedFindings[detector.Key] = append(unverifiedFindings[detector.Key], res)
 					chunkSecrets[key] = struct{}{}
