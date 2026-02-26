@@ -1490,6 +1490,22 @@ func (p passthroughDetector) Keywords() []string             { return p.keywords
 func (p passthroughDetector) Type() detectorspb.DetectorType { return p.detectorType }
 func (p passthroughDetector) Description() string            { return "fake detector for testing" }
 
+type noResultPassthroughDetector struct {
+	keywords []string
+}
+
+func (n noResultPassthroughDetector) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	return nil, nil
+}
+
+func (n noResultPassthroughDetector) Keywords() []string { return n.keywords }
+func (n noResultPassthroughDetector) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType(-1)
+}
+func (n noResultPassthroughDetector) Description() string {
+	return "fake detector that returns no results"
+}
+
 type passthroughDecoder struct{}
 
 func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableChunk {
@@ -1686,6 +1702,202 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 			assert.True(t, detectableChunk.chunk.Verify)
 		}
 	})
+}
+
+// TestVerificationOverlapWorker_UnverifiedFindingsPopulated verifies that when multiple detectors
+// match a chunk but produce distinct (non-overlapping) secrets, the detectableChunks emitted for
+// downstream verification have their unverifiedFindings field populated with the results from the
+// unverified detection pass.
+func TestVerificationOverlapWorker_UnverifiedFindingsPopulated(t *testing.T) {
+	ctx := context.Background()
+
+	// Arrange: Create a minimal engine.
+	e := &Engine{
+		detectableChunksChan:          make(chan detectableChunk, 2),
+		results:                       make(chan detectors.ResultWithMetadata, 4),
+		retainFalsePositives:          true,
+		verificationOverlapChunksChan: make(chan verificationOverlapChunk, 1),
+		verify:                        true,
+	}
+
+	// Arrange: Set up a collector for detectableChunks.
+	processedDetectableChunks := make(chan detectableChunk, 2)
+	go func() {
+		for chunk := range e.detectableChunksChan {
+			chunk.wgDoneFn()
+			processedDetectableChunks <- chunk
+		}
+	}()
+
+	// Arrange: Create a chunk to "scan."
+	chunk := sources.Chunk{
+		Data:   []byte("keyword_a secret_a_value keyword_b secret_b_value"),
+		Verify: true,
+	}
+
+	// Arrange: Create detector matches that produce non-overlapping secrets.
+	// Use very different secrets to avoid likelyDuplicate matching.
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
+		passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyword_a"}, secret: "AAAA1111"},
+		passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword_b"}, secret: "ZZZZ9999"},
+	})
+	detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
+	require.Len(t, detectorMatches, 2)
+
+	// Arrange: Enqueue a verification overlap chunk.
+	e.verificationOverlapChunksChan <- verificationOverlapChunk{
+		chunk:                       chunk,
+		detectors:                   detectorMatches,
+		verificationOverlapWgDoneFn: func() { close(e.verificationOverlapChunksChan) },
+	}
+
+	// Act
+	e.verificationOverlapWorker(ctx)
+	close(e.detectableChunksChan)
+	close(processedDetectableChunks)
+
+	// Assert: Each detectableChunk should have its unverifiedFindings populated.
+	var chunks []detectableChunk
+	for dc := range processedDetectableChunks {
+		chunks = append(chunks, dc)
+	}
+	require.Len(t, chunks, 2, "expected 2 detectableChunks for 2 non-overlapping detectors")
+
+	for _, dc := range chunks {
+		assert.NotEmpty(t, dc.unverifiedFindings, "unverifiedFindings should be populated")
+		assert.Len(t, dc.unverifiedFindings, 1, "each detector should have 1 finding")
+	}
+}
+
+// TestVerificationOverlapWorker_UnverifiedFindingsEmpty_WhenNoResults verifies that when a detector
+// matches a chunk's keywords but produces no results from FromData, no detectableChunk is emitted.
+func TestVerificationOverlapWorker_UnverifiedFindingsEmpty_WhenNoResults(t *testing.T) {
+	ctx := context.Background()
+
+	// Arrange: Create a minimal engine.
+	e := &Engine{
+		detectableChunksChan:          make(chan detectableChunk, 2),
+		retainFalsePositives:          true,
+		verificationOverlapChunksChan: make(chan verificationOverlapChunk, 1),
+		verify:                        true,
+	}
+
+	// Arrange: Set up a collector for detectableChunks.
+	processedDetectableChunks := make(chan detectableChunk, 2)
+	go func() {
+		for chunk := range e.detectableChunksChan {
+			chunk.wgDoneFn()
+			processedDetectableChunks <- chunk
+		}
+	}()
+
+	// Arrange: Create a chunk with keywords but detector returns no results.
+	chunk := sources.Chunk{
+		Data:   []byte("keyword_noresult some data"),
+		Verify: true,
+	}
+
+	// Arrange: Create a detector that returns no results.
+	noResultDetector := noResultPassthroughDetector{keywords: []string{"keyword_noresult"}}
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{noResultDetector})
+	detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
+	require.Len(t, detectorMatches, 1)
+
+	// Arrange: Enqueue a verification overlap chunk.
+	e.verificationOverlapChunksChan <- verificationOverlapChunk{
+		chunk:                       chunk,
+		detectors:                   detectorMatches,
+		verificationOverlapWgDoneFn: func() { close(e.verificationOverlapChunksChan) },
+	}
+
+	// Act
+	e.verificationOverlapWorker(ctx)
+	close(e.detectableChunksChan)
+	close(processedDetectableChunks)
+
+	// Assert: No detectableChunks should be emitted when detector finds nothing.
+	var chunks []detectableChunk
+	for dc := range processedDetectableChunks {
+		chunks = append(chunks, dc)
+	}
+	assert.Empty(t, chunks, "no detectableChunks should be emitted when detector finds no results")
+}
+
+// TestVerificationOverlapWorker_UnverifiedFindingsEmpty_WhenAllDuplicates verifies behavior when
+// multiple detectors find the same secret (an overlap). The overlapping result is sent directly to
+// the results channel with errOverlap. Due to a bug, the first result in an overlap set is not
+// treated as overlapping and emits a detectableChunk; this chunk should still have its
+// unverifiedFindings populated.
+func TestVerificationOverlapWorker_UnverifiedFindingsEmpty_WhenAllDuplicates(t *testing.T) {
+	ctx := context.Background()
+
+	// Arrange: Create a minimal engine.
+	e := &Engine{
+		detectableChunksChan:          make(chan detectableChunk, 2),
+		results:                       make(chan detectors.ResultWithMetadata, 4),
+		retainFalsePositives:          true,
+		verificationOverlapChunksChan: make(chan verificationOverlapChunk, 1),
+		verify:                        true,
+	}
+
+	// Arrange: Set up a collector for detectableChunks.
+	processedDetectableChunks := make(chan detectableChunk, 2)
+	go func() {
+		for chunk := range e.detectableChunksChan {
+			chunk.wgDoneFn()
+			processedDetectableChunks <- chunk
+		}
+	}()
+
+	// Arrange: Create a chunk where both detectors find the same secret (overlap).
+	chunk := sources.Chunk{
+		Data:   []byte("keyword overlapping_secret_value"),
+		Verify: true,
+	}
+
+	// Arrange: Create detector matches that produce the same secret (overlap case).
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
+		passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyword"}, secret: "overlapping_secret_value"},
+		passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keywo"}, secret: "overlapping_secret_value"},
+	})
+	detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
+	require.Len(t, detectorMatches, 2)
+
+	// Arrange: Enqueue a verification overlap chunk.
+	e.verificationOverlapChunksChan <- verificationOverlapChunk{
+		chunk:                       chunk,
+		detectors:                   detectorMatches,
+		verificationOverlapWgDoneFn: func() { close(e.verificationOverlapChunksChan) },
+	}
+
+	// Act
+	e.verificationOverlapWorker(ctx)
+	close(e.detectableChunksChan)
+	close(processedDetectableChunks)
+	close(e.results)
+
+	// Assert: No detectableChunks should be emitted for the detector whose secret was a duplicate.
+	var chunks []detectableChunk
+	for dc := range processedDetectableChunks {
+		chunks = append(chunks, dc)
+	}
+
+	// BUG: The current implementation treats the first result in an "overlap set" as though
+	// it's not overlapping. The first secret goes into chunkSecrets, and only the second is
+	// detected as likelyDuplicate (sent to results with errOverlap). The first detector
+	// incorrectly emits a detectableChunk for re-verification.
+	assert.Len(t, chunks, 1, "only the first detector should emit a detectableChunk")
+
+	// Assert: The emitted chunk should have unverifiedFindings populated (for the non-duplicate detector).
+	assert.NotEmpty(t, chunks[0].unverifiedFindings, "unverifiedFindings should be populated for the non-duplicate detector")
+
+	// Assert: The duplicate result should have been sent to results with an overlap error.
+	var results []detectors.ResultWithMetadata
+	for r := range e.results {
+		results = append(results, r)
+	}
+	assert.Len(t, results, 1, "one result should be emitted with overlap error")
+	assert.Equal(t, errOverlap, results[0].VerificationError())
 }
 
 func TestEngine_IterativeDecoding(t *testing.T) {

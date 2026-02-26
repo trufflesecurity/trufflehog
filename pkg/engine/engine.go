@@ -773,10 +773,11 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector *ahocorasick.DetectorMatch
-	chunk    sources.Chunk
-	decoder  detectorspb.DecoderType
-	wgDoneFn func()
+	detector           *ahocorasick.DetectorMatch
+	chunk              sources.Chunk
+	decoder            detectorspb.DecoderType
+	unverifiedFindings []detectors.Result
+	wgDoneFn           func()
 }
 
 // verificationOverlapChunk is a decoded chunk that has multiple detectors that match it.

@@ -53,6 +53,10 @@ type CustomResultsCleaner interface {
 	ShouldCleanResultsIrrespectiveOfConfiguration() bool
 }
 
+type Verifier interface {
+	Verify(result Result) Result
+}
+
 // Versioner is an optional interface that a detector can implement to
 // differentiate instances of the same detector type.
 type Versioner interface {
