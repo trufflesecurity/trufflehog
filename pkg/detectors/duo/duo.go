@@ -72,7 +72,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for host := range uniqueHosts {
 		for apiKey := range uniqueIntKeys {
 			for apiSecret := range uniqueSecretKeys {
-				fmt.Printf("Trying combination: %s, %s, %s\n", host, apiKey, apiSecret)
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Duo,
 					Raw:          []byte(apiKey),
@@ -114,7 +113,7 @@ func VerifyAuthToken(
 	)
 }
 
-// returns 401 unauthorized if credentails are invalid, 200 OK if valid, and error for anything else
+// returns 401 unauthorized if credentials are invalid, 200 OK if valid, and error for anything else
 func VerifyAdminToken(
 	ctx context.Context,
 	client *http.Client,
@@ -179,8 +178,8 @@ func verifyDuoRequest(
 		return false, err
 	}
 	defer func() {
-		io.Copy(io.Discard, res.Body)
-		res.Body.Close()
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
 	}()
 
 	switch res.StatusCode {
