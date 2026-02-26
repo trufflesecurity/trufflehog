@@ -47,7 +47,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
-				ctx: context.Background(),
+				ctx: ctx,
 				data: []byte(fmt.Sprintf(`
 					gitlab:
 					  client_id: %s
@@ -68,7 +68,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx: context.Background(),
+				ctx: ctx,
 				data: []byte(fmt.Sprintf(`
 					gitlab:
 					  client_id: %s
@@ -89,7 +89,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			name: "not found",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
@@ -101,7 +101,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
-				ctx: context.Background(),
+				ctx: ctx,
 				data: []byte(fmt.Sprintf(`
 					gitlab:
 					  client_id: %s
@@ -122,7 +122,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			name: "found, verified but unexpected api surface",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
-				ctx: context.Background(),
+				ctx: ctx,
 				data: []byte(fmt.Sprintf(`
 					gitlab:
 					  client_id: %s
