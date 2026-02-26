@@ -25,7 +25,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// SpectralOps Personal API keys:
-	// Format: spu- + 32 lowercase hex characters
+	// Format: spu- + 32 lowercase aplhabets or digits
 	spectralTokenPat = regexp.MustCompile(
 		`\b(spu-[a-z0-9]{32})\b`,
 	)
