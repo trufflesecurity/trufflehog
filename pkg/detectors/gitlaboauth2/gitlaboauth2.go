@@ -18,15 +18,17 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.EndpointSetter
+	detectors.DefaultMultiPartCredentialProvider
 }
-
-// Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
+	// Ensure the Scanner satisfies the interfaces at compile time.
+	_ detectors.Detector                    = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer          = (*Scanner)(nil)
+	_ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 	clientIdPat   = regexp.MustCompile(
 		detectors.PrefixRegex([]string{"application_id", "client_id", "app_id", "id"}) + `\b([0-9a-f]{64})\b`)
