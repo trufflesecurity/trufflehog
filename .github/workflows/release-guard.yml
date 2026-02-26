@@ -31,3 +31,5 @@ jobs:
 
           echo "Restoring $PREVIOUS_TAG as latest..."
           gh release edit "$PREVIOUS_TAG" --latest
+        env:
+          GH_TOKEN: ${{ github.token }}
