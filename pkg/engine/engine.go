@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -153,6 +154,12 @@ type Config struct {
 
 	VerificationResultCache  verificationcache.ResultCache
 	VerificationCacheMetrics verificationcache.MetricsReporter
+
+	// MaxDecodeDepth is the maximum number of iterative decoding passes per chunk.
+	// When a decoder transforms data, all decoders are re-run on the output up to this limit.
+	// 1 = single pass (no chaining), 2+ = chained (e.g., base64 inside UTF-16).
+	// Default: 5.
+	MaxDecodeDepth int
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -213,7 +220,7 @@ type Engine struct {
 	verify bool
 
 	// Note: bad hack only used for testing.
-	verificationOverlapTracker *verificationOverlapTracker
+	verificationOverlapTracker *atomic.Int32
 
 	// detectorWorkerMultiplier is used to calculate the number of detector workers.
 	detectorWorkerMultiplier int
@@ -221,6 +228,8 @@ type Engine struct {
 	notificationWorkerMultiplier int
 	// verificationOverlapWorkerMultiplier is used to calculate the number of verification overlap workers.
 	verificationOverlapWorkerMultiplier int
+
+	maxDecodeDepth int
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.
@@ -245,6 +254,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
+		maxDecodeDepth:                      cfg.MaxDecodeDepth,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -352,6 +362,10 @@ func (e *Engine) setDefaults(ctx context.Context) {
 
 	if e.verificationOverlapWorkerMultiplier < 1 {
 		e.verificationOverlapWorkerMultiplier = 1
+	}
+
+	if e.maxDecodeDepth < 1 {
+		e.maxDecodeDepth = 1
 	}
 
 	// Default decoders handle common encoding formats.
@@ -532,17 +546,6 @@ func (e *Engine) initialize(ctx context.Context) error {
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
-}
-
-type verificationOverlapTracker struct {
-	verificationOverlapDuplicateCount int
-	mu                                sync.Mutex
-}
-
-func (r *verificationOverlapTracker) increment() {
-	r.mu.Lock()
-	r.verificationOverlapDuplicateCount++
-	r.mu.Unlock()
 }
 
 const ignoreTag = "trufflehog:ignore"
@@ -786,6 +789,62 @@ type verificationOverlapChunk struct {
 	verificationOverlapWgDoneFn func()
 }
 
+// iterativeDecode applies all decoders to data, then re-applies them to any
+// new output, up to maxDepth passes. Each pass skips the PLAIN (UTF-8) decoder
+// because all other decoders already produce valid UTF-8/ASCII output, so
+// re-running PLAIN would only duplicate work without changing the data.
+//
+// The returned chunks include results from every depth level -- intermediate
+// decoded forms are scanned, not just the final one, because a secret may only
+// be recognizable at a particular decoding stage.
+func iterativeDecode(chunk *sources.Chunk, allDecoders []decoders.Decoder, maxDepth int) []*decoders.DecodableChunk {
+	var results []*decoders.DecodableChunk
+
+	currentInputs := [][]byte{chunk.Data}
+	var seen [][]byte
+
+	for depth := 0; depth < maxDepth; depth++ {
+		var nextInputs [][]byte
+
+		for _, data := range currentInputs {
+			for _, decoder := range allDecoders {
+				// The PLAIN (UTF-8) decoder always returns non-nil and only transforms
+				// invalid UTF-8 via extractSubstrings. All other decoders already produce
+				// valid UTF-8/ASCII output, so re-running PLAIN at depth > 0 would just
+				// duplicate detector work without ever changing the data.
+				if depth > 0 && decoder.Type() == detectorspb.DecoderType_PLAIN {
+					continue
+				}
+
+				chunkCopy := *chunk
+				chunkCopy.Data = data
+				decoded := decoder.FromChunk(&chunkCopy)
+				if decoded == nil {
+					continue
+				}
+
+				results = append(results, decoded)
+
+				if depth+1 < maxDepth &&
+					decoder.Type() != detectorspb.DecoderType_PLAIN &&
+					!bytes.Equal(decoded.Chunk.Data, data) &&
+					!slices.ContainsFunc(seen, func(s []byte) bool { return bytes.Equal(s, decoded.Chunk.Data) }) {
+
+					seen = append(seen, decoded.Chunk.Data)
+					nextInputs = append(nextInputs, decoded.Chunk.Data)
+				}
+			}
+		}
+
+		if len(nextInputs) == 0 {
+			break
+		}
+		currentInputs = nextInputs
+	}
+
+	return results
+}
+
 func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
@@ -793,38 +852,29 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
-		for _, decoder := range e.decoders {
-			decodeStart := time.Now()
-			// This copy is needed to preserve the original chunk.Data across multiple decoders.
-			chunkCopy := *chunk
-			decoded := decoder.FromChunk(&chunkCopy)
-			decodeTime := time.Since(decodeStart).Microseconds()
-			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
-			if decoded == nil {
-				// This means that the decoder didn't understand this chunk and isn't applicable to it.
-				continue
-			}
+		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
-			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+		for _, d := range decoded {
+			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Chunk.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
-					chunk:                       *decoded.Chunk,
+					chunk:                       *d.Chunk,
 					detectors:                   matchingDetectors,
-					decoder:                     decoded.DecoderType,
+					decoder:                     d.DecoderType,
 					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 				}
 				continue
 			}
 
 			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
+				d.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
 				wgDetect.Add(1)
 				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
+					chunk:    *d.Chunk,
 					detector: detector,
-					decoder:  decoded.DecoderType,
+					decoder:  d.DecoderType,
 					wgDoneFn: wgDetect.Done,
 				}
 			}
@@ -995,18 +1045,15 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						// This indicates that the same secret was found by multiple detectors.
 						// We should NOT VERIFY this chunk's data.
 						if e.verificationOverlapTracker != nil {
-							e.verificationOverlapTracker.increment()
+							e.verificationOverlapTracker.Add(1)
 						}
 						res.SetVerificationError(errOverlap)
 						e.processResult(
 							ctx,
-							detectableChunk{
-								chunk:    chunk.chunk,
-								detector: detector,
-								decoder:  chunk.decoder,
-								wgDoneFn: wgDetect.Done,
-							},
 							res,
+							chunk.chunk,
+							chunk.decoder,
+							detector.Detector.Description(),
 							isFalsePositive,
 						)
 
@@ -1133,7 +1180,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		}
 
 		for _, res := range results {
-			e.processResult(ctx, data, res, isFalsePositive)
+			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
 		}
 	}
 
@@ -1159,10 +1206,6 @@ func (e *Engine) filterResults(
 		results = clean(results)
 	}
 
-	if !e.retainFalsePositives {
-		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
-	}
-
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
@@ -1172,20 +1215,18 @@ func (e *Engine) filterResults(
 
 // processResult generates a detectors.ResultWithMetadata from the provided chunk and result and puts it on the results
 // channel, unless the result exists on a line with an ignore tag, in which case no result is generated.
-//
-// CMR: The provided chunk is wrapped in a detectableChunk, but I'm pretty sure that's purely out of convenience
-// (because that's what this function's callers are using when they call this function). We're past detection at this
-// point in the engine, so we should probably refactor that parameter into a less confusing data type.
 func (e *Engine) processResult(
 	ctx context.Context,
-	data detectableChunk,
 	res detectors.Result,
+	chunk sources.Chunk,
+	decoderType detectorspb.DecoderType,
+	detectorDescription string,
 	isFalsePositive func(detectors.Result) (bool, string),
 ) {
 	ignoreLinePresent := false
-	if SupportsLineNumbers(data.chunk.SourceType) {
-		copyChunk := data.chunk
-		copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
+	if SupportsLineNumbers(chunk.SourceType) {
+		copyChunk := chunk
+		copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 			copyChunk.SourceMetadata = copyMetaData
 		}
@@ -1195,15 +1236,15 @@ func (e *Engine) processResult(
 			ctx.Logger().Error(err, "error setting link")
 			return
 		}
-		data.chunk = copyChunk
+		chunk = copyChunk
 	}
 	if ignoreLinePresent {
 		return
 	}
 
-	secret := detectors.CopyMetadata(&data.chunk, res)
-	secret.DecoderType = data.decoder
-	secret.DetectorDescription = data.detector.Detector.Description()
+	secret := detectors.CopyMetadata(&chunk, res)
+	secret.DecoderType = decoderType
+	secret.DetectorDescription = detectorDescription
 
 	if !res.Verified && res.Raw != nil {
 		isFp, _ := isFalsePositive(res)
@@ -1218,7 +1259,10 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		startTime := time.Now()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
-			if result.VerificationError() != nil {
+			if result.IsWordlistFalsePositive && !e.retainFalsePositives {
+				// Skip false positives
+				continue
+			} else if result.VerificationError() != nil {
 				if !e.notifyUnknownResults {
 					// Skip results with verification errors.
 					continue

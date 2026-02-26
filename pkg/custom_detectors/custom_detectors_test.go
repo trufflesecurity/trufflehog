@@ -2,6 +2,7 @@ package custom_detectors
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -229,6 +230,60 @@ func TestDetectorPrimarySecret(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
+}
+
+func TestDetectorPrimarySecretFullMatch(t *testing.T) {
+	tests := []struct {
+		name  string
+		input *custom_detectorspb.CustomRegex
+		chunk []byte
+		want  string
+	}{
+		{
+			name: "primary regex full match",
+			input: &custom_detectorspb.CustomRegex{
+				Name:             "test",
+				Keywords:         []string{"secret"},
+				Regex:            map[string]string{"secret": `secret *= *"([^"\r\n]+)"`},
+				PrimaryRegexName: "secret",
+			},
+			chunk: []byte(`
+			// some code
+			secret="mysecret"
+			// some code
+			`),
+			want: `secret="mysecret"`,
+		},
+		{
+			name: "primary regex full match multiline",
+			input: &custom_detectorspb.CustomRegex{
+				Name:             "test",
+				Keywords:         []string{"secret"},
+				Regex:            map[string]string{"secret": `secret *= *"([^"]+)"`},
+				PrimaryRegexName: "secret",
+			},
+			chunk: []byte(`
+			// some code
+			secret="mysecret
+			thatspansmultiplelines"
+			// some code
+			`),
+			want: `secret="mysecret
+			thatspansmultiplelines"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detector, err := NewWebhookCustomRegex(tt.input)
+			assert.NoError(t, err)
+			results, err := detector.FromData(context.Background(), false, tt.chunk)
+			assert.NoError(t, err)
+			assert.Equal(t, 1, len(results))
+			assert.Equal(t, tt.want, results[0].GetPrimarySecretValue())
+		})
+	}
+
 }
 
 func TestDetectorValidations(t *testing.T) {
@@ -557,6 +612,171 @@ func TestDetectorValidations(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewWebhookCustomRegex_Validation(t *testing.T) {
+	t.Parallel()
+
+	// A known-good baseline; each test case mutates exactly one thing to trigger a specific validator.
+	base := func() *custom_detectorspb.CustomRegex {
+		return &custom_detectorspb.CustomRegex{
+			Name:     "ok",
+			Keywords: []string{"kw"},
+			Regex: map[string]string{
+				"main": `\btoken_[a-z]+\b`,
+			},
+			PrimaryRegexName: "main",
+			ExcludeRegexesCapture: []string{
+				`^skip_.*$`,
+			},
+			ExcludeRegexesMatch: []string{
+				`^ignore_.*$`,
+			},
+			Verify: []*custom_detectorspb.VerifierConfig{
+				{
+					Endpoint: "https://example.com/verify",
+					Unsafe:   false,
+					Headers:  []string{"Authorization: Bearer x"},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		mutate        func(*custom_detectorspb.CustomRegex)
+		wantErr       bool
+		wantErrSubstr string // substring expected in error
+	}{
+		{
+			name:   "Validate everything ok",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {},
+		},
+		{
+			name: "ValidateKeywords: no keywords",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Keywords = nil
+			},
+			wantErr:       true,
+			wantErrSubstr: "no keywords",
+		},
+		{
+			name: "ValidateKeywords: empty keyword",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Keywords = []string{""}
+			},
+			wantErr:       true,
+			wantErrSubstr: "empty keyword",
+		},
+		{
+			name: "ValidateRegex: no regex",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Regex = nil
+			},
+			wantErr:       true,
+			wantErrSubstr: "no regex",
+		},
+		{
+			name: "ValidateRegex: invalid regex in map",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Regex = map[string]string{"main": "("} // invalid
+			},
+			wantErr:       true,
+			wantErrSubstr: "regex 'main':",
+		},
+		{
+			name: "ValidateRegexSlice: invalid exclude_regexes_capture",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.ExcludeRegexesCapture = []string{"("} // invalid
+			},
+			wantErr:       true,
+			wantErrSubstr: "regex '1':",
+		},
+		{
+			name: "ValidateRegexSlice: invalid exclude_regexes_match",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.ExcludeRegexesMatch = []string{"("} // invalid
+			},
+			wantErr:       true,
+			wantErrSubstr: "regex '1':",
+		},
+		{
+			name: "ValidatePrimaryRegexName: unknown primary regex name",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.PrimaryRegexName = "does-not-exist"
+			},
+			wantErr:       true,
+			wantErrSubstr: `unknown primary regex name: "does-not-exist"`,
+		},
+		{
+			name: "ValidateVerifyEndpoint: empty endpoint",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify = []*custom_detectorspb.VerifierConfig{
+					{Endpoint: "", Unsafe: false, Headers: []string{"A: b"}},
+				}
+			},
+			wantErr:       true,
+			wantErrSubstr: "no endpoint",
+		},
+		{
+			name: "ValidateVerifyEndpoint: http endpoint without unsafe=true",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify = []*custom_detectorspb.VerifierConfig{
+					{Endpoint: "http://example.com/verify", Unsafe: false, Headers: []string{"A: b"}},
+				}
+			},
+			wantErr:       true,
+			wantErrSubstr: "http endpoint must have unsafe=true",
+		},
+		{
+			name: "ValidateVerifyHeaders: header missing colon",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify = []*custom_detectorspb.VerifierConfig{
+					{Endpoint: "https://example.com/verify", Unsafe: false, Headers: []string{"Authorization Bearer x"}},
+				}
+			},
+			wantErr:       true,
+			wantErrSubstr: `must contain a colon`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pb := base()
+			tt.mutate(pb)
+
+			got, err := NewWebhookCustomRegex(pb)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("expected error=%v, got error=%v (result=%#v)", tt.wantErr, err != nil, got)
+			}
+			if tt.wantErr && got != nil {
+				t.Fatalf("expected nil result on error, got=%#v", got)
+			}
+			if tt.wantErr && !strings.Contains(err.Error(), tt.wantErrSubstr) {
+				t.Fatalf("error mismatch:\n  got:  %q\n  want substring: %q", err.Error(), tt.wantErrSubstr)
+			}
+		})
+	}
+}
+
+func TestNewWebhookCustomRegex_EnsurePrimaryRegexNameSet(t *testing.T) {
+	t.Parallel()
+
+	pb := &custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"kw"},
+		Regex: map[string]string{
+			"regex_a": `regex_a`,
+			"regex_b": `regex_b`,
+		},
+		// PrimaryRegexName is not set.
+	}
+
+	detector, err := NewWebhookCustomRegex(pb)
+	assert.NoError(t, err)
+	assert.Equal(t, "regex_a", detector.GetPrimaryRegexName(), "expected PrimaryRegexName to be set to regex_a")
 }
 
 func BenchmarkProductIndices(b *testing.B) {

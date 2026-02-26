@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -23,6 +24,7 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -76,7 +78,7 @@ type Source struct {
 
 	printLegacyJSON bool
 
-	projectsPerPage int
+	projectsPerPage int64
 
 	// cache of repo URL to project info, used when generating metadata for chunks
 	repoToProjCache repoToProjectCache
@@ -182,7 +184,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
 	s.printLegacyJSON = conn.GetPrintLegacyJson()
-	s.projectsPerPage = int(feature.GitlabProjectsPerPage.Load())
+	s.projectsPerPage = feature.GitlabProjectsPerPage.Load()
 
 	if s.projectsPerPage > 100 {
 		return fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
@@ -471,14 +473,24 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	// Initialize a new api instance.
 	switch s.authMethod {
 	case "OAUTH":
-		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
 		}
 		return apiClient, nil
-
 	case "BASIC_AUTH":
-		apiClient, err := gitlab.NewBasicAuthClient(s.user, s.password, gitlab.WithBaseURL(s.url))
+		apiClient, err := gitlab.NewAuthSourceClient(
+			&gitlab.PasswordCredentialsAuthSource{Username: s.user, Password: s.password},
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %q: %w", s.url, err)
 		}
@@ -491,7 +503,13 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		}
 		fallthrough
 	case "TOKEN":
-		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
+			gitlab.WithBaseURL(s.url),
+			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
+			gitlab.WithCustomRetryMax(3),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
 		}
@@ -531,7 +549,7 @@ func (s *Source) getAllProjectRepos(
 		return fmt.Errorf("unable to authenticate using %s: %w", s.authMethod, err)
 	}
 
-	uniqueProjects := make(map[int]*gitlab.Project)
+	uniqueProjects := make(map[int64]*gitlab.Project)
 	// Record the projectsWithNamespace for logging.
 	var projectsWithNamespace []string
 
@@ -699,74 +717,91 @@ func (s *Source) getAllProjectReposV2(
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{
 		ListOptions: listOpts,
-		Membership:  gitlab.Ptr(true),
+		// Return only limited fields for each project
+		Simple: gitlab.Ptr(true),
 	}
 
-	// for non gitlab.com instances, include all available projects (public + membership).
-	if s.url != gitlabBaseURL {
-		projectQueryOptions.Membership = gitlab.Ptr(false)
+	// for gitlab.com instance, include only projects where the user is a member.
+	if s.url == gitlabBaseURL {
+		projectQueryOptions.Membership = gitlab.Ptr(true)
 	}
 
 	ctx.Logger().Info("starting projects enumeration",
-		"list_options", listOpts,
-		"all_available", *projectQueryOptions.Membership)
+		"list_options", listOpts)
 
-	// https://pkg.go.dev/gitlab.com/gitlab-org/api/client-go#Scan2
-	projectsIter := gitlab.Scan2(func(p gitlab.PaginationOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {
-		return apiClient.Projects.ListProjects(projectQueryOptions, p, gitlab.WithContext(ctx))
-	})
-
+	// totalCount tracks the total number of projects processed by this enumeration.
+	// It includes all projects fetched from the API, even those later skipped by ignore rules.
 	totalCount := 0
 
-	// process each project
-	for project, projectErr := range projectsIter {
-		if projectErr != nil {
-			err := fmt.Errorf("error during project enumeration: %w", projectErr)
+	requestOptions := []gitlab.RequestOptionFunc{gitlab.WithContext(ctx)}
 
-			if reportErr := reporter.UnitErr(ctx, err); reportErr != nil {
-				return reportErr
-			}
-
-			continue
-		}
-
-		totalCount++
-
-		projCtx := context.WithValues(ctx,
-			"project_id", project.ID,
-			"project_name", project.NameWithNamespace)
-
-		// skip projects configured to be ignored.
-		if ignoreRepo(project.PathWithNamespace) {
-			projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
-
-			continue
-		}
-
-		// report an error if we could not convert the project into a URL.
-		if _, err := url.Parse(project.HTTPURLToRepo); err != nil {
-			projCtx.Logger().V(3).Info("skipping project",
-				"reason", "URL parse failure",
-				"url", project.HTTPURLToRepo,
-				"parse_error", err)
-
-			err = fmt.Errorf("could not parse url %q given by project: %w", project.HTTPURLToRepo, err)
+	// Pagination loop: Continue fetching pages until the API indicates there are no more.
+	for {
+		// Fetch a page of projects from the GitLab API using the current query options.
+		projects, resp, err := apiClient.Projects.ListProjects(projectQueryOptions, requestOptions...)
+		if err != nil {
+			err = fmt.Errorf("received error on listing projects, you might not have permissions to do that: %w", err)
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
-
-			continue
+			// break on error as with error we will not have any response and no next page
+			break
 		}
 
-		// report the unit.
-		projCtx.Logger().V(3).Info("accepting project")
+		// Log the batch size for debugging and monitoring.
+		ctx.Logger().V(3).Info("listed projects batch", "batch_size", len(projects), "running_total", totalCount)
+		// Process each project in the current page.
+		for _, project := range projects {
+			projCtx := context.WithValues(ctx,
+				"project_id", project.ID,
+				"project_name", project.NameWithNamespace)
 
-		s.cacheGitlabProject(project)
-		unit := git.SourceUnit{Kind: git.UnitRepo, ID: project.HTTPURLToRepo}
-		gitlabReposEnumerated.WithLabelValues(s.name).Inc()
+			totalCount++
 
-		if err := reporter.UnitOk(ctx, unit); err != nil {
-			return err
+			// skip projects configured to be ignored.
+			if ignoreRepo(project.PathWithNamespace) {
+				projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+
+				continue
+			}
+
+			// report an error if we could not convert the project into a URL.
+			if _, err := url.Parse(project.HTTPURLToRepo); err != nil {
+				projCtx.Logger().V(3).Info("skipping project",
+					"reason", "URL parse failure",
+					"url", project.HTTPURLToRepo,
+					"parse_error", err)
+
+				err = fmt.Errorf("could not parse url %q given by project: %w", project.HTTPURLToRepo, err)
+				if err := reporter.UnitErr(ctx, err); err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			// report the unit.
+			projCtx.Logger().V(3).Info("accepting project")
+
+			s.cacheGitlabProject(project)
+			unit := git.SourceUnit{Kind: git.UnitRepo, ID: project.HTTPURLToRepo}
+			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
+
+			if err := reporter.UnitOk(ctx, unit); err != nil {
+				return err
+			}
+		}
+
+		// if next page is empty, break the loop
+		if resp == nil || resp.NextLink == "" {
+			// No more pages to fetch. This is the normal loop exit condition.
+			// It also acts as a safety stop if the current request failed.
+			break
+		}
+		// Only update the token for the next page if we have a valid, non-empty link.
+		requestOptions = []gitlab.RequestOptionFunc{
+			gitlab.WithContext(ctx),
+			gitlab.WithKeysetPaginationParameters(resp.NextLink),
 		}
 	}
 

@@ -47,6 +47,15 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	if err := ValidateRegex(pb.Regex); err != nil {
 		return nil, err
 	}
+	if err := ValidateRegexSlice(pb.ExcludeRegexesCapture); err != nil {
+		return nil, err
+	}
+	if err := ValidateRegexSlice(pb.ExcludeRegexesMatch); err != nil {
+		return nil, err
+	}
+	if err := ValidatePrimaryRegexName(pb.PrimaryRegexName, pb.Regex); err != nil {
+		return nil, err
+	}
 
 	for _, verify := range pb.Verify {
 		if err := ValidateVerifyEndpoint(verify.Endpoint, verify.Unsafe); err != nil {
@@ -56,6 +65,9 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 			return nil, err
 		}
 	}
+
+	// Ensure primary regex name is set.
+	ensurePrimaryRegexNameSet(pb)
 
 	// TODO: Copy only necessary data out of pb.
 	return &CustomRegexWebhook{pb}, nil
@@ -227,14 +239,27 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		values := match[key]
 		// values[0] contains the entire regex match.
 		secret := values[0]
+		fullMatch := values[0]
 		if len(values) > 1 {
 			secret = values[1]
 		}
 		raw += secret
 
-		// if the match is of the primary regex, set it's value as primary secret value in result
+		// We set the full regex match as the primary secret value.
+		// Reasoning:
+		// The engine calculates the line number using the match. When a primary secret is set, it uses that value instead of the raw secret.
+		// While the secret match itself is sufficient to calculate the line number, the same group match could appear elsewhere in the data.
+		// To avoid ambiguity, we store the full regex match as the primary secret value.
+		// This primary secret value is used only for identifying the exact line number and is not used anywhere else.
+
+		// Example:
+		// Full regex match: secret = ABC123
+		// Secret (raw): ABC123
+
+		// In this case, the primary secret value stores the full string `secret = ABC123`,
+		// allowing the engine to pinpoint the exact location and avoid matching redundant occurrences of `ABC123` in the data.
 		if c.PrimaryRegexName == key {
-			result.SetPrimarySecretValue(secret)
+			result.SetPrimarySecretValue(fullMatch)
 		}
 	}
 
@@ -391,4 +416,16 @@ func (c *CustomRegexWebhook) Description() string {
 		return defaultDescription
 	}
 	return c.GetDescription()
+}
+
+// ensurePrimaryRegexNameSet sets the PrimaryRegexName field to the
+// first regex name in sorted order if it is not already set.
+// We're sorting to ensure deterministic behavior.
+func ensurePrimaryRegexNameSet(pb *custom_detectorspb.CustomRegex) {
+	if pb.PrimaryRegexName == "" {
+		for _, name := range slices.Sorted(maps.Keys(pb.Regex)) {
+			pb.PrimaryRegexName = name
+			return
+		}
+	}
 }
