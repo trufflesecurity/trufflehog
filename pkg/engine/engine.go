@@ -992,7 +992,6 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]*ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 	unverifiedFindings := make(map[ahocorasick.DetectorKey][]detectors.Result, avgSecretsPerDetector)
-	overlappingDetectors := make(map[ahocorasick.DetectorKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
@@ -1065,10 +1064,8 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						// for this detector.
 						delete(detectorKeysWithResults, detector.Key)
 						delete(unverifiedFindings, detector.Key)
-						overlappingDetectors[detector.Key] = struct{}{}
-					} else if _, overlapped := overlappingDetectors[detector.Key]; !overlapped {
-						unverifiedFindings[detector.Key] = append(unverifiedFindings[detector.Key], res)
 					}
+					unverifiedFindings[detector.Key] = append(unverifiedFindings[detector.Key], res)
 					chunkSecrets[key] = struct{}{}
 				}
 			}
@@ -1095,9 +1092,6 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 		}
 		for k := range unverifiedFindings {
 			delete(unverifiedFindings, k)
-		}
-		for k := range overlappingDetectors {
-			delete(overlappingDetectors, k)
 		}
 
 		chunk.verificationOverlapWgDoneFn()
