@@ -773,10 +773,11 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector *ahocorasick.DetectorMatch
-	chunk    sources.Chunk
-	decoder  detectorspb.DecoderType
-	wgDoneFn func()
+	detector           *ahocorasick.DetectorMatch
+	chunk              sources.Chunk
+	decoder            detectorspb.DecoderType
+	unverifiedFindings []detectors.Result
+	wgDoneFn           func()
 }
 
 // verificationOverlapChunk is a decoded chunk that has multiple detectors that match it.
@@ -990,6 +991,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	const avgSecretsPerDetector = 8
 	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]*ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
+	unverifiedFindings := make(map[ahocorasick.DetectorKey][]detectors.Result, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
@@ -1062,6 +1064,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						// for this detector.
 						delete(detectorKeysWithResults, detector.Key)
 					}
+					unverifiedFindings[detector.Key] = append(unverifiedFindings[detector.Key], res)
 					chunkSecrets[key] = struct{}{}
 				}
 			}
@@ -1071,10 +1074,11 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
 			e.detectableChunksChan <- detectableChunk{
-				chunk:    chunk.chunk,
-				detector: detector,
-				decoder:  chunk.decoder,
-				wgDoneFn: wgDetect.Done,
+				chunk:              chunk.chunk,
+				detector:           detector,
+				decoder:            chunk.decoder,
+				unverifiedFindings: unverifiedFindings[detector.Key],
+				wgDoneFn:           wgDetect.Done,
 			}
 		}
 
@@ -1084,6 +1088,9 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 		}
 		for k := range detectorKeysWithResults {
 			delete(detectorKeysWithResults, k)
+		}
+		for k := range unverifiedFindings {
+			delete(unverifiedFindings, k)
 		}
 
 		chunk.verificationOverlapWgDoneFn()
