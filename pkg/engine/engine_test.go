@@ -1506,6 +1506,24 @@ func (n noResultPassthroughDetector) Description() string {
 	return "fake detector that returns no results"
 }
 
+type multiResultDetector struct {
+	detectorType detectorspb.DetectorType
+	keywords     []string
+	secrets      []string
+}
+
+func (m multiResultDetector) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	var results []detectors.Result
+	for _, secret := range m.secrets {
+		results = append(results, detectors.Result{Raw: []byte(secret)})
+	}
+	return results, nil
+}
+
+func (m multiResultDetector) Keywords() []string             { return m.keywords }
+func (m multiResultDetector) Type() detectorspb.DetectorType { return m.detectorType }
+func (m multiResultDetector) Description() string            { return "fake detector that returns multiple results" }
+
 type passthroughDecoder struct{}
 
 func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableChunk {
@@ -1898,6 +1916,93 @@ func TestVerificationOverlapWorker_UnverifiedFindingsEmpty_WhenAllDuplicates(t *
 	}
 	assert.Len(t, results, 1, "one result should be emitted with overlap error")
 	assert.Equal(t, errOverlap, results[0].VerificationError())
+}
+
+// TestVerificationOverlapWorker_OverlappingDetectorNotReaddedAfterNewFinding verifies that once a
+// detector is marked as overlapping (because it found a secret that duplicates another detector's
+// finding), subsequent non-overlapping findings from that same detector are not added to
+// unverifiedFindings. This prevents a detector from being "rehabilitated" after overlap detection.
+func TestVerificationOverlapWorker_OverlappingDetectorNotReaddedAfterNewFinding(t *testing.T) {
+	ctx := context.Background()
+
+	// Arrange: Create a minimal engine.
+	e := &Engine{
+		detectableChunksChan:          make(chan detectableChunk, 4),
+		results:                       make(chan detectors.ResultWithMetadata, 4),
+		retainFalsePositives:          true,
+		verificationOverlapChunksChan: make(chan verificationOverlapChunk, 1),
+		verify:                        true,
+	}
+
+	// Arrange: Set up a collector for detectableChunks.
+	processedDetectableChunks := make(chan detectableChunk, 4)
+	go func() {
+		for chunk := range e.detectableChunksChan {
+			chunk.wgDoneFn()
+			processedDetectableChunks <- chunk
+		}
+	}()
+
+	// Arrange: Create a chunk where detector B will first overlap with A, then find a unique secret.
+	chunk := sources.Chunk{
+		Data:   []byte("keyword_a]overlapping_secret keyword_b]unique_secret_b"),
+		Verify: true,
+	}
+
+	// Arrange: Create detectors where:
+	// - Detector A finds "overlapping_secret"
+	// - Detector B finds "overlapping_secret" (overlap!) AND "unique_secret_b"
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
+		passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyword_a"}, secret: "overlapping_secret"},
+		multiResultDetector{
+			detectorType: detectorspb.DetectorType(-2),
+			keywords:     []string{"keyword_b"},
+			secrets:      []string{"overlapping_secret", "unique_secret_b"},
+		},
+	})
+	detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
+	require.Len(t, detectorMatches, 2)
+
+	// Arrange: Enqueue a verification overlap chunk.
+	e.verificationOverlapChunksChan <- verificationOverlapChunk{
+		chunk:                       chunk,
+		detectors:                   detectorMatches,
+		verificationOverlapWgDoneFn: func() { close(e.verificationOverlapChunksChan) },
+	}
+
+	// Act
+	e.verificationOverlapWorker(ctx)
+	close(e.detectableChunksChan)
+	close(processedDetectableChunks)
+	close(e.results)
+
+	// Collect chunks and results.
+	var chunks []detectableChunk
+	for dc := range processedDetectableChunks {
+		chunks = append(chunks, dc)
+	}
+	var results []detectors.ResultWithMetadata
+	for r := range e.results {
+		results = append(results, r)
+	}
+
+	// Assert: Only detector A should emit a detectableChunk (due to the first-in-overlap-set bug).
+	// Detector B should NOT emit a chunk, even though it found "unique_secret_b", because it was
+	// already marked as overlapping.
+	assert.Len(t, chunks, 1, "only detector A should emit a detectableChunk")
+
+	// Assert: Detector B's overlapping result should be in results with errOverlap.
+	assert.Len(t, results, 1, "detector B's overlap should be reported")
+	assert.Equal(t, errOverlap, results[0].VerificationError())
+
+	// Assert: The emitted chunk (detector A) should have unverifiedFindings, but detector B should
+	// not have snuck back in via its unique finding.
+	for _, dc := range chunks {
+		for _, finding := range dc.unverifiedFindings {
+			assert.NotEqual(t, "unique_secret_b", string(finding.Raw),
+				"detector B's unique finding should not appear after it was marked overlapping")
+		}
+	}
 }
 
 func TestEngine_IterativeDecoding(t *testing.T) {

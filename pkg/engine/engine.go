@@ -991,6 +991,8 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	const avgSecretsPerDetector = 8
 	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]*ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
+	unverifiedFindings := make(map[ahocorasick.DetectorKey][]detectors.Result, avgSecretsPerDetector)
+	overlappingDetectors := make(map[ahocorasick.DetectorKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
@@ -1062,6 +1064,10 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						// This is to ensure that the chunk is not reprocessed with verification enabled
 						// for this detector.
 						delete(detectorKeysWithResults, detector.Key)
+						delete(unverifiedFindings, detector.Key)
+						overlappingDetectors[detector.Key] = struct{}{}
+					} else if _, overlapped := overlappingDetectors[detector.Key]; !overlapped {
+						unverifiedFindings[detector.Key] = append(unverifiedFindings[detector.Key], res)
 					}
 					chunkSecrets[key] = struct{}{}
 				}
@@ -1072,10 +1078,11 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
 			e.detectableChunksChan <- detectableChunk{
-				chunk:    chunk.chunk,
-				detector: detector,
-				decoder:  chunk.decoder,
-				wgDoneFn: wgDetect.Done,
+				chunk:              chunk.chunk,
+				detector:           detector,
+				decoder:            chunk.decoder,
+				unverifiedFindings: unverifiedFindings[detector.Key],
+				wgDoneFn:           wgDetect.Done,
 			}
 		}
 
@@ -1085,6 +1092,12 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 		}
 		for k := range detectorKeysWithResults {
 			delete(detectorKeysWithResults, k)
+		}
+		for k := range unverifiedFindings {
+			delete(unverifiedFindings, k)
+		}
+		for k := range overlappingDetectors {
+			delete(overlappingDetectors, k)
 		}
 
 		chunk.verificationOverlapWgDoneFn()
