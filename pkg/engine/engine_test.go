@@ -1501,76 +1501,115 @@ func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableC
 
 func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
 
+// TestEngine_DetectChunk_UsesVerifyFlag validates that detectChunk correctly forwards detectableChunk.verify to
+// detectors.
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
-	// Arrange: Create a minimal engine.
-	e := &Engine{
-		results:           make(chan detectors.ResultWithMetadata, 1),
-		verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+	testCases := []struct {
+		name   string
+		verify bool
+	}{
+		{name: "verify=true", verify: true},
+		{name: "verify=false", verify: false},
 	}
 
-	// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
-	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"keyword"}}})
-	detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
-	require.Len(t, detectorMatches, 1)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange: Create a minimal engine.
+			e := &Engine{
+				results:           make(chan detectors.ResultWithMetadata, 1),
+				verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+			}
 
-	// Arrange: Create a chunk to detect.
-	chunk := detectableChunk{
-		chunk: sources.Chunk{
-			Verify: true,
-		},
-		detector: detectorMatches[0],
-		wgDoneFn: func() {},
-	}
+			// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+			ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"keyword"}}})
+			detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
+			require.Len(t, detectorMatches, 1)
 
-	// Act
-	e.detectChunk(ctx, chunk)
-	close(e.results)
+			// Arrange: Create a chunk to detect.
+			chunk := detectableChunk{
+				detector: detectorMatches[0],
+				verify:   tc.verify,
+				wgDoneFn: func() {},
+			}
 
-	// Assert: Confirm that a result was generated and that it has the expected verify flag.
-	select {
-	case result := <-e.results:
-		assert.True(t, result.Result.Verified)
-	default:
-		t.Errorf("expected a result but did not get one")
+			// Act
+			e.detectChunk(ctx, chunk)
+			close(e.results)
+
+			// Assert: Confirm that a result was generated and that it has the expected verify flag.
+			select {
+			case result := <-e.results:
+				assert.Equal(t, tc.verify, result.Result.Verified)
+			default:
+				t.Errorf("expected a result but did not get one")
+			}
+		})
 	}
 }
 
+// TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag validates that scannerWorker generates detectableChunk
+// structs that have the correct verify flag set. It also validates that the original chunks' SourceVerify flags are
+// unchanged.
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
-	// Arrange: Create a minimal engine.
-	detector := &passthroughDetector{keywords: []string{"keyword"}}
-	e := &Engine{
-		AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
-		decoders:             []decoders.Decoder{passthroughDecoder{}},
-		detectableChunksChan: make(chan detectableChunk, 1),
-		sourceManager:        sources.NewManager(),
-		verify:               true,
+	testCases := []struct {
+		name         string
+		engineVerify bool
+		sourceVerify bool
+		wantVerify   bool
+	}{
+		{name: "engineVerify=false,sourceVerify=false", engineVerify: false, sourceVerify: false, wantVerify: false},
+		{name: "engineVerify=false,sourceVerify=true", engineVerify: false, sourceVerify: true, wantVerify: false},
+		{name: "engineVerify=true,sourceVerify=false", engineVerify: true, sourceVerify: false, wantVerify: false},
+		{name: "engineVerify=true,sourceVerify=true", engineVerify: true, sourceVerify: true, wantVerify: true},
 	}
 
-	// Arrange: Create a chunk to scan.
-	chunk := sources.Chunk{
-		Data:   []byte("keyword"),
-		Verify: true,
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange: Create a minimal engine.
+			detector := &passthroughDetector{keywords: []string{"keyword"}}
+			e := &Engine{
+				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
+				decoders:             []decoders.Decoder{passthroughDecoder{}},
+				detectableChunksChan: make(chan detectableChunk, 1),
+				sourceManager:        sources.NewManager(),
+				verify:               tc.engineVerify,
+				maxDecodeDepth:       1,
+			}
 
-	// Arrange: Enqueue a chunk to be scanned.
-	e.sourceManager.ScanChunk(&chunk)
+			// Arrange: Create a chunk to scan.
+			chunk := sources.Chunk{
+				Data:         []byte("keyword"),
+				SourceVerify: tc.sourceVerify,
+			}
 
-	// Act
-	go e.scannerWorker(ctx)
+			// Arrange: Enqueue a chunk to be scanned.
+			e.sourceManager.ScanChunk(&chunk)
 
-	// Assert: Confirm that a chunk was generated and that it has the expected verify flag.
-	select {
-	case chunk := <-e.detectableChunksChan:
-		assert.True(t, chunk.chunk.Verify)
-	case <-time.After(1 * time.Second):
-		t.Errorf("expected a detectableChunk but did not get one")
+			// Act
+			go e.scannerWorker(ctx)
+
+			// Assert: Confirm that a chunk was generated, that its SourceVerify flag is unchanged, and that its verify
+			// flag is correctly set.
+			select {
+			case chunk := <-e.detectableChunksChan:
+				assert.Equal(t, tc.sourceVerify, chunk.chunk.SourceVerify)
+				assert.Equal(t, tc.wantVerify, chunk.verify)
+			case <-time.After(1 * time.Second):
+				t.Errorf("expected a detectableChunk but did not get one")
+			}
+		})
 	}
 }
 
+// TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag validates that the results directly
+// generated by verificationOverlapWorker all came from detector invocations with the verify flag cleared (because these
+// results were generated from verification overlaps). It also validates that detectableChunk structs generated by
+// verificationOverlapWorker have their verify flags correctly set, and that these structs' original chunks'
+// SourceVerify flags are unchanged.
 func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
@@ -1596,8 +1635,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Arrange: Create a chunk to "scan."
 		chunk := sources.Chunk{
-			Data:   []byte("keyword ;oahpow8heg;blaisd"),
-			Verify: true,
+			Data:         []byte("keyword ;oahpow8heg;blaisd"),
+			SourceVerify: true,
 		}
 
 		// Arrange: Create overlapping detector matches. We can't create them directly, so we have to use a minimal A-H
@@ -1627,11 +1666,13 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 			assert.False(t, result.Result.Verified)
 		}
 
-		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its
+		// verify flag is correctly set.
 		// CMR: There should be not be any of these chunks. However, due to what I believe is an unrelated bug, there
-		// are. This test ensures that even in that erroneous case, their Verify flag is correct.
+		// are. This test ensures that even in that erroneous case, their contents are correct.
 		for detectableChunk := range processedDetectableChunks {
-			assert.True(t, detectableChunk.chunk.Verify)
+			assert.True(t, detectableChunk.verify)
+			assert.True(t, detectableChunk.chunk.SourceVerify)
 		}
 	})
 	t.Run("no overlap", func(t *testing.T) {
@@ -1655,8 +1696,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Arrange: Create a chunk to "scan."
 		chunk := sources.Chunk{
-			Data:   []byte("keyword ;oahpow8heg;blaisd"),
-			Verify: true,
+			Data:         []byte("keyword ;oahpow8heg;blaisd"),
+			SourceVerify: true,
 		}
 
 		// Arrange: Create non-overlapping detector matches. We can't create them directly, so we have to use a minimal
@@ -1680,9 +1721,111 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		close(e.detectableChunksChan)
 		close(processedDetectableChunks)
 
-		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		// Assert: Confirm that SourceVerify flags are unchanged, and verify flags are correctly set.
 		for detectableChunk := range processedDetectableChunks {
-			assert.True(t, detectableChunk.chunk.Verify)
+			assert.True(t, detectableChunk.chunk.SourceVerify)
+			assert.True(t, detectableChunk.verify)
 		}
 	})
+}
+
+func TestEngine_IterativeDecoding(t *testing.T) {
+	t.Parallel()
+
+	// base64(base64("my-secret-key-test-value"))
+	const (
+		doubleEncoded   = "YlhrdGMyVmpjbVYwTFd0bGVTMTBaWE4wTFhaaGJIVmw="
+		detectorKeyword = "my-secret"
+	)
+
+	// "token: bXktc2VjcmV0LWtleS10ZXN0LXZhbHVl end" as UTF-16LE
+	utf16ContainingBase64 := []byte{
+		116, 0, 111, 0, 107, 0, 101, 0, 110, 0, 58, 0, 32, 0,
+		98, 0, 88, 0, 107, 0, 116, 0, 99, 0, 50, 0, 86, 0, 106, 0,
+		99, 0, 109, 0, 86, 0, 48, 0, 76, 0, 87, 0, 116, 0, 108, 0,
+		101, 0, 83, 0, 49, 0, 48, 0, 90, 0, 88, 0, 78, 0, 48, 0,
+		76, 0, 88, 0, 90, 0, 104, 0, 98, 0, 72, 0, 86, 0, 108, 0,
+		32, 0, 101, 0, 110, 0, 100, 0,
+	}
+
+	tests := []struct {
+		name        string
+		input       []byte
+		depth       int
+		wantKeyword bool
+	}{
+		{
+			name:        "double base64, depth=1, miss",
+			input:       []byte("token: " + doubleEncoded),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "double base64, depth=2, found",
+			input:       []byte("token: " + doubleEncoded),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "utf16+base64, depth=1, miss",
+			input:       utf16ContainingBase64,
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "utf16+base64, depth=2, found",
+			input:       utf16ContainingBase64,
+			depth:       2,
+			wantKeyword: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			detector := &passthroughDetector{
+				keywords:     []string{detectorKeyword},
+				detectorType: detectorspb.DetectorType(9999),
+			}
+			e := &Engine{
+				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
+				decoders:             decoders.DefaultDecoders(),
+				detectableChunksChan: make(chan detectableChunk, 64),
+				sourceManager:        sources.NewManager(),
+				maxDecodeDepth:       tt.depth,
+			}
+
+			e.sourceManager.ScanChunk(&sources.Chunk{Data: tt.input})
+			go e.scannerWorker(ctx)
+
+			var found bool
+			timeout := time.After(2 * time.Second)
+		Loop:
+			for {
+				select {
+				case dc := <-e.detectableChunksChan:
+					dc.wgDoneFn()
+					found = true
+					for {
+						select {
+						case dc2 := <-e.detectableChunksChan:
+							dc2.wgDoneFn()
+						case <-time.After(200 * time.Millisecond):
+							break Loop
+						}
+					}
+				case <-timeout:
+					break Loop
+				}
+			}
+
+			if tt.wantKeyword {
+				assert.True(t, found, "expected detector match")
+			} else {
+				assert.False(t, found, "unexpected detector match")
+			}
+		})
+	}
 }

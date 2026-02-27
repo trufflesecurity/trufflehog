@@ -60,7 +60,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Stdin{},
 		},
-		Verify: s.verify,
+		SourceVerify: s.verify,
 	}
 
 	ctx.Logger().Info("scanning stdin for secrets")

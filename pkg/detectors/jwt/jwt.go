@@ -261,7 +261,8 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 	}
 	matchingKey, found := keySet.LookupKeyID(kid)
 	if !found {
-		return false, fmt.Errorf("no matching JWKS key")
+		// this is a determinate failure indicating rotation
+		return false, nil
 	}
 
 	// Parse matching key to the "raw" key type needed for signature verification
