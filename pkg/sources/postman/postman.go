@@ -804,7 +804,7 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 				},
 			},
 		},
-		Verify: s.verify,
+		SourceVerify: s.verify,
 	}
 }
 

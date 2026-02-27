@@ -333,11 +333,11 @@ func (s *Source) completeProgress(ctx context.Context) {
 
 func (s *Source) processObject(ctx context.Context, o object) error {
 	chunkSkel := &sources.Chunk{
-		SourceName: s.name,
-		SourceType: s.Type(),
-		JobID:      s.JobID(),
-		SourceID:   s.sourceId,
-		Verify:     s.verify,
+		SourceName:   s.name,
+		SourceType:   s.Type(),
+		JobID:        s.JobID(),
+		SourceID:     s.sourceId,
+		SourceVerify: s.verify,
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Gcs{
 				Gcs: &source_metadatapb.GCS{

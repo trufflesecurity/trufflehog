@@ -165,11 +165,11 @@ func (s *Source) chunkJSONEnumeratorReader(
 		}
 
 		chunkSkel := &sources.Chunk{
-			SourceType: s.Type(),
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			JobID:      s.JobID(),
-			Verify:     s.verify,
+			SourceType:   s.Type(),
+			SourceName:   s.name,
+			SourceID:     s.SourceID(),
+			JobID:        s.JobID(),
+			SourceVerify: s.verify,
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_JsonEnumerator{
 					JsonEnumerator: &source_metadatapb.JSONEnumerator{

@@ -346,7 +346,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 				},
 			},
 		},
-		Verify: s.verify,
+		SourceVerify: s.verify,
 	}
 
 	return handlers.HandleFile(fileCtx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
