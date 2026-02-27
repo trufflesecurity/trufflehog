@@ -351,8 +351,8 @@ func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEnt
 				},
 			},
 		},
-		Verify: s.verify,
-		Data:   []byte(historyInfo.entry.CreatedBy),
+		SourceVerify: s.verify,
+		Data:         []byte(historyInfo.entry.CreatedBy),
 	}
 
 	ctx.Logger().V(2).Info("scanning image history entry", "index", historyInfo.index, "layer", historyInfo.layerDigest)
@@ -464,7 +464,7 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 					},
 				},
 			},
-			Verify: s.verify,
+			SourceVerify: s.verify,
 		}
 		chunk.Data = data.Bytes()
 

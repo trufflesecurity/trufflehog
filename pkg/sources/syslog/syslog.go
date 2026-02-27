@@ -282,7 +282,7 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 			JobID:          s.JobID(),
 			SourceMetadata: metadata,
 			Data:           input,
-			Verify:         s.verify,
+			SourceVerify:   s.verify,
 		}
 	}
 }
@@ -332,7 +332,7 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 			SourceType:     s.syslog.sourceType,
 			SourceMetadata: metadata,
 			Data:           input,
-			Verify:         s.verify,
+			SourceVerify:   s.verify,
 		}
 	}
 }

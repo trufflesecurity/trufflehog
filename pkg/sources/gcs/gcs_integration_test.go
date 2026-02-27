@@ -79,10 +79,10 @@ func TestChunks_PublicBucket(t *testing.T) {
 
 	want := []*sources.Chunk{
 		{
-			SourceName: "test",
-			SourceType: sourcespb.SourceType_SOURCE_TYPE_GCS,
-			SourceID:   0,
-			Verify:     true,
+			SourceName:   "test",
+			SourceType:   sourcespb.SourceType_SOURCE_TYPE_GCS,
+			SourceID:     0,
+			SourceVerify: true,
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gcs{
 					Gcs: &source_metadatapb.GCS{
@@ -164,10 +164,10 @@ func createTestChunks() []*sources.Chunk {
 	chunks := make([]*sources.Chunk, 0, len(objects))
 	for _, o := range objects {
 		chunks = append(chunks, &sources.Chunk{
-			SourceName: "test",
-			SourceType: sourcespb.SourceType_SOURCE_TYPE_GCS,
-			SourceID:   0,
-			Verify:     true,
+			SourceName:   "test",
+			SourceType:   sourcespb.SourceType_SOURCE_TYPE_GCS,
+			SourceID:     0,
+			SourceVerify: true,
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gcs{
 					Gcs: &source_metadatapb.GCS{

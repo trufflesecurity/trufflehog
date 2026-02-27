@@ -388,7 +388,7 @@ func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target s
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{Gitlab: meta},
 			},
-			Verify: s.verify,
+			SourceVerify: s.verify,
 		}
 
 		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {

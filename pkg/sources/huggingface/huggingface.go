@@ -663,8 +663,8 @@ func (s *Source) chunkDiscussionComments(ctx context.Context, repoInfo repoInfo,
 					},
 				},
 			},
-			Data:   []byte(comment.Data.Latest.Raw),
-			Verify: s.verify,
+			Data:         []byte(comment.Data.Latest.Raw),
+			SourceVerify: s.verify,
 		}
 		select {
 		case <-ctx.Done():

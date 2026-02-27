@@ -111,7 +111,7 @@ func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 				SecretID:       chunk.SecretID,
 				SourceMetadata: chunk.SourceMetadata,
 				SourceType:     chunk.SourceType,
-				Verify:         chunk.Verify,
+				SourceVerify:   chunk.SourceVerify,
 			},
 		}
 	} else {

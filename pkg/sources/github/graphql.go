@@ -418,8 +418,8 @@ func (s *Source) chunkGraphqlIssues(ctx context.Context, repoInfo repoInfo, issu
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.Title + "\n" + issue.Body)),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(issue.Title + "\n" + issue.Body)),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -453,8 +453,8 @@ func (s *Source) chunkComments(ctx context.Context, repoInfo repoInfo, comments 
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.Body)),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(comment.Body)),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -483,8 +483,8 @@ func (s *Source) chunkGraphqlPullRequests(ctx context.Context, repoInfo repoInfo
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(pr.Title + "\n" + pr.Body)),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(pr.Title + "\n" + pr.Body)),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
