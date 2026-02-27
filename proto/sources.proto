@@ -281,6 +281,7 @@ message GitHub {
   bool no_cleanup = 23;
   bool ignore_gists = 24;
   bool print_legacy_json = 25;
+  bool scan_all_installations = 26;
 }
 
 message GitHubExperimental {

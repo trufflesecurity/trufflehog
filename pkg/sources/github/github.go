@@ -630,6 +630,12 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 			return err
 		}
 
+		if s.conn.ScanAllInstallations {
+			if err := s.enumerateAllInstallationRepos(ctx, connector, reporter); err != nil {
+				ctx.Logger().Error(err, "error enumerating repos from additional installations")
+			}
+		}
+
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
 			err := s.addMembersByApp(ctx, connector, reporter)
@@ -649,6 +655,58 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 					logger.Error(err, "error fetching repos by user")
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+// enumerateAllInstallationRepos discovers repos from all installations of the
+// GitHub App beyond the default one. For each additional installation, it
+// creates a per-installation API client and lists repos accessible to that
+// installation. It also records the installation ID for each repo so that
+// Clone uses the correct token.
+func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *appConnector, reporter sources.UnitReporter) error {
+	installationClient := connector.InstallationClient()
+	opts := &github.ListOptions{PerPage: defaultPagination}
+
+	installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
+	if err != nil {
+		return fmt.Errorf("could not list installations: %w", err)
+	}
+
+	for _, install := range installs {
+		if install.GetID() == connector.installationID {
+			continue
+		}
+
+		installID := install.GetID()
+		account := install.Account.GetLogin()
+		logger := ctx.Logger().WithValues("org", account, "installation_id", installID)
+		logger.Info("Enumerating repos from additional installation")
+
+		client, err := connector.APIClientForInstallation(installID)
+		if err != nil {
+			logger.Error(err, "could not create API client for installation")
+			continue
+		}
+
+		listRepos := func(ctx context.Context, _ string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+			result, resp, err := client.Apps.ListRepos(ctx, opts.getListOptions())
+			if result != nil {
+				for _, r := range result.Repositories {
+					connector.SetRepoInstallation(r.GetCloneURL(), installID)
+				}
+				return result.Repositories, resp, err
+			}
+			return nil, resp, err
+		}
+
+		if err := s.processRepos(ctx, account, reporter, listRepos, &appListOptions{
+			ListOptions: github.ListOptions{PerPage: defaultPagination},
+		}); err != nil {
+			logger.Error(err, "error enumerating repos for installation")
+			continue
 		}
 	}
 
