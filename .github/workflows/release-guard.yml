@@ -1,0 +1,35 @@
+name: Release Guard
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  unset-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore previous release as latest if needed
+        run: |
+          LATEST_TAG=$(gh release list --json tagName,isLatest -q '.[] | select(.isLatest) | .tagName')
+          if [ "$LATEST_TAG" != "${{ github.event.release.tag_name }}" ]; then
+            echo "Release is not marked as latest (latest is $LATEST_TAG), skipping."
+            exit 0
+          fi
+
+          echo "Release ${{ github.event.release.tag_name }} is marked as latest, finding previous release..."
+
+          # Get the second release in the list (sorted by date, excluding drafts/prereleases by default)
+          # The first one is the current release, so we want the second one
+          PREVIOUS_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --json tagName -q '.[1].tagName')
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous release found, cannot restore. Exiting."
+            exit 0
+          fi
+
+          echo "Restoring $PREVIOUS_TAG as latest..."
+          gh release edit "$PREVIOUS_TAG" --latest
+        env:
+          GH_TOKEN: ${{ github.token }}
