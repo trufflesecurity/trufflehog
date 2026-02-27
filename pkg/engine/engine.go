@@ -83,6 +83,12 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
+// Finisher is an optional interface that Printers can implement to perform cleanup
+// or write final output after all results have been printed.
+type Finisher interface {
+	Finish() error
+}
+
 // PrinterDispatcher wraps an existing Printer implementation and adapts it to the ResultsDispatcher interface.
 type PrinterDispatcher struct{ printer Printer }
 
@@ -92,6 +98,14 @@ func NewPrinterDispatcher(printer Printer) *PrinterDispatcher { return &PrinterD
 // Dispatch sends the result to the printer.
 func (p *PrinterDispatcher) Dispatch(ctx context.Context, result detectors.ResultWithMetadata) error {
 	return p.printer.Print(ctx, &result)
+}
+
+// Finish calls Finish on the underlying printer if it implements the Finisher interface.
+func (p *PrinterDispatcher) Finish() error {
+	if f, ok := p.printer.(Finisher); ok {
+		return f.Finish()
+	}
+	return nil
 }
 
 // Config used to configure the engine.
