@@ -668,6 +668,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shipday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shodankey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopify"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopifyoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shortcut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shotstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shutterstock"
@@ -1552,6 +1553,7 @@ func buildDetectorList() []detectors.Detector {
 		&shipday.Scanner{},
 		&shodankey.Scanner{},
 		&shopify.Scanner{},
+		&shopifyoauth.Scanner{},
 		&shortcut.Scanner{},
 		&shotstack.Scanner{},
 		&shutterstock.Scanner{},

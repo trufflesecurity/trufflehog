@@ -1051,6 +1051,7 @@ enum DetectorType {
   JWT = 1039;
   OpenAIAdmin = 1040;
   GoogleGeminiAPIKey = 1041;
+  ShopifyOAuth = 1042;
 }
 
 message Result {
