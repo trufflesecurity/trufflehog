@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   unset-latest:
@@ -12,16 +13,28 @@ jobs:
     steps:
       - name: Restore previous release as latest if needed
         run: |
+          TAG="$RELEASE_TAG"
+
+          # If the Release workflow already succeeded for this tag, the
+          # pipeline intentionally set "latest" — don't undo it.
+          RELEASE_RUN_STATUS=$(gh run list \
+            --workflow=release.yml \
+            --json conclusion,headBranch \
+            -q "[.[] | select(.headBranch == \"$TAG\")] | .[0].conclusion")
+
+          if [ "$RELEASE_RUN_STATUS" = "success" ]; then
+            echo "Release workflow succeeded for $TAG, skipping guard."
+            exit 0
+          fi
+
           LATEST_TAG=$(gh release list --json tagName,isLatest -q '.[] | select(.isLatest) | .tagName')
-          if [ "$LATEST_TAG" != "${{ github.event.release.tag_name }}" ]; then
+          if [ "$LATEST_TAG" != "$TAG" ]; then
             echo "Release is not marked as latest (latest is $LATEST_TAG), skipping."
             exit 0
           fi
 
-          echo "Release ${{ github.event.release.tag_name }} is marked as latest, finding previous release..."
+          echo "Release $TAG is marked as latest, finding previous release..."
 
-          # Get the second release in the list (sorted by date, excluding drafts/prereleases by default)
-          # The first one is the current release, so we want the second one
           PREVIOUS_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --json tagName -q '.[1].tagName')
 
           if [ -z "$PREVIOUS_TAG" ]; then
@@ -34,3 +47,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
