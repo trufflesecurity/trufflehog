@@ -45,27 +45,49 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 	if err != nil {
 		return nil, fmt.Errorf("could not create installation client transport: %w", err)
 	}
-	installationTransport.BaseURL = apiEndpoint
 
+	// For GHE.com, the BaseURL for ghinstallation must be the API subdomain
+	// WITHOUT /api/v3/ appended. ghinstallation uses this to construct the
+	// token exchange URL: {BaseURL}/app/installations/{id}/access_tokens
+	if isGHECloud(apiEndpoint) {
+		normalizedURL, err := normalizeGHECloudAPIEndpoint(apiEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("could not normalize GHE.com endpoint: %w", err)
+		}
+		installationTransport.BaseURL = normalizedURL
+	} else {
+		installationTransport.BaseURL = apiEndpoint
+	}
+
+	// --- Installation client (used for listing installs, creating tokens) ---
 	installationHttpClient := common.RetryableHTTPClientTimeout(60)
 	installationHttpClient.Transport = installationTransport
-	installationClient, err := github.NewClient(installationHttpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
+
+	var installationClient *github.Client
+	if isGHECloud(apiEndpoint) {
+		installationClient, err = createGHECloudClient(installationHttpClient, apiEndpoint)
+	} else {
+		installationClient, err = github.NewClient(installationHttpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("could not create installation client: %w", err)
 	}
 
-	apiTransport, err := ghinstallation.New(
-		httpClient.Transport,
-		appID,
-		installationID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, fmt.Errorf("could not create API client transport: %w", err)
-	}
-	apiTransport.BaseURL = apiEndpoint
+	// --- API client (used for scanning repos, listing orgs, etc.) ---
+	// Use NewFromAppsTransport to ensure the apiTransport inherits the correct BaseURL
+	// from installationTransport. Using ghinstallation.New() would create a new internal
+	// AppsTransport with the default BaseURL (api.github.com), causing APIs that rely on the BaseURL
+	// (like token refresh) to fail for GitHub Enterprise or GHEC with Data Residency.
+	apiTransport := ghinstallation.NewFromAppsTransport(installationTransport, installationID)
 
 	httpClient.Transport = apiTransport
-	apiClient, err := github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
+
+	var apiClient *github.Client
+	if isGHECloud(apiEndpoint) {
+		apiClient, err = createGHECloudClient(httpClient, apiEndpoint)
+	} else {
+		apiClient, err = github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
