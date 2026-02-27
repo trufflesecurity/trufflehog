@@ -12,23 +12,12 @@ import (
 
 var (
 	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
 		api:
 			cashboard_key: "F1A-NEI-HY4-PZK"
-			cashboard_user: "ts7z"
+			cashboard_username: "ts7z"
 			auth_type: Basic
 			base_url: "https://api.example.com/v1/user"
 			auth_token: ""
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
 	`
 	secret = "F1A-NEI-HY4-PZKts7z"
 )

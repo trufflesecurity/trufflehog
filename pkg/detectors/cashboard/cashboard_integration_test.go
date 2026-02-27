@@ -19,12 +19,12 @@ import (
 func TestCashboard_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("CASHBOARD")
-	user := testSecrets.MustGetField("SCANNER_USERNAME")
+	user := testSecrets.MustGetField("CASHBOARD_USERNAME")
 	inactiveSecret := testSecrets.MustGetField("CASHBOARD_INACTIVE")
 
 	type args struct {
@@ -44,7 +44,7 @@ func TestCashboard_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a cashboard secret %s within %s", secret, user)),
+				data:   []byte(fmt.Sprintf("You can find a cashboard secret %s and username %s", secret, user)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -60,7 +60,7 @@ func TestCashboard_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a cashboard secret %s within %s but not valid", inactiveSecret, user)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a cashboard secret %s username %s but not valid", inactiveSecret, user)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -96,6 +96,7 @@ func TestCashboard_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Cashboard.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

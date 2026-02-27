@@ -4,6 +4,7 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -26,7 +27,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"cashboard"}) + `\b([0-9A-Z]{3}-[0-9A-Z]{3}-[0-9A-Z]{3}-[0-9A-Z]{3})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cashboard"}) + `\b([0-9a-z]{1,})\b`)
+	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"username"}) + `\b([0-9a-z]{1,})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -55,27 +56,47 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				data := fmt.Sprintf("%s:%s", resUser, resMatch)
-				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cashboardapp.com/account.xml", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyMatch(ctx, client, resUser, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			results = append(results, s1)
 		}
 	}
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, user, token string) (bool, error) {
+	data := fmt.Sprintf("%s:%s", user, token)
+	sEnc := b64.StdEncoding.EncodeToString([]byte(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.cashboardapp.com/account", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
+	req.Header.Add("Content-Type", "application/xml")
+	req.Header.Add("Accept", "application/xml")
+
+	res, err := client.Do(req)
+
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
