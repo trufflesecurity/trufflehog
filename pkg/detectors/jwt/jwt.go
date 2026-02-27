@@ -1,12 +1,10 @@
 package jwt
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,14 +15,11 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct {
-	client *http.Client
-}
+type Scanner struct{}
 
 // Ensure the Scanner satisfies expected interfaces at compile time.
 var _ interface {
@@ -77,13 +72,11 @@ var jwtOptions = []jwt.ParserOption{
 	jwt.WithLeeway(time.Minute),
 }
 
-var jwtParser = jwt.NewParser(jwtOptions...)
-
-var jwtValidator = jwt.NewValidator(jwtOptions...)
-
 // FromData will find and optionally verify JWT secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	client := cmp.Or(s.client, common.SaneHttpClient())
+	jwtParser := jwt.NewParser(jwtOptions...)
+	client := detectors.DetectorHttpClientWithNoLocalAddresses
+
 	seenMatches := make(map[string]struct{})
 
 	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
@@ -105,7 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		case "HS256", "HS384", "HS512":
 			// The JWT *might* be valid, but we can't in general do signature verification on HMAC-based algorithms.
 			// We don't have a suitable status to represent this situation in trufflehog.
-			// (The `unknown` status is intended to indicate that an error occurred to to external environment conditions, like trannsient network errors.)
+			// (The `unknown` status is intended to indicate that an error occurred due to external environmental conditions, like transient network errors.)
 			// So instead, to avoid possible false positives, totally skip HMAC-based JWTs; don't even create results for them.
 			continue
 		}
@@ -156,32 +149,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-// Does the URL's refer to a non-routing host?
-func isNonRoutingHost(url *url.URL) bool {
-	h := url.Hostname()
-	if h == "localhost" {
-		return true
-	}
-
-	ip := net.ParseIP(h)
-	if ip != nil {
-		return ip.IsPrivate()
-	}
-
-	return false
-}
-
-// Parse a string into a URL, check that it is an HTTPS URL, and that it doesn't refer to a non-routing host.
-func parseRoutableHttpsUrl(urlString string) (*url.URL, error) {
+// Parse a string into a URL and check that it is an HTTPS URL.
+func parseHttpsUrl(urlString string) (*url.URL, error) {
 	url, err := url.ParseRequestURI(urlString)
 	if err != nil {
 		return nil, err
 	}
 	if url.Scheme != "https" {
 		return nil, fmt.Errorf("only https scheme is supported")
-	}
-	if isNonRoutingHost(url) {
-		return nil, fmt.Errorf("only public hosts are supported")
 	}
 
 	return url, nil
@@ -213,6 +188,8 @@ func limitReader(reader io.Reader) io.Reader {
 // - If the JWT uses public key cryptography and the OIDC Discovery protocol, we can fetch the public key and perform signature verification
 // - In all cases, we can perform claims validation (e.g., checking expiration time) and sometimes get a definite answer that a JWT is *not* live
 func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, parsedToken *jwt.Token) (bool, error) {
+	jwtValidator := jwt.NewValidator(jwtOptions...)
+
 	if err := jwtValidator.Validate(parsedToken.Claims); err != nil {
 		// though we have not checked the signature, the token is definitely invalid
 		return false, nil
@@ -225,7 +202,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 		// missing or invalid issuer
 		return false, nil
 	}
-	issuerURL, err := parseRoutableHttpsUrl(issuer)
+	issuerURL, err := parseHttpsUrl(issuer)
 	if err != nil {
 		// unsupported issuer
 		return false, nil
@@ -258,7 +235,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 		return false, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
 	}
 
-	jwksURL, err := parseRoutableHttpsUrl(discoveryDoc.JWKSUri)
+	jwksURL, err := parseHttpsUrl(discoveryDoc.JWKSUri)
 	if err != nil {
 		return false, fmt.Errorf("invalid JWKS URL: %w", err)
 	}
@@ -284,7 +261,8 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 	}
 	matchingKey, found := keySet.LookupKeyID(kid)
 	if !found {
-		return false, fmt.Errorf("no matching JWKS key")
+		// this is a determinate failure indicating rotation
+		return false, nil
 	}
 
 	// Parse matching key to the "raw" key type needed for signature verification
@@ -300,7 +278,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 		return false, nil
 	}
 
-		// signature valid and claims check out
+	// signature valid and claims check out
 	return true, nil
 }
 

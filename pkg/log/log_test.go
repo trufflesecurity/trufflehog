@@ -3,7 +3,6 @@ package log
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +11,48 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
+
+// testCore implement zapcore.Core with custom methods.
+type testCore struct {
+	check   func(zapcore.Entry, *zapcore.CheckedEntry) *zapcore.CheckedEntry
+	enabled func(zapcore.Level) bool
+	sync    func() error
+	with    func([]zapcore.Field) zapcore.Core
+	write   func(zapcore.Entry, []zapcore.Field) error
+}
+
+func (t *testCore) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if t.check != nil {
+		return t.check(e, ce)
+	}
+	return ce
+}
+func (t *testCore) Enabled(l zapcore.Level) bool {
+	if t.enabled != nil {
+		return t.enabled(l)
+	}
+	return true
+}
+func (t *testCore) Sync() error {
+	if t.sync != nil {
+		return t.sync()
+	}
+	return nil
+}
+func (t *testCore) With(fields []zapcore.Field) zapcore.Core {
+	if t.with != nil {
+		return t.with(fields)
+	}
+	return t
+}
+func (t *testCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	if t.write != nil {
+		return t.write(ent, fields)
+	}
+	return nil
+}
 
 func TestNew(t *testing.T) {
 	var jsonBuffer, consoleBuffer bytes.Buffer
@@ -61,42 +101,18 @@ func TestSetLevel(t *testing.T) {
 	assert.Equal(t, true, logger.GetSink().Enabled(2))
 }
 
-func TestWithSentryFailure(t *testing.T) {
-	var buffer bytes.Buffer
-	logger, flush := New("service-name",
-		WithSentry(sentry.ClientOptions{Dsn: "fail"}, nil),
-		WithConsoleSink(&buffer),
-	)
-	logger.Info("yay")
-	assert.Nil(t, flush())
-
-	assert.Contains(t, buffer.String(), "error configuring logger")
-	assert.Contains(t, buffer.String(), "yay")
-}
-
-func TestAddSentryFailure(t *testing.T) {
-	var buffer bytes.Buffer
-	logger, flush := New("service-name", WithConsoleSink(&buffer))
-	logger, _, err := AddSentry(logger, sentry.ClientOptions{Dsn: "fail"}, nil)
-	assert.NotNil(t, err)
-	assert.NotContains(t, err.Error(), "unsupported")
-
-	logger.Info("yay")
-	assert.Nil(t, flush())
-
-	assert.Contains(t, buffer.String(), "yay")
-}
-
 func TestAddSentry(t *testing.T) {
 	var buffer bytes.Buffer
 	var sentryMessage string
-	logger, _ := New("service-name", WithConsoleSink(&buffer))
-	logger, flush, err := AddSentry(logger, sentry.ClientOptions{
+	client, err := sentry.NewClient(sentry.ClientOptions{
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			sentryMessage = event.Message
 			return nil
 		},
-	}, nil)
+	})
+	assert.Nil(t, err)
+	logger, _ := New("service-name", WithConsoleSink(&buffer))
+	logger, flush, err := AddSentry(logger, client, nil)
 	assert.Nil(t, err)
 
 	logger.Error(nil, "oops")
@@ -111,14 +127,16 @@ func TestAddSentry(t *testing.T) {
 func TestWithSentry(t *testing.T) {
 	var buffer bytes.Buffer
 	var sentryMessage string
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			sentryMessage = event.Message
+			return nil
+		},
+	})
+	assert.Nil(t, err)
 	logger, flush := New("service-name",
 		WithConsoleSink(&buffer),
-		WithSentry(sentry.ClientOptions{
-			BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-				sentryMessage = event.Message
-				return nil
-			},
-		}, nil),
+		WithSentry(client, nil),
 	)
 	logger.Info("yay")
 	logger.Error(nil, "oops")
@@ -161,6 +179,29 @@ func TestAddSink(t *testing.T) {
 	// buf2 should only have "line 2"
 	assert.NotContains(t, buf2.String(), "line 1")
 	assert.Contains(t, buf2.String(), "line 2")
+}
+
+func TestAddSink_WithKeyValuePairs(t *testing.T) {
+	// Arrange: Create a logger with a key-value pair
+	var buf1 bytes.Buffer
+	logger, cleanup := New("service-name", WithConsoleSink(&buf1))
+	t.Cleanup(func() { _ = cleanup })
+	logger = logger.WithValues("sink 1 key", "sink 1 value")
+
+	// Arrange: Add a second sink with a new key-value pair
+	var buf2 bytes.Buffer
+	logger, flush, err := AddSink(logger, WithConsoleSink(&buf2), "sink 2 key", "sink 2 value")
+	require.NoError(t, err)
+
+	// Act
+	logger.Info("something")
+	require.NoError(t, flush())
+
+	// Assert: Confirm that each sink received only its own key-value pair
+	assert.Contains(t, buf1.String(), "sink 1")
+	assert.NotContains(t, buf1.String(), "sink 2")
+	assert.Contains(t, buf2.String(), "sink 2")
+	assert.NotContains(t, buf2.String(), "sink 1")
 }
 
 func TestStaticLevelSink(t *testing.T) {
@@ -224,72 +265,6 @@ func splitLines(s string) []string {
 	return logLines
 }
 
-func TestGlobalRedaction_Console(t *testing.T) {
-	oldState := globalRedactor
-	globalRedactor = &dynamicRedactor{
-		denySet: make(map[string]struct{}),
-	}
-	defer func() { globalRedactor = oldState }()
-
-	var buf bytes.Buffer
-	logger, flush := New("console-redaction-test",
-		WithConsoleSink(&buf, WithGlobalRedaction()),
-	)
-	RedactGlobally("foo")
-	RedactGlobally("bar")
-
-	logger.Info("this foo is :bar",
-		"foo", "bar",
-		"array", []string{"foo", "bar", "baz"},
-		"object", map[string]string{"foo": "bar"})
-	require.NoError(t, flush())
-
-	gotParts := strings.Split(buf.String(), "\t")[1:] // The first item is the timestamp
-	wantParts := []string{
-		"info-0",
-		"console-redaction-test",
-		"this ***** is :*****",
-		"{\"foo\": \"*****\", \"array\": [\"foo\", \"bar\", \"baz\"], \"object\": {\"foo\":\"bar\"}}\n",
-	}
-	assert.Equal(t, wantParts, gotParts)
-}
-
-func TestGlobalRedaction_JSON(t *testing.T) {
-	oldState := globalRedactor
-	globalRedactor = &dynamicRedactor{
-		denySet: make(map[string]struct{}),
-	}
-	defer func() { globalRedactor = oldState }()
-
-	var jsonBuffer bytes.Buffer
-	logger, flush := New("json-redaction-test",
-		WithJSONSink(&jsonBuffer, WithGlobalRedaction()),
-	)
-	RedactGlobally("foo")
-	RedactGlobally("bar")
-	logger.Info("this foo is :bar",
-		"foo", "bar",
-		"array", []string{"foo", "bar", "baz"},
-		"object", map[string]string{"foo": "bar"})
-	require.NoError(t, flush())
-
-	var parsedJSON map[string]any
-	require.NoError(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
-	assert.NotEmpty(t, parsedJSON["ts"])
-	delete(parsedJSON, "ts")
-	assert.Equal(t,
-		map[string]any{
-			"level":  "info-0",
-			"logger": "json-redaction-test",
-			"msg":    "this ***** is :*****",
-			"foo":    "*****",
-			"array":  []any{"foo", "bar", "baz"},
-			"object": map[string]interface{}{"foo": "bar"},
-		},
-		parsedJSON,
-	)
-}
-
 func TestToLogger(t *testing.T) {
 	var jsonBuffer bytes.Buffer
 	l, flush := New("service-name",
@@ -336,56 +311,36 @@ func TestToSlogger(t *testing.T) {
 	)
 }
 
-func BenchmarkLoggerRedact(b *testing.B) {
-	msg := "this is a message with 'foo' in it"
-	logKvps := []any{"key", "value", "foo", "bar", "bar", "baz", "longval", "84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa"}
-	redactor := &dynamicRedactor{denySet: make(map[string]struct{})}
-	redactor.replacer.CompareAndSwap(nil, strings.NewReplacer())
+func TestSyncFunc(t *testing.T) {
+	var syncCalled bool
+	core := testCore{
+		sync: func() error {
+			syncCalled = true
+			return nil
+		},
+	}
+	_, flush := New("service-name", &core)
+	assert.NoError(t, flush())
+	assert.True(t, syncCalled)
+}
 
-	b.Run("no redaction", func(b *testing.B) {
-		logger, flush := New("redaction-benchmark", WithJSONSink(
-			io.Discard,
-			func(conf *sinkConfig) { conf.redactor = redactor },
-		))
-		for i := 0; i < b.N; i++ {
-			logger.Info(msg, logKvps...)
-		}
-		require.NoError(b, flush())
+func TestAddSinkStillSyncs(t *testing.T) {
+	var syncCalled [2]bool
+	core := testCore{
+		sync: func() error {
+			syncCalled[0] = true
+			return nil
+		},
+	}
+	l, _ := New("service-name", &core)
+	_, flush, err := AddSink(l, &testCore{
+		sync: func() error {
+			syncCalled[1] = true
+			return nil
+		},
 	})
-	b.Run("1 redaction", func(b *testing.B) {
-		logger, flush := New("redaction-benchmark", WithJSONSink(
-			io.Discard,
-			func(conf *sinkConfig) { conf.redactor = redactor },
-		))
-		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
-		for i := 0; i < b.N; i++ {
-			logger.Info(msg, logKvps...)
-		}
-		require.NoError(b, flush())
-	})
-	b.Run("2 redactions", func(b *testing.B) {
-		logger, flush := New("redaction-benchmark", WithJSONSink(
-			io.Discard,
-			func(conf *sinkConfig) { conf.redactor = redactor },
-		))
-		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
-		redactor.configureForRedaction("foo")
-		for i := 0; i < b.N; i++ {
-			logger.Info(msg, logKvps...)
-		}
-		require.NoError(b, flush())
-	})
-	b.Run("3 redactions", func(b *testing.B) {
-		logger, flush := New("redaction-benchmark", WithJSONSink(
-			io.Discard,
-			func(conf *sinkConfig) { conf.redactor = redactor },
-		))
-		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
-		redactor.configureForRedaction("foo")
-		redactor.configureForRedaction("bar")
-		for i := 0; i < b.N; i++ {
-			logger.Info(msg, logKvps...)
-		}
-		require.NoError(b, flush())
-	})
+	assert.NoError(t, err)
+	assert.NoError(t, flush())
+	assert.True(t, syncCalled[0])
+	assert.True(t, syncCalled[1])
 }

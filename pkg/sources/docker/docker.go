@@ -69,9 +69,15 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.concurrency = concurrency
 
+	jobIDStr := fmt.Sprint(s.jobId)
+
 	// Reset metrics for this source at initialization time.
-	dockerImagesScanned.WithLabelValues(s.name).Set(0)
-	dockerLayersScanned.WithLabelValues(s.name).Set(0)
+	dockerImagesScanned.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerLayersScanned.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerLayersEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerHistoryEntriesEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerImagesEnumerated.WithLabelValues(s.name, jobIDStr).Set(0)
+	dockerHistoryEntriesScanned.WithLabelValues(s.name, jobIDStr).Set(0)
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
@@ -115,6 +121,7 @@ type layerInfo struct {
 // Chunks emits data over a channel that is decoded and scanned for secrets.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	ctx = context.WithValues(ctx, "source_type", s.Type(), "source_name", s.name)
+	jobIDStr := fmt.Sprint(s.jobId)
 
 	workers := new(errgroup.Group)
 	workers.SetLimit(s.concurrency)
@@ -153,6 +160,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			imageCtx.Logger().Error(err, "error getting image layers")
 			continue
 		}
+		dockerLayersEnumerated.WithLabelValues(s.name, jobIDStr).Add(float64(len(layers)))
 
 		// Get history entries and associate them with layers
 		historyEntries, err := getHistoryEntries(imageCtx, imgInfo, layers)
@@ -160,6 +168,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			imageCtx.Logger().Error(err, "error getting image history entries")
 			continue
 		}
+		dockerHistoryEntriesEnumerated.WithLabelValues(s.name, jobIDStr).Add(float64(len(historyEntries)))
 
 		// Scan each history entry for secrets in build commands
 		for _, historyEntry := range historyEntries {
@@ -167,7 +176,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 				imageCtx.Logger().Error(err, "error processing history entry")
 				continue
 			}
-			dockerHistoryEntriesScanned.WithLabelValues(s.name).Inc()
+			dockerHistoryEntriesScanned.WithLabelValues(s.name, jobIDStr).Inc()
 		}
 
 		imageCtx.Logger().V(2).Info("scanning image layers")
@@ -179,7 +188,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 					imageCtx.Logger().Error(err, "error processing layer")
 					return nil
 				}
-				dockerLayersScanned.WithLabelValues(s.name).Inc()
+				dockerLayersScanned.WithLabelValues(s.name, jobIDStr).Inc()
 
 				return nil
 			})
@@ -190,7 +199,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			continue
 		}
 
-		dockerImagesScanned.WithLabelValues(s.name).Inc()
+		dockerImagesScanned.WithLabelValues(s.name, jobIDStr).Inc()
 	}
 
 	return nil
@@ -502,7 +511,7 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	}
 
 	var opts []remote.Option
-	opts = append(opts, remote.WithTransport(defaultTransport))
+	opts = append(opts, remote.WithTransport(common.NewInstrumentedTransport(common.NewCustomTransport(defaultTransport))))
 
 	// Configure authentication based on credential type
 	switch s.conn.GetCredential().(type) {

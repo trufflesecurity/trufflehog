@@ -316,6 +316,8 @@ message Postman {
   string folder_name = 12;
   string field_type = 13; // Do not use this field for transport. It is only used for output to STDOUT.
   PostmanLocationType location_type = 16;
+  string response_id = 17;
+  string response_name = 18;
 }
 
 enum PostmanLocationType {
@@ -383,6 +385,11 @@ message SlackContinuous {
   string email = 7;
   Visibility visibility = 8;
   string location = 9;
+  string workspace_id = 10;
+}
+
+message JSONEnumerator {
+  string metadata = 1;
 }
 
 message MetaData {
@@ -422,5 +429,6 @@ message MetaData {
     Sentry sentry = 33;
     Stdin stdin = 34;
     SlackContinuous slackContinuous = 35;
+    JSONEnumerator jsonEnumerator = 36;
   }
 }

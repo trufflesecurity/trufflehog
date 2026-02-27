@@ -186,6 +186,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	for _, workspaceID := range s.conn.Workspaces {
 		w, err := s.client.GetWorkspace(ctx, workspaceID)
 		if err != nil {
+			if errors.Is(err, errAbortScanDueToAPIRateLimit) {
+				return err
+			}
 			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
 			ctx.Logger().Error(err, "error getting workspace %s", workspaceID)
@@ -206,6 +209,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		collection, err := s.client.GetCollection(ctx, collectionID)
 		if err != nil {
+			if errors.Is(err, errAbortScanDueToAPIRateLimit) {
+				return err
+			}
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
 			ctx.Logger().Error(err, "error getting collection %s", collectionID)
@@ -279,6 +285,9 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	for _, envID := range workspace.Environments {
 		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.Uid)
 		if err != nil {
+			if errors.Is(err, errAbortScanDueToAPIRateLimit) {
+				return err
+			}
 			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.Uid)
 			continue
 		}
@@ -316,6 +325,9 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		}
 		collection, err := s.client.GetCollection(ctx, collectionID.Uid)
 		if err != nil {
+			if errors.Is(err, errAbortScanDueToAPIRateLimit) {
+				return err
+			}
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
 			ctx.Logger().Error(err, "error getting collection %s", collectionID)
@@ -682,6 +694,8 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	if response.Uid != "" {
 		m.Link = LINK_BASE_URL + "example/" + response.Uid
 		m.FullID = response.Uid
+		m.ResponseID = response.Uid
+		m.ResponseName = response.Name
 	}
 	originalType := m.Type
 
@@ -785,6 +799,8 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					FolderName:      metadata.FolderName,
 					FieldType:       metadata.FieldType,
 					LocationType:    metadata.LocationType,
+					ResponseId:      metadata.ResponseID,
+					ResponseName:    metadata.ResponseName,
 				},
 			},
 		},

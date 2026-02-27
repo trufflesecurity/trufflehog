@@ -9,6 +9,7 @@ import (
 type metrics struct {
 	apiRequests                 *prometheus.CounterVec
 	apiMonthlyRequestsRemaining *prometheus.GaugeVec
+	apiMonthlyRequestsLimit     *prometheus.GaugeVec
 }
 
 var (
@@ -24,7 +25,15 @@ var (
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "postman_api_monthly_requests_remaining",
-		Help:      "Total number Postman API requests remaining this month.",
+		Help:      "Total number of Postman API requests remaining this month.",
+	},
+		[]string{"source_name"})
+
+	postmanAPIMonthlyRequestsLimit = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "postman_api_monthly_requests_limit",
+		Help:      "Total monthly Postman API request limit.",
 	},
 		[]string{"source_name"})
 )
@@ -35,6 +44,9 @@ func newMetrics(sourceName string) *metrics {
 			"source_name": sourceName,
 		}),
 		apiMonthlyRequestsRemaining: postmanAPIMonthlyRequestsRemaining.MustCurryWith(map[string]string{
+			"source_name": sourceName,
+		}),
+		apiMonthlyRequestsLimit: postmanAPIMonthlyRequestsLimit.MustCurryWith(map[string]string{
 			"source_name": sourceName,
 		}),
 	}

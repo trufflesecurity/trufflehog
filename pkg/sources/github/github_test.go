@@ -142,6 +142,36 @@ func TestAddReposByOrg_Repositories(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestAddReposByOrg_IncludeRepos(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/super-secret-org/repos").
+		Reply(200).
+		JSON(`[
+			{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git", "size": 1},
+			{"full_name": "super-secret-org/super-secret-repo2", "clone_url": "https://github.com/super-secret-org/super-secret-repo2.git", "size": 1},
+			{"full_name": "super-secret-org/not-super-secret-repo", "clone_url": "https://github.com/super-secret-org/not-super-secret-repo.git", "size": 1}
+		]`)
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		IncludeRepos:  []string{"super-secret-org/super*"},
+		Organizations: []string{"super-secret-org"},
+	})
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
+	assert.True(t, ok)
+	ok = s.filteredRepoCache.Exists("super-secret-org/super-secret-repo2")
+	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func TestAddReposByUser(t *testing.T) {
 	defer gock.Off()
 
@@ -459,6 +489,38 @@ func TestNormalizeRepo(t *testing.T) {
 	assert.Contains(t, err.Error(), "no repositories found")
 }
 
+func TestNormalizeRepo_Enterprise(t *testing.T) {
+	tests := []struct {
+		name       string
+		endpoint   string
+		wantResult string
+	}{
+		{
+			name:       "only host",
+			endpoint:   "https://example.com",
+			wantResult: "https://example.com/org/repo.git",
+		},
+		{
+			name:       "host with path",
+			endpoint:   "https://example.com/api/v3",
+			wantResult: "https://example.com/org/repo.git",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := Source{
+				conn: &sourcespb.GitHub{
+					Endpoint: tt.endpoint,
+				},
+			}
+
+			result, err := source.normalizeRepo("org/repo")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantResult, result)
+		})
+	}
+}
+
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
 	ctx := context.Background()
@@ -773,6 +835,30 @@ func TestEnumerateWithToken_Repositories(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
+	s.repos = []string{"some-special-repo"}
+
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(s.repos))
+	assert.Equal(t, []string{"some-special-repo"}, s.repos)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func TestEnumerateWithApp(t *testing.T) {
 	defer gock.Off()
 
@@ -973,6 +1059,52 @@ func TestGetRepoURLParts(t *testing.T) {
 	}
 }
 
+func TestGetRepoURLPartsWithTrailingHyphen(t *testing.T) {
+	// Test for https://github.com/trufflesecurity/trufflehog/issues/4679
+	// Repository names ending with a hyphen should be preserved correctly.
+	testCases := []struct {
+		name     string
+		url      string
+		expected []string
+	}{
+		{
+			name:     "https with trailing hyphen",
+			url:      "https://github.com/MYORG/my-repo-name-.git",
+			expected: []string{"github.com", "MYORG", "my-repo-name-"},
+		},
+		{
+			name:     "https with trailing hyphen no .git",
+			url:      "https://github.com/MYORG/my-repo-.git",
+			expected: []string{"github.com", "MYORG", "my-repo-"},
+		},
+		{
+			name:     "ssh with trailing hyphen",
+			url:      "ssh://git@github.com/MYORG/test-repo-.git",
+			expected: []string{"github.com", "MYORG", "test-repo-"},
+		},
+		{
+			name:     "multiple hyphens with trailing",
+			url:      "https://github.com/org-name/my-test-repo-.git",
+			expected: []string{"github.com", "org-name", "my-test-repo-"},
+		},
+		{
+			name:     "single trailing hyphen repo",
+			url:      "https://github.com/Org/-.git",
+			expected: []string{"github.com", "Org", "-"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, parts, err := getRepoURLParts(tc.url)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assert.Equal(t, tc.expected, parts)
+		})
+	}
+}
+
 func TestGetGistID(t *testing.T) {
 	tests := []struct {
 		trimmedURL []string
@@ -1101,5 +1233,80 @@ func noopReporter() sources.UnitReporter {
 		VisitUnit: func(context.Context, sources.SourceUnit) error {
 			return nil
 		},
+	}
+}
+
+// This tests reproduces a bug where both VisitUnit and VisitErr were called
+// for the same repository when caching the repository info failed.
+func TestFixBothUnitErrAndUnitOKCalled(t *testing.T) {
+	cache := simple.NewCache[string]()
+	cache.Set("myorg/myrepo", "an invalid url that will cause an error")
+	s := &Source{
+		filteredRepoCache: &filteredRepoCache{
+			Cache: cache,
+		},
+		conn: &sourcespb.GitHub{
+			Repositories: []string{"myorg/myrepo"},
+		},
+		orgsCache: simple.NewCache[string](),
+	}
+
+	var okCalled, errCalled bool
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			okCalled = true
+			return nil
+		},
+		VisitErr: func(ctx context.Context, err error) error {
+			errCalled = true
+			return nil
+		},
+	}
+	err := s.Enumerate(context.Background(), reporter)
+	require.NoError(t, err)
+
+	// expectation is that only VisitErr is called
+	assert.True(t, errCalled)
+	assert.False(t, okCalled)
+}
+
+func TestExtractRepoNameFromURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected string
+	}{
+		{
+			name:     "git URL",
+			url:      "https://github.com/org/repo.git",
+			expected: "org/repo",
+		},
+		{
+			name:     "git URL with trailing slash",
+			url:      "https://github.com/org/repo.git/",
+			expected: "org/repo",
+		},
+		{
+			name:     "git URL without .git",
+			url:      "https://github.com/org/repo",
+			expected: "org/repo",
+		},
+		{
+			name:     "git enterprise URL",
+			url:      "https://example-enterprise.com/org/repo.git",
+			expected: "org/repo",
+		},
+		{
+			name:     "just org/repo",
+			url:      "org/repo",
+			expected: "org/repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractRepoNameFromUrl(tt.url)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }

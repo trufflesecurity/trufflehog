@@ -39,6 +39,17 @@ var (
 		},
 		[]string{"url", "status_code"},
 	)
+
+	httpResponseBodySizeBytes = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: MetricsNamespace,
+			Subsystem: "http_client",
+			Name:      "response_body_size_bytes",
+			Help:      "Size of HTTP response bodies in bytes, labeled by URL.",
+			Buckets:   prometheus.ExponentialBuckets(100, 10, 5), // [100B, 1KB, 10KB, 100KB, 1MB]
+		},
+		[]string{"url"},
+	)
 )
 
 // sanitizeURL sanitizes a URL to avoid high cardinality metrics.
@@ -92,13 +103,18 @@ func recordHTTPRequest(sanitizedURL string) {
 }
 
 // recordHTTPResponse records metrics for an HTTP response.
-func recordHTTPResponse(sanitizedURL string, statusCode int, durationSeconds float64) {
+func recordHTTPResponse(sanitizedURL string, statusCode int, durationSeconds float64, contentLength int64) {
 	// Record latency
 	httpRequestDuration.WithLabelValues(sanitizedURL).Observe(durationSeconds)
 
 	// Record non-200 responses
 	if statusCode != 200 {
 		httpNon200ResponsesTotal.WithLabelValues(sanitizedURL, strconv.Itoa(statusCode)).Inc()
+	}
+
+	// Record response body size if known
+	if contentLength >= 0 {
+		httpResponseBodySizeBytes.WithLabelValues(sanitizedURL).Observe(float64(contentLength))
 	}
 }
 

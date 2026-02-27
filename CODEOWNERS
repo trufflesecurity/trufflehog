@@ -27,13 +27,13 @@ pkg/giturl/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/handlers/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/iobuf/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/sanitizer/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-proto/ @trufflesecurity/Scanning  @trufflesecurity/OSS
+proto/ @trufflesecurity/Scanning  @trufflesecurity/Integrations
 
 # OSS
 pkg/detectors/ @trufflesecurity/OSS
 pkg/common/ @trufflesecurity/OSS
 pkg/custom_detectors/ @trufflesecurity/OSS
-pkg/analzyers/ @trufflesecurity/OSS
+pkg/analyzer/ @trufflesecurity/OSS
 pkg/engine/defaults/defaults.go @trufflesecurity/OSS
 pkg/engine/defaults/defaults_test.go @trufflesecurity/OSS
 

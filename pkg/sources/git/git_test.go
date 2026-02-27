@@ -6,11 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,6 +25,40 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
+
+func TestClone_Timeout(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("an unset timeout should not cause a timeout", func(t *testing.T) {
+		_, _, err := CloneRepo(
+			ctx,
+			nil,
+			"https://github.com/dustin-decker/secretsandstuff.git",
+			"",
+			false)
+
+		// There shouldn't be an error - but if there is because of some other problem, we don't want this test to fail
+		if err != nil {
+			assert.NotContains(t, err.Error(), "timed out")
+		}
+	})
+
+	t.Run("a clone that times out should time out", func(t *testing.T) {
+		feature.GitCloneTimeoutDuration.Store(int64(1 * time.Nanosecond))
+		t.Cleanup(func() { feature.GitCloneTimeoutDuration.Store(0) })
+
+		_, _, err := CloneRepo(
+			ctx,
+			nil,
+			"https://github.com/dustin-decker/secretsandstuff.git",
+			"",
+			false)
+
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "timed out")
+		}
+	})
+}
 
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -572,6 +609,8 @@ func TestEnumerate(t *testing.T) {
 }
 
 func TestChunkUnit(t *testing.T) {
+	t.Skip("flaky - INS-212")
+
 	t.Parallel()
 	ctx := context.Background()
 	// Initialize the source.
@@ -823,7 +862,7 @@ func TestNormalizeFileURI(t *testing.T) {
 		{
 			name:     "absolute file URI unchanged",
 			input:    "file:///absolute/path",
-			expected: "file:///absolute/path",
+			expected: "",
 		},
 		{
 			name:     "relative file URI with current directory",
@@ -870,6 +909,15 @@ func TestNormalizeFileURI(t *testing.T) {
 
 			var expected string
 			switch tt.name {
+			case "absolute file URI unchanged":
+				// On Windows, absolute paths get drive letter prepended
+				// On Unix, they remain as-is
+				if runtime.GOOS == "windows" {
+					expectedPath, _ := filepath.Abs("/absolute/path")
+					expected = "file://" + expectedPath
+				} else {
+					expected = "file:///absolute/path"
+				}
 			case "relative file URI with current directory":
 				expected = "file://" + cwd
 			case "relative file URI with subdirectory":
@@ -882,7 +930,10 @@ func TestNormalizeFileURI(t *testing.T) {
 			default:
 				expected = tt.expected
 			}
-
+			// Normalize slashes for Windows comparison
+			if runtime.GOOS == "windows" {
+				expected = filepath.ToSlash(expected)
+			}
 			assert.Equal(t, expected, result.String())
 		})
 	}

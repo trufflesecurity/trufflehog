@@ -50,7 +50,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"'<>,(){}[\]&]{10,512}`)
+	// Matches typical JDBC connection strings amd ingores any special character at the end
+	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"'<>,{}[\]]{10,511}[A-Za-z0-9]`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -83,7 +84,7 @@ matchLoop:
 		}
 
 		if verify {
-			j, err := newJDBC(logCtx, jdbcConn)
+			j, err := NewJDBC(logCtx, jdbcConn)
 			if err != nil {
 				continue
 			}
@@ -206,22 +207,13 @@ func tryRedactRegex(conn string) (string, bool) {
 	return newConn, true
 }
 
-var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
+var supportedSubprotocols = map[string]func(logContext.Context, string) (JDBC, error){
 	"mysql":      parseMySQL,
 	"postgresql": parsePostgres,
 	"sqlserver":  parseSqlServer,
 }
 
-type pingResult struct {
-	err         error
-	determinate bool
-}
-
-type jdbc interface {
-	ping(context.Context) pingResult
-}
-
-func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
+func NewJDBC(ctx logContext.Context, conn string) (JDBC, error) {
 	// expected format: "jdbc:{subprotocol}:{subname}"
 	if !strings.HasPrefix(strings.ToLower(conn), "jdbc:") {
 		return nil, errors.New("expected jdbc prefix")
@@ -233,11 +225,11 @@ func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
 
-	// get the subprotocol parser
 	parser, ok := supportedSubprotocols[strings.ToLower(subprotocol)]
 	if !ok {
-		return nil, errors.New("unsupported subprotocol")
+		return nil, fmt.Errorf("unsupported subprotocol: %s", subprotocol)
 	}
+
 	return parser(ctx, subname)
 }
 

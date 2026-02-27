@@ -16,8 +16,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func TestSource_ChunksCount(t *testing.T) {
@@ -390,4 +392,255 @@ func TestSourceChunksResumptionMultipleBucketsIgnoredBucket(t *testing.T) {
 	}
 
 	assert.Equal(t, 103, count, "Should have processed all remaining data on resume")
+}
+
+func TestSource_Enumerate(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	s3key := secret.MustGetField("AWS_S3_KEY")
+	s3secret := secret.MustGetField("AWS_S3_SECRET")
+
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		},
+		Buckets: []string{"truffletestbucket"},
+	}
+
+	conn, err := anypb.New(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := Source{}
+	err = s.Init(ctx, "test enumerate", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.NoError(t, err)
+
+	assert.Equal(t, len(reporter.Units), 1)
+	assert.Equal(t, 0, len(reporter.UnitErrs), "Expected no errors during enumeration")
+
+	for _, unit := range reporter.Units {
+		id, _ := unit.SourceUnitID()
+		assert.NotEmpty(t, id, "Unit ID should not be empty")
+	}
+}
+
+func TestSource_ChunkUnit(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	s3key := secret.MustGetField("AWS_S3_KEY")
+	s3secret := secret.MustGetField("AWS_S3_SECRET")
+
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		},
+		Buckets: []string{"truffletestbucket"},
+	}
+
+	conn, err := anypb.New(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := Source{}
+	err = s.Init(ctx, "test enumerate", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.NoError(t, err)
+
+	for _, unit := range reporter.Units {
+		err = s.ChunkUnit(ctx, unit, &reporter)
+		assert.NoError(t, err, "Expected no error during ChunkUnit")
+	}
+
+	assert.Equal(t, 103, len(reporter.Chunks))
+	assert.Equal(t, 0, len(reporter.ChunkErrs))
+}
+
+func TestSource_ChunkUnit_Resumption(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	s := new(Source)
+	s.Progress = sources.Progress{
+		Message:           "Bucket: integration-resumption-tests",
+		EncodedResumeInfo: "{\"integration-resumption-tests\":\"test-dir/\"}",
+		SectionsCompleted: 0,
+		SectionsRemaining: 1,
+	}
+	connection := &sourcespb.S3{
+		Credential:       &sourcespb.S3_Unauthenticated{},
+		Buckets:          []string{"integration-resumption-tests"},
+		EnableResumption: true,
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+
+	err = s.Init(ctx, "test name", 0, 0, false, conn, 2)
+	require.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.NoError(t, err)
+
+	for _, unit := range reporter.Units {
+		err = s.ChunkUnit(ctx, unit, &reporter)
+		assert.NoError(t, err, "Expected no error during ChunkUnit")
+	}
+
+	// Verify that we processed all remaining data on resume.
+	assert.Equal(t, 9638, len(reporter.Chunks), "Should have processed all remaining data on resume")
+}
+
+// TestSource_ChunkUnit_Resumption_MultipleBucketsConcurrent tests resumption across multiple buckets
+// with concurrent ChunkUnit processing.
+func TestSource_ChunkUnit_Resumption_MultipleBucketsConcurrent(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	src := new(Source)
+	connection := &sourcespb.S3{
+		Credential:       &sourcespb.S3_Unauthenticated{},
+		Buckets:          []string{"integration-resumption-tests", "trufflesec-ahrav-test-2"},
+		EnableResumption: true,
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+	err = src.Init(ctx, "test name", 0, 0, false, conn, 2)
+	require.NoError(t, err)
+
+	src.Progress = sources.Progress{
+		Message:           "Buckets: [integration-resumption-tests trufflesec-ahrav-test-2]",
+		EncodedResumeInfo: "{\"integration-resumption-tests\":\"test-dir\", \"trufflesec-ahrav-test-2\":\"test-dir/smmed_random_data.json.zip\"}",
+		SectionsCompleted: 0,
+		SectionsRemaining: 2,
+	}
+
+	reporter := sourcestest.SafeTestReporter{}
+	err = src.Enumerate(ctx, &reporter)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(reporter.Units), "Expected two source units from enumeration")
+
+	var wg sync.WaitGroup
+
+	for _, unit := range reporter.Units {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err = src.ChunkUnit(ctx, unit, &reporter)
+			assert.NoError(t, err, "Expected no error during ChunkUnit")
+		}()
+	}
+
+	wg.Wait()
+
+	bucketChunkCounts := map[string]int{
+		"integration-resumption-tests": 9638,
+		"trufflesec-ahrav-test-2":      2,
+	}
+	actualBucketChunkCounts := make(map[string]int)
+
+	for _, chunk := range reporter.Chunks {
+		metadata, _ := chunk.SourceMetadata.Data.(*source_metadatapb.MetaData_S3)
+		actualBucketChunkCounts[metadata.S3.Bucket]++
+	}
+
+	for bucket, wantCount := range bucketChunkCounts {
+		gotCount, ok := actualBucketChunkCounts[bucket]
+		require.True(t, ok, "Expected chunks for bucket %s", bucket)
+		assert.Equal(t, wantCount, gotCount, "Chunk count mismatch for bucket %s", bucket)
+	}
+}
+
+func TestSourceChunksResumptionWithRole(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	s3key := secret.MustGetField("AWS_S3_KEY")
+	s3secret := secret.MustGetField("AWS_S3_SECRET")
+
+	src := new(Source)
+	src.Progress = sources.Progress{
+		Message:           "Bucket: integration-resumption-tests",
+		EncodedResumeInfo: "{\"current_bucket\":\"integration-resumption-tests\",\"start_after\":\"test-dir/\",\"role\":\"arn:aws:iam::619888638459:role/s3-test-assume-role\"}",
+		SectionsCompleted: 0,
+		SectionsRemaining: 1,
+	}
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		},
+		Buckets:          []string{"integration-resumption-tests"},
+		Roles:            []string{"arn:aws:iam::619888638459:role/s3-test-assume-role"},
+		EnableResumption: true,
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+
+	err = src.Init(ctx, "test name", 0, 0, false, conn, 2)
+	require.NoError(t, err)
+
+	chunksCh := make(chan *sources.Chunk)
+	var count int
+
+	cancelCtx, ctxCancel := context.WithCancel(ctx)
+	defer ctxCancel()
+
+	go func() {
+		defer close(chunksCh)
+		err = src.Chunks(cancelCtx, chunksCh)
+		assert.NoError(t, err, "Should not error during scan")
+	}()
+
+	for range chunksCh {
+		count++
+	}
+
+	// Verify that we processed all remaining data on resume.
+	// Also verify that we processed less than the total number of chunks for the source.
+	sourceTotalChunkCount := 19787
+	assert.Equal(t, 9638, count, "Should have processed all remaining data on resume")
+	assert.Less(t, count, sourceTotalChunkCount, "Should have processed less than total chunks on resume")
 }
