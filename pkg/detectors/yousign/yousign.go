@@ -3,6 +3,7 @@ package yousign
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -50,39 +51,67 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/users", PROD_URL), nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					req, err = http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/users", STAGING_URL), nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-					res, err = client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						}
-					}
-				}
-			}
+			isVerified, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	// Try V2 API (legacy) as fallback
+	isVerified, err := tryEndpoint(ctx, client, token, PROD_URL, "/users")
+	if isVerified || (err != nil && !isAuthError(err)) {
+		return isVerified, err
+	}
+
+	// Try V2 Staging as final fallback
+	return tryEndpoint(ctx, client, token, STAGING_URL, "/users")
+}
+
+func tryEndpoint(ctx context.Context, client *http.Client, token, baseURL, endpoint string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+endpoint, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	// YouSign API uses Bearer authentication
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	// V3 API expects JSON content type
+	if strings.Contains(baseURL, "v3") {
+		req.Header.Add("Content-Type", "application/json")
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+}
+
+// Helper function to determine if an error is authentication-related
+func isAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "invalid token") || strings.Contains(errStr, "401")
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

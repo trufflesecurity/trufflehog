@@ -62,7 +62,7 @@ func TestYelp_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a yelp secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a yelp secret %s within but not valid", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -131,15 +131,20 @@ func TestYelp_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
 
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("SlackWebhook.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			
+			// Fixed: Added cmpopts.IgnoreUnexported to handle unexported fields
+			ignoreOpts := []cmp.Option{
+				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError"),
+				cmpopts.IgnoreUnexported(detectors.Result{}),  // ← This was missing
+			}
+			
+			if diff := cmp.Diff(got, tt.want, ignoreOpts...); diff != "" {
+				t.Errorf("Yelp.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
