@@ -28,7 +28,7 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	apiKey, exist := credInfo["apiKey"]
 	if !exist {
-		return nil, errors.New("API key not found in credentials info")
+		return nil, analyzers.NewAnalysisError("Datadog", "validate_credentials", "config", "", errors.New("API key not found in credentials info"))
 	}
 
 	// Get appKey if provided
@@ -36,7 +36,7 @@ func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*ana
 
 	info, err := AnalyzePermissions(a.Cfg, apiKey, appKey)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Datadog", "analyze_permissions", "API", "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil

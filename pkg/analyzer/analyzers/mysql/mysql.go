@@ -33,11 +33,11 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeMyS
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	uri, ok := credInfo["connection_string"]
 	if !ok {
-		return nil, fmt.Errorf("missing connection string")
+		return nil, analyzers.NewAnalysisError("MySQL", "validate_credentials", "config", "", fmt.Errorf("missing connection string"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, uri)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("MySQL", "analyze_permissions", "Database", "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }

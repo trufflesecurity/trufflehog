@@ -31,20 +31,20 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	secret, exist := credInfo["secret"]
 	if !exist {
-		return nil, errors.New("secret not found in credentials info")
+		return nil, analyzers.NewAnalysisError("Plaid", "validate_credentials", "config", "", errors.New("secret not found in credentials info"))
 	}
 	clientID, exist := credInfo["id"]
 	if !exist {
-		return nil, errors.New("id not found in credentials info")
+		return nil, analyzers.NewAnalysisError("Plaid", "validate_credentials", "config", "", errors.New("id not found in credentials info"))
 	}
 	accessToken, exist := credInfo["token"]
 	if !exist {
-		return nil, errors.New("token not found in credentials info")
+		return nil, analyzers.NewAnalysisError("Plaid", "validate_credentials", "config", "", errors.New("token not found in credentials info"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, secret, clientID, accessToken)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Plaid", "analyze_permissions", "API", "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil

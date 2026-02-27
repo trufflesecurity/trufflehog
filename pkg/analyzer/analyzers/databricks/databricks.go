@@ -26,17 +26,17 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, exist := credInfo["token"]
 	if !exist {
-		return nil, fmt.Errorf("key not found in credential info")
+		return nil, analyzers.NewAnalysisError("DataBricks", "validate_credentials", "config", "", fmt.Errorf("key not found in credential info"))
 	}
 
 	domain, exist := credInfo["domain"]
 	if !exist {
-		return nil, fmt.Errorf("domain not found in credential info")
+		return nil, analyzers.NewAnalysisError("DataBricks", "validate_credentials", "config", "", fmt.Errorf("domain not found in credential info"))
 	}
 
 	info, err := AnalyzePermissions(ctx, a.Cfg, domain, token)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("DataBricks", "analyze_permissions", "API", "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil

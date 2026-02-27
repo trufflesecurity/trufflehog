@@ -25,12 +25,12 @@ func (a *Analyzer) Type() analyzers.AnalyzerType {
 func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credentialInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError("Twilio", "validate_credentials", "config", "", errors.New("key not found in credentialInfo"))
 	}
 
 	sid, ok := credentialInfo["sid"]
 	if !ok {
-		return nil, errors.New("sid not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError("Twilio", "validate_credentials", "config", "", errors.New("sid not found in credentialInfo"))
 	}
 
 	if a.Cfg == nil {
@@ -39,13 +39,13 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 
 	info, err := AnalyzePermissions(a.Cfg, sid, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Twilio", "analyze_permissions", "API", "", err)
 	}
 
 	// List parent and subaccounts
 	accounts, err := listTwilioAccounts(a.Cfg, sid, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError("Twilio", "analyze_permissions", "API", "", err)
 	}
 
 	var permissions []Permission
