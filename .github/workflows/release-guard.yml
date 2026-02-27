@@ -33,3 +33,4 @@ jobs:
           gh release edit "$PREVIOUS_TAG" --latest
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
