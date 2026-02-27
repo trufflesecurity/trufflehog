@@ -1,4 +1,6 @@
 version: 2
+release:
+  make_latest: false
 builds:
   - id: trufflehog-upx
     binary: trufflehog
