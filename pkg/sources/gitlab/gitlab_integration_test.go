@@ -794,7 +794,7 @@ func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
 	chunksCh := make(chan *sources.Chunk, 1)
 	chanReporter := sources.ChanReporter{Ch: chunksCh}
 	// Clear cache to force querying project details
-	clear(s.repoToProjCache.cache)
+	s.projectMetadataCache.cache.Purge()
 	go func() {
 		defer close(chunksCh)
 		for _, unit := range testReporter.Units {
@@ -859,7 +859,7 @@ func TestSource_Chunks_SimplifiedGitlabEnumeration(t *testing.T) {
 	require.NotEmpty(t, testReporter.Units, "enumeration returned no units")
 
 	// Clear project cache to force project-detail lookups during chunking
-	clear(s.repoToProjCache.cache)
+	s.projectMetadataCache.cache.Purge()
 
 	// Channel-based reporter to capture emitted chunks
 	chunksCh := make(chan *sources.Chunk, 1)
