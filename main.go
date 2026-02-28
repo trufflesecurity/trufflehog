@@ -53,6 +53,7 @@ var (
 	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
 	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	markdownOut         = cli.Flag("markdown", "Output in Markdown format.").Bool()
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
@@ -523,13 +524,15 @@ func run(state overseer.State, logSync func() error) {
 		printer = new(output.LegacyJSONPrinter)
 	case *jsonOut:
 		printer = new(output.JSONPrinter)
+	case *markdownOut:
+		printer = output.NewMarkdownPrinter(nil)
 	case *gitHubActionsFormat:
 		printer = new(output.GitHubActionsPrinter)
 	default:
 		printer = new(output.PlainPrinter)
 	}
 
-	if !*jsonLegacy && !*jsonOut {
+	if !*jsonLegacy && !*jsonOut && !*markdownOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
@@ -587,12 +590,18 @@ func run(state overseer.State, logSync func() error) {
 		if err := compareScans(ctx, cmd, engConf); err != nil {
 			logFatal(err, "error comparing detection strategies")
 		}
+		if err := closePrinter(printer); err != nil {
+			logFatal(err, "failed to close printer")
+		}
 		return
 	}
 
 	metrics, err := runSingleScan(ctx, cmd, engConf)
 	if err != nil {
 		logFatal(err, "error running scan")
+	}
+	if err := closePrinter(printer); err != nil {
+		logFatal(err, "failed to close printer")
 	}
 
 	verificationCacheMetricsSnapshot := struct {
@@ -1214,6 +1223,13 @@ func commaSeparatedToSlice(s []string) []string {
 		}
 	}
 	return result
+}
+
+func closePrinter(printer engine.Printer) error {
+	if closer, ok := printer.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
 }
 
 func printAverageDetectorTime(e *engine.Engine) {

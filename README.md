@@ -212,12 +212,18 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 trufflehog github --org=trufflesecurity --results=verified
 ```
 
-## 3: Scan a GitHub Repo for only verified secrets and get JSON output
+## 3: Scan a GitHub Repo for only verified secrets and get structured output
 
-Command:
+JSON:
 
 ```bash
 trufflehog git https://github.com/trufflesecurity/test_keys --results=verified --json
+```
+
+Or Markdown report that you can drop into documentation or ticketing system:
+
+```bash
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified --markdown > findings.md
 ```
 
 Expected output:
@@ -448,6 +454,7 @@ Flags:
       --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
       --profile             Enables profiling and sets a pprof and fgprof server on :18066.
   -j, --json                Output in JSON format.
+      --markdown            Output in Markdown format.
       --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
       --github-actions      Output in GitHub Actions format.
       --concurrency=20           Number of concurrent workers.

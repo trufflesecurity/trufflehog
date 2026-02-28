@@ -11,4 +11,7 @@ trufflehog filesystem --config=$PWD/generic.yml $PWD
 
 # to filter so that _only_ generic credentials are logged:
 trufflehog filesystem --config=$PWD/generic.yml --json --no-verification $PWD | awk '/generic-api-key/{print $0}'
+
+# capture a Markdown report:
+trufflehog filesystem --config=$PWD/generic.yml --markdown --no-verification $PWD > findings.md
 ```
