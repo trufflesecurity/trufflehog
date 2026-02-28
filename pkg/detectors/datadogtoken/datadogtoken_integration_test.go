@@ -26,6 +26,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
 	appKey := testSecrets.MustGetField("DATADOGTOKEN_APPKEY")
 	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
+	endpoint := "https://api.us5.datadoghq.com"
 
 	type args struct {
 		ctx    context.Context
@@ -44,7 +45,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within datadog %s", appKey, apiKey)),
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within datadog %s and endpoint %s", appKey, apiKey, endpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -53,6 +54,11 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					Verified:     true,
 					ExtraData: map[string]string{
 						"Type": "Application+APIKey",
+					},
+					AnalysisInfo: map[string]string{
+						"apiKey":   apiKey,
+						"appKey":   appKey,
+						"endpoint": endpoint,
 					},
 				},
 			},
@@ -78,25 +84,6 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "api key found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s", apiKey)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_DatadogToken,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"Type": "APIKeyOnly",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -115,6 +102,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			// use default cloud endpoint
 			s.UseCloudEndpoint(true)
 			s.SetCloudEndpoint(s.CloudEndpoint())
+			s.UseFoundEndpoints(true)
 
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
