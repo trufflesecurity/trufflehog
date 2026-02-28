@@ -261,12 +261,12 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 
 Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
 ```bash
-$ git clone git@github.com:trufflesecurity/test_keys.git
+git clone git@github.com:trufflesecurity/test_keys.git
 ```
 
 Run trufflehog from the parent directory (outside the git repo).
 ```bash
-$ trufflehog git file://test_keys --results=verified,unknown
+trufflehog git file://test_keys --results=verified,unknown
 ```
 
 To guard against malicious git configs in local scanning (see CVE-2025-41390), TruffleHog clones local git repositories to a temporary directory prior to scanning. This follows [Git's security best practices](https://git-scm.com/docs/git#_security). If you want to specify a custom path to clone the repository to (instead of tmp), you can use the `--clone-path` flag. If you'd like to skip the local cloning process and scan the repository directly (only do this for trusted repos), you can use the `--trust-local-git-config` flag.
@@ -439,56 +439,133 @@ Each subcommand can have options that you can see with the `--help` flag provide
 
 ```
 $ trufflehog git --help
-usage: TruffleHog git [<flags>] <uri>
+usage: TruffleHog [<flags>] <command> [<args> ...]
 
-Find credentials in git repositories.
+TruffleHog is a tool for finding credentials.
+
 
 Flags:
-  -h, --help                Show context-sensitive help (also try --help-long and --help-man).
-      --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
-      --profile             Enables profiling and sets a pprof and fgprof server on :18066.
-  -j, --json                Output in JSON format.
-      --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
-      --github-actions      Output in GitHub Actions format.
-      --concurrency=20           Number of concurrent workers.
-      --no-verification     Don't verify the results.
-      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to all types.
-      --allow-verification-overlap
+  -h, --[no-]help                Show context-sensitive help (also try --help-long and --help-man).
+      --log-level=0              Logging verbosity on a scale of 0 (info) to 5 (trace). Can be
+                                 disabled with "-1".
+      --[no-]profile             Enables profiling and sets a pprof and fgprof server on :18066.
+  -j, --[no-]json                Output in JSON format.
+      --[no-]json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab,
+                                 and github sources.
+      --[no-]github-actions      Output in GitHub Actions format.
+      --concurrency=12           Number of concurrent workers.
+      --[no-]no-verification     Don't verify the results.
+      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed
+                                 valid by API), unknown (verification failed due to error),
+                                 unverified (detected but not verified), filtered_unverified
+                                 (unverified but would have been filtered out). Defaults to
+                                 verified,unverified,unknown.
+      --[no-]no-color            Disable colorized output
+      --[no-]allow-verification-overlap
                                  Allow verification of similar credentials across detectors
-      --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
+      --[no-]filter-unverified   Only output first unverified result per chunk per detector if there
+                                 are more than one results.
       --filter-entropy=FILTER-ENTROPY
                                  Filter unverified results with Shannon entropy. Start with 3.0.
       --config=CONFIG            Path to configuration file.
-      --print-avg-detector-time
+      --[no-]print-avg-detector-time
                                  Print the average time spent on each detector.
-      --no-update           Don't check for updates.
-      --fail                Exit with code 183 if results are found.
+      --[no-]no-update           Don't check for updates.
+      --[no-]fail                Exit with code 183 if results are found.
+      --[no-]fail-on-scan-errors
+                                 Exit with non-zero error code if an error occurs during the scan.
       --verifier=VERIFIER ...    Set custom verification endpoints.
-      --custom-verifiers-only   Only use custom verification endpoints.
+      --[no-]custom-verifiers-only
+                                 Only use custom verification endpoints.
+      --detector-timeout=DETECTOR-TIMEOUT
+                                 Maximum time to spend scanning chunks per detector (e.g., 30s).
       --archive-max-size=ARCHIVE-MAX-SIZE
                                  Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
       --archive-max-depth=ARCHIVE-MAX-DEPTH
                                  Maximum depth of archive to scan.
       --archive-timeout=ARCHIVE-TIMEOUT
                                  Maximum time to spend extracting an archive.
-      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.
+      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or
+                                 IDs may be used, as well as ranges.
       --exclude-detectors=EXCLUDE-DETECTORS
-                                 Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.
-      --version             Show application version.
-  -i, --include-paths=INCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to include in scan.
-  -x, --exclude-paths=EXCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to exclude in scan.
-      --exclude-globs=EXCLUDE-GLOBS
-                                 Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.
-      --since-commit=SINCE-COMMIT
-                                 Commit to start scan from.
-      --branch=BRANCH            Branch to scan.
-      --max-depth=MAX-DEPTH      Maximum depth of commits to scan.
-      --bare                Scan bare repository (e.g. useful while using in pre-receive hooks)
+                                 Comma separated list of detector types to exclude. Protobuf name
+                                 or IDs may be used, as well as ranges. IDs defined here take
+                                 precedence over the include list.
+      --[no-]no-verification-cache
+                                 Disable verification caching
+      --[no-]force-skip-binaries
+                                 Force skipping binaries.
+      --[no-]force-skip-archives
+                                 Force skipping archives.
+      --[no-]skip-additional-refs
+                                 Skip additional references.
+      --user-agent-suffix=USER-AGENT-SUFFIX
+                                 Suffix to add to User-Agent.
+      --[no-]version             Show application version.
 
-Args:
-  <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
+Commands:
+help [<command>...]
+    Show help.
+
+git [<flags>] <uri>
+
+    Find credentials in git repositories.
+
+github [<flags>]
+    Find credentials in GitHub repositories.
+
+github-experimental --repo=REPO [<flags>]
+    Run an experimental GitHub scan. Must specify at least one experimental sub-module to run:
+    object-discovery.
+
+gitlab --token=TOKEN [<flags>]
+    Find credentials in GitLab repositories.
+
+filesystem [<flags>] [<path>...]
+    Find credentials in a filesystem.
+
+s3 [<flags>]
+    Find credentials in S3 buckets.
+
+gcs [<flags>]
+    Find credentials in GCS buckets.
+
+syslog --format=FORMAT [<flags>]
+    Scan syslog
+
+circleci --token=TOKEN
+    Scan CircleCI
+
+docker [<flags>]
+    Scan Docker Image
+
+
+travisci --token=TOKEN
+    Scan TravisCI
+
+postman [<flags>]
+    Scan Postman
+
+elasticsearch [<flags>]
+    Scan Elasticsearch
+
+jenkins --url=URL [<flags>]
+    Scan Jenkins
+
+huggingface [<flags>]
+    Find credentials in HuggingFace datasets, models and spaces.
+
+stdin
+    Find credentials from stdin.
+
+multi-scan
+    Find credentials in multiple sources defined in configuration.
+
+json-enumerator [<path>...]
+    Find credentials from a JSON enumerator input.
+
+analyze
+    Analyze API keys for fine-grained permissions information.
 ```
 
 For example, to scan a `git` repository, start with
