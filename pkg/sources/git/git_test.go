@@ -1163,3 +1163,56 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 		})
 	}
 }
+
+// TestRenamedFileContainsSecret ensures that when a file is renamed (git mv),
+// the scanner still detects secrets in the renamed file.
+// This is a regression test for: https://github.com/trufflesecurity/trufflehog/issues/4672
+func TestRenamedFileContainsSecret(t *testing.T) {
+	t.Parallel()
+
+	// Create a test repo with a secret
+	repoPath := setupTestRepo(t, "rename-test-repo")
+
+	// Create initial file with a secret
+	secret := "AKIA1234567890ABCDEF"
+	initialContent := fmt.Sprintf("aws_access_key_id = %s\naws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", secret)
+	addTestFileAndCommit(t, repoPath, "credentials.txt", initialContent)
+
+	// Rename the file using git mv
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "mv", "credentials.txt", "credentials_backup.txt").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "commit", "-m", "Rename credentials file").Run())
+
+	// Scan the repo
+	ctx := context.Background()
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.Git{
+		Directories: []string{repoPath},
+		Credential:  &sourcespb.Git_Unauthenticated{Unauthenticated: &credentialspb.Unauthenticated{}},
+	})
+	assert.NoError(t, err)
+
+	err = s.Init(ctx, "test", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	chunksChan := make(chan *sources.Chunk, 100)
+	go func() {
+		defer close(chunksChan)
+		err := s.Chunks(ctx, chunksChan)
+		assert.NoError(t, err)
+	}()
+
+	// Collect all chunks and verify we find the secret in the renamed file
+	foundInRenamedFile := false
+	for chunk := range chunksChan {
+		if chunk.SourceMetadata != nil {
+			metadata := chunk.SourceMetadata.GetGit()
+			if metadata != nil && strings.Contains(metadata.File, "credentials_backup.txt") {
+				if bytes.Contains(chunk.Data, []byte(secret)) {
+					foundInRenamedFile = true
+				}
+			}
+		}
+	}
+
+	assert.True(t, foundInRenamedFile, "Secret should be detected in the renamed file (credentials_backup.txt)")
+}
