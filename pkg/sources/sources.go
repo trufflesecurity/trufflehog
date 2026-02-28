@@ -152,7 +152,14 @@ func (c *ConfiguredSource) Init(ctx context.Context, sourceID SourceID, jobID Jo
 		return nil, errors.New("source already initialized")
 	}
 	src := c.source
-	err := src.Init(ctx, c.Name, jobID, sourceID, c.initParams.verify, c.initParams.conn, c.initParams.concurrency)
+	err := src.Init(
+		context.WithValue(ctx, sourceEntryPointLogKey, "Init"),
+		c.Name,
+		jobID,
+		sourceID,
+		c.initParams.verify,
+		c.initParams.conn,
+		c.initParams.concurrency)
 	c.source = nil
 	return src, err
 }
