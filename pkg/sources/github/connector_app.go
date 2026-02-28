@@ -3,6 +3,7 @@ package github
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
@@ -119,6 +120,10 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 // uses the correct installation token for cross-org repos.
 func (c *appConnector) SetRepoInstallation(repoURL string, installationID int64) {
 	c.repoInstallationMap[repoURL] = installationID
+	if strings.HasSuffix(repoURL, ".git") {
+		wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
+		c.repoInstallationMap[wikiURL] = installationID
+	}
 }
 
 func (c *appConnector) GraphQLClient() *githubv4.Client {

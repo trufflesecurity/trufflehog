@@ -670,12 +670,20 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 	installationClient := connector.InstallationClient()
 	opts := &github.ListOptions{PerPage: defaultPagination}
 
-	installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
-	if err != nil {
-		return fmt.Errorf("could not list installations: %w", err)
+	var allInstalls []*github.Installation
+	for {
+		installs, res, err := installationClient.Apps.ListInstallations(ctx, opts)
+		if err != nil {
+			return fmt.Errorf("could not list installations: %w", err)
+		}
+		allInstalls = append(allInstalls, installs...)
+		if res == nil || res.NextPage == 0 {
+			break
+		}
+		opts.Page = res.NextPage
 	}
 
-	for _, install := range installs {
+	for _, install := range allInstalls {
 		if install.GetID() == connector.installationID {
 			continue
 		}
