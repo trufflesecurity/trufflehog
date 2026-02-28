@@ -183,7 +183,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commodities"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/companyhub"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent"
+	confluentv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent/v1"
+	confluentv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/contentfulpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/conversiontools"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convertapi"
@@ -1051,7 +1052,8 @@ func buildDetectorList() []detectors.Detector {
 		&commercejs.Scanner{},
 		&commodities.Scanner{},
 		&companyhub.Scanner{},
-		&confluent.Scanner{},
+		&confluentv1.Scanner{},
+		&confluentv2.Scanner{},
 		&contentfulpersonalaccesstoken.Scanner{},
 		&conversiontools.Scanner{},
 		&convertapi.Scanner{},
