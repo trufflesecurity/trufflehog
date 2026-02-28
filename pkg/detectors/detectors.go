@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/url"
 	"strings"
@@ -263,9 +264,22 @@ func CleanResults(results []Result) []Result {
 // 40 characters of the capturing group that follows.
 // This can help prevent false positives.
 func PrefixRegex(keywords []string) string {
+	return PrefixRegexWithMaxDistance(keywords, 40)
+}
+
+// PrefixRegexWithMaxDistance is like PrefixRegex, but allows callers to tune
+// how far the keyword may appear from the capturing group that follows.
+//
+// This is intentionally a byte/character window, not a "line" window. Some
+// detectors may need a larger span to tolerate long URLs/comments without
+// widening the window globally for every detector.
+func PrefixRegexWithMaxDistance(keywords []string, maxChars int) string {
+	if maxChars < 0 {
+		maxChars = 0
+	}
 	pre := `(?i:`
 	middle := strings.Join(keywords, "|")
-	post := `)(?:.|[\n\r]){0,40}?`
+	post := fmt.Sprintf(`)(?:.|[\n\r]){0,%d}?`, maxChars)
 	return pre + middle + post
 }
 
