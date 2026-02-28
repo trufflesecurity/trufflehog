@@ -25,7 +25,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 	}
 	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
 	appKey := testSecrets.MustGetField("DATADOGTOKEN_APPKEY")
-	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
+	endpoint := "https://api.us5.datadoghq.com"
 
 	type args struct {
 		ctx    context.Context
@@ -44,7 +44,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within datadog %s", appKey, apiKey)),
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within datadog %s and endpoint %s", appKey, apiKey, endpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -54,43 +54,10 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"Type": "Application+APIKey",
 					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within but datadog %s not valid", inactiveAppKey, apiKey)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_DatadogToken,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"Type": "Application+APIKey",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "api key found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s", apiKey)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_DatadogToken,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"Type": "APIKeyOnly",
+					AnalysisInfo: map[string]string{
+						"apiKey":   apiKey,
+						"appKey":   appKey,
+						"endpoint": endpoint,
 					},
 				},
 			},
@@ -115,6 +82,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			// use default cloud endpoint
 			s.UseCloudEndpoint(true)
 			s.SetCloudEndpoint(s.CloudEndpoint())
+			s.UseFoundEndpoints(true)
 
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -133,6 +101,61 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 				t.Errorf("DatadogToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestDatadogToken_FromChunk_Unverified(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
+	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
+	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
+
+	data := []byte(fmt.Sprintf(
+		"You can find a datadogtoken secret %s within but datadog %s not valid",
+		inactiveAppKey,
+		apiKey,
+	))
+
+	s := Scanner{}
+	s.UseCloudEndpoint(true)
+	s.SetCloudEndpoint(s.CloudEndpoint())
+	s.UseFoundEndpoints(true)
+
+	results, err := s.FromData(ctx, true, data)
+	if err != nil {
+		t.Fatalf("FromData returned error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	r := results[0]
+
+	if r.DetectorType != detectorspb.DetectorType_DatadogToken {
+		t.Errorf("unexpected detector type: %v", r.DetectorType)
+	}
+
+	if r.Verified {
+		t.Errorf("expected token to be unverified")
+	}
+
+	if r.VerificationError() == nil {
+		t.Errorf("Expected verification error")
+	}
+
+	if got := r.ExtraData["Type"]; got != "Application+APIKey" {
+		t.Errorf("unexpected ExtraData Type: %q", got)
+	}
+
+	if len(r.Raw) == 0 {
+		t.Errorf("expected raw secret to be present")
 	}
 }
 
