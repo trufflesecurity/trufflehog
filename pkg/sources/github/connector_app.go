@@ -3,6 +3,7 @@ package github
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
@@ -22,6 +23,11 @@ type appConnector struct {
 	installationID     int64
 	appsTransport      *ghinstallation.AppsTransport
 	apiEndpoint        string
+
+	// repoInstallationMap maps repo clone URLs to their owning installation
+	// ID for repos discovered from non-default installations. Clone checks
+	// this map to use the correct installation token.
+	repoInstallationMap map[string]int64
 }
 
 var _ Connector = (*appConnector)(nil)
@@ -78,12 +84,13 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 	}
 
 	return &appConnector{
-		apiClient:          apiClient,
-		graphqlClient:      graphqlClient,
-		installationClient: installationClient,
-		installationID:     installationID,
-		appsTransport:      installationTransport,
-		apiEndpoint:        apiEndpoint,
+		apiClient:           apiClient,
+		graphqlClient:       graphqlClient,
+		installationClient:  installationClient,
+		installationID:      installationID,
+		appsTransport:       installationTransport,
+		apiEndpoint:         apiEndpoint,
+		repoInstallationMap: make(map[string]int64),
 	}, nil
 }
 
@@ -92,16 +99,31 @@ func (c *appConnector) APIClient() *github.Client {
 }
 
 func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
+	installID := c.installationID
+	if id, ok := c.repoInstallationMap[repoURL]; ok {
+		installID = id
+	}
+
 	// TODO: Check rate limit for this call.
 	token, _, err := c.installationClient.Apps.CreateInstallationToken(
 		ctx,
-		c.installationID,
+		installID,
 		&github.InstallationTokenOptions{})
 	if err != nil {
-		return "", nil, fmt.Errorf("could not create installation token: %w", err)
+		return "", nil, fmt.Errorf("could not create installation token for installation %d: %w", installID, err)
 	}
 
 	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "", "x-access-token", true, args...)
+}
+
+// SetRepoInstallation records which installation owns a repo so that Clone
+// uses the correct installation token for cross-org repos.
+func (c *appConnector) SetRepoInstallation(repoURL string, installationID int64) {
+	c.repoInstallationMap[repoURL] = installationID
+	if strings.HasSuffix(repoURL, ".git") {
+		wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
+		c.repoInstallationMap[wikiURL] = installationID
+	}
 }
 
 func (c *appConnector) GraphQLClient() *githubv4.Client {

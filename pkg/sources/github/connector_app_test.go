@@ -120,6 +120,81 @@ func TestAPIClientForInstallation(t *testing.T) {
 	})
 }
 
+func TestCloneUsesRepoInstallationMap(t *testing.T) {
+	strPtr := func(s string) *string { return &s }
+	intPtr := func(i int64) *int64 { return &i }
+
+	var mu sync.Mutex
+	var tokenInstallIDs []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "POST" && strings.Contains(r.URL.Path, "access_tokens") {
+			mu.Lock()
+			tokenInstallIDs = append(tokenInstallIDs, r.URL.Path)
+			mu.Unlock()
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":      "test-clone-token",
+				"expires_at": "2099-01-01T00:00:00Z",
+				"permissions": map[string]string{
+					"contents": "read",
+				},
+				"repositories": []map[string]interface{}{
+					{"id": 1, "full_name": strPtr("org/repo"), "clone_url": strPtr("https://github.com/org/repo.git"), "size": intPtr(0)},
+				},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+	}))
+	defer server.Close()
+
+	privKey := generateTestPrivateKey(t)
+	appsTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, 12345, privKey)
+	require.NoError(t, err)
+	appsTransport.BaseURL = server.URL
+
+	installClient, err := github.NewClient(&http.Client{Transport: appsTransport}).WithEnterpriseURLs(server.URL, server.URL)
+	require.NoError(t, err)
+
+	connector := &appConnector{
+		installationClient:  installClient,
+		installationID:      100,
+		appsTransport:       appsTransport,
+		apiEndpoint:         server.URL,
+		repoInstallationMap: make(map[string]int64),
+	}
+
+	t.Run("uses default installation when no mapping exists", func(t *testing.T) {
+		mu.Lock()
+		tokenInstallIDs = nil
+		mu.Unlock()
+
+		// Clone will fail because there's no real git server, but we can check
+		// which installation ID was used for the token request.
+		_, _, _ = connector.Clone(trContext.Background(), "https://github.com/default-org/repo.git")
+
+		mu.Lock()
+		defer mu.Unlock()
+		require.Len(t, tokenInstallIDs, 1)
+		assert.Contains(t, tokenInstallIDs[0], "/installations/100/")
+	})
+
+	t.Run("uses mapped installation for cross-org repos", func(t *testing.T) {
+		mu.Lock()
+		tokenInstallIDs = nil
+		mu.Unlock()
+
+		connector.SetRepoInstallation("https://github.com/other-org/repo.git", 999)
+		_, _, _ = connector.Clone(trContext.Background(), "https://github.com/other-org/repo.git")
+
+		mu.Lock()
+		defer mu.Unlock()
+		require.Len(t, tokenInstallIDs, 1)
+		assert.Contains(t, tokenInstallIDs[0], "/installations/999/")
+	})
+}
+
 func TestAddMembersByOrgWithClient(t *testing.T) {
 	strPtr := func(s string) *string { return &s }
 	memberPage := []*github.User{
