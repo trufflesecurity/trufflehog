@@ -27,7 +27,7 @@ var (
 			base_url: "https://api.example.com/$api_version/examples"
 			response_code: 200
 		docker:
-			user: rRwOdIJpY90QrIzOXO95d3hlSzRk5Z9a
+			user: rRwOdIJpY90QrIzOXO95d3hlSzRk5Z
 			docker_email: "docker-test@dockerhub.com"
 			docker_token: "dckr_pat_dlndn9l2JLhWvbdyP3blEZw_j7d"
 			docker_org_token: "dckr_oat_7bA9zRt5-JqX3vP0l_MnY8sK2wE-dF6h"
@@ -37,9 +37,9 @@ var (
 		# - The above credentials should only be used in a secure environment.
 	`
 	secrets = []string{
-		"rRwOdIJpY90QrIzOXO95d3hlSzRk5Z9a:dckr_pat_dlndn9l2JLhWvbdyP3blEZw_j7d",
+		"rRwOdIJpY90QrIzOXO95d3hlSzRk5Z:dckr_pat_dlndn9l2JLhWvbdyP3blEZw_j7d",
 		"docker-test@dockerhub.com:dckr_pat_dlndn9l2JLhWvbdyP3blEZw_j7d",
-		"rRwOdIJpY90QrIzOXO95d3hlSzRk5Z9a:dckr_oat_7bA9zRt5-JqX3vP0l_MnY8sK2wE-dF6h",
+		"rRwOdIJpY90QrIzOXO95d3hlSzRk5Z:dckr_oat_7bA9zRt5-JqX3vP0l_MnY8sK2wE-dF6h",
 		"docker-test@dockerhub.com:dckr_oat_7bA9zRt5-JqX3vP0l_MnY8sK2wE-dF6h",
 	}
 )

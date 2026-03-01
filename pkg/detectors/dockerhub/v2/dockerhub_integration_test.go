@@ -6,7 +6,6 @@ package dockerhub
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -27,8 +26,8 @@ func TestDockerhub_FromChunk(t *testing.T) {
 	}
 	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
 	email := testSecrets.MustGetField("DOCKERHUB_EMAIL")
-	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
-	inactivePat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
+	pat := testSecrets.MustGetField("DOCKERHUB_V2_PAT")
+	inactivePat := testSecrets.MustGetField("DOCKERHUB_V2_INACTIVE_PAT")
 
 	type args struct {
 		ctx    context.Context
@@ -75,7 +74,7 @@ func TestDockerhub_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Dockerhub,
 					Verified:     true,
 					AnalysisInfo: map[string]string{
-						"username": strings.Split(email, "-")[0],
+						"username": email,
 						"pat":      pat,
 					},
 				},
