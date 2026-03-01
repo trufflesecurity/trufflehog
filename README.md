@@ -587,20 +587,27 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
 
 ```
 ...
-      - shell: bash
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 2))" >> $GITHUB_ENV
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "depth=$((${{ github.event.pull_request.commits }}+2))" >> $GITHUB_ENV
-            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
-          fi
-      - uses: actions/checkout@v3
+       - uses: actions/github-script@v7
+        id: git-intel
         with:
-          ref: ${{env.branch}}
-          fetch-depth: ${{env.depth}}
+          script: |
+            let depth = 0;
+            let branch = "";
+            if (context.eventName == "push")  {
+              depth = context.payload.commits.length
+              branch = context.ref
+            }
+            if (context.eventName == "pull_request") {
+              depth = context.payload.pull_request.commits
+              branch = context.payload.pull_request.head.ref
+            }
+            depth = depth + 2
+            core.info(`Will fetch ${depth} commits from ${branch}.`)
+            return { "depth": depth, "branch": branch }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{steps.git-intel.outputs.result.branch}}
+          fetch-depth: ${{steps.git-intel.outputs.result.depth}}
       - uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --results=verified,unknown
