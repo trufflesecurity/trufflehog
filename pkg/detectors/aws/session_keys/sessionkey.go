@@ -203,14 +203,33 @@ func (s scanner) ShouldCleanResultsIrrespectiveOfConfiguration() bool {
 }
 
 const (
-	method   = "GET"
-	service  = "sts"
-	host     = "sts.amazonaws.com"
-	region   = "us-east-1"
-	endpoint = "https://sts.amazonaws.com"
+	method           = "GET"
+	service          = "sts"
+	regionCommercial = "us-east-1"
+	hostCommercial   = "sts.amazonaws.com"
+	regionGovCloud   = "us-gov-east-1"
+	hostGovCloud     = "sts." + regionGovCloud + ".amazonaws.com"
 )
 
-func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, resSessionMatch string, retryOn403 bool) (bool, map[string]string, error) {
+func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch, resSessionMatch string, retryOn403 bool) (bool, map[string]string, error) {
+	ok, data, err := s.attemptVerifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, retryOn403, regionCommercial, hostCommercial)
+	if err == nil && ok {
+		return true, data, nil
+	}
+
+	ok, data, err = s.attemptVerifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, retryOn403, regionGovCloud, hostGovCloud)
+	if err == nil && ok {
+		return true, data, nil
+	}
+
+	return false, nil, err
+}
+
+func (s scanner) attemptVerifyMatch(ctx context.Context, resIDMatch, resSecretMatch, resSessionMatch string, retryOn403 bool, region, host string) (bool, map[string]string, error) {
+	const method = "GET"
+	const service = "sts"
+	endpoint := "https://" + host
+
 	// REQUEST VALUES.
 	now := time.Now().UTC()
 	datestamp := now.Format("20060102")
@@ -280,11 +299,17 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			return false, nil, err
 		}
 
+		accountType := "commercial"
+		if strings.Contains(identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn, "us-gov") {
+			accountType = "gov-cloud"
+		}
+
 		extraData := map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
 			"account":        identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
 			"user_id":        identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 			"arn":            identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
+			"type":           accountType,
 		}
 		return true, extraData, nil
 	} else if res.StatusCode == 403 {
