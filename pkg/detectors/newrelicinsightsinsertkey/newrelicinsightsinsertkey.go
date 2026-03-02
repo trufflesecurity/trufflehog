@@ -2,6 +2,7 @@ package newrelicinsightsinsertkey
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,6 +82,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		"eu": "https://insights-collector.eu01.nr-data.net/v1/accounts/`nowaythiscanexist/events",
 	}
 	client := s.getClient()
+	errs := make([]error, 0, len(regionUrls))
 	for region, regionUrl := range regionUrls {
 		req, err := http.NewRequestWithContext(
 			ctx, http.MethodPost, regionUrl, http.NoBody)
@@ -104,9 +106,8 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		case http.StatusForbidden:
 			continue
 		default:
-			return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+			errs = append(errs, fmt.Errorf("unexpected status code for region %s: %d", region, res.StatusCode))
 		}
 	}
-	// invalid/revoked keys return 403 for both regions, so if we get here the key is determinately invalid
-	return false, nil, nil
+	return false, nil, errors.Join(errs...)
 }
