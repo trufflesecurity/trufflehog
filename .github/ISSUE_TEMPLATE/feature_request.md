@@ -6,7 +6,7 @@ labels: enhancement, needs triage
 assignees: trufflesecurity/product-eng
 ---
 
-Please review the [Community Note](https://github.com/trufflesecurity/trufflehog/blob/main/.github/community_note.md) before submitting
+Please Review the [Community Note](../community_note.md) before submitting
 
 ## Description
 <!--- Please leave a helpful description of the feature request here. --->
