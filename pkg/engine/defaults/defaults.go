@@ -490,6 +490,7 @@ import (
 	netlifyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicbrowserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
@@ -1371,6 +1372,7 @@ func buildDetectorList() []detectors.Detector {
 		&netlifyv2.Scanner{},
 		&netsuite.Scanner{},
 		&neutrinoapi.Scanner{},
+		&newrelicbrowserkey.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
 		&newsapi.Scanner{},
 		&newscatcher.Scanner{},
