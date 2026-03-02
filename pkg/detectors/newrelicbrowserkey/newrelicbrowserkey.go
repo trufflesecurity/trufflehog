@@ -2,6 +2,7 @@ package newrelicbrowserkey
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -84,6 +85,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		"eu": "https://bam.eu01.nr-data.net/1/",
 	}
 	client := s.getClient()
+	errs := make([]error, 0, len(regionUrls))
 	for region, regionUrl := range regionUrls {
 		fullUrl, err := url.JoinPath(regionUrl, key)
 		if err != nil {
@@ -110,9 +112,8 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		case http.StatusForbidden:
 			continue
 		default:
-			return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+			errs = append(errs, fmt.Errorf("unexpected status code for region %s: %d", region, res.StatusCode))
 		}
 	}
-	// invalid/revoked keys return 403 for both regions, so if we get here the key is determinately invalid
-	return false, nil, nil
+	return false, nil, errors.Join(errs...)
 }
