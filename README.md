@@ -735,3 +735,11 @@ the stability of the public APIs at this time.
 # License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
+
+PEGINTICHAT/.peginti/logs/843ed8_activation.yaml
+PEGINTICHAT/.github/workflows/ci.yml
+annotations:
+  peginti237_activation_log: .peginti/logs/843ed8_activation.yaml
+  PEGINTICHAT/README.md
+  ### 🔐 Activation doctrinale – Commit 843ed8
+Le log YAML est disponible dans `.peginti/logs/843ed8_activation.yaml` et certifie l’autorisation universelle des actions et workflows réutilisables.
