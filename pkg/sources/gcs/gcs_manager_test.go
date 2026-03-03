@@ -445,7 +445,10 @@ func TestGCSManagerStats_Time(t *testing.T) {
 
 	start := time.Now()
 	var stats *attributes
-	stats, _ = gm.Attributes(ctx)
+	stats, err = gm.Attributes(ctx)
+	if err != nil {
+		t.Fatalf("Attributes() error = %v", err)
+	}
 	end := time.Since(start).Seconds()
 
 	fmt.Printf("Time taken to get %d objects: %f seconds\n", stats.numObjects, end)
