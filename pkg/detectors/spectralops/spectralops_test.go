@@ -76,7 +76,7 @@ func TestSpectralOps_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern - keyword only",
 			input: `
-				[INFO] spectral scan started
+				[INFO] spectral scan started spu-
 			`,
 			want: nil,
 		},
