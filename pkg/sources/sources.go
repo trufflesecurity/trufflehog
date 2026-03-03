@@ -29,6 +29,10 @@ type (
 type Chunk struct {
 	// Data is the data to decode and scan.
 	Data []byte
+	// OriginalData holds the pre-decode source data, preserved for secret
+	// storage. Set before iterative decoding so it retains the original
+	// content even after Data is replaced with decoded forms.
+	OriginalData []byte
 
 	// SourceName is the name of the Source that produced the chunk.
 	SourceName string
