@@ -4,6 +4,7 @@ package datadog
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/fatih/color"
@@ -26,8 +27,8 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 
 // Analyze performs the analysis of the Datadog API key and returns the analyzer result.
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	apiKey := credInfo["apiKey"]
-	appKey := credInfo["appKey"]
+	apiKey := credInfo["api_key"]
+	appKey := credInfo["app_key"]
 	endpoint := credInfo["endpoint"]
 
 	info, err := AnalyzePermissions(a.Cfg, apiKey, appKey, endpoint)
@@ -71,7 +72,10 @@ func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*S
 
 	// If endpoint is provided, use it directly; otherwise detect domain
 	if endpoint != "" {
-		baseURL = endpoint + "/api"
+		baseURL, err = url.JoinPath(endpoint, "api")
+		if err != nil {
+			return nil, fmt.Errorf("failed to join path: %w", err)
+		}
 	} else {
 		baseURL, err = DetectDomain(client, apiKey, appKey)
 		if err != nil {

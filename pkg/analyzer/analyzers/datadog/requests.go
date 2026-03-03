@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"sync"
@@ -119,7 +120,11 @@ func makeDataDogRequest(client *http.Client, baseURL, endpoint, method, apiKey s
 	defer cancel()
 
 	// create request
-	req, err := http.NewRequestWithContext(ctx, method, baseURL+endpoint, http.NoBody)
+	url, err := url.JoinPath(baseURL, endpoint)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build URL: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, url, http.NoBody)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -177,8 +182,10 @@ func (h *HttpStatusTest) RunTest(client *http.Client, baseURL string, headers ma
 // --------------------------------
 func ValidateApiKey(client *http.Client, baseURL, apiKey string) (bool, error) {
 	// Use a simple endpoint to test if the domain works
-	endpoint := baseURL + endpoints[ResourceTypeValidate]
-
+	endpoint, err := url.JoinPath(baseURL, endpoints[ResourceTypeValidate])
+	if err != nil {
+		return false, fmt.Errorf("failed to build endpoint: %w", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 

@@ -72,14 +72,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			for _, baseURL := range s.Endpoints(endpoints...) {
 				client := s.getClient()
 				isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, baseURL)
-				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, resApiMatch)
 				if isVerified {
-					s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "endpoint": baseURL}
-					s1.ExtraData = map[string]string{"endpoint": baseURL}
+					s1.Verified = isVerified
+					s1.AnalysisInfo = map[string]string{"api_key": resApiMatch, "endpoint": baseURL}
 					// break the loop once we've successfully validated the token against a baseURL
 					break
 				}
+				s1.SetVerificationError(verificationErr, resApiMatch)
 			}
 		}
 		results = append(results, s1)

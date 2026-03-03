@@ -594,6 +594,22 @@
         "Parent": null
       },
       "Permission": {
+        "Value": "Observability Pipelines Read",
+        "Parent": null
+      },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Truffle Sec",
+        "FullyQualifiedName": "a4b3b545-24ec-11f0-9f57-22795724d251",
+        "Type": "User",
+        "Metadata": {
+          "email": "detectors@trufflesec.com"
+        },
+        "Parent": null
+      },
+      "Permission": {
         "Value": "Org App Keys Read",
         "Parent": null
       },

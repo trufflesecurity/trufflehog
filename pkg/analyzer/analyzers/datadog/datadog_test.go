@@ -88,7 +88,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
-			got, err := a.Analyze(ctx, map[string]string{"apiKey": tt.apiKey, "appKey": tt.appKey, "endpoint": tt.endpoint})
+			got, err := a.Analyze(ctx, map[string]string{"api_key": tt.apiKey, "app_key": tt.appKey, "endpoint": tt.endpoint})
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
@@ -175,7 +175,7 @@ func TestAnalyzer_Analyze_ApiKeyOnly(t *testing.T) {
 	want := expectedOutputAPIKey
 
 	a := Analyzer{Cfg: &config.Config{}}
-	got, err := a.Analyze(ctx, map[string]string{"apiKey": apiKey, "endpoint": "https://api.us5.datadoghq.com"})
+	got, err := a.Analyze(ctx, map[string]string{"api_key": apiKey, "endpoint": "https://api.us5.datadoghq.com"})
 	if err != nil {
 		t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, false)
 		return

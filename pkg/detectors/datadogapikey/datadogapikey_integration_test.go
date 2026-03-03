@@ -51,10 +51,7 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_DatadogApikey,
 					Verified:     true,
 					AnalysisInfo: map[string]string{
-						"apiKey":   apiKey,
-						"endpoint": datdogEndpoint,
-					},
-					ExtraData: map[string]string{
+						"api_key":  apiKey,
 						"endpoint": datdogEndpoint,
 					},
 					Raw: []byte(apiKey),
