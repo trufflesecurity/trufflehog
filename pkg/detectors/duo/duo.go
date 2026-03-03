@@ -186,6 +186,8 @@ func verifyDuoRequest(
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
+	case http.StatusForbidden: // Auth API returns 403 if credentials are admin keys be it active or inactive
+		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP status %d", res.StatusCode)
 	}

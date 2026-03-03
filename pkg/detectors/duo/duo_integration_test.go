@@ -255,7 +255,7 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 					},
 				},
 			},
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 	}
 
