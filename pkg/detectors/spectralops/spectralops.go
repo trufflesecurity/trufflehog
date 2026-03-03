@@ -33,7 +33,7 @@ var (
 
 // Keywords used for fast pre-filtering
 func (s Scanner) Keywords() []string {
-	return []string{"spectral", "spu"}
+	return []string{"spu-"}
 }
 
 func (s Scanner) getClient() *http.Client {
