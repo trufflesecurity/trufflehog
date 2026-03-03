@@ -224,6 +224,8 @@ type ResultWithMetadata struct {
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
 func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
+	// OriginalData may be nil when CopyMetadata is called outside the engine
+	// pipeline (e.g., in tests or external consumers that construct chunks directly).
 	chunkData := chunk.OriginalData
 	if chunkData == nil {
 		chunkData = chunk.Data

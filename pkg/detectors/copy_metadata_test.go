@@ -3,6 +3,8 @@ package detectors
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -19,9 +21,7 @@ func TestCopyMetadata_ChunkDataFromOriginalData(t *testing.T) {
 
 	rwm := CopyMetadata(chunk, result)
 
-	if string(rwm.ChunkData) != "original-source-data" {
-		t.Errorf("ChunkData = %q, want %q", rwm.ChunkData, "original-source-data")
-	}
+	assert.Equal(t, "original-source-data", string(rwm.ChunkData))
 }
 
 func TestCopyMetadata_ChunkDataFallsBackToData(t *testing.T) {
@@ -36,7 +36,5 @@ func TestCopyMetadata_ChunkDataFallsBackToData(t *testing.T) {
 
 	rwm := CopyMetadata(chunk, result)
 
-	if string(rwm.ChunkData) != "only-data" {
-		t.Errorf("ChunkData = %q, want %q", rwm.ChunkData, "only-data")
-	}
+	assert.Equal(t, "only-data", string(rwm.ChunkData))
 }
