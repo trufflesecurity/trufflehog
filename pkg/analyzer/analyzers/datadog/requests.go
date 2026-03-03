@@ -210,11 +210,14 @@ func ValidateApiKey(client *http.Client, baseURL, apiKey string) (bool, error) {
 	}()
 
 	// If we get a response that's not a connection error, this domain works
-	if resp.StatusCode == http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
 		return true, nil
+	case http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("Unable to validate api key with status code: %d", resp.StatusCode)
 	}
-
-	return false, errors.New("unable to validate any provided DataDog API key")
 }
 
 // --------------------------------
