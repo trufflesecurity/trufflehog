@@ -697,6 +697,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spectralops"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/speechtextai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/splunkobservabilitytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spoonacular"
@@ -1582,6 +1583,7 @@ func buildDetectorList() []detectors.Detector {
 		&sourcegraph.Scanner{},
 		&sourcegraphcody.Scanner{},
 		// &sparkpost.Scanner{},
+		&spectralops.Scanner{},
 		&speechtextai.Scanner{},
 		&splunkobservabilitytoken.Scanner{},
 		&spoonacular.Scanner{},
