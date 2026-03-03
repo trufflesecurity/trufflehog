@@ -854,6 +854,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		startTime := time.Now()
 		sourceVerify := chunk.SourceVerify
 
+		chunk.OriginalData = chunk.Data
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
 		for _, d := range decoded {
