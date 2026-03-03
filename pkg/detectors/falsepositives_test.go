@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -32,39 +31,48 @@ func (d customFalsePositiveChecker) IsFalsePositive(result Result) (bool, string
 	return IsKnownFalsePositive(string(result.Raw), map[FalsePositive]struct{}{"a specific magic string": {}}, false)
 }
 
-func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
-	results := []Result{
-		{Raw: []byte("00000")},  // "default" false positive list
-		{Raw: []byte("number")}, // from wordlist
-		// from uuid list
-		{Raw: []byte("00000000-0000-0000-0000-000000000000")},
-		{Raw: []byte("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")},
-		// real secrets
-		{Raw: []byte("hga8adshla3434g")},
-		{Raw: []byte("f795f7db-2dfe-4095-96f3-8f8370c735f9")},
+// This test validates that GetFalsePositiveCheck, when invoked on a detector that does not implement
+// CustomFalsePositiveChecker, returns a predicate that behaves as expected.
+func TestGetFalsePositiveCheck_DefaultLogic(t *testing.T) {
+	testCases := []struct {
+		raw             string
+		isFalsePositive bool
+	}{
+		{"00000", true},  // "default" false positive list
+		{"number", true}, // from wordlist
+		{"00000000-0000-0000-0000-000000000000", true}, // from uuid list
+		{"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", true}, // from uuid list
+		{"hga8adshla3434g", false},
+		{"f795f7db-2dfe-4095-96f3-8f8370c735f9", false},
 	}
-	expected := []Result{
-		{Raw: []byte("hga8adshla3434g")},
-		{Raw: []byte("f795f7db-2dfe-4095-96f3-8f8370c735f9")},
+
+	for _, tt := range testCases {
+		isFalsePositive, _ := GetFalsePositiveCheck(fakeDetector{})(Result{Raw: []byte(tt.raw)})
+		assert.Equal(t, tt.isFalsePositive, isFalsePositive, "secret %q had unexpected false positive status", tt.raw)
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results)
-	assert.ElementsMatch(t, expected, filtered)
 }
 
-func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
-	results := []Result{
-		{Raw: []byte("a specific magic string")}, // specific target
-		{Raw: []byte("00000")},                   // "default" false positive list
-		{Raw: []byte("number")},                  // from wordlist
-		{Raw: []byte("hga8adshla3434g")},         // real secret
+// This test validates that GetFalsePositiveCheck, when invoked on a detector that implements
+// CustomFalsePositiveChecker, returns a predicate that behaves as expected. (Specifically, the predicate should not
+// flag secrets that are present in the standard false positive lists.)
+func TestGetFalsePositiveCheck_CustomLogic(t *testing.T) {
+	testCases := []struct {
+		raw             string
+		isFalsePositive bool
+	}{
+		{"a specific magic string", true}, // the specific value the custom checker is looking for
+		{"00000", false},
+		{"number", false},
+		{"00000000-0000-0000-0000-000000000000", false},
+		{"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", false},
+		{"hga8adshla3434g", false},
+		{"f795f7db-2dfe-4095-96f3-8f8370c735f9", false},
 	}
-	expected := []Result{
-		{Raw: []byte("00000")},
-		{Raw: []byte("number")},
-		{Raw: []byte("hga8adshla3434g")},
+
+	for _, tt := range testCases {
+		isFalsePositive, _ := GetFalsePositiveCheck(customFalsePositiveChecker{})(Result{Raw: []byte(tt.raw)})
+		assert.Equal(t, tt.isFalsePositive, isFalsePositive, "secret %q had unexpected false positive status", tt.raw)
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results)
-	assert.ElementsMatch(t, expected, filtered)
 }
 
 func TestIsFalsePositive(t *testing.T) {
