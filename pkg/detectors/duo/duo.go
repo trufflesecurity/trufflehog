@@ -43,7 +43,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"duo"}
+	return []string{"duosecurity"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -82,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				if verify {
 					verified, verificationErr := VerifyAdminToken(ctx, s.getClient(), host, apiKey, apiSecret)
-					if !verified {
+					if !verified && verificationErr == nil {
 						verified, verificationErr = VerifyAuthToken(ctx, s.getClient(), host, apiKey, apiSecret)
 						s1.ExtraData["application"] = "Auth API"
 					}
