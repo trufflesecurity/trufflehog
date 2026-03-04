@@ -25,8 +25,7 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeAir
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(
-			"Airbrake", "analyze_permissions", "API", "", err,
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
 		)
 	}
 	return secretInfoToAnalyzerResult(info), nil

@@ -86,15 +86,13 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	// check if the `key` exist in the credentials info
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError(
-			"ElevenLabs", "validate_credentials", "config", "", errors.New("key not found in credentials info"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentials info"),
 		)
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(
-			"ElevenLabs", "analyze_permissions", "API", "", err,
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
 		)
 	}
 

@@ -37,14 +37,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePos
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, analyzers.NewAnalysisError(
-			"Posthog", "validate_credentials", "config", "", errors.New("missing key in credInfo"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("missing key in credInfo"),
 		)
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(
-			"Posthog", "analyze_permissions", "API", "", err,
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
 		)
 	}
 	return secretInfoToAnalyzerResult(info), nil
