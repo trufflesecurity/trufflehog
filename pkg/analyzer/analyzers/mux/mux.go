@@ -41,21 +41,18 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError(
-			"Mux", "validate_credentials", "config", "", errors.New("key not found in credentials info"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentials info"),
 		)
 	}
 	secret, exist := credInfo["secret"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError(
-			"Mux", "validate_credentials", "config", "", errors.New("secret not found in credentials info"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("secret not found in credentials info"),
 		)
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key, secret)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(
-			"Mux", "analyze_permissions", "API", "", err,
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
 		)
 	}
 
