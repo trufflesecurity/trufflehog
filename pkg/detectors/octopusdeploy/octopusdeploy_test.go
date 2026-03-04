@@ -98,7 +98,7 @@ func TestOctopusDeploy_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern - token only",
 			input: `
-				API-AAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+				octopus_token=API-AAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 			`,
 			want: nil,
 		},

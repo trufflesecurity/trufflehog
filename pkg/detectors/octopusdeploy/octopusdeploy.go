@@ -36,7 +36,7 @@ var (
 
 // Keywords used for fast pre-filtering
 func (s Scanner) Keywords() []string {
-	return []string{"octopus", "API-"}
+	return []string{"octopus"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -126,16 +126,12 @@ func verifyOctopusToken(
 	}()
 
 	switch res.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusForbidden:
 		return true, nil
 
 	case http.StatusUnauthorized:
 		// Invalid or revoked key
 		return false, nil
-
-	case http.StatusForbidden:
-		// Valid key but insufficient permissions
-		return true, nil
 
 	default:
 		return false, fmt.Errorf(
