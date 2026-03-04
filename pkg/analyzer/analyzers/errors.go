@@ -2,6 +2,21 @@ package analyzers
 
 import "fmt"
 
+// Operation constants for AnalysisError.
+const (
+	OperationValidateCredentials = "validate_credentials"
+	OperationAnalyzePermissions  = "analyze_permissions"
+)
+
+// Service constants for AnalysisError.
+const (
+	ServiceAPI      = "API"
+	ServiceConfig   = "config"
+	ServiceDatabase = "Database"
+	ServiceOAuth    = "OAuth"
+	ServiceCrypto   = "crypto"
+)
+
 // AnalysisErrorInfo is implemented by errors that provide structured context
 // about analysis failures. This allows downstream consumers (e.g., the scanner)
 // to extract metadata for structured error storage without depending on

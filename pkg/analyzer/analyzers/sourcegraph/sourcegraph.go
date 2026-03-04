@@ -26,14 +26,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSou
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, analyzers.NewAnalysisError(
-			"Sourcegraph", "validate_credentials", "config", "", fmt.Errorf("missing key in credInfo"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", fmt.Errorf("missing key in credInfo"),
 		)
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(
-			"Sourcegraph", "analyze_permissions", "API", "", err,
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
 		)
 	}
 	return secretInfoToAnalyzerResult(info), nil
