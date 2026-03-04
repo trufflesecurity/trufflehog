@@ -25,15 +25,13 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError(
-			"Fastly", "validate_credentials", "config", "", fmt.Errorf("key not found in credential info"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", fmt.Errorf("key not found in credential info"),
 		)
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(
-			"Fastly", "analyze_permissions", "API", "", err,
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
 		)
 	}
 

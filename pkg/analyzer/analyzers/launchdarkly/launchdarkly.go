@@ -29,16 +29,16 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	// check if the `key` exist in the credentials info
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError("LaunchDarkly", "validate_credentials", "config", "", errors.New("key not found in credentials info"))
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentials info"))
 	}
 
 	if isSDKKey(key) {
-		return nil, analyzers.NewAnalysisError("LaunchDarkly", "validate_credentials", "config", "", errors.New("sdk keys cannot be analyzed"))
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("sdk keys cannot be analyzed"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError("LaunchDarkly", "analyze_permissions", "API", "", err)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil

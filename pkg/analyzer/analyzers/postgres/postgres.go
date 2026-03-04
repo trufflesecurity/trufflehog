@@ -30,12 +30,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePos
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	uri, ok := credInfo["connection_string"]
 	if !ok {
-		return nil, analyzers.NewAnalysisError("Postgres", "validate_credentials", "config", "", errors.New("connection string not found in credInfo"))
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("connection string not found in credInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, uri)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError("Postgres", "analyze_permissions", "Database", "", err)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceDatabase, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }

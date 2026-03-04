@@ -54,22 +54,19 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	username, exist := credInfo["username"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError(
-			"DockerHub", "validate_credentials", "config", "", errors.New("username not found in the credentials info"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("username not found in the credentials info"),
 		)
 	}
 
 	pat, exist := credInfo["pat"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError(
-			"DockerHub", "validate_credentials", "config", "", errors.New("personal access token(PAT) not found in the credentials info"),
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("personal access token(PAT) not found in the credentials info"),
 		)
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, username, pat)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(
-			"DockerHub", "analyze_permissions", "API", "", err,
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
 		)
 	}
 
