@@ -3,9 +3,11 @@ package squareup
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,14 +22,14 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(sq0idp-[0-9A-Za-z]{22})\b`)
+	// This detector detects Squareup Production Access Tokens, which are 64-character strings that start with "EAAA".
+	keyPat = regexp.MustCompile(`\b(EAAA[0-9A-Za-z-_]{60})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sq0idp-"}
+	return []string{"EAAA"}
 }
 
 // FromData will find and optionally verify Squareup secrets in a given set of bytes.
@@ -45,25 +47,59 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://connect.squareup.com/oauth2/authorize?client_id=%s&scope=CUSTOMERS_WRITE+CUSTOMERS_READ&session=False&state=82201dd8d83d23cc8a48caf52b", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifySquareToken(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifySquareToken(
+	ctx context.Context,
+	client *http.Client,
+	token string,
+) (bool, error) {
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		"https://connect.squareup.com/v2/locations",
+		http.NoBody,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+
+	case http.StatusOK:
+		return true, nil
+
+	case http.StatusUnauthorized:
+		return false, nil
+
+	default:
+		return false, fmt.Errorf(
+			"unexpected HTTP response status %d",
+			res.StatusCode,
+		)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

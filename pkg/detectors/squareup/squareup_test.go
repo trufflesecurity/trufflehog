@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	validPattern   = "sq0idp-CIlelDA4a0mIksYXPGwUzy"
-	invalidPattern = "sq0idp-CIlelDA?a0mIksYXPGwUzy"
-	keyword        = "squareup"
+	validPattern   = "EAAAl-CIlelDA4a0mIksYXPGwUzyakldwao-wadljadkmnjkdgndxvnmervw--c3"
+	invalidPattern = "EAAAl-CIlelDA@a0mIksYXPGwUzydaw.dapwdpalwffkjewfinweifnwiefnweif"
+	keyword        = "EAAA"
 )
 
 func TestSquareup_Pattern(t *testing.T) {
