@@ -587,7 +587,13 @@ func run(state overseer.State, logSync func() error) {
 	}
 
 	if *compareDetectionStrategies {
-		if err := compareScans(ctx, cmd, engConf); err != nil {
+		compareCfg := engConf
+		compareCfg.Dispatcher = engine.NewPrinterDispatcher(discardPrinter{})
+
+		if err := compareScans(ctx, cmd, compareCfg); err != nil {
+			if closeErr := closePrinter(printer); closeErr != nil {
+				ctx.Logger().Error(closeErr, "failed to close printer after scan error")
+			}
 			logFatal(err, "error comparing detection strategies")
 		}
 		if err := closePrinter(printer); err != nil {
@@ -598,6 +604,9 @@ func run(state overseer.State, logSync func() error) {
 
 	metrics, err := runSingleScan(ctx, cmd, engConf)
 	if err != nil {
+		if closeErr := closePrinter(printer); closeErr != nil {
+			ctx.Logger().Error(closeErr, "failed to close printer after scan error")
+		}
 		logFatal(err, "error running scan")
 	}
 	if err := closePrinter(printer); err != nil {
@@ -640,29 +649,36 @@ func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {
 	var (
 		entireMetrics    metrics
 		maxLengthMetrics metrics
-		err              error
 	)
+
+	entireCfg := cfg
+	entireCfg.ShouldScanEntireChunk = true
+	entireErrCh := make(chan error, 1)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		// Run scan with entire chunk span calculator.
-		cfg.ShouldScanEntireChunk = true
-		entireMetrics, err = runSingleScan(ctx, cmd, cfg)
-		if err != nil {
-			ctx.Logger().Error(err, "error running scan with entire chunk span calculator")
-		}
+		var err error
+		entireMetrics, err = runSingleScan(ctx, cmd, entireCfg)
+		entireErrCh <- err
 	}()
 
 	// Run scan with max-length span calculator.
-	maxLengthMetrics, err = runSingleScan(ctx, cmd, cfg)
+	maxLengthMetrics, err := runSingleScan(ctx, cmd, cfg)
 	if err != nil {
+		wg.Wait()
+		if entireErr := <-entireErrCh; entireErr != nil {
+			ctx.Logger().Error(entireErr, "error running scan with entire chunk span calculator")
+		}
 		return fmt.Errorf("error running scan with custom span calculator: %v", err)
 	}
 
 	wg.Wait()
+	if err := <-entireErrCh; err != nil {
+		return fmt.Errorf("error running scan with entire chunk span calculator: %v", err)
+	}
 
 	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
 }
@@ -687,6 +703,12 @@ func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
 type metrics struct {
 	engine.Metrics
 	hasFoundResults bool
+}
+
+type discardPrinter struct{}
+
+func (discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) error {
+	return nil
 }
 
 func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics, error) {
