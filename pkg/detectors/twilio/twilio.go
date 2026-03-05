@@ -23,7 +23,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.RetryableHTTPClient()
 	sidPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "account", "id", "sid"}) + `\b(AC[0-9a-f]{32})\b`)
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "auth", "token", "secret", "key"}) + `\b([0-9a-f]{32})\b`)
 )
