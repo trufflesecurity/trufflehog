@@ -58,7 +58,7 @@ func TestDataDogToken_Pattern_WithValidAPIandAppKey(t *testing.T) {
 	}
 
 	if diff := cmp.Diff(expected, actual); diff != "" {
-		t.Errorf("%s diff: (-want +got)\n%s", "TestDataDogToken_Pattern_WithValidAPIKeyOnly", diff)
+		t.Errorf("%s diff: (-want +got)\n%s", "TestDataDogToken_Pattern_WithValidAPIandAppKey", diff)
 	}
 }
 
