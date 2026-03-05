@@ -54,6 +54,7 @@ enum SourceType {
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
   SOURCE_TYPE_SLACK_CONTINUOUS = 41;
+  SOURCE_TYPE_JSON_ENUMERATOR = 42;
 }
 
 message LocalSource {
@@ -184,6 +185,7 @@ message Filesystem {
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
   bool skip_binaries = 5; // allows skipping binary files from the scan
+  int32 max_symlink_depth = 6; // allows following symlinks upto specified max depth
 }
 
 message GCS {
@@ -547,4 +549,8 @@ message Stdin {}
 message SlackContinuous {
   string namespace = 1;
   string project_id = 2;
+}
+
+message JSONEnumerator {
+  repeated string paths = 1;
 }
