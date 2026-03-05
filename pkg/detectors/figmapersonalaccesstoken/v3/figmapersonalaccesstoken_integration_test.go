@@ -14,18 +14,18 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_V3_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_V3_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -50,12 +50,11 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_FigmaPersonalAccessToken,
+					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     true,
 					ExtraData: map[string]string{
-						"version": "1",
+						"version": "3",
 					},
-					AnalysisInfo: map[string]string{"token": secret},
 				},
 			},
 			wantErr: false,
@@ -65,15 +64,15 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a figmapersonalaccesstoken secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a figmapersonalaccesstoken secret %s within but not valid", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_FigmaPersonalAccessToken,
+					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
-						"version": "1",
+						"version": "3",
 					},
 				},
 			},
@@ -89,10 +88,10 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_FigmaPersonalAccessToken,
+					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
-						"version": "1",
+						"version": "3",
 					},
 				},
 			},
@@ -109,10 +108,10 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_FigmaPersonalAccessToken,
+					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
-						"version": "1",
+						"version": "3",
 					},
 				},
 			},
@@ -146,7 +145,7 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("FigmaPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

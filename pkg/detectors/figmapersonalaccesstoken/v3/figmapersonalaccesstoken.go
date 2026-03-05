@@ -11,7 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
@@ -21,15 +21,15 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int { return 2 }
+func (Scanner) Version() int { return 3 }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b`)
+	keyPat        = regexp.MustCompile(`\b(figp_[a-zA-Z0-9_=-]{40,54})\b`)
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"figma"}
+	return []string{"figp_"}
 }
 
 func (s Scanner) Description() string {
@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_FigmaPersonalAccessToken,
+			DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 			Raw:          []byte(resMatch),
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
@@ -74,6 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detector_typepb.DetectorType {
-	return detector_typepb.DetectorType_FigmaPersonalAccessToken
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_FigmaPersonalAccessToken
 }

@@ -17,7 +17,6 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
@@ -25,17 +24,24 @@ func (Scanner) Version() int { return 1 }
 
 var (
 	defaultClient = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b([0-9]{6}-[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b([0-9]{6}-[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"figma"}
 }
 
-// FromData will find and optionally verify FigmaPersonalAccessToken secrets in a given set of bytes.
+func (s Scanner) Description() string {
+	return "Figma is a web-based design tool. Personal Access Tokens can be used to access and modify design files and other resources."
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -53,28 +59,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.figma.com/v1/me", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("X-Figma-Token", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode != 403 {
-					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					s1.SetVerificationError(err, resMatch)
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
+			isVerified, verificationErr := VerifyMatch(ctx, s.getClient(), resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 			if s1.Verified {
 				s1.AnalysisInfo = map[string]string{"token": resMatch}
 			}
@@ -90,6 +77,26 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 	return detector_typepb.DetectorType_FigmaPersonalAccessToken
 }
 
-func (s Scanner) Description() string {
-	return "Figma is a web-based design tool. Personal Access Tokens can be used to access and modify design files and other resources."
+// VerifyMatch checks if the provided Figma token is valid by making a request to the Figma API.
+func VerifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.figma.com/v1/me", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("X-Figma-Token", token)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	switch {
+	case res.StatusCode >= 200 && res.StatusCode < 300:
+		return true, nil
+	case res.StatusCode == 403:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
