@@ -426,7 +426,7 @@ func (s *Source) chunkBuild(
 				},
 			},
 		},
-		Verify: s.verify,
+		SourceVerify: s.verify,
 	}
 
 	ctx.Logger().V(4).Info("scanning build log")
