@@ -85,12 +85,16 @@ func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*S
 
 	if appKey == "" {
 		// If no application key is provided, we can only validate the API key
-		isValidApiKey, err := ValidateApiKey(client, baseURL, apiKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate api key: %v", err)
-		}
-		if !isValidApiKey {
-			return nil, errors.New("invalid api key provided")
+		if endpoint != "" {
+			// If endpoint is empty we don't need to validate again because DetectDomain would have already validated the API key against detected domain
+			// But if endpoint is provided, we should validate the API key against the provided endpoint to ensure it's valid before proceeding
+			isValidApiKey, err := ValidateApiKey(client, baseURL, apiKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to validate api key: %v", err)
+			}
+			if !isValidApiKey {
+				return nil, errors.New("invalid api key provided")
+			}
 		}
 		if err := CaptureApiKeyPermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
 			return nil, fmt.Errorf("failed to fetch permissions: %v", err)
