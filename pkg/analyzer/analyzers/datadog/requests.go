@@ -313,7 +313,7 @@ func CapturePermissions(client *http.Client, baseURL, apiKey, appKey string, sec
 }
 
 // API key is not finely grained, so we assign some default permissions
-func CaptureApiKeyPermissions(client *http.Client, baseURL, apiKey, appKey string, secretInfo *SecretInfo) error {
+func CaptureApiKeyPermissions(secretInfo *SecretInfo) error {
 	scopes, err := readInScopes()
 	if err != nil {
 		return fmt.Errorf("reading in scopes: %w", err)

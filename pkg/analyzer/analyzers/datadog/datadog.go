@@ -96,7 +96,7 @@ func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*S
 				return nil, errors.New("invalid api key provided")
 			}
 		}
-		if err := CaptureApiKeyPermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
+		if err := CaptureApiKeyPermissions(secretInfo); err != nil {
 			return nil, fmt.Errorf("failed to fetch permissions: %v", err)
 		}
 		return secretInfo, nil
@@ -119,7 +119,7 @@ func AnalyzePermissions(cfg *config.Config, apiKey, appKey, endpoint string) (*S
 	}
 
 	// Capture API key permissions
-	if err := CaptureApiKeyPermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
+	if err := CaptureApiKeyPermissions(secretInfo); err != nil {
 		return nil, fmt.Errorf("failed to fetch permissions: %v", err)
 	}
 	return secretInfo, nil
