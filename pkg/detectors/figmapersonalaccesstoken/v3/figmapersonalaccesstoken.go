@@ -21,15 +21,15 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int { return 2 }
+func (Scanner) Version() int { return 3 }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b`)
+	keyPat        = regexp.MustCompile(`\b(figp_[a-zA-Z0-9_=-]{40,54})\b`)
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"figma"}
+	return []string{"figp_"}
 }
 
 func (s Scanner) Description() string {
