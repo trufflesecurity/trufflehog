@@ -17,7 +17,7 @@ var (
 	_ detectors.Detector = (*Scanner)(nil)
 
 	// Token pattern: 54-64 char lowercase alphanumeric, only when near context keywords.
-	tokenPat = regexp.MustCompile(`(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN|RANCHER_SECRET_KEY)[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`)
+	tokenPat = regexp.MustCompile(`(?i)(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN|RANCHER_SECRET_KEY)[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

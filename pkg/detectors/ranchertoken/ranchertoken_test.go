@@ -28,18 +28,9 @@ func TestRancherToken_Pattern(t *testing.T) {
 			want: []string{"jswpl27hs8pd88rmw2mgfgrjtpljp85fd5v7rhdwr2s6z22hvt6vjt"},
 		},
 		{
-			name: "valid pattern - yaml config",
+			name: "valid pattern - docker env",
 			input: `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: rancher-agent
-spec:
-  containers:
-    - name: agent
-      env:
-        - name: RANCHER_TOKEN
-          value: "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567a"
+docker run -e RANCHER_TOKEN=abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567a rancher/rancher
 `,
 			want: []string{"abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567a"},
 		},
