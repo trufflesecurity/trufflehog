@@ -512,6 +512,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicinsightsinsertkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
@@ -1425,6 +1426,7 @@ func buildDetectorList() []detectors.Detector {
 		&neutrinoapi.Scanner{},
 		&newrelicinsightsinsertkey.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
+		&newrelicuserkey.Scanner{},
 		&newsapi.Scanner{},
 		&newscatcher.Scanner{},
 		&nexmoapikey.Scanner{},
