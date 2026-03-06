@@ -74,3 +74,13 @@ func TestAnalysisErrorMessageNilError(t *testing.T) {
 		t.Errorf("Error() = %q, want %q", e.Error(), expected)
 	}
 }
+
+func TestAnalysisErrorMessageEmptyResource(t *testing.T) {
+	orig := fmt.Errorf("invalid token")
+	e := NewAnalysisError("OpenAI", "analyze_permissions", "API", "", orig)
+
+	expected := "OpenAI analysis failed: analyze_permissions on API: invalid token"
+	if e.Error() != expected {
+		t.Errorf("Error() = %q, want %q", e.Error(), expected)
+	}
+}
