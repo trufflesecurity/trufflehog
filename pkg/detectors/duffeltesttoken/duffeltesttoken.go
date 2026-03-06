@@ -27,7 +27,7 @@ var (
 	// Duffel test token pattern
 	// Format: duffel_test_ + 43 alphanumeric / dash / underscore characters
 	duffelTestTokenPat = regexp.MustCompile(
-		`\b(duffel_test_[A-Za-z0-9-_]{43})\b`,
+		`\b(duffel_test_[A-Za-z0-9_-]{43})\b`,
 	)
 )
 
