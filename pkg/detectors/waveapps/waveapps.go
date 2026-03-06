@@ -27,6 +27,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Wave payment tokens have distinct prefixes: wave_sn_prod_ or wave_ci_prod_
+	// These are Waveapps (waveapps.com) API token types, not country codes.
+	// Ref: https://developer.waveapps.com/hc/en-us/articles/360018856751-Authentication
 	keyPat = regexp.MustCompile(`\b(wave_(?:sn|ci)_prod_[A-Za-z0-9_-]{30,})\b`)
 )
 
@@ -70,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyWaveapps(ctx context.Context, client *http.Client, token string) (bool, error) {
-	// Use a simple introspection query to verify the token is valid.
+	// Use a simple user query to verify the token is valid.
 	payload := strings.NewReader(`{"query":"{ user { id } }"}`)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, waveappsURL, payload)
 	if err != nil {
