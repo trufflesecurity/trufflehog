@@ -61,7 +61,7 @@ func TestDuffelTestToken_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern - invalid characters",
 			input: `
-				duffel_test_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!
+				duffel_test_aaaaaaaaaaaaaaaaaaaaaaa!aaaaaaaaaaaaaaaaaaa
 			`,
 			want: nil,
 		},
