@@ -280,6 +280,28 @@ var (
 	usingTUI   = false
 )
 
+// expandTilde replaces a leading ~ in each argument with the user's home
+// directory. This compensates for bypassing the shell (which would normally
+// perform this expansion) while still avoiding shell metacharacter injection.
+func expandTilde(args []string) []string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return args
+	}
+	out := make([]string, len(args))
+	for i, arg := range args {
+		switch {
+		case arg == "~":
+			out[i] = home
+		case strings.HasPrefix(arg, "~/"):
+			out[i] = home + arg[1:]
+		default:
+			out[i] = arg
+		}
+	}
+	return out
+}
+
 func init() {
 	_, _ = maxprocs.Set()
 
@@ -307,6 +329,11 @@ func init() {
 		if len(args) == 0 {
 			os.Exit(0)
 		}
+
+		// The TUI passes user input as literal strings. Since we no longer
+		// invoke a shell, we must expand ~ ourselves so paths like ~/foo
+		// resolve correctly.
+		args = expandTilde(args)
 
 		binary, err := exec.LookPath(os.Args[0])
 		if err == nil {
