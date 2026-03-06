@@ -818,6 +818,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vultrapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vyte"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/walkscore"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/waveapps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weatherbit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weatherstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/web3storage"
@@ -1706,6 +1707,7 @@ func buildDetectorList() []detectors.Detector {
 		&vultrapikey.Scanner{},
 		&vyte.Scanner{},
 		&walkscore.Scanner{},
+		&waveapps.Scanner{},
 		&weatherbit.Scanner{},
 		&weatherstack.Scanner{},
 		&web3storage.Scanner{},

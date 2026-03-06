@@ -1149,6 +1149,7 @@ const (
 	DetectorType_OpenAIAdmin                             DetectorType = 1040
 	DetectorType_GoogleGeminiAPIKey                      DetectorType = 1041
 	DetectorType_ArtifactoryReferenceToken               DetectorType = 1042
+	DetectorType_Waveapps                                DetectorType = 1043
 )
 
 // Enum value maps for DetectorType.
@@ -2193,6 +2194,7 @@ var (
 		1040: "OpenAIAdmin",
 		1041: "GoogleGeminiAPIKey",
 		1042: "ArtifactoryReferenceToken",
+		1043: "Waveapps",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3234,6 +3236,7 @@ var (
 		"OpenAIAdmin":                       1040,
 		"GoogleGeminiAPIKey":                1041,
 		"ArtifactoryReferenceToken":         1042,
+		"Waveapps":                          1043,
 	}
 )
 
