@@ -1052,6 +1052,7 @@ enum DetectorType {
   OpenAIAdmin = 1040;
   GoogleGeminiAPIKey = 1041;
   ArtifactoryReferenceToken = 1042;
+  MercadoPago = 1043;
 }
 
 message Result {
