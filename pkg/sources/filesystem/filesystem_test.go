@@ -494,7 +494,7 @@ func TestResumptionInfoDoesNotGrowWithSubdirectories(t *testing.T) {
 	err = os.WriteFile(filepath.Join(currentDir, "deepest.txt"), []byte("deepest"), 0644)
 	require.NoError(t, err)
 
-	conn, err := anypb.New(&sourcespb.Filesystem{MaxSymlinkDepth: 0})
+	conn, err := anypb.New(&sourcespb.Filesystem{})
 	require.NoError(t, err)
 
 	// Initialize the source.
