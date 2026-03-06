@@ -3,13 +3,14 @@ package ldap
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/go-ldap/ldap/v3"
+	ldap "github.com/mariduv/ldap-verify"
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -72,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					verificationErr := verifyLDAP(username[1], password[1], ldapURL)
+					verificationErr := verifyLDAP(ctx, username[1], password[1], ldapURL)
 					s1.Verified = verificationErr == nil
 					if !isErrDeterminate(verificationErr) {
 						s1.SetVerificationError(verificationErr, password[1])
@@ -102,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			verificationError := verifyLDAP(username, password, ldapURL)
+			verificationError := verifyLDAP(ctx, username, password, ldapURL)
 
 			s1.Verified = verificationError == nil
 			if !isErrDeterminate(verificationError) {
@@ -117,18 +118,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func isErrDeterminate(err error) bool {
-	switch e := err.(type) {
-	case *ldap.Error:
-		switch e.Err.(type) {
-		case *net.OpError:
-			return false
-		}
+	var neterr *net.OpError
+
+	if errors.As(err, &neterr) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, context.Canceled) {
+		return false
 	}
 
 	return true
 }
 
-func verifyLDAP(username, password string, ldapURL *url.URL) error {
+func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL) error {
 	// Tests with non-TLS, TLS, and STARTTLS
 
 	uri := ldapURL.String()
@@ -136,13 +137,13 @@ func verifyLDAP(username, password string, ldapURL *url.URL) error {
 	switch ldapURL.Scheme {
 	case "ldap":
 		// Non-TLS dial
-		l, err := ldap.DialURL(uri)
+		l, err := ldap.DialURL(uri, ldap.DialWithContext(ctx))
 		if err != nil {
 			return err
 		}
 		defer l.Close()
 		// Non-TLS verify
-		err = l.Bind(username, password)
+		err = l.BindContext(ctx, username, password)
 		if err == nil {
 			return nil
 		}
@@ -153,20 +154,23 @@ func verifyLDAP(username, password string, ldapURL *url.URL) error {
 			return err
 		}
 		// STARTTLS verify
-		return l.Bind(username, password)
+		return l.BindContext(ctx, username, password)
 	case "ldaps":
 		// TLS dial
-		l, err := ldap.DialURL(uri, ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+		l, err := ldap.DialURL(
+			uri,
+			ldap.DialWithContext(ctx),
+			ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+		)
 		if err != nil {
 			return err
 		}
 		defer l.Close()
 		// TLS verify
-		return l.Bind(username, password)
+		return l.BindContext(ctx, username, password)
 	default:
 		return fmt.Errorf("unknown ldap scheme %q", ldapURL.Scheme)
 	}
-
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
