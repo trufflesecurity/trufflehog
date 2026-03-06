@@ -50,12 +50,16 @@ func NewAnalysisError(analyzerType, operation, service, resource string, err err
 }
 
 func (e *AnalysisError) Error() string {
-	if e.err != nil {
-		return fmt.Sprintf("%s analysis failed: %s on %s (resource: %s): %v",
-			e.analyzerType, e.operation, e.service, e.resource, e.err)
+	var resource string
+	if e.resource != "" {
+		resource = fmt.Sprintf(" (resource: %s)", e.resource)
 	}
-	return fmt.Sprintf("%s analysis failed: %s on %s (resource: %s)",
-		e.analyzerType, e.operation, e.service, e.resource)
+	if e.err != nil {
+		return fmt.Sprintf("%s analysis failed: %s on %s%s: %v",
+			e.analyzerType, e.operation, e.service, resource, e.err)
+	}
+	return fmt.Sprintf("%s analysis failed: %s on %s%s",
+		e.analyzerType, e.operation, e.service, resource)
 }
 
 func (e *AnalysisError) Unwrap() error    { return e.err }
