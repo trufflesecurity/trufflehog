@@ -3,6 +3,7 @@ package mercadopago
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -79,7 +80,10 @@ func verifyMercadoPago(ctx context.Context, client *http.Client, token string) (
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+	}()
 
 	switch res.StatusCode {
 	case http.StatusOK:
