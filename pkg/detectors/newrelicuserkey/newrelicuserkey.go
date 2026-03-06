@@ -91,7 +91,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		"eu": "https://api.eu.newrelic.com/graphql",
 	}
 	client := s.getClient()
-	body := "{ requestContext { userId } }"
+	body := `{"query": "{ requestContext { userId } }"}`
 	errs := make([]error, 0, len(regionUrls))
 	for region, regionUrl := range regionUrls {
 		req, err := http.NewRequestWithContext(
@@ -99,6 +99,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		if err != nil {
 			return false, nil, fmt.Errorf("error constructing request: %w", err)
 		}
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("API-Key", key)
 
 		res, err := client.Do(req)
