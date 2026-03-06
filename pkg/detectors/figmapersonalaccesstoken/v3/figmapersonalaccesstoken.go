@@ -25,7 +25,7 @@ func (Scanner) Version() int { return 3 }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b(figp_[a-zA-Z0-9_=-]{40,54})\b`)
+	keyPat        = regexp.MustCompile(`(figp_[a-zA-Z0-9_=-]{40,54})`)
 )
 
 func (s Scanner) Keywords() []string {
