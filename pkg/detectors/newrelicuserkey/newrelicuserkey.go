@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -105,6 +106,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 			return false, nil, fmt.Errorf("error making request: %w", err)
 		}
 		defer func() {
+			_, _ = io.Copy(io.Discard, res.Body)
 			_ = res.Body.Close()
 		}()
 
