@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -217,13 +218,11 @@ func (s *Source) scanSymlink(
 	if s.filter != nil && !s.filter.Pass(resolvedPath) {
 		return nil
 	}
-	resumptionKey := rootPath + "#" + path
-	startState := s.GetEncodedResumeInfoFor(resumptionKey)
-	resuming := startState != ""
-	if resuming && startState == resolvedPath {
-		ctx.Logger().V(5).Info("skipping symlink, already scanned", "path", resolvedPath)
-		return nil
-	}
+
+	// Use a single resumption key for the entire scan rooted at rootPath.
+	// Resume checks are handled by the calling scanDir function.
+	resumptionKey := rootPath
+
 	workerPool.Go(func() error {
 		if !fileInfo.Mode().Type().IsRegular() {
 			ctx.Logger().V(5).Info("skipping non-regular file", "path", resolvedPath)
@@ -232,7 +231,7 @@ func (s *Source) scanSymlink(
 		if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
 		}
-		s.SetEncodedResumeInfoFor(resumptionKey, resolvedPath)
+		s.SetEncodedResumeInfoFor(resumptionKey, path)
 		return nil
 	})
 
@@ -249,12 +248,15 @@ func (s *Source) scanDir(
 ) error {
 	// check if the full path is not matching any pattern in include
 	// FilterRuleSet and matching any exclude FilterRuleSet.
-	resumptionKey := rootPath + "#" + path
 	if s.filter != nil && s.filter.ShouldExclude(path) {
 		return nil
 	}
-	startState := s.GetEncodedResumeInfoFor(resumptionKey)
-	resuming := startState != ""
+
+	// Use a single resumption key for the entire scan rooted at rootPath.
+	// The value stored is the full path of the last successfully scanned file.
+	// This avoids accumulating separate entries for each subdirectory visited.
+	resumptionKey := rootPath
+	resumeAfter := s.GetEncodedResumeInfoFor(resumptionKey)
 
 	ctx.Logger().V(5).Info("Full path found is", "fullPath", path)
 
@@ -271,11 +273,24 @@ func (s *Source) scanDir(
 			}
 		}
 
-		if resuming {
-			if entryPath == startState {
-				resuming = false
+		// Skip entries until we pass the resume point.
+		if resumeAfter != "" {
+			// If this entry is the resume point, clear it so subsequent entries are processed.
+			if entryPath == resumeAfter {
+				resumeAfter = ""
+				continue // Skip the resume point itself since it was already processed.
 			}
-		} else if entry.Type()&os.ModeSymlink != 0 {
+			// If the resume point is within this directory (a descendant), we need to
+			// traverse into it to find where to resume.
+			if entry.IsDir() && strings.HasPrefix(resumeAfter, entryPath+string(filepath.Separator)) {
+				// Continue into this directory to find the resume point.
+			} else {
+				// Skip this entry - it comes before the resume point in traversal order.
+				continue
+			}
+		}
+
+		if entry.Type()&os.ModeSymlink != 0 {
 			ctx.Logger().V(5).Info("Entry found is a symlink", "path", entryPath)
 			if !s.canFollowSymlinks() {
 				// If the file or directory is a symlink but the followSymlinks is disable ignore the path
