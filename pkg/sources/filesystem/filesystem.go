@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -217,13 +218,11 @@ func (s *Source) scanSymlink(
 	if s.filter != nil && !s.filter.Pass(resolvedPath) {
 		return nil
 	}
-	resumptionKey := rootPath + "#" + path
-	startState := s.GetEncodedResumeInfoFor(resumptionKey)
-	resuming := startState != ""
-	if resuming && startState == resolvedPath {
-		ctx.Logger().V(5).Info("skipping symlink, already scanned", "path", resolvedPath)
-		return nil
-	}
+
+	// Use a single resumption key for the entire scan rooted at rootPath.
+	// Resume checks are handled by the calling scanDir function.
+	resumptionKey := rootPath
+
 	workerPool.Go(func() error {
 		if !fileInfo.Mode().Type().IsRegular() {
 			ctx.Logger().V(5).Info("skipping non-regular file", "path", resolvedPath)
@@ -232,7 +231,7 @@ func (s *Source) scanSymlink(
 		if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
 		}
-		s.SetEncodedResumeInfoFor(resumptionKey, resolvedPath)
+		s.SetEncodedResumeInfoFor(resumptionKey, path)
 		return nil
 	})
 
@@ -249,12 +248,35 @@ func (s *Source) scanDir(
 ) error {
 	// check if the full path is not matching any pattern in include
 	// FilterRuleSet and matching any exclude FilterRuleSet.
-	resumptionKey := rootPath + "#" + path
 	if s.filter != nil && s.filter.ShouldExclude(path) {
 		return nil
 	}
-	startState := s.GetEncodedResumeInfoFor(resumptionKey)
-	resuming := startState != ""
+
+	// Use a single resumption key for the entire scan rooted at rootPath.
+	// The value stored is the full path of the last successfully scanned file.
+	// This avoids accumulating separate entries for each subdirectory visited.
+	resumptionKey := rootPath
+	resumeAfter := s.GetEncodedResumeInfoFor(resumptionKey)
+
+	// Only consider resumption if the resume point is within this directory's subtree.
+	// Since os.ReadDir returns entries sorted by filename:
+	// - If we're scanning /root/ccc and the resume point is /root/bbb/file.txt,
+	//   we've already passed it (bbb < ccc) and should process ccc normally.
+	// - If we're scanning /root/aaa and the resume point is /root/bbb/file.txt,
+	//   we haven't reached it yet (aaa < bbb), so aaa was already fully scanned
+	//   and should be skipped entirely.
+	if resumeAfter != "" && !strings.HasPrefix(resumeAfter, path+string(filepath.Separator)) && resumeAfter != path {
+		// Resume point is not in this subtree. Compare paths to determine if we
+		// should skip this directory (already scanned) or process it (already passed).
+		if path < resumeAfter {
+			// This directory comes before the resume point lexicographically,
+			// meaning it was already fully scanned. Skip it entirely.
+			return nil
+		}
+		// This directory comes after the resume point, so we've already passed
+		// the resume point. Process this directory normally.
+		resumeAfter = ""
+	}
 
 	ctx.Logger().V(5).Info("Full path found is", "fullPath", path)
 
@@ -271,11 +293,35 @@ func (s *Source) scanDir(
 			}
 		}
 
-		if resuming {
-			if entryPath == startState {
-				resuming = false
+		// Skip entries until we pass the resume point.
+		// We don't clear the resume info when we find the resume point - instead we
+		// keep it set until a new file is scanned. This ensures we don't lose progress
+		// if the scan is interrupted between finding the resume point and scanning
+		// the next file.
+		if resumeAfter != "" {
+			// If this entry is the resume point, stop skipping.
+			if entryPath == resumeAfter {
+				resumeAfter = ""
+				continue // Skip the resume point itself since it was already processed.
 			}
-		} else if entry.Type()&os.ModeSymlink != 0 {
+			// If the resume point is within this entry (a descendant), we need to
+			// traverse into it to find where to resume.
+			if entry.IsDir() && strings.HasPrefix(resumeAfter, entryPath+string(filepath.Separator)) {
+				// Recurse into this directory to find the resume point.
+				if err := s.scanDir(ctx, entryPath, chunksChan, workerPool, depth, rootPath); err != nil {
+					ctx.Logger().Error(err, "error scanning directory", "path", entryPath)
+				}
+				// After recursing, clear local resumeAfter. The child scanDir will have
+				// handled resumption within its subtree, and subsequent entries in this
+				// directory should be processed normally.
+				resumeAfter = ""
+				continue
+			}
+			// Skip this entry - it comes before the resume point in traversal order.
+			continue
+		}
+
+		if entry.Type()&os.ModeSymlink != 0 {
 			ctx.Logger().V(5).Info("Entry found is a symlink", "path", entryPath)
 			if !s.canFollowSymlinks() {
 				// If the file or directory is a symlink but the followSymlinks is disable ignore the path
