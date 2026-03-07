@@ -572,13 +572,12 @@ polling:
 }
 
 func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 
 	// Create a directory with files that have predictable alphabetical order.
 	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(rootDir)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
 
 	// Create files with predictable names for sorting.
 	files := []string{"aaa.txt", "bbb.txt", "ccc.txt", "ddd.txt"}
@@ -623,7 +622,6 @@ func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
 }
 
 func TestResumptionWithNestedDirectories(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 
 	// Create a nested directory structure:
@@ -636,7 +634,7 @@ func TestResumptionWithNestedDirectories(t *testing.T) {
 	//     file3.txt
 	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-nested-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(rootDir)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
 
 	dirs := []string{"aaa", "bbb", "ccc"}
 	for i, dir := range dirs {
@@ -682,7 +680,6 @@ func TestResumptionWithNestedDirectories(t *testing.T) {
 }
 
 func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 
 	// Create a directory structure:
@@ -700,7 +697,7 @@ func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 	// precede the resume point were already fully scanned and should be skipped.
 	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-subtree-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(rootDir)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
 
 	dirs := []string{"aaa", "bbb", "ccc"}
 	for i, dir := range dirs {
