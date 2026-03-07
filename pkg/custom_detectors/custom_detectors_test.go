@@ -779,6 +779,49 @@ func TestNewWebhookCustomRegex_EnsurePrimaryRegexNameSet(t *testing.T) {
 	assert.Equal(t, "regex_a", detector.GetPrimaryRegexName(), "expected PrimaryRegexName to be set to regex_a")
 }
 
+func TestDetectorMetadata_Empty(t *testing.T) {
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "test-metadata-empty",
+		Keywords: []string{"password"},
+		Regex:    map[string]string{"regex": "password=\"(.*)\""},
+		Metadata: map[string]string{}, // empty metadata
+	})
+	assert.NoError(t, err)
+	results, err := detector.FromData(context.Background(), false, []byte(`password="123456"`))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(results))
+	// ExtraData should only contain "name", not any metadata fields
+	assert.Equal(t, "test-metadata-empty", results[0].ExtraData["name"])
+	// Verify no metadata fields are present - ExtraData should only have "name"
+	assert.Equal(t, 1, len(results[0].ExtraData), "ExtraData should only contain 'name' field when metadata is empty")
+}
+
+func TestDetectorMetadata_Populated(t *testing.T) {
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "test-metadata-populated",
+		Keywords: []string{"api"},
+		Regex:    map[string]string{"api_key": "api_key=\"([^\"]+)\""},
+		Metadata: map[string]string{
+			"environment":   "production",
+			"team":          "security",
+			"severity":      "high",
+			"rotation_guide": "https://example.com/rotate-api-keys",
+			"custom_field":  "any value",
+		},
+	})
+	assert.NoError(t, err)
+	results, err := detector.FromData(context.Background(), false, []byte(`api_key="test123"`))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(results))
+	// Verify all metadata fields are present in ExtraData
+	assert.Equal(t, "test-metadata-populated", results[0].ExtraData["name"])
+	assert.Equal(t, "production", results[0].ExtraData["environment"])
+	assert.Equal(t, "security", results[0].ExtraData["team"])
+	assert.Equal(t, "high", results[0].ExtraData["severity"])
+	assert.Equal(t, "https://example.com/rotate-api-keys", results[0].ExtraData["rotation_guide"])
+	assert.Equal(t, "any value", results[0].ExtraData["custom_field"])
+}
+
 func BenchmarkProductIndices(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = productIndices(3, 2, 6)
