@@ -1,9 +1,12 @@
 package filesystem
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -394,7 +397,7 @@ func TestScanSubDirFile(t *testing.T) {
 	// Create an IncludePathsFile with the absolute path of the file
 	includeFilePath := filepath.Join(testDir, "include.txt")
 	err = os.WriteFile(includeFilePath, []byte(strings.ReplaceAll(filePath, `\`, `\\`)+"\n"), 0644)
-  require.NoError(t, err)
+	require.NoError(t, err)
 
 	conn, err := anypb.New(&sourcespb.Filesystem{
 		IncludePathsFile: includeFilePath,
@@ -462,6 +465,110 @@ func TestSkipBinaries(t *testing.T) {
 	require.Equal(t, 1, chunkCount, "Should have processed exactly one text file")
 	require.Contains(t, processedFiles, textFile, "Should have processed the text file")
 	require.NotContains(t, processedFiles, binaryFile, "Binary file should be skipped")
+}
+
+func TestResumptionInfoDoesNotGrowWithSubdirectories(t *testing.T) {
+	ctx := context.AddLogger(t.Context())
+
+	// Create a deeply nested directory structure with files at each level.
+	// Structure: root/dir0/dir1/dir2/.../dir9, each containing a file.
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
+
+	const numSubdirs = 10
+	currentDir := rootDir
+	for i := 0; i < numSubdirs; i++ {
+		// Create a file in the current directory
+		filePath := filepath.Join(currentDir, fmt.Sprintf("file%d.txt", i))
+		err := os.WriteFile(filePath, []byte(fmt.Sprintf("content %d", i)), 0644)
+		require.NoError(t, err)
+
+		// Create the next subdirectory
+		subDir := filepath.Join(currentDir, fmt.Sprintf("subdir%d", i))
+		err = os.Mkdir(subDir, 0755)
+		require.NoError(t, err)
+		currentDir = subDir
+	}
+	// Create a file in the deepest directory
+	err = os.WriteFile(filepath.Join(currentDir, "deepest.txt"), []byte("deepest"), 0644)
+	require.NoError(t, err)
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption growth", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Track the maximum size of EncodedResumeInfo during the scan.
+	var maxResumeInfoSize int
+	var mu sync.Mutex
+
+	// We need to periodically check the resume info size during scanning.
+	// Run ChunkUnit in a goroutine and poll the progress.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		reporter := sourcestest.TestReporter{}
+		err := s.ChunkUnit(ctx, sources.CommonSourceUnit{
+			ID: rootDir,
+		}, &reporter)
+		require.NoError(t, err)
+	}()
+
+	// Poll the resume info size while scanning is in progress.
+	ticker := time.NewTicker(1 * time.Millisecond)
+	defer ticker.Stop()
+
+polling:
+	for {
+		select {
+		case <-done:
+			break polling
+		case <-ticker.C:
+			progress := s.GetProgress()
+			mu.Lock()
+			if len(progress.EncodedResumeInfo) > maxResumeInfoSize {
+				maxResumeInfoSize = len(progress.EncodedResumeInfo)
+			}
+			mu.Unlock()
+		}
+	}
+
+	// After scan completes, check the final state.
+	finalProgress := s.GetProgress()
+	t.Logf("Final EncodedResumeInfo length: %d", len(finalProgress.EncodedResumeInfo))
+	t.Logf("Max EncodedResumeInfo length during scan: %d", maxResumeInfoSize)
+
+	// Parse the resume info to count entries if it's not empty.
+	if maxResumeInfoSize > 0 {
+		var resumeMap map[string]string
+		err := json.Unmarshal([]byte(finalProgress.EncodedResumeInfo), &resumeMap)
+		if err == nil {
+			t.Logf("Final resume info entries: %d", len(resumeMap))
+		}
+	}
+
+	// The key assertion: resumption info should NOT grow proportionally with
+	// the number of subdirectories. During the scan, it should only track the
+	// current position, not accumulate entries for every directory visited.
+	//
+	// With proper implementation, resume info should have at most a few entries
+	// (e.g., one per directory being actively scanned), not one entry per
+	// directory that has ever been visited.
+	//
+	// A reasonable upper bound for resume info size: each entry is roughly
+	// "rootPath#subPath": "filePath". With temp paths ~50 chars, one entry is
+	// ~150 bytes with JSON overhead. For 10 directories, accumulation would
+	// mean ~1500+ bytes. A non-accumulating implementation should stay well
+	// under that.
+	const maxAcceptableResumeInfoSize = 300 // bytes - allows for ~2 entries max
+	assert.LessOrEqual(t, maxResumeInfoSize, maxAcceptableResumeInfoSize,
+		"Resume info grew to %d bytes during scan, suggesting accumulation across %d subdirectories. "+
+			"Resume info should not accumulate entries for each subdirectory visited.",
+		maxResumeInfoSize, numSubdirs)
 }
 
 // createTempFile is a helper function to create a temporary file in the given
