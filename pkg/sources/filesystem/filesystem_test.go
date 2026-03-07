@@ -694,19 +694,10 @@ func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 	//   ccc/
 	//     file3.txt
 	//
-	// This test demonstrates a potential issue in the resumption logic.
-	// When scanDir is called for a directory (aaa/) with a resume point that
-	// is OUTSIDE that directory's subtree (bbb/file2.txt), the code clears
-	// resumeAfter and processes the directory normally.
-	//
-	// The comment in the code only mentions the case where we've "already passed"
-	// the resume point (scanning ccc/ when resume point is in bbb/). However,
-	// the same logic executes when we HAVEN'T YET reached the resume point
-	// (scanning aaa/ when resume point is in bbb/).
-	//
-	// For aaa/ (which comes BEFORE bbb/ lexicographically), clearing resumeAfter
-	// and rescanning is incorrect - we would have already fully scanned aaa/
-	// before reaching the resume point in bbb/.
+	// This test verifies correct behavior when scanDir is called for a directory
+	// with a resume point OUTSIDE that directory's subtree. Since os.ReadDir
+	// returns entries sorted by filename, directories that lexicographically
+	// precede the resume point were already fully scanned and should be skipped.
 	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-subtree-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(rootDir)
@@ -749,12 +740,9 @@ func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 		scannedFiles[filepath.Base(file)] = true
 	}
 
-	// BUG: file1.txt IS scanned (current behavior), but arguably SHOULD NOT be
-	// scanned because aaa/ comes before bbb/ lexicographically, meaning aaa/
-	// would have been fully processed before reaching the resume point.
-	//
-	// This test is currently written to FAIL, demonstrating the potential bug.
-	// If/when this is fixed, the assertions should be inverted.
+	// file1.txt should NOT be scanned because aaa/ comes before bbb/
+	// lexicographically, meaning aaa/ would have been fully processed
+	// before reaching the resume point.
 	assert.False(t, scannedFiles["file1.txt"],
 		"file1.txt should NOT be scanned because aaa/ comes before resume point bbb/file2.txt lexicographically")
 	assert.Equal(t, 0, len(reporter.Chunks),

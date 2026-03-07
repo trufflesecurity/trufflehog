@@ -259,11 +259,23 @@ func (s *Source) scanDir(
 	resumeAfter := s.GetEncodedResumeInfoFor(resumptionKey)
 
 	// Only consider resumption if the resume point is within this directory's subtree.
-	// Since os.ReadDir returns entries sorted by filename, if we're scanning /root/ccc
-	// and the resume point is /root/bbb/file.txt, we've already passed it (bbb < ccc
-	// lexicographically) and should process everything in ccc normally.
+	// Since os.ReadDir returns entries sorted by filename:
+	// - If we're scanning /root/ccc and the resume point is /root/bbb/file.txt,
+	//   we've already passed it (bbb < ccc) and should process ccc normally.
+	// - If we're scanning /root/aaa and the resume point is /root/bbb/file.txt,
+	//   we haven't reached it yet (aaa < bbb), so aaa was already fully scanned
+	//   and should be skipped entirely.
 	if resumeAfter != "" && !strings.HasPrefix(resumeAfter, path+string(filepath.Separator)) && resumeAfter != path {
-		resumeAfter = "" // Resume point is not in this subtree, process normally.
+		// Resume point is not in this subtree. Compare paths to determine if we
+		// should skip this directory (already scanned) or process it (already passed).
+		if path < resumeAfter {
+			// This directory comes before the resume point lexicographically,
+			// meaning it was already fully scanned. Skip it entirely.
+			return nil
+		}
+		// This directory comes after the resume point, so we've already passed
+		// the resume point. Process this directory normally.
+		resumeAfter = ""
 	}
 
 	ctx.Logger().V(5).Info("Full path found is", "fullPath", path)
