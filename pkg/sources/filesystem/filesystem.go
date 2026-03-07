@@ -258,6 +258,13 @@ func (s *Source) scanDir(
 	resumptionKey := rootPath
 	resumeAfter := s.GetEncodedResumeInfoFor(resumptionKey)
 
+	// Only consider resumption if the resume point is within this directory's subtree.
+	// If we're scanning /root/ccc and the resume point is /root/bbb/file.txt, we've
+	// already passed it and should process everything in ccc normally.
+	if resumeAfter != "" && !strings.HasPrefix(resumeAfter, path+string(filepath.Separator)) && resumeAfter != path {
+		resumeAfter = "" // Resume point is not in this subtree, process normally.
+	}
+
 	ctx.Logger().V(5).Info("Full path found is", "fullPath", path)
 
 	entries, err := os.ReadDir(path)
@@ -274,20 +281,31 @@ func (s *Source) scanDir(
 		}
 
 		// Skip entries until we pass the resume point.
+		// We don't clear the resume info when we find the resume point - instead we
+		// keep it set until a new file is scanned. This ensures we don't lose progress
+		// if the scan is interrupted between finding the resume point and scanning
+		// the next file.
 		if resumeAfter != "" {
-			// If this entry is the resume point, clear it so subsequent entries are processed.
+			// If this entry is the resume point, stop skipping.
 			if entryPath == resumeAfter {
 				resumeAfter = ""
 				continue // Skip the resume point itself since it was already processed.
 			}
-			// If the resume point is within this directory (a descendant), we need to
+			// If the resume point is within this entry (a descendant), we need to
 			// traverse into it to find where to resume.
 			if entry.IsDir() && strings.HasPrefix(resumeAfter, entryPath+string(filepath.Separator)) {
-				// Continue into this directory to find the resume point.
-			} else {
-				// Skip this entry - it comes before the resume point in traversal order.
+				// Recurse into this directory to find the resume point.
+				if err := s.scanDir(ctx, entryPath, chunksChan, workerPool, depth, rootPath); err != nil {
+					ctx.Logger().Error(err, "error scanning directory", "path", entryPath)
+				}
+				// After recursing, clear local resumeAfter. The child scanDir will have
+				// handled resumption within its subtree, and subsequent entries in this
+				// directory should be processed normally.
+				resumeAfter = ""
 				continue
 			}
+			// Skip this entry - it comes before the resume point in traversal order.
+			continue
 		}
 
 		if entry.Type()&os.ModeSymlink != 0 {

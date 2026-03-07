@@ -571,6 +571,116 @@ polling:
 		maxResumeInfoSize, numSubdirs)
 }
 
+func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Create a directory with files that have predictable alphabetical order.
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(rootDir)
+
+	// Create files with predictable names for sorting.
+	files := []string{"aaa.txt", "bbb.txt", "ccc.txt", "ddd.txt"}
+	for _, name := range files {
+		filePath := filepath.Join(rootDir, name)
+		err := os.WriteFile(filePath, []byte("content of "+name), 0644)
+		require.NoError(t, err)
+	}
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Pre-set the resume point to simulate a previous interrupted scan.
+	// Setting it to bbb.txt means we should skip aaa.txt and bbb.txt,
+	// and only scan ccc.txt and ddd.txt.
+	resumePoint := filepath.Join(rootDir, "bbb.txt")
+	s.SetEncodedResumeInfoFor(rootDir, resumePoint)
+
+	// Run the scan.
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: rootDir}, &reporter)
+	require.NoError(t, err)
+
+	// Collect scanned file names.
+	scannedFiles := make(map[string]bool)
+	for _, chunk := range reporter.Chunks {
+		file := chunk.SourceMetadata.GetFilesystem().GetFile()
+		scannedFiles[filepath.Base(file)] = true
+	}
+
+	// Assert only files after the resume point were scanned.
+	assert.False(t, scannedFiles["aaa.txt"], "aaa.txt should have been skipped (before resume point)")
+	assert.False(t, scannedFiles["bbb.txt"], "bbb.txt should have been skipped (the resume point itself)")
+	assert.True(t, scannedFiles["ccc.txt"], "ccc.txt should have been scanned (after resume point)")
+	assert.True(t, scannedFiles["ddd.txt"], "ddd.txt should have been scanned (after resume point)")
+	assert.Equal(t, 2, len(reporter.Chunks), "expected exactly 2 files to be scanned")
+}
+
+func TestResumptionWithNestedDirectories(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Create a nested directory structure:
+	// root/
+	//   aaa/
+	//     file1.txt
+	//   bbb/
+	//     file2.txt
+	//   ccc/
+	//     file3.txt
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-nested-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(rootDir)
+
+	dirs := []string{"aaa", "bbb", "ccc"}
+	for i, dir := range dirs {
+		dirPath := filepath.Join(rootDir, dir)
+		err := os.Mkdir(dirPath, 0755)
+		require.NoError(t, err)
+
+		filePath := filepath.Join(dirPath, fmt.Sprintf("file%d.txt", i+1))
+		err = os.WriteFile(filePath, []byte(fmt.Sprintf("content of file%d", i+1)), 0644)
+		require.NoError(t, err)
+	}
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption nested", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Pre-set the resume point to bbb/file2.txt.
+	// This should skip aaa/file1.txt and bbb/file2.txt, only scanning ccc/file3.txt.
+	resumePoint := filepath.Join(rootDir, "bbb", "file2.txt")
+	s.SetEncodedResumeInfoFor(rootDir, resumePoint)
+
+	// Run the scan.
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: rootDir}, &reporter)
+	require.NoError(t, err)
+
+	// Collect scanned file names.
+	scannedFiles := make(map[string]bool)
+	for _, chunk := range reporter.Chunks {
+		file := chunk.SourceMetadata.GetFilesystem().GetFile()
+		scannedFiles[filepath.Base(file)] = true
+	}
+
+	// Assert only file3.txt was scanned.
+	assert.False(t, scannedFiles["file1.txt"], "file1.txt should have been skipped (in aaa/, before resume point)")
+	assert.False(t, scannedFiles["file2.txt"], "file2.txt should have been skipped (the resume point itself)")
+	assert.True(t, scannedFiles["file3.txt"], "file3.txt should have been scanned (in ccc/, after resume point)")
+	assert.Equal(t, 1, len(reporter.Chunks), "expected exactly 1 file to be scanned")
+}
+
 // createTempFile is a helper function to create a temporary file in the given
 // directory with the provided contents. If dir is "", the operating system's
 // temp directory is used.
