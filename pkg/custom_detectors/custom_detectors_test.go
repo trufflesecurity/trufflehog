@@ -802,11 +802,11 @@ func TestDetectorMetadata_Populated(t *testing.T) {
 		Keywords: []string{"api"},
 		Regex:    map[string]string{"api_key": "api_key=\"([^\"]+)\""},
 		Metadata: map[string]string{
-			"environment":   "production",
-			"team":          "security",
-			"severity":      "high",
+			"environment":    "production",
+			"team":           "security",
+			"severity":       "high",
 			"rotation_guide": "https://example.com/rotate-api-keys",
-			"custom_field":  "any value",
+			"custom_field":   "any value",
 		},
 	})
 	assert.NoError(t, err)
