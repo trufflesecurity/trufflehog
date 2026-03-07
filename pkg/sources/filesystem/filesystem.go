@@ -259,8 +259,9 @@ func (s *Source) scanDir(
 	resumeAfter := s.GetEncodedResumeInfoFor(resumptionKey)
 
 	// Only consider resumption if the resume point is within this directory's subtree.
-	// If we're scanning /root/ccc and the resume point is /root/bbb/file.txt, we've
-	// already passed it and should process everything in ccc normally.
+	// Since os.ReadDir returns entries sorted by filename, if we're scanning /root/ccc
+	// and the resume point is /root/bbb/file.txt, we've already passed it (bbb < ccc
+	// lexicographically) and should process everything in ccc normally.
 	if resumeAfter != "" && !strings.HasPrefix(resumeAfter, path+string(filepath.Separator)) && resumeAfter != path {
 		resumeAfter = "" // Resume point is not in this subtree, process normally.
 	}

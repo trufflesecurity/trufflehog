@@ -681,6 +681,86 @@ func TestResumptionWithNestedDirectories(t *testing.T) {
 	assert.Equal(t, 1, len(reporter.Chunks), "expected exactly 1 file to be scanned")
 }
 
+func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Create a directory structure:
+	// root/
+	//   aaa/
+	//     file1.txt
+	//   bbb/
+	//     file2.txt
+	//   ccc/
+	//     file3.txt
+	//
+	// This test demonstrates a potential issue in the resumption logic.
+	// When scanDir is called for a directory (aaa/) with a resume point that
+	// is OUTSIDE that directory's subtree (bbb/file2.txt), the code clears
+	// resumeAfter and processes the directory normally.
+	//
+	// The comment in the code only mentions the case where we've "already passed"
+	// the resume point (scanning ccc/ when resume point is in bbb/). However,
+	// the same logic executes when we HAVEN'T YET reached the resume point
+	// (scanning aaa/ when resume point is in bbb/).
+	//
+	// For aaa/ (which comes BEFORE bbb/ lexicographically), clearing resumeAfter
+	// and rescanning is incorrect - we would have already fully scanned aaa/
+	// before reaching the resume point in bbb/.
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-subtree-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(rootDir)
+
+	dirs := []string{"aaa", "bbb", "ccc"}
+	for i, dir := range dirs {
+		dirPath := filepath.Join(rootDir, dir)
+		err := os.Mkdir(dirPath, 0755)
+		require.NoError(t, err)
+
+		filePath := filepath.Join(dirPath, fmt.Sprintf("file%d.txt", i+1))
+		err = os.WriteFile(filePath, []byte(fmt.Sprintf("content of file%d", i+1)), 0644)
+		require.NoError(t, err)
+	}
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption subtree", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Pre-set the resume point to bbb/file2.txt using aaaDir as the key.
+	// This simulates an edge case where scanDir is called directly for a
+	// directory with a resume point outside its subtree.
+	aaaDir := filepath.Join(rootDir, "aaa")
+	resumePoint := filepath.Join(rootDir, "bbb", "file2.txt")
+	s.SetEncodedResumeInfoFor(aaaDir, resumePoint)
+
+	// Scan the aaa directory with a resume point outside its subtree.
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: aaaDir}, &reporter)
+	require.NoError(t, err)
+
+	// Collect scanned file names.
+	scannedFiles := make(map[string]bool)
+	for _, chunk := range reporter.Chunks {
+		file := chunk.SourceMetadata.GetFilesystem().GetFile()
+		scannedFiles[filepath.Base(file)] = true
+	}
+
+	// BUG: file1.txt IS scanned (current behavior), but arguably SHOULD NOT be
+	// scanned because aaa/ comes before bbb/ lexicographically, meaning aaa/
+	// would have been fully processed before reaching the resume point.
+	//
+	// This test is currently written to FAIL, demonstrating the potential bug.
+	// If/when this is fixed, the assertions should be inverted.
+	assert.False(t, scannedFiles["file1.txt"],
+		"file1.txt should NOT be scanned because aaa/ comes before resume point bbb/file2.txt lexicographically")
+	assert.Equal(t, 0, len(reporter.Chunks),
+		"expected 0 files to be scanned since aaa/ was already fully processed before the resume point")
+}
+
 // createTempFile is a helper function to create a temporary file in the given
 // directory with the provided contents. If dir is "", the operating system's
 // temp directory is used.
