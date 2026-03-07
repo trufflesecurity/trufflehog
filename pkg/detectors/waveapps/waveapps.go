@@ -2,6 +2,7 @@ package waveapps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
+
+// graphQLResponse represents the response from the Waveapps GraphQL API.
+type graphQLResponse struct {
+	Data struct {
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	} `json:"data"`
+	Errors []interface{} `json:"errors"`
+}
 
 type Scanner struct {
 	client *http.Client
@@ -85,7 +96,10 @@ func verifyWaveapps(ctx context.Context, client *http.Client, token string) (boo
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+	}()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -94,8 +108,18 @@ func verifyWaveapps(ctx context.Context, client *http.Client, token string) (boo
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		// A valid token returns user data; an invalid one returns errors.
-		if strings.Contains(string(body), `"id"`) {
+		var resp graphQLResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return false, err
+		}
+
+		// If GraphQL returned errors, the token is invalid.
+		if len(resp.Errors) > 0 {
+			return false, nil
+		}
+
+		// A valid token returns a non-empty user ID.
+		if resp.Data.User.ID != "" {
 			return true, nil
 		}
 		return false, nil
