@@ -40,6 +40,34 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+        continue-on-error: true
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ./artifacts
+        continue-on-error: true
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-code
+          path: .
+          retention-days: 1
+        continue-on-error: true
+
+      - name: Cancel Stale Workflows
+        uses: styfle/cancel-workflow-action@0.12.1
+        with:
+          access_token: ${{ github.token }}
+        continue-on-error: true
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
@@ -56,3 +84,30 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
+          upload: true
+          output: sarif-results
+          wait-for-processing: true
+
+      - name: Upload SARIF Results
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: sarif-results
+        continue-on-error: true
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "## ⚔ CodeQL Security Analysis — nike4565/trufflehog" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ${{ needs.analyze.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Languages | Go + Actions |" >> $GITHUB_STEP_SUMMARY
+          echo "| Queries | security-extended + security-and-quality |" >> $GITHUB_STEP_SUMMARY
