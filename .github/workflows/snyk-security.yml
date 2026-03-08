@@ -1,0 +1,78 @@
+name: Snyk Security
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  snyk:
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    runs-on: ubuntu-latest
+
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SNYK_DISABLE_ANALYTICS: "1"
+      SNYK_INTEGRATION_NAME: "github-actions"
+      SNYK_SEVERITY_THRESHOLD: high
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cache to speed up Snyk scans
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/snyk
+          key: snyk-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      # Install Snyk CLI
+      - name: Set up Snyk CLI
+        uses: snyk/actions/setup@806182742461562b67788a64410098c9d9b96adb
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      # Snyk Code (SAST)
+      - name: Snyk Code test
+        run: snyk code test --severity-threshold=${{ env.SNYK_SEVERITY_THRESHOLD }} --sarif > snyk-code.sarif || true
+
+      # Snyk Secrets Scan
+      - name: Snyk Secrets Scan
+        run: snyk code test --scan=secrets --sarif > snyk-secrets.sarif || true
+
+      # Snyk Open Source (SCA)
+      - name: Snyk Open Source test
+        run: snyk test --all-projects --severity-threshold=${{ env.SNYK_SEVERITY_THRESHOLD }} || true
+
+      - name: Snyk Open Source monitor
+        run: snyk monitor --all-projects
+
+      # Snyk IaC
+      - name: Snyk IaC test and report
+        run: snyk iac test --experimental --report || true
+
+      # Build Docker image
+      - name: Build Docker image
+        run: docker build -t your/image-to-test .
+
+      # Snyk Container
+      - name: Snyk Container monitor
+        run: snyk container monitor your/image-to-test --file=Dockerfile
+
+      # Upload SAST results
+      - name: Upload Snyk Code results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+
+      # Upload Secrets results
+      - name: Upload Snyk Secrets results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-secrets.sarif
