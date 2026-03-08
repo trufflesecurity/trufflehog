@@ -1,0 +1,61 @@
+ ══════════════════════════════════════════════════════════
+ 📝 .dockerignore - Optimize Docker Build
+ ══════════════════════════════════════════════════════════
+
+ Git Files
+.git
+.gitignore
+.gitattributes
+.github
+
+ Documentation
+*.md
+README.md
+LICENSE
+CHANGELOG.md
+docs/
+
+ CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+ IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+ OS Files
+.DS_Store
+Thumbs.db
+
+ Build Artifacts
+bin/
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+ Test Files
+*_test.go
+testdata/
+coverage.out
+*.test
+
+ Dependencies
+vendor/
+
+ Temporary Files
+tmp/
+temp/
+*.log
+*.tmp
+
+ Docker
+Dockerfile*
+docker-compose*.yml
