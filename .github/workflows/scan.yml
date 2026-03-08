@@ -8,26 +8,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    uses: ./.github/workflows/reusable-build.yml
-    with:
-      go-version: "1.22"
-      build-flags: "-v"
-    secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
-
   scan:
     name: TruffleHog OSS Scan
     runs-on: ubuntu-latest
-    needs: build
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run TruffleHog OSS by asrar-mared
-        uses: ./
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
         with:
           path: "./"
           extra_args: "--no-update"
-          version: "latest"
