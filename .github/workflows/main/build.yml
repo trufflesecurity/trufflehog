@@ -1,0 +1,17 @@
+name: Main Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      go-version: "1.22"
+      build-flags: "-v"
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
