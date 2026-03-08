@@ -1,0 +1,33 @@
+name: Reusable Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+      build-flags:
+        required: false
+        type: string
+    secrets:
+      token:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Build
+        run: |
+          go build ${{ inputs.build-flags }} ./...
+        env:
+          GITHUB_TOKEN: ${{ secrets.token }}
