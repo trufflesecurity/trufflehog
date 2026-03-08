@@ -1,130 +1,71 @@
-version: 2
-release:
-  make_latest: false
-builds:
-  - id: trufflehog-upx
-    binary: trufflehog
-    ldflags:
-      - -s -w -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
-    env: [CGO_ENABLED=0]
-    goos:
-    - linux
-    goarch:
-    - amd64
-    - arm64
-    hooks:
-      post:
-        - upx -q "{{ .Path }}"
-  - id: trufflehog
-    binary: trufflehog
-    ldflags:
-      - -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
-    env: [CGO_ENABLED=0]
-    goos:
-    - darwin
-    - windows
-    goarch:
-    - amd64
-    - arm64
-dockers:
-  - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
-    dockerfile: Dockerfile.goreleaser
-    extra_files:
-    - entrypoint.sh
-    use: buildx
-    build_flag_templates:
-    - --platform=linux/amd64
-    - --label=org.opencontainers.image.title={{ .ProjectName }}
-    - --label=org.opencontainers.image.description={{ .ProjectName }}
-    - --label=org.opencontainers.image.url=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.source=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.version={{ .Version }}
-    - --label=org.opencontainers.image.revision={{ .FullCommit }}
-    - --label=org.opencontainers.image.licenses=AGPL-3.0
-    - --provenance=false
-  - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8"]
+# ══════════════════════════════════════════════════════════
+# 🔧 SLSA GoReleaser Configuration
+# ══════════════════════════════════════════════════════════
+
+version: 1
+
+# ═══════════════════════════════════════════════════════
+# Environment Variables
+# ═══════════════════════════════════════════════════════
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+
+# ═══════════════════════════════════════════════════════
+# Build Flags
+# ═══════════════════════════════════════════════════════
+flags:
+  - -trimpath
+  - -mod=readonly
+
+# ═══════════════════════════════════════════════════════
+# Linker Flags (ldflags)
+# ═══════════════════════════════════════════════════════
+ldflags:
+  - -s
+  - -w
+  - -X main.version={{.Version}}
+  - -X main.commit={{.Commit}}
+  - -X main.date={{.Date}}
+  - -X main.builtBy=slsa-github-generator
+  - -extldflags '-static'
+
+# ═══════════════════════════════════════════════════════
+# Build Targets (Multi-Platform)
+# ═══════════════════════════════════════════════════════
+goos:
+  - linux
+  - windows
+  - darwin
+  - freebsd
+
+goarch:
+  - amd64
+  - arm64
+  - arm
+  - 386
+
+goarm:
+  - 6
+  - 7
+
+# ═══════════════════════════════════════════════════════
+# Binary Name Template
+# ═══════════════════════════════════════════════════════
+binary: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+
+# ═══════════════════════════════════════════════════════
+# Main Package Path
+# ═══════════════════════════════════════════════════════
+main: ./cmd/main.go
+
+# ═══════════════════════════════════════════════════════
+# Ignore Certain Combinations
+# ═══════════════════════════════════════════════════════
+ignore:
+  - goos: darwin
+    goarch: 386
+  - goos: windows
+    goarch: arm
+  - goos: windows
     goarch: arm64
-    dockerfile: Dockerfile.goreleaser
-    extra_files:
-    - entrypoint.sh
-    use: buildx
-    build_flag_templates:
-    - --platform=linux/arm64/v8
-    - --label=org.opencontainers.image.title={{ .ProjectName }}
-    - --label=org.opencontainers.image.description={{ .ProjectName }}
-    - --label=org.opencontainers.image.url=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.source=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.version={{ .Version }}
-    - --label=org.opencontainers.image.revision={{ .FullCommit }}
-    - --label=org.opencontainers.image.licenses=AGPL-3.0
-    - --provenance=false
-  - image_templates: ["ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
-    dockerfile: Dockerfile.goreleaser
-    extra_files:
-    - entrypoint.sh
-    use: buildx
-    build_flag_templates:
-    - --platform=linux/amd64
-    - --label=org.opencontainers.image.title={{ .ProjectName }}
-    - --label=org.opencontainers.image.description={{ .ProjectName }}
-    - --label=org.opencontainers.image.url=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.source=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.version={{ .Version }}
-    - --label=org.opencontainers.image.revision={{ .FullCommit }}
-    - --label=org.opencontainers.image.licenses=AGPL-3.0
-    - --provenance=false
-  - image_templates: ["ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8"]
-    goarch: arm64
-    dockerfile: Dockerfile.goreleaser
-    extra_files:
-    - entrypoint.sh
-    use: buildx
-    build_flag_templates:
-    - --platform=linux/arm64/v8
-    - --label=org.opencontainers.image.title={{ .ProjectName }}
-    - --label=org.opencontainers.image.description={{ .ProjectName }}
-    - --label=org.opencontainers.image.url=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.source=https://github.com/trufflesecurity/{{ .ProjectName }}
-    - --label=org.opencontainers.image.version={{ .Version }}
-    - --label=org.opencontainers.image.revision={{ .FullCommit }}
-    - --label=org.opencontainers.image.licenses=AGPL-3.0
-    - --provenance=false
-docker_manifests:
-  - name_template: trufflesecurity/{{ .ProjectName }}:{{ .Version }}
-    image_templates:
-    - trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
-    - trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
-  - name_template: trufflesecurity/{{ .ProjectName }}:latest
-    image_templates:
-    - trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
-    - trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
-  - name_template: ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}
-    image_templates:
-    - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
-    - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
-  - name_template: ghcr.io/trufflesecurity/{{ .ProjectName }}:latest
-    image_templates:
-    - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
-    - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
-brews:
-  - repository:
-      owner: trufflesecurity
-      name: homebrew-trufflehog
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    description: "Find credentials all over the place"
-    name: "trufflehog"
-    homepage: "https://github.com/trufflesecurity/trufflehog"
-    install: |
-      bin.install "trufflehog"
-signs:
-  - cmd: cosign
-    signature: "${artifact}.sig"
-    certificate: "${artifact}.pem"
-    args: 
-      - "sign-blob"
-      - "--oidc-issuer=https://token.actions.githubusercontent.com"
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
-      - "${artifact}"
-      - "--yes"
-    artifacts: checksum
