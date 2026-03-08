@@ -1,6 +1,6 @@
-name: 'TruffleHog OSS'
-description: 'Find and verify leaked credentials in your source code.'
-author: Truffle Security Co. <support@trufflesec.com>
+name: 'TruffleHog OSS by asrar-mared'
+description: 'Find and verify leaked credentials in your source code — maintained by asrar-mared (Bug Hunter).'
+author: asrar-mared <support@asrar-mared.com>
 
 inputs:
   path:
@@ -22,6 +22,7 @@ inputs:
     default: "latest"
     description: Scan with this trufflehog cli version.
     required: false
+
 branding:
   icon: "shield"
   color: "green"
@@ -38,19 +39,16 @@ runs:
         COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
         VERSION: ${{ inputs.version }}
       run: |
-        ##########################################
-        ## ADVANCED USAGE                       ##
-        ## Scan by BASE & HEAD user inputs      ##
-        ## If BASE == HEAD, exit with error     ##
-        ##########################################
-        # Check if jq is installed, if not, install it
+        echo "🔍 Starting TruffleHog scan — powered by asrar-mared (Bug Hunter)"
+
         if ! command -v jq &> /dev/null
         then
-          echo "jq could not be found, installing..."
+          echo "jq not found — installing..."
           apt-get -y update && apt-get install -y jq
         fi
 
-        git status >/dev/null  # make sure we are in a git repository
+        git status >/dev/null
+
         if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
           if [ -n "$BASE" ]; then
             base_commit=$(git rev-parse "$BASE" 2>/dev/null) || true
@@ -63,12 +61,9 @@ runs:
             head_commit=""
           fi
           if [ "$base_commit" == "$head_commit" ] ; then
-            echo "::error::BASE and HEAD commits are the same. TruffleHog won't scan anything. Please see documentation (https://github.com/trufflesecurity/trufflehog#octocat-trufflehog-github-action)."
+            echo "::error::BASE and HEAD are identical — nothing to scan."
             exit 1
           fi
-        ##########################################
-        ## Scan commits based on event type     ##
-        ##########################################
         else
           if [ "${{ github.event_name }}" == "push" ]; then
             COMMIT_LENGTH=$(printenv COMMIT_IDS | jq length)
@@ -90,17 +85,15 @@ runs:
             HEAD=${{github.event.pull_request.head.sha}}
           fi
         fi
-        ##########################################
-        ##          Run TruffleHog              ##
-        ##########################################
+
         docker run --rm -v .:/tmp -w /tmp \
         ghcr.io/trufflesecurity/trufflehog:${VERSION} \
         git file:///tmp/ \
-        --since-commit \
-        ${BASE:-''} \
-        --branch \
-        ${HEAD:-''} \
+        --since-commit ${BASE:-''} \
+        --branch ${HEAD:-''} \
         --fail \
         --no-update \
         --github-actions \
         ${ARGS:-''}
+
+        echo "✅ Scan completed successfully — signed by asrar-mared (Bug Hunter)"
