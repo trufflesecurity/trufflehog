@@ -90,15 +90,17 @@ func verifyToken(ctx logContext.Context, client *http.Client, token string) (boo
 		return false, nil, err
 	}
 
-	var extraData map[string]string
+	extraData := make(map[string]string)
 
 	// lightweight analyze: unconditionally preserve the response body
-	extraData[lwa.KeyResponse] = string(lwa.CopyAndCloseResponseBody(ctx, res))
+	resBody := lwa.CopyAndCloseResponseBody(ctx, res)
+
+	extraData[lwa.KeyResponse] = string(resBody)
 
 	switch res.StatusCode {
 	case 200:
 		var resData response
-		if err = json.NewDecoder(res.Body).Decode(&resData); err != nil {
+		if err = json.Unmarshal(resBody, &resData); err != nil {
 			// We got a response that this code doesn't know how to properly handle; perhaps the detector code needs to be updated.
 			// Log the error, and then propagate it, making this an indeterminate result.
 			ctx.Logger().Error(err, "failed to parse response")
