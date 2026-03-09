@@ -137,7 +137,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initialDepth := 1
 			err = s.scanSymlink(ctx, cleanPath, chunksChan, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path + "#")
+			s.ClearEncodedResumeContainingId(path)
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root path is a dir", "path", cleanPath)
 			workerPool := new(errgroup.Group)
@@ -145,7 +145,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initialDepth := 1
 			err = s.scanDir(ctx, cleanPath, chunksChan, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path + "#")
+			s.ClearEncodedResumeContainingId(path)
 		} else {
 			if !fileInfo.Mode().IsRegular() {
 				logger.Info("skipping non-regular file", "path", cleanPath)
@@ -447,7 +447,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			initialDepth := 1
 			scanErr = s.scanSymlink(ctx, cleanPath, ch, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path + "#")
+			s.ClearEncodedResumeContainingId(path)
 
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root path is a dir", "path", cleanPath)
@@ -457,7 +457,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			// TODO: Finer grain error tracking of individual chunks.
 			scanErr = s.scanDir(ctx, cleanPath, ch, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeContainingId(path + "#")
+			s.ClearEncodedResumeContainingId(path)
 		} else {
 			ctx.Logger().V(5).Info("Root path is a file", "path", cleanPath)
 			// TODO: Finer grain error tracking of individual
