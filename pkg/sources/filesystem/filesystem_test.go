@@ -116,7 +116,7 @@ func TestScanFile(t *testing.T) {
 	ctx := context.WithLogger(context.Background(), logr.Discard())
 	go func() {
 		defer close(chunksChan)
-		err = source.scanFile(ctx, tmpfile.Name(), chunksChan)
+		err = source.scanFile(ctx, tmpfile.Name(), chunksChan, ".")
 		assert.Nil(t, err)
 	}()
 
@@ -148,7 +148,7 @@ func TestScanBinaryFile(t *testing.T) {
 
 	go func() {
 		defer close(chunksChan)
-		errChan <- source.scanFile(ctx, tmpfile.Name(), chunksChan)
+		errChan <- source.scanFile(ctx, tmpfile.Name(), chunksChan, ".")
 	}()
 
 	err = <-errChan
@@ -580,9 +580,14 @@ func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
 
 	// Create files with predictable names for sorting.
-	files := []string{"aaa.txt", "bbb.txt", "ccc.txt", "ddd.txt"}
-	for _, name := range files {
-		filePath := filepath.Join(rootDir, name)
+	files := []string{
+		filepath.Join(rootDir, "aaa.txt"),
+		filepath.Join(rootDir, "bbb.txt"),
+		filepath.Join(rootDir, "ccc.txt"),
+		filepath.Join(rootDir, "ddd.txt"),
+	}
+	for _, filePath := range files {
+		name := filepath.Base(filePath)
 		err := os.WriteFile(filePath, []byte("content of "+name), 0644)
 		require.NoError(t, err)
 	}
@@ -592,14 +597,15 @@ func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test resumption", 0, 0, true, conn, 1)
-	require.NoError(t, err)
 
 	// Pre-set the resume point to simulate a previous interrupted scan.
 	// Setting it to bbb.txt means we should skip aaa.txt and bbb.txt,
 	// and only scan ccc.txt and ddd.txt.
 	resumePoint := filepath.Join(rootDir, "bbb.txt")
 	s.SetEncodedResumeInfoFor(rootDir, resumePoint)
+
+	err = s.Init(ctx, "test resumption", 0, 0, true, conn, 1)
+	require.NoError(t, err)
 
 	// Run the scan.
 	reporter := sourcestest.TestReporter{}
@@ -636,9 +642,12 @@ func TestResumptionWithNestedDirectories(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
 
-	dirs := []string{"aaa", "bbb", "ccc"}
-	for i, dir := range dirs {
-		dirPath := filepath.Join(rootDir, dir)
+	dirs := []string{
+		filepath.Join(rootDir, "aaa"),
+		filepath.Join(rootDir, "bbb"),
+		filepath.Join(rootDir, "ccc"),
+	}
+	for i, dirPath := range dirs {
 		err := os.Mkdir(dirPath, 0755)
 		require.NoError(t, err)
 
@@ -652,13 +661,14 @@ func TestResumptionWithNestedDirectories(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test resumption nested", 0, 0, true, conn, 1)
-	require.NoError(t, err)
 
 	// Pre-set the resume point to bbb/file2.txt.
 	// This should skip aaa/file1.txt and bbb/file2.txt, only scanning ccc/file3.txt.
 	resumePoint := filepath.Join(rootDir, "bbb", "file2.txt")
 	s.SetEncodedResumeInfoFor(rootDir, resumePoint)
+
+	err = s.Init(ctx, "test resumption nested", 0, 0, true, conn, 1)
+	require.NoError(t, err)
 
 	// Run the scan.
 	reporter := sourcestest.TestReporter{}
@@ -715,8 +725,6 @@ func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test resumption subtree", 0, 0, true, conn, 1)
-	require.NoError(t, err)
 
 	// Pre-set the resume point to bbb/file2.txt using aaaDir as the key.
 	// This simulates an edge case where scanDir is called directly for a
@@ -724,6 +732,9 @@ func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 	aaaDir := filepath.Join(rootDir, "aaa")
 	resumePoint := filepath.Join(rootDir, "bbb", "file2.txt")
 	s.SetEncodedResumeInfoFor(aaaDir, resumePoint)
+
+	err = s.Init(ctx, "test resumption subtree", 0, 0, true, conn, 1)
+	require.NoError(t, err)
 
 	// Scan the aaa directory with a resume point outside its subtree.
 	reporter := sourcestest.TestReporter{}

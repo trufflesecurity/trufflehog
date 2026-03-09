@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"sync/atomic"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -38,6 +38,7 @@ type Source struct {
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 	maxSymlinkDepth int
+	resuming        atomic.Bool
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -88,6 +89,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	if err != nil {
 		return err
 	}
+
+	s.resuming.Store(s.GetProgress().EncodedResumeInfo != "")
+
 	return nil
 }
 
@@ -137,7 +141,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initialDepth := 1
 			err = s.scanSymlink(ctx, cleanPath, chunksChan, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(path)
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root path is a dir", "path", cleanPath)
 			workerPool := new(errgroup.Group)
@@ -145,14 +148,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			initialDepth := 1
 			err = s.scanDir(ctx, cleanPath, chunksChan, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(path)
 		} else {
 			if !fileInfo.Mode().IsRegular() {
 				logger.Info("skipping non-regular file", "path", cleanPath)
 				continue
 			}
 			ctx.Logger().V(5).Info("Root path is a file", "path", cleanPath)
-			err = s.scanFile(ctx, cleanPath, chunksChan)
+			err = s.scanFile(ctx, cleanPath, chunksChan, path)
 		}
 
 		if err != nil && !errors.Is(err, io.EOF) {
@@ -219,19 +221,16 @@ func (s *Source) scanSymlink(
 		return nil
 	}
 
-	// Use a single resumption key for the entire scan rooted at rootPath.
-	// Resume checks are handled by the calling scanDir function.
-	resumptionKey := rootPath
-
 	workerPool.Go(func() error {
 		if !fileInfo.Mode().Type().IsRegular() {
 			ctx.Logger().V(5).Info("skipping non-regular file", "path", resolvedPath)
 			return nil
 		}
-		if err := s.scanFile(ctx, resolvedPath, chunksChan); err != nil {
+
+		if err := s.scanFile(ctx, resolvedPath, chunksChan, rootPath); err != nil {
 			ctx.Logger().Error(err, "error scanning file", "path", resolvedPath)
 		}
-		s.SetEncodedResumeInfoFor(resumptionKey, path)
+
 		return nil
 	})
 
@@ -252,32 +251,6 @@ func (s *Source) scanDir(
 		return nil
 	}
 
-	// Use a single resumption key for the entire scan rooted at rootPath.
-	// The value stored is the full path of the last successfully scanned file.
-	// This avoids accumulating separate entries for each subdirectory visited.
-	resumptionKey := rootPath
-	resumeAfter := s.GetEncodedResumeInfoFor(resumptionKey)
-
-	// Only consider resumption if the resume point is within this directory's subtree.
-	// Since os.ReadDir returns entries sorted by filename:
-	// - If we're scanning /root/ccc and the resume point is /root/bbb/file.txt,
-	//   we've already passed it (bbb < ccc) and should process ccc normally.
-	// - If we're scanning /root/aaa and the resume point is /root/bbb/file.txt,
-	//   we haven't reached it yet (aaa < bbb), so aaa was already fully scanned
-	//   and should be skipped entirely.
-	if resumeAfter != "" && !strings.HasPrefix(resumeAfter, path+string(filepath.Separator)) && resumeAfter != path {
-		// Resume point is not in this subtree. Compare paths to determine if we
-		// should skip this directory (already scanned) or process it (already passed).
-		if path < resumeAfter {
-			// This directory comes before the resume point lexicographically,
-			// meaning it was already fully scanned. Skip it entirely.
-			return nil
-		}
-		// This directory comes after the resume point, so we've already passed
-		// the resume point. Process this directory normally.
-		resumeAfter = ""
-	}
-
 	ctx.Logger().V(5).Info("Full path found is", "fullPath", path)
 
 	entries, err := os.ReadDir(path)
@@ -291,34 +264,6 @@ func (s *Source) scanDir(
 			if !entry.IsDir() && entry.Type()&os.ModeSymlink == 0 {
 				continue
 			}
-		}
-
-		// Skip entries until we pass the resume point.
-		// We don't clear the resume info when we find the resume point - instead we
-		// keep it set until a new file is scanned. This ensures we don't lose progress
-		// if the scan is interrupted between finding the resume point and scanning
-		// the next file.
-		if resumeAfter != "" {
-			// If this entry is the resume point, stop skipping.
-			if entryPath == resumeAfter {
-				resumeAfter = ""
-				continue // Skip the resume point itself since it was already processed.
-			}
-			// If the resume point is within this entry (a descendant), we need to
-			// traverse into it to find where to resume.
-			if entry.IsDir() && strings.HasPrefix(resumeAfter, entryPath+string(filepath.Separator)) {
-				// Recurse into this directory to find the resume point.
-				if err := s.scanDir(ctx, entryPath, chunksChan, workerPool, depth, rootPath); err != nil {
-					ctx.Logger().Error(err, "error scanning directory", "path", entryPath)
-				}
-				// After recursing, clear local resumeAfter. The child scanDir will have
-				// handled resumption within its subtree, and subsequent entries in this
-				// directory should be processed normally.
-				resumeAfter = ""
-				continue
-			}
-			// Skip this entry - it comes before the resume point in traversal order.
-			continue
 		}
 
 		if entry.Type()&os.ModeSymlink != 0 {
@@ -342,10 +287,9 @@ func (s *Source) scanDir(
 			}
 			ctx.Logger().V(5).Info("Entry found is a file", "path", entryPath)
 			workerPool.Go(func() error {
-				if err := s.scanFile(ctx, entryPath, chunksChan); err != nil {
+				if err := s.scanFile(ctx, entryPath, chunksChan, rootPath); err != nil {
 					ctx.Logger().Error(err, "error scanning file", "path", entryPath)
 				}
-				s.SetEncodedResumeInfoFor(resumptionKey, entryPath)
 				return nil
 			})
 		}
@@ -356,7 +300,7 @@ func (s *Source) scanDir(
 
 var skipSymlinkErr = errors.New("skipping symlink")
 
-func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk, rootPath string) error {
 	fileCtx := context.WithValues(ctx, "path", path)
 	fileStat, err := os.Lstat(path)
 	if err != nil {
@@ -364,6 +308,37 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	if fileStat.Mode()&os.ModeSymlink != 0 {
 		return skipSymlinkErr
+	}
+
+	// Use a single resumption key for the entire scan rooted at rootPath.
+	// The value stored is the full path of the last successfully scanned file.
+	// This avoids accumulating separate entries for each subdirectory visited.
+	resumptionKey := rootPath
+	resumeAfter := s.GetEncodedResumeInfoFor(resumptionKey)
+
+	// Skip entries until we pass the resume point.
+	// In a pre-symlink world we could rely on lexicographical search, e.g:
+	// - If we're scanning /root/ccc and the resume point is /root/bbb/file.txt,
+	//   we've already passed it (bbb < ccc) and should process ccc normally.
+	// - If we're scanning /root/aaa and the resume point is /root/bbb/file.txt,
+	//   we haven't reached it yet (aaa < bbb), so aaa was already fully scanned
+	//   and should be skipped entirely.
+	//
+	// In a post-symlink world, something in /root/aaa could be a link to
+	// /root/ddd. So we can't check if a path is beneath another path to rule out
+	// anything lexicographically before it being scanned.
+	//
+	// We don't clear the resume info when we find the resume point - instead we
+	// keep it set until a new file is scanned. This ensures we don't lose progress
+	// if the scan is interrupted between finding the resume point and scanning
+	// the next file.
+	if s.resuming.Load() {
+		// If this entry is the resume point, stop skipping.
+		if path == resumeAfter {
+			s.resuming.Store(false)
+		}
+
+		return nil
 	}
 
 	// Check if file is binary and should be skipped
@@ -395,7 +370,13 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		SourceVerify: s.verify,
 	}
 
-	return handlers.HandleFile(fileCtx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	if err := handlers.HandleFile(fileCtx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan}); err != nil {
+		return err
+	}
+
+	s.SetEncodedResumeInfoFor(resumptionKey, rootPath)
+
+	return nil
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
@@ -447,7 +428,6 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			initialDepth := 1
 			scanErr = s.scanSymlink(ctx, cleanPath, ch, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(path)
 
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root path is a dir", "path", cleanPath)
@@ -457,7 +437,6 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			// TODO: Finer grain error tracking of individual chunks.
 			scanErr = s.scanDir(ctx, cleanPath, ch, workerPool, initialDepth, path)
 			_ = workerPool.Wait()
-			s.ClearEncodedResumeInfoFor(path)
 		} else {
 			ctx.Logger().V(5).Info("Root path is a file", "path", cleanPath)
 			// TODO: Finer grain error tracking of individual
@@ -466,7 +445,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 				logger.Info("skipping non-regular file", "path", cleanPath)
 				return
 			}
-			scanErr = s.scanFile(ctx, cleanPath, ch)
+			scanErr = s.scanFile(ctx, cleanPath, ch, path)
 		}
 	}()
 
