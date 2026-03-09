@@ -174,8 +174,6 @@ func (s *Source) scanSymlink(
 	depth int,
 	rootPath, path string,
 ) error {
-	fmt.Printf("scanning symlink %s\n", path)
-
 	if !s.canFollowSymlinks() {
 		ctx.Logger().V(2).Info("skipping, following symlinks is not allowed")
 		return nil
@@ -272,8 +270,6 @@ func (s *Source) scanDir(
 		resumeAfter = ""
 	}
 
-	fmt.Printf("scanning dir %s\n", path)
-
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
 
@@ -284,8 +280,8 @@ func (s *Source) scanDir(
 
 	for _, entry := range entries {
 		entryPath := filepath.Join(path, entry.Name())
+
 		ctx := trContext.WithValues(ctx, "entry_path", entryPath)
-		fmt.Printf("  entry %q\n", entryPath)
 
 		// Skip entries until we pass the resume point.
 		// We don't clear the resume info when we find the resume point - instead we
@@ -353,7 +349,6 @@ func (s *Source) scanDir(
 	}
 
 	if err := workerPool.Wait(); err != nil {
-		fmt.Printf("file worker error: %s\n", err)
 		ctx.Logger().Error(err, "file worker error")
 	}
 
@@ -361,16 +356,12 @@ func (s *Source) scanDir(
 }
 
 func (s *Source) scanFile(ctx trContext.Context, path string, chunksChan chan *sources.Chunk) error {
-	fmt.Printf("scanning file %s\n", path)
-
 	if s.filter != nil {
 		if !s.filter.Pass(path) {
-			fmt.Println("!s.filter.Pass")
 			ctx.Logger().V(2).Info("directory was not included in filter; skipping")
 			return nil
 		}
 		if s.filter.ShouldExclude(path) {
-			fmt.Println("s.filter.ShouldExclude")
 			ctx.Logger().V(2).Info("directory was excluded by filter; skipping")
 			return nil
 		}
@@ -378,7 +369,6 @@ func (s *Source) scanFile(ctx trContext.Context, path string, chunksChan chan *s
 
 	// Check if file is binary and should be skipped
 	if (s.skipBinaries || feature.ForceSkipBinaries.Load()) && common.IsBinary(path) {
-		fmt.Println("skipping binary file")
 		ctx.Logger().V(5).Info("skipping binary file")
 		return nil
 	}
@@ -389,7 +379,6 @@ func (s *Source) scanFile(ctx trContext.Context, path string, chunksChan chan *s
 	}
 	defer inputFile.Close()
 
-	fmt.Printf("scanning file %q\n", path)
 	ctx.Logger().V(3).Info("scanning file")
 
 	chunkSkel := &sources.Chunk{
@@ -454,7 +443,6 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 	go func() {
 		defer close(ch)
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			fmt.Println("unit is a symlink")
 			ctx.Logger().V(5).Info("unit is a symlink")
 			if err := s.scanSymlink(ctx, ch, depth, rootPath, path); err != nil {
 				ctx.Logger().Error(err, "error scanning symlink unit")
@@ -465,7 +453,6 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 		}
 
 		if fileInfo.IsDir() {
-			fmt.Println("unit is a directory")
 			ctx.Logger().V(5).Info("unit is a directory")
 			// TODO: Finer grain error tracking of individual chunks.
 			if err := s.scanDir(ctx, ch, depth, rootPath, path); err != nil {
@@ -477,12 +464,10 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 		}
 
 		if !fileInfo.Mode().IsRegular() {
-			fmt.Println("unit is a non-regular file; skipping")
 			ctx.Logger().V(2).Info("unit is a non-regular file; skipping")
 			return
 		}
 
-		fmt.Println("unit is a file")
 		ctx.Logger().V(5).Info("unit is a file")
 		// TODO: Finer grain error tracking of individual chunks (in the case of
 		// archives).
