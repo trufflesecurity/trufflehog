@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -506,10 +505,7 @@ func TestScanSymlink_NoError(t *testing.T) {
 	}
 	chunks := make(chan *sources.Chunk, 10)
 	go func() {
-		workerPool := new(errgroup.Group)
-		workerPool.SetLimit(src.concurrency)
-		err := src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, workerPool, 1, filepath.Join(baseDir, "A"))
-		_ = workerPool.Wait()
+		err := src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, 0, filepath.Join(baseDir, "A"))
 		require.NoError(t, err)
 		close(chunks)
 	}()
@@ -555,18 +551,8 @@ func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
 		maxSymlinkDepth: 2,
 	}
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
 
-	err = src.scanSymlink(
-		ctx,
-		filepath.Join(baseDir, "A"),
-		chunks,
-		workerPool,
-		1,
-		filepath.Join(baseDir, "A"),
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, 0, filepath.Join(baseDir, "A"))
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")
@@ -597,18 +583,7 @@ func TestScanSymlink_FileTarget(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
-
-	err = src.scanSymlink(
-		ctx,
-		symlinkPath,
-		chunks,
-		workerPool,
-		1,
-		symlinkPath,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, symlinkPath, chunks, 1, symlinkPath)
 	require.NoError(t, err)
 	close(chunks)
 	var chunkCount int
@@ -639,18 +614,7 @@ func TestScanSymlink_SelfLoop(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
-
-	err = src.scanSymlink(
-		ctx,
-		symlinkPath,
-		chunks,
-		workerPool,
-		1,
-		symlinkPath,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, symlinkPath, chunks, 1, symlinkPath)
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")
@@ -675,18 +639,8 @@ func TestScanSymlink_BrokenSymlink(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
 
-	err = src.scanSymlink(
-		ctx,
-		symlinkPath,
-		chunks,
-		workerPool,
-		0,
-		symlinkPath,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, symlinkPath, chunks, 0, symlinkPath)
 	close(chunks)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "lstat error")
@@ -714,18 +668,7 @@ func TestScanSymlink_TwoFileLoop(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
-
-	err = src.scanSymlink(
-		ctx,
-		fileA,
-		chunks,
-		workerPool,
-		0,
-		fileA,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, fileA, chunks, 0, fileA)
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")

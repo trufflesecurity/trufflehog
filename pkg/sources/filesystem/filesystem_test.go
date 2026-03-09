@@ -33,6 +33,10 @@ func TestSource_Scan(t *testing.T) {
 		verify     bool
 		connection *sourcespb.Filesystem
 	}
+
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+
 	tests := []struct {
 		name               string
 		init               init
@@ -51,7 +55,7 @@ func TestSource_Scan(t *testing.T) {
 			wantSourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Filesystem{
 					Filesystem: &source_metadatapb.Filesystem{
-						File: "filesystem.go",
+						File: filepath.Join(wd, "filesystem.go"),
 						Line: 1, // First chunk starts at line 1
 					},
 				},
@@ -87,7 +91,7 @@ func TestSource_Scan(t *testing.T) {
 			}()
 			var counter int
 			for chunk := range chunksCh {
-				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
+				if filepath.Base(chunk.SourceMetadata.GetFilesystem().GetFile()) == "filesystem.go" {
 					counter++
 					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" && counter == 1 { // First chunk should start at line 1
 						t.Errorf("Source.Chunks() %s metadata mismatch (-want +got):\n%s", tt.name, diff)
