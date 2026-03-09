@@ -505,7 +505,7 @@ func TestScanSymlink_NoError(t *testing.T) {
 	}
 	chunks := make(chan *sources.Chunk, 10)
 	go func() {
-		err := src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, 0, filepath.Join(baseDir, "A"))
+		err := src.scanSymlink(ctx, chunks, 0, filepath.Join(baseDir, "A"), filepath.Join(baseDir, "A"))
 		require.NoError(t, err)
 		close(chunks)
 	}()
@@ -552,7 +552,7 @@ func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
 	}
 	chunks := make(chan *sources.Chunk, 10)
 
-	err = src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, 0, filepath.Join(baseDir, "A"))
+	err = src.scanSymlink(ctx, chunks, 0, filepath.Join(baseDir, "A"), filepath.Join(baseDir, "A"))
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")
@@ -583,7 +583,7 @@ func TestScanSymlink_FileTarget(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	err = src.scanSymlink(ctx, symlinkPath, chunks, 1, symlinkPath)
+	err = src.scanSymlink(ctx, chunks, 1, symlinkPath, symlinkPath)
 	require.NoError(t, err)
 	close(chunks)
 	var chunkCount int
@@ -614,7 +614,7 @@ func TestScanSymlink_SelfLoop(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	err = src.scanSymlink(ctx, symlinkPath, chunks, 1, symlinkPath)
+	err = src.scanSymlink(ctx, chunks, 1, symlinkPath, symlinkPath)
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")
@@ -640,7 +640,7 @@ func TestScanSymlink_BrokenSymlink(t *testing.T) {
 
 	chunks := make(chan *sources.Chunk, 10)
 
-	err = src.scanSymlink(ctx, symlinkPath, chunks, 0, symlinkPath)
+	err = src.scanSymlink(ctx, chunks, 0, symlinkPath, symlinkPath)
 	close(chunks)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "lstat error")
@@ -668,7 +668,7 @@ func TestScanSymlink_TwoFileLoop(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	err = src.scanSymlink(ctx, fileA, chunks, 0, fileA)
+	err = src.scanSymlink(ctx, chunks, 0, fileA, fileA)
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")

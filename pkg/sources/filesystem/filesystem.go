@@ -138,7 +138,7 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			ctx.Logger().V(5).Info("root path is a symlink")
-			if err := s.scanSymlink(ctx, path, chunksChan, depth, rootPath); err != nil {
+			if err := s.scanSymlink(ctx, chunksChan, depth, rootPath, path); err != nil {
 				ctx.Logger().Error(err, "error scanning root symlink")
 			}
 			continue
@@ -146,7 +146,7 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 
 		if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("root path is a directory")
-			if err := s.scanDir(ctx, path, chunksChan, depth, rootPath); err != nil {
+			if err := s.scanDir(ctx, chunksChan, depth, rootPath, path); err != nil {
 				ctx.Logger().Error(err, "error scanning root directory")
 			}
 			continue
@@ -170,10 +170,9 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 
 func (s *Source) scanSymlink(
 	ctx trContext.Context,
-	path string,
 	chunksChan chan *sources.Chunk,
 	depth int,
-	rootPath string,
+	rootPath, path string,
 ) error {
 	fmt.Printf("scanning symlink %s\n", path)
 
@@ -209,12 +208,12 @@ func (s *Source) scanSymlink(
 
 	if fileInfo.Mode()&os.ModeSymlink != 0 {
 		ctx.Logger().V(5).Info("symlink is a symlink")
-		return s.scanSymlink(ctx, resolvedPath, chunksChan, depth, rootPath)
+		return s.scanSymlink(ctx, chunksChan, depth, rootPath, resolvedPath)
 	}
 
 	if fileInfo.IsDir() {
 		ctx.Logger().V(5).Info("symlink is a directory")
-		return s.scanDir(ctx, resolvedPath, chunksChan, depth, rootPath)
+		return s.scanDir(ctx, chunksChan, depth, rootPath, resolvedPath)
 	}
 
 	if !fileInfo.Mode().Type().IsRegular() {
@@ -237,10 +236,9 @@ func (s *Source) scanSymlink(
 
 func (s *Source) scanDir(
 	ctx trContext.Context,
-	path string,
 	chunksChan chan *sources.Chunk,
 	depth int,
-	rootPath string,
+	rootPath, path string,
 ) error {
 	// check if the full path is not matching any pattern in include
 	// FilterRuleSet and matching any exclude FilterRuleSet.
@@ -304,7 +302,7 @@ func (s *Source) scanDir(
 			// traverse into it to find where to resume.
 			if entry.IsDir() && strings.HasPrefix(resumeAfter, entryPath+string(filepath.Separator)) {
 				// Recurse into this directory to find the resume point.
-				if err := s.scanDir(ctx, entryPath, chunksChan, depth, rootPath); err != nil {
+				if err := s.scanDir(ctx, chunksChan, depth, rootPath, entryPath); err != nil {
 					ctx.Logger().Error(err, "error scanning directory", "path", entryPath)
 				}
 				// After recursing, clear local resumeAfter. The child scanDir will have
@@ -319,7 +317,7 @@ func (s *Source) scanDir(
 
 		if entry.Type()&os.ModeSymlink != 0 {
 			ctx.Logger().V(5).Info("entry is a symlink")
-			if err := s.scanSymlink(ctx, entryPath, chunksChan, depth, rootPath); err != nil {
+			if err := s.scanSymlink(ctx, chunksChan, depth, rootPath, entryPath); err != nil {
 				ctx.Logger().Error(err, "error scanning symlink")
 			}
 
@@ -328,7 +326,7 @@ func (s *Source) scanDir(
 
 		if entry.IsDir() {
 			ctx.Logger().V(5).Info("entry is a directory")
-			if err := s.scanDir(ctx, entryPath, chunksChan, depth, rootPath); err != nil {
+			if err := s.scanDir(ctx, chunksChan, depth, rootPath, entryPath); err != nil {
 				ctx.Logger().Error(err, "error scanning directory")
 			}
 
@@ -458,7 +456,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			fmt.Println("unit is a symlink")
 			ctx.Logger().V(5).Info("unit is a symlink")
-			if err := s.scanSymlink(ctx, path, ch, depth, rootPath); err != nil {
+			if err := s.scanSymlink(ctx, ch, depth, rootPath, path); err != nil {
 				ctx.Logger().Error(err, "error scanning symlink unit")
 				scanErr = err
 			}
@@ -470,7 +468,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 			fmt.Println("unit is a directory")
 			ctx.Logger().V(5).Info("unit is a directory")
 			// TODO: Finer grain error tracking of individual chunks.
-			if err := s.scanDir(ctx, path, ch, depth, rootPath); err != nil {
+			if err := s.scanDir(ctx, ch, depth, rootPath, path); err != nil {
 				ctx.Logger().Error(err, "error scanning directory unit")
 				scanErr = err
 			}
