@@ -135,7 +135,7 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
 			initialDepth := 1
-			err = s.scanSymlink(ctx, chunksChan, workerPool, initialDepth, rootPath, cleanPath)
+			err = s.scanSymlink(ctx, chunksChan, workerPool, rootPath, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else if fileInfo.IsDir() {
@@ -143,7 +143,7 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
 			initialDepth := 1
-			err = s.scanDir(ctx, chunksChan, workerPool, initialDepth, rootPath, cleanPath)
+			err = s.scanDir(ctx, chunksChan, workerPool, rootPath, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else {
@@ -169,8 +169,9 @@ func (s *Source) scanSymlink(
 	ctx trContext.Context,
 	chunksChan chan *sources.Chunk,
 	workerPool *errgroup.Group,
+	rootPath string,
 	depth int,
-	rootPath, path string,
+	path string,
 ) error {
 	if depth > s.maxSymlinkDepth {
 		return errors.New("max symlink depth reached")
@@ -195,7 +196,7 @@ func (s *Source) scanSymlink(
 			"resolvedPath", resolvedPath,
 			"depth", depth,
 		)
-		return s.scanSymlink(ctx, chunksChan, workerPool, depth+1, rootPath, resolvedPath)
+		return s.scanSymlink(ctx, chunksChan, workerPool, rootPath, depth+1, resolvedPath)
 	}
 
 	if fileInfo.IsDir() {
@@ -206,7 +207,7 @@ func (s *Source) scanSymlink(
 			"depth", depth,
 		)
 
-		return s.scanDir(ctx, chunksChan, workerPool, depth+1, rootPath, resolvedPath)
+		return s.scanDir(ctx, chunksChan, workerPool, rootPath, depth+1, resolvedPath)
 	}
 	ctx.Logger().V(5).Info(
 		"found symlink to file",
@@ -241,8 +242,9 @@ func (s *Source) scanDir(
 	ctx trContext.Context,
 	chunksChan chan *sources.Chunk,
 	workerPool *errgroup.Group,
+	rootPath string,
 	depth int,
-	rootPath, path string,
+	path string,
 ) error {
 	// check if the full path is not matching any pattern in include
 	// FilterRuleSet and matching any exclude FilterRuleSet.
@@ -306,7 +308,7 @@ func (s *Source) scanDir(
 			// traverse into it to find where to resume.
 			if entry.IsDir() && strings.HasPrefix(resumeAfter, entryPath+string(filepath.Separator)) {
 				// Recurse into this directory to find the resume point.
-				if err := s.scanDir(ctx, chunksChan, workerPool, depth, rootPath, entryPath); err != nil {
+				if err := s.scanDir(ctx, chunksChan, workerPool, rootPath, depth, entryPath); err != nil {
 					ctx.Logger().Error(err, "error scanning directory", "path", entryPath)
 				}
 				// After recursing, clear local resumeAfter. The child scanDir will have
@@ -326,12 +328,12 @@ func (s *Source) scanDir(
 				ctx.Logger().Info("skipping, following symlinks is not allowed", "path", entryPath)
 				continue
 			}
-			if err := s.scanSymlink(ctx, chunksChan, workerPool, depth, rootPath, entryPath); err != nil {
+			if err := s.scanSymlink(ctx, chunksChan, workerPool, rootPath, depth, entryPath); err != nil {
 				ctx.Logger().Error(err, "error scanning symlink", "path", entryPath)
 			}
 		} else if entry.IsDir() {
 			ctx.Logger().V(5).Info("Entry found is a directory", "path", entryPath)
-			if err := s.scanDir(ctx, chunksChan, workerPool, depth, rootPath, entryPath); err != nil {
+			if err := s.scanDir(ctx, chunksChan, workerPool, rootPath, depth, entryPath); err != nil {
 				ctx.Logger().Error(err, "error scanning directory", "path", entryPath)
 			}
 		} else {
@@ -443,7 +445,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
 			initialDepth := 1
-			scanErr = s.scanSymlink(ctx, ch, workerPool, initialDepth, rootPath, cleanPath)
+			scanErr = s.scanSymlink(ctx, ch, workerPool, rootPath, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeInfoFor(rootPath)
 
@@ -453,7 +455,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 			workerPool.SetLimit(s.concurrency)
 			initialDepth := 1
 			// TODO: Finer grain error tracking of individual chunks.
-			scanErr = s.scanDir(ctx, ch, workerPool, initialDepth, rootPath, cleanPath)
+			scanErr = s.scanDir(ctx, ch, workerPool, rootPath, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else {
