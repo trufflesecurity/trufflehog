@@ -489,7 +489,6 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 			initialDepth := 0
 			scanErr = s.scanSymlink(ctx, ch, rootPath, initialDepth, cleanPath)
 			s.ClearEncodedResumeInfoFor(rootPath)
-
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root unit is a directory")
 			initialDepth := 0
@@ -513,6 +512,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 		if chunk == nil {
 			continue
 		}
+
 		if err := reporter.ChunkOk(ctx, *chunk); err != nil {
 			return err
 		}
@@ -522,5 +522,6 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 		ctx.Logger().Error(scanErr, "error scanning filesystem")
 		return reporter.ChunkErr(ctx, scanErr)
 	}
+
 	return nil
 }
