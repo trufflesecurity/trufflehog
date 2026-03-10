@@ -129,7 +129,7 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 			ctx.Logger().V(5).Info("Root path is a symlink", "path", cleanPath)
 			workerPool := new(errgroup.Group)
 			workerPool.SetLimit(s.concurrency)
-			initialDepth := 1
+			initialDepth := 0
 			err = s.scanSymlink(ctx, chunksChan, workerPool, rootPath, initialDepth, cleanPath)
 			_ = workerPool.Wait()
 			s.ClearEncodedResumeInfoFor(rootPath)
