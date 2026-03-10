@@ -53,6 +53,7 @@ var (
 	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
 	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	markdownOut         = cli.Flag("markdown", "Output in Markdown format.").Bool()
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
@@ -523,13 +524,15 @@ func run(state overseer.State, logSync func() error) {
 		printer = new(output.LegacyJSONPrinter)
 	case *jsonOut:
 		printer = new(output.JSONPrinter)
+	case *markdownOut:
+		printer = output.NewMarkdownPrinter(nil)
 	case *gitHubActionsFormat:
 		printer = new(output.GitHubActionsPrinter)
 	default:
 		printer = new(output.PlainPrinter)
 	}
 
-	if !*jsonLegacy && !*jsonOut {
+	if !*jsonLegacy && !*jsonOut && !*markdownOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
@@ -584,15 +587,30 @@ func run(state overseer.State, logSync func() error) {
 	}
 
 	if *compareDetectionStrategies {
-		if err := compareScans(ctx, cmd, engConf); err != nil {
+		compareCfg := engConf
+		compareCfg.Dispatcher = engine.NewPrinterDispatcher(discardPrinter{})
+
+		if err := compareScans(ctx, cmd, compareCfg); err != nil {
+			if closeErr := closePrinter(printer); closeErr != nil {
+				ctx.Logger().Error(closeErr, "failed to close printer after scan error")
+			}
 			logFatal(err, "error comparing detection strategies")
+		}
+		if err := closePrinter(printer); err != nil {
+			logFatal(err, "failed to close printer")
 		}
 		return
 	}
 
 	metrics, err := runSingleScan(ctx, cmd, engConf)
 	if err != nil {
+		if closeErr := closePrinter(printer); closeErr != nil {
+			ctx.Logger().Error(closeErr, "failed to close printer after scan error")
+		}
 		logFatal(err, "error running scan")
+	}
+	if err := closePrinter(printer); err != nil {
+		logFatal(err, "failed to close printer")
 	}
 
 	verificationCacheMetricsSnapshot := struct {
@@ -631,29 +649,36 @@ func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {
 	var (
 		entireMetrics    metrics
 		maxLengthMetrics metrics
-		err              error
 	)
+
+	entireCfg := cfg
+	entireCfg.ShouldScanEntireChunk = true
+	entireErrCh := make(chan error, 1)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		// Run scan with entire chunk span calculator.
-		cfg.ShouldScanEntireChunk = true
-		entireMetrics, err = runSingleScan(ctx, cmd, cfg)
-		if err != nil {
-			ctx.Logger().Error(err, "error running scan with entire chunk span calculator")
-		}
+		var err error
+		entireMetrics, err = runSingleScan(ctx, cmd, entireCfg)
+		entireErrCh <- err
 	}()
 
 	// Run scan with max-length span calculator.
-	maxLengthMetrics, err = runSingleScan(ctx, cmd, cfg)
+	maxLengthMetrics, err := runSingleScan(ctx, cmd, cfg)
 	if err != nil {
+		wg.Wait()
+		if entireErr := <-entireErrCh; entireErr != nil {
+			ctx.Logger().Error(entireErr, "error running scan with entire chunk span calculator")
+		}
 		return fmt.Errorf("error running scan with custom span calculator: %v", err)
 	}
 
 	wg.Wait()
+	if err := <-entireErrCh; err != nil {
+		return fmt.Errorf("error running scan with entire chunk span calculator: %v", err)
+	}
 
 	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
 }
@@ -678,6 +703,12 @@ func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
 type metrics struct {
 	engine.Metrics
 	hasFoundResults bool
+}
+
+type discardPrinter struct{}
+
+func (discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) error {
+	return nil
 }
 
 func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics, error) {
@@ -1214,6 +1245,13 @@ func commaSeparatedToSlice(s []string) []string {
 		}
 	}
 	return result
+}
+
+func closePrinter(printer engine.Printer) error {
+	if closer, ok := printer.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
 }
 
 func printAverageDetectorTime(e *engine.Engine) {
