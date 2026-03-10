@@ -151,9 +151,7 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 		}
 
 		if err != nil && !errors.Is(err, io.EOF) {
-			if !errors.Is(err, skipSymlinkErr) {
-				logger.Error(err, "error scanning filesystem")
-			}
+			logger.Error(err, "error scanning filesystem")
 		}
 	}
 
@@ -353,16 +351,12 @@ func (s *Source) scanDir(
 	return nil
 }
 
-var skipSymlinkErr = errors.New("skipping symlink")
-
 func (s *Source) scanFile(ctx trContext.Context, chunksChan chan *sources.Chunk, path string) error {
 	fileCtx := trContext.WithValues(ctx, "path", path)
-	fileStat, err := os.Lstat(path)
+
+	_, err := os.Lstat(path)
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
-	}
-	if fileStat.Mode()&os.ModeSymlink != 0 {
-		return skipSymlinkErr
 	}
 
 	// Check if file is binary and should be skipped
@@ -474,9 +468,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 	}
 
 	if scanErr != nil && !errors.Is(scanErr, io.EOF) {
-		if !errors.Is(scanErr, skipSymlinkErr) {
-			logger.Error(scanErr, "error scanning filesystem")
-		}
+		logger.Error(scanErr, "error scanning filesystem")
 		return reporter.ChunkErr(ctx, scanErr)
 	}
 	return nil
