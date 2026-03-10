@@ -565,7 +565,6 @@ func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
 		filepath.Join(baseDir, "A"),
 		0,
 		filepath.Join(baseDir, "A"),
-		filepath.Join(baseDir, "A"),
 	)
 	_ = workerPool.Wait()
 	close(chunks)
@@ -607,7 +606,6 @@ func TestScanSymlink_FileTarget(t *testing.T) {
 		workerPool,
 		symlinkPath,
 		0,
-		symlinkPath,
 		symlinkPath,
 	)
 	_ = workerPool.Wait()
@@ -651,7 +649,6 @@ func TestScanSymlink_SelfLoop(t *testing.T) {
 		symlinkPath,
 		0,
 		symlinkPath,
-		symlinkPath,
 	)
 	_ = workerPool.Wait()
 	close(chunks)
@@ -687,7 +684,6 @@ func TestScanSymlink_BrokenSymlink(t *testing.T) {
 		workerPool,
 		symlinkPath,
 		0,
-		symlinkPath,
 		symlinkPath,
 	)
 	_ = workerPool.Wait()
@@ -727,7 +723,6 @@ func TestScanSymlink_TwoFileLoop(t *testing.T) {
 		workerPool,
 		fileA,
 		0,
-		fileA,
 		fileA,
 	)
 	_ = workerPool.Wait()
