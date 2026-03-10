@@ -178,7 +178,7 @@ func (s *Source) scanSymlink(
 	}
 	cleanPath := filepath.Clean(path)
 
-	resolvedPath, err := os.Readlink(path)
+	resolvedPath, err := os.Readlink(cleanPath)
 	if err != nil {
 		return fmt.Errorf("readlink error: %w", err)
 	}
