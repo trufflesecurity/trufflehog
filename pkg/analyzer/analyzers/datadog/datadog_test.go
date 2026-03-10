@@ -69,7 +69,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			appKey:   appKey,
 			endpoint: "https://api.eu.datadoghq.com",
 			want: []byte(fmt.Sprintf(`{
-				"AnalyzerType": %s,
+				"AnalyzerType": %d,
 				"Bindings": [],
 				"UnboundedResources": null,
 				"Metadata": {}
