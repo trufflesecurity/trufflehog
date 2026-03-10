@@ -169,11 +169,9 @@ func (s *Source) scanSymlink(
 	path string,
 ) error {
 	if !s.canFollowSymlinks() {
-		if !s.canFollowSymlinks() {
-			// If the file or directory is a symlink but the followSymlinks is disable ignore the path
-			ctx.Logger().V(2).Info("skipping, following symlinks is not allowed", "path", path)
-			return nil
-		}
+		// If the file or directory is a symlink but the followSymlinks is disable ignore the path
+		ctx.Logger().V(2).Info("skipping, following symlinks is not allowed", "path", path)
+		return nil
 	}
 
 	depth++
