@@ -70,9 +70,9 @@ func TestTableau_FromChunk(t *testing.T) {
 						"auth_token_received":   "true",
 					},
 					AnalysisInfo: map[string]string{
-						"endpoint":  tableauURL,
-						"patSecret": tokenSecret,
-						"tokenName": tokenName,
+						"endpoint":   tableauURL,
+						"pat_secret": tokenSecret,
+						"token_name": tokenName,
 					},
 				},
 			},

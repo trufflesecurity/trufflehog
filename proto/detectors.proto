@@ -1051,7 +1051,9 @@ enum DetectorType {
   JWT = 1039;
   OpenAIAdmin = 1040;
   GoogleGeminiAPIKey = 1041;
-  NewRelicBrowserKey = 1042;
+  ArtifactoryReferenceToken = 1042;
+  DatadogApikey = 1043;
+  NewRelicBrowserKey = 1044;
 }
 
 message Result {
