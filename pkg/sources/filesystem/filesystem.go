@@ -230,7 +230,7 @@ func (s *Source) scanSymlink(
 	ctx.Logger().V(5).Info("Symlink links to a file")
 
 	if s.filter != nil && !s.filter.Pass(resolvedPath) {
-		ctx.Logger().V(2).Info("File was filtered out by filter.Pass; skipping")
+		ctx.Logger().V(2).Info("Symlinked file was filtered out by filter.Pass; skipping")
 		return nil
 	}
 
@@ -239,12 +239,12 @@ func (s *Source) scanSymlink(
 	resumptionKey := rootPath
 
 	if !fileInfo.Mode().Type().IsRegular() {
-		ctx.Logger().V(2).Info("File is a non-regular file; skipping")
+		ctx.Logger().V(2).Info("Symlinked file is a non-regular file; skipping")
 		return nil
 	}
 
 	if err := s.scanFile(ctx, chunksChan, resolvedPath); err != nil {
-		ctx.Logger().Error(err, "error scanning file")
+		ctx.Logger().Error(err, "error scanning symlinked file")
 	}
 
 	s.SetEncodedResumeInfoFor(resumptionKey, cleanPath)
