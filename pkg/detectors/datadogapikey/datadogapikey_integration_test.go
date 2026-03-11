@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package datadogtoken
+package datadogapikey
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestDatadogToken_FromChunk(t *testing.T) {
+func TestDataDogApiKey_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
@@ -24,10 +24,8 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
-	appKey := testSecrets.MustGetField("DATADOGTOKEN_APPKEY")
-	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
-	endpoint := "https://api.us5.datadoghq.com"
-
+	invalidApiKey := "FKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
+	datdogEndpoint := "https://api.us5.datadoghq.com"
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -45,21 +43,18 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within datadog %s and endpoint %s", appKey, apiKey, endpoint)),
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret within datadog %s and endpoint is %v", apiKey, datdogEndpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatadogToken,
+					DetectorType: detectorspb.DetectorType_DatadogApikey,
 					Verified:     true,
-					ExtraData: map[string]string{
-						"Type": "Application+APIKey",
-					},
 					AnalysisInfo: map[string]string{
 						"api_key":  apiKey,
-						"app_key":  appKey,
-						"endpoint": endpoint,
+						"endpoint": datdogEndpoint,
 					},
+					Raw: []byte(apiKey),
 				},
 			},
 			wantErr: false,
@@ -69,16 +64,14 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within but datadog %s not valid", inactiveAppKey, apiKey)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret within datadog %s and endpoint is %v", invalidApiKey, datdogEndpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatadogToken,
+					DetectorType: detectorspb.DetectorType_DatadogApikey,
 					Verified:     false,
-					ExtraData: map[string]string{
-						"Type": "Application+APIKey",
-					},
+					Raw:          []byte(invalidApiKey),
 				},
 			},
 			wantErr: false,
@@ -108,14 +101,6 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DatadogToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-				got[i].RawV2 = nil
-				delete(got[i].ExtraData, "user_emails")
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("DatadogToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
