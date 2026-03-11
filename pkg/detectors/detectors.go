@@ -221,10 +221,19 @@ type ResultWithMetadata struct {
 	DetectorDescription string
 	// DecoderType is the type of decoder that was used to generate this result's data.
 	DecoderType detectorspb.DecoderType
+	// ChunkData holds the original pre-decode source chunk data, preserved
+	// for secret storage encryption in the dispatcher.
+	ChunkData []byte
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
 func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
+	// OriginalData may be nil when CopyMetadata is called outside the engine
+	// pipeline (e.g., in tests or external consumers that construct chunks directly).
+	chunkData := chunk.OriginalData
+	if chunkData == nil {
+		chunkData = chunk.Data
+	}
 	return ResultWithMetadata{
 		SourceMetadata: chunk.SourceMetadata,
 		SourceID:       chunk.SourceID,
@@ -233,6 +242,7 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
 		Result:         result,
+		ChunkData:      chunkData,
 	}
 }
 

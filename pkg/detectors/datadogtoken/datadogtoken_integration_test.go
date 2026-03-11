@@ -25,6 +25,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 	}
 	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
 	appKey := testSecrets.MustGetField("DATADOGTOKEN_APPKEY")
+	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
 	endpoint := "https://api.us5.datadoghq.com"
 
 	type args struct {
@@ -55,9 +56,28 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 						"Type": "Application+APIKey",
 					},
 					AnalysisInfo: map[string]string{
-						"apiKey":   apiKey,
-						"appKey":   appKey,
+						"api_key":  apiKey,
+						"app_key":  appKey,
 						"endpoint": endpoint,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a datadogtoken secret %s within but datadog %s not valid", inactiveAppKey, apiKey)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_DatadogToken,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"Type": "Application+APIKey",
 					},
 				},
 			},
