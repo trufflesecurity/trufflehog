@@ -116,7 +116,7 @@ func TestScanFile(t *testing.T) {
 	ctx := trContext.WithLogger(trContext.Background(), logr.Discard())
 	go func() {
 		defer close(chunksChan)
-		err = source.scanFile(ctx, tmpfile.Name(), chunksChan)
+		err = source.scanFile(ctx, chunksChan, tmpfile.Name())
 		assert.Nil(t, err)
 	}()
 
@@ -148,7 +148,7 @@ func TestScanBinaryFile(t *testing.T) {
 
 	go func() {
 		defer close(chunksChan)
-		errChan <- source.scanFile(ctx, tmpfile.Name(), chunksChan)
+		errChan <- source.scanFile(ctx, chunksChan, tmpfile.Name())
 	}()
 
 	err = <-errChan
