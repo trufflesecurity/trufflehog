@@ -111,7 +111,7 @@ func (s *Source) canFollowSymlinks() bool {
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	for i, rootPath := range s.paths {
-		ctx = trContext.WithValues(ctx,
+		ctx := trContext.WithValues(ctx,
 			"root_path", rootPath,
 		)
 		if common.IsDone(ctx) {
