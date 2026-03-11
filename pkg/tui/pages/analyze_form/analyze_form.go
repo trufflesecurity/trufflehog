@@ -98,14 +98,18 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 	case "datadog":
 		inputs = []textinputs.InputConfig{{
 			Label:       "API Key",
-			Key:         "apiKey",
+			Key:         "api_key",
 			Required:    true,
 			RedactInput: true,
 		}, {
 			Label:       "Application Key",
-			Key:         "appKey",
-			Required:    true,
+			Key:         "app_key",
+			Required:    false,
 			RedactInput: true,
+		}, {
+			Label:    "Endpoint (press Enter to skip if unknown; TruffleHog will attempt to auto-detect)",
+			Key:      "endpoint",
+			Required: false,
 		}}
 	case "mux":
 		inputs = []textinputs.InputConfig{{
