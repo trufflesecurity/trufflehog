@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -25,7 +25,7 @@ import (
 )
 
 func TestSource_Scan(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 
 	type init struct {
@@ -113,7 +113,7 @@ func TestScanFile(t *testing.T) {
 	source := &Source{}
 	chunksChan := make(chan *sources.Chunk, 2)
 
-	ctx := context.WithLogger(context.Background(), logr.Discard())
+	ctx := trContext.WithLogger(trContext.Background(), logr.Discard())
 	go func() {
 		defer close(chunksChan)
 		err = source.scanFile(ctx, tmpfile.Name(), chunksChan)
@@ -144,7 +144,7 @@ func TestScanBinaryFile(t *testing.T) {
 	chunksChan := make(chan *sources.Chunk, 2)
 	errChan := make(chan error, 1)
 
-	ctx := context.WithLogger(context.Background(), logr.Discard())
+	ctx := trContext.WithLogger(trContext.Background(), logr.Discard())
 
 	go func() {
 		defer close(chunksChan)
@@ -166,7 +166,7 @@ func TestScanBinaryFile(t *testing.T) {
 func TestEnumerate(t *testing.T) {
 	// TODO: refactor to allow a virtual filesystem.
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup the connection to test enumeration.
 	dir, err := os.MkdirTemp("", "trufflehog-test-enumerate")
@@ -222,7 +222,7 @@ func TestEnumerate(t *testing.T) {
 
 func TestChunkUnit(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup test file to chunk.
 	fileContents := "TestChunkUnit"
@@ -275,7 +275,7 @@ func TestChunkUnit(t *testing.T) {
 
 func TestEnumerateReporterErr(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup the connection to test enumeration.
 	units := []string{
@@ -302,7 +302,7 @@ func TestEnumerateReporterErr(t *testing.T) {
 
 func TestChunkUnitReporterErr(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup test file to chunk.
 	tmpfile, err := os.CreateTemp("", "example.txt")
@@ -342,7 +342,7 @@ func TestChunkUnitReporterErr(t *testing.T) {
 
 func TestSkipDir(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// create a temp directory with files
 	ignoreDir, cleanupDir, err := createTempDir("", "ignore1", "ignore2", "ignore3")
@@ -377,7 +377,7 @@ func TestSkipDir(t *testing.T) {
 
 func TestScanSubDirFile(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Use a fixed directory for the test
 	testDir := filepath.Join(os.TempDir(), "trufflehog-test")
@@ -442,7 +442,7 @@ func TestSkipBinaries(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Run the scan
 	go func() {
@@ -468,7 +468,7 @@ func TestSkipBinaries(t *testing.T) {
 }
 
 func TestResumptionInfoDoesNotGrowWithSubdirectories(t *testing.T) {
-	ctx := context.AddLogger(t.Context())
+	ctx := trContext.AddLogger(t.Context())
 
 	// Create a deeply nested directory structure with files at each level.
 	// Structure: root/dir0/dir1/dir2/.../dir9, each containing a file.
@@ -572,7 +572,7 @@ polling:
 }
 
 func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Create a directory with files that have predictable alphabetical order.
 	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-test")
@@ -622,7 +622,7 @@ func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
 }
 
 func TestResumptionWithNestedDirectories(t *testing.T) {
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Create a nested directory structure:
 	// root/
@@ -680,7 +680,7 @@ func TestResumptionWithNestedDirectories(t *testing.T) {
 }
 
 func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Create a directory structure:
 	// root/
