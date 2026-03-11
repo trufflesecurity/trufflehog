@@ -437,7 +437,7 @@ func (s *Source) scanFile(ctx trContext.Context, chunksChan chan *sources.Chunk,
 // filepath or a directory.
 func (s *Source) Enumerate(ctx trContext.Context, reporter sources.UnitReporter) error {
 	for _, rootPath := range s.paths {
-		ctx = trContext.WithValues(ctx,
+		ctx := trContext.WithValues(ctx,
 			"root_path", rootPath,
 		)
 
