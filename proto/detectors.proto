@@ -1052,7 +1052,8 @@ enum DetectorType {
   OpenAIAdmin = 1040;
   GoogleGeminiAPIKey = 1041;
   ArtifactoryReferenceToken = 1042;
-  NewRelicUserKey = 1043;
+  DatadogApikey = 1043;
+  NewRelicUserKey = 1044;
 }
 
 message Result {
