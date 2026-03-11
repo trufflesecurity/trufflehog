@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -63,7 +63,7 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx trContext.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
 
 	s.concurrency = concurrency
@@ -109,7 +109,7 @@ func (s *Source) canFollowSymlinks() bool {
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	for i, path := range s.paths {
 		logger := ctx.Logger().WithValues("path", path)
 		if common.IsDone(ctx) {
@@ -166,7 +166,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 func (s *Source) scanSymlink(
-	ctx context.Context,
+	ctx trContext.Context,
 	path string,
 	chunksChan chan *sources.Chunk,
 	workerPool *errgroup.Group,
@@ -239,7 +239,7 @@ func (s *Source) scanSymlink(
 }
 
 func (s *Source) scanDir(
-	ctx context.Context,
+	ctx trContext.Context,
 	path string,
 	chunksChan chan *sources.Chunk,
 	workerPool *errgroup.Group,
@@ -356,8 +356,8 @@ func (s *Source) scanDir(
 
 var skipSymlinkErr = errors.New("skipping symlink")
 
-func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
-	fileCtx := context.WithValues(ctx, "path", path)
+func (s *Source) scanFile(ctx trContext.Context, path string, chunksChan chan *sources.Chunk) error {
+	fileCtx := trContext.WithValues(ctx, "path", path)
 	fileStat, err := os.Lstat(path)
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
@@ -401,7 +401,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
 // passes the configured paths as the source unit, whether it be a single
 // filepath or a directory.
-func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+func (s *Source) Enumerate(ctx trContext.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
 		_, err := os.Lstat(filepath.Clean(path))
 		if err != nil {
@@ -419,7 +419,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 }
 
 // ChunkUnit implements SourceUnitChunker interface.
-func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	path, _ := unit.SourceUnitID()
 	logger := ctx.Logger().WithValues("path", path)
 
