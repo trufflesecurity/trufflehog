@@ -98,7 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					maps.Copy(result.ExtraData, extraData)
 					result.SetVerificationError(verificationErr, tokenName, tokenSecret, endpoint)
 					if isVerified {
-						result.AnalysisInfo = map[string]string{"tokenName": tokenName, "patSecret": tokenSecret, "endpoint": endpoint}
+						result.AnalysisInfo = map[string]string{"token_name": tokenName, "pat_secret": tokenSecret, "endpoint": endpoint}
 					}
 				}
 				results = append(results, result)
