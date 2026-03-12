@@ -83,11 +83,14 @@ func (s *Source) Init(aCtx trContext.Context, name string, jobId sources.JobID, 
 	if err != nil {
 		return fmt.Errorf("unable to create filter: %w", err)
 	}
+
 	s.filter = filter
+
 	err = s.setMaxSymlinkDepth(&conn)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -100,7 +103,9 @@ func (s *Source) setMaxSymlinkDepth(conn *sourcespb.Filesystem) error {
 			defaultMaxSymlinkDepth,
 		)
 	}
+
 	s.maxSymlinkDepth = depth
+
 	return nil
 }
 
@@ -114,9 +119,11 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 		ctx := trContext.WithValues(ctx,
 			"root_path", rootPath,
 		)
+
 		if common.IsDone(ctx) {
 			return nil
 		}
+
 		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", rootPath), "")
 
 		cleanPath := filepath.Clean(rootPath)
@@ -131,28 +138,31 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 			continue
 		}
 
+		initialDepth := 0
+
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			// if the root path is a symlink we scan the symlink
 			ctx.Logger().V(5).Info("Root path is a symlink")
-			initialDepth := 0
-			err = s.scanSymlink(ctx, chunksChan, rootPath, initialDepth, cleanPath)
+			if err := s.scanSymlink(ctx, chunksChan, rootPath, initialDepth, cleanPath); err != nil {
+				ctx.Logger().Error(err, "error scanning root path symlink")
+			}
+
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root path is a dir")
-			initialDepth := 0
-			err = s.scanDir(ctx, chunksChan, rootPath, initialDepth, cleanPath)
-			s.ClearEncodedResumeInfoFor(rootPath)
-		} else {
-			if !fileInfo.Mode().IsRegular() {
-				ctx.Logger().V(2).Info("Root path is a non-regular file; skipping")
-				continue
+			if err := s.scanDir(ctx, chunksChan, rootPath, initialDepth, cleanPath); err != nil {
+				ctx.Logger().Error(err, "error scanning root path directory")
 			}
-			ctx.Logger().V(5).Info("Root path is a file")
-			err = s.scanFile(ctx, chunksChan, cleanPath)
-		}
 
-		if err != nil && !errors.Is(err, io.EOF) {
-			ctx.Logger().Error(err, "error scanning filesystem")
+			s.ClearEncodedResumeInfoFor(rootPath)
+		} else if !fileInfo.Mode().IsRegular() {
+			ctx.Logger().V(2).Info("Root path is a non-regular file; skipping")
+		} else {
+			ctx.Logger().V(5).Info("Root path is a file")
+			if err := s.scanFile(ctx, chunksChan, cleanPath); err != nil {
+				if !errors.Is(err, io.EOF) {
+					ctx.Logger().Error(err, "error scanning filesystem")
+				}
+			}
 		}
 	}
 
@@ -175,7 +185,6 @@ func (s *Source) scanSymlink(
 	ctx.Logger().V(5).Info("scanSymlink")
 
 	if !s.canFollowSymlinks() {
-		// If the file or directory is a symlink but the followSymlinks is disable ignore the path
 		ctx.Logger().V(2).Info("Path is a symlink, but following symlinks is not allowed; skipping")
 		return nil
 	}
@@ -267,8 +276,6 @@ func (s *Source) scanDir(
 
 	ctx.Logger().V(5).Info("scanDir")
 
-	// check if the full path is not matching any pattern in include
-	// FilterRuleSet and matching any exclude FilterRuleSet.
 	if s.filter != nil && s.filter.ShouldExclude(path) {
 		ctx.Logger().V(2).Info("Path was filtered out by filter.ShouldExclude; skipping")
 		return nil
@@ -402,7 +409,6 @@ func (s *Source) scanFile(ctx trContext.Context, chunksChan chan *sources.Chunk,
 
 	ctx.Logger().V(5).Info("scanFile")
 
-	// Check if file is binary and should be skipped
 	if (s.skipBinaries || feature.ForceSkipBinaries.Load()) && common.IsBinary(path) {
 		ctx.Logger().V(5).Info("File is binary; skipping")
 		return nil
@@ -480,31 +486,35 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 	}
 
 	ch := make(chan *sources.Chunk)
-	var scanErr error
+	var reportErr error
+	initialDepth := 0
+
 	go func() {
 		defer close(ch)
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			// if the root path is a symlink we scan the symlink
 			ctx.Logger().V(5).Info("Root unit is a symlink")
-			initialDepth := 0
-			scanErr = s.scanSymlink(ctx, ch, rootPath, initialDepth, cleanPath)
+			if err := s.scanSymlink(ctx, ch, rootPath, initialDepth, cleanPath); err != nil {
+				ctx.Logger().Error(err, "error scanning root unit symlink")
+				reportErr = reporter.ChunkErr(ctx, err)
+			}
+
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else if fileInfo.IsDir() {
 			ctx.Logger().V(5).Info("Root unit is a directory")
-			initialDepth := 0
-			// TODO: Finer grain error tracking of individual chunks.
-			scanErr = s.scanDir(ctx, ch, rootPath, initialDepth, cleanPath)
-			s.ClearEncodedResumeInfoFor(rootPath)
-		} else {
-			// TODO: Finer grain error tracking of individual
-			// chunks (in the case of archives).
-			if !fileInfo.Mode().IsRegular() {
-				ctx.Logger().V(2).Info("Root unit is a non-regular file; skipping")
-				return
+			if err := s.scanDir(ctx, ch, rootPath, initialDepth, cleanPath); err != nil {
+				ctx.Logger().Error(err, "error scanning root unit directory")
+				reportErr = reporter.ChunkErr(ctx, err)
 			}
 
+			s.ClearEncodedResumeInfoFor(rootPath)
+		} else if !fileInfo.Mode().IsRegular() {
+			ctx.Logger().V(2).Info("Root unit is a non-regular file; skipping")
+		} else {
 			ctx.Logger().V(5).Info("Root unit is a file")
-			scanErr = s.scanFile(ctx, ch, cleanPath)
+			if err := s.scanFile(ctx, ch, cleanPath); err != nil && !errors.Is(err, io.EOF) {
+				ctx.Logger().Error(err, "error scanning root unit file")
+				reportErr = reporter.ChunkErr(ctx, err)
+			}
 		}
 	}()
 
@@ -518,10 +528,5 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 		}
 	}
 
-	if scanErr != nil && !errors.Is(scanErr, io.EOF) {
-		ctx.Logger().Error(scanErr, "error scanning filesystem")
-		return reporter.ChunkErr(ctx, scanErr)
-	}
-
-	return nil
+	return reportErr
 }
