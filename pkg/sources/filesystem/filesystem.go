@@ -377,7 +377,7 @@ func (s *Source) scanDir(
 				continue
 			}
 
-			ctx.Logger().V(5).Info("Entry found is a file")
+			ctx.Logger().V(5).Info("Entry is a file")
 			workerPool.Go(func() error {
 				if err := s.scanFile(ctx, chunksChan, entryPath); err != nil {
 					ctx.Logger().Error(err, "error scanning file")
