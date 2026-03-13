@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	lwa "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lightweight_analyze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -21,10 +22,17 @@ type Scanner struct {
 func (Scanner) Version() int { return 1 }
 
 type UserRes struct {
+	UserID       string `json:"user_id"`
 	Subscription struct {
 		Tier string `json:"tier"`
 	} `json:"subscription"`
-	Name string `json:"first_name"`
+	FirstName string `json:"first_name"`
+}
+
+type ErrorRes struct {
+	Detail struct {
+		Status string `json:"status"`
+	} `json:"detail"`
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -44,6 +52,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Elevenlabs secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	uniqueMatches := make(map[string]struct{})
@@ -67,12 +76,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isVerified, userResponse, verificationErr := verifyMatch(ctx, client, match)
+			isVerified, extraData, verificationErr := verifyMatch(logCtx, client, match)
 			s1.Verified = isVerified
-			if userResponse != nil {
-				s1.ExtraData["Name"] = userResponse.Name
-				s1.ExtraData["Tier"] = userResponse.Subscription.Tier
+			fmt.Println(extraData)
+			for k, v := range extraData {
+				s1.ExtraData[k] = v
 			}
+			fmt.Println(s1.ExtraData)
 			s1.SetVerificationError(verificationErr, match)
 
 			if s1.Verified {
@@ -88,7 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, *UserRes, error) {
+func verifyMatch(ctx logContext.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.elevenlabs.io/v1/user", nil)
 	if err != nil {
 		return false, nil, err
@@ -99,24 +109,43 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, nil, err
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
+
+	extraData := make(map[string]string)
+
+	// lightweight analyze: unconditionally preserve the response body
+	resBody := lwa.CopyAndCloseResponseBody(ctx, res)
 
 	switch res.StatusCode {
 	case http.StatusOK:
 		// If the endpoint returns useful information, we can return it as a map.
 		var userResponse UserRes
-		if err = json.NewDecoder(res.Body).Decode(&userResponse); err != nil {
-			return false, nil, err
+		if err = json.Unmarshal(resBody, &userResponse); err != nil {
+			ctx.Logger().Error(err, "failed to parse response")
+			return false, extraData, err
 		}
-		return true, &userResponse, nil
+
+		// lightweight analyze: annotate "standard" fields
+		lwa.AugmentExtraData(extraData, lwa.Fields{
+			ID:   &userResponse.UserID,
+			Name: &userResponse.FirstName,
+			// Could include subscription tier here if wanted
+		})
+
+		return true, extraData, nil
 	case http.StatusBadRequest, http.StatusUnauthorized:
-		// The secret is determinately not verified (nothing to do)
-		return false, nil, nil
+		// If the response says {"detail":{"status":"missing_permissions","message":"The API key you used is missing the permission user_read to execute this operation."}}
+		// then the key is valid, but we can't add the metadata
+		var errorResponse ErrorRes
+		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
+			ctx.Logger().Error(err, "failed to parse response")
+			return false, extraData, err
+		}
+		if errorResponse.Detail.Status == "missing_permissions" {
+			return true, extraData, nil
+		}
+		return false, extraData, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, extraData, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
