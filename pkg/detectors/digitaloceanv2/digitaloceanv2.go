@@ -123,6 +123,10 @@ func verifyRefreshToken(ctx logContext.Context, client *http.Client, token strin
 			return false, extraData, err, ""
 		}
 
+		if resData.AccessToken == "" {
+			return false, extraData, fmt.Errorf("access_token not found in response: %s", string(resBody)), ""
+		}
+
 		// lightweight analyze: annotate "standard" fields
 		lwa.AugmentExtraData(extraData, lwa.Fields{
 			ID:    &resData.Info.UUID,
@@ -168,7 +172,7 @@ func verifyAccessToken(ctx logContext.Context, client *http.Client, token string
 		var resData accountResponse
 		if err = json.Unmarshal(resBody, &resData); err != nil {
 			ctx.Logger().Error(err, "failed to parse response")
-			return false, extraData, err
+			return true, extraData, nil
 		}
 
 		// lightweight analyze: annotate "standard" fields
