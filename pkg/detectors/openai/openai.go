@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
 
 	regexp "github.com/wasilibs/go-re2"
 
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	lwa "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lightweight_analyze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -42,6 +43,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify OpenAI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	uniqueMatches := make(map[string]struct{})
@@ -62,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			verified, extraData, verificationErr := verifyToken(ctx, client, token)
+			verified, extraData, verificationErr := verifyToken(logCtx, client, token)
 			s1.Verified = verified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
@@ -75,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyToken(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyToken(ctx logContext.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.openai.com/v1/me", nil)
 	if err != nil {
 		return false, nil, err
@@ -87,24 +89,36 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, nil, err
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
+
+	extraData := make(map[string]string)
+
+	// lightweight analyze: unconditionally preserve the response body
+	resBody := lwa.CopyAndCloseResponseBody(ctx, res)
+
+	extraData[lwa.KeyResponse] = string(resBody)
 
 	switch res.StatusCode {
 	case 200:
 		var resData response
-		if err = json.NewDecoder(res.Body).Decode(&resData); err != nil {
-			return false, nil, err
+		if err = json.Unmarshal(resBody, &resData); err != nil {
+			// We got a response that this code doesn't know how to properly handle; perhaps the detector code needs to be updated.
+			// Log the error, and then propagate it, making this an indeterminate result.
+			ctx.Logger().Error(err, "failed to parse response")
+			return false, extraData, err
 		}
 
-		extraData := map[string]string{
-			"id":          resData.ID,
-			"total_orgs":  fmt.Sprintf("%d", len(resData.Orgs.Data)),
-			"mfa_enabled": strconv.FormatBool(resData.MfaFlagEnabled),
-			"created_at":  time.Unix(int64(resData.Created), 0).Format(time.RFC3339),
-		}
+		// lightweight analyze: annotate "standard" fields
+		lwa.AugmentExtraData(extraData, lwa.Fields {
+			ID: &resData.ID,
+			Name: &resData.Name,
+			Email: &resData.Email,
+		})
+
+		// existing extra data collection
+		extraData["id"] = resData.ID
+		extraData["total_orgs"] = fmt.Sprintf("%d", len(resData.Orgs.Data))
+		extraData["mfa_enabled"] = strconv.FormatBool(resData.MfaFlagEnabled)
+		extraData["created_at"] = time.Unix(int64(resData.Created), 0).Format(time.RFC3339)
 
 		if len(resData.Orgs.Data) > 0 {
 			extraData["description"] = resData.Orgs.Data[0].Description
@@ -114,9 +128,9 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 		return true, extraData, nil
 	case 401:
 		// Invalid
-		return false, nil, nil
+		return false, extraData, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, extraData, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
@@ -131,8 +145,8 @@ func (s Scanner) Description() string {
 type response struct {
 	Object                   string `json:"object"`
 	ID                       string `json:"id"`
-	Email                    any    `json:"email"`
-	Name                     any    `json:"name"`
+	Email                    string `json:"email"`
+	Name                     string `json:"name"`
 	Picture                  any    `json:"picture"`
 	Created                  int    `json:"created"`
 	PhoneNumber              any    `json:"phone_number"`
