@@ -231,18 +231,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info *git.SourceMetadataInfo) *source_metadatapb.MetaData {
 			gitlabMetadata := &source_metadatapb.Gitlab{
-				Commit:              sanitizer.UTF8(commit),
-				File:                sanitizer.UTF8(file),
-				Email:               sanitizer.UTF8(email),
-				Repository:          sanitizer.UTF8(repository),
-				RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
-				Link:                giturl.GenerateLink(repository, commit, file, line),
-				Timestamp:           sanitizer.UTF8(timestamp),
-				Line:                line,
+				Commit:              sanitizer.UTF8(info.Commit),
+				File:                sanitizer.UTF8(info.File),
+				Email:               sanitizer.UTF8(info.Email),
+				Repository:          sanitizer.UTF8(info.Repository),
+				RepositoryLocalPath: sanitizer.UTF8(info.RepositoryLocalPath),
+				Link:                giturl.GenerateLink(info.Repository, info.Commit, info.File, info.Line),
+				Timestamp:           sanitizer.UTF8(info.Timestamp),
+				Line:                info.Line,
 			}
-			proj, ok := s.repoToProjCache.get(repository)
+			proj, ok := s.repoToProjCache.get(info.Repository)
 			if ok {
 				gitlabMetadata.ProjectId = int64(proj.id)
 				gitlabMetadata.ProjectName = proj.name
