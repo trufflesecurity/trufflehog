@@ -421,7 +421,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
 	switch c := s.connector.(type) {
 	case *appConnector:
-		if err := s.enumerateWithApp(ctx, c.InstallationClient(), dedupeReporter); err != nil {
+		if err := s.enumerateWithApp(ctx, c, dedupeReporter); err != nil {
 			return err
 		}
 	case *basicAuthConnector:
@@ -623,7 +623,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	return nil
 }
 
-func (s *Source) enumerateWithApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
+func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, reporter sources.UnitReporter) error {
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
 		if err := s.getReposByApp(ctx, reporter); err != nil {
@@ -632,7 +632,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, installationClient *githu
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, installationClient, reporter)
+			err := s.addMembersByApp(ctx, connector, reporter)
 			if err != nil {
 				return err
 			}
@@ -930,7 +930,8 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 	return nil
 }
 
-func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
+func (s *Source) addMembersByApp(ctx context.Context, connector *appConnector, reporter sources.UnitReporter) error {
+	installationClient := connector.InstallationClient()
 	opts := &github.ListOptions{
 		PerPage: membersAppPagination,
 	}
@@ -941,12 +942,25 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 		return fmt.Errorf("could not enumerate installed orgs: %w", err)
 	}
 
-	for _, org := range installs {
-		if org.Account.GetType() != "Organization" {
+	for _, install := range installs {
+		if install.Account.GetType() != "Organization" {
 			continue
 		}
-		if err := s.addMembersByOrg(ctx, *org.Account.Login, reporter); err != nil {
-			return err
+		org := install.Account.GetLogin()
+		logger := ctx.Logger().WithValues("org", org, "installation_id", install.GetID())
+
+		// Create a per-installation API client so that the token is scoped to
+		// this org. GitHub App installation tokens only bypass IP allowlists for
+		// their own org; using a cross-org token causes 403s.
+		client, err := connector.APIClientForInstallation(install.GetID())
+		if err != nil {
+			logger.Error(err, "could not create API client for installation")
+			continue
+		}
+
+		if err := s.addMembersByOrgWithClient(ctx, client, org, reporter); err != nil {
+			logger.Error(err, "Unable to add members for org")
+			continue
 		}
 	}
 
@@ -1028,6 +1042,10 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string, reporter source
 }
 
 func (s *Source) addMembersByOrg(ctx context.Context, org string, reporter sources.UnitReporter) error {
+	return s.addMembersByOrgWithClient(ctx, s.connector.APIClient(), org, reporter)
+}
+
+func (s *Source) addMembersByOrgWithClient(ctx context.Context, client *github.Client, org string, reporter sources.UnitReporter) error {
 	opts := &github.ListMembersOptions{
 		PublicOnly: false,
 		ListOptions: github.ListOptions{
@@ -1037,7 +1055,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string, reporter sourc
 
 	logger := ctx.Logger().WithValues("org", org)
 	for {
-		members, res, err := s.connector.APIClient().Organizations.ListMembers(ctx, org, opts)
+		members, res, err := client.Organizations.ListMembers(ctx, org, opts)
 		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
