@@ -114,38 +114,20 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 			if err == nil {
 				s.metrics.incFilesProcessed()
 			}
-			s.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
+
 		}
+		s.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 		ctx.Logger().V(3).Info("SQLite database fully chunked and ready for scanning")
 	}()
 	return dataOrErrChan
 }
 
 func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string, conn *sql.DB, dataOrErrChan chan DataOrErr) error {
-	colNames := []string{}
-	cols, err := conn.Query(`PRAGMA table_info("` + table + `")`) // for some reason calling Columns() raises an error, so we do an actual PRAGMA query
-	if err != nil {
-		return err
-	}
-	defer cols.Close() //nolint:errcheck
-	for cols.Next() {
-		var id, colName, c3, c4, c5, c6 any
-		if err := cols.Scan(&id, &colName, &c3, &c4, &c5, &c6); err != nil {
-			return err
-		}
-		colNameStr, ok := colName.(string)
-		if !ok {
-			return fmt.Errorf("expected string for column name, got %T", colName)
-		}
-		colNames = append(colNames, colNameStr)
-	}
-	if err = cols.Err(); err != nil {
-		return err
-	}
 	rows, err := conn.Query(`SELECT * from "` + table + `";`)
 	if err != nil {
 		return err
 	}
+	colNames, err := rows.Columns()
 	defer rows.Close() //nolint:errcheck
 	buf := bytes.NewBuffer(nil)
 	for rows.Next() {
