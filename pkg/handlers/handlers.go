@@ -298,6 +298,7 @@ var skipArchiverMimeTypes = map[mimeType]struct{}{
 	pythonMime:   {},
 	pyAppMime:    {},
 	pyScriptMime: {},
+	sqliteMime:   {},
 	tclTextMime:  {},
 	tclMime:      {},
 	apkMime:      {},

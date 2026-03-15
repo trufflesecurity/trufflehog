@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
@@ -134,8 +135,10 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 			outFile := buffer.NewBuffer()
 			// create a new CSV -- we're essentially exporting the db as CSV so the rest of the scanner can easily scan it
 			w := csv.NewWriter(outFile)
+			re := regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
+			tableName := re.ReplaceAllString(table, "")
 			colNames := []string{}
-			cols, err := conn.Query("PRAGMA table_info(" + table + ")") // for some reason calling Columns() raises an error, so we do an actual PRAGMA query
+			cols, err := conn.Query(`PRAGMA table_info("` + tableName + `")`) // for some reason calling Columns() raises an error, so we do an actual PRAGMA query
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingWarning, err),
@@ -146,8 +149,9 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 				if err := cols.Scan(&id, &colName, &c3, &c4, &c5, &c6); err != nil {
 
 					dataOrErrChan <- DataOrErr{
-						Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingWarning, err),
+						Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingFatal, err),
 					}
+					return err
 				}
 				colNames = append(colNames, colName.(string))
 			}
@@ -155,10 +159,11 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 			err = w.Write(colNamesWithTable)
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
-					Err: fmt.Errorf("%w: error writing column names: %v", ErrProcessingWarning, err),
+					Err: fmt.Errorf("%w: error writing column names: %v", ErrProcessingFatal, err),
 				}
+				return err
 			}
-			rows, err := conn.Query(`SELECT * from ` + table)
+			rows, err := conn.Query(`SELECT * from ?`, table)
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error querying table contents: %v", ErrProcessingWarning, err),
