@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"time"
@@ -68,15 +68,7 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 			_ = tempDb.Close()
 			_ = os.Remove(tempDb.Name())
 		}()
-		buf := bytes.NewBuffer(nil)
-		_, err = buf.ReadFrom(input)
-		if err != nil {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error writing temporary sqlite db: %v", ErrProcessingFatal, err),
-			}
-			return
-		}
-		_, err = tempDb.Write(buf.Bytes())
+		_, err = io.Copy(tempDb, input)
 		if err != nil {
 			dataOrErrChan <- DataOrErr{
 				Err: fmt.Errorf("%w: error writing temporary sqlite db: %v", ErrProcessingFatal, err),
@@ -114,6 +106,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 		return err
 	}
 	defer tableNameRows.Close() //nolint:errcheck
+	re := regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
 	tableNames := []string{}
 	for tableNameRows.Next() {
 		name := ""
@@ -124,7 +117,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 			}
 			return err
 		}
-		tableNames = append(tableNames, name)
+		tableNames = append(tableNames, re.ReplaceAllString(name, ""))
 	}
 	// for each table, get column names and all rows
 	for _, table := range tableNames {
@@ -135,10 +128,8 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 			outFile := buffer.NewBuffer()
 			// create a new CSV -- we're essentially exporting the db as CSV so the rest of the scanner can easily scan it
 			w := csv.NewWriter(outFile)
-			re := regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
-			tableName := re.ReplaceAllString(table, "")
 			colNames := []string{}
-			cols, err := conn.Query(`PRAGMA table_info("` + tableName + `")`) // for some reason calling Columns() raises an error, so we do an actual PRAGMA query
+			cols, err := conn.Query(`PRAGMA table_info("` + table + `")`) // for some reason calling Columns() raises an error, so we do an actual PRAGMA query
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingWarning, err),
@@ -164,7 +155,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 				}
 				return err
 			}
-			rows, err := conn.Query(`SELECT * from ` + tableName + `;`)
+			rows, err := conn.Query(`SELECT * from ` + table + `;`)
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error querying table contents: %v", ErrProcessingWarning, err),
@@ -182,12 +173,11 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 						Err: fmt.Errorf("%w: error scanning row contents: %v", ErrProcessingWarning, err),
 					}
 				}
-				row = append(row, tableName)
 				strRow := []string{}
 				for i := range rowPtrs {
 					strRow = append(strRow, fmt.Sprintf("%v", row[i]))
 				}
-				strRow = append(strRow, tableName)
+				strRow = append(strRow, table)
 				err = w.Write(strRow)
 				if err != nil {
 					dataOrErrChan <- DataOrErr{
@@ -196,7 +186,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 				}
 			}
 			w.Flush()
-			fileCtx := logContext.WithValues(ctx, "table", tableName)
+			fileCtx := logContext.WithValues(ctx, "table", table)
 			rdr, err := newMimeTypeReader(outFile)
 			if err != nil {
 				return fmt.Errorf("error creating mime-type reader: %w", err)
