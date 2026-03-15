@@ -14,6 +14,17 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const (
+	SQLITE_TIMEOUT     = 5000
+	SANITIZATION_REGEX = `[^a-zA-Z0-9_\-]`
+	VALIDATION_REGEX   = `^[a-zA-Z_][a-zA-Z0-9_]*$`
+)
+
+var (
+	sanitizationRegex   = regexp.MustCompile(SANITIZATION_REGEX)
+	validTableNameRegex = regexp.MustCompile(VALIDATION_REGEX)
+)
+
 type sqliteHandler struct{ *defaultHandler }
 
 func newSqliteHandler() *sqliteHandler {
@@ -77,7 +88,7 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 		}
 
 		// open our temp file as a SQLITE3 db with some nice options to keep us moving along
-		conn, err := sql.Open("sqlite", "file:"+tempDb.Name()+"?_busy_timeout=5000&_journal_mode=WAL")
+		conn, err := sql.Open("sqlite", "file:"+tempDb.Name()+"?_pragma=busy_timeout("+fmt.Sprintf("%d", SQLITE_TIMEOUT)+")&_pragma=journal_mode(WAL)")
 		if err != nil {
 			dataOrErrChan <- DataOrErr{
 				Err: fmt.Errorf("%w: error opening temporary sqlite database file: %v", ErrProcessingFatal, err),
@@ -95,7 +106,6 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 			return
 		}
 		defer tableNameRows.Close() //nolint:errcheck
-		re := regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
 		tableNames := []string{}
 		for tableNameRows.Next() {
 			name := ""
@@ -106,17 +116,21 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 				}
 				return
 			}
-			tableNames = append(tableNames, re.ReplaceAllString(name, ""))
+			sanitizedName := sanitizationRegex.ReplaceAllString(name, "")
+			if sanitizedName == "" || !validTableNameRegex.MatchString(sanitizedName) {
+				// Skip invalid table names
+				continue
+			}
+			tableNames = append(tableNames, sanitizedName)
 		}
-
 		for _, table := range tableNames {
 			// run our processor function
 			err = s.processSqliteTable(ctx, table, conn, dataOrErrChan)
 			if err == nil {
 				s.metrics.incFilesProcessed()
 			}
+			s.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 		}
-		s.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 		ctx.Logger().V(3).Info("SQLite database fully chunked and ready for scanning")
 	}()
 	return dataOrErrChan
@@ -127,28 +141,37 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 	cols, err := conn.Query(`PRAGMA table_info("` + table + `")`) // for some reason calling Columns() raises an error, so we do an actual PRAGMA query
 	if err != nil {
 		dataOrErrChan <- DataOrErr{
-			Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingWarning, err),
+			Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingFatal, err),
 		}
+		return err
 	}
 	defer cols.Close() //nolint:errcheck
 	for cols.Next() {
 		var id, colName, c3, c4, c5, c6 any
 		if err := cols.Scan(&id, &colName, &c3, &c4, &c5, &c6); err != nil {
-
 			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingFatal, err),
+				Err: fmt.Errorf("%w: error scanning column names: %v", ErrProcessingFatal, err),
 			}
 			return err
 		}
-		colNames = append(colNames, colName.(string))
+		colNameStr, ok := colName.(string)
+		if !ok {
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: expected string for column name, but got %T", ErrProcessingFatal, colName),
+			}
+			return err
+		}
+		colNames = append(colNames, colNameStr)
 	}
-	rows, err := conn.Query(`SELECT * from ` + table + `;`)
+	rows, err := conn.Query(`SELECT * from "` + table + `";`)
 	if err != nil {
 		dataOrErrChan <- DataOrErr{
-			Err: fmt.Errorf("%w: error querying table contents: %v", ErrProcessingWarning, err),
+			Err: fmt.Errorf("%w: error querying table contents: %v", ErrProcessingFatal, err),
 		}
+		return err
 	}
 	defer rows.Close() //nolint:errcheck
+	buf := bytes.NewBuffer(nil)
 	for rows.Next() {
 		row := make([]any, len(colNames))
 		rowPtrs := make([]any, len(colNames))
@@ -165,22 +188,16 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 			strRow = append(strRow, fmt.Sprintf("%v", row[i]))
 		}
 		strRow = append(strRow, table)
-		if err != nil {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error wrting to temp csv: %v", ErrProcessingWarning, err),
-			}
-		}
 		jsonMap := map[string]any{
 			"__table__": table,
 		}
 		for i, col := range colNames {
 			jsonMap[col] = strRow[i]
 		}
-		buf := bytes.NewBuffer(nil)
 		b, err := yaml.Marshal(jsonMap)
 		if err != nil {
 			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error marshlaing row to json: %v", ErrProcessingWarning, err),
+				Err: fmt.Errorf("%w: error marshaling row to json: %v", ErrProcessingWarning, err),
 			}
 		}
 		_, err = buf.Write(b)
@@ -202,6 +219,7 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 			s.metrics.incErrors()
 		}
 		s.metrics.incFilesProcessed()
+		buf.Reset()
 	}
 	return nil
 }
