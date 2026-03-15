@@ -21,7 +21,7 @@ func TestHandleSqliteFile(t *testing.T) {
 	handler := newSqliteHandler()
 	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), r)
 	count := 0
-	wantCount := 2
+	wantCount := 11
 	for e := range dataOrErrChan {
 		assert.NoError(t, e.Err)
 		count++
