@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"time"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -15,14 +14,7 @@ import (
 )
 
 const (
-	SQLITE_TIMEOUT     = 5000
-	SANITIZATION_REGEX = `[^a-zA-Z0-9_\-]`
-	VALIDATION_REGEX   = `^[a-zA-Z_][a-zA-Z0-9_]*$`
-)
-
-var (
-	sanitizationRegex   = regexp.MustCompile(SANITIZATION_REGEX)
-	validTableNameRegex = regexp.MustCompile(VALIDATION_REGEX)
+	SQLITE_TIMEOUT = 5000
 )
 
 type sqliteHandler struct{ *defaultHandler }
@@ -108,12 +100,13 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 				}
 				return
 			}
-			sanitizedName := sanitizationRegex.ReplaceAllString(name, "")
-			if sanitizedName == "" || !validTableNameRegex.MatchString(sanitizedName) {
-				// Skip invalid table names
-				continue
+			tableNames = append(tableNames, name)
+		}
+		if err = tableNameRows.Err(); err != nil {
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: error scanning table: %v", ErrProcessingFatal, err),
 			}
-			tableNames = append(tableNames, sanitizedName)
+			return
 		}
 		for _, table := range tableNames {
 			// run our processor function
@@ -146,6 +139,9 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 		}
 		colNames = append(colNames, colNameStr)
 	}
+	if err = cols.Err(); err != nil {
+		return err
+	}
 	rows, err := conn.Query(`SELECT * from "` + table + `";`)
 	if err != nil {
 		return err
@@ -166,12 +162,12 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error scanning row contents: %v", ErrProcessingWarning, err),
 				}
+				continue
 			}
 			strRow := []string{}
 			for i := range rowPtrs {
 				strRow = append(strRow, fmt.Sprintf("%v", row[i]))
 			}
-			strRow = append(strRow, table)
 			jsonMap := map[string]any{
 				"__table__": table,
 			}
@@ -183,12 +179,14 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error marshaling row to json: %v", ErrProcessingWarning, err),
 				}
+				continue
 			}
 			_, err = buf.Write(b)
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error writing bytes to buffer: %v", ErrProcessingWarning, err),
 				}
+				continue
 			}
 			fileCtx := logContext.WithValues(ctx, "table", table)
 			rdr, err := newMimeTypeReader(buf)
@@ -201,10 +199,14 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 					Err: fmt.Errorf("%w: error processing sqlite database: %v", ErrProcessingWarning, err),
 				}
 				s.metrics.incErrors()
+				continue
 			}
 			s.metrics.incFilesProcessed()
 			buf.Reset()
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return err
 	}
 	return nil
 }
