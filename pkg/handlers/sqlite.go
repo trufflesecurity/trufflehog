@@ -150,7 +150,7 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 		}
 		colNameStr, ok := colName.(string)
 		if !ok {
-			return fmt.Errorf("expexted string for column name, got %T", colName)
+			return fmt.Errorf("expected string for column name, got %T", colName)
 		}
 		colNames = append(colNames, colNameStr)
 	}
