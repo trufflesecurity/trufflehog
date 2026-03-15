@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	_ "modernc.org/sqlite"
 )
 
 type sqliteHandler struct{ *defaultHandler }
