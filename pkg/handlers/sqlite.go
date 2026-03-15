@@ -140,86 +140,79 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 	colNames := []string{}
 	cols, err := conn.Query(`PRAGMA table_info("` + table + `")`) // for some reason calling Columns() raises an error, so we do an actual PRAGMA query
 	if err != nil {
-		dataOrErrChan <- DataOrErr{
-			Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingFatal, err),
-		}
 		return err
 	}
 	defer cols.Close() //nolint:errcheck
 	for cols.Next() {
 		var id, colName, c3, c4, c5, c6 any
 		if err := cols.Scan(&id, &colName, &c3, &c4, &c5, &c6); err != nil {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error scanning column names: %v", ErrProcessingFatal, err),
-			}
 			return err
 		}
 		colNameStr, ok := colName.(string)
 		if !ok {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: expected string for column name, but got %T", ErrProcessingFatal, colName),
-			}
-			return err
+			return fmt.Errorf("expexted string for column name, got %T", colName)
 		}
 		colNames = append(colNames, colNameStr)
 	}
 	rows, err := conn.Query(`SELECT * from "` + table + `";`)
 	if err != nil {
-		dataOrErrChan <- DataOrErr{
-			Err: fmt.Errorf("%w: error querying table contents: %v", ErrProcessingFatal, err),
-		}
 		return err
 	}
 	defer rows.Close() //nolint:errcheck
 	buf := bytes.NewBuffer(nil)
 	for rows.Next() {
-		row := make([]any, len(colNames))
-		rowPtrs := make([]any, len(colNames))
-		for i := range colNames {
-			rowPtrs[i] = &row[i]
-		}
-		if err := rows.Scan(rowPtrs...); err != nil {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error scanning row contents: %v", ErrProcessingWarning, err),
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			row := make([]any, len(colNames))
+			rowPtrs := make([]any, len(colNames))
+			for i := range colNames {
+				rowPtrs[i] = &row[i]
 			}
-		}
-		strRow := []string{}
-		for i := range rowPtrs {
-			strRow = append(strRow, fmt.Sprintf("%v", row[i]))
-		}
-		strRow = append(strRow, table)
-		jsonMap := map[string]any{
-			"__table__": table,
-		}
-		for i, col := range colNames {
-			jsonMap[col] = strRow[i]
-		}
-		b, err := yaml.Marshal(jsonMap)
-		if err != nil {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error marshaling row to json: %v", ErrProcessingWarning, err),
+			if err := rows.Scan(rowPtrs...); err != nil {
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error scanning row contents: %v", ErrProcessingWarning, err),
+				}
 			}
-		}
-		_, err = buf.Write(b)
-		if err != nil {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error writing bytes to buffer: %v", ErrProcessingWarning, err),
+			strRow := []string{}
+			for i := range rowPtrs {
+				strRow = append(strRow, fmt.Sprintf("%v", row[i]))
 			}
-		}
-		fileCtx := logContext.WithValues(ctx, "table", table)
-		rdr, err := newMimeTypeReader(buf)
-		if err != nil {
-			return fmt.Errorf("error creating mime-type reader: %w", err)
-		}
-		// now handle each table in CSV format as you would any other file
-		if err := s.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
-			dataOrErrChan <- DataOrErr{
-				Err: fmt.Errorf("%w: error processing sqlite database: %v", ErrProcessingWarning, err),
+			strRow = append(strRow, table)
+			jsonMap := map[string]any{
+				"__table__": table,
 			}
-			s.metrics.incErrors()
+			for i, col := range colNames {
+				jsonMap[col] = strRow[i]
+			}
+			b, err := yaml.Marshal(jsonMap)
+			if err != nil {
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error marshaling row to json: %v", ErrProcessingWarning, err),
+				}
+			}
+			_, err = buf.Write(b)
+			if err != nil {
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error writing bytes to buffer: %v", ErrProcessingWarning, err),
+				}
+			}
+			fileCtx := logContext.WithValues(ctx, "table", table)
+			rdr, err := newMimeTypeReader(buf)
+			if err != nil {
+				return fmt.Errorf("error creating mime-type reader: %w", err)
+			}
+			// now handle each table in CSV format as you would any other file
+			if err := s.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error processing sqlite database: %v", ErrProcessingWarning, err),
+				}
+				s.metrics.incErrors()
+			}
+			s.metrics.incFilesProcessed()
+			buf.Reset()
 		}
-		s.metrics.incFilesProcessed()
-		buf.Reset()
 	}
 	return nil
 }
