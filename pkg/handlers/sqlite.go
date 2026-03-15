@@ -35,14 +35,6 @@ func newSqliteHandler() *sqliteHandler {
 // It returns a channel of DataorErr that will receive either file data
 // or errors encountered during processing.
 //
-// Fatal errors that will terminate processing include:
-// - Context cancellation or deadline exceeded
-// - Errors reading or uncompressing the RPM file
-// - Panics during processing (wrapped as ErrProcessingFatal)
-//
-// Non-fatal errors that will be reported but allow processing to continue include:
-// - Errors processing individual files within the RPM archive (wrapped as ErrProcessingWarning)
-//
 // This implementation was heavily inspired by the RPM Handler and github.com/joho/sqltocsv (MIT)
 func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
