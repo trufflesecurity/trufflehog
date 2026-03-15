@@ -163,7 +163,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 				}
 				return err
 			}
-			rows, err := conn.Query(`SELECT * from ?`, table)
+			rows, err := conn.Query(`SELECT * from ` + tableName + `;`)
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error querying table contents: %v", ErrProcessingWarning, err),
@@ -180,12 +180,12 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 						Err: fmt.Errorf("%w: error scanning row contents: %v", ErrProcessingWarning, err),
 					}
 				}
-				row = append(row, table)
+				row = append(row, tableName)
 				strRow := []string{}
 				for i := range rowPtrs {
 					strRow = append(strRow, fmt.Sprintf("%v", row[i]))
 				}
-				strRow = append(strRow, table)
+				strRow = append(strRow, tableName)
 				err = w.Write(strRow)
 				if err != nil {
 					dataOrErrChan <- DataOrErr{
@@ -194,7 +194,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 				}
 			}
 			w.Flush()
-			fileCtx := logContext.WithValues(ctx, "table", table)
+			fileCtx := logContext.WithValues(ctx, "table", tableName)
 			rdr, err := newMimeTypeReader(outFile)
 			if err != nil {
 				return fmt.Errorf("error creating mime-type reader: %w", err)
