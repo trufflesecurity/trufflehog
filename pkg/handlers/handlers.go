@@ -223,6 +223,7 @@ const (
 	arHandlerType      handlerType = "ar"
 	rpmHandlerType     handlerType = "rpm"
 	apkHandlerType     handlerType = "apk"
+	sqliteHandlerType  handlerType = "sqlite"
 	defaultHandlerType handlerType = "default"
 	apkExt                         = ".apk"
 )
@@ -257,6 +258,7 @@ const (
 	pythonMime   mimeType = "text/x-python"
 	pyAppMime    mimeType = "application/x-python"
 	pyScriptMime mimeType = "application/x-script.python"
+	sqliteMime   mimeType = "application/vnd.sqlite3"
 	tclTextMime  mimeType = "text/x-tcl"
 	tclMime      mimeType = "application/x-tcl"
 	apkMime      mimeType = "application/vnd.android.package-archive"
@@ -320,6 +322,8 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 		return newRPMHandler()
 	case apkMime:
 		return newAPKHandler()
+	case sqliteMime:
+		return newSqliteHandler()
 	default:
 		if isGenericArchive {
 			return newArchiveHandler()
