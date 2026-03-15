@@ -17,7 +17,7 @@ func TestHandleSqliteFile(t *testing.T) {
 	defer cancel()
 	r, err := newFileReader(ctx, file)
 	assert.NoError(t, err)
-	defer r.Close()
+	defer r.Close() //nolint:errcheck
 	handler := newSqliteHandler()
 	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), r)
 	count := 0

@@ -72,6 +72,7 @@ require (
 	github.com/mariduv/ldap-verify v0.0.2
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d
 	github.com/microsoft/go-mssqldb v1.8.2
 	github.com/mitchellh/go-ps v1.0.0
@@ -240,7 +241,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/mattn/go-sqlite3 v1.14.34 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

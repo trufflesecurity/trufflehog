@@ -20,7 +20,7 @@ func newSqliteHandler() *sqliteHandler {
 }
 
 // HandleFile processes SQLITE databases.
-// It returns a channel of DataorErr that will recieve either file data
+// It returns a channel of DataorErr that will receive either file data
 // or errors encountered during processing.
 //
 // Fatal errors that will terminate processing include:
@@ -61,7 +61,7 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 	}
 	defer func() {
 		// clean up temp file when we're done with it
-		tempDb.Close()
+		_ = tempDb.Close()
 		_ = os.Remove(tempDb.Name())
 	}()
 	buf := bytes.NewBuffer(nil)
@@ -85,7 +85,7 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 			Err: fmt.Errorf("%w: error opening temporary sqlite database file: %v", ErrProcessingFatal, err),
 		}
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
 	// run our processor function
 	err = s.processSQLiteDB(ctx, conn, dataOrErrChan)
@@ -100,7 +100,7 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, dataOrErrChan chan DataOrErr) error {
 	// gets a list of all tables in the database
 	tableNameRows, err := conn.Query(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`)
-	defer tableNameRows.Close()
+	defer tableNameRows.Close() //nolint:errcheck
 	if err != nil {
 		dataOrErrChan <- DataOrErr{
 			Err: fmt.Errorf("%w: error scanning for table names in database: %v", ErrProcessingFatal, err),
@@ -173,7 +173,12 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 					strRow = append(strRow, fmt.Sprintf("%v", row[i]))
 				}
 				strRow = append(strRow, table)
-				w.Write(strRow)
+				err = w.Write(strRow)
+				if err != nil {
+					dataOrErrChan <- DataOrErr{
+						Err: fmt.Errorf("%w: error wrting to temp csv: %v", ErrProcessingWarning, err),
+					}
+				}
 			}
 			w.Flush()
 			fileCtx := logContext.WithValues(ctx, "table", table)
