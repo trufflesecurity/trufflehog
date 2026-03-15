@@ -144,6 +144,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 					Err: fmt.Errorf("%w: error getting column names: %v", ErrProcessingWarning, err),
 				}
 			}
+			defer cols.Close() //nolint:errcheck
 			for cols.Next() {
 				var id, colName, c3, c4, c5, c6 any
 				if err := cols.Scan(&id, &colName, &c3, &c4, &c5, &c6); err != nil {
@@ -169,6 +170,7 @@ func (s *sqliteHandler) processSQLiteDB(ctx logContext.Context, conn *sql.DB, da
 					Err: fmt.Errorf("%w: error querying table contents: %v", ErrProcessingWarning, err),
 				}
 			}
+			defer rows.Close() //nolint:errcheck
 			for rows.Next() {
 				row := make([]any, len(colNames))
 				rowPtrs := make([]any, len(colNames))
