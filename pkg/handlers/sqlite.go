@@ -84,7 +84,7 @@ func (s *sqliteHandler) HandleFile(ctx logContext.Context, input fileReader) cha
 		}
 
 		// open our temp file as a SQLITE3 db with some nice options to keep us moving along
-		conn, err := sql.Open("sqlite3", "file:"+tempDb.Name()+"?_busy_timeout=5000&_journal_mode=WAL")
+		conn, err := sql.Open("sqlite", "file:"+tempDb.Name()+"?_busy_timeout=5000&_journal_mode=WAL")
 		if err != nil {
 			dataOrErrChan <- DataOrErr{
 				Err: fmt.Errorf("%w: error opening temporary sqlite database file: %v", ErrProcessingFatal, err),
