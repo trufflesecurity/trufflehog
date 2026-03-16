@@ -138,6 +138,7 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+			buf.Reset()
 			row := make([]any, len(colNames))
 			rowPtrs := make([]any, len(colNames))
 			for i := range colNames {
@@ -187,7 +188,6 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 				continue
 			}
 			s.metrics.incFilesProcessed()
-			buf.Reset()
 		}
 	}
 	if err = rows.Err(); err != nil {
