@@ -127,11 +127,11 @@ func (s *sqliteHandler) processSqliteTable(ctx logContext.Context, table string,
 	if err != nil {
 		return err
 	}
+	defer rows.Close() //nolint:errcheck
 	colNames, err := rows.Columns()
 	if err != nil {
 		return fmt.Errorf("%w: error getting column names: %v", ErrProcessingFatal, err)
 	}
-	defer rows.Close() //nolint:errcheck
 	buf := bytes.NewBuffer(nil)
 	for rows.Next() {
 		select {
