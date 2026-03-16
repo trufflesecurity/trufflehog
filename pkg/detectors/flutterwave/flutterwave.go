@@ -12,6 +12,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+var flutterwaveKeyPattern = regexp.MustCompile(`flw_(test|live)_[0-9a-zA-Z]{50,}|FLWSECK-[0-9a-zA-Z]{32}-X`)
+
 type scanner struct{}
 
 var _ detectors.Detector = (*scanner)(nil)
@@ -23,8 +25,7 @@ func (s scanner) Keywords() []string {
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`flw_(test|live)_[0-9a-zA-Z]{50,}|FLWSECK[_-]?[a-zA-Z0-9]{30,}`)
-	matches := rx.FindAllString(dataStr, -1)
+	matches := flutterwaveKeyPattern.FindAllString(dataStr, -1)
 
 	for _, match := range matches {
 		s := detectors.Result{

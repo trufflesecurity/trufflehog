@@ -13,6 +13,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+var interswitchKeyPattern = regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})|macKey["']?\s*[:=]\s*["']?([0-9A-Fa-f]{64})`)
+
 type scanner struct{}
 
 var _ detectors.Detector = (*scanner)(nil)
@@ -24,8 +26,7 @@ func (s scanner) Keywords() []string {
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})|macKey["']?\s*[:=]\s*["']?([0-9A-Fa-f]{64})`)
-	matches := rx.FindAllStringSubmatch(dataStr, -1)
+	matches := interswitchKeyPattern.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) < 1 {

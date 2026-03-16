@@ -12,6 +12,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+var paystackKeyPattern = regexp.MustCompile(`sk_[a-z]{1,}_[0-9a-zA-Z]{40}`)
+
 type scanner struct{}
 
 var _ detectors.Detector = (*scanner)(nil)
@@ -23,8 +25,7 @@ func (s scanner) Keywords() []string {
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`sk_(live|test)_[0-9a-zA-Z]{40}`)
-	matches := rx.FindAllString(dataStr, -1)
+	matches := paystackKeyPattern.FindAllString(dataStr, -1)
 
 	for _, match := range matches {
 		s := detectors.Result{
@@ -83,5 +84,5 @@ func (s scanner) Type() detectorspb.DetectorType {
 }
 
 func (s scanner) Description() string {
-	return "Detects Paystack API secret keys (sk_live and sk_test)"
+	return "Detects Paystack API secret keys (sk_* format)"
 }

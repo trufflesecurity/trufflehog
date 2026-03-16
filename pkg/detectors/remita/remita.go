@@ -13,6 +13,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+var remitaKeyPattern = regexp.MustCompile(`remita[_-]?(?:api[_-])?key["\s:=]+([0-9a-zA-Z]{32,})|[0-9]{10,15}\|?[0-9a-zA-Z]{40,}`)
+
 type scanner struct{}
 
 var _ detectors.Detector = (*scanner)(nil)
@@ -24,8 +26,7 @@ func (s scanner) Keywords() []string {
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`remita[_-]?(?:api[_-])?key["\s:=]+([0-9a-zA-Z]{32,})|[0-9]{10,15}\|?[0-9a-zA-Z]{40,}`)
-	matches := rx.FindAllStringSubmatch(dataStr, -1)
+	matches := remitaKeyPattern.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) < 1 {
