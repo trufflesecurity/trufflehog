@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -51,7 +52,7 @@ func verifyFlutterwaveKey(ctx context.Context, key string) bool {
 	req.Header.Add("Authorization", "Bearer "+key)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := common.SaneHttpClient().Do(req)
 	if err != nil {
 		return false
 	}

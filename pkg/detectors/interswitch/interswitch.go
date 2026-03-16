@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -23,7 +24,7 @@ func (s scanner) Keywords() []string {
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})|macKey["']?\s*[:=]\s*["']?[0-9A-Fa-f]{64}`)
+	rx := regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})|macKey["']?\s*[:=]\s*["']?([0-9A-Fa-f]{64})`)
 	matches := rx.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
@@ -34,6 +35,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		key := match[0]
 		if len(match) > 1 && match[1] != "" {
 			key = match[1]
+		} else if len(match) > 2 && match[2] != "" {
+			key = match[2]
 		}
 
 		s := detectors.Result{
@@ -53,7 +56,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyInterswitchKey(ctx context.Context, key string) bool {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://sandbox.interswitchng.com/api/v1/merchant/profile", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.interswitchng.com/api/v1/merchant/profile", nil)
 	if err != nil {
 		return false
 	}
@@ -62,7 +65,7 @@ func verifyInterswitchKey(ctx context.Context, key string) bool {
 	req.Header.Add("Authorization", "Basic "+auth)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := common.SaneHttpClient().Do(req)
 	if err != nil {
 		return false
 	}

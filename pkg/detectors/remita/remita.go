@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -53,7 +54,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyRemitaKey(ctx context.Context, key string) bool {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://remitademo.net/api/v1/send/api/echo", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.remita.net/v1/send/api/echo", nil)
 	if err != nil {
 		return false
 	}
@@ -62,7 +63,7 @@ func verifyRemitaKey(ctx context.Context, key string) bool {
 	req.Header.Add("Authorization", "Basic "+auth)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := common.SaneHttpClient().Do(req)
 	if err != nil {
 		return false
 	}

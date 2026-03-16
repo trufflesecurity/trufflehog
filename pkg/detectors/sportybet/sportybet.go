@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -16,24 +18,21 @@ type scanner struct{}
 var _ detectors.Detector = (*scanner)(nil)
 
 func (s scanner) Keywords() []string {
-	return []string{"sportybet", "sportybet_api", "sporty_api_key", "betking", "betting", "Bearer"}
+	return []string{"sportybet", "sportybet_api", "sporty_api_key"}
 }
 
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`sportybet[_-]?(?:api[_-])?(?:key|token)["\s:=]+([0-9a-zA-Z]{32,})|eyJ[A-Za-z0-9-_]{100,}|Bearer [A-Za-z0-9-_]{50,}\.[A-Za-z0-9-_]{50,}\.[A-Za-z0-9-_]{50,}`)
+	rx := regexp.MustCompile(`sportybet[_-]?(?:api[_-])?(?:key|token)["\s:=]+([0-9a-zA-Z]{32,})`)
 	matches := rx.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) < 1 {
+		if len(match) < 2 {
 			continue
 		}
 
-		key := match[0]
-		if len(match) > 1 && match[1] != "" {
-			key = match[1]
-		}
+		key := match[1]
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sportybet,
@@ -57,10 +56,13 @@ func verifySportybetKey(ctx context.Context, key string) bool {
 		return false
 	}
 
-	req.Header.Add("Authorization", "Bearer "+key)
+	// Strip "Bearer " prefix if present
+	token := strings.TrimPrefix(key, "Bearer ")
+
+	req.Header.Add("Authorization", "Bearer "+token)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := common.SaneHttpClient().Do(req)
 	if err != nil {
 		return false
 	}

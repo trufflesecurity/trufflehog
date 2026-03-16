@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -22,7 +23,7 @@ func (s scanner) Keywords() []string {
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`sk_(live|test)_[0-9a-zA-Z]{50,}`)
+	rx := regexp.MustCompile(`sk_(live|test)_[0-9a-zA-Z]{40}`)
 	matches := rx.FindAllString(dataStr, -1)
 
 	for _, match := range matches {
@@ -51,7 +52,7 @@ func verifyPaystackKey(ctx context.Context, key string) bool {
 	req.Header.Add("Authorization", "Bearer "+key)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := common.SaneHttpClient().Do(req)
 	if err != nil {
 		return false
 	}
