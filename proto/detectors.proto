@@ -1049,6 +1049,9 @@ enum DetectorType {
   PhraseAccessToken = 1037;
   Photoroom = 1038;
   JWT = 1039;
+  Remita = 1040;
+  Interswitch = 1041;
+  Sportybet = 1042;
 }
 
 message Result {

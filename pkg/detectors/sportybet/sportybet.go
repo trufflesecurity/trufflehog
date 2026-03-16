@@ -1,4 +1,4 @@
-package paystack
+package sportybet
 
 import (
 	"bytes"
@@ -16,23 +16,32 @@ type scanner struct{}
 var _ detectors.Detector = (*scanner)(nil)
 
 func (s scanner) Keywords() []string {
-	return []string{"paystack", "sk_live", "sk_test"}
+	return []string{"sportybet", "sportybet_api", "sporty_api_key", "betking", "betting", "Bearer"}
 }
 
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`sk_(live|test)_[0-9a-zA-Z]{50,}`)
-	matches := rx.FindAllString(dataStr, -1)
+	rx := regexp.MustCompile(`sportybet[_-]?(?:api[_-])?(?:key|token)["\s:=]+([0-9a-zA-Z]{32,})|eyJ[A-Za-z0-9-_]{100,}|Bearer [A-Za-z0-9-_]{50,}\.[A-Za-z0-9-_]{50,}\.[A-Za-z0-9-_]{50,}`)
+	matches := rx.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
+		if len(match) < 1 {
+			continue
+		}
+
+		key := match[0]
+		if len(match) > 1 && match[1] != "" {
+			key = match[1]
+		}
+
 		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Paystack,
-			Raw:          []byte(match),
+			DetectorType: detectorspb.DetectorType_Sportybet,
+			Raw:          []byte(key),
 		}
 
 		if verify {
-			isVerified := verifyPaystackKey(ctx, match)
+			isVerified := verifySportybetKey(ctx, key)
 			s.Verified = isVerified
 		}
 
@@ -42,8 +51,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyPaystackKey(ctx context.Context, key string) bool {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.paystack.co/balance", nil)
+func verifySportybetKey(ctx context.Context, key string) bool {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.sportybet.com/api/v2/user/account", nil)
 	if err != nil {
 		return false
 	}
@@ -78,9 +87,9 @@ func verifyPaystackKey(ctx context.Context, key string) bool {
 }
 
 func (s scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Paystack
+	return detectorspb.DetectorType_Sportybet
 }
 
 func (s scanner) Description() string {
-	return "Detects Paystack API secret keys (sk_live and sk_test)"
+	return "Detects SportyBet/BetKing API tokens and credentials"
 }

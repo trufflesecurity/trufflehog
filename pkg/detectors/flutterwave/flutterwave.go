@@ -1,76 +1,86 @@
 package flutterwave
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"io"
 	"net/http"
-	"strings"
+	"regexp"
 
-	regexp "github.com/wasilibs/go-re2"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Detector = (*scanner)(nil)
 
-var (
-	client = common.SaneHttpClient()
-
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-
-	keyPat = regexp.MustCompile(`\b(FLWSECK-[0-9a-z]{32}-X)\b`)
-)
-
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"FLWSECK-"}
+func (s scanner) Keywords() []string {
+	return []string{"flutterwave", "flw_test", "flw_live", "FLWSECK"}
 }
 
-// FromData will find and optionally verify Flutterwave secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	rx := regexp.MustCompile(`flw_(test|live)_[0-9a-zA-Z]{50,}|FLWSECK[_-]?[a-zA-Z0-9]{30,}`)
+	matches := rx.FindAllString(dataStr, -1)
 
 	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
-		s1 := detectors.Result{
+		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Flutterwave,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(match),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.flutterwave.com/v3/subaccounts", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified := verifyFlutterwaveKey(ctx, match)
+			s.Verified = isVerified
 		}
 
-		results = append(results, s1)
+		results = append(results, s)
 	}
 
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
+func verifyFlutterwaveKey(ctx context.Context, key string) bool {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.flutterwave.com/v3/merchants", nil)
+	if err != nil {
+		return false
+	}
+
+	req.Header.Add("Authorization", "Bearer "+key)
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+
+	if resp.StatusCode == 200 && !bytes.Contains(bodyBytes, []byte("error")) {
+		return true
+	}
+
+	if resp.StatusCode == 401 || resp.StatusCode == 403 || bytes.Contains(bodyBytes, []byte("invalid")) || bytes.Contains(bodyBytes, []byte("unauthorized")) {
+		return false
+	}
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return true
+	}
+
+	return false
+}
+
+func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Flutterwave
 }
 
-func (s Scanner) Description() string {
-	return "Flutterwave is a payment technology company providing seamless and secure payment solutions for businesses. Flutterwave API keys can be used to access and manage payment services and transactions."
+func (s scanner) Description() string {
+	return "Detects Flutterwave API secret keys"
 }

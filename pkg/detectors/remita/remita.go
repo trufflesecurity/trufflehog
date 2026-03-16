@@ -1,8 +1,9 @@
-package paystack
+package remita
 
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"regexp"
@@ -16,23 +17,32 @@ type scanner struct{}
 var _ detectors.Detector = (*scanner)(nil)
 
 func (s scanner) Keywords() []string {
-	return []string{"paystack", "sk_live", "sk_test"}
+	return []string{"remita", "remita_api_key", "remita_merchant"}
 }
 
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	rx := regexp.MustCompile(`sk_(live|test)_[0-9a-zA-Z]{50,}`)
-	matches := rx.FindAllString(dataStr, -1)
+	rx := regexp.MustCompile(`remita[_-]?(?:api[_-])?key["\s:=]+([0-9a-zA-Z]{32,})|[0-9]{10,15}\|?[0-9a-zA-Z]{40,}`)
+	matches := rx.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
+		if len(match) < 1 {
+			continue
+		}
+
+		key := match[0]
+		if len(match) > 1 && match[1] != "" {
+			key = match[1]
+		}
+
 		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Paystack,
-			Raw:          []byte(match),
+			DetectorType: detectorspb.DetectorType_Remita,
+			Raw:          []byte(key),
 		}
 
 		if verify {
-			isVerified := verifyPaystackKey(ctx, match)
+			isVerified := verifyRemitaKey(ctx, key)
 			s.Verified = isVerified
 		}
 
@@ -42,13 +52,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyPaystackKey(ctx context.Context, key string) bool {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.paystack.co/balance", nil)
+func verifyRemitaKey(ctx context.Context, key string) bool {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://remitademo.net/api/v1/send/api/echo", nil)
 	if err != nil {
 		return false
 	}
 
-	req.Header.Add("Authorization", "Bearer "+key)
+	auth := base64.StdEncoding.EncodeToString([]byte(key + ":"))
+	req.Header.Add("Authorization", "Basic "+auth)
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -78,9 +89,9 @@ func verifyPaystackKey(ctx context.Context, key string) bool {
 }
 
 func (s scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Paystack
+	return detectorspb.DetectorType_Remita
 }
 
 func (s scanner) Description() string {
-	return "Detects Paystack API secret keys (sk_live and sk_test)"
+	return "Detects Remita API keys and merchant credentials"
 }
