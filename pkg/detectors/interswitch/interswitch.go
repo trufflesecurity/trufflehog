@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
+
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -49,8 +51,11 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified := verifyInterswitchKey(ctx, key)
-			s.Verified = isVerified
+			verified, verifyErr := verifyInterswitchKey(ctx, key)
+			s.Verified = verified
+			if verifyErr != nil {
+				s.SetVerificationError(verifyErr, key)
+			}
 		}
 
 		results = append(results, s)
@@ -59,10 +64,10 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyInterswitchKey(ctx context.Context, key string) bool {
+func verifyInterswitchKey(ctx context.Context, key string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.interswitchng.com/api/v1/merchant/profile", nil)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	auth := base64.StdEncoding.EncodeToString([]byte(key + ":"))
@@ -71,29 +76,26 @@ func verifyInterswitchKey(ctx context.Context, key string) bool {
 
 	resp, err := interswitchClient.Do(req)
 	if err != nil {
-		return false
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false
+		return false, err
 	}
 
-	// Invalid responses
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return false
-	}
-
-	// Valid response: 2xx without "invalid"/"unauthorized" keywords
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		if !bytes.Contains(bodyBytes, []byte("invalid")) && !bytes.Contains(bodyBytes, []byte("unauthorized")) {
-			return true
+	switch resp.StatusCode {
+	case http.StatusOK:
+		if bytes.Contains(bodyBytes, []byte("invalid")) || bytes.Contains(bodyBytes, []byte("unauthorized")) {
+			return false, nil
 		}
-		return false
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-
-	return false
 }
 
 func (s scanner) Type() detectorspb.DetectorType {
