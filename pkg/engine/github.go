@@ -55,6 +55,15 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		git.ScanOptionFilter(c.Filter),
 		git.ScanOptionLogOptions(logOptions),
 	}
+
+	if c.MaxDepth != 0 {
+		opts = append(opts, git.ScanOptionMaxDepth(int64(c.MaxDepth)))
+	}
+
+	if c.SinceDate != "" {
+		opts = append(opts, git.ScanOptionSinceDate(c.SinceDate))
+	}
+
 	scanOptions := git.NewScanOptions(opts...)
 
 	sourceName := "trufflehog - github"

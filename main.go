@@ -102,6 +102,7 @@ var (
 	gitScanBranch          = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth        = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	gitScanBare            = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
+	gitScanSinceDate       = gitScan.Flag("since", "Scan commits more recent than a specific date (e.g. 2024-01-01).").String()
 	gitClonePath           = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	gitNoCleanup           = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	gitTrustLocalGitConfig = gitScan.Flag("trust-local-git-config", "Trust local git config.").Bool()
@@ -129,6 +130,8 @@ var (
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
+	githubScanMaxDepth          = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	githubScanSinceDate         = githubScan.Flag("since", "Scan commits more recent than a specific date (e.g. 2024-01-01).").String()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -781,6 +784,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			NoCleanup:           *gitNoCleanup,
 			PrintLegacyJSON:     *jsonLegacy,
 			TrustLocalGitConfig: *gitTrustLocalGitConfig,
+			SinceDate:           *gitScanSinceDate,
 		}
 
 		// detect if trufflehog is running git source as a pre-commit hook
@@ -843,6 +847,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
 			PrintLegacyJSON:            *jsonLegacy,
+			MaxDepth:                   *githubScanMaxDepth,
+			SinceDate:                  *githubScanSinceDate,
 		}
 
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
