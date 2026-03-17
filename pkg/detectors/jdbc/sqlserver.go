@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -12,13 +11,27 @@ import (
 	mssql "github.com/microsoft/go-mssqldb"
 )
 
-type sqlServerJDBC struct {
-	connStr string
+type SqlServerJDBC struct {
+	ConnectionInfo
 }
 
-func (s *sqlServerJDBC) ping(ctx context.Context) pingResult {
+var _ JDBC = (*SqlServerJDBC)(nil)
+
+func (s *SqlServerJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "mssql", isSqlServerErrorDeterminate,
-		s.connStr)
+		buildSQLServerConnectionString(s.Host, s.User, s.Password, "master", map[string]string{"connection+timeout": "5"}))
+}
+
+func (s *SqlServerJDBC) GetDBType() DatabaseType {
+	return SQLServer
+}
+
+func (s *SqlServerJDBC) GetConnectionInfo() *ConnectionInfo {
+	return &s.ConnectionInfo
+}
+
+func (s *SqlServerJDBC) BuildConnectionString() string {
+	return buildSQLServerConnectionString(s.Host, s.User, s.Password, s.Database, s.Params)
 }
 
 func isSqlServerErrorDeterminate(err error) bool {
@@ -35,7 +48,7 @@ func isSqlServerErrorDeterminate(err error) bool {
 	return false
 }
 
-func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
+func parseSqlServer(ctx logContext.Context, subname string) (JDBC, error) {
 	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected connection to start with //")
 	}
@@ -43,7 +56,9 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 
 	port := "1433"
 	user := "sa"
+	database := "master"
 	var password, host string
+	params := make(map[string]string)
 
 	for i, param := range strings.Split(conn, ";") {
 		key, value, found := strings.Cut(param, "=")
@@ -58,18 +73,24 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 			continue
 		}
 
+		// incase there is a bridge between jdbc and some driver like "odbc", and conn string looks like this odbc:server
+		if split := strings.Split(key, ":"); len(split) > 1 {
+			key = split[1]
+		}
+
 		switch strings.ToLower(key) {
-		case "password":
-			password = value
-		case "spring.datasource.password":
+		case "password", "spring.datasource.password", "pwd":
 			password = value
 		case "server":
 			host = value
 		case "port":
 			port = value
-		case "user", "uid", "user id":
+		case "user", "uid", "user id", "userid":
 			user = value
-
+		case "database", "databasename":
+			database = value
+		default:
+			params[key] = value
 		}
 	}
 
@@ -80,14 +101,23 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 		return nil, fmt.Errorf("missing host or password in connection string")
 	}
 
-	urlStr := fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=master&connection+timeout=5", user, password, host, port)
-	jdbcUrl, err := url.Parse(urlStr)
-	if err != nil {
-		ctx.Logger().WithName("jdbc").
-			V(3).
-			Info("Skipping invalid SQL Server URL", "url", urlStr, "err", err)
-		return nil, err
-	}
+	return &SqlServerJDBC{
+		ConnectionInfo: ConnectionInfo{
+			Host:     host + ":" + port,
+			User:     user,
+			Password: password,
+			Database: database,
+			Params:   params,
+		},
+	}, nil
+}
 
-	return &sqlServerJDBC{connStr: jdbcUrl.String()}, nil
+func buildSQLServerConnectionString(host, user, password, database string, params map[string]string) string {
+	conn := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s", user, password, host, database)
+	if len(params) > 0 {
+		for k, v := range params {
+			conn += fmt.Sprintf("&%s=%s", k, v)
+		}
+	}
+	return conn
 }

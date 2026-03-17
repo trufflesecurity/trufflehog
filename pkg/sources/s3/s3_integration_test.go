@@ -584,3 +584,63 @@ func TestSource_ChunkUnit_Resumption_MultipleBucketsConcurrent(t *testing.T) {
 		assert.Equal(t, wantCount, gotCount, "Chunk count mismatch for bucket %s", bucket)
 	}
 }
+
+func TestSourceChunksResumptionWithRole(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	s3key := secret.MustGetField("AWS_S3_KEY")
+	s3secret := secret.MustGetField("AWS_S3_SECRET")
+
+	src := new(Source)
+	src.Progress = sources.Progress{
+		Message:           "Bucket: integration-resumption-tests",
+		EncodedResumeInfo: "{\"current_bucket\":\"integration-resumption-tests\",\"start_after\":\"test-dir/\",\"role\":\"arn:aws:iam::619888638459:role/s3-test-assume-role\"}",
+		SectionsCompleted: 0,
+		SectionsRemaining: 1,
+	}
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		},
+		Buckets:          []string{"integration-resumption-tests"},
+		Roles:            []string{"arn:aws:iam::619888638459:role/s3-test-assume-role"},
+		EnableResumption: true,
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+
+	err = src.Init(ctx, "test name", 0, 0, false, conn, 2)
+	require.NoError(t, err)
+
+	chunksCh := make(chan *sources.Chunk)
+	var count int
+
+	cancelCtx, ctxCancel := context.WithCancel(ctx)
+	defer ctxCancel()
+
+	go func() {
+		defer close(chunksCh)
+		err = src.Chunks(cancelCtx, chunksCh)
+		assert.NoError(t, err, "Should not error during scan")
+	}()
+
+	for range chunksCh {
+		count++
+	}
+
+	// Verify that we processed all remaining data on resume.
+	// Also verify that we processed less than the total number of chunks for the source.
+	sourceTotalChunkCount := 19787
+	assert.Equal(t, 9638, count, "Should have processed all remaining data on resume")
+	assert.Less(t, count, sourceTotalChunkCount, "Should have processed less than total chunks on resume")
+}

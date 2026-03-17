@@ -70,7 +70,7 @@ const defaultMaxObjectsPerPage = 1000
 
 // NewCheckpointer creates a new checkpointer for S3 scanning operations.
 // The progress provides the underlying mechanism for persisting scan state.
-func NewCheckpointer(ctx context.Context, progress *sources.Progress) *Checkpointer {
+func NewCheckpointer(ctx context.Context, progress *sources.Progress, isUnitScan bool) *Checkpointer {
 	ctx.Logger().Info("Creating checkpointer")
 
 	return &Checkpointer{
@@ -78,6 +78,7 @@ func NewCheckpointer(ctx context.Context, progress *sources.Progress) *Checkpoin
 		completedObjects: make([]bool, defaultMaxObjectsPerPage),
 		completionOrder:  make([]int, 0, defaultMaxObjectsPerPage),
 		progress:         progress,
+		isUnitScan:       isUnitScan,
 	}
 }
 
@@ -98,6 +99,7 @@ func (p *Checkpointer) Reset() {
 type ResumeInfo struct {
 	CurrentBucket string `json:"current_bucket"` // Current bucket being scanned
 	StartAfter    string `json:"start_after"`    // Last processed object key
+	Role          string `json:"role"`           // Role used for scanning
 }
 
 // ResumePoint retrieves the last saved checkpoint state if one exists.
@@ -121,7 +123,7 @@ func (p *Checkpointer) ResumePoint(ctx context.Context) (ResumeInfo, error) {
 		return resume, nil
 	}
 
-	return ResumeInfo{CurrentBucket: resumeInfo.CurrentBucket, StartAfter: resumeInfo.StartAfter}, nil
+	return ResumeInfo{CurrentBucket: resumeInfo.CurrentBucket, StartAfter: resumeInfo.StartAfter, Role: resumeInfo.Role}, nil
 }
 
 // Complete marks the entire scanning operation as finished and clears the resume state.
@@ -191,6 +193,10 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	if checkpointIdx < 0 {
 		return nil // No completed objects yet
 	}
+	if checkpointIdx >= len(pageContents) {
+		// this should never happen
+		return fmt.Errorf("checkpoint index %d exceeds page contents size %d", checkpointIdx, len(pageContents))
+	}
 	obj := pageContents[checkpointIdx]
 
 	return p.updateCheckpoint(bucket, role, *obj.Key)
@@ -215,7 +221,7 @@ func (p *Checkpointer) updateCheckpoint(bucket string, role string, lastKey stri
 		return nil
 	}
 
-	encoded, err := json.Marshal(&ResumeInfo{CurrentBucket: bucket, StartAfter: lastKey})
+	encoded, err := json.Marshal(&ResumeInfo{CurrentBucket: bucket, StartAfter: lastKey, Role: role})
 	if err != nil {
 		return fmt.Errorf("failed to encode resume info: %w", err)
 	}
@@ -227,12 +233,4 @@ func (p *Checkpointer) updateCheckpoint(bucket string, role string, lastKey stri
 		string(encoded),
 	)
 	return nil
-}
-
-// SetIsUnitScan sets whether the checkpointer is operating in unit scan mode.
-func (p *Checkpointer) SetIsUnitScan(isUnitScan bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.isUnitScan = isUnitScan
 }

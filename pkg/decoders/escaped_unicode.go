@@ -105,13 +105,14 @@ func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 			DecoderType: d.Type(),
 			Chunk: &sources.Chunk{
 				Data:           chunkData,
+				OriginalData:   chunk.OriginalData,
 				SourceName:     chunk.SourceName,
 				SourceID:       chunk.SourceID,
 				JobID:          chunk.JobID,
 				SecretID:       chunk.SecretID,
 				SourceMetadata: chunk.SourceMetadata,
 				SourceType:     chunk.SourceType,
-				Verify:         chunk.Verify,
+				SourceVerify:   chunk.SourceVerify,
 			},
 		}
 	} else {

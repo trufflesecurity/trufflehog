@@ -150,7 +150,7 @@ func TestGenerateLink(t *testing.T) {
 				commit: "abcdef",
 				file:   "main.go",
 			},
-			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go",
+			want: "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef",
 		},
 		{
 			name: "Azure link gen with line",
@@ -160,7 +160,16 @@ func TestGenerateLink(t *testing.T) {
 				file:   "main.go",
 				line:   int64(20),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
+			want: "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=21&lineStartColumn=1",
+		},
+		{
+			name: "Azure link gen - no file",
+			args: args{
+				repo:   "https://dev.azure.com/org/project/_git/repo",
+				commit: "abcdef",
+				file:   "",
+			},
+			want: "https://dev.azure.com/org/project/_git/repo?version=GCabcdef",
 		},
 		{
 			name: "Unknown provider on-prem instance",
@@ -279,10 +288,10 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 		{
 			name: "Update Azure link with line",
 			args: args{
-				link:    "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
+				link:    "https://dev.azure.com/org/project/_git/repo?path=/main.go&version=GCabcdef&line=20&lineEnd=21&lineStartColumn=1",
 				newLine: int64(40),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=40",
+			want: "https://dev.azure.com/org/project/_git/repo?line=40&lineEnd=41&lineStartColumn=1&path=%2Fmain.go&version=GCabcdef",
 		},
 		{
 			name: "Add line to github link without line",

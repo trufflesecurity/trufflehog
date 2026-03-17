@@ -434,9 +434,12 @@ func normalizeFileURI(uri *url.URL) (*url.URL, error) {
 		return nil, fmt.Errorf("failed to resolve absolute path for %q: %w", rawPath, err)
 	}
 
+	// Convert to forward slashes (for Windows compatibility)
+	normalizedPath := filepath.ToSlash(absPath)
+
 	normalizedURI := &url.URL{
 		Scheme: "file",
-		Path:   absPath,
+		Path:   normalizedPath,
 	}
 
 	return normalizedURI, nil
@@ -448,6 +451,7 @@ type cloneParams struct {
 	args      []string
 	clonePath string
 	authInUrl bool
+	timeout   time.Duration
 }
 
 // CloneRepo orchestrates the cloning of a given Git repository, returning its local path
@@ -473,7 +477,9 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 		}
 	}
 
-	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl})
+	timeout := time.Duration(feature.GitCloneTimeoutDuration.Load())
+
+	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl, timeout})
 	if err != nil {
 		// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
 		// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
@@ -490,6 +496,8 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
 // clonePath. It then opens the cloned repository, returning a git.Repository object.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
+	start := time.Now()
+
 	cloneURL, err := GitURLParse(params.gitURL)
 	if err != nil {
 		return nil, err
@@ -527,10 +535,16 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		}
 	}
 
+	var cancel context.CancelFunc
+	if params.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, params.timeout)
+		defer cancel()
+	}
+
 	gitArgs = append(gitArgs, "--quiet")
 	gitArgs = append(gitArgs, params.args...)
 	gitArgs = append(gitArgs, cloneURL.String(), params.clonePath)
-	cloneCmd := exec.Command("git", gitArgs...)
+	cloneCmd := exec.CommandContext(ctx, "git", gitArgs...)
 
 	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
@@ -543,6 +557,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		"args", params.args,
 	)
 
+	logger.V(3).Info("executing git clone command")
 	outputBytes, err := cloneCmd.CombinedOutput()
 	var output string
 	if secretForRedaction != "" {
@@ -556,7 +571,9 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	}
 	logger.V(3).Info("git subcommand finished", "output", output)
 
-	if cloneCmd.ProcessState == nil {
+	if common.IsDone(ctx) {
+		return nil, fmt.Errorf("git clone timed out (after %s)", time.Since(start))
+	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
 		logger.V(1).Info("git clone failed", "error", err)
@@ -570,7 +587,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	if err != nil {
 		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-	logger.V(1).Info("successfully cloned repo")
+	logger.V(1).Info("successfully cloned repo", "time_seconds", time.Since(start).Seconds())
 
 	metricsInstance.RecordCloneOperation(statusSuccess, cloneSuccess, 0)
 
@@ -745,7 +762,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           []byte(sb.String()),
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			if err := reporter.ChunkOk(ctx, chunk); err != nil {
 				return err
@@ -779,7 +796,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
@@ -828,7 +845,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           data,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
@@ -866,7 +883,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-					Verify:         s.verify,
+					SourceVerify:   s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -886,7 +903,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           line,
-					Verify:         s.verify,
+					SourceVerify:   s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -910,7 +927,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			SourceType:     s.sourceType,
 			SourceMetadata: metadata,
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-			Verify:         s.verify,
+			SourceVerify:   s.verify,
 		}
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
 			// TODO: Return error.
@@ -1010,7 +1027,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(err, "error handling binary file")
@@ -1040,7 +1057,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           data,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
@@ -1327,7 +1344,10 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 			if !isRepoBare(path) {
 				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
-				originalIndexPath := filepath.Join(strings.TrimPrefix(normalizedURI.String(), "file://"), gitDirName, "index")
+				uriPath := normalizedURI.Path
+
+				originalIndexPath := filepath.Join(uriPath, gitDirName, "index")
+
 				clonedIndexPath := filepath.Join(path, gitDirName, "index")
 
 				indexData, err := os.ReadFile(originalIndexPath)

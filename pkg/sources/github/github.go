@@ -254,7 +254,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
 		simple.NewCache[string](),
-		s.conn.GetRepositories(),
+		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
 	s.repos = s.conn.Repositories
@@ -410,6 +410,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			if err := dedupeReporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
+			continue
 		}
 		if err := dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url}); err != nil {
 			return err
@@ -448,16 +449,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		// filteredRepoCache have an entry in the repoInfoCache.
 		for _, repo := range s.filteredRepoCache.Values() {
 			// Extract the repository name from the URL for filtering
-			repoName := repo
-			if strings.Contains(repo, "/") {
-				// Try to extract org/repo name from URL
-				if strings.Contains(repo, "github.com") {
-					parts := strings.Split(repo, "/")
-					if len(parts) >= 2 {
-						repoName = parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git")
-					}
-				}
-			}
+			repoName := extractRepoNameFromUrl(repo)
 
 			// Final filter check - only include repositories that pass the filter
 			if s.filteredRepoCache.wantRepo(repoName) {
@@ -1138,10 +1130,16 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 		repoURL.User = nil
 	}
 
+	// Use Host and Path directly instead of reconstructing via String().
+	// This preserves special characters like trailing hyphens in repo names
+	// that might be lost during URL reconstruction.
+	// See: https://github.com/trufflesecurity/trufflehog/issues/4679
+	host := repoURL.Host
+	path := strings.TrimPrefix(repoURL.Path, "/")
+	path = strings.TrimSuffix(path, ".git")
+
 	urlString := repoURL.String()
-	trimmedURL := strings.TrimPrefix(urlString, repoURL.Scheme+"://")
-	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
-	urlParts := strings.Split(trimmedURL, "/")
+	urlParts := append([]string{host}, strings.Split(path, "/")...)
 
 	// Validate
 	switch len(urlParts) {
@@ -1254,8 +1252,8 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(comment.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1391,8 +1389,8 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.GetTitle() + "\n" + issue.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(issue.GetTitle() + "\n" + issue.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1458,8 +1456,8 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(comment.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1554,8 +1552,8 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(pr.GetTitle() + "\n" + pr.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(pr.GetTitle() + "\n" + pr.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1590,8 +1588,8 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(comment.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1629,7 +1627,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
 		},
-		Verify: s.verify,
+		SourceVerify: s.verify,
 	}
 
 	u, err := url.Parse(meta.GetLink())

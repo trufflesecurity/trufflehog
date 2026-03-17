@@ -55,6 +55,33 @@ var (
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
+	ignorePatterns []*regexp.Regexp
+}
+
+func New(opts ...func(*Scanner)) *Scanner {
+	scanner := &Scanner{
+		ignorePatterns: []*regexp.Regexp{},
+	}
+	for _, opt := range opts {
+		opt(scanner)
+	}
+
+	return scanner
+}
+
+func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
+	return func(s *Scanner) {
+		var ignorePatterns []*regexp.Regexp
+		for _, ignoreString := range ignoreStrings {
+			ignorePattern, err := regexp.Compile(ignoreString)
+			if err != nil {
+				panic(fmt.Sprintf("%s is not a valid regex, error received: %v", ignoreString, err))
+			}
+			ignorePatterns = append(ignorePatterns, ignorePattern)
+		}
+
+		s.ignorePatterns = ignorePatterns
+	}
 }
 
 var _ detectors.Detector = (*Scanner)(nil)
@@ -66,7 +93,7 @@ func (s Scanner) Keywords() []string {
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	var results []detectors.Result
-	candidateParamSets := findUriMatches(data)
+	candidateParamSets := findUriMatches(data, s.ignorePatterns)
 
 	for _, params := range candidateParamSets {
 		if common.IsDone(ctx) {
@@ -161,9 +188,12 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
-func findUriMatches(data []byte) []map[string]string {
+func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []map[string]string {
 	var matches []map[string]string
 	for _, uri := range uriPattern.FindAll(data, -1) {
+		if shouldIgnore(uri, ignorePatterns) {
+			continue
+		}
 		// Capture the database type (e.g., "postgres" or "postgresql")
 		dbTypeMatch := uriPattern.FindSubmatch(uri)
 		if len(dbTypeMatch) < 2 {
@@ -186,6 +216,15 @@ func findUriMatches(data []byte) []map[string]string {
 		matches = append(matches, params)
 	}
 	return matches
+}
+
+func shouldIgnore(uri []byte, ignorePatterns []*regexp.Regexp) bool {
+	for _, ignore := range ignorePatterns {
+		if ignore.Match(uri) {
+			return true
+		}
+	}
+	return false
 }
 
 // getDeadlineInSeconds gets the deadline from the context in seconds. If there
