@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,6 +15,8 @@ import (
 )
 
 type Scanner struct{}
+
+var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -84,4 +87,8 @@ func verifyFlutterwave(ctx context.Context, key string) (bool, error) {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Flutterwave
+}
+
+func (s Scanner) Description() string {
+	return "Detects Flutterwave secret API keys (FLWSECK format)"
 }
