@@ -472,7 +472,7 @@ enum DetectorType {
   KakaoTalk = 460; // Not yet implemented
   RiteKit = 461;
   Shutterstock = 462;
-  Text2Data = 463 [deprecated = true];;
+  Text2Data = 463 [deprecated = true];
   YouNeedABudget = 464;
   Cricket = 465; // Not yet implemented
   Filestack = 466; // Not yet implemented
@@ -668,7 +668,7 @@ enum DetectorType {
   Meistertask = 656;
   Mindmeister = 657;
   PeopleDataLabs = 658;
-  ScraperSite = 659  [deprecated = true];
+  ScraperSite = 659 [deprecated = true];
   Scrapfly = 660;
   SimplyNoted = 661;
   TravelPayouts = 662;
@@ -790,7 +790,7 @@ enum DetectorType {
   TimeCamp = 778;
   Userflow = 779;
   Wistia = 780;
-  SportRadar = 781 [deprecated = true];;
+  SportRadar = 781 [deprecated = true];
   UptimeRobot = 782;
   Codequiry = 783;
   ExtractorAPI = 784;
@@ -878,7 +878,7 @@ enum DetectorType {
   Copyscape = 866; // Not yet implemented
   Besnappy = 867;
   Salesmate = 868;
-  Heatmapapi = 869 [deprecated = true];;
+  Heatmapapi = 869 [deprecated = true];
   Websitepulse = 870;
   Uclassify = 871;
   Convert = 872;
@@ -1049,9 +1049,13 @@ enum DetectorType {
   PhraseAccessToken = 1037;
   Photoroom = 1038;
   JWT = 1039;
-  Remita = 1040;
-  Interswitch = 1041;
-  Sportybet = 1042;
+  OpenAIAdmin = 1040;
+  GoogleGeminiAPIKey = 1041;
+  ArtifactoryReferenceToken = 1042;
+  DatadogApikey = 1043;
+  Remita = 1044;
+  Interswitch = 1045;
+  Sportybet = 1046;
 }
 
 message Result {
@@ -1063,11 +1067,7 @@ message Result {
   StructuredData structured_data = 7;
   string hash_v2 = 8;
   DecoderType decoder_type = 9;
-
-  // This field should only be populated if the verification process itself failed in a way that provides no information
-  // about the verification status of the candidate secret, such as if the verification request timed out.
   string verification_error_message = 10;
-
   FalsePositiveInfo false_positive_info = 11;
 }
 
