@@ -23,7 +23,6 @@ type Scanner struct {
 
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
-var _ detectors.CloudProvider = (*Scanner)(nil)
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
@@ -69,8 +68,8 @@ func (s Scanner) FromData(
 	}
 
 	var uniqueVaultUrls = make(map[string]struct{})
-	for _, match := range vaultUrlPat.FindAllString(dataStr, -1) {
-		url := strings.TrimSpace(match)
+	for _, match := range vaultUrlPat.FindAllStringSubmatch(dataStr, -1) {
+		url := strings.TrimSpace(match[1])
 		uniqueVaultUrls[url] = struct{}{}
 	}
 	endpoints := make([]string, 0, len(uniqueVaultUrls))
