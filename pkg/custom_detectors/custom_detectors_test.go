@@ -2,12 +2,16 @@ package custom_detectors
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
@@ -783,4 +787,196 @@ func BenchmarkProductIndices(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = productIndices(3, 2, 6)
 	}
+}
+
+func TestIsStatusInRanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		ranges     []string
+		want       bool
+	}{
+		{"default empty ranges, 200", 200, nil, true},
+		{"default empty ranges, 403", 403, nil, false},
+		{"single code match", 403, []string{"403"}, true},
+		{"single code no match", 200, []string{"403"}, false},
+		{"range match lower bound", 200, []string{"200-299"}, true},
+		{"range match upper bound", 299, []string{"200-299"}, true},
+		{"range no match", 300, []string{"200-299"}, false},
+		{"multiple ranges", 403, []string{"200-299", "403"}, true},
+		{"multiple ranges no match", 500, []string{"200-299", "403"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := isStatusInRanges(tt.statusCode, tt.ranges)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCreateResults_SuccessRanges(t *testing.T) {
+	t.Parallel()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden) // 403
+		fmt.Fprint(w, "forbidden-but-valid")
+	}))
+	defer ts.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "range-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `secret_([a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint:      ts.URL,
+				Unsafe:        true,
+				SuccessRanges: []string{"403"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_abc"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Verified)
+}
+
+func TestCreateResults_DefaultRange200(t *testing.T) {
+	t.Parallel()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "ok")
+	}))
+	defer ts.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "default-range-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `secret_([a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint: ts.URL,
+				Unsafe:   true,
+				// No SuccessRanges: should default to 200 only.
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_abc"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Verified)
+}
+
+func TestCreateResults_NetworkError_SetsVerificationError(t *testing.T) {
+	t.Parallel()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "net-err-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `secret_([a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				// Use a port that's definitely not listening.
+				Endpoint: "http://127.0.0.1:1/verify",
+				Unsafe:   true,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_abc"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.False(t, results[0].Verified)
+	assert.NotNil(t, results[0].VerificationError(), "expected verification error on network failure")
+}
+
+func TestCreateResults_NonSuccessStatus_NoVerificationError(t *testing.T) {
+	t.Parallel()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized) // 401
+	}))
+	defer ts.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "rejection-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `secret_([a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint: ts.URL,
+				Unsafe:   true,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_abc"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.False(t, results[0].Verified)
+	assert.Nil(t, results[0].VerificationError(), "expected no verification error on definitive rejection")
+}
+
+func TestCreateResults_SecondConfigClearsVerificationError(t *testing.T) {
+	// Second verifier responds with a clear 401 rejection, which should
+	// clear the inconclusive error from the first (unreachable) verifier.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "multi-config-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `secret_([a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				// First config: unreachable -> network error (inconclusive).
+				Endpoint: "http://127.0.0.1:1/verify",
+				Unsafe:   true,
+			},
+			{
+				// Second config: clear 401 rejection.
+				Endpoint: ts.URL,
+				Unsafe:   true,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_abc"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.False(t, results[0].Verified)
+	assert.Nil(t, results[0].VerificationError(),
+		"second config's clear rejection should have cleared the first config's network error")
+}
+
+func TestNewWebhookCustomRegex_InvalidSuccessRanges(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "bad-range",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `secret`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint:      "https://example.com/verify",
+				SuccessRanges: []string{"abc"},
+			},
+		},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to convert")
 }
