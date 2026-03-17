@@ -338,8 +338,6 @@ type GithubConfig struct {
 	IgnoreGists bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
-	// MaxDepth is the maximum depth of commits to scan.
-	MaxDepth int
 	// SinceDate limits scanning to commits more recent than the specified date.
 	SinceDate string
 }

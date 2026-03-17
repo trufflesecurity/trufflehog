@@ -130,7 +130,6 @@ var (
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
-	githubScanMaxDepth          = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	githubScanSinceDate         = githubScan.Flag("since", "Scan commits more recent than a specific date (e.g. 2024-01-01).").String()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
@@ -847,7 +846,6 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
 			PrintLegacyJSON:            *jsonLegacy,
-			MaxDepth:                   *githubScanMaxDepth,
 			SinceDate:                  *githubScanSinceDate,
 		}
 
