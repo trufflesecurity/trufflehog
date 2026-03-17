@@ -63,6 +63,7 @@ func (s Scanner) FromData(
 		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Shippo,
 			Raw:          []byte(token),
+			Redacted:     token[:10] + "...",
 		}
 
 		if verify {

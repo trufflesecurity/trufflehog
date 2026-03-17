@@ -667,6 +667,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sheety"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sherpadesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shipday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shippo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shodankey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shortcut"
@@ -1552,6 +1553,7 @@ func buildDetectorList() []detectors.Detector {
 		&sheety.Scanner{},
 		&sherpadesk.Scanner{},
 		&shipday.Scanner{},
+		&shippo.Scanner{},
 		&shodankey.Scanner{},
 		&shopify.Scanner{},
 		&shortcut.Scanner{},
