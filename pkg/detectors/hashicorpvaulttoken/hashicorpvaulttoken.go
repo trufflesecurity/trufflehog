@@ -83,7 +83,7 @@ func (s Scanner) FromData(
 				DetectorType: detectorspb.DetectorType_HashiCorpVaultToken,
 				Raw:          []byte(token),
 				RawV2:        []byte(token + endpoint),
-				Redacted:     token[8:] + "...",
+				Redacted:     token[:8] + "...",
 			}
 
 			if verify {
