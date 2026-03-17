@@ -26,6 +26,10 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	clientIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"id"}) + `\b([a-zA-Z0-9]{32})\b`)
 	clientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"secret"}) + `\b([a-zA-Z0-9]{32})\b`)
+	// Box enterprise and user IDs are numeric strings.
+	subjectIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{
+		"enterprise", "enterprise_id", "user_id", "subject", "box_subject",
+	}) + `\b([0-9]{6,20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -52,6 +56,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueSecretMatches[match[1]] = struct{}{}
 	}
 
+	uniqueSubjectIdMatches := make(map[string]struct{})
+	for _, match := range subjectIdPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueSubjectIdMatches[match[1]] = struct{}{}
+	}
+
 	for resIdMatch := range uniqueIdMatches {
 		for resSecretMatch := range uniqueSecretMatches {
 
@@ -60,29 +69,52 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_BoxOauth,
-				Raw:          []byte(resIdMatch),
-				RawV2:        []byte(resIdMatch + resSecretMatch),
-			}
-
+			var isVerified bool
+			var verificationErr error
 			if verify {
 				client := s.client
 				if client == nil {
 					client = defaultClient
 				}
 
-				isVerified, extraData, verificationErr := verifyMatch(ctx, client, resIdMatch, resSecretMatch)
-				s1.Verified = isVerified
-				s1.ExtraData = extraData
-				s1.SetVerificationError(verificationErr, resIdMatch)
+				isVerified, verificationErr = verifyMatch(ctx, client, resIdMatch, resSecretMatch)
 			}
 
-			results = append(results, s1)
-
-			// box client supports only one client id and secret pair
-			if s1.Verified {
-				break
+			if len(uniqueSubjectIdMatches) > 0 {
+				// Emit one result per subject_id
+				for subjectId := range uniqueSubjectIdMatches {
+					s1 := detectors.Result{
+						DetectorType: detectorspb.DetectorType_BoxOauth,
+						Raw:          []byte(resIdMatch),
+						RawV2:        []byte(resIdMatch + resSecretMatch),
+						Verified:     isVerified,
+					}
+					s1.SetVerificationError(verificationErr, resIdMatch)
+					if isVerified {
+						s1.AnalysisInfo = map[string]string{
+							"client_id":     resIdMatch,
+							"client_secret": resSecretMatch,
+							"subject_id":    subjectId,
+						}
+					}
+					results = append(results, s1)
+				}
+				if isVerified {
+					// box supports only one client id and secret pair
+					break
+				}
+			} else {
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_BoxOauth,
+					Raw:          []byte(resIdMatch),
+					RawV2:        []byte(resIdMatch + resSecretMatch),
+					Verified:     isVerified,
+				}
+				s1.SetVerificationError(verificationErr, resIdMatch)
+				results = append(results, s1)
+				if isVerified {
+					break
+				}
 			}
 		}
 	}
@@ -90,19 +122,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, id string, secret string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, id string, secret string) (bool, error) {
 	url := "https://api.box.com/oauth2/token"
 	payload := strings.NewReader("grant_type=client_credentials&client_id=" + id + "&client_secret=" + secret)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 
 	req.Header = http.Header{"content-type": []string{"application/x-www-form-urlencoded"}}
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -121,19 +153,19 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 		{
 			bodyBytes, err := io.ReadAll(res.Body)
 			if err != nil {
-				return false, nil, err
+				return false, err
 			}
 			body := string(bodyBytes)
 			if strings.Contains(body, "unauthorized_client") {
-				return true, nil, nil
+				return true, nil
 			} else if strings.Contains(body, "invalid_client") {
-				return false, nil, nil
+				return false, nil
 			} else {
-				return false, nil, fmt.Errorf("response body missing expected keyword")
+				return false, fmt.Errorf("response body missing expected keyword")
 			}
 		}
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
