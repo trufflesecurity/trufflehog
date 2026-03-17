@@ -21,20 +21,6 @@ type Scanner struct {
 
 func (Scanner) Version() int { return 1 }
 
-type UserRes struct {
-	UserID       string `json:"user_id"`
-	Subscription struct {
-		Tier string `json:"tier"`
-	} `json:"subscription"`
-	FirstName string `json:"first_name"`
-}
-
-type ErrorRes struct {
-	Detail struct {
-		Status string `json:"status"`
-	} `json:"detail"`
-}
-
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
@@ -111,12 +97,19 @@ func verifyMatch(ctx logContext.Context, client *http.Client, token string) (boo
 	extraData := make(map[string]string)
 
 	// lightweight analyze: unconditionally preserve the response body
-	resBody := lwa.CopyAndCloseResponseBody(ctx, res)
+	resBody := lwa.CopyAndCloseResponseBody(ctx, extraData, res)
 
 	switch res.StatusCode {
 	case http.StatusOK:
 		// If the endpoint returns useful information, we can return it as a map.
-		var userResponse UserRes
+		var userResponse struct {
+			UserID       string `json:"user_id"`
+			Subscription struct {
+				Tier string `json:"tier"`
+			} `json:"subscription"`
+			FirstName string `json:"first_name"`
+		}
+
 		if err = json.Unmarshal(resBody, &userResponse); err != nil {
 			ctx.Logger().Error(err, "failed to parse response")
 			return false, extraData, err
@@ -133,7 +126,12 @@ func verifyMatch(ctx logContext.Context, client *http.Client, token string) (boo
 	case http.StatusBadRequest, http.StatusUnauthorized:
 		// If the response says {"detail":{"status":"missing_permissions","message":"The API key you used is missing the permission user_read to execute this operation."}}
 		// then the key is valid, but we can't add the metadata
-		var errorResponse ErrorRes
+		var errorResponse struct {
+			Detail struct {
+				Status string `json:"status"`
+			} `json:"detail"`
+		}
+
 		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
 			ctx.Logger().Error(err, "failed to parse response")
 			return false, extraData, err

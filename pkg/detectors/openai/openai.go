@@ -93,9 +93,7 @@ func verifyToken(ctx logContext.Context, client *http.Client, token string) (boo
 	extraData := make(map[string]string)
 
 	// lightweight analyze: unconditionally preserve the response body
-	resBody := lwa.CopyAndCloseResponseBody(ctx, res)
-
-	extraData[lwa.KeyResponse] = string(resBody)
+	resBody := lwa.CopyAndCloseResponseBody(ctx, extraData, res)
 
 	switch res.StatusCode {
 	case 200:

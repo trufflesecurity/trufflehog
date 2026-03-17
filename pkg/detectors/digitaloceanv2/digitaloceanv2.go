@@ -111,30 +111,35 @@ func verifyRefreshToken(ctx logContext.Context, client *http.Client, token strin
 	extraData := make(map[string]string)
 
 	// lightweight analyze: unconditionally preserve the response body
-
-	resBody := lwa.CopyAndCloseResponseBody(ctx, res)
-	extraData[lwa.KeyResponse] = string(resBody)
+	resBody := lwa.CopyAndCloseResponseBody(ctx, extraData, res)
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		var resData oauthResponse
+		var resData struct {
+			AccessToken *string `json:"access_token"`
+			Info        struct {
+				UUID  *string `json:"uuid"`
+				Name  *string `json:"name"`
+				Email *string `json:"email"`
+			} `json:"info"`
+		}
 		if err = json.Unmarshal(resBody, &resData); err != nil {
 			ctx.Logger().Error(err, "failed to parse response")
 			return false, extraData, err, ""
 		}
 
-		if resData.AccessToken == "" {
+		if resData.AccessToken == nil {
 			return false, extraData, fmt.Errorf("access_token not found in response: %s", string(resBody)), ""
 		}
 
-		// lightweight analyze: annotate "standard" fields
+		// lightweight analyze: annotate standard fields
 		lwa.AugmentExtraData(extraData, lwa.Fields{
-			ID:    &resData.Info.UUID,
-			Name:  &resData.Info.Name,
-			Email: &resData.Info.Email,
+			ID:    resData.Info.UUID,
+			Name:  resData.Info.Name,
+			Email: resData.Info.Email,
 		})
 
-		return true, extraData, nil, resData.AccessToken
+		return true, extraData, nil, *resData.AccessToken
 	case http.StatusUnauthorized:
 		return false, extraData, nil, ""
 	default:
@@ -164,22 +169,28 @@ func verifyAccessToken(ctx logContext.Context, client *http.Client, token string
 	extraData := make(map[string]string)
 
 	// lightweight analyze: unconditionally preserve the response body
-	resBody := lwa.CopyAndCloseResponseBody(ctx, res)
-	extraData[lwa.KeyResponse] = string(resBody)
+	resBody := lwa.CopyAndCloseResponseBody(ctx, extraData, res)
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		var resData accountResponse
+		var resData struct {
+			Account struct {
+				UUID  *string `json:"uuid"`
+				Name  *string `json:"name"`
+				Email *string `json:"email"`
+			} `json:"account"`
+		}
+
 		if err = json.Unmarshal(resBody, &resData); err != nil {
 			ctx.Logger().Error(err, "failed to parse response")
 			return true, extraData, nil
 		}
 
-		// lightweight analyze: annotate "standard" fields
+		// lightweight analyze: annotate standard fields
 		lwa.AugmentExtraData(extraData, lwa.Fields{
-			ID:    &resData.Account.UUID,
-			Name:  &resData.Account.Name,
-			Email: &resData.Account.Email,
+			ID:    resData.Account.UUID,
+			Name:  resData.Account.Name,
+			Email: resData.Account.Email,
 		})
 
 		return true, extraData, nil
@@ -188,23 +199,6 @@ func verifyAccessToken(ctx logContext.Context, client *http.Client, token string
 	default:
 		return false, extraData, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
-}
-
-type accountResponse struct {
-	Account struct {
-		UUID  string `json:"uuid"`
-		Name  string `json:"name"`
-		Email string `json:"email"`
-	} `json:"account"`
-}
-
-type oauthResponse struct {
-	AccessToken string `json:"access_token"`
-	Info        struct {
-		UUID  string `json:"uuid"`
-		Name  string `json:"name"`
-		Email string `json:"email"`
-	} `json:"info"`
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

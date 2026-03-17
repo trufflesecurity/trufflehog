@@ -12,9 +12,10 @@ const (
 )
 
 // LWACopyAndCloseResponseBody copies an HTTP response body, close it, and logs any errors that occur.
+// It also makes a copy of the raw response body to extraData[KeyResponse].
 //
 // This is a helper function for lightweight analysis implementation in detectors.
-func CopyAndCloseResponseBody(ctx context.Context, res *http.Response) []byte {
+func CopyAndCloseResponseBody(ctx context.Context, extraData map[string]string, res *http.Response) []byte {
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		ctx.Logger().Error(err, "failed to read response body")
@@ -23,6 +24,7 @@ func CopyAndCloseResponseBody(ctx context.Context, res *http.Response) []byte {
 	if err != nil {
 		ctx.Logger().Error(err, "failed to close response body")
 	}
+	extraData[KeyResponse] = string(resBody)
 	return resBody
 }
 
