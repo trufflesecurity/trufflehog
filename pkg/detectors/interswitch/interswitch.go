@@ -13,7 +13,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-var interswitchKeyPattern = regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})|macKey["']?\s*[:=]\s*["']?([0-9A-Fa-f]{64})`)
+var (
+	interswitchKeyPattern = regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})|macKey["']?\s*[:=]\s*["']?([0-9A-Fa-f]{64})`)
+	interswitchClient     = common.SaneHttpClient()
+)
 
 type scanner struct{}
 
@@ -66,7 +69,7 @@ func verifyInterswitchKey(ctx context.Context, key string) bool {
 	req.Header.Add("Authorization", "Basic "+auth)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := common.SaneHttpClient().Do(req)
+	resp, err := interswitchClient.Do(req)
 	if err != nil {
 		return false
 	}
@@ -77,14 +80,19 @@ func verifyInterswitchKey(ctx context.Context, key string) bool {
 		return false
 	}
 
-	if resp.StatusCode == 200 && !bytes.Contains(bodyBytes, []byte("error")) {
-		return true
+	// Valid response: 200 OK and no "invalid"/"unauthorized" keywords
+	if resp.StatusCode == 200 {
+		if !bytes.Contains(bodyBytes, []byte("invalid")) && !bytes.Contains(bodyBytes, []byte("unauthorized")) {
+			return true
+		}
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 || bytes.Contains(bodyBytes, []byte("invalid")) || bytes.Contains(bodyBytes, []byte("unauthorized")) {
+	// Invalid responses
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return false
 	}
 
+	// 2xx responses without error keywords = valid
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return true
 	}

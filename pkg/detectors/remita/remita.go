@@ -13,7 +13,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-var remitaKeyPattern = regexp.MustCompile(`remita[_-]?(?:api[_-])?key["\s:=]+([0-9a-zA-Z]{32,})|[0-9]{10,15}\|?[0-9a-zA-Z]{40,}`)
+var (
+	remitaKeyPattern = regexp.MustCompile(`remita[_-]?(?:api[_-])?key["\s:=]+([0-9a-zA-Z]{32,})`)
+	remitaClient     = common.SaneHttpClient()
+)
 
 type scanner struct{}
 
@@ -29,14 +32,11 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := remitaKeyPattern.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) < 1 {
+		if len(match) < 2 {
 			continue
 		}
 
-		key := match[0]
-		if len(match) > 1 && match[1] != "" {
-			key = match[1]
-		}
+		key := match[1]
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Remita,
@@ -64,7 +64,7 @@ func verifyRemitaKey(ctx context.Context, key string) bool {
 	req.Header.Add("Authorization", "Basic "+auth)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := common.SaneHttpClient().Do(req)
+	resp, err := remitaClient.Do(req)
 	if err != nil {
 		return false
 	}
@@ -75,14 +75,19 @@ func verifyRemitaKey(ctx context.Context, key string) bool {
 		return false
 	}
 
-	if resp.StatusCode == 200 && !bytes.Contains(bodyBytes, []byte("error")) {
-		return true
+	// Valid response: 200 OK and no "invalid"/"unauthorized" keywords
+	if resp.StatusCode == 200 {
+		if !bytes.Contains(bodyBytes, []byte("invalid")) && !bytes.Contains(bodyBytes, []byte("unauthorized")) {
+			return true
+		}
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 || bytes.Contains(bodyBytes, []byte("invalid")) || bytes.Contains(bodyBytes, []byte("unauthorized")) {
+	// Invalid responses
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return false
 	}
 
+	// 2xx responses without error keywords = valid
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return true
 	}

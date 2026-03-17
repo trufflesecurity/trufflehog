@@ -12,7 +12,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-var flutterwaveKeyPattern = regexp.MustCompile(`flw_(test|live)_[0-9a-zA-Z]{50,}|FLWSECK-[0-9a-zA-Z]{32}-X`)
+var (
+	flutterwaveKeyPattern = regexp.MustCompile(`flw_(test|live)_[0-9a-zA-Z]{50,}|FLWSECK-[0-9a-zA-Z]{32}-X`)
+	flutterwaveClient     = common.SaneHttpClient()
+)
 
 type scanner struct{}
 
@@ -53,7 +56,7 @@ func verifyFlutterwaveKey(ctx context.Context, key string) bool {
 	req.Header.Add("Authorization", "Bearer "+key)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := common.SaneHttpClient().Do(req)
+	resp, err := flutterwaveClient.Do(req)
 	if err != nil {
 		return false
 	}
@@ -64,14 +67,19 @@ func verifyFlutterwaveKey(ctx context.Context, key string) bool {
 		return false
 	}
 
-	if resp.StatusCode == 200 && !bytes.Contains(bodyBytes, []byte("error")) {
-		return true
+	// Valid response: 200 OK and no "invalid"/"unauthorized" keywords
+	if resp.StatusCode == 200 {
+		if !bytes.Contains(bodyBytes, []byte("invalid")) && !bytes.Contains(bodyBytes, []byte("unauthorized")) {
+			return true
+		}
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 || bytes.Contains(bodyBytes, []byte("invalid")) || bytes.Contains(bodyBytes, []byte("unauthorized")) {
+	// Invalid responses
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return false
 	}
 
+	// 2xx responses without error keywords = valid
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return true
 	}
