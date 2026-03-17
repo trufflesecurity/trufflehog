@@ -11,8 +11,6 @@ import (
 )
 
 func TestJiraToken_Pattern(t *testing.T) {
-	d := Scanner{}
-	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
 		name                string
 		input               string
@@ -311,6 +309,8 @@ func TestJiraToken_Pattern(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			d := Scanner{}
+			ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
 				// if intentionally no keywords are passed
