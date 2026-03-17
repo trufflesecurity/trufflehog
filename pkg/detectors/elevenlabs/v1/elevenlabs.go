@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -64,9 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, extraData, verificationErr := verifyMatch(logCtx, client, match)
 			s1.Verified = isVerified
-			for k, v := range extraData {
-				s1.ExtraData[k] = v
-			}
+			maps.Copy(s1.ExtraData, extraData)
 			s1.SetVerificationError(verificationErr, match)
 
 			if s1.Verified {
@@ -121,6 +120,9 @@ func verifyMatch(ctx logContext.Context, client *http.Client, token string) (boo
 			Name: &userResponse.FirstName,
 			// Could include subscription tier here if wanted
 		})
+
+		extraData["Name"] = userResponse.UserID
+		extraData["Tier"] = userResponse.Subscription.Tier
 
 		return true, extraData, nil
 	case http.StatusBadRequest, http.StatusUnauthorized:
