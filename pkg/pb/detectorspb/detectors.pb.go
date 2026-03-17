@@ -1145,10 +1145,14 @@ const (
 	DetectorType_HashiCorpVaultAuth                      DetectorType = 1036
 	DetectorType_PhraseAccessToken                       DetectorType = 1037
 	DetectorType_Photoroom                               DetectorType = 1038
-	DetectorType_JWT                                     DetectorType = 1039
-	DetectorType_Remita                                  DetectorType = 1040
-	DetectorType_Interswitch                             DetectorType = 1041
-	DetectorType_Sportybet                               DetectorType = 1042
+		DetectorType_JWT                       DetectorType = 1039
+	DetectorType_OpenAIAdmin               DetectorType = 1040
+	DetectorType_GoogleGeminiAPIKey        DetectorType = 1041
+	DetectorType_ArtifactoryReferenceToken DetectorType = 1042
+	DetectorType_DatadogApikey             DetectorType = 1043
+	DetectorType_Remita                    DetectorType = 1044
+	DetectorType_Interswitch               DetectorType = 1045
+	DetectorType_Sportybet                 DetectorType = 1046
 )
 
 // Enum value maps for DetectorType.
@@ -2190,9 +2194,13 @@ var (
 		1037: "PhraseAccessToken",
 		1038: "Photoroom",
 		1039: "JWT",
-		1040: "Remita",
-		1041: "Interswitch",
-		1042: "Sportybet",
+		1040: "OpenAIAdmin",
+		1041: "GoogleGeminiAPIKey",
+		1042: "ArtifactoryReferenceToken",
+		1043: "DatadogApikey",
+		1044: "Remita",
+		1045: "Interswitch",
+		1046: "Sportybet",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3230,10 +3238,14 @@ var (
 		"HashiCorpVaultAuth":                1036,
 		"PhraseAccessToken":                 1037,
 		"Photoroom":                         1038,
-		"JWT":                               1039,
-		"Remita":                            1040,
-		"Interswitch":                       1041,
-		"Sportybet":                         1042,
+		"JWT":                       1039,
+		"OpenAIAdmin":               1040,
+		"GoogleGeminiAPIKey":        1041,
+		"ArtifactoryReferenceToken": 1042,
+		"DatadogApikey":             1043,
+		"Remita":                    1044,
+		"Interswitch":               1045,
+		"Sportybet":                 1046,
 	}
 )
 
