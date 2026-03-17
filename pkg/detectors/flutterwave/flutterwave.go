@@ -5,7 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -67,21 +67,17 @@ func verifyFlutterwaveKey(ctx context.Context, key string) bool {
 		return false
 	}
 
-	// Valid response: 200 OK and no "invalid"/"unauthorized" keywords
-	if resp.StatusCode == 200 {
-		if !bytes.Contains(bodyBytes, []byte("invalid")) && !bytes.Contains(bodyBytes, []byte("unauthorized")) {
-			return true
-		}
-	}
-
 	// Invalid responses
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return false
 	}
 
-	// 2xx responses without error keywords = valid
+	// Valid response: 2xx without "invalid"/"unauthorized" keywords
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true
+		if !bytes.Contains(bodyBytes, []byte("invalid")) && !bytes.Contains(bodyBytes, []byte("unauthorized")) {
+			return true
+		}
+		return false
 	}
 
 	return false
