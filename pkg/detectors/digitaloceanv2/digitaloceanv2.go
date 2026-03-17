@@ -183,7 +183,7 @@ func verifyAccessToken(ctx logContext.Context, client *http.Client, token string
 
 		if err = json.Unmarshal(resBody, &resData); err != nil {
 			ctx.Logger().Error(err, "failed to parse response")
-			return true, extraData, nil
+			return false, extraData, nil
 		}
 
 		// lightweight analyze: annotate standard fields
