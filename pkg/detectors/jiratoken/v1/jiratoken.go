@@ -20,14 +20,21 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) Version() int { return 1 }
+
+// reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
+// In case we don't find any domain matches we can use this as the graphql API works with this domain if our authentication is valid
+func (Scanner) CloudEndpoint() string { return "api.atlassian.com" }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
@@ -70,23 +77,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	var uniqueTokens, uniqueDomains, uniqueEmails = make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
+	var foundEndpoints = make([]string, 0)
 
 	for _, token := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueTokens[token[1]] = struct{}{}
 	}
 
 	for _, domain := range domainPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueDomains[domain[1]] = struct{}{}
+		foundEndpoints = append(foundEndpoints, domain[1])
 	}
 
 	for _, email := range emailPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
 	}
 
-	if len(uniqueDomains) == 0 {
-		// reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
-		// In case we don't find any domain matches we can use this as the graphql API works with this domain if our authentication is valid
-		uniqueDomains["api.atlassian.com"] = struct{}{}
+	// add found + configured endpoints to the list
+	for _, endpoint := range s.Endpoints(foundEndpoints...) {
+		endpoint = strings.TrimPrefix(endpoint, "https://")
+		endpoint = strings.TrimSuffix(endpoint, "/")
+		uniqueDomains[endpoint] = struct{}{}
 	}
 
 	for email := range uniqueEmails {
