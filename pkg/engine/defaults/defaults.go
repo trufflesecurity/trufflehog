@@ -355,6 +355,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvaultauth"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvaulttoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hasura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
@@ -1230,6 +1231,7 @@ func buildDetectorList() []detectors.Detector {
 		&harness.Scanner{},
 		&harvest.Scanner{},
 		&hashicorpvaultauth.Scanner{},
+		&hashicorpvaulttoken.Scanner{},
 		&hasura.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
