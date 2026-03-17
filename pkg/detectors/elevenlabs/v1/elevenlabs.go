@@ -121,7 +121,7 @@ func verifyMatch(ctx logContext.Context, client *http.Client, token string) (boo
 			// Could include subscription tier here if wanted
 		})
 
-		extraData["Name"] = userResponse.UserID
+		extraData["Name"] = userResponse.FirstName
 		extraData["Tier"] = userResponse.Subscription.Tier
 
 		return true, extraData, nil
