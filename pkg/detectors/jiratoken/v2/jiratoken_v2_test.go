@@ -324,7 +324,7 @@ func TestJiraToken_Pattern(t *testing.T) {
 			d.UseFoundEndpoints(test.useFoundEndpoints)
 			d.UseCloudEndpoint(test.useCloudEndpoint)
 			d.SetCloudEndpoint(d.CloudEndpoint())
-			d.SetConfiguredEndpoints(test.configuredEndpoints...)
+			_ = d.SetConfiguredEndpoints(test.configuredEndpoints...)
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			if err != nil {
 				t.Errorf("error = %v", err)
