@@ -24,7 +24,9 @@ func TestBatchToken_FromData_Integration(t *testing.T) {
 
 	vaultURL := testSecrets.MustGetField("HASHICORPVAULT_CLOUD_URL")
 
-	// To generate:
+	// This token has maximum TTL of 32days (768h), so it should still be valid by the time this test runs
+	// but if the test fails due to an invalid token, this is the most likely culprit and the token may need to be regenerated.
+	// To regenerate the token run this command in vault web cli:
 	// write auth/token/create type=batch policies="test-policy" ttl="768h"
 	batchToken := testSecrets.MustGetField("HASHICORPVAULT_BATCH_TOKEN")
 
