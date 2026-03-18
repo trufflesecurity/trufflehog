@@ -17,7 +17,7 @@ func TestBatchToken_FromData_Integration(t *testing.T) {
 	defer cancel()
 
 	// Fetch test secrets
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors-vault")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets: %s", err)
 	}
