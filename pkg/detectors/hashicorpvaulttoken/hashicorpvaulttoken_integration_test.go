@@ -103,7 +103,7 @@ func TestVaultToken_FromData_Integration(t *testing.T) {
 	}
 }
 
-func BenchmarkSpectralOps_FromData(b *testing.B) {
+func BenchmarkHashicorpVaultToken_FromData(b *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
 
