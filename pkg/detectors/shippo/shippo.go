@@ -25,16 +25,14 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Shippo live tokens:
-	// Format: shippo_live_ + 40 hex characters
+	// Format: shippo_live_ or shippo_test_ + 40 hex characters
 	shippoLiveTokenPat = regexp.MustCompile(
-		// `\b(shippo_live_[a-f0-9]{40})\b`,
 		`\b(shippo_(live|test)_[a-f0-9]{40})\b`,
 	)
 )
 
 // Keywords used for fast pre-filtering
 func (s Scanner) Keywords() []string {
-	// return []string{"shippo_live_"}
 	return []string{"shippo_live_", "shippo_test_"} // remove this line
 }
 
