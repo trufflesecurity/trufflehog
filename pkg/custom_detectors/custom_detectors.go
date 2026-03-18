@@ -309,8 +309,10 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		}()
 
 		if isStatusInRanges(resp.StatusCode, verifyConfig.GetSuccessRanges()) {
-			// mark the result as verified
+			// mark the result as verified and clear any prior
+			// inconclusive error from an earlier config.
 			result.Verified = true
+			result.ClearVerificationError()
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {

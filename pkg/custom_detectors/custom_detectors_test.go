@@ -963,6 +963,42 @@ func TestCreateResults_SecondConfigClearsVerificationError(t *testing.T) {
 		"second config's clear rejection should have cleared the first config's network error")
 }
 
+func TestCreateResults_SuccessAfterNetworkError_ClearsVerificationError(t *testing.T) {
+	// If config 1 has a network error and config 2 succeeds,
+	// the result should be verified with no lingering error.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok": true}`)
+	}))
+	defer ts.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "success-after-error-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `secret_([a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				// First config: unreachable.
+				Endpoint: "http://127.0.0.1:1/verify",
+				Unsafe:   true,
+			},
+			{
+				// Second config: succeeds.
+				Endpoint: ts.URL,
+				Unsafe:   true,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_abc"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Verified)
+	assert.Nil(t, results[0].VerificationError(),
+		"successful verification should clear prior network error")
+}
+
 func TestNewWebhookCustomRegex_InvalidSuccessRanges(t *testing.T) {
 	t.Parallel()
 
