@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
-func TestBatchToken_FromData_Integration(t *testing.T) {
+func TestBatchToken_FromData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -102,7 +102,7 @@ func TestBatchToken_FromData_Integration(t *testing.T) {
 	}
 }
 
-func BenchmarkHashicorpVaultBatchToken_FromData(b *testing.B) {
+func BenchmarkFromData(b *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
 
