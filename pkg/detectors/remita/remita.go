@@ -1,7 +1,6 @@
 package remita
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"

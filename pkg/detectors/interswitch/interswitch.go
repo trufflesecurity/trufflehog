@@ -1,7 +1,6 @@
 package interswitch
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"

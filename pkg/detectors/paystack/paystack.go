@@ -1,7 +1,6 @@
 package paystack
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
