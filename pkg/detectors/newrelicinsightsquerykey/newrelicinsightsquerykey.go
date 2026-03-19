@@ -94,33 +94,44 @@ func (s Scanner) verify(ctx context.Context, key string, accountID string) (bool
 		"us": fmt.Sprintf("https://insights-api.newrelic.com/v1/accounts/%s/query?nrql=SELECT%%201", accountID),
 		"eu": fmt.Sprintf("https://insights-api.eu.newrelic.com/v1/accounts/%s/query?nrql=SELECT%%201", accountID),
 	}
-	client := s.getClient()
 	errs := make([]error, 0, len(regionUrls))
 	for region, regionUrl := range regionUrls {
-		req, err := http.NewRequestWithContext(
-			ctx, http.MethodGet, regionUrl, http.NoBody)
+		verified, err := s.verifyRegion(ctx, key, accountID, region, regionUrl)
 		if err != nil {
-			return false, nil, fmt.Errorf("error constructing request: %w", err)
-		}
-		req.Header.Set("X-Query-Key", key)
-
-		res, err := client.Do(req)
-		if err != nil {
-			return false, nil, fmt.Errorf("error making request: %w", err)
-		}
-		defer func() {
-			_, _ = io.Copy(io.Discard, res.Body)
-			_ = res.Body.Close()
-		}()
-
-		switch res.StatusCode {
-		case http.StatusOK:
-			return true, map[string]string{"region": region}, nil
-		case http.StatusUnauthorized:
+			errs = append(errs, fmt.Errorf("error verifying region %s: %w", region, err))
 			continue
-		default:
-			errs = append(errs, fmt.Errorf("unexpected status code for region %s: %d", region, res.StatusCode))
+		}
+		if verified {
+			return true, map[string]string{"region": region}, nil
 		}
 	}
 	return false, nil, errors.Join(errs...)
+}
+
+func (s Scanner) verifyRegion(ctx context.Context, key, accountID, region, regionUrl string) (bool, error) {
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodGet, regionUrl, http.NoBody)
+	if err != nil {
+		return false, fmt.Errorf("error constructing request: %w", err)
+	}
+	req.Header.Set("X-Query-Key", key)
+
+	client := s.getClient()
+	res, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("error making request: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
