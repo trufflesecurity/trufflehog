@@ -23,7 +23,6 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 var (
