@@ -81,7 +81,6 @@ func verifyInterswitchKey(ctx context.Context, key string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	defer resp.Body.Close()
 _, _ = io.Copy(io.Discard, resp.Body)
 
 	switch resp.StatusCode {

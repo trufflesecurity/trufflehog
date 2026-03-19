@@ -1053,9 +1053,13 @@ enum DetectorType {
 
 
 
-  Remita = 1040;
-  Interswitch = 1041;
-  Sportybet = 1042;
+  OpenAIAdmin = 1040;
+  GoogleGeminiAPIKey = 1041;
+  ArtifactoryReferenceToken = 1042;
+  DatadogApikey = 1043;
+  Remita = 1044;
+  Interswitch = 1045;
+  Sportybet = 1046;
 }
 
 message Result {
