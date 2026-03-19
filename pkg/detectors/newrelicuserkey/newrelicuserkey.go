@@ -90,41 +90,52 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		"us": "https://api.newrelic.com/graphql",
 		"eu": "https://api.eu.newrelic.com/graphql",
 	}
-	client := s.getClient()
-	body := `{"query": "{ requestContext { userId } }"}`
+
 	errs := make([]error, 0, len(regionUrls))
 	for region, regionUrl := range regionUrls {
-		req, err := http.NewRequestWithContext(
-			ctx, http.MethodPost, regionUrl, strings.NewReader(body))
+		verified, extraData, err := s.verifyRegion(ctx, key, region, regionUrl)
 		if err != nil {
-			return false, nil, fmt.Errorf("error constructing request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("API-Key", key)
-
-		res, err := client.Do(req)
-		if err != nil {
-			return false, nil, fmt.Errorf("error making request: %w", err)
-		}
-		defer func() {
-			_, _ = io.Copy(io.Discard, res.Body)
-			_ = res.Body.Close()
-		}()
-
-		switch res.StatusCode {
-		case http.StatusOK:
-			var resp graphqlResponse
-			if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-				errs = append(errs, fmt.Errorf("error decoding response for region %s: %w", region, err))
-				continue
-			}
-			return true, map[string]string{"region": region, "user_id": resp.Data.RequestContext.UserID}, nil
-		case http.StatusUnauthorized, http.StatusForbidden:
-			// 401 means the key is invalid, 403 means the region is incorrect
+			errs = append(errs, fmt.Errorf("error verifying region %s: %w", region, err))
 			continue
-		default:
-			errs = append(errs, fmt.Errorf("unexpected status code for region %s: %d", region, res.StatusCode))
+		}
+		if verified {
+			return true, extraData, nil
 		}
 	}
 	return false, nil, errors.Join(errs...)
+}
+
+func (s Scanner) verifyRegion(ctx context.Context, key, region, regionUrl string) (bool, map[string]string, error) {
+	body := `{"query": "{ requestContext { userId } }"}`
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, regionUrl, strings.NewReader(body))
+	if err != nil {
+		return false, nil, fmt.Errorf("error constructing request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("API-Key", key)
+
+	client := s.getClient()
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		var resp graphqlResponse
+		if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+			return false, nil, fmt.Errorf("error decoding response for region %s: %w", region, err)
+		}
+		return true, map[string]string{"region": region, "user_id": resp.Data.RequestContext.UserID}, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		// 401 means the key is invalid, 403 means the region is incorrect
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected status code for region %s: %d", region, res.StatusCode)
+	}
 }
