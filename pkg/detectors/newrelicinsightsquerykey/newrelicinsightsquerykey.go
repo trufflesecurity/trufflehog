@@ -96,7 +96,7 @@ func (s Scanner) verify(ctx context.Context, key string, accountID string) (bool
 	}
 	errs := make([]error, 0, len(regionUrls))
 	for region, regionUrl := range regionUrls {
-		verified, err := s.verifyRegion(ctx, key, accountID, region, regionUrl)
+		verified, err := s.verifyRegion(ctx, key, regionUrl)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("error verifying region %s: %w", region, err))
 			continue
@@ -108,7 +108,7 @@ func (s Scanner) verify(ctx context.Context, key string, accountID string) (bool
 	return false, nil, errors.Join(errs...)
 }
 
-func (s Scanner) verifyRegion(ctx context.Context, key, accountID, region, regionUrl string) (bool, error) {
+func (s Scanner) verifyRegion(ctx context.Context, key, regionUrl string) (bool, error) {
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodGet, regionUrl, http.NoBody)
 	if err != nil {
