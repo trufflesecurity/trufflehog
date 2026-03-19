@@ -235,7 +235,7 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 		SourceType:  s.Type(),
 		Verify:      s.verify,
 		Concurrency: concurrency,
-		SourceMetadataFunc: func(info *git.SourceMetadataInfo) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Huggingface{
 					Huggingface: &source_metadatapb.Huggingface{

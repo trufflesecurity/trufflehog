@@ -231,7 +231,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(info *git.SourceMetadataInfo) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 			gitlabMetadata := &source_metadatapb.Gitlab{
 				Commit:              sanitizer.UTF8(info.Commit),
 				File:                sanitizer.UTF8(info.File),

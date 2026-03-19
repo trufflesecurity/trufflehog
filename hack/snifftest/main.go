@@ -197,7 +197,7 @@ func main() {
 					SkipBinaries: true,
 					SkipArchives: false,
 					Concurrency:  runtime.NumCPU(),
-					SourceMetadataFunc: func(info *git.SourceMetadataInfo) *source_metadatapb.MetaData {
+					SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 						return &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Git{
 								Git: &source_metadatapb.Git{
