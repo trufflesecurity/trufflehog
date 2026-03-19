@@ -75,17 +75,12 @@ func verifyRemitaKey(ctx context.Context, key string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, err
-	}
+	defer resp.Body.Close()
+_, _ = io.Copy(io.Discard, resp.Body)
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		if bytes.Contains(bodyBytes, []byte("invalid")) || bytes.Contains(bodyBytes, []byte("unauthorized")) {
-			return false, nil
-		}
-		return true, nil
+    return true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:

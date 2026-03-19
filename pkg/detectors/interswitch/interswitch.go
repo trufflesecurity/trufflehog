@@ -38,12 +38,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		key := match[0]
-		if len(match) > 1 && match[1] != "" {
-			key = match[1]
-		} else if len(match) > 2 && match[2] != "" {
-			key = match[2]
-		}
+		var key string
+if len(match) > 1 && match[1] != "" {
+    key = match[1]
+} else if len(match) > 2 && match[2] != "" {
+    key = match[2]
+} else {
+    continue
+}
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Interswitch,
@@ -80,17 +82,12 @@ func verifyInterswitchKey(ctx context.Context, key string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, err
-	}
+	defer resp.Body.Close()
+_, _ = io.Copy(io.Discard, resp.Body)
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		if bytes.Contains(bodyBytes, []byte("invalid")) || bytes.Contains(bodyBytes, []byte("unauthorized")) {
-			return false, nil
-		}
-		return true, nil
+    return true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:

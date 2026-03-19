@@ -25,7 +25,7 @@ var (
 	// - FLWSECK_TEST-<32chars>-X  (test keys)
 	// - FLWSECK_LIVE-<32chars>-X  (live keys)
 	// - FLWSECK-<32chars>-X       (legacy/generic)
-	flutterwaveKeyPattern = regexp.MustCompile(`FLWSECK(?:_TEST|_LIVE)?-[0-9a-zA-Z]{32}-X`)
+	flutterwaveKeyPattern = regexp.MustCompile(`\bFLWSECK(?:_TEST|_LIVE)?-[0-9a-zA-Z]{32}-X\b`)
 
 	keywords = []string{"flutterwave", "FLWSECK"}
 )
