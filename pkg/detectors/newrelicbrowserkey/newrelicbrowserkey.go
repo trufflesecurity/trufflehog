@@ -84,36 +84,48 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 		"us": "https://bam.nr-data.net/1/",
 		"eu": "https://bam.eu01.nr-data.net/1/",
 	}
-	client := s.getClient()
 	errs := make([]error, 0, len(regionUrls))
 	for region, regionUrl := range regionUrls {
-		fullUrl, err := url.JoinPath(regionUrl, key)
+		verified, err := s.verifyRegion(ctx, key, regionUrl)
 		if err != nil {
-			return false, nil, fmt.Errorf("error constructing URL: %w", err)
-		}
-		req, err := http.NewRequestWithContext(
-			ctx, http.MethodPost, fullUrl, http.NoBody)
-		if err != nil {
-			return false, nil, fmt.Errorf("error constructing request: %w", err)
-		}
-
-		res, err := client.Do(req)
-		if err != nil {
-			return false, nil, fmt.Errorf("error making request: %w", err)
-		}
-		defer func() {
-			_, _ = io.Copy(io.Discard, res.Body)
-			_ = res.Body.Close()
-		}()
-
-		switch res.StatusCode {
-		case http.StatusBadRequest:
-			return true, map[string]string{"region": region}, nil
-		case http.StatusForbidden:
+			errs = append(errs, fmt.Errorf("error verifying region %s: %w", region, err))
 			continue
-		default:
-			errs = append(errs, fmt.Errorf("unexpected status code for region %s: %d", region, res.StatusCode))
+		}
+		if verified {
+			return true, map[string]string{"region": region}, nil
 		}
 	}
 	return false, nil, errors.Join(errs...)
+}
+
+func (s Scanner) verifyRegion(ctx context.Context, key string, regionUrl string) (bool, error) {
+	fullUrl, err := url.JoinPath(regionUrl, key)
+	if err != nil {
+		return false, fmt.Errorf("error constructing URL: %w", err)
+	}
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, fullUrl, http.NoBody)
+	if err != nil {
+		return false, fmt.Errorf("error constructing request: %w", err)
+	}
+
+	client := s.getClient()
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("error making request: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusBadRequest:
+		return true, nil
+	case http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
