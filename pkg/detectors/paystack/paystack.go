@@ -19,15 +19,15 @@ var (
 	paystackClient     = common.SaneHttpClient()
 )
 
-type scanner struct{}
+type Scanner struct{}
 
-var _ detectors.Detector = (*scanner)(nil)
+var _ detectors.Detector = (*Scanner)(nil)
 
-func (s scanner) Keywords() []string {
+func (s Scanner) Keywords() []string {
 	return []string{"paystack", "sk_live", "sk_test"}
 }
 
-func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := paystackKeyPattern.FindAllStringSubmatch(dataStr, -1)
@@ -90,10 +90,10 @@ func verifyPaystackKey(ctx context.Context, key string) (bool, error) {
 	}
 }
 
-func (s scanner) Type() detectorspb.DetectorType {
+func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Paystack
 }
 
-func (s scanner) Description() string {
+func (s Scanner) Description() string {
 	return "Detects Paystack API secret keys (sk_* format)"
 }

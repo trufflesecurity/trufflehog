@@ -20,15 +20,15 @@ var (
 	sportybetClient     = common.SaneHttpClient()
 )
 
-type scanner struct{}
+type Scanner struct{}
 
-var _ detectors.Detector = (*scanner)(nil)
+var _ detectors.Detector = (*Scanner)(nil)
 
-func (s scanner) Keywords() []string {
+func (s Scanner) Keywords() []string {
 	return []string{"sportybet", "sportybet_api", "sporty_api_key"}
 }
 
-func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := sportybetKeyPattern.FindAllStringSubmatch(dataStr, -1)
@@ -94,10 +94,10 @@ func verifySportybetKey(ctx context.Context, key string) (bool, error) {
 	}
 }
 
-func (s scanner) Type() detectorspb.DetectorType {
+func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sportybet
 }
 
-func (s scanner) Description() string {
+func (s Scanner) Description() string {
 	return "Detects SportyBet/BetKing API tokens and credentials"
 }

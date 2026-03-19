@@ -20,15 +20,15 @@ var (
 	remitaClient     = common.SaneHttpClient()
 )
 
-type scanner struct{}
+type Scanner struct{}
 
-var _ detectors.Detector = (*scanner)(nil)
+var _ detectors.Detector = (*Scanner)(nil)
 
-func (s scanner) Keywords() []string {
+func (s Scanner) Keywords() []string {
 	return []string{"remita", "remita_api_key", "remita_merchant"}
 }
 
-func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := remitaKeyPattern.FindAllStringSubmatch(dataStr, -1)
@@ -93,10 +93,10 @@ func verifyRemitaKey(ctx context.Context, key string) (bool, error) {
 	}
 }
 
-func (s scanner) Type() detectorspb.DetectorType {
+func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Remita
 }
 
-func (s scanner) Description() string {
+func (s Scanner) Description() string {
 	return "Detects Remita API keys and merchant credentials"
 }
