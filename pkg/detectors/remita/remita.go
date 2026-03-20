@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	remitaKeyPattern = regexp.MustCompile(`remita[_-]?(?:api[_-])?key["\s:=]+([0-9a-zA-Z]{32,})`)
+	remitaKeyPattern = regexp.MustCompile(`(?i)remita[_-]?(?:api[_-])?key["\s:=]+([0-9a-zA-Z]{32,})`)
 	remitaClient     = common.SaneHttpClient()
 )
 
