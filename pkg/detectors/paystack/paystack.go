@@ -37,20 +37,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		key := match[1]
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Paystack,
 			Raw:          []byte(key),
 		}
 
 		if verify {
 			verified, verifyErr := verifyPaystackKey(ctx, key)
-			s.Verified = verified
+			result.Verified = verified
 			if verifyErr != nil {
-				s.SetVerificationError(verifyErr, key)
+				result.SetVerificationError(verifyErr, key)
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -71,11 +71,11 @@ func verifyPaystackKey(ctx context.Context, key string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-_, _ = io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-    return true, nil
+		return true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:

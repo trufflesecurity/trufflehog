@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	sportybetKeyPattern = regexp.MustCompile(`(?i)sportybet[_-]?(?:api[_-])?(?:key|token)["\s:=]+([0-9a-zA-Z]{32,})`)
+	sportybetKeyPattern = regexp.MustCompile(`(?i)sportybet[_-]?(?:api[_-])?(?:key|token)["\s:=]+([0-9a-zA-Z]{32,64})`)
 	sportybetClient     = common.SaneHttpClient()
 )
 
@@ -23,7 +23,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 func (s Scanner) Keywords() []string {
-	return []string{"sportybet", "sportybet_api", "sporty_api_key"}
+	return []string{"sportybet", "sportybet_api"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -38,20 +38,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		key := match[1]
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sportybet,
 			Raw:          []byte(key),
 		}
 
 		if verify {
 			verified, verifyErr := verifySportybetKey(ctx, key)
-			s.Verified = verified
+			result.Verified = verified
 			if verifyErr != nil {
-				s.SetVerificationError(verifyErr, key)
+				result.SetVerificationError(verifyErr, key)
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -72,11 +72,11 @@ func verifySportybetKey(ctx context.Context, key string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-_, _ = io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-    return true, nil
+		return true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:

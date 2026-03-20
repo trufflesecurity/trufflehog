@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	interswitchKeyPattern = regexp.MustCompile(`(?i)(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})`)
+	interswitchKeyPattern = regexp.MustCompile(`(?i)(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,64})`)
 	interswitchClient     = common.SaneHttpClient()
 )
 
@@ -35,18 +35,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		key := match[1]
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Interswitch,
 			Raw:          []byte(key),
 		}
 		if verify {
 			verified, verifyErr := verifyInterswitchKey(ctx, key)
-			s.Verified = verified
+			result.Verified = verified
 			if verifyErr != nil {
-				s.SetVerificationError(verifyErr, key)
+				result.SetVerificationError(verifyErr, key)
 			}
 		}
-		results = append(results, s)
+		results = append(results, result)
 	}
 	return results, nil
 }
