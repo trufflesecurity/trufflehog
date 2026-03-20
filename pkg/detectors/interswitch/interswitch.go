@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	interswitchKeyPattern = regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})|macKey["']?\s*[:=]\s*["']?([0-9A-Fa-f]{64})`)
+	interswitchKeyPattern = regexp.MustCompile(`(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,})`)
 	interswitchClient     = common.SaneHttpClient()
 )
 
@@ -24,33 +24,21 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 func (s Scanner) Keywords() []string {
-	return []string{"interswitch", "quickteller", "interswitch", "macKey"}
+	return []string{"interswitch", "quickteller", "macKey"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
 	matches := interswitchKeyPattern.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
-		if len(match) < 1 {
+		if len(match) < 2 || match[1] == "" {
 			continue
 		}
-
-		var key string
-if len(match) > 1 && match[1] != "" {
-    key = match[1]
-} else if len(match) > 2 && match[2] != "" {
-    key = match[2]
-} else {
-    continue
-}
-
+		key := match[1]
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Interswitch,
 			Raw:          []byte(key),
 		}
-
 		if verify {
 			verified, verifyErr := verifyInterswitchKey(ctx, key)
 			s.Verified = verified
@@ -58,10 +46,8 @@ if len(match) > 1 && match[1] != "" {
 				s.SetVerificationError(verifyErr, key)
 			}
 		}
-
 		results = append(results, s)
 	}
-
 	return results, nil
 }
 
@@ -70,22 +56,18 @@ func verifyInterswitchKey(ctx context.Context, key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	auth := base64.StdEncoding.EncodeToString([]byte(key + ":"))
 	req.Header.Add("Authorization", "Basic "+auth)
 	req.Header.Add("Content-Type", "application/json")
-
 	resp, err := interswitchClient.Do(req)
 	if err != nil {
 		return false, err
 	}
 	defer resp.Body.Close()
-
-_, _ = io.Copy(io.Discard, resp.Body)
-
+	_, _ = io.Copy(io.Discard, resp.Body)
 	switch resp.StatusCode {
 	case http.StatusOK:
-    return true, nil
+		return true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:
@@ -98,5 +80,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Detects Interswitch API keys and MAC keys"
+	return "Detects Interswitch API keys"
 }
