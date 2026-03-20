@@ -24,7 +24,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 func (s Scanner) Keywords() []string {
-	return []string{"interswitch", "quickteller", "macKey"}
+	return []string{"interswitch", "quickteller"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
