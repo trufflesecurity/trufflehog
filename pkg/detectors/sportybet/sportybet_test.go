@@ -19,8 +19,8 @@ func TestSportybet_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "sportybet_token=abcdefghijklmnopqrstuvwxyz123456",
-			want:  []string{"abcdefghijklmnopqrstuvwxyz123456"},
+			input: "sportybet_token=abcdefghijklmnopqrstuvwxyz1234567890abcd",
+			want:  []string{"abcdefghijklmnopqrstuvwxyz1234567890abcd"},
 		},
 	}
 	for _, test := range tests {

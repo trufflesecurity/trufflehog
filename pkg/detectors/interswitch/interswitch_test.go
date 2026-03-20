@@ -19,8 +19,8 @@ func TestInterswitch_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "interswitch_api_key=abcdefghijklmnopqrstuvwxyz123456",
-			want:  []string{"abcdefghijklmnopqrstuvwxyz123456"},
+			input: "interswitch_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcd",
+			want:  []string{"abcdefghijklmnopqrstuvwxyz1234567890abcd"},
 		},
 	}
 	for _, test := range tests {
