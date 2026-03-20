@@ -145,6 +145,15 @@ func (s *Source) withScanOptions(scanOptions *ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
+// ApplyScanOption applies an additional scan option on top of the source's existing scan options.
+// This can be used after Init to augment options without replacing the full set.
+func (s *Source) ApplyScanOption(opt ScanOption) {
+	if s.scanOptions == nil {
+		s.scanOptions = NewScanOptions()
+	}
+	opt(s.scanOptions)
+}
+
 // Init returns an initialized Git source.
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
@@ -704,7 +713,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isRepoBare(path))
+	var additionalArgs []string
+	if scanOptions.SinceDate != "" {
+		additionalArgs = append(additionalArgs, fmt.Sprintf("--after=%s", scanOptions.SinceDate))
+		repoCtx.Logger().V(2).Info("limiting git log by date", "since", scanOptions.SinceDate)
+	}
+
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isRepoBare(path), additionalArgs...)
 	if err != nil {
 		return err
 	}

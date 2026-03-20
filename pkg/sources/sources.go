@@ -291,6 +291,8 @@ type GitConfig struct {
 	PrintLegacyJSON bool
 	// TrustLocalGitConfig allows to trust the local git config.
 	TrustLocalGitConfig bool
+	// SinceDate limits scanning to commits more recent than the specified date.
+	SinceDate string
 }
 
 // GithubConfig defines the optional configuration for a github source.
@@ -336,6 +338,8 @@ type GithubConfig struct {
 	IgnoreGists bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
+	// SinceDate limits scanning to commits more recent than the specified date.
+	SinceDate string
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
