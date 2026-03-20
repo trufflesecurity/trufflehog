@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	interswitchKeyPattern = regexp.MustCompile(`(?i)(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{32,64})`)
+	interswitchKeyPattern = regexp.MustCompile(`(?i)(?:interswitch|quickteller)[_-]?(?:api[_-])?(?:key|secret)["\s:=]+([0-9a-zA-Z]{40,64})(?:[^0-9a-zA-Z]|$)`)
 	interswitchClient     = common.SaneHttpClient()
 )
 

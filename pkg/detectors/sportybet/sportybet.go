@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	sportybetKeyPattern = regexp.MustCompile(`(?i)sportybet[_-]?(?:api[_-])?(?:key|token)["\s:=]+([0-9a-zA-Z]{32,64})`)
+	sportybetKeyPattern = regexp.MustCompile(`(?i)sportybet[_-]?(?:api[_-])?(?:key|token)["\s:=]+([0-9a-zA-Z]{40,64})(?:[^0-9a-zA-Z]|$)`)
 	sportybetClient     = common.SaneHttpClient()
 )
 
