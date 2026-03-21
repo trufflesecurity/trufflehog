@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -64,6 +65,9 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 		if err := ValidateVerifyHeaders(verify.Headers); err != nil {
 			return nil, err
 		}
+		if err := ValidateVerifyRanges(verify.SuccessRanges); err != nil {
+			return nil, err
+		}
 	}
 
 	// Ensure primary regex name is set.
@@ -73,7 +77,7 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	return &CustomRegexWebhook{pb}, nil
 }
 
-var httpClient = common.SaneHttpClient()
+var httpClient = common.RetryableHTTPClient()
 
 func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -295,6 +299,8 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		}
 		resp, err := httpClient.Do(req)
 		if err != nil {
+			// Network failure / timeout:  mark as inconclusive.
+			result.SetVerificationError(err)
 			continue
 		}
 		defer func() {
@@ -302,9 +308,11 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			_ = resp.Body.Close()
 		}()
 
-		if resp.StatusCode == http.StatusOK {
-			// mark the result as verified
+		if isStatusInRanges(resp.StatusCode, verifyConfig.GetSuccessRanges()) {
+			// mark the result as verified and clear any prior
+			// inconclusive error from an earlier config.
 			result.Verified = true
+			result.ClearVerificationError()
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -323,6 +331,11 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 
 			break
 		}
+		// Non-success status code: definitively not verified.
+		// Clear any previous verification error (e.g. from an earlier
+		// config that had a network failure) since this endpoint gave
+		// a clear answer.
+		result.ClearVerificationError()
 	}
 
 	select {
@@ -331,6 +344,32 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	case results <- result:
 		return nil
 	}
+}
+
+// isStatusInRanges checks whether statusCode falls within any of the given
+// ranges. Each range is either a single code ("403") or a dash-separated
+// inclusive range ("200-299"). When ranges is empty, only 200 is accepted
+// (backward compatible default).
+func isStatusInRanges(statusCode int, ranges []string) bool {
+	if len(ranges) == 0 {
+		return statusCode == http.StatusOK
+	}
+	for _, r := range ranges {
+		if strings.Contains(r, "-") {
+			parts := strings.SplitN(r, "-", 2)
+			lo, _ := strconv.Atoi(parts[0])
+			hi, _ := strconv.Atoi(parts[1])
+			if statusCode >= lo && statusCode <= hi {
+				return true
+			}
+		} else {
+			code, _ := strconv.Atoi(r)
+			if statusCode == code {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *CustomRegexWebhook) Keywords() []string {

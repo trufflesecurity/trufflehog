@@ -147,6 +147,11 @@ func (r *Result) SetVerificationError(err error, secrets ...string) {
 	}
 }
 
+// ClearVerificationError resets the verification error to nil.
+func (r *Result) ClearVerificationError() {
+	r.verificationError = nil
+}
+
 // Public accessors for the fields could also be provided if needed.
 func (r *Result) VerificationError() error {
 	return r.verificationError
