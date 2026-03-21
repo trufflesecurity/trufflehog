@@ -19,20 +19,58 @@ var (
 	validEmailPattern    = "xfkf_bz7@grum.com"
 	invalidEmailPattern  = "xfKF_BZq7/grum.com"
 	keyword              = "jira"
+	cloudEndpoint        = "api.atlassian.com"
+	configuredEndpoint   = "example.atlassian.net"
 )
 
 func TestJiraToken_Pattern(t *testing.T) {
-	d := Scanner{}
-	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name  string
-		input string
-		want  []string
+		name                string
+		input               string
+		want                []string
+		useFoundEndpoints   bool
+		useCloudEndpoint    bool
+		configuredEndpoints []string
 	}{
 		{
-			name:  "valid pattern - with keyword jira",
-			input: fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern, keyword, validEmailPattern),
-			want:  []string{validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern},
+			name:              "valid pattern - use found endpoint",
+			input:             fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern, keyword, validEmailPattern),
+			useFoundEndpoints: true,
+			want:              []string{validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern},
+		},
+		{
+			name:             "valid pattern - use cloud endpoint",
+			input:            fmt.Sprintf("%s %s          \n%s\n%s %s", keyword, validTokenPattern, keyword, keyword, validEmailPattern),
+			useCloudEndpoint: true,
+			want:             []string{validEmailPattern + ":" + validTokenPattern + ":" + cloudEndpoint},
+		},
+		{
+			name:                "valid pattern - use configured endpoint",
+			input:               fmt.Sprintf("%s %s          \n%s\n%s %s", keyword, validTokenPattern, keyword, keyword, validEmailPattern),
+			configuredEndpoints: []string{validDomainPattern},
+			want:                []string{validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern},
+		},
+		{
+			name:                "valid pattern - use found + configured endpoint",
+			input:               fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern, keyword, validEmailPattern),
+			useFoundEndpoints:   true,
+			configuredEndpoints: []string{configuredEndpoint},
+			want: []string{
+				validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern,
+				validEmailPattern + ":" + validTokenPattern + ":" + configuredEndpoint,
+			},
+		},
+		{
+			name:                "valid pattern - use found + configured + cloud endpoint",
+			input:               fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern, keyword, validEmailPattern),
+			useFoundEndpoints:   true,
+			useCloudEndpoint:    true,
+			configuredEndpoints: []string{configuredEndpoint},
+			want: []string{
+				validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern,
+				validEmailPattern + ":" + validTokenPattern + ":" + configuredEndpoint,
+				validEmailPattern + ":" + validTokenPattern + ":" + cloudEndpoint,
+			},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
@@ -48,12 +86,17 @@ func TestJiraToken_Pattern(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			d := Scanner{}
+			ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-
+			d.UseFoundEndpoints(test.useFoundEndpoints)
+			d.UseCloudEndpoint(test.useCloudEndpoint)
+			d.SetCloudEndpoint(d.CloudEndpoint())
+			_ = d.SetConfiguredEndpoints(test.configuredEndpoints...)
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			if err != nil {
 				t.Errorf("error = %v", err)
