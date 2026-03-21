@@ -3,8 +3,8 @@ package flutterwave
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -15,62 +15,59 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-
-	keyPat = regexp.MustCompile(`\b(FLWSECK-[0-9a-z]{32}-X)\b`)
+	client                = common.SaneHttpClient()
+	flutterwaveKeyPattern = regexp.MustCompile(`\bFLWSECK(?:_TEST|_LIVE)?-[0-9a-zA-Z]{32}-X\b`)
+	keywords              = []string{"flutterwave", "FLWSECK"}
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"FLWSECK-"}
-}
+func (s Scanner) Keywords() []string { return keywords }
 
-// FromData will find and optionally verify Flutterwave secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
+	matches := flutterwaveKeyPattern.FindAllString(dataStr, -1)
 	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
-		s1 := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Flutterwave,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(match),
 		}
-
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.flutterwave.com/v3/subaccounts", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
+			verified, verifyErr := verifyFlutterwave(ctx, match)
+			result.Verified = verified
+			if verifyErr != nil {
+				result.SetVerificationError(verifyErr, match)
 			}
 		}
-
-		results = append(results, s1)
+		results = append(results, result)
 	}
-
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Flutterwave
+func verifyFlutterwave(ctx context.Context, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.flutterwave.com/v3/transactions", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
 
+func (s Scanner) Type() detectorspb.DetectorType { return detectorspb.DetectorType_Flutterwave }
 func (s Scanner) Description() string {
-	return "Flutterwave is a payment technology company providing seamless and secure payment solutions for businesses. Flutterwave API keys can be used to access and manage payment services and transactions."
+	return "Detects Flutterwave secret API keys (FLWSECK format)"
 }

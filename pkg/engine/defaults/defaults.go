@@ -548,6 +548,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paymongo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paypaloauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paystack"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/remita"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/interswitch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportybet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pdflayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pdfshift"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
@@ -1431,6 +1434,9 @@ func buildDetectorList() []detectors.Detector {
 		&paymongo.Scanner{},
 		&paypaloauth.Scanner{},
 		&paystack.Scanner{},
+		&remita.Scanner{},
+		&interswitch.Scanner{},
+		&sportybet.Scanner{},
 		&pdflayer.Scanner{},
 		&pdfshift.Scanner{},
 		&peopledatalabs.Scanner{},
