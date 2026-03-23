@@ -111,7 +111,7 @@ func (s *Source) canFollowSymlinks() bool {
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	for i, rootPath := range s.paths {
-		lctx := trContext.WithValues(ctx,
+		log := trContext.Logger().WithValues(
 			"root_path", rootPath,
 		)
 
@@ -123,38 +123,38 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 
 		cleanRootPath := filepath.Clean(rootPath)
 
-		lctx = trContext.WithValues(lctx,
+		log = log.WithValues(
 			"clean_root_path", cleanRootPath,
 		)
 
 		fileInfo, err := os.Lstat(cleanRootPath)
 		if err != nil {
-			lctx.Logger().Error(err, "unable to get file info")
+			log.Error(err, "unable to get file info")
 			continue
 		}
 
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			// if the root path is a symlink we scan the symlink
-			lctx.Logger().V(5).Info("Root path is a symlink")
+			log.V(5).Info("Root path is a symlink")
 			initialDepth := 0
 			err = s.scanSymlink(ctx, chunksChan, rootPath, initialDepth, cleanRootPath)
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else if fileInfo.IsDir() {
-			lctx.Logger().V(5).Info("Root path is a dir")
+			log.V(5).Info("Root path is a dir")
 			initialDepth := 0
 			err = s.scanDir(ctx, chunksChan, rootPath, initialDepth, cleanRootPath)
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else {
 			if !fileInfo.Mode().IsRegular() {
-				lctx.Logger().V(2).Info("Root path is a non-regular file; skipping")
+				log.V(2).Info("Root path is a non-regular file; skipping")
 				continue
 			}
-			lctx.Logger().V(5).Info("Root path is a file")
+			log.V(5).Info("Root path is a file")
 			err = s.scanFile(ctx, chunksChan, cleanRootPath)
 		}
 
 		if err != nil && !errors.Is(err, io.EOF) {
-			lctx.Logger().Error(err, "error scanning filesystem")
+			log.Error(err, "error scanning filesystem")
 		}
 	}
 
@@ -168,22 +168,22 @@ func (s *Source) scanSymlink(
 	depth int,
 	path string,
 ) error {
-	lctx := trContext.WithValues(ctx,
+	log := trContext.Logger().WithValues(
 		"root_path", rootPath,
 		"start_depth", depth,
 	)
 
-	lctx.Logger().V(5).Info("scanSymlink")
+	log.V(5).Info("scanSymlink")
 
 	if !s.canFollowSymlinks() {
 		// If the file or directory is a symlink but the followSymlinks is disable ignore the path
-		lctx.Logger().V(2).Info("Path is a symlink, but following symlinks is not allowed; skipping")
+		log.V(2).Info("Path is a symlink, but following symlinks is not allowed; skipping")
 		return nil
 	}
 
 	depth++
 
-	lctx = trContext.WithValues(lctx,
+	log = log.WithValues(
 		"depth", depth,
 	)
 
@@ -211,19 +211,19 @@ func (s *Source) scanSymlink(
 	}
 
 	if fileInfo.Mode()&os.ModeSymlink != 0 {
-		lctx.Logger().V(5).Info("Symlink links to another symlink")
+		log.V(5).Info("Symlink links to another symlink")
 		return s.scanSymlink(ctx, chunksChan, rootPath, depth, resolvedPath)
 	}
 
 	if fileInfo.IsDir() {
-		lctx.Logger().V(5).Info("Symlink links to a directory")
+		log.V(5).Info("Symlink links to a directory")
 		return s.scanDir(ctx, chunksChan, rootPath, depth, resolvedPath)
 	}
 
-	lctx.Logger().V(5).Info("Symlink links to a file")
+	log.V(5).Info("Symlink links to a file")
 
 	if s.filter != nil && !s.filter.Pass(resolvedPath) {
-		lctx.Logger().V(2).Info("Symlinked file was filtered out by filter.Pass; skipping")
+		log.V(2).Info("Symlinked file was filtered out by filter.Pass; skipping")
 		return nil
 	}
 
@@ -232,12 +232,12 @@ func (s *Source) scanSymlink(
 	resumptionKey := rootPath
 
 	if !fileInfo.Mode().Type().IsRegular() {
-		lctx.Logger().V(2).Info("Symlinked file is a non-regular file; skipping")
+		log.V(2).Info("Symlinked file is a non-regular file; skipping")
 		return nil
 	}
 
 	if err := s.scanFile(ctx, chunksChan, resolvedPath); err != nil {
-		lctx.Logger().Error(err, "error scanning symlinked file")
+		log.Error(err, "error scanning symlinked file")
 	}
 
 	s.SetEncodedResumeInfoFor(resumptionKey, cleanPath)
@@ -252,17 +252,17 @@ func (s *Source) scanDir(
 	depth int,
 	path string,
 ) error {
-	lctx := trContext.WithValues(ctx,
+	log := trContext.Logger().WithValues(
 		"root_path", rootPath,
 		"depth", depth,
 	)
 
-	lctx.Logger().V(5).Info("scanDir")
+	log.V(5).Info("scanDir")
 
 	// check if the full path is not matching any pattern in include
 	// FilterRuleSet and matching any exclude FilterRuleSet.
 	if s.filter != nil && s.filter.ShouldExclude(path) {
-		lctx.Logger().V(2).Info("Path was filtered out by filter.ShouldExclude; skipping")
+		log.V(2).Info("Path was filtered out by filter.ShouldExclude; skipping")
 		return nil
 	}
 
@@ -283,13 +283,13 @@ func (s *Source) scanDir(
 		// Resume point is not in this subtree. Compare paths to determine if we
 		// should skip this directory (already scanned) or process it (already passed).
 		if path < resumeAfter {
-			lctx.Logger().V(5).Info("Resumption: path already seen")
+			log.V(5).Info("Resumption: path already seen")
 			// This directory comes before the resume point lexicographically,
 			// meaning it was already fully scanned. Skip it entirely.
 			return nil
 		}
 
-		lctx.Logger().V(5).Info("Resumption: complete")
+		log.V(5).Info("Resumption: complete")
 		// This directory comes after the resume point, so we've already passed
 		// the resume point. Process this directory normally.
 		resumeAfter = ""
@@ -308,7 +308,7 @@ func (s *Source) scanDir(
 
 		if s.filter != nil && !s.filter.Pass(entryPath) {
 			if !entry.IsDir() && entry.Type()&os.ModeSymlink == 0 {
-				lctx.Logger().V(2).Info("File entry was filtered by filter.Pass; skipping")
+				log.V(2).Info("File entry was filtered by filter.Pass; skipping")
 				continue
 			}
 		}
@@ -321,7 +321,7 @@ func (s *Source) scanDir(
 		if resumeAfter != "" {
 			// If this entry is the resume point, stop skipping.
 			if entryPath == resumeAfter {
-				lctx.Logger().V(5).Info("Resumption: resume point already seen")
+				log.V(5).Info("Resumption: resume point already seen")
 				resumeAfter = ""
 				continue // Skip the resume point itself since it was already processed.
 			}
@@ -330,7 +330,7 @@ func (s *Source) scanDir(
 			if entry.IsDir() && strings.HasPrefix(resumeAfter, entryPath+string(filepath.Separator)) {
 				// Recurse into this directory to find the resume point.
 				if err := s.scanDir(ctx, chunksChan, rootPath, depth, entryPath); err != nil {
-					lctx.Logger().Error(err, "error scanning directory")
+					log.Error(err, "error scanning directory")
 				}
 				// After recursing, clear local resumeAfter. The child scanDir will have
 				// handled resumption within its subtree, and subsequent entries in this
@@ -344,24 +344,24 @@ func (s *Source) scanDir(
 		}
 
 		if entry.Type()&os.ModeSymlink != 0 {
-			lctx.Logger().V(5).Info("Entry is a symlink")
+			log.V(5).Info("Entry is a symlink")
 			if err := s.scanSymlink(ctx, chunksChan, rootPath, depth, entryPath); err != nil {
-				lctx.Logger().Error(err, "error scanning symlink")
+				log.Error(err, "error scanning symlink")
 			}
 		} else if entry.IsDir() {
-			lctx.Logger().V(5).Info("Entry is a directory")
+			log.V(5).Info("Entry is a directory")
 			if err := s.scanDir(ctx, chunksChan, rootPath, depth, entryPath); err != nil {
-				lctx.Logger().Error(err, "error scanning directory")
+				log.Error(err, "error scanning directory")
 			}
 		} else {
 			if !entry.Type().IsRegular() {
 				continue
 			}
 
-			lctx.Logger().V(5).Info("Entry is a file")
+			log.V(5).Info("Entry is a file")
 			workerPool.Go(func() error {
 				if err := s.scanFile(ctx, chunksChan, entryPath); err != nil {
-					lctx.Logger().Error(err, "error scanning file")
+					log.Error(err, "error scanning file")
 				}
 
 				s.SetEncodedResumeInfoFor(resumptionKey, entryPath)
@@ -414,12 +414,12 @@ func (s *Source) scanFile(ctx trContext.Context, chunksChan chan *sources.Chunk,
 // filepath or a directory.
 func (s *Source) Enumerate(ctx trContext.Context, reporter sources.UnitReporter) error {
 	for _, rootPath := range s.paths {
-		lctx := trContext.WithValues(ctx,
+		log := trContext.Logger().WithValues(
 			"root_path", rootPath,
 		)
 
 		if _, err := os.Lstat(filepath.Clean(rootPath)); err != nil {
-			lctx.Logger().Error(err, "unable to stat path")
+			log.Error(err, "unable to stat path")
 
 			if unitErrErr := reporter.UnitErr(ctx, err); unitErrErr != nil {
 				return unitErrErr
@@ -443,7 +443,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 
 	cleanPath := filepath.Clean(rootPath)
 
-	lctx := trContext.WithValues(ctx,
+	log := trContext.Logger().WithValues(
 		"root_path", rootPath,
 		"clean_root_path", cleanPath,
 	)
@@ -459,12 +459,12 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 		defer close(ch)
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			// if the root path is a symlink we scan the symlink
-			lctx.Logger().V(5).Info("Root unit is a symlink")
+			log.V(5).Info("Root unit is a symlink")
 			initialDepth := 0
 			scanErr = s.scanSymlink(ctx, ch, rootPath, initialDepth, cleanPath)
 			s.ClearEncodedResumeInfoFor(rootPath)
 		} else if fileInfo.IsDir() {
-			lctx.Logger().V(5).Info("Root unit is a directory")
+			log.V(5).Info("Root unit is a directory")
 			initialDepth := 0
 			// TODO: Finer grain error tracking of individual chunks.
 			scanErr = s.scanDir(ctx, ch, rootPath, initialDepth, cleanPath)
@@ -473,11 +473,11 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 			// TODO: Finer grain error tracking of individual
 			// chunks (in the case of archives).
 			if !fileInfo.Mode().IsRegular() {
-				lctx.Logger().V(2).Info("Root unit is a non-regular file; skipping")
+				log.V(2).Info("Root unit is a non-regular file; skipping")
 				return
 			}
 
-			lctx.Logger().V(5).Info("Root unit is a file")
+			log.V(5).Info("Root unit is a file")
 			scanErr = s.scanFile(ctx, ch, cleanPath)
 		}
 	}()
@@ -493,7 +493,7 @@ func (s *Source) ChunkUnit(ctx trContext.Context, unit sources.SourceUnit, repor
 	}
 
 	if scanErr != nil && !errors.Is(scanErr, io.EOF) {
-		lctx.Logger().Error(scanErr, "error scanning filesystem")
+		log.Error(scanErr, "error scanning filesystem")
 		return reporter.ChunkErr(ctx, scanErr)
 	}
 
