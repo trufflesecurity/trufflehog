@@ -22,7 +22,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([A-Za-z0-9_-]{37})\b`)
+	// Pre-2026 format: lowercase hex, 37-45 chars, requires "cloudflare" keyword nearby.
+	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([a-f0-9]{37,45})\b`)
+	// 2026+ format: cfk_ prefix, sufficiently unique to match without keyword proximity.
+	apiKeyV2Pat = regexp.MustCompile(`\b(cfk_[a-zA-Z0-9]{40}[a-f0-9]{8})\b`)
 
 	emailPat = regexp.MustCompile(common.EmailPattern)
 )
@@ -30,7 +33,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"cloudflare"}
+	return []string{"cloudflare", "cfk_"}
 }
 
 // FromData will find and optionally verify CloudflareGlobalApiKey secrets in a given set of bytes.
@@ -38,6 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	apiKeyMatches := apiKeyPat.FindAllStringSubmatch(dataStr, -1)
+	apiKeyMatches = append(apiKeyMatches, apiKeyV2Pat.FindAllStringSubmatch(dataStr, -1)...)
 
 	uniqueEmailMatches := make(map[string]struct{})
 	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
