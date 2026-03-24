@@ -195,7 +195,10 @@ func TestArtifactory_Endpoint_Contains_CustomEndpoint(t *testing.T) {
 	appURL := "example.com"
 	s := Scanner{}
 	s.UseFoundEndpoints(true)
-	s.SetConfiguredEndpoints(appURL)
+	err := s.SetConfiguredEndpoints(appURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
 	for _, ep := range s.Endpoints() {
 		if ep != appURL {
 			t.Fatalf("expected endpoint %s to be present in endpoints list, got %s", appURL, ep)

@@ -162,7 +162,10 @@ func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
 
 	s := Scanner{}
 	s.UseFoundEndpoints(true)
-	s.SetConfiguredEndpoints(instanceURL)
+	err = s.SetConfiguredEndpoints(instanceURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
 	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", secret))
 	want := []detectors.Result{
 		{
