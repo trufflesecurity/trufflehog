@@ -1150,6 +1150,7 @@ const (
 	DetectorType_GoogleGeminiAPIKey                      DetectorType = 1041
 	DetectorType_ArtifactoryReferenceToken               DetectorType = 1042
 	DetectorType_DatadogApikey                           DetectorType = 1043
+	DetectorType_WaveApps                                DetectorType = 1044
 )
 
 // Enum value maps for DetectorType.
@@ -2195,6 +2196,7 @@ var (
 		1041: "GoogleGeminiAPIKey",
 		1042: "ArtifactoryReferenceToken",
 		1043: "DatadogApikey",
+		1044: "WaveApps",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3237,6 +3239,7 @@ var (
 		"GoogleGeminiAPIKey":                1041,
 		"ArtifactoryReferenceToken":         1042,
 		"DatadogApikey":                     1043,
+		"WaveApps":                          1044,
 	}
 )
 
