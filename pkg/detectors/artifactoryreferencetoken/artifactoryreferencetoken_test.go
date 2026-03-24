@@ -213,7 +213,11 @@ func TestArtifactoryreferencetoken_Endpoint_Contains_CustomEndpoint(t *testing.T
 	if err != nil {
 		t.Fatal("Error in setting configured endpoint")
 	}
-	for _, ep := range s.Endpoints() {
+	configuredEndpoints := s.Endpoints()
+	if len(configuredEndpoints) == 0 {
+		t.Fatal("No Confiured endpoint found")
+	}
+	for _, ep := range configuredEndpoints {
 		if ep != appURL {
 			t.Fatalf("expected endpoint %s to be present in endpoints list, got %s", appURL, ep)
 		}

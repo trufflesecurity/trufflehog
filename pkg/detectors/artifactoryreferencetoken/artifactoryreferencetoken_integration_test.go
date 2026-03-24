@@ -181,6 +181,9 @@ func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
 	if len(got) == 0 {
 		t.Fatal("expected at least one result from FromData, got 0")
 	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d results", len(want))
+	}
 	for i := range got {
 		if len(got[i].RawV2) == 0 {
 			t.Fatalf("no raw secret present: \n %+v", got[i])
