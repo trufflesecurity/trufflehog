@@ -2,6 +2,7 @@ package viewneo
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -46,9 +47,9 @@ VIEWNEO_API_TOKEN="` + validPattern + `"`,
 			want: []string{validPattern},
 		},
 		{
-			name: "valid pattern - key out of prefix range",
-			input: "viewneo keyword is not close to the real key in the data\n = '" + validPattern + "'",
-			want: []string{},
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			want:  []string{},
 		},
 		{
 			name: "invalid pattern - bad character in token",
