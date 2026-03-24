@@ -38,7 +38,8 @@ var (
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"hvs.", "s."}
+	// We cant use s. as a keyword because it is too broad so that's why we are using "vault".
+	return []string{"hvs.", "vault"}
 }
 
 func (Scanner) CloudEndpoint() string { return "" }
