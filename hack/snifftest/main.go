@@ -197,15 +197,15 @@ func main() {
 					SkipBinaries: true,
 					SkipArchives: false,
 					Concurrency:  runtime.NumCPU(),
-					SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+					SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 						return &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Git{
 								Git: &source_metadatapb.Git{
-									Commit:     commit,
-									File:       file,
-									Email:      email,
-									Repository: repository,
-									Timestamp:  timestamp,
+									Commit:     info.Commit,
+									File:       info.File,
+									Email:      info.Email,
+									Repository: info.Repository,
+									Timestamp:  info.Timestamp,
 								},
 							},
 						}
