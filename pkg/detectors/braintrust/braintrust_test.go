@@ -24,7 +24,7 @@ func TestBraintrust_Pattern(t *testing.T) {
 			name: "valid pattern - basic",
 			input: `
 				[INFO] Starting AI eval
-				[DEBUG] API key sk-JMwsKdC5JJfEGS4NhbQjzh1zfeYvGCuBkosFRWn98Z1H13Yg
+				[DEBUG] braintrust_key=sk-JMwsKdC5JJfEGS4NhbQjzh1zfeYvGCuBkosFRWn98Z1H13Yg
 			`,
 			want: []string{
 				"sk-JMwsKdC5JJfEGS4NhbQjzh1zfeYvGCuBkosFRWn98Z1H13Yg",
@@ -43,8 +43,8 @@ func TestBraintrust_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - multiple tokens",
 			input: `
-				sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-				sk-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+				braintrust_key1=sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+				braintrust_key2=sk-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 			`,
 			want: []string{
 				"sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -54,21 +54,21 @@ func TestBraintrust_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern - too short",
 			input: `
-				[DEBUG] key=sk-1234
+				[DEBUG] braintrust_key=sk-1234
 			`,
 			want: nil,
 		},
 		{
 			name: "invalid pattern - too long",
 			input: `
-				[DEBUG] key=sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+				[DEBUG] braintrust_key=sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 			`,
 			want: nil,
 		},
 		{
 			name: "invalid pattern - invalid characters",
 			input: `
-				[DEBUG] key=sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!
+				[DEBUG] braintrust_key=sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!
 			`,
 			want: nil,
 		},
@@ -82,7 +82,7 @@ func TestBraintrust_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - mixed alphanumeric",
 			input: `
-				[DEBUG] key=sk-a1B2c3D4e5F6g7H8i9J0kLmNoPqRsTuVwXyZ1234567890ao
+				[DEBUG] braintrust_key=sk-a1B2c3D4e5F6g7H8i9J0kLmNoPqRsTuVwXyZ1234567890ao
 			`,
 			want: []string{
 				"sk-a1B2c3D4e5F6g7H8i9J0kLmNoPqRsTuVwXyZ1234567890ao",
