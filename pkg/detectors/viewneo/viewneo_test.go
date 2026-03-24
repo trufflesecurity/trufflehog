@@ -2,7 +2,6 @@ package viewneo
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,9 +11,19 @@ import (
 )
 
 var (
-	validPattern   = "cZZ32f1UDFCqsSP6uUlFyPLrXnGhgunvxc3jRsTO1mygukFtXxmk3sV0Q4PiGW8TstPPagjg8o3N0Jp25RKDJUOssch6rbSBVPc3R5vsRSa7y00CKKuu6T6N.2oV6hZlvOR7Jm3L6PzRLMbPRburA2FUfRlRLktcCbt2nBX1iyAfdMv8JvCjAhUJHT52PhiAT3ca7FNd5q5ZXAkn87LnuQhc5UHyuwD8gcWstOghUHZ20tcz7SjVuKyWZFgODlW2WczXqHKxaNhWYz4.839QXG7zlPYdYNhfbvQZe1zHr6bbbjIQYUs2q5whTtUWm8tCMWaOtm_DEZ_xKO5RUrajoClRedRiGK0fFAMshDSyAROOa7NXcE4WM_AuURDSif51QmcWY5HRITdd7y639Zc2Sz1kkUz-Ks_Aqe7xy0VUOlA8m4w2A7IfQ2iDtUeAlWIz1vsOihDxWeNqvTj5D5JOQcyRCiCfTfDWptrJCkKsMWMcDNRE773ypzQVn3r6VSVC63UqdT5Et5jpS5C1wFMuJDei5w7t4vPBTbodepVLtEkn4HcuyTEt0m-Rh_LIxMShlL56AeC7bVBNvvRpNMi_YT3wTozsXvAXEDS1bdOcD_MLk7-g8L1FfeBZxTnRfLR81idE4qR7ecTeNgfVvuiddb-IGrIAefADZ_Vzl49E3amY7twA7EqX04lBZiVfZsO1R0BlzsCLqQ10fsleLl-S00R01G1Fn2e2gkEkRkwOfxbA7BdTYJwz3s1m7rC2HmQLyT_-h8qE30fGzWkoq7INPSTmJ0EJOPDRY3TZi7axUSDEjZbF8TwXcD3jFDmaAYD3D4E5NSKnILnacXC-kfGZQcP4bcrPbHa4BoNN3kyt"
-	invalidPattern = "c?Z32f1UDFCqsSP6uUlFyPLrXnGhgunvxc3jRsTO1mygukFtXxmk3sV0Q4PiGW8TstPPagjg8o3N0Jp25RKDJUOssch6rbSBVPc3R5vsRSa7y00CKKuu6T6N.2oV6hZlvOR7Jm3L6PzRLMbPRburA2FUfRlRLktcCbt2nBX1iyAfdMv8JvCjAhUJHT52PhiAT3ca7FNd5q5ZXAkn87LnuQhc5UHyuwD8gcWstOghUHZ20tcz7SjVuKyWZFgODlW2WczXqHKxaNhWYz4.839QXG7zlPYdYNhfbvQZe1zHr6bbbjIQYUs2q5whTtUWm8tCMWaOtm_DEZ_xKO5RUrajoClRedRiGK0fFAMshDSyAROOa7NXcE4WM_AuURDSif51QmcWY5HRITdd7y639Zc2Sz1kkUz-Ks_Aqe7xy0VUOlA8m4w2A7IfQ2iDtUeAlWIz1vsOihDxWeNqvTj5D5JOQcyRCiCfTfDWptrJCkKsMWMcDNRE773ypzQVn3r6VSVC63UqdT5Et5jpS5C1wFMuJDei5w7t4vPBTbodepVLtEkn4HcuyTEt0m-Rh_LIxMShlL56AeC7bVBNvvRpNMi_YT3wTozsXvAXEDS1bdOcD_MLk7-g8L1FfeBZxTnRfLR81idE4qR7ecTeNgfVvuiddb-IGrIAefADZ_Vzl49E3amY7twA7EqX04lBZiVfZsO1R0BlzsCLqQ10fsleLl-S00R01G1Fn2e2gkEkRkwOfxbA7BdTYJwz3s1m7rC2HmQLyT_-h8qE30fGzWkoq7INPSTmJ0EJOPDRY3TZi7axUSDEjZbF8TwXcD3jFDmaAYD3D4E5NSKnILnacXC-kfGZQcP4bcrPbHa4BoNN3kyt"
-	keyword        = "viewneo"
+	// Realistic JWT-like viewneo bearer token: header.payload.signature
+	// Matches the detector pattern: [a-z0-9A-Z]{120,300}.[a-z0-9A-Z]{150,300}.[a-z0-9A-Z-_]{600,800}
+	validPattern = "NbrnTP3fAbnFbmOHnKYaXRvj7uff0LYTH8xIZM1JRcoreogrNwwmq6OLkTkx9NIQ0Wobtqn62tOy4CqpIqK3yn9FfcgMXAdx9G81aSQHqNgAC72qFl41sNLjVHWGaub52Z" +
+		".td26fEeVVhDIq2AnHTmt9OBGhnuKoneNo41eoPni6JDWYlgAACTP9gyv1plBArp5B1Id9Z850kEnydx9qWCA79ISjs8JHUdKF0j7elKPoh3pKMzKG5mSoyPstUeC99enq522wjZRL9OaYsP6ihgIqLSmNqE40fAr" +
+		".aXOqVJBae45I1Ljit5Y35npgX4ANj73-Z4bVv7Z3ZrYg32o0DtYobmv39rPz-I8h-l9qgBUuMGyKqTa7IUVQxeQvu2UttAzsiA8R5NtJasBLPDCnE5YkfGOv0WRombpE2eAOmSFpPaWXgBl9Hdp2DZQ_M85NUG1J5VEqpOXHOresruIioSTeAIAnA5LS2WyawW29AVIMooBbvRzkDiNbzKbPiDdynuWyW1qfbI_wPXPW8mbjiQKnSXkMVh09gbtR9zTeSOgX2Mh-YwBxGv20g9O1TBU9rZIEBUr21f4pDNyb2lnZv4Sra8fUFWSPFYfoStLEHBVvSrqhmhIWlnEU-HsgmolaIr-JSi3F3KECld8E0zeOdjKt_hWMYoHCC3_tNNV8nnQkleaCMsoTSDR7YOQ7BIP60ektVKshSS8GFfcBuqf91K8_RrcWEP6lLOFfwvQ2vSs80JDuu-zG_QIAmxWOWnJ7CSh-MpkJJf_6Dh1FTGr1-pJy6G43rYA7G0stL_FjIwJIDumSKoXcVTZyQ0-FcGL33CHDUAPjE-vSP222yuTW3ceO6_VBgO3CS5cYsxjHKYkf3Np6jDqqaZ5RkCwLOBq2myEpKK_s-QrKRVdMF5sZMwONRUQ1O5PtCLUfsVliI-H61q"
+
+	// Invalid: character at position 60 replaced with ? which is not in [a-z0-9A-Z],
+	// breaking the first segment's {120,300} alphanumeric requirement.
+	invalidPattern = "NbrnTP3fAbnFbmOHnKYaXRvj7uff0LYTH8xIZM1JRcoreogrNwwmq6OLkT?x9NIQ0Wobtqn62tOy4CqpIqK3yn9FfcgMXAdx9G81aSQHqNgAC72qFl41sNLjVHWGaub52Z" +
+		".td26fEeVVhDIq2AnHTmt9OBGhnuKoneNo41eoPni6JDWYlgAACTP9gyv1plBArp5B1Id9Z850kEnydx9qWCA79ISjs8JHUdKF0j7elKPoh3pKMzKG5mSoyPstUeC99enq522wjZRL9OaYsP6ihgIqLSmNqE40fAr" +
+		".aXOqVJBae45I1Ljit5Y35npgX4ANj73-Z4bVv7Z3ZrYg32o0DtYobmv39rPz-I8h-l9qgBUuMGyKqTa7IUVQxeQvu2UttAzsiA8R5NtJasBLPDCnE5YkfGOv0WRombpE2eAOmSFpPaWXgBl9Hdp2DZQ_M85NUG1J5VEqpOXHOresruIioSTeAIAnA5LS2WyawW29AVIMooBbvRzkDiNbzKbPiDdynuWyW1qfbI_wPXPW8mbjiQKnSXkMVh09gbtR9zTeSOgX2Mh-YwBxGv20g9O1TBU9rZIEBUr21f4pDNyb2lnZv4Sra8fUFWSPFYfoStLEHBVvSrqhmhIWlnEU-HsgmolaIr-JSi3F3KECld8E0zeOdjKt_hWMYoHCC3_tNNV8nnQkleaCMsoTSDR7YOQ7BIP60ektVKshSS8GFfcBuqf91K8_RrcWEP6lLOFfwvQ2vSs80JDuu-zG_QIAmxWOWnJ7CSh-MpkJJf_6Dh1FTGr1-pJy6G43rYA7G0stL_FjIwJIDumSKoXcVTZyQ0-FcGL33CHDUAPjE-vSP222yuTW3ceO6_VBgO3CS5cYsxjHKYkf3Np6jDqqaZ5RkCwLOBq2myEpKK_s-QrKRVdMF5sZMwONRUQ1O5PtCLUfsVliI-H61q"
+
+	keyword = "viewneo"
 )
 
 func TestViewneo_Pattern(t *testing.T) {
@@ -26,24 +35,25 @@ func TestViewneo_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword viewneo",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern - realistic bearer token in config",
+			input: `# viewneo digital signage config
+VIEWNEO_API_TOKEN="` + validPattern + `"`,
+			want: []string{validPattern},
 		},
 		{
-			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern - ignore duplicate",
+			input: `viewneo token = '` + validPattern + `' | '` + validPattern + `'`,
+			want: []string{validPattern},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
-			want:  []string{},
+			name: "valid pattern - key out of prefix range",
+			input: "viewneo keyword is not close to the real key in the data\n = '" + validPattern + "'",
+			want: []string{},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
+			name: "invalid pattern - bad character in token",
+			input: `viewneo token = '` + invalidPattern + `'`,
+			want: []string{},
 		},
 	}
 
