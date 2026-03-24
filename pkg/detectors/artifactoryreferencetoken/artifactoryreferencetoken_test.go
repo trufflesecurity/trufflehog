@@ -205,7 +205,7 @@ func TestArtifactoryReferenceToken_Pattern(t *testing.T) {
 	}
 }
 
-func TestArtifactory_Endpoint_Contains_CustomEndpoint(t *testing.T) {
+func TestArtifactoryreferencetoken_Endpoint_Contains_CustomEndpoint(t *testing.T) {
 	appURL := "example.com"
 	s := Scanner{}
 	s.UseFoundEndpoints(true)
