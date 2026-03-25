@@ -66,6 +66,12 @@ jobs:
     steps:
       - name: Restore previous release as latest
         run: |
+          LATEST_TAG=$(gh release list --json tagName,isLatest -q '.[] | select(.isLatest) | .tagName')
+          if [ "$LATEST_TAG" != "$RELEASE_TAG" ]; then
+            echo "Tag $RELEASE_TAG is not marked as latest (latest is $LATEST_TAG), skipping."
+            exit 0
+          fi
+
           PREVIOUS_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --json tagName -q '.[1].tagName')
           if [ -z "$PREVIOUS_TAG" ]; then
             echo "No previous release found, cannot restore."
@@ -76,3 +82,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
