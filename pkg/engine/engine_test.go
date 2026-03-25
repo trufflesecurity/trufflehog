@@ -1181,6 +1181,9 @@ func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.Dete
 func (customCleaner) Description() string { return "" }
 
 func (c customCleaner) CleanResults(result []detectors.Result, verficationEnabled bool) []detectors.Result {
+	if !verficationEnabled {
+		return []detectors.Result{{}}
+	}
 	return []detectors.Result{}
 }
 func (c customCleaner) ShouldCleanResultsIrrespectiveOfConfiguration() bool { return c.ignoreConfig }
@@ -1218,6 +1221,14 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
 		},
+		{
+			name:               "clean irrespective of config with verification disabled",
+			cleaningConfigured: false,
+			ignoreConfig:       true,
+			verify:             false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{{}},
+		},
 	}
 
 	for _, tt := range testCases {
@@ -1230,6 +1241,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			engine := Engine{
 				filterUnverified:     tt.cleaningConfigured,
 				retainFalsePositives: true,
+				verify:               tt.verify,
 			}
 
 			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
