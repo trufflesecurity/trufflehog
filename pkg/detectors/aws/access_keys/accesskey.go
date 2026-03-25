@@ -305,8 +305,8 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	return true, extraData, nil
 }
 
-func (s scanner) CleanResults(results []detectors.Result) []detectors.Result {
-	return aws.CleanResults(results)
+func (s scanner) CleanResults(results []detectors.Result, verificationEnabled bool) []detectors.Result {
+	return aws.CleanResults(results, verificationEnabled)
 }
 
 func (s scanner) Type() detectorspb.DetectorType {

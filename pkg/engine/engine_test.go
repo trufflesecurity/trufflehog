@@ -1180,7 +1180,7 @@ func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.Dete
 
 func (customCleaner) Description() string { return "" }
 
-func (c customCleaner) CleanResults([]detectors.Result) []detectors.Result {
+func (c customCleaner) CleanResults(result []detectors.Result, verficationEnabled bool) []detectors.Result {
 	return []detectors.Result{}
 }
 func (c customCleaner) ShouldCleanResultsIrrespectiveOfConfiguration() bool { return c.ignoreConfig }
@@ -1190,6 +1190,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 		name               string
 		cleaningConfigured bool
 		ignoreConfig       bool
+		verify             bool
 		resultsToClean     []detectors.Result
 		wantResults        []detectors.Result
 	}{
@@ -1197,6 +1198,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to clean",
 			cleaningConfigured: true,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
 		},
@@ -1204,6 +1206,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to not clean",
 			cleaningConfigured: false,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{{}},
 		},
@@ -1211,6 +1214,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "clean irrespective of config",
 			cleaningConfigured: false,
 			ignoreConfig:       true,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
 		},
