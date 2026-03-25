@@ -54,6 +54,25 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
       - name: Mark release as latest
-        run: gh release edit ${{ github.ref_name }} --latest
+        run: gh release edit "$TAG" --latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+
+  revert-latest:
+    needs: Release
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore previous release as latest
+        run: |
+          PREVIOUS_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --json tagName -q '.[1].tagName')
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous release found, cannot restore."
+            exit 0
+          fi
+          echo "Restoring $PREVIOUS_TAG as latest..."
+          gh release edit "$PREVIOUS_TAG" --latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
