@@ -62,10 +62,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for clientId := range uniqueIdMatches {
+	secretLoop:
 		for clientSecret := range uniqueSecretMatches {
 			for _, endpoint := range s.Endpoints() {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_GitLabOauth2,
+					DetectorType: s.Type(),
 					Raw:          []byte(clientSecret),
 					RawV2:        []byte(clientId + clientSecret + endpoint),
 				}
@@ -75,12 +76,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						ctx, s.getClient(), endpoint, clientId, clientSecret,
 					)
 					s1.Verified = isVerified
-					s1.SetVerificationError(verificationErr, clientSecret)
+					s1.SetVerificationError(verificationErr)
 
 					if s1.Verified {
-						// if secret is verified with one endpoint, break the loop to continue to next secret
+						// A client_id is bound to a single secret; skip remaining
+						// endpoints and secrets for this client_id.
 						results = append(results, s1)
-						break
+						break secretLoop
 					}
 				}
 
@@ -113,13 +115,15 @@ func verifyMatch(ctx context.Context, client *http.Client, endpoint string, clie
 		_ = res.Body.Close()
 	}()
 
-	// GitLab validates credentials before checking grant type.
+	// We use grant_type=client_credentials which GitLab doesn't support for OAuth apps,
+	// so even valid credentials never return 200. Instead, GitLab validates credentials
+	// before checking grant type:
 	//
-	// - If credentials are valid but grant type is unsupported, returns 400 with "invalid_scope"
-	// - If credentials are invalid, returns 401 with "invalid_client"
+	// - 400 with "invalid_scope": credentials are valid (grant type rejected after auth passed)
+	// - 401 with "invalid_client": credentials are invalid
 	//
-	// Note: Apps with `api` scope may return 422, which we treat as unverified (not verified or invalid)
-	// to avoid false positives.
+	// Any other status (e.g. 422 for apps with `api` scope) is treated as inconclusive
+	// since we cannot determine credential validity, and falls through to the default case.
 	switch res.StatusCode {
 	case http.StatusBadRequest:
 		bodyBytes, err := io.ReadAll(res.Body)
