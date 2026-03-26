@@ -30,6 +30,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/amplitudeapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypoint"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypointoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apacta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/api2cart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apideck"
@@ -47,6 +48,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactoryreferencetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artsy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanaoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
@@ -893,6 +895,7 @@ func buildDetectorList() []detectors.Detector {
 		&amplitudeapikey.Scanner{},
 		&anthropic.Scanner{},
 		&anypoint.Scanner{},
+		&anypointoauth2.Scanner{},
 		&apacta.Scanner{},
 		&api2cart.Scanner{},
 		&apideck.Scanner{},
@@ -911,6 +914,7 @@ func buildDetectorList() []detectors.Detector {
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
 		&artifactory.Scanner{},
+		&artifactoryreferencetoken.Scanner{},
 		&artsy.Scanner{},
 		&asanaoauth.Scanner{},
 		&asanapersonalaccesstoken.Scanner{},

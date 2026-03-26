@@ -777,6 +777,7 @@ type detectableChunk struct {
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
 	wgDoneFn func()
+	verify   bool
 }
 
 // verificationOverlapChunk is a decoded chunk that has multiple detectors that match it.
@@ -851,8 +852,9 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
-		sourceVerify := chunk.Verify
+		sourceVerify := chunk.SourceVerify
 
+		chunk.OriginalData = chunk.Data
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
 		for _, d := range decoded {
@@ -869,12 +871,12 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			}
 
 			for _, detector := range matchingDetectors {
-				d.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
 				wgDetect.Add(1)
 				e.detectableChunksChan <- detectableChunk{
 					chunk:    *d.Chunk,
 					detector: detector,
 					decoder:  d.DecoderType,
+					verify:   e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides),
 					wgDoneFn: wgDetect.Done,
 				}
 			}
@@ -1069,11 +1071,11 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
-			chunk.chunk.Verify = e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
 			e.detectableChunksChan <- detectableChunk{
 				chunk:    chunk.chunk,
 				detector: detector,
 				decoder:  chunk.decoder,
+				verify:   e.shouldVerifyChunk(chunk.chunk.SourceVerify, detector, e.detectorVerificationOverrides),
 				wgDoneFn: wgDetect.Done,
 			}
 		}
@@ -1136,7 +1138,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := e.verificationCache.FromData(
 			ctx,
 			data.detector.Detector,
-			data.chunk.Verify,
+			data.verify,
 			data.chunk.SecretID != 0,
 			matchBytes)
 		t.Stop()
