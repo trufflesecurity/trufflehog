@@ -134,6 +134,10 @@ TokenLoop:
 							continue
 						} else if errors.Is(verificationErr, ErrTokenExpired) {
 							continue TokenLoop
+						} else if errors.Is(verificationErr, ErrTokenRevoked) {
+							// Token was explicitly revoked; emit a clean unverified result.
+							r = createResult(token, clientId, tenantId, false, nil, nil)
+							break ClientLoop
 						} else {
 							// Received an unexpected/unhandled error type.
 							r = createResult(token, clientId, tenantId, isVerified, extraData, verificationErr)
@@ -171,6 +175,7 @@ const defaultClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c" // Microsoft Offi
 
 var (
 	ErrTokenExpired           = errors.New("token expired")
+	ErrTokenRevoked           = errors.New("token revoked")
 	ErrTenantNotFound         = errors.New("tenant not found")
 	ErrClientNotFoundInTenant = errors.New("application was not found in tenant")
 )
@@ -253,6 +258,10 @@ func verifyMatch(ctx context.Context, client *http.Client, refreshToken string, 
 			// https://login.microsoftonline.com/error?code=700082
 			// https://login.microsoftonline.com/error?code=70043
 			return false, nil, ErrTokenExpired
+		case strings.HasPrefix(d, "AADSTS50173:"):
+			// https://login.microsoftonline.com/error?code=50173
+			// Token was explicitly revoked by the user or an administrator.
+			return false, nil, ErrTokenRevoked
 		case strings.HasPrefix(d, "AADSTS700016:"):
 			// https://login.microsoftonline.com/error?code=700016
 			return false, nil, ErrClientNotFoundInTenant
