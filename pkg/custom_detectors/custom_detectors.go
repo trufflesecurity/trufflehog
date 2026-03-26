@@ -77,7 +77,7 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	return &CustomRegexWebhook{pb}, nil
 }
 
-var httpClient = common.RetryableHTTPClient()
+var httpClient = common.SaneHttpClient()
 
 func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
