@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestLangfuse_FromChunk(t *testing.T) {
@@ -28,7 +28,6 @@ func TestLangfuse_FromChunk(t *testing.T) {
 	secretKey := testSecrets.MustGetField("LANGFUSE_SECRET_KEY")
 	inactivePublicKey := testSecrets.MustGetField("LANGFUSE_INACTIVE_PUBLIC_KEY")
 	inactiveSecretKey := testSecrets.MustGetField("LANGFUSE_INACTIVE_SECRET_KEY")
-
 
 	type args struct {
 		ctx    context.Context
@@ -53,7 +52,7 @@ func TestLangfuse_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Langfuse,
+					DetectorType: detector_typepb.DetectorType_Langfuse,
 					Verified:     true,
 				},
 			},
@@ -70,7 +69,7 @@ func TestLangfuse_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Langfuse,
+					DetectorType: detector_typepb.DetectorType_Langfuse,
 					Verified:     false,
 				},
 			},
@@ -99,7 +98,7 @@ func TestLangfuse_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Langfuse,
+					DetectorType: detector_typepb.DetectorType_Langfuse,
 					Verified:     false,
 				},
 			},
@@ -116,7 +115,7 @@ func TestLangfuse_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Langfuse,
+					DetectorType: detector_typepb.DetectorType_Langfuse,
 					Verified:     false,
 				},
 			},

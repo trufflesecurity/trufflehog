@@ -2,16 +2,17 @@ package trelloapikey
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -45,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				token := strings.TrimSpace(tokenMatch[1])
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_TrelloApiKey,
+					DetectorType: detector_typepb.DetectorType_TrelloApiKey,
 					Redacted:     resMatch,
 					Raw:          []byte(resMatch),
 				}
@@ -73,8 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_TrelloApiKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_TrelloApiKey
 }
 
 func (s Scanner) Description() string {

@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSauceLabs_FromChunk(t *testing.T) {
@@ -49,12 +49,12 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SauceLabs,
+					DetectorType: detector_typepb.DetectorType_SauceLabs,
 					Verified:     true,
 					RawV2:        []byte(id + secret),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SauceLabs,
+					DetectorType: detector_typepb.DetectorType_SauceLabs,
 					Verified:     false,
 					RawV2:        []byte(secret + secret),
 				},
@@ -71,12 +71,12 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SauceLabs,
+					DetectorType: detector_typepb.DetectorType_SauceLabs,
 					Verified:     false,
 					RawV2:        []byte(id + inactiveSecret),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SauceLabs,
+					DetectorType: detector_typepb.DetectorType_SauceLabs,
 					Verified:     false,
 					RawV2:        []byte(inactiveSecret + inactiveSecret),
 				},

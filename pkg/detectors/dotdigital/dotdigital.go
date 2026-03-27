@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for email := range uniqueEmails {
 		for password := range uniquePasswords {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Dotdigital,
+				DetectorType: detector_typepb.DetectorType_Dotdigital,
 				Raw:          []byte(email),
 				RawV2:        []byte(email + password),
 			}
@@ -114,8 +114,8 @@ func verifyMatch(ctx context.Context, client *http.Client, email, pass string) (
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Dotdigital
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Dotdigital
 }
 
 func (s Scanner) Description() string {

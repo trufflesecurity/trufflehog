@@ -3,16 +3,17 @@ package onelogin
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -44,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, clientSecret := range oauthClientSecretPat.FindAllStringSubmatch(dataStr, -1) {
 
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_OneLogin,
+				DetectorType: detector_typepb.DetectorType_OneLogin,
 				Raw:          []byte(clientID[1]),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", clientID[1], clientSecret[1])),
 				Redacted:     clientID[1],
@@ -77,8 +78,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OneLogin
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OneLogin
 }
 
 func (s Scanner) Description() string {

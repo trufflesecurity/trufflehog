@@ -6,13 +6,14 @@ package azure_openai
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"testing"
-	"time"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAzureOpenAI_FromChunk(t *testing.T) {
@@ -48,7 +49,7 @@ func TestAzureOpenAI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureOpenAI,
+					DetectorType: detector_typepb.DetectorType_AzureOpenAI,
 					Verified:     true,
 				},
 			},
@@ -65,7 +66,7 @@ func TestAzureOpenAI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureOpenAI,
+					DetectorType: detector_typepb.DetectorType_AzureOpenAI,
 					Verified:     false,
 				},
 			},
@@ -94,7 +95,7 @@ func TestAzureOpenAI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureOpenAI,
+					DetectorType: detector_typepb.DetectorType_AzureOpenAI,
 					Verified:     false,
 				},
 			},
@@ -111,7 +112,7 @@ func TestAzureOpenAI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureOpenAI,
+					DetectorType: detector_typepb.DetectorType_AzureOpenAI,
 					Verified:     false,
 				},
 			},

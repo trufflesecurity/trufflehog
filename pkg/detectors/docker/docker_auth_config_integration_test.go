@@ -3,6 +3,18 @@
 
 package docker
 
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+)
+
 func TestDocker_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -36,7 +48,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     true,
 				},
 			},
@@ -53,7 +65,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     false,
 				},
 			},
@@ -82,7 +94,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     false,
 				},
 			},
@@ -99,7 +111,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     false,
 				},
 			},
