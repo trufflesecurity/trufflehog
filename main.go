@@ -277,7 +277,7 @@ var (
 	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
 
 	webScan  = cli.Command("web", "Scan websites for leaked credentials")
-	webUrls  = webScan.Flag("urls", "One or more URLs to scan (required). Supports http:// and https://.").Required().Strings()
+	webUrls  = webScan.Flag("url", "One or more URLs to scan (required). You can repeat this flag. Supports http:// and https://.").Required().Strings()
 	webCrawl = webScan.Flag("crawl", "Enable crawling: follow links discovered on the initial page(s).").Default("false").Bool()
 	webDepth = webScan.Flag("depth", "Maximum link depth to follow when crawling. 0 = only the seed URL(s); 1 = seed + direct links; etc.").Default("1").Int()
 	webDelay = webScan.Flag("delay", "Delay (in seconds) between requests to the same domain. Helps respect server load.").Default("1").Int()
