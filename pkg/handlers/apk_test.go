@@ -20,7 +20,7 @@ func TestAPKHandler(t *testing.T) {
 		matchString     string
 	}{
 		"apk_with_3_leaked_keys": {
-			archiveURL:     "https://github.com/joeleonjr/leakyAPK/raw/refs/heads/main/aws_leak.apk",
+			archiveURL:     "https://raw.githubusercontent.com/MuneebUllahKhan222/asset-hosting/refs/heads/main/aws_leak.apk",
 			expectedChunks: 942,
 			// Note: the secret count is 4 instead of 3 b/c we're not actually running the secret detection engine,
 			// we're just looking for a string match. There is one extra string match in the APK (but only 3 detected secrets).
