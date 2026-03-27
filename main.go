@@ -276,6 +276,12 @@ var (
 	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
 	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
 
+	webScan  = cli.Command("web", "Scan websites for leaked credentials")
+	webUrls  = webScan.Flag("urls", "One or more URLs to scan (required). Supports http:// and https://.").Required().Strings()
+	webCrawl = webScan.Flag("crawl", "Enable crawling: follow links discovered on the initial page(s).").Default("false").Bool()
+	webDepth = webScan.Flag("depth", "Maximum link depth to follow when crawling. 0 = only the seed URL(s); 1 = seed + direct links; etc.").Default("1").Int()
+	webDelay = webScan.Flag("delay", "Delay (in seconds) between requests to the same domain. Helps respect server load.").Default("1").Int()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
@@ -1153,6 +1159,23 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
 		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
+	case webScan.FullCommand():
+		if len(*webUrls) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one url")
+		}
+
+		cfg := sources.WebConfig{
+			URLs:  *webUrls,
+			Crawl: *webCrawl,
+			Depth: *webDepth,
+			Delay: *webDelay,
+		}
+
+		if ref, err := eng.ScanWeb(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan web: %v", err)
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
