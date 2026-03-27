@@ -13,6 +13,7 @@ import (
 )
 
 func TestAPKHandler(t *testing.T) {
+	t.Skip("[INS-421] - Skipping this test because the apk file being used in this test is unavailable")
 	tests := map[string]struct {
 		archiveURL      string
 		expectedChunks  int
