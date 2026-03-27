@@ -55,6 +55,7 @@ enum SourceType {
   SOURCE_TYPE_STDIN = 40;
   SOURCE_TYPE_SLACK_CONTINUOUS = 41;
   SOURCE_TYPE_JSON_ENUMERATOR = 42;
+  SOURCE_TYPE_WEB = 43;
 }
 
 message LocalSource {
@@ -553,4 +554,11 @@ message SlackContinuous {
 
 message JSONEnumerator {
   repeated string paths = 1;
+}
+
+message Web {
+  repeated string urls = 1;
+  bool crawl = 2;
+  int64 depth = 3;
+  int64 delay = 4;
 }
