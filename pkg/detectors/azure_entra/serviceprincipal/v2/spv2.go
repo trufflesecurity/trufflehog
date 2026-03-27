@@ -74,7 +74,6 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 	logCtx := logContext.AddLogger(ctx)
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 
-SecretLoop:
 	for clientSecret := range clientSecrets {
 		var (
 			r        *detectors.Result
@@ -116,7 +115,8 @@ SecretLoop:
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretInvalid):
 							continue ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretExpired):
-							continue SecretLoop
+							r = createResult(tenantId, clientId, clientSecret, false, nil, verificationErr)
+							break ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrTenantNotFound):
 							// Tenant doesn't exist. This shouldn't happen with the check above.
 							delete(tenantIds, tenantId)
