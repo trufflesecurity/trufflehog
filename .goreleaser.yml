@@ -1,5 +1,10 @@
 version: 2
 release:
+  # GoReleaser creates the GitHub release before artifacts finish uploading.
+  # scripts/install.sh queries /releases/latest to find the current version, so
+  # a premature "latest" flag causes install failures during the upload window.
+  # The release workflow's mark-latest job promotes the release only after
+  # GoReleaser completes successfully.
   make_latest: false
 builds:
   - id: trufflehog-upx
