@@ -3,8 +3,10 @@ package v2
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -74,8 +76,13 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 	logCtx := logContext.AddLogger(ctx)
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 
+	// Clone maps so verification-driven deletions don't mutate the caller's
+	// data or produce non-deterministic results across scanner runs.
+	activeClients := maps.Clone(clientIds)
+	activeTenants := maps.Clone(tenantIds)
+
 SecretLoop:
-	for clientSecret := range clientSecrets {
+	for _, clientSecret := range slices.Sorted(maps.Keys(clientSecrets)) {
 		var (
 			r        *detectors.Result
 			clientId string
@@ -83,12 +90,17 @@ SecretLoop:
 		)
 
 	ClientLoop:
-		for cId := range clientIds {
+		for _, cId := range slices.Sorted(maps.Keys(activeClients)) {
+			if _, ok := activeClients[cId]; !ok {
+				continue
+			}
 			clientId = cId
-			for tId := range tenantIds {
+			for _, tId := range slices.Sorted(maps.Keys(activeTenants)) {
+				if _, ok := activeTenants[tId]; !ok {
+					continue
+				}
 				tenantId = tId
 
-				// Skip known invalid tenants.
 				invalidClients := invalidClientsForTenant[tenantId]
 				if invalidClients == nil {
 					invalidClients = map[string]struct{}{}
@@ -100,15 +112,12 @@ SecretLoop:
 
 				if verify {
 					if !azure_entra.TenantExists(logCtx, client, tenantId) {
-						// Tenant doesn't exist
-						delete(tenantIds, tenantId)
+						delete(activeTenants, tenantId)
 						continue
 					}
-					// Tenant exists, ensure this isn't attempted as a clientId.
-					delete(clientIds, tenantId)
+					delete(activeClients, tenantId)
 
 					isVerified, extraData, verificationErr := serviceprincipal.VerifyCredentials(ctx, client, tenantId, clientId, clientSecret)
-					// Handle errors.
 					if verificationErr != nil {
 						switch {
 						case errors.Is(verificationErr, serviceprincipal.ErrConditionalAccessPolicy):
@@ -118,18 +127,15 @@ SecretLoop:
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretExpired):
 							continue SecretLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrTenantNotFound):
-							// Tenant doesn't exist. This shouldn't happen with the check above.
-							delete(tenantIds, tenantId)
+							delete(activeTenants, tenantId)
 							continue
 						case errors.Is(verificationErr, serviceprincipal.ErrClientNotFoundInTenant):
-							// Tenant is valid but the ClientID doesn't exist.
 							invalidClients[clientId] = struct{}{}
 							continue
 						}
 					}
 
-					// The result is verified or there's only one associated client and tenant.
-					if isVerified || (len(clientIds) == 1 && len(tenantIds) == 1) {
+					if isVerified || (len(activeClients) == 1 && len(activeTenants) == 1) {
 						r = createResult(tenantId, clientId, clientSecret, isVerified, extraData, verificationErr)
 						break ClientLoop
 					}
@@ -138,11 +144,10 @@ SecretLoop:
 		}
 
 		if r == nil {
-			// Only include the clientId and tenantId if we're confident which one it is.
-			if len(clientIds) != 1 {
+			if len(activeClients) != 1 {
 				clientId = ""
 			}
-			if len(tenantIds) != 1 {
+			if len(activeTenants) != 1 {
 				tenantId = ""
 			}
 			r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
