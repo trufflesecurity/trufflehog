@@ -6,13 +6,14 @@ package deepseek
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"testing"
-	"time"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDeepseek_FromChunk(t *testing.T) {
@@ -49,7 +50,7 @@ func TestDeepseek_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DeepSeek,
+					DetectorType: detector_typepb.DetectorType_DeepSeek,
 					Verified:     true,
 				},
 			},
@@ -66,7 +67,7 @@ func TestDeepseek_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DeepSeek,
+					DetectorType: detector_typepb.DetectorType_DeepSeek,
 					Verified:     false,
 				},
 			},
@@ -95,7 +96,7 @@ func TestDeepseek_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DeepSeek,
+					DetectorType: detector_typepb.DetectorType_DeepSeek,
 					Verified:     false,
 				},
 			},

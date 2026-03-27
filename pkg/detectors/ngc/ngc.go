@@ -3,16 +3,17 @@ package ngc
 import (
 	"context"
 	"encoding/base64"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -46,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		containsKey := keyPat2.MatchString(string(decode))
 		if containsKey {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_NGC,
+				DetectorType: detector_typepb.DetectorType_NGC,
 				Raw:          []byte(resMatch),
 			}
 
@@ -76,8 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_NGC
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_NGC
 }
 
 func (s Scanner) Description() string {

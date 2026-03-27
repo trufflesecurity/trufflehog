@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -31,7 +32,7 @@ type Detector interface {
 	Keywords() []string
 
 	// Type returns the DetectorType number from detectors.proto for the given detector.
-	Type() detectorspb.DetectorType
+	Type() detector_typepb.DetectorType
 
 	// Description returns a description for the result being detected
 	Description() string
@@ -95,7 +96,7 @@ type CloudProvider interface {
 
 type Result struct {
 	// DetectorType is the type of Detector.
-	DetectorType detectorspb.DetectorType
+	DetectorType detector_typepb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
 	// Verified indicates whether the result was verified or not.

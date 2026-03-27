@@ -858,7 +858,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func buildDetectorList() []detectors.Detector {
@@ -1773,8 +1773,8 @@ func DefaultDetectors() []detectors.Detector {
 	return detectorList
 }
 
-func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {
-	out := make(map[detectorspb.DetectorType]struct{})
+func DefaultDetectorTypesImplementing[T any]() map[detector_typepb.DetectorType]struct{} {
+	out := make(map[detector_typepb.DetectorType]struct{})
 	for _, detector := range DefaultDetectors() {
 		if _, ok := detector.(T); ok {
 			out[detector.Type()] = struct{}{}

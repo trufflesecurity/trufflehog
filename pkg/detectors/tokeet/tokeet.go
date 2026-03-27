@@ -3,16 +3,17 @@ package tokeet
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -47,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resIdMatch := strings.TrimSpace(idmatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Tokeet,
+				DetectorType: detector_typepb.DetectorType_Tokeet,
 				Raw:          []byte(resMatch),
 			}
 			if verify {
@@ -74,8 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Tokeet
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Tokeet
 }
 
 func (s Scanner) Description() string {

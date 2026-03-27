@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestBoxOauth_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BoxOauth,
+					DetectorType: detector_typepb.DetectorType_BoxOauth,
 					Verified:     true,
 					Raw:          []byte(id),
 					RawV2:        []byte(id + secret),
@@ -68,7 +68,7 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BoxOauth,
+					DetectorType: detector_typepb.DetectorType_BoxOauth,
 					Verified:     false,
 					Raw:          []byte(id),
 					RawV2:        []byte(id + invalidSecret),

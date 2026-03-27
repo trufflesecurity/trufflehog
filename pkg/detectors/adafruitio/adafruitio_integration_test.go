@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAdafruitIO_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestAdafruitIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AdafruitIO,
+					DetectorType: detector_typepb.DetectorType_AdafruitIO,
 					Verified:     true,
 				},
 			},
@@ -65,7 +65,7 @@ func TestAdafruitIO_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_AdafruitIO,
+					DetectorType: detector_typepb.DetectorType_AdafruitIO,
 					Verified:     false,
 				}
 				r.SetVerificationError(context.DeadlineExceeded)
@@ -83,7 +83,7 @@ func TestAdafruitIO_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_AdafruitIO,
+					DetectorType: detector_typepb.DetectorType_AdafruitIO,
 					Verified:     false,
 				}
 				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 500"))
@@ -101,7 +101,7 @@ func TestAdafruitIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AdafruitIO,
+					DetectorType: detector_typepb.DetectorType_AdafruitIO,
 					Verified:     false,
 				},
 			},
