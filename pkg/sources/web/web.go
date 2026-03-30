@@ -101,7 +101,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	jobIDStr := fmt.Sprint(s.jobId)
 
 	// Create a background context for crawling (independent of incoming ctx).
-	crawlCtx, cancel := context.WithTimeout(context.Background(), time.Duration(s.conn.GetTimeout())*time.Second)
+	crawlCtx, cancel := context.WithTimeout(ctx, time.Duration(s.conn.GetTimeout())*time.Second)
 	defer cancel()
 
 	eg, _ := errgroup.WithContext(crawlCtx)
@@ -139,7 +139,6 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	// docs: http://go-colly.org/docs/introduction/configuration/
 	collector := colly.NewCollector(
 		colly.UserAgent(s.conn.GetUserAgent()),
-		colly.AllowedDomains(parsedURL.Hostname(), fmt.Sprintf("*.%s", parsedURL.Hostname())), // with subdomains
 		colly.Async(true),
 	)
 
@@ -159,6 +158,15 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	}); err != nil {
 		return fmt.Errorf("failed to limit rules to the colly collector: %w", err)
 	}
+
+	// request validations
+	collector.OnRequest(func(r *colly.Request) {
+		host := r.URL.Hostname()
+		if host != parsedURL.Hostname() && !strings.HasSuffix(host, parsedURL.Hostname()) {
+			ctx.Logger().V(5).Info("blocked by domain filter", "url", r.URL.String())
+			r.Abort()
+		}
+	})
 
 	// Set up callbacks
 	collector.OnResponse(func(r *colly.Response) {
