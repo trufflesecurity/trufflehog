@@ -1373,12 +1373,22 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	assert.NoError(t, err)
 
 	var count int
+	noCloudEndpointDetectors := map[detectorspb.DetectorType]struct{}{
+		detectorspb.DetectorType_ArtifactoryAccessToken:     {},
+		detectorspb.DetectorType_ArtifactoryReferenceToken:  {},
+		detectorspb.DetectorType_TableauPersonalAccessToken: {},
+		// these do not have any cloud endpoint
+	}
+
 	for _, det := range e.detectors {
 		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
 			id := config.GetDetectorID(det)
-			if len(endpoints.Endpoints()) == 0 && det.Type() != detectorspb.DetectorType_ArtifactoryAccessToken && det.Type() != detectorspb.DetectorType_TableauPersonalAccessToken { // artifactory and tableau does not have any cloud endpoint
-				t.Fatalf("detector %q Endpoints() is empty", id.String())
+			if len(endpoints.Endpoints()) == 0 {
+				if _, ok := noCloudEndpointDetectors[det.Type()]; !ok {
+					t.Fatalf("detector %q Endpoints() is empty", id.String())
+				}
 			}
+
 			count++
 		}
 	}
@@ -1732,10 +1742,22 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 func TestEngine_IterativeDecoding(t *testing.T) {
 	t.Parallel()
 
-	// base64(base64("my-secret-key-test-value"))
 	const (
+		// base64(base64("my-secret-key-test-value"))
 		doubleEncoded   = "YlhrdGMyVmpjbVYwTFd0bGVTMTBaWE4wTFhaaGJIVmw="
 		detectorKeyword = "my-secret"
+
+		// escapedUnicode("my-secret-key-test-value")
+		escapedUnicode = `\u006d\u0079\u002d\u0073\u0065\u0063\u0072\u0065\u0074\u002d\u006b\u0065\u0079\u002d\u0074\u0065\u0073\u0074\u002d\u0076\u0061\u006c\u0075\u0065`
+
+		// escapedUnicode(escapedUnicode("my-secret-key-test-value"))
+		doubleEscapedUnicode = `\u005c\u0075\u0030\u0030\u0036\u0064\u005c\u0075\u0030\u0030\u0037\u0039\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0033\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0036\u0033\u005c\u0075\u0030\u0030\u0037\u0032\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0036\u0062\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0039\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0033\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0036\u005c\u0075\u0030\u0030\u0036\u0031\u005c\u0075\u0030\u0030\u0036\u0063\u005c\u0075\u0030\u0030\u0037\u0035\u005c\u0075\u0030\u0030\u0036\u0035`
+
+		// base64(escapedUnicode("my-secret-key-test-value"))
+		b64EscapedUnicode = "XHUwMDZkXHUwMDc5XHUwMDJkXHUwMDczXHUwMDY1XHUwMDYzXHUwMDcyXHUwMDY1XHUwMDc0XHUwMDJkXHUwMDZiXHUwMDY1XHUwMDc5XHUwMDJkXHUwMDc0XHUwMDY1XHUwMDczXHUwMDc0XHUwMDJkXHUwMDc2XHUwMDYxXHUwMDZjXHUwMDc1XHUwMDY1"
+
+		// escapedUnicode(base64("my-secret-key-test-value"))
+		escapedUnicodeB64 = `\u0062\u0058\u006b\u0074\u0063\u0032\u0056\u006a\u0063\u006d\u0056\u0030\u004c\u0057\u0074\u006c\u0065\u0053\u0031\u0030\u005a\u0058\u004e\u0030\u004c\u0058\u005a\u0068\u0062\u0048\u0056\u006c`
 	)
 
 	// "token: bXktc2VjcmV0LWtleS10ZXN0LXZhbHVl end" as UTF-16LE
@@ -1775,6 +1797,48 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 		{
 			name:        "utf16+base64, depth=2, found",
 			input:       utf16ContainingBase64,
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "escaped unicode, depth=1, found",
+			input:       []byte("token: " + escapedUnicode),
+			depth:       1,
+			wantKeyword: true,
+		},
+		{
+			name:        "double escaped unicode, depth=1, miss",
+			input:       []byte("token: " + doubleEscapedUnicode),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "double escaped unicode, depth=2, found",
+			input:       []byte("token: " + doubleEscapedUnicode),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "base64+escaped unicode, depth=1, miss",
+			input:       []byte("token: " + b64EscapedUnicode),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "base64+escaped unicode, depth=2, found",
+			input:       []byte("token: " + b64EscapedUnicode),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "escaped unicode+base64, depth=1, miss",
+			input:       []byte("token: " + escapedUnicodeB64),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "escaped unicode+base64, depth=2, found",
+			input:       []byte("token: " + escapedUnicodeB64),
 			depth:       2,
 			wantKeyword: true,
 		},
