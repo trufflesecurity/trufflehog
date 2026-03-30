@@ -162,7 +162,7 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	// request validations
 	collector.OnRequest(func(r *colly.Request) {
 		host := r.URL.Hostname()
-		if host != parsedURL.Hostname() && !strings.HasSuffix(host, parsedURL.Hostname()) {
+		if host != parsedURL.Hostname() && !strings.HasSuffix(host, "."+parsedURL.Hostname()) {
 			ctx.Logger().V(5).Info("blocked by domain filter", "url", r.URL.String())
 			r.Abort()
 		}
