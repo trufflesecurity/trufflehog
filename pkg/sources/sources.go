@@ -500,9 +500,8 @@ type WebConfig struct {
 	// domain. Increase this to reduce load on the target server.
 	Delay int
 
-	// Timeout is the maximum number of seconds to spend crawling a single
-	// seed URL before aborting. Applied independently per URL.
-	// Defaults to 30 seconds if unset or zero.
+	// Timeout is the maximum number of seconds to spend crawling
+	// seeded URLs before aborting. Defaults to 30 seconds if unset or zero.
 	Timeout int
 
 	// UserAgent is the User-Agent header sent with each request.
