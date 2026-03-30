@@ -7266,6 +7266,8 @@ func (m *Web) validate(all bool) error {
 
 	// no validation rules for Delay
 
+	// no validation rules for Timeout
+
 	// no validation rules for UserAgent
 
 	// no validation rules for IgnoreRobots

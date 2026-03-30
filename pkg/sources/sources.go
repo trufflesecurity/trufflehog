@@ -484,19 +484,33 @@ type JSONEnumeratorConfig struct {
 
 // WebConfig defines the configuration for the web source.
 type WebConfig struct {
-	// URL is the list of starting points for scanning.
+	// URLs are the seed URLs to scan. At least one is required.
+	// Each URL is crawled independently with its own collector.
 	URLs []string
 
-	// Crawl determines whether to follow links from the starting page.
+	// Crawl controls whether links discovered on each page are followed.
+	// When false, only the seed URLs themselves are scanned.
 	Crawl bool
 
-	// Depth controls how many link hops to follow when Crawl is true.
-	// 0 = only the starting URL, 1 = starting URL and direct links, etc.
+	// Depth is the maximum number of link hops to follow when Crawl is true.
+	// 1 = seed + direct links; 2 = one level deeper; 0 = unlimited.
 	Depth int
 
-	// Delay is the delay (in seconds) between requests to the same domain.
-	Delay        int
-	UserAgent    string
+	// Delay is the number of seconds to wait between requests to the same
+	// domain. Increase this to reduce load on the target server.
+	Delay int
+
+	// Timeout is the maximum number of seconds to spend crawling a single
+	// seed URL before aborting. Applied independently per URL.
+	// Defaults to 30 seconds if unset or zero.
+	Timeout int
+
+	// UserAgent is the User-Agent header sent with each request.
+	// Defaults to a TruffleHog identifier if empty.
+	UserAgent string
+
+	// IgnoreRobots disables robots.txt enforcement when true.
+	// Only enable this if you have explicit permission to crawl the target site.
 	IgnoreRobots bool
 }
 
