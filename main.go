@@ -1169,11 +1169,6 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one url")
 		}
 
-		if *webUserAgent == "" {
-			ctx.Logger().Info("No user agent set; using default", "user-agent", "trufflehog-web (+https://github.com/trufflesecurity/trufflehog)")
-			*webUserAgent = "trufflehog-web (+https://github.com/trufflesecurity/trufflehog)"
-		}
-
 		cfg := sources.WebConfig{
 			URLs:         *webUrls,
 			Crawl:        *webCrawl,
