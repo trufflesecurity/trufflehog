@@ -53,12 +53,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.concurrency = concurrency
 	// If s.concurrency is 0, use 1
+	// TODO: make it configurable
 	if s.concurrency == 0 {
 		s.concurrency = 1
 	}
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
+	}
+
+	// Use the user-provided User-Agent if set; otherwise fall back to a default that identifies TruffleHog.
+	if s.conn.GetUserAgent() == "" {
+		s.conn.UserAgent = "trufflehog-web (+https://github.com/trufflesecurity/trufflehog)"
 	}
 
 	// validations
@@ -112,7 +118,7 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	}
 
 	collector := colly.NewCollector(
-		colly.UserAgent("trufflehog-web (+https://github.com/trufflesecurity/trufflehog)"),
+		colly.UserAgent(s.conn.GetUserAgent()),
 		colly.AllowedDomains(url.Hostname(), fmt.Sprintf("*.%s", url.Hostname())), // with subdomains
 		colly.Async(true),
 	)
