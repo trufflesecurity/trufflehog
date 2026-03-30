@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"golang.org/x/net/html"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -68,6 +68,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		s.conn.UserAgent = "trufflehog-web (+https://github.com/trufflesecurity/trufflehog)"
 	}
 
+	// The 30-second timeout is a safety net
+	if s.conn.GetTimeout() <= 0 {
+		s.conn.Timeout = 30
+	}
+
 	if s.conn.GetIgnoreRobots() {
 		ctx.Logger().Info("Warning: Robots.txt is ignored. Only use this if you have permission to crawl the target site.")
 	}
@@ -75,10 +80,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	// validations
 	if len(s.conn.GetUrls()) == 0 {
 		return errors.New("no URL provided")
-	}
-	// TODO: Enable support for more than one URLs
-	if len(s.conn.GetUrls()) > 1 {
-		return errors.New("only one base URL is allowed right now")
 	}
 
 	// Validate URLs format
@@ -97,26 +98,28 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 // Chunks emits data over a channel that is decoded and scanned for secrets.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	var wg sync.WaitGroup
 	jobIDStr := fmt.Sprint(s.jobId)
 
-	// Create a background context for crawling (independent of incoming ctx)
-	crawlCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Create a background context for crawling (independent of incoming ctx).
+	crawlCtx, cancel := context.WithTimeout(context.Background(), time.Duration(s.conn.GetTimeout())*time.Second)
 	defer cancel()
 
-	for _, url := range s.conn.GetUrls() {
-		ctx.Logger().V(5).Info("Processing Url", "url", url)
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			s.crawlURL(crawlCtx, url, chunksChan)
-		}(url)
+	eg, _ := errgroup.WithContext(crawlCtx)
 
+	for _, u := range s.conn.GetUrls() {
+		u := u // capture
+		ctx.Logger().V(5).Info("Processing Url", "url", u)
 		webUrlsScanned.WithLabelValues(s.name, jobIDStr).Inc()
+		eg.Go(func() error {
+			return s.crawlURL(crawlCtx, u, chunksChan)
+		})
 	}
 
-	// Block until all crawls complete
-	wg.Wait()
+	if err := eg.Wait(); err != nil {
+		ctx.Logger().Error(err, "One or more crawls failed")
+		return err
+	}
+
 	ctx.Logger().Info("All crawls completed")
 	return nil
 }
@@ -129,19 +132,25 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 		"ignore_robots", s.conn.GetIgnoreRobots(),
 	)
 
-	url, err := url.Parse(seedURL)
+	parsedURL, err := url.Parse(seedURL)
 	if err != nil {
 		return fmt.Errorf("invalid URL %q: %w", seedURL, err)
 	}
 
+	// docs: http://go-colly.org/docs/introduction/configuration/
 	collector := colly.NewCollector(
 		colly.UserAgent(s.conn.GetUserAgent()),
-		colly.AllowedDomains(url.Hostname(), fmt.Sprintf("*.%s", url.Hostname())), // with subdomains
+		colly.AllowedDomains(parsedURL.Hostname(), fmt.Sprintf("*.%s", parsedURL.Hostname())), // with subdomains
 		colly.Async(true),
 	)
 
+	// Apply depth limit only when crawling is enabled and a positive depth is set.
+	if s.conn.GetCrawl() && s.conn.GetDepth() > 0 {
+		collector.MaxDepth = int(s.conn.GetDepth())
+	}
+
 	// By default, the crawler respects robots.txt rules. Setting IgnoreRobotsTxt to true overrides this behavior.
-	// Users can enable this only when they have explicit permission to crawl the site.
+	// Users can enable this only when they have explicit permission to crawl the target site.
 	collector.IgnoreRobotsTxt = s.conn.GetIgnoreRobots()
 
 	collector.Limit(&colly.LimitRule{
@@ -152,7 +161,7 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 
 	// Set up callbacks
 	collector.OnResponse(func(r *colly.Response) {
-		ctx.Logger().Info("Response recieved")
+		ctx.Logger().Info("Response received")
 		if err := s.processChunk(ctx, r, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error processing page")
 		}
@@ -160,6 +169,36 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	collector.OnError(func(r *colly.Response, err error) {
 		ctx.Logger().Error(err, "error fetching page", "url", r.Request.URL)
 	})
+
+	// Follow links only when crawling is explicitly enabled.
+	if s.conn.GetCrawl() {
+		collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if link == "" {
+				return
+			}
+
+			if err := e.Request.Visit(link); err != nil {
+				if _, ok := err.(*colly.AlreadyVisitedError); !ok {
+					ctx.Logger().V(5).Info("Skipping link", "url", link, "reason", err)
+				}
+			}
+		})
+
+		// Also enqueue linked JavaScript files - a common location for hardcoded secrets.
+		collector.OnHTML("script[src]", func(e *colly.HTMLElement) {
+			src := e.Request.AbsoluteURL(e.Attr("src"))
+			if src == "" {
+				return
+			}
+
+			if err := e.Request.Visit(src); err != nil {
+				if _, ok := err.(*colly.AlreadyVisitedError); !ok {
+					ctx.Logger().V(5).Info("Skipping script", "url", src, "reason", err)
+				}
+			}
+		})
+	}
 
 	// Create a channel to signal when the crawl is done.
 	done := make(chan struct{})
