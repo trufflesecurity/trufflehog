@@ -100,7 +100,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	jobIDStr := fmt.Sprint(s.jobId)
 
-	// Create a background context for crawling (independent of incoming ctx).
+	// Create a new context with timeout.
 	crawlCtx, cancel := context.WithTimeout(ctx, time.Duration(s.conn.GetTimeout())*time.Second)
 	defer cancel()
 
