@@ -45,7 +45,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	logger := logContext.AddLogger(ctx).Logger().WithName("mongodb")
 	dataStr := string(data)
 
-	uniqueMatches := make(map[string]string)
+	type mongoMatch struct {
+		password string
+		parsedURL *url.URL
+	}
+	uniqueMatches := make(map[string]mongoMatch)
 	for _, match := range connStrPat.FindAllStringSubmatch(dataStr, -1) {
 		// Filter out common placeholder passwords.
 		password := match[3]
@@ -78,16 +82,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		connUrl.RawQuery = params.Encode()
 		connStr = connUrl.String()
 
-		uniqueMatches[connStr] = password
+		uniqueMatches[connStr] = mongoMatch{password: password, parsedURL: connUrl}
 	}
 
-	for connStr, password := range uniqueMatches {
+	for connStr, m := range uniqueMatches {
+		extraData := map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+		}
+		if m.parsedURL.Host != "" {
+			extraData["host"] = m.parsedURL.Host
+		}
+		if m.parsedURL.User != nil && m.parsedURL.User.Username() != "" {
+			extraData["username"] = m.parsedURL.User.Username()
+		}
+		if db := strings.TrimPrefix(m.parsedURL.Path, "/"); db != "" {
+			extraData["database"] = db
+		}
+
 		r := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MongoDB,
 			Raw:          []byte(connStr),
-			ExtraData: map[string]string{
-				"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
-			},
+			ExtraData:    extraData,
 		}
 
 		if verify {
@@ -101,7 +116,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if isErrDeterminate(vErr) {
 				continue
 			}
-			r.SetVerificationError(vErr, password)
+			r.SetVerificationError(vErr, m.password)
 
 			if isVerified {
 				r.AnalysisInfo = map[string]string{
