@@ -252,18 +252,36 @@ func (s *Source) processChunk(ctx context.Context, data *colly.Response, chunksC
 	return common.CancellableWrite(ctx, chunksChan, chunk)
 }
 
+// extractPageTitle parses an HTML document and returns the text content of the
+// first <title> element, with leading and trailing whitespace trimmed.
+// Returns an empty string if the body is empty, cannot be parsed, or contains
+// no <title> element.
 func extractPageTitle(body []byte) string {
 	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
 		return ""
 	}
+
 	var title string
+
+	// f is a recursive depth-first walker over the HTML node tree.
+	// It is declared as a variable first so that the closure can reference
+	// itself when recursing into child nodes.
 	var f func(*html.Node)
 	f = func(n *html.Node) {
+		if title != "" {
+			return // already found, skip the rest of the tree
+		}
+		// We are only interested in element nodes (e.g. <title>, <div>).
+		// Text, comment, and doctype nodes are skipped by this check.
 		if n.Type == html.ElementNode && n.Data == "title" && n.FirstChild != nil {
+			// <title> content is always a single text node directly inside
+			// the element. n.FirstChild.Data holds the raw string value.
 			title = strings.TrimSpace(n.FirstChild.Data)
 			return
 		}
+
+		// Recurse into child nodes to continue the depth-first traversal.
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			f(c)
 		}

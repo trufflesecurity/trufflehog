@@ -493,7 +493,7 @@ type WebConfig struct {
 	Crawl bool
 
 	// Depth is the maximum number of link hops to follow when Crawl is true.
-	// 1 = seed + direct links; 2 = one level deeper; 0 = unlimited.
+	// 1 = seed; 2 = one level deeper; 0 = unlimited.
 	Depth int
 
 	// Delay is the number of seconds to wait between requests to the same
