@@ -562,4 +562,5 @@ message Web {
   int64 depth = 3;
   int64 delay = 4;
   string user_agent = 5;
+  bool ignore_robots = 6;
 }

@@ -495,8 +495,9 @@ type WebConfig struct {
 	Depth int
 
 	// Delay is the delay (in seconds) between requests to the same domain.
-	Delay     int
-	UserAgent string
+	Delay        int
+	UserAgent    string
+	IgnoreRobots bool
 }
 
 // Progress is used to update job completion progress across sources.

@@ -67,6 +67,10 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		s.conn.UserAgent = "trufflehog-web (+https://github.com/trufflesecurity/trufflehog)"
 	}
 
+	if s.conn.GetIgnoreRobots() {
+		ctx.Logger().Info("Warning: Robots.txt is ignored. Only use this if you have permission to crawl the target site.")
+	}
+
 	// validations
 	if len(s.conn.GetUrls()) == 0 {
 		return errors.New("no URL provided")
@@ -112,6 +116,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *sources.Chunk) error {
+	// Add static crawl configuration to the context so that all subsequent logs include these fields.
+	ctx = context.WithValues(ctx,
+		"url", seedURL,
+		"user_agent", s.conn.GetUserAgent(),
+		"ignore_robots", s.conn.GetIgnoreRobots(),
+	)
+
 	url, err := url.Parse(seedURL)
 	if err != nil {
 		return fmt.Errorf("invalid URL %q: %w", seedURL, err)
@@ -123,9 +134,9 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 		colly.Async(true),
 	)
 
-	// Respect robots.txt
-	// TODO: maybe allow users to set this as well with warning
-	collector.IgnoreRobotsTxt = false
+	// By default, the crawler respects robots.txt rules. Setting IgnoreRobotsTxt to true overrides this behavior.
+	// Users can enable this only when they have explicit permission to crawl the site.
+	collector.IgnoreRobotsTxt = s.conn.GetIgnoreRobots()
 
 	collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
@@ -135,7 +146,7 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 
 	// Set up callbacks
 	collector.OnResponse(func(r *colly.Response) {
-		ctx.Logger().Info("OnResponse fired", "url", r.Request.URL)
+		ctx.Logger().Info("Response recieved")
 		if err := s.processChunk(ctx, r, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error processing page")
 		}
@@ -147,7 +158,7 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	// Create a channel to signal when the crawl is done.
 	done := make(chan struct{})
 	go func() {
-		ctx.Logger().Info("starting crawl")
+		ctx.Logger().Info("Starting crawl")
 		if err := collector.Visit(seedURL); err != nil {
 			ctx.Logger().Error(err, "Visit failed")
 		}
@@ -158,10 +169,10 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	// Wait for either crawl to finish or context cancellation.
 	select {
 	case <-done:
-		ctx.Logger().Info("crawl finished normally")
+		ctx.Logger().Info("Crawl finished normally")
 		return nil
 	case <-ctx.Done():
-		ctx.Logger().Info("context cancelled or timeout reached")
+		ctx.Logger().Info("Context cancelled or timeout reached")
 		<-done // Wait for goroutine to finish cleanup
 		return ctx.Err()
 	}
