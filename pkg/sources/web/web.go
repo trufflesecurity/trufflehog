@@ -64,6 +64,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 	// Use the user-provided User-Agent if set; otherwise fall back to a default that identifies TruffleHog.
 	if s.conn.GetUserAgent() == "" {
+		ctx.Logger().Info("No user agent set; using default", "user-agent", "trufflehog-web (+https://github.com/trufflesecurity/trufflehog)")
 		s.conn.UserAgent = "trufflehog-web (+https://github.com/trufflesecurity/trufflehog)"
 	}
 
@@ -87,7 +88,9 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		}
 	}
 
-	// TODO: reset metrics if needed
+	// metrics
+	jobIDStr := fmt.Sprint(s.jobId)
+	webUrlsScanned.WithLabelValues(s.name, jobIDStr).Set(0)
 
 	return nil
 }
@@ -95,6 +98,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 // Chunks emits data over a channel that is decoded and scanned for secrets.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	var wg sync.WaitGroup
+	jobIDStr := fmt.Sprint(s.jobId)
 
 	// Create a background context for crawling (independent of incoming ctx)
 	crawlCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -107,6 +111,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			defer wg.Done()
 			s.crawlURL(crawlCtx, url, chunksChan)
 		}(url)
+
+		webUrlsScanned.WithLabelValues(s.name, jobIDStr).Inc()
 	}
 
 	// Block until all crawls complete
