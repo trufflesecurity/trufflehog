@@ -7268,6 +7268,8 @@ func (m *Web) validate(all bool) error {
 
 	// no validation rules for UserAgent
 
+	// no validation rules for IgnoreRobots
+
 	if len(errors) > 0 {
 		return WebMultiError(errors)
 	}
