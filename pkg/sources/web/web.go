@@ -107,7 +107,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	eg, _ := errgroup.WithContext(crawlCtx)
 
 	for _, u := range s.conn.GetUrls() {
-		u := u // capture
 		ctx.Logger().V(5).Info("Processing Url", "url", u)
 		webUrlsScanned.WithLabelValues(s.name, jobIDStr).Inc()
 		eg.Go(func() error {
@@ -153,11 +152,13 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	// Users can enable this only when they have explicit permission to crawl the target site.
 	collector.IgnoreRobotsTxt = s.conn.GetIgnoreRobots()
 
-	collector.Limit(&colly.LimitRule{
+	if err := collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: s.concurrency,
 		Delay:       time.Duration(s.conn.GetDelay()) * time.Second,
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to limit rules to the colly collector: %w", err)
+	}
 
 	// Set up callbacks
 	collector.OnResponse(func(r *colly.Response) {
