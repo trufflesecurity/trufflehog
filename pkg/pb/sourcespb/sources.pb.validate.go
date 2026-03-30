@@ -7266,6 +7266,8 @@ func (m *Web) validate(all bool) error {
 
 	// no validation rules for Delay
 
+	// no validation rules for UserAgent
+
 	if len(errors) > 0 {
 		return WebMultiError(errors)
 	}

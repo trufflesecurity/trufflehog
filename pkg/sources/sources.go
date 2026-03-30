@@ -485,17 +485,18 @@ type JSONEnumeratorConfig struct {
 // WebConfig defines the configuration for the web source.
 type WebConfig struct {
 	// URL is the list of starting points for scanning.
-	URLs []string `json:"url" mapstructure:"url"`
+	URLs []string
 
 	// Crawl determines whether to follow links from the starting page.
-	Crawl bool `json:"crawl" mapstructure:"crawl"`
+	Crawl bool
 
 	// Depth controls how many link hops to follow when Crawl is true.
 	// 0 = only the starting URL, 1 = starting URL and direct links, etc.
-	Depth int `json:"depth" mapstructure:"depth"`
+	Depth int
 
 	// Delay is the delay (in seconds) between requests to the same domain.
-	Delay int `json:"delay" mapstructure:"delay"`
+	Delay     int
+	UserAgent string
 }
 
 // Progress is used to update job completion progress across sources.
