@@ -15,10 +15,13 @@ import (
 // ScanWeb scans a given web connection.
 func (e *Engine) ScanWeb(ctx context.Context, c sources.WebConfig) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Web{
-		Urls:  c.URLs,
-		Crawl: c.Crawl,
-		Depth: int64(c.Depth),
-		Delay: int64(c.Delay),
+		Urls:         c.URLs,
+		Crawl:        c.Crawl,
+		Depth:        int64(c.Depth),
+		Delay:        int64(c.Delay),
+		Timeout:      int64(c.Timeout),
+		UserAgent:    c.UserAgent,
+		IgnoreRobots: c.IgnoreRobots,
 	}
 
 	var conn anypb.Any
