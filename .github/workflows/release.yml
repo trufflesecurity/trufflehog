@@ -16,6 +16,7 @@ jobs:
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
+      # Setup steps - no external side effects.
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -43,6 +44,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y upx
+
+      # GoReleaser pipeline (sequential, not atomic):
+      #   1. build + archive + checksum + sign  (local only, no side effects)
+      #   2. homebrew tap update                (commit to trufflesecurity/homebrew-trufflehog)
+      #   3. docker images + manifests          (DockerHub + GHCR, including :latest tags)
+      #   4. github release creation            (artifacts uploaded, make_latest: false)
+      #
+      # On failure: GoReleaser does not roll back completed phases. Depending
+      # on where it failed, some subset of the above may have been published.
+      # Check:
+      #   - Homebrew tap: https://github.com/trufflesecurity/homebrew-trufflehog
+      #   - DockerHub:    https://hub.docker.com/r/trufflesecurity/trufflehog/tags
+      #   - GHCR:         https://github.com/trufflesecurity/trufflehog/pkgs/container/trufflehog
+      #   - GH releases:  https://github.com/trufflesecurity/trufflehog/releases
+      #
+      # If the GitHub release was created but artifacts are missing, the
+      # install script (scripts/install.sh) will fail for users on that
+      # version. The release is NOT marked latest (make_latest: false), so
+      # /releases/latest still points to the previous good release.
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -53,3 +73,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+  # Promotes the GitHub release to "latest" only after the Release job fully
+  # succeeds (including post-steps). At this point, all artifacts have been
+  # published: Docker images and :latest tags are live, the Homebrew tap is
+  # updated, binaries are attached to the GitHub release, and checksums are
+  # signed.
+  #
+  # If this job fails, the release exists with all artifacts but is not flagged
+  # as latest. /releases/latest and scripts/install.sh still point to the
+  # previous release. To manually promote:
+  #   gh release edit <tag> --latest --repo trufflesecurity/trufflehog
+  mark-latest:
+    needs: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark release as latest
+        run: gh release edit "$TAG" --latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
