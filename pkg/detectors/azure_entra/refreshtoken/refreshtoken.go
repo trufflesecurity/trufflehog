@@ -82,7 +82,6 @@ func (s Scanner) processMatches(ctx context.Context, refreshTokens, clientIds, t
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 	validTenants := make(map[string]struct{})
 
-TokenLoop:
 	for token := range refreshTokens {
 		var (
 			r        *detectors.Result
