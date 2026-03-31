@@ -127,23 +127,22 @@ func (s Scanner) processMatches(ctx context.Context, refreshTokens, clientIds, t
 							// Tenant doesn't exist. This shouldn't happen with the check above.
 							delete(tenantIds, tenantId)
 							continue
-						} else if errors.Is(verificationErr, ErrClientNotFoundInTenant) {
-							// Tenant is valid but the ClientID doesn't exist.
-							invalidClients[clientId] = struct{}{}
-							continue
-						} else if errors.Is(verificationErr, ErrTokenExpired) {
-							// Token has expired; emit a clean unverified result
-							r = createResult(token, clientId, tenantId, false, nil, nil)
-							break ClientLoop
-						} else if errors.Is(verificationErr, ErrTokenRevoked) {
-							// Token was explicitly revoked; emit a clean unverified result.
-							r = createResult(token, clientId, tenantId, false, nil, nil)
-							break ClientLoop
-						} else {
-							// Received an unexpected/unhandled error type.
-							r = createResult(token, clientId, tenantId, isVerified, extraData, verificationErr)
-							break ClientLoop
-						}
+					} else if errors.Is(verificationErr, ErrClientNotFoundInTenant) {
+						// Tenant is valid but the ClientID doesn't exist.
+						invalidClients[clientId] = struct{}{}
+						continue
+					} else if errors.Is(verificationErr, ErrTokenExpired) {
+						// Token has expired; break to the r==nil block which applies
+						// confidence-adjusted clientId/tenantId before creating the result.
+						break ClientLoop
+					} else if errors.Is(verificationErr, ErrTokenRevoked) {
+						// Token was explicitly revoked; same as above.
+						break ClientLoop
+					} else {
+						// Received an unexpected/unhandled error type.
+						r = createResult(token, clientId, tenantId, isVerified, extraData, verificationErr)
+						break ClientLoop
+					}
 					}
 
 					// The result is verified or there's only one associated client and tenant.
