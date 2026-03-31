@@ -288,19 +288,19 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
-						Commit:              sanitizer.UTF8(commit),
-						File:                sanitizer.UTF8(file),
-						Email:               sanitizer.UTF8(email),
-						Repository:          sanitizer.UTF8(repository),
-						Link:                giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:           sanitizer.UTF8(timestamp),
-						Line:                line,
-						Visibility:          s.visibilityOf(aCtx, repository),
-						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+						Commit:              sanitizer.UTF8(info.Commit),
+						File:                sanitizer.UTF8(info.File),
+						Email:               sanitizer.UTF8(info.Email),
+						Repository:          sanitizer.UTF8(info.Repository),
+						Link:                giturl.GenerateLink(info.Repository, info.Commit, info.File, info.Line),
+						Timestamp:           sanitizer.UTF8(info.Timestamp),
+						Line:                info.Line,
+						Visibility:          s.visibilityOf(aCtx, info.Repository),
+						RepositoryLocalPath: sanitizer.UTF8(info.RepositoryLocalPath),
 					},
 				},
 			}
@@ -1252,8 +1252,8 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(comment.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1389,8 +1389,8 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.GetTitle() + "\n" + issue.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(issue.GetTitle() + "\n" + issue.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1456,8 +1456,8 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(comment.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1552,8 +1552,8 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(pr.GetTitle() + "\n" + pr.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(pr.GetTitle() + "\n" + pr.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1588,8 +1588,8 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
-			Verify: s.verify,
+			Data:         []byte(sanitizer.UTF8(comment.GetBody())),
+			SourceVerify: s.verify,
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
@@ -1627,7 +1627,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
 		},
-		Verify: s.verify,
+		SourceVerify: s.verify,
 	}
 
 	u, err := url.Parse(meta.GetLink())

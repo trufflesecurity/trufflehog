@@ -30,6 +30,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/amplitudeapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypoint"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypointoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apacta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/api2cart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apideck"
@@ -338,6 +339,7 @@ import (
 	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
 	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googlegemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
@@ -893,6 +895,7 @@ func buildDetectorList() []detectors.Detector {
 		&amplitudeapikey.Scanner{},
 		&anthropic.Scanner{},
 		&anypoint.Scanner{},
+		&anypointoauth2.Scanner{},
 		&apacta.Scanner{},
 		&api2cart.Scanner{},
 		&apideck.Scanner{},
@@ -1211,6 +1214,7 @@ func buildDetectorList() []detectors.Detector {
 		&godaddyv1.Scanner{},
 		&godaddyv2.Scanner{},
 		&goodday.Scanner{},
+		&googlegemini.Scanner{},
 		&googleoauth2.Scanner{},
 		&grafana.Scanner{},
 		&grafanaserviceaccount.Scanner{},

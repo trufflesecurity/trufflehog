@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
@@ -65,6 +66,7 @@ var (
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
+	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
 	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
@@ -158,8 +160,9 @@ var (
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Strings()
 	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive = filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
-	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanIncludePaths    = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	filesystemScanExcludePaths    = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanMaxSymlinkDepth = filesystemScan.Flag("max-symlink-depth", "Maximum depth to follow symlinks during filesystem scan.").Short('s').Int32()
 
 	s3Scan              = cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey           = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
@@ -270,9 +273,34 @@ var (
 	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
 	multiScanScan  = cli.Command("multi-scan", "Find credentials in multiple sources defined in configuration.")
 
+	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
+	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
+
+// expandTilde replaces a leading ~ in each argument with the user's home
+// directory. This compensates for bypassing the shell (which would normally
+// perform this expansion) while still avoiding shell metacharacter injection.
+func expandTilde(args []string) []string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return args
+	}
+	out := make([]string, len(args))
+	for i, arg := range args {
+		switch {
+		case arg == "~":
+			out[i] = home
+		case strings.HasPrefix(arg, "~/"):
+			out[i] = home + arg[1:]
+		default:
+			out[i] = arg
+		}
+	}
+	return out
+}
 
 func init() {
 	_, _ = maxprocs.Set()
@@ -302,12 +330,17 @@ func init() {
 			os.Exit(0)
 		}
 
-		binary, err := exec.LookPath("sh")
+		// The TUI passes user input as literal strings. Since we no longer
+		// invoke a shell, we must expand ~ ourselves so paths like ~/foo
+		// resolve correctly.
+		args = expandTilde(args)
+
+		binary, err := exec.LookPath(os.Args[0])
 		if err == nil {
 			// On success, this call will never return. On failure, fallthrough
 			// to overwriting os.Args.
-			cmd := strings.Join(append(os.Args[:1], args...), " ")
-			_ = syscall.Exec(binary, []string{"sh", "-c", cmd}, append(os.Environ(), "TUI_PARENT=true"))
+			execArgs := append([]string{binary}, args...)
+			_ = syscall.Exec(binary, execArgs, append(os.Environ(), "TUI_PARENT=true"))
 		}
 
 		// Overwrite the Args slice so overseer works properly.
@@ -559,6 +592,7 @@ func run(state overseer.State, logSync func() error) {
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
 		ShouldScanEntireChunk:    *scanEntireChunk,
+		MaxDecodeDepth:           *maxDecodeDepth,
 		VerificationCacheMetrics: &verificationCacheMetrics,
 	}
 
@@ -901,6 +935,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Paths:            paths,
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
+			MaxSymlinkDepth:  *filesystemScanMaxSymlinkDepth,
 		}
 		if ref, err := eng.ScanFileSystem(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
@@ -1111,6 +1146,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		cfg := sources.StdinConfig{}
 		if ref, err := eng.ScanStdinInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
+	case jsonEnumeratorScan.FullCommand():
+		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
+		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
