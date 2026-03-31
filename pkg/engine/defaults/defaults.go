@@ -553,6 +553,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/persona"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/photoroom"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
@@ -1436,6 +1437,7 @@ func buildDetectorList() []detectors.Detector {
 		&peopledatalabs.Scanner{},
 		&pepipost.Scanner{},
 		&percy.Scanner{},
+		&persona.Scanner{},
 		&photoroom.Scanner{},
 		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
