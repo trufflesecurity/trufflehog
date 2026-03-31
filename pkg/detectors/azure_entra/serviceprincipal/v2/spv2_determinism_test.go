@@ -2,6 +2,10 @@ package v2
 
 import (
 	"context"
+	"io"
+	"maps"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,7 +113,10 @@ func TestProcessData_DeterministicRawV2(t *testing.T) {
 }
 
 // TestProcessData_DoesNotMutateCallerMaps verifies that ProcessData does not
-// modify the maps passed by the caller.
+// modify the maps passed by the caller. It uses verify=true with a mock HTTP
+// client so that the verification code path (which contains delete calls) is
+// actually exercised. With verify=false, no deletes occur and the test would
+// pass trivially even without maps.Clone.
 func TestProcessData_DoesNotMutateCallerMaps(t *testing.T) {
 	const clientSecret = "abc4Q~fake-secret-that-is-long-enough1234567"
 
@@ -118,20 +125,39 @@ func TestProcessData_DoesNotMutateCallerMaps(t *testing.T) {
 		"a1b2c3d4-e5f6-7890-abcd-ef1234567890": {},
 		"f9e8d7c6-b5a4-3210-fedc-ba9876543210": {},
 	}
+	// Use tenant IDs unique to this test to avoid polluting the package-level
+	// tenantCache shared with other tests.
 	tenantIDs := map[string]struct{}{
-		"11111111-2222-3333-4444-555566667777": {},
-		"aaaaaaaa-bbbb-cccc-dddd-eeeeffff0000": {},
+		"cccccccc-dddd-eeee-ffff-000011112222": {},
+		"dddddddd-eeee-ffff-0000-111122223333": {},
 	}
 
-	origSecretLen := len(secrets)
-	origClientLen := len(clientIDs)
-	origTenantLen := len(tenantIDs)
+	origSecrets := maps.Clone(secrets)
+	origClientIDs := maps.Clone(clientIDs)
+	origTenantIDs := maps.Clone(tenantIDs)
 
-	_ = ProcessData(context.Background(), secrets, clientIDs, tenantIDs, false, nil)
+	// Return 400 for every request so TenantExists returns false, triggering
+	// delete(activeTenants, tenantId) inside the verify block.
+	mockClient := &http.Client{
+		Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		}),
+	}
 
-	assert.Len(t, secrets, origSecretLen, "caller's secrets map must not be mutated")
-	assert.Len(t, clientIDs, origClientLen, "caller's clientIDs map must not be mutated")
-	assert.Len(t, tenantIDs, origTenantLen, "caller's tenantIDs map must not be mutated")
+	_ = ProcessData(context.Background(), secrets, clientIDs, tenantIDs, true, mockClient)
+
+	assert.Equal(t, origSecrets, secrets, "caller's secrets map must not be mutated")
+	assert.Equal(t, origClientIDs, clientIDs, "caller's clientIDs map must not be mutated")
+	assert.Equal(t, origTenantIDs, tenantIDs, "caller's tenantIDs map must not be mutated")
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 // TestProcessData_SameSecretDifferentRawV2 demonstrates the chain:
