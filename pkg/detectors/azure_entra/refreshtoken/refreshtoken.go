@@ -133,7 +133,9 @@ TokenLoop:
 							invalidClients[clientId] = struct{}{}
 							continue
 						} else if errors.Is(verificationErr, ErrTokenExpired) {
-							continue TokenLoop
+							// Token has expired; emit a clean unverified result
+							r = createResult(token, clientId, tenantId, false, nil, nil)
+							break ClientLoop
 						} else if errors.Is(verificationErr, ErrTokenRevoked) {
 							// Token was explicitly revoked; emit a clean unverified result.
 							r = createResult(token, clientId, tenantId, false, nil, nil)
