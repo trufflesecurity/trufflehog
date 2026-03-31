@@ -49,6 +49,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
 	artifactoryaccesstoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory/accesstoken"
 	artifactorybasicauth "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory/basicauth"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactoryreferencetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artsy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanaoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
@@ -915,6 +916,7 @@ func buildDetectorList() []detectors.Detector {
 		&apptivo.Scanner{},
 		&artifactoryaccesstoken.Scanner{},
 		&artifactorybasicauth.Scanner{},
+		&artifactoryreferencetoken.Scanner{},
 		&artsy.Scanner{},
 		&asanaoauth.Scanner{},
 		&asanapersonalaccesstoken.Scanner{},
