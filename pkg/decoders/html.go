@@ -36,9 +36,8 @@ var highSignalAttrs = map[string]bool{
 	"action":     true,
 	"value":      true,
 	"content":    true,
-	"alt":        true,
-	"title":      true,
-	"xlink:href": true,
+	"alt":   true,
+	"title": true,
 }
 
 // syntaxHighlightPrefixes lists CSS class prefixes used by syntax highlighting
@@ -196,7 +195,7 @@ func emitAttributes(buf *bytes.Buffer, n *html.Node) {
 		if val == "" || val == "#" {
 			continue
 		}
-		decoded, err := url.QueryUnescape(val)
+		decoded, err := url.PathUnescape(val)
 		if err == nil && decoded != val {
 			val = decoded
 		}

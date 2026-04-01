@@ -131,6 +131,14 @@ func TestHTML_FromChunk(t *testing.T) {
 			want:  "https://api.stripe.com/v1/charges?key=sk_live_123\nPay",
 		},
 
+		{
+			// '+' is a literal character in attribute values (not a space).
+			// PathUnescape preserves it while still decoding %XX sequences.
+			name:  "plus sign preserved in attribute value",
+			chunk: &sources.Chunk{Data: []byte(`<input type="hidden" value="sk_test_abc+def/123"/>`)},
+			want:  "sk_test_abc+def/123",
+		},
+
 		// --- Script / style / comment content ---
 		{
 			// Inline <script> blocks frequently contain API keys, tokens,
