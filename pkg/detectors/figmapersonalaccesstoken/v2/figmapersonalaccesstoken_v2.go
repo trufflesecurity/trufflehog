@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
+	figma "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := v1.VerifyMatch(ctx, s.getClient(), resMatch)
+			isVerified, verificationErr := figma.VerifyMatch(ctx, s.getClient(), resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 			if s1.Verified {
