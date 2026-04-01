@@ -69,7 +69,6 @@ require (
 	github.com/lestrrat-go/jwx/v3 v3.0.12
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20250404061050-e13639e27357
-	github.com/mariduv/ldap-verify v0.0.2
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d
@@ -96,6 +95,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.34.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
+	github.com/trufflesecurity/ldap-verify v0.0.0-20260401205135-1cad02b26426
 	github.com/wasilibs/go-re2 v1.9.0
 	github.com/xo/dburl v0.23.8
 	gitlab.com/gitlab-org/api/client-go v1.12.0
