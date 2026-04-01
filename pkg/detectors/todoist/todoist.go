@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.todoist.com/rest/v2/projects", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.todoist.com/api/v1/projects", nil)
 			if err != nil {
 				continue
 			}
