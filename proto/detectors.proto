@@ -80,9 +80,9 @@ enum DetectorType {
   DiscordWebhook = 66;
   EtsyApiKey = 67 [deprecated = true];
   FastlyPersonalToken = 68;
-  GoogleOauth2 = 69; // Not yet implemented
+  GoogleOauth2 = 69;
   ReCAPTCHA = 70; // Not yet implemented
-  GoogleApiKey = 71; // Not yet implemented
+  GoogleApiKey = 71 [deprecated = true];
   Hunter = 72;
   IbmCloudUserKey = 73;
   Netlify = 74;
