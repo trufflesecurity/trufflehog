@@ -3,7 +3,6 @@ package figmapersonalaccesstoken
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	figma "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := VerifyMatch(ctx, s.getClient(), resMatch)
+			isVerified, verificationErr := figma.VerifyMatch(ctx, s.getClient(), resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 			if s1.Verified {
@@ -76,33 +76,4 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FigmaPersonalAccessToken
-}
-
-// VerifyMatch checks if the provided Figma token is valid by making a request to the Figma API.
-func VerifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.figma.com/v1/me", http.NoBody)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Add("X-Figma-Token", token)
-	res, err := client.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
-
-	switch res.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusForbidden:
-		return false, nil
-		// The Figma API returns 403 for invalid, expired, or revoked tokens,
-		// as well as valid tokens that lack the required scopes for the requested resource.
-	default:
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-	}
 }
