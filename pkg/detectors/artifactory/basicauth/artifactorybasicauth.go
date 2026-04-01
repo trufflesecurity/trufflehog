@@ -100,7 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			username: username,
 			password: password,
 			host:     host,
-			raw:      match[0],
+			raw:      username + ":" + password + "@" + host,
 		}
 	}
 
