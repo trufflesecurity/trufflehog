@@ -8,10 +8,11 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	lwa "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lightweight_analyze"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
@@ -52,6 +53,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Slack secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	for key, tokenPat := range tokenPats {
@@ -82,9 +84,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					// lightweight analyze: unconditionally preserve the response body
+					resBody := lwa.CopyAndCloseResponseBody(logCtx, s1.ExtraData, res)
+
 					var authResponse authRes
-					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
+					if err := json.Unmarshal(resBody, &authResponse); err != nil {
 						err = fmt.Errorf("failed to decode auth response: %w", err)
 						s1.SetVerificationError(err, token)
 					}
@@ -94,6 +98,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// Store name of user and team in extra data received from slack's api
 						s1.ExtraData["team"] = authResponse.Team
 						s1.ExtraData["name"] = authResponse.User
+
+						// lightweight analyze: annotate standard fields
+						lwa.AugmentExtraData(s1.ExtraData, lwa.Fields{
+							Name: &authResponse.User,
+							ID:   &authResponse.UserID,
+							URL:  &authResponse.URL,
+						})
 						// Slack API returns 200 even if the token is invalid. We need to check the error field.
 					} else if authResponse.Error == "invalid_auth" {
 						// The secret is determinately not verified (nothing to do)

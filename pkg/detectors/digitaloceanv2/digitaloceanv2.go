@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	lwa "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lightweight_analyze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -37,6 +38,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify DigitalOceanV2 secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	var uniqueTokens = make(map[string]struct{})
@@ -60,17 +62,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// Check if the token is a refresh token or an access token
 			switch {
 			case strings.HasPrefix(token, "dor_v1_"):
-				verified, verificationErr, newAccessToken := verifyRefreshToken(ctx, client, token)
+				verified, extraData, verificationErr, newAccessToken := verifyRefreshToken(logCtx, client, token)
 				s1.SetVerificationError(verificationErr)
 				s1.Verified = verified
+				s1.ExtraData = extraData
 				if s1.Verified {
 					s1.AnalysisInfo = map[string]string{
 						"key": newAccessToken,
 					}
 				}
 			case strings.HasPrefix(token, "doo_v1_"), strings.HasPrefix(token, "dop_v1_"):
-				verified, verificationErr := verifyAccessToken(ctx, client, token)
+				verified, extraData, verificationErr := verifyAccessToken(logCtx, client, token)
 				s1.Verified = verified
+				s1.ExtraData = extraData
 				s1.SetVerificationError(verificationErr)
 				if s1.Verified {
 					s1.AnalysisInfo = map[string]string{
@@ -90,42 +94,56 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // If the token is valid, it returns the new access token and no error.
 // If the token is invalid/expired, it returns an empty string and no error.
 // If an error is encountered, it returns an empty string along and the error.
-func verifyRefreshToken(ctx context.Context, client *http.Client, token string) (bool, error, string) {
-	// Ref: https://docs.digitalocean.com/reference/api/oauth/
+func verifyRefreshToken(ctx logContext.Context, client *http.Client, token string) (bool, map[string]string, error, string) {
+	// Ref: https://docs.digitalocean.com/reference/api/oauth/#token
 
 	url := "https://cloud.digitalocean.com/v1/oauth/token?grant_type=refresh_token&refresh_token=" + token
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to create request: %w", err), ""
+		return false, nil, fmt.Errorf("failed to create request: %w", err), ""
 	}
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("failed to make request: %w", err), ""
+		return false, nil, fmt.Errorf("failed to make request: %w", err), ""
 	}
 
-	bodyBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		return false, fmt.Errorf("failed to read response body: %w", err), ""
-	}
-	defer res.Body.Close()
+	extraData := make(map[string]string)
+
+	// lightweight analyze: unconditionally preserve the response body
+	resBody := lwa.CopyAndCloseResponseBody(ctx, extraData, res)
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		var responseMap map[string]interface{}
-		if err := json.Unmarshal(bodyBytes, &responseMap); err != nil {
-			return false, fmt.Errorf("failed to parse response body: %w", err), ""
+		var resData struct {
+			AccessToken *string `json:"access_token"`
+			Info        struct {
+				UUID  *string `json:"uuid"`
+				Name  *string `json:"name"`
+				Email *string `json:"email"`
+			} `json:"info"`
 		}
-		// Extract the access token from the response
-		accessToken, exists := responseMap["access_token"].(string)
-		if !exists {
-			return false, fmt.Errorf("access_token not found in response: %s", string(bodyBytes)), ""
+		if err = json.Unmarshal(resBody, &resData); err != nil {
+			ctx.Logger().Error(err, "failed to parse response")
+			return false, extraData, err, ""
 		}
-		return true, nil, accessToken
+
+		if resData.AccessToken == nil {
+			return false, extraData, fmt.Errorf("access_token not found in response: %s", string(resBody)), ""
+		}
+
+		// lightweight analyze: annotate standard fields
+		lwa.AugmentExtraData(extraData, lwa.Fields{
+			ID:    resData.Info.UUID,
+			Name:  resData.Info.Name,
+			Email: resData.Info.Email,
+		})
+
+		return true, extraData, nil, *resData.AccessToken
 	case http.StatusUnauthorized:
-		return false, nil, ""
+		return false, extraData, nil, ""
 	default:
-		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode), ""
+		return false, extraData, fmt.Errorf("unexpected status code: %d", res.StatusCode), ""
 	}
 }
 
@@ -133,29 +151,53 @@ func verifyRefreshToken(ctx context.Context, client *http.Client, token string) 
 // If the token is valid, it returns true and no error.
 // If the token is invalid, it returns false and no error.
 // If an error is encountered, it returns false along with the error.
-func verifyAccessToken(ctx context.Context, client *http.Client, token string) (bool, error) {
+func verifyAccessToken(ctx logContext.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	// Ref: https://docs.digitalocean.com/reference/api/digitalocean/#tag/Account
 
 	url := "https://api.digitalocean.com/v2/account"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to create request: %w", err)
+		return false, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("failed to make request: %w", err)
+		return false, nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer res.Body.Close()
+
+	extraData := make(map[string]string)
+
+	// lightweight analyze: unconditionally preserve the response body
+	resBody := lwa.CopyAndCloseResponseBody(ctx, extraData, res)
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, nil
+		var resData struct {
+			Account struct {
+				UUID  *string `json:"uuid"`
+				Name  *string `json:"name"`
+				Email *string `json:"email"`
+			} `json:"account"`
+		}
+
+		if err = json.Unmarshal(resBody, &resData); err != nil {
+			ctx.Logger().Error(err, "failed to parse response")
+			return false, extraData, nil
+		}
+
+		// lightweight analyze: annotate standard fields
+		lwa.AugmentExtraData(extraData, lwa.Fields{
+			ID:    resData.Account.UUID,
+			Name:  resData.Account.Name,
+			Email: resData.Account.Email,
+		})
+
+		return true, extraData, nil
 	case http.StatusUnauthorized:
-		return false, nil
+		return false, extraData, nil
 	default:
-		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return false, extraData, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 }
 

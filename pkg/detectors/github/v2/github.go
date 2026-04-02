@@ -7,6 +7,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -47,6 +48,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -69,10 +71,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := common.SaneHttpClient()
 
-			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+			isVerified, extraData, userResponse, headers, err := s.VerifyGithub(logCtx, client, token)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
 
+			for k, v := range extraData {
+				s1.ExtraData[k] = v
+			}
 			if userResponse != nil {
 				v1.SetUserResponse(userResponse, &s1)
 			}

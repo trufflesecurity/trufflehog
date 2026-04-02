@@ -9,7 +9,9 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	lwa "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lightweight_analyze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -101,6 +103,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify DatadogToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
@@ -139,12 +142,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("DD-APPLICATION-KEY", resAppMatch)
 					res, err := client.Do(req)
 					if err == nil {
-						defer res.Body.Close()
+						// lightweight analyze: unconditionally preserve the response body
+						resBody := lwa.CopyAndCloseResponseBody(logCtx, s1.ExtraData, res)
+
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 							s1.AnalysisInfo = map[string]string{"api_key": resApiMatch, "app_key": resAppMatch, "endpoint": baseURL}
 							var serviceResponse userServiceResponse
-							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
+							if err := json.Unmarshal(resBody, &serviceResponse); err == nil {
 								// setup emails
 								if len(serviceResponse.Data) > 0 {
 									setUserEmails(serviceResponse.Data, &s1)
@@ -153,6 +158,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								if len(serviceResponse.Included) > 0 {
 									setOrganizationInfo(serviceResponse.Included, &s1)
 								}
+								// lightweight analyze: annotate standard fields
+								orgName := s1.ExtraData["org_name"]
+								orgURL := s1.ExtraData["org_url"]
+								emails := s1.ExtraData["user_emails"]
+								lwa.AugmentExtraData(s1.ExtraData, lwa.Fields{
+									Name:  &orgName,
+									URL:   &orgURL,
+									Email: &emails,
+								})
 							}
 							// break the loop once we've successfully validated the token against a baseURL
 							break

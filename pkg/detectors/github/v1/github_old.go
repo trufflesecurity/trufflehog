@@ -10,7 +10,9 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	lwa "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lightweight_analyze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -41,6 +43,7 @@ var (
 // TODO: Add secret context?? Information about access, ownership etc
 type UserRes struct {
 	Login     string `json:"login"`
+	ID        int    `json:"id"`
 	Type      string `json:"type"`
 	SiteAdmin bool   `json:"site_admin"`
 	Name      string `json:"name"`
@@ -89,6 +92,7 @@ var ghKnownNonSensitivePrefixes = []string{
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -129,11 +133,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := common.SaneHttpClient()
 
-			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+			isVerified, extraData, userResponse, headers, err := s.VerifyGithub(logCtx, client, token)
 
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
 
+			for k, v := range extraData {
+				s1.ExtraData[k] = v
+			}
 			if userResponse != nil {
 				SetUserResponse(userResponse, &s1)
 			}
@@ -148,7 +155,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token string) (bool, *UserRes, *HeaderInfo, error) {
+func (s Scanner) VerifyGithub(ctx logContext.Context, client *http.Client, token string) (bool, map[string]string, *UserRes, *HeaderInfo, error) {
 	// https://developer.github.com/v3/users/#get-the-authenticated-user
 	var requestErr error
 	for _, url := range s.Endpoints() {
@@ -167,19 +174,32 @@ func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token st
 			continue
 		}
 
+		extraData := make(map[string]string)
+
+		// lightweight analyze: unconditionally preserve the response body
+		resBody := lwa.CopyAndCloseResponseBody(ctx, extraData, res)
+
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
 			var userResponse UserRes
-			err = json.NewDecoder(res.Body).Decode(&userResponse)
-			res.Body.Close()
+			err = json.Unmarshal(resBody, &userResponse)
 			if err == nil {
+				// lightweight analyze: annotate standard fields
+				userID := fmt.Sprintf("%d", userResponse.ID)
+				lwa.AugmentExtraData(extraData, lwa.Fields{
+					ID:    &userID,
+					Name:  &userResponse.Name,
+					Email: &userResponse.Email,
+					URL:   &userResponse.UserURL,
+				})
+
 				// GitHub does not seem to consistently return this header.
 				scopes := res.Header.Get("X-OAuth-Scopes")
 				expiry := res.Header.Get("github-authentication-token-expiration")
-				return true, &userResponse, &HeaderInfo{Scopes: scopes, Expiry: expiry}, nil
+				return true, extraData, &userResponse, &HeaderInfo{Scopes: scopes, Expiry: expiry}, nil
 			}
 		}
 	}
-	return false, nil, nil, requestErr
+	return false, nil, nil, nil, requestErr
 }
 
 func SetUserResponse(userResponse *UserRes, s1 *detectors.Result) {
