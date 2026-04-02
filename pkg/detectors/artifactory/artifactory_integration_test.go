@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -93,6 +94,33 @@ func TestArtifactory_FromChunk(t *testing.T) {
 				t.Errorf("Artifactory.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestArtifactory_FromChunk_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	mockSecret := "AKCp5bueTFpfypEqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM"
+	appURL := "trufflesecurity.com"
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	err := s.SetConfiguredEndpoints(appURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", mockSecret))
+
+	got, err := s.FromData(ctx, true, data)
+	if err != nil {
+		t.Fatalf("unexpected error from FromData: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatal("expected at least one result from FromData, got 0")
+	}
+	expectedRawV2 := []byte(mockSecret + appURL)
+	if string(got[0].RawV2) != string(expectedRawV2) {
+		t.Errorf("Artifactory.FromData() rawV2 secret mismatch: got %s, want %s", string(got[0].RawV2), string(expectedRawV2))
 	}
 }
 
