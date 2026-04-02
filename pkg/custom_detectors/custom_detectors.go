@@ -196,9 +196,10 @@ MatchLoop:
 	close(resultsCh)
 
 	for result := range resultsCh {
-		if result.ExtraData != nil {
-			result.ExtraData["name"] = c.GetName()
+		if result.ExtraData == nil {
+			result.ExtraData = make(map[string]string)
 		}
+		result.ExtraData["name"] = c.GetName()
 
 		results = append(results, result)
 	}
@@ -224,7 +225,14 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	result := detectors.Result{
 		DetectorType: detectorspb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
-		ExtraData:    map[string]string{},
+	}
+
+	// Copy metadata from detector configuration to ExtraData
+	if metadata := c.GetMetadata(); len(metadata) > 0 {
+		result.ExtraData = make(map[string]string, len(metadata))
+		for key, value := range metadata {
+			result.ExtraData[key] = value
+		}
 	}
 
 	var raw string
@@ -319,6 +327,9 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			}
 
 			// store the processed response in ExtraData
+			if result.ExtraData == nil {
+				result.ExtraData = make(map[string]string)
+			}
 			result.ExtraData["response"] = responseStr
 
 			break
