@@ -22,7 +22,7 @@ check:
 	go vet $(shell go list ./... | grep -v /vendor/)
 
 lint:
-	go tool golangci-lint run --disable errcheck,staticcheck --enable bodyclose,copyloopvar,misspell --timeout 10m
+	./scripts/lint.sh
 
 test-failing:
 	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/) | grep FAIL
