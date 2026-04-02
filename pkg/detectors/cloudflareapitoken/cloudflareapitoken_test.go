@@ -45,6 +45,16 @@ func TestCloudFlareAPIToken_Pattern(t *testing.T) {
 			input: validPattern,
 			want:  []string{secret},
 		},
+		{
+			name:  "valid v2 user token - no keyword proximity needed",
+			input: "token: cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe",
+			want:  []string{"cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe"},
+		},
+		{
+			name:  "valid v2 account token - no keyword proximity needed",
+			input: "token: cfat_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe",
+			want:  []string{"cfat_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe"},
+		},
 	}
 
 	for _, test := range tests {

@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	validPattern   = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012 / testuser1005@example.com"
-	invalidPattern = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012/testing@go"
+	validPattern   = "abcdef1234567890abcdef1234567890abcdef0 / testuser1005@example.com"
+	validV2Pattern = "cfk_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe / testuser1005@example.com"
+	invalidPattern = "abcdef1234567890abcdef1234567890abcdef0/testing@go"
 )
 
 func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
@@ -28,12 +29,17 @@ func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: fmt.Sprintf("cloudflare: %s", validPattern),
-			want:  []string{"abcD123efg456HIJklmn789OPQ_rstUVWxYZ-testuser1005@example.com"},
+			want:  []string{"abcdef1234567890abcdef1234567890abcdef0testuser1005@example.com"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
 			input: fmt.Sprintf("cloudflare keyword is not close to the real key and id = %s", validPattern),
 			want:  nil,
+		},
+		{
+			name:  "valid v2 pattern - no keyword proximity needed",
+			input: fmt.Sprintf("some config: %s", validV2Pattern),
+			want:  []string{"cfk_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfetestuser1005@example.com"},
 		},
 		{
 			name:  "invalid pattern",
