@@ -82,7 +82,6 @@ func (s Scanner) processMatches(ctx context.Context, refreshTokens, clientIds, t
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 	validTenants := make(map[string]struct{})
 
-TokenLoop:
 	for token := range refreshTokens {
 		var (
 			r        *detectors.Result
@@ -128,17 +127,22 @@ TokenLoop:
 							// Tenant doesn't exist. This shouldn't happen with the check above.
 							delete(tenantIds, tenantId)
 							continue
-						} else if errors.Is(verificationErr, ErrClientNotFoundInTenant) {
-							// Tenant is valid but the ClientID doesn't exist.
-							invalidClients[clientId] = struct{}{}
-							continue
-						} else if errors.Is(verificationErr, ErrTokenExpired) {
-							continue TokenLoop
-						} else {
-							// Received an unexpected/unhandled error type.
-							r = createResult(token, clientId, tenantId, isVerified, extraData, verificationErr)
-							break ClientLoop
-						}
+					} else if errors.Is(verificationErr, ErrClientNotFoundInTenant) {
+						// Tenant is valid but the ClientID doesn't exist.
+						invalidClients[clientId] = struct{}{}
+						continue
+					} else if errors.Is(verificationErr, ErrTokenExpired) {
+						// Token has expired; break to the r==nil block which applies
+						// confidence-adjusted clientId/tenantId before creating the result.
+						break ClientLoop
+					} else if errors.Is(verificationErr, ErrTokenRevoked) {
+						// Token was explicitly revoked; same as above.
+						break ClientLoop
+					} else {
+						// Received an unexpected/unhandled error type.
+						r = createResult(token, clientId, tenantId, isVerified, extraData, verificationErr)
+						break ClientLoop
+					}
 					}
 
 					// The result is verified or there's only one associated client and tenant.
@@ -171,6 +175,7 @@ const defaultClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c" // Microsoft Offi
 
 var (
 	ErrTokenExpired           = errors.New("token expired")
+	ErrTokenRevoked           = errors.New("token revoked")
 	ErrTenantNotFound         = errors.New("tenant not found")
 	ErrClientNotFoundInTenant = errors.New("application was not found in tenant")
 )
@@ -253,6 +258,10 @@ func verifyMatch(ctx context.Context, client *http.Client, refreshToken string, 
 			// https://login.microsoftonline.com/error?code=700082
 			// https://login.microsoftonline.com/error?code=70043
 			return false, nil, ErrTokenExpired
+		case strings.HasPrefix(d, "AADSTS50173:"):
+			// https://login.microsoftonline.com/error?code=50173
+			// Token was explicitly revoked by the user or an administrator.
+			return false, nil, ErrTokenRevoked
 		case strings.HasPrefix(d, "AADSTS700016:"):
 			// https://login.microsoftonline.com/error?code=700016
 			return false, nil, ErrClientNotFoundInTenant
