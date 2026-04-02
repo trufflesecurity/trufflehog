@@ -70,6 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyAirbrakeProjectKey(ctx, client, key, id)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr)
+				s1.AnalysisInfo = map[string]string{"key": key}
 			}
 
 			results = append(results, s1)
