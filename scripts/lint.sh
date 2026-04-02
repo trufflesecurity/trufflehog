@@ -14,7 +14,7 @@ if [[ -x "${GOLANGCI_LINT}" ]] && "${GOLANGCI_LINT}" version 2>&1 | grep -q "${G
     echo "golangci-lint ${GOLANGCI_LINT_VERSION} found"
 else
     echo "Installing golangci-lint ${GOLANGCI_LINT_VERSION}..."
-    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@"${GOLANGCI_LINT_VERSION}"
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b "${GOBIN}" "${GOLANGCI_LINT_VERSION}"
 fi
 
 # shellcheck disable=SC2086
