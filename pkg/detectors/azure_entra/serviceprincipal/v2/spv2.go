@@ -115,7 +115,7 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretInvalid):
 							continue ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretExpired):
-							r = createResult(tenantId, clientId, clientSecret, false, nil, verificationErr)
+							r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
 							break ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrTenantNotFound):
 							// Tenant doesn't exist. This shouldn't happen with the check above.

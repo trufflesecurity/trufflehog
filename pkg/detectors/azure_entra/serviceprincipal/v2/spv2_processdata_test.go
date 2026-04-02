@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -144,6 +143,5 @@ func TestProcessData_ExpiredSecretShouldEmitResult(t *testing.T) {
 	assert.Equal(t, detectorspb.DetectorType_Azure, r.DetectorType)
 	assert.Equal(t, []byte(clientSecret), r.Raw)
 	assert.NotNil(t, r.RawV2, "RawV2 should be set when clientId and tenantId are known")
-	assert.Contains(t, r.VerificationError().Error(), serviceprincipal.ErrSecretExpired.Error(),
-		"verification error should indicate secret expiry")
+	assert.Nil(t, r.VerificationError(), "expired secret is definitively invalid, not indeterminate")
 }
