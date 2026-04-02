@@ -31,18 +31,19 @@ var htmlTagPattern = regexp.MustCompile(`<[a-zA-Z][a-zA-Z0-9]*[\s>/]`)
 // highSignalAttrs are attribute names whose values are extracted into the
 // decoded output because they commonly contain URLs, tokens, or other secrets.
 var highSignalAttrs = map[string]bool{
-	"href":       true,
-	"src":        true,
-	"action":     true,
-	"value":      true,
-	"content":    true,
-	"alt":   true,
-	"title": true,
+	"href":    true,
+	"src":     true,
+	"action":  true,
+	"value":   true,
+	"content": true,
+	"alt":     true,
+	"title":   true,
 }
 
-// syntaxHighlightPrefixes lists CSS class prefixes used by syntax highlighting
-// libraries. Elements with these classes mark logical line boundaries in code
-// blocks where the platform (e.g. Teams) strips actual newlines.
+// syntaxHighlightPrefixes lists CSS class prefixes that mark logical line
+// boundaries in code blocks. MS Teams uses highlight.js (hljs-* classes) to
+// render code, stripping the original newlines in the process. Add prefixes
+// here if other sources use different syntax highlighting libraries.
 var syntaxHighlightPrefixes = []string{"hljs-"}
 
 // residualEntityReplacer decodes common HTML entities that survive double-encoding.
