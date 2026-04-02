@@ -46,7 +46,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a twilio account_sid %s and secret_key within %s", id, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -69,7 +69,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secretInactive, id)),
+				data:   []byte(fmt.Sprintf("You can find a twilio account_sid %s and secret_key within %s", id, secretInactive)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -90,7 +90,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
+				data:   []byte("You cannot find the twilio secret within"),
 				verify: true,
 			},
 			want:    nil,
@@ -101,7 +101,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(100 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a twilio account_sid %s and secret_key within %s", id, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -123,7 +123,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a twilio secret %s within awsId %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -156,7 +156,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Twilio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
