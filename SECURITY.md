@@ -3,6 +3,7 @@ Please report security issues to security@trufflesec.com and include `trufflehog
 ## Blind SSRF & Outbound Request Policy
 Truffle Security treats blind SSRF (the ability to induce outbound requests without data retrieval) as a hardening opportunity rather than a vulnerability. We do not issue CVEs or formal advisories for reports showing outbound interactions unless they demonstrate a tangible security risk to users.
 
+
 #### Policy Criteria
 **Vulnerability (CVE Issued):** We will issue a CVE if a researcher demonstrates a clear exploit chain. For example:
 - Credential Exfiltration: Forcing TruffleHog to send third-party secrets (discovered during a scan) or the host's own environment credentials (e.g., IAM metadata) to an attacker-controlled endpoint.
