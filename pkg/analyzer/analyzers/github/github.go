@@ -37,6 +37,9 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	if err != nil {
 		return nil, err
 	}
+	if info == nil {
+		return nil, fmt.Errorf("GitHub analyzer returned no data for token")
+	}
 	return secretInfoToAnalyzerResult(info), nil
 }
 
