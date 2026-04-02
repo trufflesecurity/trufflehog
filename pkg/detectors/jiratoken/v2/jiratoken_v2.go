@@ -90,10 +90,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					isVerified, verificationErr := v1.VerifyJiraToken(ctx, client, email, domain, token)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, token)
-					s1.AnalysisInfo = map[string]string{
-						"token":  token,
-						"domain": domain,
-						"email":  email,
+					if isVerified {
+						s1.AnalysisInfo = map[string]string{
+							"token":  token,
+							"domain": domain,
+							"email":  email,
+						}
 					}
 				}
 
