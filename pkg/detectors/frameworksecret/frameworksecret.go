@@ -243,8 +243,10 @@ func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
 		return false, ""
 	}
 
-	// Use TruffleHog's built-in false positive detection for other frameworks
-	if isFP, reason := detectors.IsKnownFalsePositive(secret, detectors.DefaultFalsePositives, true); isFP {
+	// Disable word check (substring matching against badlist) for all framework secrets.
+	// Symfony and Rails secrets are hex strings that naturally contain substrings
+	// like "abcde", "2048", "ed25519" from the badlist — these are valid hex, not false positives.
+	if isFP, reason := detectors.IsKnownFalsePositive(secret, detectors.DefaultFalsePositives, false); isFP {
 		return true, reason
 	}
 
