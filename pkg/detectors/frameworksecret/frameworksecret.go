@@ -2,7 +2,6 @@ package frameworksecret
 
 import (
 	"context"
-	"math"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -145,7 +144,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			// Entropy check for formats that need it (Django)
-			if fw.checkEntropy && shannonEntropy(secret) < minEntropy {
+			if fw.checkEntropy && detectors.StringShannonEntropy(secret) < minEntropy {
 				continue
 			}
 
@@ -175,28 +174,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// shannonEntropy calculates the Shannon entropy of a string.
-// Higher entropy = more random = more likely to be a real secret.
-func shannonEntropy(s string) float64 {
-	if len(s) == 0 {
-		return 0
-	}
-
-	charCount := make(map[rune]int)
-	for _, c := range s {
-		charCount[c]++
-	}
-
-	entropy := 0.0
-	length := float64(len(s))
-	for _, count := range charCount {
-		probability := float64(count) / length
-		entropy -= probability * math.Log2(probability)
-	}
-
-	return entropy
-}
-
 // redactSecret returns a redacted version of the secret for display.
 // Example: "a1b2c3d4...****e5f6" for a 32-char secret
 func redactSecret(secret string) string {
@@ -218,9 +195,13 @@ func isPlaceholder(secret string) bool {
 
 	// Check for repeating characters (e.g., "aaaa..." or "1111...")
 	if len(secret) >= 10 {
+		checkLen := 20
+		if len(secret) < checkLen {
+			checkLen = len(secret)
+		}
 		first := rune(secret[0])
 		allSame := true
-		for _, c := range secret[1:20] { // Check first 20 chars
+		for _, c := range secret[1:checkLen] {
 			if c != first {
 				allSame = false
 				break
