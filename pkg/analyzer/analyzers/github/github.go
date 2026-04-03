@@ -83,11 +83,11 @@ func secretInfoToUserBindings(info *common.SecretInfo) []analyzers.Binding {
 }
 
 func userToResource(user *gh.User) *analyzers.Resource {
-	name := *user.Login
+	name := user.GetLogin()
 	return &analyzers.Resource{
 		Name:               name,
 		FullyQualifiedName: fmt.Sprintf("github.com/%s", name),
-		Type:               strings.ToLower(*user.Type), // "user" or "organization"
+		Type:               strings.ToLower(user.GetType()), // "user" or "organization"
 	}
 }
 
@@ -115,8 +115,8 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 	var bindings []analyzers.Binding
 	for _, repo := range repos {
 		resource := analyzers.Resource{
-			Name:               *repo.Name,
-			FullyQualifiedName: fmt.Sprintf("github.com/%s", *repo.FullName),
+			Name:               repo.GetName(),
+			FullyQualifiedName: fmt.Sprintf("github.com/%s", repo.GetFullName()),
 			Type:               "repository",
 			Parent:             userToResource(repo.Owner),
 		}
@@ -128,11 +128,17 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 func secretInfoToGistBindings(info *common.SecretInfo) []analyzers.Binding {
 	var bindings []analyzers.Binding
 	for _, gist := range info.Gists {
+		// A gist without an owner cannot be attributed to a user, so we cannot
+		// build a meaningful resource or FQN for it. Skip it rather than
+		// producing silently corrupt output (e.g. "gist.github.com//id").
+		if gist.GetOwner() == nil {
+			continue
+		}
 		resource := analyzers.Resource{
-			Name:               *gist.Description,
-			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", *gist.Owner.Login, *gist.ID),
+			Name:               gist.GetDescription(),
+			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", gist.GetOwner().GetLogin(), gist.GetID()),
 			Type:               "gist",
-			Parent:             userToResource(gist.Owner),
+			Parent:             userToResource(gist.GetOwner()),
 		}
 		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
 	}

@@ -6,10 +6,88 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	gh "github.com/google/go-github/v67/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	githubcommon "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+func strPtr(s string) *string { return &s }
+
+func makeOwner(login, userType string) *gh.User {
+	return &gh.User{Login: &login, Type: &userType}
+}
+
+// TestSecretInfoToGistBindings exercises nil-field edge cases that caused a
+// production panic (nil Description and nil Owner from the GitHub API).
+func TestSecretInfoToGistBindings(t *testing.T) {
+	owner := makeOwner("truffle-sandbox", "User")
+	scope := []analyzers.Permission{{Value: "gist"}}
+
+	tests := []struct {
+		name     string
+		gists    []*gh.Gist
+		wantLen  int
+		wantFQNs []string
+		wantName string
+	}{
+		{
+			name: "nil description produces empty name, gist is still included",
+			gists: []*gh.Gist{
+				{ID: strPtr("abc123"), Description: nil, Owner: owner},
+			},
+			wantLen:  1,
+			wantFQNs: []string{"gist.github.com/truffle-sandbox/abc123"},
+			wantName: "",
+		},
+		{
+			name: "nil owner: gist is skipped entirely",
+			gists: []*gh.Gist{
+				{ID: strPtr("abc123"), Description: strPtr("my gist"), Owner: nil},
+			},
+			wantLen: 0,
+		},
+		{
+			name: "mix of valid and nil-owner gists: only valid gist is included",
+			gists: []*gh.Gist{
+				{ID: strPtr("abc123"), Description: strPtr("valid gist"), Owner: owner},
+				{ID: strPtr("def456"), Description: strPtr("no owner"), Owner: nil},
+			},
+			wantLen:  1,
+			wantFQNs: []string{"gist.github.com/truffle-sandbox/abc123"},
+		},
+		{
+			name:    "empty gist list: no bindings",
+			gists:   nil,
+			wantLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := &githubcommon.SecretInfo{
+				Metadata: &githubcommon.TokenMetadata{OauthScopes: scope},
+				Gists:    tt.gists,
+			}
+			got := secretInfoToGistBindings(info)
+			if len(got) != tt.wantLen {
+				t.Errorf("got %d bindings, want %d", len(got), tt.wantLen)
+			}
+			for i, fqn := range tt.wantFQNs {
+				if i >= len(got) {
+					break
+				}
+				if got[i].Resource.FullyQualifiedName != fqn {
+					t.Errorf("binding[%d].FullyQualifiedName = %q, want %q", i, got[i].Resource.FullyQualifiedName, fqn)
+				}
+			}
+			if tt.wantName != "" && len(got) > 0 && got[0].Resource.Name != tt.wantName {
+				t.Errorf("binding[0].Name = %q, want %q", got[0].Resource.Name, tt.wantName)
+			}
+		})
+	}
+}
 
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
