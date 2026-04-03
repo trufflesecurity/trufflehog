@@ -384,6 +384,50 @@ trufflehog huggingface --model <model_id> --include-discussions --include-prs
 aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
 ```
 
+## 19. Scan image and video files for secrets (OCR)
+
+TruffleHog can extract text from **PNG/JPEG images** and **MP4/MKV/WebM video frames** using OCR, then scan that text for secrets. This is useful for catching credentials embedded in screenshots, screen recordings, or documentation images.
+
+### Prerequisites
+
+- **Tesseract OCR** — the OCR engine used to extract text from images
+- **FFmpeg** — required only for video files (extracts frames before OCR)
+
+```bash
+# Ubuntu / Debian
+sudo apt install tesseract-ocr ffmpeg
+
+# macOS
+brew install tesseract ffmpeg
+```
+
+### Improved accuracy with tessdata-best (recommended)
+
+By default Tesseract ships with a fast but less accurate model. For secret scanning — where a single misread character invalidates a match — download the high-quality `tessdata-best` model:
+
+```bash
+mkdir -p ~/.tessdata-best
+curl -L -o ~/.tessdata-best/eng.traineddata \
+  https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata
+```
+
+TruffleHog automatically detects and uses `~/.tessdata-best` when present. You can also point to any custom tessdata directory via the `TESSDATA_PREFIX` environment variable.
+
+### Usage
+
+Enable OCR with the `--enable-ocr` flag when scanning any source that may contain image or video files:
+
+```bash
+# Scan a filesystem path containing images
+trufflehog filesystem /path/to/screenshots --enable-ocr
+
+# Scan a git repo whose history may include committed images
+trufflehog git https://github.com/example/repo --enable-ocr
+
+# Scan an S3 bucket for secrets in images
+trufflehog s3 --bucket=my-bucket --enable-ocr --results=verified
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?

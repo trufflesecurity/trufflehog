@@ -107,7 +107,25 @@ func (h *ocrHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 	return dataOrErrChan
 }
 
-// ocrImage extracts text from a single image using tesseract.
+// tessdataDir returns the tessdata directory to use, preferring tessdata-best
+// models when available. Resolution order:
+//  1. TESSDATA_PREFIX environment variable (explicit user override)
+//  2. ~/.tessdata-best (conventional install location for tessdata-best)
+//  3. Empty string → let Tesseract use its compiled-in default
+func tessdataDir() string {
+	if v := os.Getenv("TESSDATA_PREFIX"); v != "" {
+		return v
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		p := filepath.Join(home, ".tessdata-best")
+		if _, err := os.Stat(filepath.Join(p, "eng.traineddata")); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// ocrImage extracts text from a single image using Tesseract.
 func (h *ocrHandler) ocrImage(ctx logContext.Context, input io.Reader) (string, error) {
 	if _, err := exec.LookPath("tesseract"); err != nil {
 		return "", fmt.Errorf("tesseract not found in PATH: %w", err)
@@ -140,14 +158,20 @@ func (h *ocrHandler) ocrImage(ctx logContext.Context, input io.Reader) (string, 
 	}
 	tmpFile.Close()
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, "tesseract",
-		tmpFile.Name(), "stdout",
-		"--psm", "6",
-		"--dpi", "300",
+	args := []string{tmpFile.Name(), "stdout", "--oem", "1", "--psm", "6", "--dpi", "300",
 		"-c", "preserve_interword_spaces=1",
 		"-c", "textord_space_size_is_variable=0",
-	)
+		// Restrict to printable ASCII — secrets are always ASCII and this prevents
+		// Tesseract from substituting Unicode lookalikes (curly quotes, em-dash, etc.)
+		// which would cause secret patterns to fail to match.
+		"-c", `tessedit_char_whitelist= !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_` + "`" + `abcdefghijklmnopqrstuvwxyz{|}~`,
+	}
+	if dir := tessdataDir(); dir != "" {
+		args = append(args, "--tessdata-dir", dir)
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, "tesseract", args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -249,10 +273,20 @@ func isVideoMime(m mimeType) bool {
 	return m == mp4Mime || m == mkvMime || m == webmMime
 }
 
-const preprocessScaleFactor = 2
+const preprocessScaleFactor = 3
 
-// preprocessImage decodes an image, converts it to grayscale, and scales it up
-// by 2x to improve tesseract accuracy on small or low-contrast text.
+// preprocessImage prepares a screenshot for Tesseract OCR of typed/code text.
+//
+// Pipeline:
+//  1. Convert to grayscale (ITU-R BT.601 luminance).
+//  2. Stretch contrast so the full 0–255 range is used.
+//  3. Upscale 3× with bilinear interpolation — more pixels per character
+//     stroke lets Tesseract resolve details that distinguish l/1/I and 0/O.
+//  4. Binarize with Otsu's method — eliminates anti-aliasing gray zones that
+//     cause similar-character confusions like L→1 or 9→0.
+//  5. Auto-invert if the background is dark (terminal/dark-theme screenshots)
+//     because Tesseract's LSTM engine expects dark text on a light background.
+//
 // Falls back gracefully — callers should use the original data if this errors.
 func preprocessImage(data []byte) ([]byte, error) {
 	src, _, err := image.Decode(bytes.NewReader(data))
@@ -261,23 +295,161 @@ func preprocessImage(data []byte) ([]byte, error) {
 	}
 
 	bounds := src.Bounds()
-	w, h := bounds.Dx()*preprocessScaleFactor, bounds.Dy()*preprocessScaleFactor
+	srcW, srcH := bounds.Dx(), bounds.Dy()
 
-	gray := image.NewGray(image.Rect(0, 0, w, h))
-	for y := 0; y < h; y++ {
-		srcY := bounds.Min.Y + y/preprocessScaleFactor
-		for x := 0; x < w; x++ {
-			srcX := bounds.Min.X + x/preprocessScaleFactor
-			r, g, b, _ := src.At(srcX, srcY).RGBA()
+	// Step 1: grayscale at original resolution.
+	gray := image.NewGray(image.Rect(0, 0, srcW, srcH))
+	for y := 0; y < srcH; y++ {
+		for x := 0; x < srcW; x++ {
+			r, g, b, _ := src.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
 			// ITU-R BT.601 luminance.
 			lum := (19595*r + 38470*g + 7471*b + 1<<15) >> 24
 			gray.SetGray(x, y, color.Gray{Y: uint8(lum)})
 		}
 	}
 
+	// Step 2: contrast normalization — stretch histogram to full 0–255 range.
+	gray = normalizeContrast(gray, srcW, srcH)
+
+	// Step 3: upscale with bilinear interpolation.
+	dstW, dstH := srcW*preprocessScaleFactor, srcH*preprocessScaleFactor
+	scaled := image.NewGray(image.Rect(0, 0, dstW, dstH))
+	for y := 0; y < dstH; y++ {
+		for x := 0; x < dstW; x++ {
+			scaled.SetGray(x, y, color.Gray{Y: bilinearSample(gray, srcW, srcH, x, y, dstW, dstH)})
+		}
+	}
+
+	// Step 4 & 5: Otsu binarization + auto-invert for dark backgrounds.
+	thresh := otsuThreshold(scaled, dstW, dstH)
+	out := binarizeAndNormalizeBg(scaled, thresh, dstW, dstH)
+
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, gray); err != nil {
+	if err := png.Encode(&buf, out); err != nil {
 		return nil, fmt.Errorf("encoding preprocessed image: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+// normalizeContrast stretches the grayscale histogram so the darkest pixel
+// becomes 0 and the brightest becomes 255, maximising contrast before scaling.
+func normalizeContrast(img *image.Gray, w, h int) *image.Gray {
+	lo, hi := uint8(255), uint8(0)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			v := img.GrayAt(x, y).Y
+			if v < lo {
+				lo = v
+			}
+			if v > hi {
+				hi = v
+			}
+		}
+	}
+	if hi == lo {
+		return img // flat image, nothing to stretch
+	}
+	scale := 255.0 / float64(hi-lo)
+	out := image.NewGray(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			v := img.GrayAt(x, y).Y
+			out.SetGray(x, y, color.Gray{Y: uint8(float64(v-lo) * scale)})
+		}
+	}
+	return out
+}
+
+// bilinearSample maps a destination pixel back to fractional source coordinates
+// and interpolates between the four surrounding source pixels.
+func bilinearSample(img *image.Gray, srcW, srcH, dstX, dstY, dstW, dstH int) uint8 {
+	fx := float64(dstX) * float64(srcW-1) / float64(dstW-1)
+	fy := float64(dstY) * float64(srcH-1) / float64(dstH-1)
+
+	x0, y0 := int(fx), int(fy)
+	x1, y1 := x0+1, y0+1
+	if x1 >= srcW {
+		x1 = srcW - 1
+	}
+	if y1 >= srcH {
+		y1 = srcH - 1
+	}
+	dx, dy := fx-float64(x0), fy-float64(y0)
+
+	v00 := float64(img.GrayAt(x0, y0).Y)
+	v10 := float64(img.GrayAt(x1, y0).Y)
+	v01 := float64(img.GrayAt(x0, y1).Y)
+	v11 := float64(img.GrayAt(x1, y1).Y)
+
+	return uint8(v00*(1-dx)*(1-dy) + v10*dx*(1-dy) + v01*(1-dx)*dy + v11*dx*dy)
+}
+
+// otsuThreshold computes the optimal binarization threshold using Otsu's method,
+// which maximises inter-class variance between foreground and background pixels.
+func otsuThreshold(img *image.Gray, w, h int) uint8 {
+	total := w * h
+	var hist [256]int
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			hist[img.GrayAt(x, y).Y]++
+		}
+	}
+
+	sum := 0
+	for i, c := range hist {
+		sum += i * c
+	}
+
+	var sumB, wB int
+	var best float64
+	thresh := uint8(128)
+	for i, c := range hist {
+		wB += c
+		if wB == 0 {
+			continue
+		}
+		wF := total - wB
+		if wF == 0 {
+			break
+		}
+		sumB += i * c
+		mB := float64(sumB) / float64(wB)
+		mF := float64(sum-sumB) / float64(wF)
+		v := float64(wB) * float64(wF) * (mB - mF) * (mB - mF)
+		if v > best {
+			best = v
+			thresh = uint8(i)
+		}
+	}
+	return thresh
+}
+
+// binarizeAndNormalizeBg converts img to pure black-and-white using thresh, then
+// inverts the result if the background is dark so that Tesseract always receives
+// dark text on a white background (its preferred input for the LSTM engine).
+func binarizeAndNormalizeBg(img *image.Gray, thresh uint8, w, h int) *image.Gray {
+	out := image.NewGray(image.Rect(0, 0, w, h))
+	lightPx := 0
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if img.GrayAt(x, y).Y >= thresh {
+				out.SetGray(x, y, color.Gray{Y: 255})
+				lightPx++
+			}
+		}
+	}
+	// If more than half the pixels are dark, the background is dark (e.g. a
+	// terminal screenshot). Invert so text becomes dark on a white background.
+	if lightPx < w*h/2 {
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				if out.GrayAt(x, y).Y == 0 {
+					out.SetGray(x, y, color.Gray{Y: 255})
+				} else {
+					out.SetGray(x, y, color.Gray{Y: 0})
+				}
+			}
+		}
+	}
+	return out
 }

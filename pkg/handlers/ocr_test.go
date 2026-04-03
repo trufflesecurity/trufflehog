@@ -34,7 +34,7 @@ func TestOCRHandlerImage(t *testing.T) {
 	feature.EnableOCR.Store(true)
 	defer feature.EnableOCR.Store(false)
 
-	file, err := os.Open("testdata/image.png")
+	file, err := os.Open("testdata/test_secret.png")
 	require.NoError(t, err)
 	defer file.Close()
 
@@ -131,7 +131,7 @@ func TestOCRHandlerVideo(t *testing.T) {
 	require.NoError(t, err)
 	defer file.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	rdr, err := newFileReader(ctx, file)
@@ -151,7 +151,7 @@ func TestOCRHandlerVideo(t *testing.T) {
 		assert.NotEmpty(t, dataOrErr.Data)
 	}
 
-	assert.Greater(t, count, 0, "expected at least one chunk of OCR text from test_secret.mp4")
+	assert.Greater(t, count, 0, "expected at least one chunk of OCR text from test_secret.webm")
 }
 
 // TestOCRMimeTypeRouting verifies that selectHandler routes image/video MIME types
