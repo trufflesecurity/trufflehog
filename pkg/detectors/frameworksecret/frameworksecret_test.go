@@ -311,7 +311,7 @@ func TestFrameworkSecretKey_Entropy(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			entropy := shannonEntropy(tc.input)
+			entropy := detectors.StringShannonEntropy(tc.input)
 			if entropy < tc.wantMin {
 				t.Errorf("entropy = %f, want >= %f", entropy, tc.wantMin)
 			}
