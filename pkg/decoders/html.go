@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/net/html"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -15,12 +16,8 @@ import (
 // HTML is a decoder that extracts textual content from HTML documents.
 // It produces a normalized view containing visible text, attribute values,
 // script/style content, and HTML comments with entities and URL-encoding decoded.
-type HTML struct {
-	// Enabled controls whether the decoder is active. When nil, the decoder
-	// is always active. Inject a function that checks a feature flag to
-	// allow dynamic toggling without restarting the scanner.
-	Enabled func() bool
-}
+// Gated at runtime by feature.HTMLDecoderEnabled.
+type HTML struct{}
 
 func (d *HTML) Type() detectorspb.DecoderType {
 	return detectorspb.DecoderType_HTML
@@ -31,19 +28,18 @@ var htmlTagPattern = regexp.MustCompile(`<[a-zA-Z][a-zA-Z0-9]*[\s>/]`)
 // highSignalAttrs are attribute names whose values are extracted into the
 // decoded output because they commonly contain URLs, tokens, or other secrets.
 var highSignalAttrs = map[string]bool{
-	"href":    true,
-	"src":     true,
-	"action":  true,
-	"value":   true,
-	"content": true,
-	"alt":     true,
-	"title":   true,
+	"href":       true,
+	"src":        true,
+	"action":     true,
+	"value":      true,
+	"content":    true,
+	"alt":   true,
+	"title": true,
 }
 
-// syntaxHighlightPrefixes lists CSS class prefixes that mark logical line
-// boundaries in code blocks. MS Teams uses highlight.js (hljs-* classes) to
-// render code, stripping the original newlines in the process. Add prefixes
-// here if other sources use different syntax highlighting libraries.
+// syntaxHighlightPrefixes lists CSS class prefixes used by syntax highlighting
+// libraries. Elements with these classes mark logical line boundaries in code
+// blocks where the platform (e.g. Teams) strips actual newlines.
 var syntaxHighlightPrefixes = []string{"hljs-"}
 
 // residualEntityReplacer decodes common HTML entities that survive double-encoding.
@@ -85,7 +81,7 @@ var blockElements = map[string]bool{
 }
 
 func (d *HTML) FromChunk(chunk *sources.Chunk) *DecodableChunk {
-	if d.Enabled != nil && !d.Enabled() {
+	if !feature.HTMLDecoderEnabled.Load() {
 		return nil
 	}
 	if chunk == nil || len(chunk.Data) == 0 {

@@ -3,6 +3,7 @@ package decoders
 import (
 	"testing"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -363,6 +364,9 @@ func TestHTML_FromChunk(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			feature.HTMLDecoderEnabled.Store(true)
+			defer feature.HTMLDecoderEnabled.Store(false)
+
 			d := &HTML{}
 			got := d.FromChunk(tt.chunk)
 
@@ -386,11 +390,11 @@ func TestHTML_FromChunk(t *testing.T) {
 	}
 }
 
-// TestHTML_FeatureFlagDisabled verifies that the decoder is a no-op when the
-// Enabled callback returns false, allowing the HTMLDecoder feature flag to
-// gate the decoder at runtime without removing it from the pipeline.
+// TestHTML_FeatureFlagDisabled verifies that the decoder is a no-op when
+// feature.HTMLDecoderEnabled is false.
 func TestHTML_FeatureFlagDisabled(t *testing.T) {
-	d := &HTML{Enabled: func() bool { return false }}
+	feature.HTMLDecoderEnabled.Store(false)
+	d := &HTML{}
 	chunk := &sources.Chunk{Data: []byte(`<p>secret: hunter2</p>`)}
 	if got := d.FromChunk(chunk); got != nil {
 		t.Errorf("FromChunk() should return nil when disabled, got %q", string(got.Chunk.Data))
@@ -398,9 +402,12 @@ func TestHTML_FeatureFlagDisabled(t *testing.T) {
 }
 
 // TestHTML_FeatureFlagEnabled verifies that the decoder processes HTML normally
-// when the Enabled callback returns true.
+// when feature.HTMLDecoderEnabled is true.
 func TestHTML_FeatureFlagEnabled(t *testing.T) {
-	d := &HTML{Enabled: func() bool { return true }}
+	feature.HTMLDecoderEnabled.Store(true)
+	defer feature.HTMLDecoderEnabled.Store(false)
+
+	d := &HTML{}
 	chunk := &sources.Chunk{Data: []byte(`<p>secret: hunter2</p>`)}
 	got := d.FromChunk(chunk)
 	if got == nil {
