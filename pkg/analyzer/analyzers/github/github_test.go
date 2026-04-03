@@ -26,20 +26,20 @@ func TestSecretInfoToGistBindings(t *testing.T) {
 	scope := []analyzers.Permission{{Value: "gist"}}
 
 	tests := []struct {
-		name     string
-		gists    []*gh.Gist
-		wantLen  int
-		wantFQNs []string
-		wantName string
+		name      string
+		gists     []*gh.Gist
+		wantLen   int
+		wantFQNs  []string
+		wantNames []string // parallel to wantFQNs; checked unconditionally (including empty string)
 	}{
 		{
 			name: "nil description produces empty name, gist is still included",
 			gists: []*gh.Gist{
 				{ID: strPtr("abc123"), Description: nil, Owner: owner},
 			},
-			wantLen:  1,
-			wantFQNs: []string{"gist.github.com/truffle-sandbox/abc123"},
-			wantName: "",
+			wantLen:   1,
+			wantFQNs:  []string{"gist.github.com/truffle-sandbox/abc123"},
+			wantNames: []string{""},
 		},
 		{
 			name: "nil owner: gist is skipped entirely",
@@ -54,8 +54,9 @@ func TestSecretInfoToGistBindings(t *testing.T) {
 				{ID: strPtr("abc123"), Description: strPtr("valid gist"), Owner: owner},
 				{ID: strPtr("def456"), Description: strPtr("no owner"), Owner: nil},
 			},
-			wantLen:  1,
-			wantFQNs: []string{"gist.github.com/truffle-sandbox/abc123"},
+			wantLen:   1,
+			wantFQNs:  []string{"gist.github.com/truffle-sandbox/abc123"},
+			wantNames: []string{"valid gist"},
 		},
 		{
 			name:    "empty gist list: no bindings",
@@ -82,8 +83,13 @@ func TestSecretInfoToGistBindings(t *testing.T) {
 					t.Errorf("binding[%d].FullyQualifiedName = %q, want %q", i, got[i].Resource.FullyQualifiedName, fqn)
 				}
 			}
-			if tt.wantName != "" && len(got) > 0 && got[0].Resource.Name != tt.wantName {
-				t.Errorf("binding[0].Name = %q, want %q", got[0].Resource.Name, tt.wantName)
+			for i, name := range tt.wantNames {
+				if i >= len(got) {
+					break
+				}
+				if got[i].Resource.Name != name {
+					t.Errorf("binding[%d].Name = %q, want %q", i, got[i].Resource.Name, name)
+				}
 			}
 		})
 	}

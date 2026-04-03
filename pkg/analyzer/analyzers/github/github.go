@@ -114,6 +114,11 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 	}
 	var bindings []analyzers.Binding
 	for _, repo := range repos {
+		// A repo without an owner cannot be attributed; skip it rather than
+		// producing a corrupt parent resource with empty name/FQN.
+		if repo.GetOwner() == nil {
+			continue
+		}
 		resource := analyzers.Resource{
 			Name:               repo.GetName(),
 			FullyQualifiedName: fmt.Sprintf("github.com/%s", repo.GetFullName()),
