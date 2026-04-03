@@ -92,6 +92,7 @@ var (
 	gitCloneTimeout    = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	enableOCR          = cli.Flag("enable-ocr", "Enable OCR scanning of images and video frames for secrets. Requires tesseract and ffmpeg.").Bool()
 
 	gitScan                = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -504,6 +505,10 @@ func run(state overseer.State, logSync func() error) {
 
 	if *userAgentSuffix != "" {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
+	}
+
+	if *enableOCR {
+		feature.EnableOCR.Store(true)
 	}
 
 	// OSS Default APK handling on

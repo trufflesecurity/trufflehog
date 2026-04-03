@@ -224,6 +224,7 @@ const (
 	rpmHandlerType     handlerType = "rpm"
 	apkHandlerType     handlerType = "apk"
 	defaultHandlerType handlerType = "default"
+	ocrHandlerType     handlerType = "ocr"
 	apkExt                         = ".apk"
 )
 
@@ -264,6 +265,15 @@ const (
 	jarMime      mimeType = "application/java-archive"
 	msgMime      mimeType = "application/vnd.ms-outlook"
 	docMime      mimeType = "application/msword"
+
+	// Image MIME types for OCR.
+	pngMime  mimeType = "image/png"
+	jpegMime mimeType = "image/jpeg"
+
+	// Video MIME types for OCR.
+	mp4Mime  mimeType = "video/mp4"
+	mkvMime  mimeType = "video/x-matroska"
+	webmMime mimeType = "video/webm"
 )
 
 // skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
@@ -301,6 +311,11 @@ var skipArchiverMimeTypes = map[mimeType]struct{}{
 	apkMime:      {},
 	msgMime:      {},
 	docMime:      {},
+	pngMime:      {},
+	jpegMime:     {},
+	mp4Mime:      {},
+	mkvMime:      {},
+	webmMime:     {},
 }
 
 // selectHandler dynamically selects and configures a FileHandler based on the provided |mimetype| type and archive flag.
@@ -320,6 +335,16 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 		return newRPMHandler()
 	case apkMime:
 		return newAPKHandler()
+	case pngMime, jpegMime:
+		if feature.EnableOCR.Load() {
+			return newOCRHandler()
+		}
+		return newDefaultHandler(defaultHandlerType)
+	case mp4Mime, mkvMime, webmMime:
+		if feature.EnableOCR.Load() {
+			return newOCRHandler()
+		}
+		return newDefaultHandler(defaultHandlerType)
 	default:
 		if isGenericArchive {
 			return newArchiveHandler()
