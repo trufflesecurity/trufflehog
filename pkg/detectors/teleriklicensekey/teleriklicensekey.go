@@ -49,16 +49,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for match := range uniqueMatches {
+		// Always check if this is a Telerik license key (local validation, not remote)
+		isTelerik, _ := isTelerikLicenseKey(match)
+		if !isTelerik {
+			continue
+		}
+
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TelerikLicenseKey,
 			Raw:          []byte(match),
 		}
 
 		if verify {
-			isVerified, extraData, verificationErr := verifyMatch(match)
-			s1.Verified = isVerified
-			s1.ExtraData = extraData
-			s1.SetVerificationError(verificationErr, match)
+			// Set verified to true since local Telerik check passed
+			s1.Verified = true
 		}
 
 		results = append(results, s1)
@@ -67,23 +71,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(token string) (bool, map[string]string, error) {
-	// Decode JWT header
+func isTelerikLicenseKey(token string) (bool, error) {
+	// Decode JWT header to verify typ claim
 	headerClaims, err := decodeJWT(token)
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to decode JWT: %w", err)
+		return false, fmt.Errorf("failed to decode JWT: %w", err)
 	}
 
 	// Get the token type from header - should be "Telerik License Key"
 	tokenType, ok := headerClaims["typ"].(string)
-
 	if ok && tokenType == "Telerik License Key" {
-		// If the JWT's header "typ" claim is "Telerik License Key", consider it verified
-		return true, nil, nil
+		return true, nil
 	}
 
-	// All other tokens are considered unverified
-	return false, nil, nil
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
