@@ -51,19 +51,14 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, unverified",
+			name: "non-telerik jwt is filtered",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within but not valid", inactiveSecret)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_TelerikLicenseKey,
-					Verified:     false,
-				},
-			},
+			want:                nil,
 			wantErr:             false,
 			wantVerificationErr: false,
 		},

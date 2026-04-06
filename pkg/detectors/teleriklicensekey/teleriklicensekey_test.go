@@ -32,15 +32,6 @@ func TestTeleriklicensekey_Pattern(t *testing.T) {
 			want: []string{validTelerikLicenseJWT},
 		},
 		{
-			name: "Valid JWT - Not a Telerik License Key",
-			input: `
-				[INFO] Checking for Telerik License key
-				[DEBUG] Using eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
-				[ERROR] Response received: Valid JWT, but is not a Telerik License Key.
-			`,
-			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"},
-		},
-		{
 			name: "Malformed JWT - no JWT pattern detected",
 			input: `
 				[INFO] Checking for Telerik License key
