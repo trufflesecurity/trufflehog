@@ -7,6 +7,7 @@
 package configpb
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	custom_detectorspb "github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	sourcespb "github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -29,6 +30,7 @@ type Config struct {
 
 	Sources   []*sourcespb.LocalSource          `protobuf:"bytes,9,rep,name=sources,proto3" json:"sources,omitempty"`
 	Detectors []*custom_detectorspb.CustomRegex `protobuf:"bytes,13,rep,name=detectors,proto3" json:"detectors,omitempty"`
+	Ocr       *OCRConfig                        `protobuf:"bytes,14,opt,name=ocr,proto3" json:"ocr,omitempty"`
 }
 
 func (x *Config) Reset() {
@@ -77,25 +79,669 @@ func (x *Config) GetDetectors() []*custom_detectorspb.CustomRegex {
 	return nil
 }
 
+func (x *Config) GetOcr() *OCRConfig {
+	if x != nil {
+		return x.Ocr
+	}
+	return nil
+}
+
+// OCRConfig selects which OCR backend to use when --enable-ocr is active.
+// Exactly one provider must be set. If the ocr block is omitted entirely,
+// TruffleHog falls back to the local Tesseract binary (same as --enable-ocr alone).
+type OCRConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Provider:
+	//
+	//	*OCRConfig_Tesseract
+	//	*OCRConfig_Google
+	//	*OCRConfig_Openai
+	//	*OCRConfig_Custom
+	Provider isOCRConfig_Provider `protobuf_oneof:"provider"`
+}
+
+func (x *OCRConfig) Reset() {
+	*x = OCRConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OCRConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OCRConfig) ProtoMessage() {}
+
+func (x *OCRConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OCRConfig.ProtoReflect.Descriptor instead.
+func (*OCRConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{1}
+}
+
+func (m *OCRConfig) GetProvider() isOCRConfig_Provider {
+	if m != nil {
+		return m.Provider
+	}
+	return nil
+}
+
+func (x *OCRConfig) GetTesseract() *TesseractOCRConfig {
+	if x, ok := x.GetProvider().(*OCRConfig_Tesseract); ok {
+		return x.Tesseract
+	}
+	return nil
+}
+
+func (x *OCRConfig) GetGoogle() *GoogleOCRConfig {
+	if x, ok := x.GetProvider().(*OCRConfig_Google); ok {
+		return x.Google
+	}
+	return nil
+}
+
+func (x *OCRConfig) GetOpenai() *OpenAIOCRConfig {
+	if x, ok := x.GetProvider().(*OCRConfig_Openai); ok {
+		return x.Openai
+	}
+	return nil
+}
+
+func (x *OCRConfig) GetCustom() *CustomOCRConfig {
+	if x, ok := x.GetProvider().(*OCRConfig_Custom); ok {
+		return x.Custom
+	}
+	return nil
+}
+
+type isOCRConfig_Provider interface {
+	isOCRConfig_Provider()
+}
+
+type OCRConfig_Tesseract struct {
+	Tesseract *TesseractOCRConfig `protobuf:"bytes,1,opt,name=tesseract,proto3,oneof"`
+}
+
+type OCRConfig_Google struct {
+	Google *GoogleOCRConfig `protobuf:"bytes,2,opt,name=google,proto3,oneof"`
+}
+
+type OCRConfig_Openai struct {
+	Openai *OpenAIOCRConfig `protobuf:"bytes,3,opt,name=openai,proto3,oneof"`
+}
+
+type OCRConfig_Custom struct {
+	Custom *CustomOCRConfig `protobuf:"bytes,4,opt,name=custom,proto3,oneof"`
+}
+
+func (*OCRConfig_Tesseract) isOCRConfig_Provider() {}
+
+func (*OCRConfig_Google) isOCRConfig_Provider() {}
+
+func (*OCRConfig_Openai) isOCRConfig_Provider() {}
+
+func (*OCRConfig_Custom) isOCRConfig_Provider() {}
+
+// TesseractOCRConfig uses the local Tesseract binary.
+// Included for explicitness; reserved for future per-field options (e.g. tessdata path).
+type TesseractOCRConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *TesseractOCRConfig) Reset() {
+	*x = TesseractOCRConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TesseractOCRConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TesseractOCRConfig) ProtoMessage() {}
+
+func (x *TesseractOCRConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TesseractOCRConfig.ProtoReflect.Descriptor instead.
+func (*TesseractOCRConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{2}
+}
+
+// GoogleOCRConfig is a preset for the Google Cloud Vision TEXT_DETECTION API.
+// Exactly one auth method must be set. Service account credentials are recommended
+// over API keys for production use.
+type GoogleOCRConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Auth:
+	//
+	//	*GoogleOCRConfig_CredentialsFile
+	//	*GoogleOCRConfig_ApiKey
+	Auth isGoogleOCRConfig_Auth `protobuf_oneof:"auth"`
+}
+
+func (x *GoogleOCRConfig) Reset() {
+	*x = GoogleOCRConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GoogleOCRConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GoogleOCRConfig) ProtoMessage() {}
+
+func (x *GoogleOCRConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GoogleOCRConfig.ProtoReflect.Descriptor instead.
+func (*GoogleOCRConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{3}
+}
+
+func (m *GoogleOCRConfig) GetAuth() isGoogleOCRConfig_Auth {
+	if m != nil {
+		return m.Auth
+	}
+	return nil
+}
+
+func (x *GoogleOCRConfig) GetCredentialsFile() string {
+	if x, ok := x.GetAuth().(*GoogleOCRConfig_CredentialsFile); ok {
+		return x.CredentialsFile
+	}
+	return ""
+}
+
+func (x *GoogleOCRConfig) GetApiKey() string {
+	if x, ok := x.GetAuth().(*GoogleOCRConfig_ApiKey); ok {
+		return x.ApiKey
+	}
+	return ""
+}
+
+type isGoogleOCRConfig_Auth interface {
+	isGoogleOCRConfig_Auth()
+}
+
+type GoogleOCRConfig_CredentialsFile struct {
+	// credentials_file is the path to a Google service account JSON key file.
+	// Supports ${ENV_VAR} expansion. Recommended for production.
+	CredentialsFile string `protobuf:"bytes,1,opt,name=credentials_file,json=credentialsFile,proto3,oneof"`
+}
+
+type GoogleOCRConfig_ApiKey struct {
+	// api_key is a Google Cloud API key. Simpler but less secure than a service account.
+	// Supports ${ENV_VAR} expansion.
+	ApiKey string `protobuf:"bytes,2,opt,name=api_key,json=apiKey,proto3,oneof"`
+}
+
+func (*GoogleOCRConfig_CredentialsFile) isGoogleOCRConfig_Auth() {}
+
+func (*GoogleOCRConfig_ApiKey) isGoogleOCRConfig_Auth() {}
+
+// OpenAIOCRConfig is a preset for the OpenAI chat completions vision API (GPT-4o by default).
+type OpenAIOCRConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// API key for the OpenAI API. Supports ${ENV_VAR} expansion.
+	ApiKey string `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	// Model to use (default: "gpt-4o").
+	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+}
+
+func (x *OpenAIOCRConfig) Reset() {
+	*x = OpenAIOCRConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OpenAIOCRConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenAIOCRConfig) ProtoMessage() {}
+
+func (x *OpenAIOCRConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenAIOCRConfig.ProtoReflect.Descriptor instead.
+func (*OpenAIOCRConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *OpenAIOCRConfig) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *OpenAIOCRConfig) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+// CustomOCRConfig describes a generic HTTP OCR server.
+type CustomOCRConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Full URL of the OCR endpoint.
+	Endpoint string             `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Auth     *OCRAuthConfig     `protobuf:"bytes,2,opt,name=auth,proto3" json:"auth,omitempty"`
+	Request  *OCRRequestConfig  `protobuf:"bytes,3,opt,name=request,proto3" json:"request,omitempty"`
+	Response *OCRResponseConfig `protobuf:"bytes,4,opt,name=response,proto3" json:"response,omitempty"`
+}
+
+func (x *CustomOCRConfig) Reset() {
+	*x = CustomOCRConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CustomOCRConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CustomOCRConfig) ProtoMessage() {}
+
+func (x *CustomOCRConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CustomOCRConfig.ProtoReflect.Descriptor instead.
+func (*CustomOCRConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CustomOCRConfig) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *CustomOCRConfig) GetAuth() *OCRAuthConfig {
+	if x != nil {
+		return x.Auth
+	}
+	return nil
+}
+
+func (x *CustomOCRConfig) GetRequest() *OCRRequestConfig {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+func (x *CustomOCRConfig) GetResponse() *OCRResponseConfig {
+	if x != nil {
+		return x.Response
+	}
+	return nil
+}
+
+// OCRAuthConfig describes how to authenticate against the OCR endpoint.
+type OCRAuthConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// type must be one of: bearer, header, api_key_query, basic.
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	// value is the token or API key. Supports ${ENV_VAR} expansion.
+	Value string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	// header_name is used when type is "header" (e.g. "X-Api-Key").
+	HeaderName string `protobuf:"bytes,3,opt,name=header_name,json=headerName,proto3" json:"header_name,omitempty"`
+	// param_name is the query parameter name used when type is "api_key_query".
+	ParamName string `protobuf:"bytes,4,opt,name=param_name,json=paramName,proto3" json:"param_name,omitempty"`
+	// username / password are used when type is "basic". Both support ${ENV_VAR} expansion.
+	Username string `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
+	Password string `protobuf:"bytes,6,opt,name=password,proto3" json:"password,omitempty"`
+}
+
+func (x *OCRAuthConfig) Reset() {
+	*x = OCRAuthConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OCRAuthConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OCRAuthConfig) ProtoMessage() {}
+
+func (x *OCRAuthConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OCRAuthConfig.ProtoReflect.Descriptor instead.
+func (*OCRAuthConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *OCRAuthConfig) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *OCRAuthConfig) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *OCRAuthConfig) GetHeaderName() string {
+	if x != nil {
+		return x.HeaderName
+	}
+	return ""
+}
+
+func (x *OCRAuthConfig) GetParamName() string {
+	if x != nil {
+		return x.ParamName
+	}
+	return ""
+}
+
+func (x *OCRAuthConfig) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *OCRAuthConfig) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+// OCRRequestConfig controls how the HTTP request body is constructed.
+type OCRRequestConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// content_type of the request (default: "application/json").
+	ContentType string `protobuf:"bytes,1,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	// body_template is a Go text/template string.
+	// Available variables: {{.Base64Image}}, {{.MimeType}}.
+	BodyTemplate string `protobuf:"bytes,2,opt,name=body_template,json=bodyTemplate,proto3" json:"body_template,omitempty"`
+}
+
+func (x *OCRRequestConfig) Reset() {
+	*x = OCRRequestConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OCRRequestConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OCRRequestConfig) ProtoMessage() {}
+
+func (x *OCRRequestConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OCRRequestConfig.ProtoReflect.Descriptor instead.
+func (*OCRRequestConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *OCRRequestConfig) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *OCRRequestConfig) GetBodyTemplate() string {
+	if x != nil {
+		return x.BodyTemplate
+	}
+	return ""
+}
+
+// OCRResponseConfig controls how the text is extracted from the HTTP response.
+type OCRResponseConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// text_path is a dot-separated path into the JSON response body.
+	// Examples: "text", "result.text", "choices.0.message.content"
+	TextPath string `protobuf:"bytes,1,opt,name=text_path,json=textPath,proto3" json:"text_path,omitempty"`
+}
+
+func (x *OCRResponseConfig) Reset() {
+	*x = OCRResponseConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_config_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OCRResponseConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OCRResponseConfig) ProtoMessage() {}
+
+func (x *OCRResponseConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_config_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OCRResponseConfig.ProtoReflect.Descriptor instead.
+func (*OCRResponseConfig) Descriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *OCRResponseConfig) GetTextPath() string {
+	if x != nil {
+		return x.TextPath
+	}
+	return ""
+}
+
 var File_config_proto protoreflect.FileDescriptor
 
 var file_config_proto_rawDesc = []byte{
 	0x0a, 0x0c, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x06,
 	0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x1a, 0x0d, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x2e,
 	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x16, 0x63, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x5f, 0x64, 0x65,
-	0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x75, 0x0a,
-	0x06, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x2e, 0x0a, 0x07, 0x73, 0x6f, 0x75, 0x72, 0x63,
-	0x65, 0x73, 0x18, 0x09, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x73, 0x6f, 0x75, 0x72, 0x63,
-	0x65, 0x73, 0x2e, 0x4c, 0x6f, 0x63, 0x61, 0x6c, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x07,
-	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x12, 0x3b, 0x0a, 0x09, 0x64, 0x65, 0x74, 0x65, 0x63,
-	0x74, 0x6f, 0x72, 0x73, 0x18, 0x0d, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1d, 0x2e, 0x63, 0x75, 0x73,
-	0x74, 0x6f, 0x6d, 0x5f, 0x64, 0x65, 0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x2e, 0x43, 0x75,
-	0x73, 0x74, 0x6f, 0x6d, 0x52, 0x65, 0x67, 0x65, 0x78, 0x52, 0x09, 0x64, 0x65, 0x74, 0x65, 0x63,
-	0x74, 0x6f, 0x72, 0x73, 0x42, 0x3a, 0x5a, 0x38, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63,
-	0x6f, 0x6d, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69,
-	0x74, 0x79, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33,
-	0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x62, 0x2f, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x70, 0x62,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x17, 0x76,
+	0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x65, 0x2f, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x65,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x9a, 0x01, 0x0a, 0x06, 0x43, 0x6f, 0x6e, 0x66, 0x69,
+	0x67, 0x12, 0x2e, 0x0a, 0x07, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x18, 0x09, 0x20, 0x03,
+	0x28, 0x0b, 0x32, 0x14, 0x2e, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x2e, 0x4c, 0x6f, 0x63,
+	0x61, 0x6c, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x07, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
+	0x73, 0x12, 0x3b, 0x0a, 0x09, 0x64, 0x65, 0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x18, 0x0d,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x1d, 0x2e, 0x63, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x5f, 0x64, 0x65,
+	0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x2e, 0x43, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x52, 0x65,
+	0x67, 0x65, 0x78, 0x52, 0x09, 0x64, 0x65, 0x74, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x12, 0x23,
+	0x0a, 0x03, 0x6f, 0x63, 0x72, 0x18, 0x0e, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x63, 0x6f,
+	0x6e, 0x66, 0x69, 0x67, 0x2e, 0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x03,
+	0x6f, 0x63, 0x72, 0x22, 0xec, 0x01, 0x0a, 0x09, 0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69,
+	0x67, 0x12, 0x3a, 0x0a, 0x09, 0x74, 0x65, 0x73, 0x73, 0x65, 0x72, 0x61, 0x63, 0x74, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x54, 0x65,
+	0x73, 0x73, 0x65, 0x72, 0x61, 0x63, 0x74, 0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67,
+	0x48, 0x00, 0x52, 0x09, 0x74, 0x65, 0x73, 0x73, 0x65, 0x72, 0x61, 0x63, 0x74, 0x12, 0x31, 0x0a,
+	0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e,
+	0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x47, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x4f, 0x43, 0x52,
+	0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x48, 0x00, 0x52, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
+	0x12, 0x31, 0x0a, 0x06, 0x6f, 0x70, 0x65, 0x6e, 0x61, 0x69, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x17, 0x2e, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x49,
+	0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x48, 0x00, 0x52, 0x06, 0x6f, 0x70, 0x65,
+	0x6e, 0x61, 0x69, 0x12, 0x31, 0x0a, 0x06, 0x63, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x18, 0x04, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x43, 0x75, 0x73,
+	0x74, 0x6f, 0x6d, 0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x48, 0x00, 0x52, 0x06,
+	0x63, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x42, 0x0a, 0x0a, 0x08, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64,
+	0x65, 0x72, 0x22, 0x14, 0x0a, 0x12, 0x54, 0x65, 0x73, 0x73, 0x65, 0x72, 0x61, 0x63, 0x74, 0x4f,
+	0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x22, 0x61, 0x0a, 0x0f, 0x47, 0x6f, 0x6f, 0x67,
+	0x6c, 0x65, 0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x2b, 0x0a, 0x10, 0x63,
+	0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x73, 0x5f, 0x66, 0x69, 0x6c, 0x65, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x0f, 0x63, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74,
+	0x69, 0x61, 0x6c, 0x73, 0x46, 0x69, 0x6c, 0x65, 0x12, 0x19, 0x0a, 0x07, 0x61, 0x70, 0x69, 0x5f,
+	0x6b, 0x65, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x06, 0x61, 0x70, 0x69,
+	0x4b, 0x65, 0x79, 0x42, 0x06, 0x0a, 0x04, 0x61, 0x75, 0x74, 0x68, 0x22, 0x40, 0x0a, 0x0f, 0x4f,
+	0x70, 0x65, 0x6e, 0x41, 0x49, 0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x17,
+	0x0a, 0x07, 0x61, 0x70, 0x69, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x06, 0x61, 0x70, 0x69, 0x4b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x6d, 0x6f, 0x64, 0x65, 0x6c,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x22, 0xcd, 0x01,
+	0x0a, 0x0f, 0x43, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x4f, 0x43, 0x52, 0x43, 0x6f, 0x6e, 0x66, 0x69,
+	0x67, 0x12, 0x24, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x42, 0x08, 0xfa, 0x42, 0x05, 0x72, 0x03, 0x90, 0x01, 0x01, 0x52, 0x08, 0x65,
+	0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x12, 0x29, 0x0a, 0x04, 0x61, 0x75, 0x74, 0x68, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x15, 0x2e, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x4f,
+	0x43, 0x52, 0x41, 0x75, 0x74, 0x68, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x04, 0x61, 0x75,
+	0x74, 0x68, 0x12, 0x32, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e, 0x4f, 0x43, 0x52,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x07, 0x72,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x35, 0x0a, 0x08, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x63, 0x6f, 0x6e, 0x66, 0x69,
+	0x67, 0x2e, 0x4f, 0x43, 0x52, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x43, 0x6f, 0x6e,
+	0x66, 0x69, 0x67, 0x52, 0x08, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0xb1, 0x01,
+	0x0a, 0x0d, 0x4f, 0x43, 0x52, 0x41, 0x75, 0x74, 0x68, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12,
+	0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74,
+	0x79, 0x70, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1f, 0x0a, 0x0b, 0x68, 0x65, 0x61,
+	0x64, 0x65, 0x72, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a,
+	0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1d, 0x0a, 0x0a, 0x70, 0x61,
+	0x72, 0x61, 0x6d, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09,
+	0x70, 0x61, 0x72, 0x61, 0x6d, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x75, 0x73, 0x65,
+	0x72, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x75, 0x73, 0x65,
+	0x72, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72,
+	0x64, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72,
+	0x64, 0x22, 0x5a, 0x0a, 0x10, 0x4f, 0x43, 0x52, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x43,
+	0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74,
+	0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x63, 0x6f, 0x6e,
+	0x74, 0x65, 0x6e, 0x74, 0x54, 0x79, 0x70, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x62, 0x6f, 0x64, 0x79,
+	0x5f, 0x74, 0x65, 0x6d, 0x70, 0x6c, 0x61, 0x74, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x0c, 0x62, 0x6f, 0x64, 0x79, 0x54, 0x65, 0x6d, 0x70, 0x6c, 0x61, 0x74, 0x65, 0x22, 0x30, 0x0a,
+	0x11, 0x4f, 0x43, 0x52, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x43, 0x6f, 0x6e, 0x66,
+	0x69, 0x67, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x65, 0x78, 0x74, 0x5f, 0x70, 0x61, 0x74, 0x68, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x74, 0x65, 0x78, 0x74, 0x50, 0x61, 0x74, 0x68, 0x42,
+	0x3a, 0x5a, 0x38, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72,
+	0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72,
+	0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f,
+	0x70, 0x62, 0x2f, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x33,
 }
 
 var (
@@ -110,20 +756,36 @@ func file_config_proto_rawDescGZIP() []byte {
 	return file_config_proto_rawDescData
 }
 
-var file_config_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_config_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_config_proto_goTypes = []interface{}{
 	(*Config)(nil),                         // 0: config.Config
-	(*sourcespb.LocalSource)(nil),          // 1: sources.LocalSource
-	(*custom_detectorspb.CustomRegex)(nil), // 2: custom_detectors.CustomRegex
+	(*OCRConfig)(nil),                      // 1: config.OCRConfig
+	(*TesseractOCRConfig)(nil),             // 2: config.TesseractOCRConfig
+	(*GoogleOCRConfig)(nil),                // 3: config.GoogleOCRConfig
+	(*OpenAIOCRConfig)(nil),                // 4: config.OpenAIOCRConfig
+	(*CustomOCRConfig)(nil),                // 5: config.CustomOCRConfig
+	(*OCRAuthConfig)(nil),                  // 6: config.OCRAuthConfig
+	(*OCRRequestConfig)(nil),               // 7: config.OCRRequestConfig
+	(*OCRResponseConfig)(nil),              // 8: config.OCRResponseConfig
+	(*sourcespb.LocalSource)(nil),          // 9: sources.LocalSource
+	(*custom_detectorspb.CustomRegex)(nil), // 10: custom_detectors.CustomRegex
 }
 var file_config_proto_depIdxs = []int32{
-	1, // 0: config.Config.sources:type_name -> sources.LocalSource
-	2, // 1: config.Config.detectors:type_name -> custom_detectors.CustomRegex
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	9,  // 0: config.Config.sources:type_name -> sources.LocalSource
+	10, // 1: config.Config.detectors:type_name -> custom_detectors.CustomRegex
+	1,  // 2: config.Config.ocr:type_name -> config.OCRConfig
+	2,  // 3: config.OCRConfig.tesseract:type_name -> config.TesseractOCRConfig
+	3,  // 4: config.OCRConfig.google:type_name -> config.GoogleOCRConfig
+	4,  // 5: config.OCRConfig.openai:type_name -> config.OpenAIOCRConfig
+	5,  // 6: config.OCRConfig.custom:type_name -> config.CustomOCRConfig
+	6,  // 7: config.CustomOCRConfig.auth:type_name -> config.OCRAuthConfig
+	7,  // 8: config.CustomOCRConfig.request:type_name -> config.OCRRequestConfig
+	8,  // 9: config.CustomOCRConfig.response:type_name -> config.OCRResponseConfig
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_config_proto_init() }
@@ -144,6 +806,112 @@ func file_config_proto_init() {
 				return nil
 			}
 		}
+		file_config_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OCRConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_config_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TesseractOCRConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_config_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GoogleOCRConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_config_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OpenAIOCRConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_config_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CustomOCRConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_config_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OCRAuthConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_config_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OCRRequestConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_config_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OCRResponseConfig); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+	}
+	file_config_proto_msgTypes[1].OneofWrappers = []interface{}{
+		(*OCRConfig_Tesseract)(nil),
+		(*OCRConfig_Google)(nil),
+		(*OCRConfig_Openai)(nil),
+		(*OCRConfig_Custom)(nil),
+	}
+	file_config_proto_msgTypes[3].OneofWrappers = []interface{}{
+		(*GoogleOCRConfig_CredentialsFile)(nil),
+		(*GoogleOCRConfig_ApiKey)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -151,7 +919,7 @@ func file_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_config_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
