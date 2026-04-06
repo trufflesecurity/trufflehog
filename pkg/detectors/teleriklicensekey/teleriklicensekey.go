@@ -25,7 +25,7 @@ const maxSecretSize = 4096
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_.+\/]*)\b`)
+	keyPat = regexp.MustCompile(`\b(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_.+/-]*)\b`)
 )
 
 // The default max secret size value for this detector must be overridden or JWTs with lots of claims will get missed.

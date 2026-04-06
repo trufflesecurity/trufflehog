@@ -97,6 +97,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teleriklicensekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitlyaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitmex"
@@ -1572,6 +1573,7 @@ func buildDetectorList() []detectors.Detector {
 		&simplynoted.Scanner{},
 		&simvoly.Scanner{},
 		&sinchmessage.Scanner{},
+		&teleriklicensekey.Scanner{},
 		&sirv.Scanner{},
 		&siteleaf.Scanner{},
 		&skrappio.Scanner{},
