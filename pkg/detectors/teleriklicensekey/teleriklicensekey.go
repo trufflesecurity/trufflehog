@@ -60,11 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(match),
 		}
 
-		if verify {
-			// Set verified to true since local Telerik check passed
-			s1.Verified = true
-		}
-
 		results = append(results, s1)
 	}
 

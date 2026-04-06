@@ -34,7 +34,7 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, not verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -44,7 +44,7 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_TelerikLicenseKey,
-					Verified:     true,
+					Verified:     false,
 				},
 			},
 			wantErr:             false,
