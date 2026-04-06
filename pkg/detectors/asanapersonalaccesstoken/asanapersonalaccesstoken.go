@@ -52,6 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, err := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, resMatch)
+			if isVerified {
+				s1.AnalysisInfo = map[string]string{"key": resMatch}
+			}
 		}
 
 		results = append(results, s1)
