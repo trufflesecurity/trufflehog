@@ -155,6 +155,32 @@ func TestHTML_FromChunk(t *testing.T) {
 			want:  "text\nbody { background: url(\"https://cdn.com?key=secret\"); }",
 		},
 		{
+			// Script following an inline element must NOT concatenate with
+			// the preceding text; it needs its own newline boundary.
+			name:  "script adjacent to inline text gets boundary",
+			chunk: &sources.Chunk{Data: []byte(`<span>text</span><script>var key="secret";</script>`)},
+			want:  "text\nvar key=\"secret\";",
+		},
+		{
+			// Style following an inline element must NOT concatenate.
+			name:  "style adjacent to inline text gets boundary",
+			chunk: &sources.Chunk{Data: []byte(`<span>text</span><style>.x { color: red; }</style>`)},
+			want:  "text\n.x { color: red; }",
+		},
+		{
+			// Entity-like sequences in script content are raw text and must
+			// NOT be decoded by the residual entity replacer.
+			name:  "entities in script preserved as raw text",
+			chunk: &sources.Chunk{Data: []byte(`<script>var url = "a=1&amp;b=2";</script>`)},
+			want:  `var url = "a=1&amp;b=2";`,
+		},
+		{
+			// Entity-like sequences in style content are raw text.
+			name:  "entities in style preserved as raw text",
+			chunk: &sources.Chunk{Data: []byte(`<style>body::after { content: "&amp;copy"; }</style>`)},
+			want:  `body::after { content: "&amp;copy"; }`,
+		},
+		{
 			// HTML comments are a common place for debug credentials and
 			// TODO notes with hardcoded passwords.
 			name:  "HTML comment content included",

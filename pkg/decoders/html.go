@@ -78,6 +78,16 @@ var blockElements = map[string]bool{
 	"details": true, "summary": true, "main": true, "nav": true, "aside": true,
 	"form": true, "fieldset": true, "legend": true,
 	"dd": true, "dt": true, "dl": true,
+	"script": true, "style": true,
+}
+
+// rawTextElements are elements whose content the HTML parser treats as raw
+// text (entities are NOT decoded). Residual entity decoding must be skipped
+// for text nodes inside these elements to avoid corrupting literal sequences
+// like &amp; in JavaScript.
+var rawTextElements = map[string]bool{
+	"script": true,
+	"style":  true,
 }
 
 func (d *HTML) FromChunk(chunk *sources.Chunk) *DecodableChunk {
@@ -118,18 +128,20 @@ func extractHTML(data []byte) []byte {
 	var buf bytes.Buffer
 	buf.Grow(len(data))
 
-	walkNode(&buf, doc)
+	walkNode(&buf, doc, false)
 
 	result := stripInvisible(buf.Bytes())
-	result = decodeResidualEntities(result)
 	return normalizeWhitespace(result)
 }
 
-func walkNode(buf *bytes.Buffer, n *html.Node) {
+func walkNode(buf *bytes.Buffer, n *html.Node, inRawText bool) {
 	switch n.Type {
 	case html.TextNode:
 		text := n.Data
 		if text != "" {
+			if !inRawText {
+				text = residualEntityReplacer.Replace(text)
+			}
 			buf.WriteString(text)
 		}
 
@@ -151,17 +163,18 @@ func walkNode(buf *bytes.Buffer, n *html.Node) {
 
 		emitAttributes(buf, n)
 
+		childRaw := inRawText || rawTextElements[n.Data]
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walkNode(buf, c)
+			walkNode(buf, c, childRaw)
 		}
 
-		if isBlock || n.Data == "br" {
+		if isBlock {
 			ensureNewline(buf)
 		}
 
 	default:
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walkNode(buf, c)
+			walkNode(buf, c, inRawText)
 		}
 	}
 }
@@ -213,15 +226,6 @@ func ensureNewline(buf *bytes.Buffer) {
 
 func stripInvisible(data []byte) []byte {
 	return []byte(invisibleReplacer.Replace(string(data)))
-}
-
-func decodeResidualEntities(data []byte) []byte {
-	s := string(data)
-	decoded := residualEntityReplacer.Replace(s)
-	if decoded == s {
-		return data
-	}
-	return []byte(decoded)
 }
 
 // normalizeWhitespace collapses runs of blank lines and trims leading/trailing whitespace.
