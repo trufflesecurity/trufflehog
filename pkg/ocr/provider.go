@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/configpb"
 )
@@ -49,27 +48,18 @@ func NewProvider(cfg *configpb.OCRConfig) (Provider, error) {
 		return &TesseractProvider{}, nil
 	}
 
-	switch p := cfg.GetProvider().(type) {
+	switch cfg.GetProvider().(type) {
 	case *configpb.OCRConfig_Tesseract:
-		_ = p
 		return &TesseractProvider{}, nil
 
 	case *configpb.OCRConfig_Google:
-		return NewGoogleProvider(p.Google)
+		return NewGoogleProvider(cfg.GetGoogle())
 
 	case *configpb.OCRConfig_Openai:
-		apiKey := ExpandEnv(p.Openai.GetApiKey())
-		if apiKey == "" {
-			return nil, fmt.Errorf("ocr.openai.api_key must not be empty")
-		}
-		model := strings.TrimSpace(p.Openai.GetModel())
-		if model == "" {
-			model = "gpt-4o"
-		}
-		return NewOpenAIProvider(apiKey, model), nil
+		return NewOpenAIProvider(cfg.GetOpenai())
 
 	case *configpb.OCRConfig_Custom:
-		return NewCustomHTTPProvider(p.Custom)
+		return NewCustomHTTPProvider(cfg.GetCustom())
 
 	default:
 		return nil, fmt.Errorf("unknown OCR provider in config")

@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/configpb"
 )
 
 const openAIEndpoint = "https://api.openai.com/v1/chat/completions"
@@ -22,8 +25,13 @@ type OpenAIProvider struct {
 	httpClient *http.Client
 }
 
-// NewOpenAIProvider creates an OpenAIProvider. model defaults to "gpt-4o" if empty.
-func NewOpenAIProvider(apiKey, model string) *OpenAIProvider {
+// NewOpenAIProvider constructs an OpenAIProvider from the proto config.
+func NewOpenAIProvider(cfg *configpb.OpenAIOCRConfig) (*OpenAIProvider, error) {
+	apiKey := ExpandEnv(cfg.GetApiKey())
+	if apiKey == "" {
+		return nil, fmt.Errorf("openai ocr: api_key must not be empty")
+	}
+	model := strings.TrimSpace(cfg.GetModel())
 	if model == "" {
 		model = "gpt-4o"
 	}
@@ -31,7 +39,7 @@ func NewOpenAIProvider(apiKey, model string) *OpenAIProvider {
 		apiKey:     apiKey,
 		model:      model,
 		httpClient: &http.Client{},
-	}
+	}, nil
 }
 
 // ExtractText sends imageData to the OpenAI vision API and returns the extracted text.
