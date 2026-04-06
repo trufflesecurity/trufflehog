@@ -97,7 +97,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teleriklicensekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitlyaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitmex"
@@ -750,6 +749,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/technicalanalysisapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tefter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/telegrambottoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teleriklicensekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teletype"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/telnyx"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/terraformcloudpersonaltoken"
@@ -1573,7 +1573,6 @@ func buildDetectorList() []detectors.Detector {
 		&simplynoted.Scanner{},
 		&simvoly.Scanner{},
 		&sinchmessage.Scanner{},
-		&teleriklicensekey.Scanner{},
 		&sirv.Scanner{},
 		&siteleaf.Scanner{},
 		&skrappio.Scanner{},
@@ -1640,6 +1639,7 @@ func buildDetectorList() []detectors.Detector {
 		&technicalanalysisapi.Scanner{},
 		&tefter.Scanner{},
 		&telegrambottoken.Scanner{},
+		&teleriklicensekey.Scanner{},
 		&teletype.Scanner{},
 		&telnyx.Scanner{},
 		&terraformcloudpersonaltoken.Scanner{},
