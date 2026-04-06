@@ -36,15 +36,14 @@ func TestViewneo_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern - realistic bearer token in config",
-			input: `# viewneo digital signage config
-VIEWNEO_API_TOKEN="` + validPattern + `"`,
-			want: []string{validPattern},
+			name:  "valid pattern - realistic bearer token in config",
+			input: fmt.Sprintf("# %s digital signage config\nVIEWNEO_API_TOKEN=\"%s\"", keyword, validPattern),
+			want:  []string{validPattern},
 		},
 		{
-			name: "valid pattern - ignore duplicate",
-			input: `viewneo token = '` + validPattern + `' | '` + validPattern + `'`,
-			want: []string{validPattern},
+			name:  "valid pattern - ignore duplicate",
+			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
