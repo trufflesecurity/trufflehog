@@ -15,13 +15,23 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+// Ensure the Scanner satisfies expected interfaces at compile time.
+var _ interface {
+	detectors.Detector
+	detectors.MaxSecretSizeProvider
+} = (*Scanner)(nil)
+
+const maxSecretSize = 4096
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_.+\/]*)\b`)
 )
+
+// The default max secret size value for this detector must be overridden or JWTs with lots of claims will get missed.
+func (Scanner) MaxSecretSize() int64 {
+	return maxSecretSize
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
