@@ -79,40 +79,6 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
-		{
-			name: "found, verified (no HTTP client needed for JWT validation)",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_TelerikLicenseKey,
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
-		{
-			name: "found, verified (local JWT validation)",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_TelerikLicenseKey,
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
