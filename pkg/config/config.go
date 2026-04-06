@@ -25,6 +25,7 @@ import (
 type Config struct {
 	Sources   []sources.ConfiguredSource
 	Detectors []detectors.Detector
+	Ocr       *configpb.OCRConfig // populated when an ocr: block is present in the YAML
 }
 
 // Read parses a given filename into a Config.
@@ -69,6 +70,7 @@ func NewYAML(input []byte) (*Config, error) {
 	return &Config{
 		Detectors: detectorConfigs,
 		Sources:   sourceConfigs,
+		Ocr:       inputYAML.GetOcr(),
 	}, nil
 }
 

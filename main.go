@@ -34,6 +34,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/ocr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/configpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -93,6 +95,7 @@ var (
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 	enableOCR          = cli.Flag("enable-ocr", "Enable OCR scanning of images and video frames for secrets. Requires tesseract and ffmpeg.").Bool()
+	ocrConfigFilename  = cli.Flag("ocr-config", "Path to OCR provider config file. Configures the OCR provider (google, openai, or custom) and automatically enables OCR.").ExistingFile()
 
 	gitScan                = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -509,6 +512,7 @@ func run(state overseer.State, logSync func() error) {
 
 	if *enableOCR {
 		feature.EnableOCR.Store(true)
+		logger.Info("OCR enabled", "provider", "tesseract")
 	}
 
 	// OSS Default APK handling on
@@ -531,6 +535,35 @@ func run(state overseer.State, logSync func() error) {
 		if err != nil {
 			logFatal(err, "error parsing the provided configuration file")
 		}
+	}
+
+	// Wire up a remote OCR provider if configured. Two sources are supported:
+	//   1. --ocr-config: a dedicated OCR config file (takes precedence). Useful for
+	//      single-source scans (filesystem, git, etc.) where --config is not used.
+	//   2. ocr: block inside --config: convenient for multi-scan where sources,
+	//      detectors, and OCR config all live in one file.
+	// Either way, the provider is set and OCR is enabled automatically.
+	var ocrCfgBlock *configpb.OCRConfig
+	if *ocrConfigFilename != "" {
+		ocrFileCfg, err := config.Read(*ocrConfigFilename)
+		if err != nil {
+			logFatal(err, "error parsing the provided OCR config file")
+		}
+		if ocrFileCfg.Ocr == nil {
+			logFatal(fmt.Errorf("no ocr: block found in %s", *ocrConfigFilename), "invalid OCR config")
+		}
+		ocrCfgBlock = ocrFileCfg.Ocr
+	} else if conf.Ocr != nil {
+		ocrCfgBlock = conf.Ocr
+	}
+	if ocrCfgBlock != nil {
+		provider, err := ocr.NewProvider(ocrCfgBlock)
+		if err != nil {
+			logFatal(err, "error initializing OCR provider")
+		}
+		handlers.SetOCRProvider(provider)
+		feature.EnableOCR.Store(true)
+		logger.Info("OCR enabled", "provider", ocr.ProviderName(ocrCfgBlock))
 	}
 
 	if *detectorTimeout != 0 {

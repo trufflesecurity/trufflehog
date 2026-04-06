@@ -11,6 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/ocr"
 )
 
 func skipIfNoTesseract(t *testing.T) {
@@ -45,7 +46,7 @@ func TestOCRHandlerImage(t *testing.T) {
 	require.NoError(t, err)
 	defer rdr.Close()
 
-	handler := newOCRHandler()
+	handler := newOCRHandler(&ocr.TesseractProvider{})
 	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
 
 	count := 0
@@ -79,7 +80,7 @@ func TestOCRHandlerImageNoText(t *testing.T) {
 	require.NoError(t, err)
 	defer rdr.Close()
 
-	handler := newOCRHandler()
+	handler := newOCRHandler(&ocr.TesseractProvider{})
 	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
 
 	count := 0
@@ -108,7 +109,7 @@ func TestOCRHandlerDisabled(t *testing.T) {
 	require.NoError(t, err)
 	defer rdr.Close()
 
-	handler := newOCRHandler()
+	handler := newOCRHandler(&ocr.TesseractProvider{})
 	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
 
 	count := 0
@@ -138,7 +139,7 @@ func TestOCRHandlerVideo(t *testing.T) {
 	require.NoError(t, err)
 	defer rdr.Close()
 
-	handler := newOCRHandler()
+	handler := newOCRHandler(&ocr.TesseractProvider{})
 	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
 
 	count := 0

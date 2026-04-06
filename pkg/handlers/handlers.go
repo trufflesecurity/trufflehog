@@ -16,9 +16,18 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/ocr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
+
+// activeOCRProvider is the ocr.Provider used when OCR is enabled.
+// It defaults to TesseractProvider and may be replaced via SetOCRProvider before scanning begins.
+var activeOCRProvider ocr.Provider = &ocr.TesseractProvider{}
+
+// SetOCRProvider replaces the package-level OCR provider.
+// Call this once at startup before any files are processed.
+func SetOCRProvider(p ocr.Provider) { activeOCRProvider = p }
 
 // fileReader is a custom reader that wraps an io.Reader and provides additional functionality for identifying
 // and handling different file types. It abstracts away the complexity of detecting file formats, MIME types,
@@ -337,12 +346,12 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 		return newAPKHandler()
 	case pngMime, jpegMime:
 		if feature.EnableOCR.Load() {
-			return newOCRHandler()
+			return newOCRHandler(activeOCRProvider)
 		}
 		return newDefaultHandler(defaultHandlerType)
 	case mp4Mime, mkvMime, webmMime:
 		if feature.EnableOCR.Load() {
-			return newOCRHandler()
+			return newOCRHandler(activeOCRProvider)
 		}
 		return newDefaultHandler(defaultHandlerType)
 	default:

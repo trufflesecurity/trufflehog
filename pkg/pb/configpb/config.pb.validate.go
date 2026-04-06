@@ -124,6 +124,35 @@ func (m *Config) validate(all bool) error {
 
 	}
 
+	if all {
+		switch v := interface{}(m.GetOcr()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ConfigValidationError{
+					field:  "Ocr",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ConfigValidationError{
+					field:  "Ocr",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOcr()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ConfigValidationError{
+				field:  "Ocr",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return ConfigMultiError(errors)
 	}
@@ -200,3 +229,1125 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ConfigValidationError{}
+
+// Validate checks the field values on OCRConfig with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *OCRConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OCRConfig with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in OCRConfigMultiError, or nil
+// if none found.
+func (m *OCRConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OCRConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Provider.(type) {
+	case *OCRConfig_Tesseract:
+		if v == nil {
+			err := OCRConfigValidationError{
+				field:  "Provider",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTesseract()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Tesseract",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Tesseract",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTesseract()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OCRConfigValidationError{
+					field:  "Tesseract",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *OCRConfig_Google:
+		if v == nil {
+			err := OCRConfigValidationError{
+				field:  "Provider",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetGoogle()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Google",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Google",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetGoogle()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OCRConfigValidationError{
+					field:  "Google",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *OCRConfig_Openai:
+		if v == nil {
+			err := OCRConfigValidationError{
+				field:  "Provider",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetOpenai()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Openai",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Openai",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetOpenai()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OCRConfigValidationError{
+					field:  "Openai",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *OCRConfig_Custom:
+		if v == nil {
+			err := OCRConfigValidationError{
+				field:  "Provider",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetCustom()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Custom",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OCRConfigValidationError{
+						field:  "Custom",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCustom()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OCRConfigValidationError{
+					field:  "Custom",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return OCRConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// OCRConfigMultiError is an error wrapping multiple validation errors returned
+// by OCRConfig.ValidateAll() if the designated constraints aren't met.
+type OCRConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OCRConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OCRConfigMultiError) AllErrors() []error { return m }
+
+// OCRConfigValidationError is the validation error returned by
+// OCRConfig.Validate if the designated constraints aren't met.
+type OCRConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OCRConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OCRConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OCRConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OCRConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OCRConfigValidationError) ErrorName() string { return "OCRConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e OCRConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOCRConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OCRConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OCRConfigValidationError{}
+
+// Validate checks the field values on TesseractOCRConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *TesseractOCRConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TesseractOCRConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// TesseractOCRConfigMultiError, or nil if none found.
+func (m *TesseractOCRConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TesseractOCRConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return TesseractOCRConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// TesseractOCRConfigMultiError is an error wrapping multiple validation errors
+// returned by TesseractOCRConfig.ValidateAll() if the designated constraints
+// aren't met.
+type TesseractOCRConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TesseractOCRConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TesseractOCRConfigMultiError) AllErrors() []error { return m }
+
+// TesseractOCRConfigValidationError is the validation error returned by
+// TesseractOCRConfig.Validate if the designated constraints aren't met.
+type TesseractOCRConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TesseractOCRConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TesseractOCRConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TesseractOCRConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TesseractOCRConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TesseractOCRConfigValidationError) ErrorName() string {
+	return "TesseractOCRConfigValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TesseractOCRConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTesseractOCRConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TesseractOCRConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TesseractOCRConfigValidationError{}
+
+// Validate checks the field values on GoogleOCRConfig with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *GoogleOCRConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GoogleOCRConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GoogleOCRConfigMultiError, or nil if none found.
+func (m *GoogleOCRConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GoogleOCRConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Auth.(type) {
+	case *GoogleOCRConfig_CredentialsFile:
+		if v == nil {
+			err := GoogleOCRConfigValidationError{
+				field:  "Auth",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for CredentialsFile
+	case *GoogleOCRConfig_ApiKey:
+		if v == nil {
+			err := GoogleOCRConfigValidationError{
+				field:  "Auth",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ApiKey
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return GoogleOCRConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// GoogleOCRConfigMultiError is an error wrapping multiple validation errors
+// returned by GoogleOCRConfig.ValidateAll() if the designated constraints
+// aren't met.
+type GoogleOCRConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GoogleOCRConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GoogleOCRConfigMultiError) AllErrors() []error { return m }
+
+// GoogleOCRConfigValidationError is the validation error returned by
+// GoogleOCRConfig.Validate if the designated constraints aren't met.
+type GoogleOCRConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GoogleOCRConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GoogleOCRConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GoogleOCRConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GoogleOCRConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GoogleOCRConfigValidationError) ErrorName() string { return "GoogleOCRConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e GoogleOCRConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGoogleOCRConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GoogleOCRConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GoogleOCRConfigValidationError{}
+
+// Validate checks the field values on OpenAIOCRConfig with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *OpenAIOCRConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OpenAIOCRConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// OpenAIOCRConfigMultiError, or nil if none found.
+func (m *OpenAIOCRConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OpenAIOCRConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for ApiKey
+
+	// no validation rules for Model
+
+	if len(errors) > 0 {
+		return OpenAIOCRConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// OpenAIOCRConfigMultiError is an error wrapping multiple validation errors
+// returned by OpenAIOCRConfig.ValidateAll() if the designated constraints
+// aren't met.
+type OpenAIOCRConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OpenAIOCRConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OpenAIOCRConfigMultiError) AllErrors() []error { return m }
+
+// OpenAIOCRConfigValidationError is the validation error returned by
+// OpenAIOCRConfig.Validate if the designated constraints aren't met.
+type OpenAIOCRConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OpenAIOCRConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OpenAIOCRConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OpenAIOCRConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OpenAIOCRConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OpenAIOCRConfigValidationError) ErrorName() string { return "OpenAIOCRConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e OpenAIOCRConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOpenAIOCRConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OpenAIOCRConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OpenAIOCRConfigValidationError{}
+
+// Validate checks the field values on CustomOCRConfig with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *CustomOCRConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CustomOCRConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CustomOCRConfigMultiError, or nil if none found.
+func (m *CustomOCRConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CustomOCRConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+		err = CustomOCRConfigValidationError{
+			field:  "Endpoint",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetAuth()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CustomOCRConfigValidationError{
+					field:  "Auth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CustomOCRConfigValidationError{
+					field:  "Auth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAuth()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CustomOCRConfigValidationError{
+				field:  "Auth",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CustomOCRConfigValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CustomOCRConfigValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CustomOCRConfigValidationError{
+				field:  "Request",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetResponse()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CustomOCRConfigValidationError{
+					field:  "Response",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CustomOCRConfigValidationError{
+					field:  "Response",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetResponse()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CustomOCRConfigValidationError{
+				field:  "Response",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CustomOCRConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// CustomOCRConfigMultiError is an error wrapping multiple validation errors
+// returned by CustomOCRConfig.ValidateAll() if the designated constraints
+// aren't met.
+type CustomOCRConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CustomOCRConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CustomOCRConfigMultiError) AllErrors() []error { return m }
+
+// CustomOCRConfigValidationError is the validation error returned by
+// CustomOCRConfig.Validate if the designated constraints aren't met.
+type CustomOCRConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CustomOCRConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CustomOCRConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CustomOCRConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CustomOCRConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CustomOCRConfigValidationError) ErrorName() string { return "CustomOCRConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e CustomOCRConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCustomOCRConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CustomOCRConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CustomOCRConfigValidationError{}
+
+// Validate checks the field values on OCRAuthConfig with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *OCRAuthConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OCRAuthConfig with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in OCRAuthConfigMultiError, or
+// nil if none found.
+func (m *OCRAuthConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OCRAuthConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Type
+
+	// no validation rules for Value
+
+	// no validation rules for HeaderName
+
+	// no validation rules for ParamName
+
+	// no validation rules for Username
+
+	// no validation rules for Password
+
+	if len(errors) > 0 {
+		return OCRAuthConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// OCRAuthConfigMultiError is an error wrapping multiple validation errors
+// returned by OCRAuthConfig.ValidateAll() if the designated constraints
+// aren't met.
+type OCRAuthConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OCRAuthConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OCRAuthConfigMultiError) AllErrors() []error { return m }
+
+// OCRAuthConfigValidationError is the validation error returned by
+// OCRAuthConfig.Validate if the designated constraints aren't met.
+type OCRAuthConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OCRAuthConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OCRAuthConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OCRAuthConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OCRAuthConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OCRAuthConfigValidationError) ErrorName() string { return "OCRAuthConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e OCRAuthConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOCRAuthConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OCRAuthConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OCRAuthConfigValidationError{}
+
+// Validate checks the field values on OCRRequestConfig with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *OCRRequestConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OCRRequestConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// OCRRequestConfigMultiError, or nil if none found.
+func (m *OCRRequestConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OCRRequestConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for ContentType
+
+	// no validation rules for BodyTemplate
+
+	if len(errors) > 0 {
+		return OCRRequestConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// OCRRequestConfigMultiError is an error wrapping multiple validation errors
+// returned by OCRRequestConfig.ValidateAll() if the designated constraints
+// aren't met.
+type OCRRequestConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OCRRequestConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OCRRequestConfigMultiError) AllErrors() []error { return m }
+
+// OCRRequestConfigValidationError is the validation error returned by
+// OCRRequestConfig.Validate if the designated constraints aren't met.
+type OCRRequestConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OCRRequestConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OCRRequestConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OCRRequestConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OCRRequestConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OCRRequestConfigValidationError) ErrorName() string { return "OCRRequestConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e OCRRequestConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOCRRequestConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OCRRequestConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OCRRequestConfigValidationError{}
+
+// Validate checks the field values on OCRResponseConfig with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *OCRResponseConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OCRResponseConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// OCRResponseConfigMultiError, or nil if none found.
+func (m *OCRResponseConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OCRResponseConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TextPath
+
+	if len(errors) > 0 {
+		return OCRResponseConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// OCRResponseConfigMultiError is an error wrapping multiple validation errors
+// returned by OCRResponseConfig.ValidateAll() if the designated constraints
+// aren't met.
+type OCRResponseConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OCRResponseConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OCRResponseConfigMultiError) AllErrors() []error { return m }
+
+// OCRResponseConfigValidationError is the validation error returned by
+// OCRResponseConfig.Validate if the designated constraints aren't met.
+type OCRResponseConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OCRResponseConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OCRResponseConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OCRResponseConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OCRResponseConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OCRResponseConfigValidationError) ErrorName() string {
+	return "OCRResponseConfigValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e OCRResponseConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOCRResponseConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OCRResponseConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OCRResponseConfigValidationError{}

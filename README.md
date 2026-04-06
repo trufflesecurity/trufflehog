@@ -386,24 +386,54 @@ aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
 
 ## 19. Scan image and video files for secrets (OCR)
 
-TruffleHog can extract text from **PNG/JPEG images** and **MP4/MKV/WebM video frames** using OCR, then scan that text for secrets. This is useful for catching credentials embedded in screenshots, screen recordings, or documentation images.
+TruffleHog can extract text from **PNG/JPEG images** and **MP4/MKV/WebM video frames**, then scan that text for secrets. This catches credentials embedded in screenshots, screen recordings, and documentation images.
 
-### Prerequisites
+Before text is sent to any OCR engine, TruffleHog runs an image preprocessing pipeline — grayscale conversion, contrast normalization, 3× upscaling, and Otsu binarization — to maximize character accuracy regardless of which provider you use.
 
-- **Tesseract OCR** — the OCR engine used to extract text from images
-- **FFmpeg** — required only for video files (extracts frames before OCR)
+**FFmpeg is required for video files** (to extract frames). It is not needed for image-only scanning.
 
 ```bash
 # Ubuntu / Debian
-sudo apt install tesseract-ocr ffmpeg
+sudo apt install ffmpeg
 
 # macOS
-brew install tesseract ffmpeg
+brew install ffmpeg
 ```
 
-### Improved accuracy with tessdata-best (recommended)
+---
 
-By default Tesseract ships with a fast but less accurate model. For secret scanning — where a single misread character invalidates a match — download the high-quality `tessdata-best` model:
+### Choosing an OCR provider
+
+TruffleHog supports four OCR providers. Pick the one that fits your setup:
+
+| Provider | Accuracy | Setup | Cost |
+|---|---|---|---|
+| Tesseract (local) | Good | Install binary | Free |
+| Google Cloud Vision | Excellent | API key | Pay-per-use |
+| OpenAI GPT-4o | Excellent | API key | Pay-per-use |
+| Custom HTTP server | Depends | Self-hosted | Varies |
+
+---
+
+### Option A — Tesseract (local, no API key)
+
+Install Tesseract and enable OCR with the `--enable-ocr` flag:
+
+```bash
+# Ubuntu / Debian
+sudo apt install tesseract-ocr
+
+# macOS
+brew install tesseract
+```
+
+```bash
+trufflehog filesystem /path/to/screenshots --enable-ocr
+```
+
+**Improving Tesseract accuracy**
+
+The default Tesseract model is optimized for speed. For better results with secret scanning — where a single misread character breaks a match — use the `tessdata-best` model:
 
 ```bash
 mkdir -p ~/.tessdata-best
@@ -411,22 +441,83 @@ curl -L -o ~/.tessdata-best/eng.traineddata \
   https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata
 ```
 
-TruffleHog automatically detects and uses `~/.tessdata-best` when present. You can also point to any custom tessdata directory via the `TESSDATA_PREFIX` environment variable.
+TruffleHog automatically detects and uses `~/.tessdata-best` when present. You can also override the path via the `TESSDATA_PREFIX` environment variable.
 
-### Usage
+---
 
-Enable OCR with the `--enable-ocr` flag when scanning any source that may contain image or video files:
+### Option B — Remote OCR provider (Google, OpenAI, or custom)
+
+For higher accuracy or to avoid installing local dependencies, configure a remote OCR provider. OCR is enabled automatically — no `--enable-ocr` needed.
+
+**Single-source scans** (`filesystem`, `git`, `github`, etc.) — use the dedicated `--ocr-config` flag pointing to a YAML file that contains only the `ocr:` block:
 
 ```bash
-# Scan a filesystem path containing images
-trufflehog filesystem /path/to/screenshots --enable-ocr
-
-# Scan a git repo whose history may include committed images
-trufflehog git https://github.com/example/repo --enable-ocr
-
-# Scan an S3 bucket for secrets in images
-trufflehog s3 --bucket=my-bucket --enable-ocr --results=verified
+trufflehog filesystem /path/to/screenshots --ocr-config=ocr.yaml
 ```
+
+**Multi-source scans** (`multi-scan`) — add the `ocr:` block directly to your existing `--config` file alongside `sources:` and `detectors:`, so everything stays in one place:
+
+```bash
+trufflehog multi-scan --config=config.yaml
+```
+
+In both cases the `ocr:` block has the same structure and accepts exactly one provider:
+
+**Google Cloud Vision**
+
+Service account credentials are recommended for production. Create a service account with the `Cloud Vision API User` role, download the JSON key file, and reference it in the config:
+
+```yaml
+ocr:
+  google:
+    credentials_file: "/path/to/service-account.json"
+```
+
+If you prefer an API key instead:
+
+```yaml
+ocr:
+  google:
+    api_key: "${GOOGLE_VISION_API_KEY}"
+```
+
+**OpenAI GPT-4o**
+
+```yaml
+ocr:
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4o"    # optional — gpt-4o is the default
+```
+
+**Custom HTTP server**
+
+For any other HTTP-based OCR service. The `body_template` is a Go template with two variables: `{{.Base64Image}}` (base64-encoded PNG) and `{{.MimeType}}` (always `image/png`). The `text_path` is a dot-separated path into the JSON response body; numeric segments are treated as array indices.
+
+```yaml
+ocr:
+  custom:
+    endpoint: "https://my-ocr.example.com/v1/extract"
+    auth:
+      type: bearer             # see auth types below
+      value: "${OCR_TOKEN}"
+    request:
+      content_type: "application/json"
+      body_template: '{"image": "{{.Base64Image}}", "mime_type": "{{.MimeType}}"}'
+    response:
+      text_path: "result.text"   # e.g. "choices.0.message.content" for nested responses
+```
+
+**Auth types**
+
+| `type` | Behaviour | Required fields |
+|---|---|---|
+| `bearer` | Adds `Authorization: Bearer <value>` | `value` |
+| `header` | Sets an arbitrary request header | `header_name`, `value` |
+| `api_key_query` | Appends the key as a URL query parameter | `param_name`, `value` |
+| `basic` | HTTP Basic Auth | `username`, `password` |
+
+All string fields support `${ENV_VAR}` expansion so secrets never need to be hardcoded in the config file.
 
 # :question: FAQ
 

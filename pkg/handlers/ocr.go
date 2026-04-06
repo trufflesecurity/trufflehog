@@ -17,6 +17,7 @@ import (
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/ocr"
 )
 
 const (
@@ -25,15 +26,20 @@ const (
 	frameIntervalSeconds = 1                 // Extract 1 frame per second.
 )
 
-// ocrHandler extracts text from images and video frames using external
-// tools (tesseract for OCR, ffmpeg for video frame extraction) and feeds
-// the extracted text into the standard text processing pipeline.
-type ocrHandler struct{ *defaultHandler }
+// ocrHandler extracts text from images and video frames using the configured
+// ocr.Provider and feeds the extracted text into the standard text processing pipeline.
+type ocrHandler struct {
+	*defaultHandler
+	provider ocr.Provider
+}
 
 var _ FileHandler = (*ocrHandler)(nil)
 
-func newOCRHandler() *ocrHandler {
-	return &ocrHandler{defaultHandler: newDefaultHandler(ocrHandlerType)}
+func newOCRHandler(p ocr.Provider) *ocrHandler {
+	return &ocrHandler{
+		defaultHandler: newDefaultHandler(ocrHandlerType),
+		provider:       p,
+	}
 }
 
 // HandleFile processes image and video files by extracting text via OCR.
@@ -107,30 +113,8 @@ func (h *ocrHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 	return dataOrErrChan
 }
 
-// tessdataDir returns the tessdata directory to use, preferring tessdata-best
-// models when available. Resolution order:
-//  1. TESSDATA_PREFIX environment variable (explicit user override)
-//  2. ~/.tessdata-best (conventional install location for tessdata-best)
-//  3. Empty string → let Tesseract use its compiled-in default
-func tessdataDir() string {
-	if v := os.Getenv("TESSDATA_PREFIX"); v != "" {
-		return v
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		p := filepath.Join(home, ".tessdata-best")
-		if _, err := os.Stat(filepath.Join(p, "eng.traineddata")); err == nil {
-			return p
-		}
-	}
-	return ""
-}
-
-// ocrImage extracts text from a single image using Tesseract.
+// ocrImage reads, preprocesses, and OCRs a single image using the configured provider.
 func (h *ocrHandler) ocrImage(ctx logContext.Context, input io.Reader) (string, error) {
-	if _, err := exec.LookPath("tesseract"); err != nil {
-		return "", fmt.Errorf("tesseract not found in PATH: %w", err)
-	}
-
 	imgData, err := io.ReadAll(io.LimitReader(input, maxOCRImageSize+1))
 	if err != nil {
 		return "", fmt.Errorf("error reading image data: %w", err)
@@ -146,50 +130,13 @@ func (h *ocrHandler) ocrImage(ctx logContext.Context, input io.Reader) (string, 
 		processedData = imgData
 	}
 
-	tmpFile, err := os.CreateTemp("", "trufflehog-ocr-*.png")
-	if err != nil {
-		return "", fmt.Errorf("error creating temp file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.Write(processedData); err != nil {
-		tmpFile.Close()
-		return "", fmt.Errorf("error writing temp file: %w", err)
-	}
-	tmpFile.Close()
-
-	args := []string{tmpFile.Name(), "stdout", "--oem", "1", "--psm", "6", "--dpi", "300",
-		"-c", "preserve_interword_spaces=1",
-		"-c", "textord_space_size_is_variable=0",
-		// Restrict to printable ASCII — secrets are always ASCII and this prevents
-		// Tesseract from substituting Unicode lookalikes (curly quotes, em-dash, etc.)
-		// which would cause secret patterns to fail to match.
-		"-c", `tessedit_char_whitelist= !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_` + "`" + `abcdefghijklmnopqrstuvwxyz{|}~`,
-	}
-	if dir := tessdataDir(); dir != "" {
-		args = append(args, "--tessdata-dir", dir)
-	}
-
-	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, "tesseract", args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("tesseract failed: %w (stderr: %s)", err, stderr.String())
-	}
-
-	return stdout.String(), nil
+	return h.provider.ExtractText(ctx, processedData)
 }
 
-// ocrVideo extracts text from video frames using ffmpeg for frame extraction
-// and tesseract for OCR on each frame.
+// ocrVideo extracts frames from a video using ffmpeg and OCRs each frame.
 func (h *ocrHandler) ocrVideo(ctx logContext.Context, input io.Reader) (string, error) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		return "", fmt.Errorf("ffmpeg not found in PATH: %w", err)
-	}
-	if _, err := exec.LookPath("tesseract"); err != nil {
-		return "", fmt.Errorf("tesseract not found in PATH: %w", err)
 	}
 
 	videoData, err := io.ReadAll(io.LimitReader(input, maxOCRVideoSize+1))
@@ -275,17 +222,17 @@ func isVideoMime(m mimeType) bool {
 
 const preprocessScaleFactor = 3
 
-// preprocessImage prepares a screenshot for Tesseract OCR of typed/code text.
+// preprocessImage prepares a screenshot for OCR of typed/code text.
 //
 // Pipeline:
 //  1. Convert to grayscale (ITU-R BT.601 luminance).
 //  2. Stretch contrast so the full 0–255 range is used.
 //  3. Upscale 3× with bilinear interpolation — more pixels per character
-//     stroke lets Tesseract resolve details that distinguish l/1/I and 0/O.
+//     stroke lets the OCR engine resolve details that distinguish l/1/I and 0/O.
 //  4. Binarize with Otsu's method — eliminates anti-aliasing gray zones that
 //     cause similar-character confusions like L→1 or 9→0.
 //  5. Auto-invert if the background is dark (terminal/dark-theme screenshots)
-//     because Tesseract's LSTM engine expects dark text on a light background.
+//     because most OCR engines expect dark text on a light background.
 //
 // Falls back gracefully — callers should use the original data if this errors.
 func preprocessImage(data []byte) ([]byte, error) {
@@ -425,8 +372,8 @@ func otsuThreshold(img *image.Gray, w, h int) uint8 {
 }
 
 // binarizeAndNormalizeBg converts img to pure black-and-white using thresh, then
-// inverts the result if the background is dark so that Tesseract always receives
-// dark text on a white background (its preferred input for the LSTM engine).
+// inverts the result if the background is dark so that OCR engines always receive
+// dark text on a white background.
 func binarizeAndNormalizeBg(img *image.Gray, thresh uint8, w, h int) *image.Gray {
 	out := image.NewGray(image.Rect(0, 0, w, h))
 	lightPx := 0

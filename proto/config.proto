@@ -6,8 +6,88 @@ option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/configpb";
 
 import "sources.proto";
 import "custom_detectors.proto";
+import "validate/validate.proto";
 
 message Config {
     repeated sources.LocalSource sources = 9;
     repeated custom_detectors.CustomRegex detectors = 13;
+    OCRConfig ocr = 14;
+}
+
+// OCRConfig selects which OCR backend to use when --enable-ocr is active.
+// Exactly one provider must be set. If the ocr block is omitted entirely,
+// TruffleHog falls back to the local Tesseract binary (same as --enable-ocr alone).
+message OCRConfig {
+    oneof provider {
+        TesseractOCRConfig  tesseract = 1;
+        GoogleOCRConfig     google    = 2;
+        OpenAIOCRConfig     openai    = 3;
+        CustomOCRConfig     custom    = 4;
+    }
+}
+
+// TesseractOCRConfig uses the local Tesseract binary.
+// Included for explicitness; reserved for future per-field options (e.g. tessdata path).
+message TesseractOCRConfig {}
+
+// GoogleOCRConfig is a preset for the Google Cloud Vision TEXT_DETECTION API.
+// Exactly one auth method must be set. Service account credentials are recommended
+// over API keys for production use.
+message GoogleOCRConfig {
+    oneof auth {
+        // credentials_file is the path to a Google service account JSON key file.
+        // Supports ${ENV_VAR} expansion. Recommended for production.
+        string credentials_file = 1;
+        // api_key is a Google Cloud API key. Simpler but less secure than a service account.
+        // Supports ${ENV_VAR} expansion.
+        string api_key = 2;
+    }
+}
+
+// OpenAIOCRConfig is a preset for the OpenAI chat completions vision API (GPT-4o by default).
+message OpenAIOCRConfig {
+    // API key for the OpenAI API. Supports ${ENV_VAR} expansion.
+    string api_key = 1;
+    // Model to use (default: "gpt-4o").
+    string model = 2;
+}
+
+// CustomOCRConfig describes a generic HTTP OCR server.
+message CustomOCRConfig {
+    // Full URL of the OCR endpoint.
+    string endpoint = 1 [(validate.rules).string.uri_ref = true];
+    OCRAuthConfig    auth     = 2;
+    OCRRequestConfig request  = 3;
+    OCRResponseConfig response = 4;
+}
+
+// OCRAuthConfig describes how to authenticate against the OCR endpoint.
+message OCRAuthConfig {
+    // type must be one of: bearer, header, api_key_query, basic.
+    string type        = 1;
+    // value is the token or API key. Supports ${ENV_VAR} expansion.
+    string value       = 2;
+    // header_name is used when type is "header" (e.g. "X-Api-Key").
+    string header_name = 3;
+    // param_name is the query parameter name used when type is "api_key_query".
+    string param_name  = 4;
+    // username / password are used when type is "basic". Both support ${ENV_VAR} expansion.
+    string username    = 5;
+    string password    = 6;
+}
+
+// OCRRequestConfig controls how the HTTP request body is constructed.
+message OCRRequestConfig {
+    // content_type of the request (default: "application/json").
+    string content_type  = 1;
+    // body_template is a Go text/template string.
+    // Available variables: {{.Base64Image}}, {{.MimeType}}.
+    string body_template = 2;
+}
+
+// OCRResponseConfig controls how the text is extracted from the HTTP response.
+message OCRResponseConfig {
+    // text_path is a dot-separated path into the JSON response body.
+    // Examples: "text", "result.text", "choices.0.message.content"
+    string text_path = 1;
 }
