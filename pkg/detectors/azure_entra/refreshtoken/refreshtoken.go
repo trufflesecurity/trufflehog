@@ -253,10 +253,12 @@ func verifyMatch(ctx context.Context, client *http.Client, refreshToken string, 
 		switch {
 		case strings.HasPrefix(d, "AADSTS70008:"),
 			strings.HasPrefix(d, "AADSTS700082:"),
-			strings.HasPrefix(d, "AADSTS70043:"):
+			strings.HasPrefix(d, "AADSTS70043:"),
+			strings.HasPrefix(d, "AADSTS50173:"):
 			// https://login.microsoftonline.com/error?code=70008
 			// https://login.microsoftonline.com/error?code=700082
 			// https://login.microsoftonline.com/error?code=70043
+			// https://login.microsoftonline.com/error?code=50173
 			return false, nil, ErrTokenExpired
 		case strings.HasPrefix(d, "AADSTS50173:"):
 			// https://login.microsoftonline.com/error?code=50173

@@ -2,11 +2,16 @@ package refreshtoken
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -140,6 +145,85 @@ func TestRefreshToken_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestVerifyMatch_ErrorCodes(t *testing.T) {
+	tests := []struct {
+		name    string
+		code    string
+		desc    string
+		wantErr error
+	}{
+		{
+			name:    "AADSTS70008 - expired token",
+			code:    "invalid_grant",
+			desc:    "AADSTS70008: The provided authorization code or refresh token has expired.",
+			wantErr: ErrTokenExpired,
+		},
+		{
+			name:    "AADSTS700082 - expired token",
+			code:    "invalid_grant",
+			desc:    "AADSTS700082: The refresh token has expired due to inactivity.",
+			wantErr: ErrTokenExpired,
+		},
+		{
+			name:    "AADSTS70043 - expired token",
+			code:    "invalid_grant",
+			desc:    "AADSTS70043: The refresh token has expired or is otherwise invalid.",
+			wantErr: ErrTokenExpired,
+		},
+		{
+			name:    "AADSTS50173 - grant revoked",
+			code:    "invalid_grant",
+			desc:    "AADSTS50173: The provided grant has expired due to it being revoked, a fresh auth token is needed. The user might have changed or reset their password.",
+			wantErr: ErrTokenExpired,
+		},
+		{
+			name:    "AADSTS700016 - client not found",
+			code:    "unauthorized_client",
+			desc:    "AADSTS700016: Application with identifier 'xxx' was not found in the directory 'yyy'.",
+			wantErr: ErrClientNotFoundInTenant,
+		},
+		{
+			name:    "AADSTS90002 - tenant not found",
+			code:    "invalid_request",
+			desc:    "AADSTS90002: Tenant 'xxx' not found.",
+			wantErr: ErrTenantNotFound,
+		},
+		{
+			name:    "AADSTS9002313 - invalid token (no error)",
+			code:    "invalid_grant",
+			desc:    "AADSTS9002313: Invalid request. Request is malformed or invalid.",
+			wantErr: nil,
+		},
+		{
+			name:    "unknown error code",
+			code:    "invalid_grant",
+			desc:    "AADSTS99999: Something unexpected happened.",
+			wantErr: fmt.Errorf("unexpected error 'invalid_grant': AADSTS99999: Something unexpected happened."),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, err := json.Marshal(errorResponse{Error: tt.code, Description: tt.desc})
+			require.NoError(t, err)
+
+			client := common.ConstantResponseHttpClient(400, string(body))
+			verified, extraData, verifyErr := verifyMatch(context.Background(), client, "fake-token", "fake-client", "fake-tenant")
+
+			assert.False(t, verified)
+			assert.Nil(t, extraData)
+
+			if tt.wantErr == nil {
+				assert.NoError(t, verifyErr)
+			} else if errors.Is(tt.wantErr, ErrTokenExpired) || errors.Is(tt.wantErr, ErrClientNotFoundInTenant) || errors.Is(tt.wantErr, ErrTenantNotFound) {
+				assert.ErrorIs(t, verifyErr, tt.wantErr)
+			} else {
+				assert.EqualError(t, verifyErr, tt.wantErr.Error())
 			}
 		})
 	}
