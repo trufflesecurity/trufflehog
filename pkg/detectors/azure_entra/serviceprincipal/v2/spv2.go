@@ -100,6 +100,7 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 				}
 				tenantId = tId
 
+				// Skip known-invalid client/tenant combinations.
 				invalidClients := invalidClientsForTenant[tenantId]
 				if invalidClients == nil {
 					invalidClients = map[string]struct{}{}
@@ -111,9 +112,11 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 
 				if verify {
 					if !azure_entra.TenantExists(logCtx, client, tenantId) {
+						// Tenant doesn't exist.
 						delete(activeTenants, tenantId)
 						continue
 					}
+					// Tenant exists, ensure this isn't attempted as a clientId.
 					delete(activeClients, tenantId)
 
 					isVerified, extraData, verificationErr := serviceprincipal.VerifyCredentials(ctx, client, tenantId, clientId, clientSecret)
@@ -127,14 +130,17 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 							r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
 							break ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrTenantNotFound):
+							// Tenant doesn't exist; shouldn't happen given the check above.
 							delete(activeTenants, tenantId)
 							continue
 						case errors.Is(verificationErr, serviceprincipal.ErrClientNotFoundInTenant):
+							// Tenant is valid but the client ID doesn't exist in it.
 							invalidClients[clientId] = struct{}{}
 							continue
 						}
 					}
 
+						// The result is verified or there's only one associated client and tenant.
 					if isVerified || (len(activeClients) == 1 && len(activeTenants) == 1) {
 						r = createResult(tenantId, clientId, clientSecret, isVerified, extraData, verificationErr)
 						break ClientLoop
@@ -144,6 +150,7 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 		}
 
 		if r == nil {
+			// Only include the clientId and tenantId if we're confident which one it is.
 			if len(activeClients) != 1 {
 				clientId = ""
 			}
