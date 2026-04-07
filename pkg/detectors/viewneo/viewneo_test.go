@@ -2,7 +2,6 @@ package viewneo
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -23,8 +22,6 @@ var (
 	invalidPattern = "NbrnTP3fAbnFbmOHnKYaXRvj7uff0LYTH8xIZM1JRcoreogrNwwmq6OLkT?x9NIQ0Wobtqn62tOy4CqpIqK3yn9FfcgMXAdx9G81aSQHqNgAC72qFl41sNLjVHWGaub52Z" +
 		".td26fEeVVhDIq2AnHTmt9OBGhnuKoneNo41eoPni6JDWYlgAACTP9gyv1plBArp5B1Id9Z850kEnydx9qWCA79ISjs8JHUdKF0j7elKPoh3pKMzKG5mSoyPstUeC99enq522wjZRL9OaYsP6ihgIqLSmNqE40fAr" +
 		".aXOqVJBae45I1Ljit5Y35npgX4ANj73-Z4bVv7Z3ZrYg32o0DtYobmv39rPz-I8h-l9qgBUuMGyKqTa7IUVQxeQvu2UttAzsiA8R5NtJasBLPDCnE5YkfGOv0WRombpE2eAOmSFpPaWXgBl9Hdp2DZQ_M85NUG1J5VEqpOXHOresruIioSTeAIAnA5LS2WyawW29AVIMooBbvRzkDiNbzKbPiDdynuWyW1qfbI_wPXPW8mbjiQKnSXkMVh09gbtR9zTeSOgX2Mh-YwBxGv20g9O1TBU9rZIEBUr21f4pDNyb2lnZv4Sra8fUFWSPFYfoStLEHBVvSrqhmhIWlnEU-HsgmolaIr-JSi3F3KECld8E0zeOdjKt_hWMYoHCC3_tNNV8nnQkleaCMsoTSDR7YOQ7BIP60ektVKshSS8GFfcBuqf91K8_RrcWEP6lLOFfwvQ2vSs80JDuu-zG_QIAmxWOWnJ7CSh-MpkJJf_6Dh1FTGr1-pJy6G43rYA7G0stL_FjIwJIDumSKoXcVTZyQ0-FcGL33CHDUAPjE-vSP222yuTW3ceO6_VBgO3CS5cYsxjHKYkf3Np6jDqqaZ5RkCwLOBq2myEpKK_s-QrKRVdMF5sZMwONRUQ1O5PtCLUfsVliI-H61q"
-
-	keyword = "viewneo"
 )
 
 func TestViewneo_Pattern(t *testing.T) {
@@ -37,17 +34,17 @@ func TestViewneo_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern - realistic bearer token in config",
-			input: fmt.Sprintf("# %s digital signage config\nVIEWNEO_API_TOKEN=\"%s\"", keyword, validPattern),
+			input: "# viewneo digital signage config\nVIEWNEO_API_TOKEN=\"" + validPattern + "\"",
 			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
+			input: "viewneo token = '" + validPattern + "' | '" + validPattern + "'",
 			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			input: "viewneo keyword is not close to the real key in the data\n = '" + validPattern + "'",
 			want:  []string{},
 		},
 		{
