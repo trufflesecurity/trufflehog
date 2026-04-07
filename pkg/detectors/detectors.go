@@ -31,7 +31,7 @@ type Detector interface {
 	// That is, if any of the keywords are found in a chunk, the chunk will be run through the detector.
 	Keywords() []string
 
-	// Type returns the DetectorType number from detectors.proto for the given detector.
+	// Type returns the DetectorType number from detector_type.proto for the given detector.
 	Type() detector_typepb.DetectorType
 
 	// Description returns a description for the result being detected
