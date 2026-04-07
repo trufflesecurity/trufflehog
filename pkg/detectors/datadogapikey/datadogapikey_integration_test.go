@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDataDogApiKey_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatadogApikey,
+					DetectorType: detector_typepb.DetectorType_DatadogApikey,
 					Verified:     true,
 					AnalysisInfo: map[string]string{
 						"api_key":  apiKey,
@@ -69,7 +69,7 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatadogApikey,
+					DetectorType: detector_typepb.DetectorType_DatadogApikey,
 					Verified:     false,
 					Raw:          []byte(invalidApiKey),
 				},

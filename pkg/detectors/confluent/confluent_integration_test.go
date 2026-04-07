@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestConfluent_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestConfluent_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Confluent,
+					DetectorType: detector_typepb.DetectorType_Confluent,
 					Verified:     true,
 				},
 			},
@@ -65,7 +65,7 @@ func TestConfluent_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Confluent,
+					DetectorType: detector_typepb.DetectorType_Confluent,
 					Verified:     false,
 				},
 			},

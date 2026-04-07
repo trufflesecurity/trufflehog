@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueKeys {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Api2Cart,
+			DetectorType: detector_typepb.DetectorType_Api2Cart,
 			Raw:          []byte(key),
 		}
 
@@ -109,8 +109,8 @@ type Response struct {
 	ReturnCode int `json:"return_code"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Api2Cart
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Api2Cart
 }
 
 func (s Scanner) Description() string {
