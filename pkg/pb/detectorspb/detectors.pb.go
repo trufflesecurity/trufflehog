@@ -28,6 +28,7 @@ const (
 	DecoderType_BASE64          DecoderType = 2
 	DecoderType_UTF16           DecoderType = 3
 	DecoderType_ESCAPED_UNICODE DecoderType = 4
+	DecoderType_HTML            DecoderType = 5
 )
 
 // Enum value maps for DecoderType.
@@ -38,6 +39,7 @@ var (
 		2: "BASE64",
 		3: "UTF16",
 		4: "ESCAPED_UNICODE",
+		5: "HTML",
 	}
 	DecoderType_value = map[string]int32{
 		"UNKNOWN":         0,
@@ -45,6 +47,7 @@ var (
 		"BASE64":          2,
 		"UTF16":           3,
 		"ESCAPED_UNICODE": 4,
+		"HTML":            5,
 	}
 )
 
