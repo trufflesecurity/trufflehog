@@ -11,7 +11,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -75,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for clientId := range uniqueClientIds {
 			for secret := range uniqueSecrets {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_ShopifyOAuth,
+					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Raw:          []byte(secret),
 					RawV2:        fmt.Appendf(nil, "%s:%s:%s", domain, clientId, secret),
 				}
@@ -133,8 +133,8 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, domain, c
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ShopifyOAuth
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ShopifyOAuth
 }
 
 func (s Scanner) Description() string {

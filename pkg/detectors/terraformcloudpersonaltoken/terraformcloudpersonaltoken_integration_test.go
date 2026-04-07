@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTerraformCloudPersonalToken_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestTerraformCloudPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TerraformCloudPersonalToken,
+					DetectorType: detector_typepb.DetectorType_TerraformCloudPersonalToken,
 					Verified:     true,
 				},
 			},
@@ -71,7 +71,7 @@ func TestTerraformCloudPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TerraformCloudPersonalToken,
+					DetectorType: detector_typepb.DetectorType_TerraformCloudPersonalToken,
 					Verified:     false,
 				},
 			},
@@ -87,7 +87,7 @@ func TestTerraformCloudPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TerraformCloudPersonalToken,
+					DetectorType: detector_typepb.DetectorType_TerraformCloudPersonalToken,
 					Verified:     false,
 				},
 			},

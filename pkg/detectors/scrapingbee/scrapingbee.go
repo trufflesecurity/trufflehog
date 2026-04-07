@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -20,8 +20,8 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ScrapingBee
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ScrapingBee
 }
 
 func (s Scanner) Description() string {
@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueMatches {
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ScrapingBee,
+			DetectorType: detector_typepb.DetectorType_ScrapingBee,
 			Raw:          []byte(key),
 		}
 

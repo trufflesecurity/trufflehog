@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDefaultDetectorsHaveUniqueVersions(t *testing.T) {
-	detectorTypeToVersions := make(map[detectorspb.DetectorType]map[int]struct{})
+	detectorTypeToVersions := make(map[detector_typepb.DetectorType]map[int]struct{})
 	addVersion := func(versions map[int]struct{}, version int) map[int]struct{} {
 		if versions == nil {
 			versions = make(map[int]struct{})
@@ -27,7 +27,7 @@ func TestDefaultDetectorsHaveUniqueVersions(t *testing.T) {
 		key := detector.Type()
 		if set, ok := detectorTypeToVersions[key]; ok && set != nil {
 			if _, ok := set[version]; ok {
-				t.Errorf("detector %q has duplicate version: %d", detectorspb.DetectorType_name[int32(key)], version)
+				t.Errorf("detector %q has duplicate version: %d", detector_typepb.DetectorType_name[int32(key)], version)
 			}
 		}
 		detectorTypeToVersions[key] = addVersion(detectorTypeToVersions[key], version)
@@ -44,7 +44,7 @@ func TestDefaultDetectorTypesImplementing(t *testing.T) {
 		}
 		t.Errorf(
 			"detector %q doesn't match expected",
-			detectorspb.DetectorType_name[int32(detector.Type())],
+			detector_typepb.DetectorType_name[int32(detector.Type())],
 		)
 	}
 }
@@ -61,7 +61,7 @@ func TestDefaultVersionerDetectorsHaveNonZeroVersions(t *testing.T) {
 		}
 		t.Errorf(
 			"detector %q implements Versioner that returns a zero version",
-			detectorspb.DetectorType_name[int32(detector.Type())],
+			detector_typepb.DetectorType_name[int32(detector.Type())],
 		)
 	}
 }

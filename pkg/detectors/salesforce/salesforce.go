@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const (
@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			tokenMatch := strings.TrimSpace(token[0])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Salesforce,
+				DetectorType: detector_typepb.DetectorType_Salesforce,
 				Raw:          []byte(tokenMatch),
 			}
 
@@ -103,8 +103,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Salesforce
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Salesforce
 }
 
 func (s Scanner) Description() string {

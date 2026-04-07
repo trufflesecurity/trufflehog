@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestYelp_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestYelp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Yelp,
+					DetectorType: detector_typepb.DetectorType_Yelp,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestYelp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Yelp,
+					DetectorType: detector_typepb.DetectorType_Yelp,
 					Verified:     false,
 				},
 			},
@@ -94,7 +94,7 @@ func TestYelp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Yelp,
+					DetectorType: detector_typepb.DetectorType_Yelp,
 					Verified:     false,
 				},
 			},
@@ -111,7 +111,7 @@ func TestYelp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Yelp,
+					DetectorType: detector_typepb.DetectorType_Yelp,
 					Verified:     false,
 				},
 			},

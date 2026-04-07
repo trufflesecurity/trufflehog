@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{ client *http.Client }
@@ -43,7 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_WeightsAndBiases,
+			DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 			Raw:          []byte(match),
 		}
 
@@ -127,6 +127,6 @@ func (s Scanner) Description() string {
 	return "Weights & Biases is a Machine Learning Operations (MLOps) platform that helps track experiments, version datasets, evaluate model performance, and collaborate with team members"
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_WeightsAndBiases
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_WeightsAndBiases
 }

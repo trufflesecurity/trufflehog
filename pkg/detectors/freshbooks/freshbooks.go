@@ -10,7 +10,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resURI := strings.TrimSpace(uriMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Freshbooks,
+				DetectorType: detector_typepb.DetectorType_Freshbooks,
 				Raw:          []byte(resMatch),
 			}
 
@@ -77,8 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Freshbooks
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Freshbooks
 }
 
 func (s Scanner) Description() string {

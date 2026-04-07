@@ -17,7 +17,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resPrivKeyMatch := strings.TrimSpace(privKeyMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Kraken,
+				DetectorType: detector_typepb.DetectorType_Kraken,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resPrivKeyMatch),
 			}
@@ -111,8 +111,8 @@ func getKrakenSignature(url_path string, values url.Values, secret []byte) strin
 	return base64.StdEncoding.EncodeToString(macsum)
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Kraken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Kraken
 }
 
 func (s Scanner) Description() string {

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSlack_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestSlack_FromChunk(t *testing.T) {
 			},
 			wantResults: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detector_typepb.DetectorType_Slack,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"name":           "marge.haskell.bridge",
@@ -71,7 +71,7 @@ func TestSlack_FromChunk(t *testing.T) {
 			},
 			wantResults: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detector_typepb.DetectorType_Slack,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
@@ -91,7 +91,7 @@ func TestSlack_FromChunk(t *testing.T) {
 			},
 			wantResults: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detector_typepb.DetectorType_Slack,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
@@ -112,7 +112,7 @@ func TestSlack_FromChunk(t *testing.T) {
 			},
 			wantResults: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detector_typepb.DetectorType_Slack,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
@@ -133,7 +133,7 @@ func TestSlack_FromChunk(t *testing.T) {
 			},
 			wantResults: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detector_typepb.DetectorType_Slack,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
@@ -154,7 +154,7 @@ func TestSlack_FromChunk(t *testing.T) {
 			},
 			wantResults: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detector_typepb.DetectorType_Slack,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",

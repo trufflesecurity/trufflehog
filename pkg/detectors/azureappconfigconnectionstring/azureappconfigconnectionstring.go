@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		id := connectionInfo[2]       //	Id
 		secret := connectionInfo[3]   // Secret
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_AzureAppConfigConnectionString,
+			DetectorType: detector_typepb.DetectorType_AzureAppConfigConnectionString,
 			Raw:          []byte(id),
 			RawV2:        []byte(connectionString),
 		}
@@ -75,8 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureAppConfigConnectionString
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureAppConfigConnectionString
 }
 
 func (s Scanner) Description() string {

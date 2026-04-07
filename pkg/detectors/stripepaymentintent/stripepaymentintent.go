@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	for clientSecret := range clientSecrets {
 		for key := range secretKeys {
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
+				DetectorType: detector_typepb.DetectorType_StripePaymentIntent,
 				Raw:          []byte(clientSecret),
 				RawV2:        []byte(clientSecret + key),
 				ExtraData: map[string]string{
@@ -82,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 
 		for key := range publishableKeys {
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
+				DetectorType: detector_typepb.DetectorType_StripePaymentIntent,
 				Raw:          []byte(clientSecret),
 				RawV2:        []byte(clientSecret + key),
 				ExtraData: map[string]string{
@@ -117,8 +117,8 @@ func extractMatches(pattern *regexp.Regexp, data string) map[string]struct{} {
 	return result
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_StripePaymentIntent
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_StripePaymentIntent
 }
 
 func (s Scanner) Description() string {

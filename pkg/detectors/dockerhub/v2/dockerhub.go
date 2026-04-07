@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -180,8 +180,8 @@ type mfaRequiredResponse struct {
 	MfaToken string `json:"login_2fa_token"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Dockerhub
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Dockerhub
 }
 
 func (s Scanner) Description() string {

@@ -10,7 +10,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			domainRes := strings.TrimSpace(domainMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
+				DetectorType: detector_typepb.DetectorType_Auth0ManagementApiToken,
 				Redacted:     domainRes,
 				Raw:          []byte(managementAPITokenRes),
 				RawV2:        []byte(managementAPITokenRes + domainRes),
@@ -102,8 +102,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token, domain string)
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Auth0ManagementApiToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Auth0ManagementApiToken
 }
 
 func (s Scanner) Description() string {

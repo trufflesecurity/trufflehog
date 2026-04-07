@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPlanetscale_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     true,
 				},
 			},
@@ -70,7 +70,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},
@@ -99,7 +99,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},
@@ -116,7 +116,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},

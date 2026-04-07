@@ -12,7 +12,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_OpenAI,
+			DetectorType: detector_typepb.DetectorType_OpenAI,
 			Redacted:     token[:3] + "..." + token[min(len(token)-1, 47):],
 			Raw:          []byte(token),
 		}
@@ -120,8 +120,8 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OpenAI
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OpenAI
 }
 
 func (s Scanner) Description() string {

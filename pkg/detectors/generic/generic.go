@@ -11,7 +11,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func New() Scanner {
@@ -91,7 +91,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Generic,
+			DetectorType: detector_typepb.DetectorType_Generic,
 			Raw:          []byte(token),
 		}
 
@@ -110,8 +110,8 @@ func hasReMatch(matchers []*regexp.Regexp, token string) bool {
 	return false
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Generic
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Generic
 }
 
 func (s Scanner) Description() string {

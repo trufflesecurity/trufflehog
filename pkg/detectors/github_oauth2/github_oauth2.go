@@ -9,7 +9,7 @@ import (
 	"golang.org/x/oauth2/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, secretMatch := range oauth2ClientSecretMatches {
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_GitHubOauth2,
+				DetectorType: detector_typepb.DetectorType_GitHubOauth2,
 				Raw:          []byte(idMatch[1]),
 				RawV2:        []byte(idMatch[1] + secretMatch[1]),
 			}
@@ -77,8 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GitHubOauth2
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GitHubOauth2
 }
 
 func (s Scanner) Description() string {

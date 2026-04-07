@@ -17,7 +17,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Gengo,
+				DetectorType: detector_typepb.DetectorType_Gengo,
 				Raw:          []byte(resSecretMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
 			}
@@ -108,8 +108,8 @@ func getGengoSignature(timeStamp string, secret string) string {
 	return hex.EncodeToString(macsum)
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Gengo
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Gengo
 }
 
 func (s Scanner) Description() string {

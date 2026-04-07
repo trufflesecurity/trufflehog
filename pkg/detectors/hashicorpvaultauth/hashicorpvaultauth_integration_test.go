@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:          detectorspb.DetectorType_HashiCorpVaultAuth,
+					DetectorType:          detector_typepb.DetectorType_HashiCorpVaultAuth,
 					Verified:              false,
 					VerificationFromCache: false,
 					Raw:                   []byte(inactiveSecretId),
@@ -77,7 +77,7 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:          detectorspb.DetectorType_HashiCorpVaultAuth,
+					DetectorType:          detector_typepb.DetectorType_HashiCorpVaultAuth,
 					Verified:              true,
 					VerificationFromCache: false,
 					Raw:                   []byte(secretId),

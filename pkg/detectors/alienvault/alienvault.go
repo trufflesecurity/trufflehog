@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueKeys {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_AlienVault,
+			DetectorType: detector_typepb.DetectorType_AlienVault,
 			Raw:          []byte(key),
 		}
 
@@ -66,8 +66,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AlienVault
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AlienVault
 }
 
 func verifyAlienVaultKey(ctx context.Context, client *http.Client, key string) (bool, error) {

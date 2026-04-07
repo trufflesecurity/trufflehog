@@ -11,7 +11,7 @@ import (
 	"github.com/couchbase/gocb/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -28,8 +28,8 @@ var (
 	passwordPat         = common.PasswordRegexCheck(`^<>;.*&|£\n\s`)
 )
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Couchbase
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Couchbase
 }
 
 func (s Scanner) Description() string {
@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Couchbase,
+					DetectorType: detector_typepb.DetectorType_Couchbase,
 					Raw:          fmt.Appendf([]byte(""), "%s:%s@%s", username, password, connString),
 				}
 

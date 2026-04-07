@@ -16,7 +16,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type scanner struct {
@@ -126,7 +126,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_AWSSessionKey,
+					DetectorType: detector_typepb.DetectorType_AWSSessionKey,
 					Raw:          []byte(idMatch),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", idMatch, secretMatch, sessionMatch)),
 					Redacted:     idMatch,
@@ -339,8 +339,8 @@ func checkSessionToken(sessionToken string, secret string) bool {
 	return true
 }
 
-func (s scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AWSSessionKey
+func (s scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AWSSessionKey
 }
 
 func (s scanner) Description() string {

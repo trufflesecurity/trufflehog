@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestOpsgenie_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestOpsgenie_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Opsgenie,
+					DetectorType: detector_typepb.DetectorType_Opsgenie,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"account": "secretdetectors",
@@ -68,7 +68,7 @@ func TestOpsgenie_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Opsgenie,
+					DetectorType: detector_typepb.DetectorType_Opsgenie,
 					Verified:     false,
 				},
 			},

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestShopifyOAuth_FromChunk(t *testing.T) {
@@ -57,7 +57,7 @@ func TestShopifyOAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ShopifyOAuth,
+					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Verified:     true,
 				},
 			},
@@ -78,7 +78,7 @@ func TestShopifyOAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ShopifyOAuth,
+					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Verified:     false,
 				},
 			},
@@ -130,7 +130,7 @@ func TestShopifyOAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ShopifyOAuth,
+					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Verified:     false,
 				},
 			},

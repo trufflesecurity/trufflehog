@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for secretId := range uniqueSecretIds {
 			for vaultUrl := range uniqueVaultUrls {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_HashiCorpVaultAuth,
+					DetectorType: detector_typepb.DetectorType_HashiCorpVaultAuth,
 					Raw:          []byte(secretId),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", roleId, secretId)),
 					ExtraData: map[string]string{
@@ -143,8 +143,8 @@ func verifyMatch(ctx context.Context, client *http.Client, roleId, secretId, vau
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_HashiCorpVaultAuth
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_HashiCorpVaultAuth
 }
 
 func (s Scanner) Description() string {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type mockTransport struct {
@@ -111,7 +111,7 @@ func TestProcessData_VerificationErrors(t *testing.T) {
 			if tc.wantResultCount > 0 {
 				r := results[0]
 				assert.Equal(t, tc.wantVerified, r.Verified)
-				assert.Equal(t, detectorspb.DetectorType_Azure, r.DetectorType)
+				assert.Equal(t, detector_typepb.DetectorType_Azure, r.DetectorType)
 				assert.Equal(t, []byte(clientSecret), r.Raw)
 				assert.NotNil(t, r.RawV2, "RawV2 should be set when clientId and tenantId are known")
 			}
@@ -140,7 +140,7 @@ func TestProcessData_ExpiredSecretShouldEmitResult(t *testing.T) {
 	require.Len(t, results, 1, "expired secret must still produce a result")
 	r := results[0]
 	assert.False(t, r.Verified, "expired secret should not be marked as verified")
-	assert.Equal(t, detectorspb.DetectorType_Azure, r.DetectorType)
+	assert.Equal(t, detector_typepb.DetectorType_Azure, r.DetectorType)
 	assert.Equal(t, []byte(clientSecret), r.Raw)
 	assert.NotNil(t, r.RawV2, "RawV2 should be set when clientId and tenantId are known")
 	assert.Nil(t, r.VerificationError(), "expired secret is definitively invalid, not indeterminate")

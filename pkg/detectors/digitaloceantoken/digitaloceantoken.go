@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -41,7 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueTokens {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_DigitalOceanToken,
+			DetectorType: detector_typepb.DetectorType_DigitalOceanToken,
 			Raw:          []byte(token),
 		}
 
@@ -91,8 +91,8 @@ func verifyDigitalOceanToken(ctx context.Context, client *http.Client, token str
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_DigitalOceanToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_DigitalOceanToken
 }
 
 func (s Scanner) Description() string {

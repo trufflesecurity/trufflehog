@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Agora,
+				DetectorType: detector_typepb.DetectorType_Agora,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
 			}
@@ -108,8 +108,8 @@ func verifyAgora(ctx context.Context, client *http.Client, resMatch, resSecret s
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Agora
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Agora
 }
 
 func (s Scanner) Description() string {

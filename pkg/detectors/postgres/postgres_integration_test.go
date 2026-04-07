@@ -18,7 +18,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 var postgresDockerHash string
@@ -92,7 +92,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     true,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
@@ -111,7 +111,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     true,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
@@ -130,7 +130,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     true,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
@@ -149,7 +149,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     true,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
@@ -168,7 +168,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     true,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
@@ -187,7 +187,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     false,
 					Raw:          []byte("postgresql://postgres:inactive@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:inactive@localhost:5434"),
@@ -229,7 +229,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     false,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@192.0.2.0:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@192.0.2.0:5434"),
@@ -251,7 +251,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     false,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5432"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5432"),
@@ -273,7 +273,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     false,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
@@ -294,7 +294,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Postgres,
+					DetectorType: detector_typepb.DetectorType_Postgres,
 					Verified:     false,
 					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),

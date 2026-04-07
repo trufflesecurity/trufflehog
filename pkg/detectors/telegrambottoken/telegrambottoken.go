@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		key := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_TelegramBotToken,
+			DetectorType: detector_typepb.DetectorType_TelegramBotToken,
 			Raw:          []byte(key),
 		}
 
@@ -92,8 +92,8 @@ type userResponse struct {
 	Username string `json:"username"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_TelegramBotToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_TelegramBotToken
 }
 
 func (s Scanner) Description() string {

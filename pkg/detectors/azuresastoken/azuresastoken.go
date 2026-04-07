@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -47,8 +47,8 @@ func (s Scanner) Keywords() []string {
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureSasToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureSasToken
 }
 
 func (s Scanner) Description() string {
@@ -77,7 +77,7 @@ UrlLoop:
 	for url, storageAccount := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureSasToken,
+				DetectorType: detector_typepb.DetectorType_AzureSasToken,
 				Raw:          []byte(url),
 				RawV2:        []byte(url + key),
 			}

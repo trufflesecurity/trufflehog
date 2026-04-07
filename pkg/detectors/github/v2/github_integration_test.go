@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGitHub_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"account_type": "User",
@@ -80,7 +80,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
@@ -100,7 +100,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
@@ -120,7 +120,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
@@ -140,7 +140,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
@@ -160,7 +160,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
@@ -180,7 +180,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",

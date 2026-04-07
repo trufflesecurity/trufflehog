@@ -10,7 +10,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for token := range uniqueTokens {
 		for domain := range uniqueDomains {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Okta,
+				DetectorType: detector_typepb.DetectorType_Okta,
 				Raw:          []byte(token),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, token)),
 			}
@@ -107,8 +107,8 @@ func verifyOktaToken(ctx context.Context, client *http.Client, domain, token str
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Okta
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Okta
 }
 
 func (s Scanner) Description() string {

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGitlab_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -69,7 +69,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -89,7 +89,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -109,7 +109,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -130,7 +130,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -151,7 +151,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",

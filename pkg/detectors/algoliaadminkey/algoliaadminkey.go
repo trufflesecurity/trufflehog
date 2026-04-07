@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -75,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			r := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AlgoliaAdminKey,
+				DetectorType: detector_typepb.DetectorType_AlgoliaAdminKey,
 				Raw:          []byte(key),
 				RawV2:        []byte(id + ":" + key),
 			}
@@ -179,8 +179,8 @@ type keyResponse struct {
 	Description string   `json:"description"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AlgoliaAdminKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AlgoliaAdminKey
 }
 
 func (s Scanner) Description() string {

@@ -63,7 +63,7 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
 
 ### Creating a new Secret Scanner
 
-1. Identify the Secret Detector name from the [/proto/detectors.proto](/proto/detectors.proto) `DetectorType` enum.
+1. Identify the Secret Detector name from the [/proto/detector_type.proto](/proto/detector_type.proto) `DetectorType` enum.
 
 2. Generate the Secret Detector
 
@@ -154,7 +154,7 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
    ```bash
    dos2unix ./scripts/gen_proto.sh
    ```
-5. Open [/proto/detectors.proto](/proto/detectors.proto) file and add new detectors then save it. Make sure Docker is running and run this in Ubuntu command line.
+5. Open [/proto/detector_type.proto](/proto/detector_type.proto) file and add new detectors then save it. Make sure Docker is running and run this in Ubuntu command line.
    ```bash
    make protos
    ```

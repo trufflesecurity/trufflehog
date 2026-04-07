@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				resPassphraseMatch := strings.TrimSpace(passphraseMatch[1])
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_KuCoin,
+					DetectorType: detector_typepb.DetectorType_KuCoin,
 					Raw:          []byte(resKeyMatch),
 					RawV2:        []byte(resKeyMatch + resPassphraseMatch),
 				}
@@ -116,8 +116,8 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 	return base64.StdEncoding.EncodeToString(macsum)
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_KuCoin
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_KuCoin
 }
 
 func (s Scanner) Description() string {

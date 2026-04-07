@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -54,8 +54,8 @@ func (s Scanner) Description() string {
 		"GoDaddy provides applications and access to relevant third-party products and platforms to connect their customers"
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GoDaddy
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GoDaddy
 }
 
 // FromData will find and optionally verify GoDaddy API Key and secrets in a given set of bytes.
@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for key := range uniqueKeys {
 		for secret := range uniqueSecrets {
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_GoDaddy,
+				DetectorType: detector_typepb.DetectorType_GoDaddy,
 				Raw:          []byte(key),
 				ExtraData:    make(map[string]string),
 			}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // Scanner is a stateless struct that implements the detector interface.
@@ -26,8 +26,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"bitbucket", "ATBB"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_BitbucketAppPassword
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_BitbucketAppPassword
 }
 
 func (s Scanner) Description() string {
@@ -80,7 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	var results []detectors.Result
 	for username, password := range uniqueCredentials {
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_BitbucketAppPassword,
+			DetectorType: detector_typepb.DetectorType_BitbucketAppPassword,
 			Raw:          fmt.Appendf(nil, "%s:%s", username, password),
 		}
 		if verify {

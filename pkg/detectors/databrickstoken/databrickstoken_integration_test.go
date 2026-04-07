@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDatabricksToken_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestDatabricksToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatabricksToken,
+					DetectorType: detector_typepb.DetectorType_DatabricksToken,
 					Verified:     true,
 				},
 			},
@@ -69,7 +69,7 @@ func TestDatabricksToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatabricksToken,
+					DetectorType: detector_typepb.DetectorType_DatabricksToken,
 					Verified:     false,
 				},
 			},
@@ -98,7 +98,7 @@ func TestDatabricksToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatabricksToken,
+					DetectorType: detector_typepb.DetectorType_DatabricksToken,
 					Verified:     false,
 				},
 			},
@@ -115,7 +115,7 @@ func TestDatabricksToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DatabricksToken,
+					DetectorType: detector_typepb.DetectorType_DatabricksToken,
 					Verified:     false,
 				},
 			},
