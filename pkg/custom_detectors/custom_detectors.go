@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // The maximum number of matches from one chunk. This const is used when
@@ -222,7 +222,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 
 	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType_CustomRegex,
+		DetectorType: detector_typepb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
 		ExtraData:    map[string]string{},
 	}
@@ -398,8 +398,8 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 	return matches
 }
 
-func (c *CustomRegexWebhook) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_CustomRegex
+func (c *CustomRegexWebhook) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_CustomRegex
 }
 
 const defaultDescription = "This is a user-defined detector with no description provided."

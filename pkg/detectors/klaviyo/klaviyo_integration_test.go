@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestKlaviyo_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestKlaviyo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Klaviyo,
+					DetectorType: detector_typepb.DetectorType_Klaviyo,
 					Verified:     true,
 				},
 			},
@@ -68,7 +68,7 @@ func TestKlaviyo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Klaviyo,
+					DetectorType: detector_typepb.DetectorType_Klaviyo,
 					Verified:     false,
 				},
 			},
@@ -97,7 +97,7 @@ func TestKlaviyo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Klaviyo,
+					DetectorType: detector_typepb.DetectorType_Klaviyo,
 					Verified:     false,
 				},
 			},
@@ -114,7 +114,7 @@ func TestKlaviyo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Klaviyo,
+					DetectorType: detector_typepb.DetectorType_Klaviyo,
 					Verified:     false,
 				},
 			},

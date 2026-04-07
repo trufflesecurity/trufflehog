@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -29,8 +29,8 @@ var (
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"clickhelp", "key", "token", "api", "secret"}) + `\b([0-9A-Za-z]{24})\b`)
 )
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ClickHelp
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ClickHelp
 }
 
 func (s Scanner) Description() string {
@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for email := range uniqueEmails {
 			for apiKey := range uniqueAPIKeys {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_ClickHelp,
+					DetectorType: detector_typepb.DetectorType_ClickHelp,
 					Raw:          []byte(portalLink),
 					RawV2:        []byte(portalLink + email),
 				}

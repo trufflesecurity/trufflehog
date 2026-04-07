@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Bannerbear,
+			DetectorType: detector_typepb.DetectorType_Bannerbear,
 			Raw:          []byte(match),
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
@@ -68,8 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Bannerbear
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Bannerbear
 }
 
 func (s Scanner) Description() string {
