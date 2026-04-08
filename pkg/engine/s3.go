@@ -63,6 +63,16 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 		connection.Roles = c.Roles
 	}
 
+	if len(c.IncludeExtensions) > 0 && len(c.ExcludeExtensions) > 0 {
+		return sources.JobProgressRef{}, fmt.Errorf("cannot use --include-extensions and --exclude-extensions together")
+	}
+	if len(c.IncludeExtensions) > 0 {
+		connection.IncludeExtensions = c.IncludeExtensions
+	}
+	if len(c.ExcludeExtensions) > 0 {
+		connection.ExcludeExtensions = c.ExcludeExtensions
+	}
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
