@@ -5,6 +5,87 @@ import (
 	"testing"
 )
 
+func TestMongoDB_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+		wantDatabase string
+	}{
+		{
+			name:         "single host with port",
+			data:         `mongodb://myDBReader:D1fficultP%40ssw0rd@mongodb0.example.com:27017`,
+			wantHost:     "mongodb0.example.com:27017",
+			wantUsername: "myDBReader",
+		},
+		{
+			name:         "single host without port",
+			data:         `mongodb://myDBReader:D1fficultP%40ssw0rd@mongodb0.example.com`,
+			wantHost:     "mongodb0.example.com",
+			wantUsername: "myDBReader",
+		},
+		{
+			name:         "with options and no database",
+			data:         `mongodb://username:password@host.docker.internal:27018/?authMechanism=PLAIN&tls=true`,
+			wantHost:     "host.docker.internal:27018",
+			wantUsername: "username",
+		},
+		{
+			name:         "cosmos db style with database",
+			data:         `mongodb://agenda-live:m21w7PFfRXQwfHZU1Fgx0rTX29ZBQaWMODLeAjsmyslVcMmcmy6CnLyu3byVDtdLYcCokze8lIE4KyAgSCGZxQ==@agenda-live.mongo.cosmos.azure.com:10255/csb-db?retryWrites=false&ssl=true&replicaSet=globaldb&maxIdleTimeMS=120000&appName=@agenda-live@`,
+			wantHost:     "agenda-live.mongo.cosmos.azure.com:10255",
+			wantUsername: "agenda-live",
+			wantDatabase: "csb-db",
+		},
+		{
+			name:         "with database in path",
+			data:         `mongodb://db-user:db-password@mongodb-instance:27017/db-name`,
+			wantHost:     "mongodb-instance:27017",
+			wantUsername: "db-user",
+			wantDatabase: "db-name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if len(results) == 0 {
+				t.Fatal("expected at least one result")
+			}
+			r := results[0]
+			if got := r.ExtraData["host"]; got != tt.wantHost {
+				t.Errorf("ExtraData[host] = %q, want %q", got, tt.wantHost)
+			}
+			if tt.wantUsername != "" {
+				if got := r.ExtraData["username"]; got != tt.wantUsername {
+					t.Errorf("ExtraData[username] = %q, want %q", got, tt.wantUsername)
+				}
+			} else {
+				if got, ok := r.ExtraData["username"]; ok {
+					t.Errorf("ExtraData[username] should be absent, got %q", got)
+				}
+			}
+			if tt.wantDatabase != "" {
+				if got := r.ExtraData["database"]; got != tt.wantDatabase {
+					t.Errorf("ExtraData[database] = %q, want %q", got, tt.wantDatabase)
+				}
+			} else {
+				if got, ok := r.ExtraData["database"]; ok {
+					t.Errorf("ExtraData[database] should be absent, got %q", got)
+				}
+			}
+			if got := r.ExtraData["rotation_guide"]; got == "" {
+				t.Error("ExtraData[rotation_guide] should still be present")
+			}
+		})
+	}
+}
+
 func TestMongoDB_Pattern(t *testing.T) {
 	tests := []struct {
 		name        string
