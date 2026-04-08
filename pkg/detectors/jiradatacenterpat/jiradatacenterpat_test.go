@@ -56,6 +56,26 @@ func TestJiraDataCenterPAT_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name:  "valid PAT ending with +",
+			input: `jira_token: MzE3MjgzNDMyNTczOmTaXorACdDy8aVJU6FotdRcz2y+`,
+			want:  []string{"MzE3MjgzNDMyNTczOmTaXorACdDy8aVJU6FotdRcz2y+https://jira.example.com"},
+		},
+		{
+			name:  "not a match - invalid first character",
+			input: `jira_token: ATg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M`,
+			want:  []string{},
+		},
+		{
+			name:  "not a match - substring of longer base64 string",
+			input: `jira_token: MzE3MjgzNDMyNTczOmTaXorACdDy8aVJU6FotdRcz2y+AAAA`,
+			want:  []string{},
+		},
+		{
+			name:  "not a match - followed by base64 padding",
+			input: `jira_token: NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M=`,
+			want:  []string{},
+		},
+		{
 			name:  "too short - not a match",
 			input: `jira_token: NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0`,
 			want:  []string{},

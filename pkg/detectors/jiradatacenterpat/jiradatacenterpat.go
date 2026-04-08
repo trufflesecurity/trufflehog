@@ -28,8 +28,11 @@ var (
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// Example: NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M
-	patPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira", "atlassian"}) + `\b([A-Za-z0-9+/]{44})\b`)
+	// PATs are base64-encoded strings of the form <12-digit-id>:<20-random-bytes> (33 bytes, 44 chars, no padding).
+	// Since the first byte is always an ASCII digit (0x30–0x39), the first base64 character is always M, N, or O.
+	// This is also verified by generating 25+ tokens.
+	// The trailing boundary (?:[^A-Za-z0-9+/=]|\z) is used instead of \b to correctly handle tokens ending in + or /.
+	patPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira", "atlassian"}) + `\b([MNO][A-Za-z0-9+/]{43})(?:[^A-Za-z0-9+/=]|\z)`)
 	urlPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira", "atlassian"}) + `(https?://[A-Za-z0-9][A-Za-z0-9.\-]*(?::\d{1,5})?)`)
 )
 
