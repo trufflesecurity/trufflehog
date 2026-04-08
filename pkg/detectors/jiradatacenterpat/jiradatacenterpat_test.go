@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const (
@@ -220,7 +220,7 @@ func TestJiraDataCenterPAT_FromData(t *testing.T) {
 			require.Len(t, results, tt.wantResults)
 
 			for _, result := range results {
-				assert.Equal(t, detectorspb.DetectorType_JiraDataCenterPAT, result.DetectorType)
+				assert.Equal(t, detector_typepb.DetectorType_JiraDataCenterPAT, result.DetectorType)
 				assert.NotEmpty(t, result.Raw)
 				assert.Equal(t, tt.wantVerified, result.Verified)
 				assert.Equal(t, tt.wantVerificationErr, result.VerificationError() != nil)

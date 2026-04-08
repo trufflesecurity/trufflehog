@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, token := range tokens {
 		for _, endpoint := range s.Endpoints(uniqueURLs...) {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_JiraDataCenterPAT,
+				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
 				RawV2:        []byte(token + endpoint),
 				Redacted:     token[:3] + "..." + token[len(token)-3:],
@@ -138,8 +138,8 @@ func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_JiraDataCenterPAT
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_JiraDataCenterPAT
 }
 
 func (s Scanner) Description() string {
