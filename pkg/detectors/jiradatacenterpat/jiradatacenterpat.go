@@ -124,7 +124,8 @@ func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) 
 	case http.StatusOK:
 		var result map[string]any
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			return false, nil, nil
+			// 200 confirms the token is valid; failing to decode only means we can't extract extra data.
+			return true, nil, nil
 		}
 		extraData := map[string]string{}
 		if name, ok := result["displayName"].(string); ok {

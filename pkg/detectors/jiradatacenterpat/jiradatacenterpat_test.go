@@ -168,6 +168,19 @@ func TestJiraDataCenterPAT_FromData(t *testing.T) {
 			},
 		},
 		{
+			name: "found, verified - invalid json body",
+			setup: func() {
+				gock.New(testEndpoint).
+					Get("/rest/api/2/myself").
+					Reply(http.StatusOK).
+					BodyString("not json")
+			},
+			data:         fmt.Sprintf("jira token: %s", testToken),
+			verify:       true,
+			wantResults:  1,
+			wantVerified: true,
+		},
+		{
 			name: "found, unverified (401)",
 			setup: func() {
 				gock.New(testEndpoint).
