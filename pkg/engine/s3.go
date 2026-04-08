@@ -24,7 +24,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 	hasProfile := len(c.Profile) > 0
 
 	if hasProfile && (hasStaticCreds || c.CloudCred) {
-		return sources.JobProgressRef{}, fmt.Errorf("cannot use --profile with --key, --secret, --session-token, or --cloud-environment")
+		return sources.JobProgressRef{}, fmt.Errorf("cannot use --aws-profile with --key, --secret, --session-token, or --cloud-environment")
 	}
 	if c.CloudCred && hasStaticCreds {
 		return sources.JobProgressRef{}, fmt.Errorf("cannot use cloud environment and static credentials together")
