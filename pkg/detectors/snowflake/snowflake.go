@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -121,7 +121,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Snowflake,
+					DetectorType: detector_typepb.DetectorType_Snowflake,
 					Raw:          []byte(resPasswordMatch),
 					ExtraData: map[string]string{
 						"account":  resAccountMatch,
@@ -191,8 +191,8 @@ func verifyMatch(ctx context.Context, account, username, password string) (bool,
 	return loginResp.Success, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Snowflake
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Snowflake
 }
 
 func (s Scanner) Description() string {
