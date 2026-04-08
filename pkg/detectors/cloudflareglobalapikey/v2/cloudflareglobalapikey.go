@@ -2,42 +2,45 @@ package cloudflareglobalapikey
 
 import (
 	"context"
-	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
-	detectors.DefaultMultiPartCredentialProvider
+	v1.Scanner
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (Scanner) Version() int { return 2 }
 
 var (
 	client = common.SaneHttpClient()
 
-	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([A-Za-z0-9_-]{37})\b`)
+	// 2026+ format: cfk_ prefix, sufficiently unique to match without keyword proximity.
+	apiKeyV2Pat = regexp.MustCompile(`\b(cfk_[a-zA-Z0-9]{40}[a-f0-9]{8})\b`)
 
 	emailPat = regexp.MustCompile(common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"cloudflare"}
+	return []string{"cfk_"}
 }
 
 // FromData will find and optionally verify CloudflareGlobalApiKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	apiKeyMatches := apiKeyPat.FindAllStringSubmatch(dataStr, -1)
+	apiKeyMatches := apiKeyV2Pat.FindAllStringSubmatch(dataStr, -1)
 
 	uniqueEmailMatches := make(map[string]struct{})
 	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
@@ -47,34 +50,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, apiKeyMatch := range apiKeyMatches {
 		apiKeyRes := strings.TrimSpace(apiKeyMatch[1])
 
+		if len(uniqueEmailMatches) == 0 {
+			// No email found; still report the token unverified.
+			results = append(results, detectors.Result{
+				DetectorType: detector_typepb.DetectorType_CloudflareGlobalApiKey,
+				Raw:          []byte(apiKeyRes),
+			})
+			continue
+		}
+
 		for emailMatch := range uniqueEmailMatches {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_CloudflareGlobalApiKey,
 				Redacted:     emailMatch,
 				Raw:          []byte(apiKeyRes),
-				SecretParts: map[string]string{
-					"key":   apiKeyRes,
-					"email": emailMatch,
-				},
-				RawV2: []byte(apiKeyRes + emailMatch),
+				RawV2:        []byte(apiKeyRes + emailMatch),
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/user", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("X-Auth-Email", emailMatch)
-				req.Header.Add("X-Auth-Key", apiKeyRes)
-				req.Header.Add("Content-Type", "application/json")
-
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				s1.Verified = v1.VerifyGlobalAPIKey(ctx, client, apiKeyRes, emailMatch)
 			}
 
 			results = append(results, s1)
@@ -89,5 +83,5 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Cloudflare is a web infrastructure and website security company. Its services include content delivery network (CDN), DDoS mitigation, Internet security, and distributed domain name server (DNS) services. Cloudflare API keys can be used to access and modify these services."
+	return "Cloudflare is a web infrastructure and website security company. Its services include content delivery network (CDN), DDoS mitigation, Internet security, and distributed domain name server (DNS) services. Cloudflare API keys (cfk_ prefixed, 2026+ format) can be used to access and modify these services."
 }
