@@ -17,6 +17,7 @@ import (
 	"github.com/avast/apkparser"
 	dextk "github.com/csnewman/dextk"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
@@ -205,6 +206,9 @@ func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkCha
 
 	// Process all files for secrets
 	for _, file := range zipReader.File {
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
 		if err := h.processFile(ctx, file, resTable, apkChan); err != nil {
 			ctx.Logger().V(2).Info(fmt.Sprintf("failed to process file: %s", file.Name), "error", err)
 		}
