@@ -21,7 +21,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// origin ca keys documentation: https://developers.cloudflare.com/fundamentals/api/get-started/ca-keys/
+	// Origin CA keys (aka "Service Keys") are deprecated as of 2026-03-19:
+	// https://developers.cloudflare.com/changelog/post/2026-03-19-service-key-authentication-deprecated/
+	//
+	// Reference: https://developers.cloudflare.com/fundamentals/api/get-started/ca-keys/
 	keyPat = regexp.MustCompile(`\b(v1\.0-[A-Za-z0-9-]{171})\b`)
 )
 
