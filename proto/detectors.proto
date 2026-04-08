@@ -1054,6 +1054,7 @@ enum DetectorType {
   ArtifactoryReferenceToken = 1042;
   DatadogApikey = 1043;
   ShopifyOAuth = 1044;
+  Rancher = 1045;
 }
 
 message Result {
