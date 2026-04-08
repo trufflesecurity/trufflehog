@@ -16,7 +16,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestIntegrationMongoDB_FromChunk(t *testing.T) {
@@ -77,7 +77,7 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -96,7 +96,7 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -115,7 +115,7 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -135,7 +135,7 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -214,7 +214,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -233,7 +233,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -252,7 +252,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -272,7 +272,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MongoDB,
+					DetectorType: detector_typepb.DetectorType_MongoDB,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
