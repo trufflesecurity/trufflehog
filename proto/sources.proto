@@ -385,6 +385,7 @@ message S3 {
   repeated string roles = 7;
   repeated string ignore_buckets = 8;
   bool enable_resumption = 9 [deprecated = true];
+  string profile = 10;
 }
 
 message Slack {

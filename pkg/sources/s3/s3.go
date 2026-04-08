@@ -134,6 +134,14 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 }
 
 func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Client, error) {
+	var configOpts []func(*config.LoadOptions) error
+	configOpts = append(configOpts, config.WithRegion(region))
+
+	// If a named profile is specified, use it to resolve credentials from ~/.aws/credentials and ~/.aws/config.
+	if profile := s.conn.GetProfile(); profile != "" {
+		configOpts = append(configOpts, config.WithSharedConfigProfile(profile))
+	}
+
 	var credsProvider aws.CredentialsProvider
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.S3_SessionToken:
@@ -154,9 +162,15 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		// come from the environment or the credentials file or whatever else AWS gets up to).
 	}
 
+	// Only set an explicit credentials provider when we have one (static creds or anonymous).
+	// When using a named profile, let the SDK resolve credentials from the profile config.
+	if credsProvider != nil {
+		configOpts = append(configOpts, config.WithCredentialsProvider(credsProvider))
+	}
+
 	if roleArn != "" {
 		// The config loaded here will be used to retrieve and refresh temporary credentials from AssumeRole
-		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region), config.WithCredentialsProvider(credsProvider))
+		cfg, err := config.LoadDefaultConfig(ctx, configOpts...)
 		if err != nil {
 			return nil, err
 		}
@@ -169,13 +183,14 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		//   "If you explicitly configure a provider on aws.Config directly,
 		//    you must also explicitly wrap the provider with this type using NewCredentialsCache"
 		credsProvider = aws.NewCredentialsCache(provider)
+		// Rebuild options with only the role-based credentials for the final config.
+		configOpts = []func(*config.LoadOptions) error{
+			config.WithRegion(region),
+			config.WithCredentialsProvider(credsProvider),
+		}
 	}
 
-	cfg, err := config.LoadDefaultConfig(
-		ctx,
-		config.WithRegion(region),
-		config.WithCredentialsProvider(credsProvider),
-	)
+	cfg, err := config.LoadDefaultConfig(ctx, configOpts...)
 	if err != nil {
 		return nil, err
 	}
