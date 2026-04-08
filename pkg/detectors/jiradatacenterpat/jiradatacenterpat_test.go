@@ -25,7 +25,7 @@ const (
 
 func TestJiraDataCenterPAT_Pattern(t *testing.T) {
 	d := Scanner{}
-	d.SetConfiguredEndpoints("https://jira.example.com")
+	_ = d.SetConfiguredEndpoints("https://jira.example.com")
 	d.UseFoundEndpoints(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -109,7 +109,7 @@ func TestJiraDataCenterPAT_FromData(t *testing.T) {
 	client := common.SaneHttpClient()
 
 	d := Scanner{client: client}
-	d.SetConfiguredEndpoints(testEndpoint)
+	_ = d.SetConfiguredEndpoints(testEndpoint)
 	d.UseFoundEndpoints(false)
 
 	defer gock.Off()
