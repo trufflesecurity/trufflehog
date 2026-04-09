@@ -84,8 +84,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 	// Validate URLs format
 	for _, u := range s.conn.GetUrls() {
-		if _, err := url.Parse(u); err != nil {
+		parsedURL, err := url.Parse(u)
+		if err != nil {
 			return fmt.Errorf("invalid URL %q: %w", u, err)
+		}
+		if parsedURL.Scheme == "" {
+			return fmt.Errorf("invalid URL %q: missing scheme (must be http or https)", u)
+		}
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return fmt.Errorf("invalid URL %q: unsupported scheme %q (must be http or https)", u, parsedURL.Scheme)
+		}
+		if parsedURL.Host == "" {
+			return fmt.Errorf("invalid URL %q: missing host", u)
 		}
 	}
 
@@ -105,6 +115,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	defer cancel()
 
 	eg, _ := errgroup.WithContext(crawlCtx)
+	eg.SetLimit(s.concurrency)
 
 	for _, u := range s.conn.GetUrls() {
 		ctx.Logger().V(5).Info("Processing Url", "url", u)
@@ -158,6 +169,14 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	}); err != nil {
 		return fmt.Errorf("failed to limit rules to the colly collector: %w", err)
 	}
+
+	// Wire the collector to our cancellable context so in-flight HTTP requests
+	// are cancelled immediately when the context deadline fires.
+	collector.Context = ctx
+
+	// Per-request HTTP timeout as a safety net for individual slow responses.
+	// This is separate from the overall crawl timeout controlled by ctx.
+	collector.SetRequestTimeout(30 * time.Second)
 
 	// request validations
 	collector.OnRequest(func(r *colly.Request) {
