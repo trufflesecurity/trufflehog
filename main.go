@@ -173,6 +173,9 @@ var (
 	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag. Incompatible with --ignore-bucket.").Strings()
 	s3ScanIgnoreBuckets = s3Scan.Flag("ignore-bucket", "Name of S3 bucket to ignore. You can repeat this flag. Incompatible with --bucket.").Strings()
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
+	s3ScanProfile            = s3Scan.Flag("aws-profile", "AWS shared credentials profile to use. Cannot be used with --key, --secret, --session-token, or --cloud-environment.").Envar("AWS_PROFILE").String()
+	s3ScanIncludeExtensions  = s3Scan.Flag("include-extensions", "File extensions to include in scanning, comma-separated (e.g., yaml,yml,config). Incompatible with --exclude-extensions.").Strings()
+	s3ScanExcludeExtensions  = s3Scan.Flag("exclude-extensions", "File extensions to exclude from scanning, comma-separated (e.g., zip,png,jpg). Incompatible with --include-extensions.").Strings()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
 	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
@@ -951,7 +954,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IgnoreBuckets: *s3ScanIgnoreBuckets,
 			Roles:         *s3ScanRoleArns,
 			CloudCred:     *s3ScanCloudEnv,
-			MaxObjectSize: int64(*s3ScanMaxObjectSize),
+			MaxObjectSize:     int64(*s3ScanMaxObjectSize),
+			Profile:           *s3ScanProfile,
+			IncludeExtensions: *s3ScanIncludeExtensions,
+			ExcludeExtensions: *s3ScanExcludeExtensions,
 		}
 		if ref, err := eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
