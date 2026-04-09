@@ -143,6 +143,61 @@ func TestInit_ValidURL_HTTPS(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestInit_DuplicateURL(t *testing.T) {
+	conn := &anypb.Any{}
+	require.NoError(t, conn.MarshalFrom(&sourcespb.Web{
+		Urls: []string{"http://example.com", "http://example.com"},
+	}))
+	s := &Source{}
+	err := s.Init(context.TODO(), "test", 0, 0, false, conn, 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate URL")
+}
+
+// Partial failure and error handling
+
+func TestChunks_PartialFailure(t *testing.T) {
+	// Test that when one URL fails and another succeeds, we still process the successful one
+	// and return an error at the end.
+
+	goodSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><head><title>Good</title></head><body>Good data</body></html>`)
+	}))
+	defer goodSrv.Close()
+
+	// This URL will fail (port 1 is unreachable)
+	badURL := "http://localhost:1"
+
+	s := initSource(t, &sourcespb.Web{
+		Urls: []string{badURL, goodSrv.URL},
+		Timeout: 2,
+	}, 1)
+
+	chunksChan := make(chan *sources.Chunk, 16)
+
+	// Chunks should return an error due to the bad URL
+	err := s.Chunks(context.TODO(), chunksChan)
+	close(chunksChan)
+
+	// Collect chunks that were successfully emitted
+	var chunks []*sources.Chunk
+	for c := range chunksChan {
+		chunks = append(chunks, c)
+	}
+
+	// Should have an error (the bad URL)
+	assert.Error(t, err, "expected error from unreachable URL")
+
+	// But should still have processed the good URL
+	assert.NotEmpty(t, chunks, "expected chunks from the reachable URL despite one failure")
+
+	// Verify the chunk is from the good URL
+	meta := chunks[0].SourceMetadata.Data.(*source_metadatapb.MetaData_Web)
+	assert.Contains(t, meta.Web.Url, "127.0.0.1", "chunk should be from the working URL")
+	assert.Equal(t, "Good", meta.Web.PageTitle)
+}
+
 // Visit error propagation
 
 func TestChunks_VisitErrorPropagated(t *testing.T) {
