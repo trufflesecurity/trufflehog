@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# NOTE: Version and args must match .github/workflows/lint.yml
 GOLANGCI_LINT_VERSION="v2.11.4"
 
 # TODO: Re-enable errcheck and staticcheck once pre-existing issues are resolved.

@@ -22,6 +22,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
+          # NOTE: Version and args must match scripts/lint.sh
           version: v2.11.4
           args: --disable errcheck,staticcheck --enable bodyclose,copyloopvar,misspell --timeout 10m
   semgrep:
