@@ -228,20 +228,25 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 		})
 	}
 
-	// Create a channel to signal when the crawl is done.
-	done := make(chan struct{})
+	// Create a channel to propagate errors from the crawl goroutine.
+	done := make(chan error)
 	go func() {
 		ctx.Logger().Info("Starting crawl")
 		if err := collector.Visit(seedURL); err != nil {
 			ctx.Logger().Error(err, "Visit failed")
+			done <- err
+			return
 		}
 		collector.Wait() // blocks until all requests finish
-		close(done)
+		done <- nil      // Signal successful completion
 	}()
 
 	// Wait for either crawl to finish or context cancellation.
 	select {
-	case <-done:
+	case err := <-done:
+		if err != nil {
+			return err
+		}
 		ctx.Logger().Info("Crawl finished normally")
 		return nil
 	case <-ctx.Done():
