@@ -108,8 +108,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 // Chunks emits data over a channel that is decoded and scanned for secrets.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	jobIDStr := fmt.Sprint(s.jobId)
-
 	// Create a new context with timeout.
 	crawlCtx, cancel := context.WithTimeout(ctx, time.Duration(s.conn.GetTimeout())*time.Second)
 	defer cancel()
@@ -119,7 +117,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	for _, u := range s.conn.GetUrls() {
 		ctx.Logger().V(5).Info("Processing Url", "url", u)
-		webUrlsScanned.WithLabelValues(s.name, jobIDStr).Inc()
 		eg.Go(func() error {
 			return s.crawlURL(crawlCtx, u, chunksChan)
 		})
@@ -190,6 +187,9 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	// Set up callbacks
 	collector.OnResponse(func(r *colly.Response) {
 		ctx.Logger().Info("Response received")
+		// Increment metric for each page actually fetched.
+		jobIDStr := fmt.Sprint(s.jobId)
+		webUrlsScanned.WithLabelValues(s.name, jobIDStr).Inc()
 		if err := s.processChunk(ctx, r, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error processing page")
 		}
