@@ -143,6 +143,26 @@ func TestInit_ValidURL_HTTPS(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Visit error propagation
+
+func TestChunks_VisitErrorPropagated(t *testing.T) {
+	// Test that Visit() errors on the seed URL are propagated, not silently swallowed.
+	// Point to a URL that will definitely fail to connect.
+	failURL := "http://localhost:1"  // Port 1 is unlikely to have a service; connection should be refused
+
+	s := initSource(t, &sourcespb.Web{Urls: []string{failURL}, Timeout: 2}, 1)
+	chunksChan := make(chan *sources.Chunk, 16)
+
+	// Chunks() should return an error, not nil.
+	err := s.Chunks(context.TODO(), chunksChan)
+	close(chunksChan)
+
+	// The error should be non-nil because the seed URL is unreachable.
+	assert.Error(t, err, "expected Visit() error to be propagated")
+	// We don't check the exact error message since it can vary by OS/network,
+	// but it should be a network error, not a context error.
+}
+
 // Happy path
 
 func TestChunks_HappyPath(t *testing.T) {
