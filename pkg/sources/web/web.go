@@ -82,8 +82,14 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		return errors.New("no URL provided")
 	}
 
-	// Validate URLs format
+	// Validate URLs format and detect duplicates
+	seen := make(map[string]struct{}, len(s.conn.GetUrls()))
 	for _, u := range s.conn.GetUrls() {
+		if _, dup := seen[u]; dup {
+			return fmt.Errorf("duplicate URL %q", u)
+		}
+		seen[u] = struct{}{}
+
 		parsedURL, err := url.Parse(u)
 		if err != nil {
 			return fmt.Errorf("invalid URL %q: %w", u, err)
@@ -112,18 +118,25 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	crawlCtx, cancel := context.WithTimeout(ctx, time.Duration(s.conn.GetTimeout())*time.Second)
 	defer cancel()
 
-	eg, _ := errgroup.WithContext(crawlCtx)
+	var eg errgroup.Group
 	eg.SetLimit(s.concurrency)
+	scanErrs := sources.NewScanErrors()
 
 	for _, u := range s.conn.GetUrls() {
 		ctx.Logger().V(5).Info("Processing Url", "url", u)
+		u := u // capture loop variable
 		eg.Go(func() error {
-			return s.crawlURL(crawlCtx, u, chunksChan)
+			if err := s.crawlURL(crawlCtx, u, chunksChan); err != nil {
+				ctx.Logger().Error(err, "Crawl failed", "url", u)
+				scanErrs.Add(fmt.Errorf("%s: %w", u, err))
+			}
+			return nil // continue on error; don't propagate to errgroup
 		})
 	}
 
-	if err := eg.Wait(); err != nil {
-		ctx.Logger().Error(err, "One or more crawls failed")
+	eg.Wait()
+
+	if err := scanErrs.Errors(); err != nil {
 		return err
 	}
 
@@ -148,6 +161,7 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	collector := colly.NewCollector(
 		colly.UserAgent(s.conn.GetUserAgent()),
 		colly.Async(true),
+		colly.MaxBodySize(10 * 1024 * 1024), // 10 MB limit per response
 	)
 
 	// Apply depth limit only when crawling is enabled and a positive depth is set.
