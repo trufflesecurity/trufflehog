@@ -88,6 +88,61 @@ func TestInit_ZeroConcurrencyDefaultsToOne(t *testing.T) {
 	assert.Equal(t, 1, s.concurrency)
 }
 
+// URL validation
+
+func TestInit_InvalidURL_MissingScheme(t *testing.T) {
+	conn := &anypb.Any{}
+	require.NoError(t, conn.MarshalFrom(&sourcespb.Web{
+		Urls: []string{"example.com"},
+	}))
+	s := &Source{}
+	err := s.Init(context.TODO(), "test", 0, 0, false, conn, 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing scheme")
+}
+
+func TestInit_InvalidURL_UnsupportedScheme(t *testing.T) {
+	conn := &anypb.Any{}
+	require.NoError(t, conn.MarshalFrom(&sourcespb.Web{
+		Urls: []string{"ftp://example.com"},
+	}))
+	s := &Source{}
+	err := s.Init(context.TODO(), "test", 0, 0, false, conn, 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported scheme")
+}
+
+func TestInit_InvalidURL_MissingHost(t *testing.T) {
+	conn := &anypb.Any{}
+	require.NoError(t, conn.MarshalFrom(&sourcespb.Web{
+		Urls: []string{"http://"},
+	}))
+	s := &Source{}
+	err := s.Init(context.TODO(), "test", 0, 0, false, conn, 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing host")
+}
+
+func TestInit_ValidURL_HTTP(t *testing.T) {
+	conn := &anypb.Any{}
+	require.NoError(t, conn.MarshalFrom(&sourcespb.Web{
+		Urls: []string{"http://example.com"},
+	}))
+	s := &Source{}
+	err := s.Init(context.TODO(), "test", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+}
+
+func TestInit_ValidURL_HTTPS(t *testing.T) {
+	conn := &anypb.Any{}
+	require.NoError(t, conn.MarshalFrom(&sourcespb.Web{
+		Urls: []string{"https://example.com"},
+	}))
+	s := &Source{}
+	err := s.Init(context.TODO(), "test", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+}
+
 // Happy path
 
 func TestChunks_HappyPath(t *testing.T) {
@@ -429,3 +484,4 @@ func TestChunks_IgnoreRobotsTxt(t *testing.T) {
 
 	assert.True(t, secretVisited, "/secret should be crawled when IgnoreRobots=true")
 }
+
