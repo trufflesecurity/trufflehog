@@ -124,7 +124,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	for _, u := range s.conn.GetUrls() {
 		ctx.Logger().V(5).Info("Processing Url", "url", u)
-		u := u // capture loop variable
 		eg.Go(func() error {
 			if err := s.crawlURL(crawlCtx, u, chunksChan); err != nil {
 				ctx.Logger().Error(err, "Crawl failed", "url", u)
@@ -134,7 +133,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		})
 	}
 
-	eg.Wait()
+	_ = eg.Wait()
 
 	if err := scanErrs.Errors(); err != nil {
 		return err
@@ -161,7 +160,7 @@ func (s *Source) crawlURL(ctx context.Context, seedURL string, chunksChan chan *
 	collector := colly.NewCollector(
 		colly.UserAgent(s.conn.GetUserAgent()),
 		colly.Async(true),
-		colly.MaxBodySize(10 * 1024 * 1024), // 10 MB limit per response
+		colly.MaxBodySize(10*1024*1024), // 10 MB limit per response
 	)
 
 	// Apply depth limit only when crawling is enabled and a positive depth is set.
