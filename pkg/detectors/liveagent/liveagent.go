@@ -9,7 +9,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{
@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, domainMatch := range domainMatches {
 			domainRes := strings.TrimSpace(domainMatch[0])
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_LiveAgent,
+				DetectorType: detector_typepb.DetectorType_LiveAgent,
 				Raw:          []byte(resMatch),
 				ExtraData: map[string]string{
 					"domain": domainRes,
@@ -91,8 +91,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_LiveAgent
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_LiveAgent
 }
 
 func (s Scanner) Description() string {

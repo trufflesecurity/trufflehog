@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -29,8 +29,8 @@ var _ interface {
 	detectors.MaxSecretSizeProvider
 } = (*Scanner)(nil)
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Docker
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Docker
 }
 
 func (s Scanner) Description() string {
@@ -114,7 +114,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			r := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Docker,
+				DetectorType: detector_typepb.DetectorType_Docker,
 				Raw:          []byte(b64encoded),
 				RawV2:        []byte(`{"registry":"` + registry + `","auth":"` + b64encoded + `"}`),
 				ExtraData:    map[string]string{"Username": username},

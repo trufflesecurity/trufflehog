@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		keyMatch := strings.TrimSpace(key[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Anthropic,
+			DetectorType: detector_typepb.DetectorType_Anthropic,
 			Raw:          []byte(keyMatch),
 			ExtraData:    make(map[string]string),
 		}
@@ -126,8 +126,8 @@ func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Anthropic
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Anthropic
 }
 
 func (s Scanner) Description() string {

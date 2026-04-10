@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestCaspio_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestCaspio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Caspio,
+					DetectorType: detector_typepb.DetectorType_Caspio,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestCaspio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Caspio,
+					DetectorType: detector_typepb.DetectorType_Caspio,
 					Verified:     false,
 				},
 			},

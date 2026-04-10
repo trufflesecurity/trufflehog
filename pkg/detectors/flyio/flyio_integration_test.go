@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFlyio_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestFlyio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FlyIO,
+					DetectorType: detector_typepb.DetectorType_FlyIO,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestFlyio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FlyIO,
+					DetectorType: detector_typepb.DetectorType_FlyIO,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,7 @@ func TestFlyio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FlyIO,
+					DetectorType: detector_typepb.DetectorType_FlyIO,
 					Verified:     false,
 				},
 			},
@@ -113,7 +113,7 @@ func TestFlyio_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_FlyIO,
+					DetectorType: detector_typepb.DetectorType_FlyIO,
 					Verified:     false,
 				}
 				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 404"))
