@@ -21,7 +21,7 @@ var (
 		`(?i)(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN)[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`,
 	)
 	serverPattern = regexp.MustCompile(
-		`(?i)(?:CATTLE_SERVER|RANCHER_URL)\s*[=:]\s*["']?(https?://[a-zA-Z0-9._\-]+)["']?`,
+		`(?i)(?:CATTLE_SERVER|RANCHER_URL)\s*[=:]\s*["']?(https?://[a-zA-Z0-9._\-]+(:\d+)?)["']?`,
 	)
 )
 
