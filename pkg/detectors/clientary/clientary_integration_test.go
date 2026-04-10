@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestRoninApp_FromChunk(t *testing.T) {
@@ -49,11 +49,11 @@ func TestRoninApp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Clientary,
+					DetectorType: detector_typepb.DetectorType_Clientary,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Clientary,
+					DetectorType: detector_typepb.DetectorType_Clientary,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"Rebrading Docs": "https://www.clientary.com/articles/a-new-brand/",
@@ -72,7 +72,7 @@ func TestRoninApp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Clientary,
+					DetectorType: detector_typepb.DetectorType_Clientary,
 					Verified:     false,
 				},
 			},

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTwilio_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_Twilio,
 					Verified:     true,
 					Redacted:     id,
 					RawV2:        []byte(id + secret),
@@ -74,7 +74,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_Twilio,
 					Verified:     false,
 					Redacted:     id,
 					RawV2:        []byte(id + secretInactive),
@@ -106,7 +106,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_Twilio,
 					Verified:     false,
 					Redacted:     id,
 					RawV2:        []byte(id + secret),
@@ -128,7 +128,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_Twilio,
 					Verified:     false,
 					Redacted:     id,
 					RawV2:        []byte(id + secret),

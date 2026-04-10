@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestParseur_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestParseur_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Parseur,
+					DetectorType: detector_typepb.DetectorType_Parseur,
 					Verified:     true,
 				},
 			},
@@ -65,7 +65,7 @@ func TestParseur_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Parseur,
+					DetectorType: detector_typepb.DetectorType_Parseur,
 					Verified:     false,
 				},
 			},

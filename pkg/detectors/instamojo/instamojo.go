@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resClientId := strings.TrimSpace(clientIdMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Instamojo,
+				DetectorType: detector_typepb.DetectorType_Instamojo,
 				Raw:          []byte(resClientId),
 			}
 
@@ -93,8 +93,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Instamojo
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Instamojo
 }
 
 func (s Scanner) Description() string {
