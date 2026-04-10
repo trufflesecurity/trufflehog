@@ -1374,11 +1374,11 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	assert.NoError(t, err)
 
 	var count int
-	noCloudEndpointDetectors := map[detectorspb.DetectorType]struct{}{
-		detectorspb.DetectorType_ArtifactoryAccessToken:     {},
-		detectorspb.DetectorType_ArtifactoryReferenceToken:  {},
-		detectorspb.DetectorType_TableauPersonalAccessToken: {},
-		detectorspb.DetectorType_HashiCorpVaultAuth:         {},
+	noCloudEndpointDetectors := map[detector_typepb.DetectorType]struct{}{
+		detector_typepb.DetectorType_ArtifactoryAccessToken:     {},
+		detector_typepb.DetectorType_ArtifactoryReferenceToken:  {},
+		detector_typepb.DetectorType_TableauPersonalAccessToken: {},
+		detector_typepb.DetectorType_HashiCorpVaultAuth:         {},
 		// these do not have any cloud endpoint
 	}
 
