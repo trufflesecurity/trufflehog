@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	validPattern   = "RANCHER_URL=https://rancher.example.com\nRANCHER_API_TOKEN=kubeadmin5f8a3b2c1d9e4f7a6b0c5d2e8f1a4b7c3d6e9f2a5b8c1d4e7f0a3b6"
+	validPattern   = "CATTLE_SERVER=https://rancher.example.com\nCATTLE_TOKEN=kubeadmin5f8a3b2c1d9e4f7a6b0c5d2e8f1a4b7c3d6e9f2a5b8c1d4e7f0a3b6"
 	invalidPattern = "RANCHER_API_TOKEN=shorttoken123"
-	keyword        = "rancher_api_token"
+	keyword        = "cattle_token"
 )
 
 func TestRancher_Pattern(t *testing.T) {
@@ -27,17 +27,17 @@ func TestRancher_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern with server context",
-			input: fmt.Sprintf("%s", validPattern),
-			want:  []string{"kubeadmin5f8a3b2c1d9e4f7a6b0c5d2e8f1a4b7c3d6e9f2a5b8c1d4e7f0a3b6"},
+			input: validPattern,
+			want:  []string{"https://rancher.example.com:kubeadmin5f8a3b2c1d9e4f7a6b0c5d2e8f1a4b7c3d6e9f2a5b8c1d4e7f0a3b6"},
 		},
 		{
 			name:  "invalid pattern - token too short",
-			input: fmt.Sprintf("%s token = '%s'", keyword, invalidPattern),
+			input: fmt.Sprintf("CATTLE_SERVER=https://rancher.example.com\n%s", invalidPattern),
 			want:  []string{},
 		},
 		{
 			name:  "no server context - should not detect",
-			input: "RANCHER_API_TOKEN=kubeadmin5f8a3b2c1d9e4f7a6b0c5d2e8f1a4b7c3d6e9f2a5b8c1d4e7f0a3b6",
+			input: "CATTLE_TOKEN=kubeadmin5f8a3b2c1d9e4f7a6b0c5d2e8f1a4b7c3d6e9f2a5b8c1d4e7f0a3b6",
 			want:  []string{},
 		},
 	}

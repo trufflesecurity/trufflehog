@@ -3,6 +3,7 @@ package rancher
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -17,10 +18,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	tokenPattern = regexp.MustCompile(
-		`(?i)(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN)[^\w]{1,4}([a-z0-9]{54,64})`,
+		`(?i)(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN)[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`,
 	)
 	serverPattern = regexp.MustCompile(
-		`(?i)(?:CATTLE_SERVER|RANCHER_URL|rancher\.[a-z0-9-]+\.[a-z]{2,})`,
+		`(?i)(?:CATTLE_SERVER|RANCHER_URL)\s*[=:]\s*["']?(https?://[a-zA-Z0-9._\-]+)["']?`,
 	)
 )
 
@@ -31,9 +32,11 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	if !serverPattern.MatchString(dataStr) {
+	serverMatches := serverPattern.FindStringSubmatch(dataStr)
+	if len(serverMatches) < 2 {
 		return
 	}
+	serverURL := strings.TrimRight(serverMatches[1], "/")
 
 	matches := tokenPattern.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
@@ -45,18 +48,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Rancher,
 			Raw:          []byte(token),
+			RawV2:        []byte(serverURL + ":" + token),
 		}
 
 		if verify {
 			client := common.SaneHttpClient()
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://rancher.example.com/v3", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", serverURL+"/v3", nil)
 			if err != nil {
 				continue
 			}
 			req.Header.Set("Authorization", "Bearer "+token)
 			res, err := client.Do(req)
 			if err == nil {
-				res.Body.Close()
+				defer res.Body.Close()
 				if res.StatusCode == http.StatusOK {
 					result.Verified = true
 				}
