@@ -189,15 +189,6 @@ func TestHashiCorpVaultAuth_WithCustomEndpoint(t *testing.T) {
 	if len(results) == 0 {
 		t.Fatal("expected at least one result from FromData, got 0")
 	}
-	for _, result := range results {
-		endpoint, ok := result.ExtraData["URL"]
-		if !ok {
-			t.Fatalf("expected URL in ExtraData, got: %v", result.ExtraData)
-		}
-		if endpoint != vaultUrl {
-			t.Fatalf("expected endpoint %s, got %s", vaultUrl, endpoint)
-		}
-	}
 	want := []detectors.Result{
 		{
 			DetectorType:          detectorspb.DetectorType_HashiCorpVaultAuth,
