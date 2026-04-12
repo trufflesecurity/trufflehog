@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
+					DetectorType: detector_typepb.DetectorType_MicrosoftTeamsWebhook,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
+					DetectorType: detector_typepb.DetectorType_MicrosoftTeamsWebhook,
 					Verified:     false,
 				},
 			},
@@ -83,7 +83,7 @@ func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
+					DetectorType: detector_typepb.DetectorType_MicrosoftTeamsWebhook,
 					Verified:     false,
 				},
 			},
@@ -100,7 +100,7 @@ func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
+					DetectorType: detector_typepb.DetectorType_MicrosoftTeamsWebhook,
 					Verified:     false,
 				},
 			},
@@ -117,7 +117,7 @@ func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
+					DetectorType: detector_typepb.DetectorType_MicrosoftTeamsWebhook,
 					Verified:     false,
 				},
 			},

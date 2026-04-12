@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Dovico,
+				DetectorType: detector_typepb.DetectorType_Dovico,
 				Raw:          []byte(key),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", key, userKey)),
 			}
@@ -114,8 +114,8 @@ func verifyMatch(ctx context.Context, client *http.Client, key, user string) (bo
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Dovico
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Dovico
 }
 
 func (s Scanner) Description() string {

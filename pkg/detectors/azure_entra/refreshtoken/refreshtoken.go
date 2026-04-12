@@ -18,7 +18,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -45,8 +45,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"0.A", "1.A"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureRefreshToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureRefreshToken
 }
 
 func (s Scanner) Description() string {
@@ -308,7 +308,7 @@ func findTokenMatches(data string) map[string]struct{} {
 
 func createResult(refreshToken, clientId, tenantId string, verified bool, extraData map[string]string, err error) *detectors.Result {
 	r := &detectors.Result{
-		DetectorType: detectorspb.DetectorType_AzureRefreshToken,
+		DetectorType: detector_typepb.DetectorType_AzureRefreshToken,
 		Raw:          []byte(refreshToken),
 		ExtraData:    extraData,
 		Verified:     verified,

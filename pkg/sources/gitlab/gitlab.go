@@ -13,6 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/gitcmd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -166,7 +167,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	if err := git.CmdCheck(); err != nil {
+	if err := gitcmd.CheckVersion(); err != nil {
 		return err
 	}
 

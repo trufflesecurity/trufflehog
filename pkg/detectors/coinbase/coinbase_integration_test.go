@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestCoinbase_FromChunk(t *testing.T) {
@@ -55,7 +55,7 @@ func TestCoinbase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detector_typepb.DetectorType_Coinbase,
 					Verified:     true,
 				},
 			},
@@ -72,7 +72,7 @@ func TestCoinbase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detector_typepb.DetectorType_Coinbase,
 					Verified:     false,
 				},
 			},
@@ -101,7 +101,7 @@ func TestCoinbase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detector_typepb.DetectorType_Coinbase,
 					Verified:     false,
 				},
 			},
@@ -118,7 +118,7 @@ func TestCoinbase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detector_typepb.DetectorType_Coinbase,
 					Verified:     false,
 				},
 			},
