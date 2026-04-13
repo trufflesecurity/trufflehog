@@ -3,6 +3,7 @@ package pagerdutyapikey
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -84,6 +85,20 @@ func verifyPagerdutyapikey(ctx context.Context, client *http.Client, token strin
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
+	case http.StatusForbidden:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		bodyStr := string(bodyBytes)
+
+		// 403 with "Access Denied" and "2010" means valid credentials with insufficient permissions.
+		// Ref: https://developer.pagerduty.com/docs/errors
+		if strings.Contains(bodyStr, "Access Denied") && strings.Contains(bodyStr, "2010") {
+			return true, nil
+		}
+
+		return false, fmt.Errorf("response status forbidden 403: %s", bodyStr)
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
