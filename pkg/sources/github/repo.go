@@ -245,8 +245,8 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 	opts := listOpts.getListOptions()
 
 	var (
-		numRepos, numForks int
-		uniqueOrgs         = map[string]struct{}{}
+		numRepos, numForks, numArchived int
+		uniqueOrgs                      = map[string]struct{}{}
 	)
 
 	// loop to handle pagination.
@@ -267,6 +267,15 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 				}
 				numForks++
 			}
+
+			if r.GetArchived() {
+				if s.conn.ExcludeArchived {
+					logger.V(3).Info("skipping archived repository", "repo", r.GetFullName())
+					continue
+				}
+				numArchived++
+			}
+
 			numRepos++
 
 			// track unique organizations.
@@ -298,7 +307,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 	}
 
 	// final logging of repository stats.
-	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
+	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_archived", numArchived, "num_orgs", len(uniqueOrgs))
 	githubOrgsEnumerated.WithLabelValues(s.name).Add(float64(len(uniqueOrgs)))
 
 	return nil
