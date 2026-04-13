@@ -709,7 +709,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squarespace"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareup"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sslmate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuscake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuspage"
@@ -1599,7 +1598,6 @@ func buildDetectorList() []detectors.Detector {
 		&square.Scanner{},
 		&squareapp.Scanner{},
 		&squarespace.Scanner{},
-		&squareup.Scanner{},
 		&sslmate.Scanner{},
 		&statuscake.Scanner{},
 		&statuspage.Scanner{},

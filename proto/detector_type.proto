@@ -619,7 +619,7 @@ enum DetectorType {
   Simplybook = 615; // Not yet implemented
   Vyte = 616;
   Nylas = 617;
-  Squareup = 618;
+  Squareup = 618 [deprecated = true];
   Dandelion = 619;
   DataFire = 620 [deprecated = true];
   DeepAI = 621;

@@ -11,20 +11,22 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	roleIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"role"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 
@@ -61,15 +63,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueVaultUrls[url] = struct{}{}
 	}
 
-	// If no names or secrets found, return empty results
-	if len(uniqueRoleIds) == 0 || len(uniqueSecretIds) == 0 || len(uniqueVaultUrls) == 0 {
+	// If no roleIds or secrets found, return empty results
+	if len(uniqueRoleIds) == 0 || len(uniqueSecretIds) == 0 {
 		return results, nil
 	}
 
+	endpoints := make([]string, 0, len(uniqueVaultUrls))
+	for endpoint := range uniqueVaultUrls {
+		endpoints = append(endpoints, endpoint)
+	}
+
+	var uniqueUrls = make(map[string]struct{})
+	for _, endpoint := range s.Endpoints(endpoints...) {
+		uniqueUrls[endpoint] = struct{}{}
+	}
 	// create combination results that can be verified
 	for roleId := range uniqueRoleIds {
 		for secretId := range uniqueSecretIds {
-			for vaultUrl := range uniqueVaultUrls {
+			for vaultUrl := range uniqueUrls {
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_HashiCorpVaultAuth,
 					Raw:          []byte(secretId),
