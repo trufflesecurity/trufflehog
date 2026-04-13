@@ -72,10 +72,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for endpoint := range uniqueVaultUrls {
 		endpoints = append(endpoints, endpoint)
 	}
+
+	var uniqueUrls = make(map[string]struct{})
+	for _, endpoint := range s.Endpoints(endpoints...) {
+		uniqueUrls[endpoint] = struct{}{}
+	}
 	// create combination results that can be verified
 	for roleId := range uniqueRoleIds {
 		for secretId := range uniqueSecretIds {
-			for _, vaultUrl := range s.Endpoints(endpoints...) {
+			for vaultUrl := range uniqueUrls {
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_HashiCorpVaultAuth,
 					Raw:          []byte(secretId),
