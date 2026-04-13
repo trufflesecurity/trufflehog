@@ -142,6 +142,8 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.s.UseCloudEndpoint(true)
+			tt.s.UseFoundEndpoints(true)
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HashiCorpVaultAuth.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -161,6 +163,49 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 				t.Errorf("HashiCorpVaultAuth.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestHashiCorpVaultAuth_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	roleId := testSecrets.MustGetField("HASHICORPVAULTAUTH_ROLE_ID")
+	secretId := testSecrets.MustGetField("HASHICORPVAULTAUTH_SECRET_ID")
+	vaultUrl := testSecrets.MustGetField("HASHICORPVAULTAUTH_URL")
+	s := Scanner{}
+	s.UseCloudEndpoint(true)
+	s.UseFoundEndpoints(true)
+	s.SetConfiguredEndpoints(vaultUrl)
+	data := fmt.Appendf(nil, "hashicorp config:\nrole_id: %s\nsecret_id: %s", roleId, secretId)
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("unexpected error from FromData: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected at least one result from FromData, got 0")
+	}
+	want := []detectors.Result{
+		{
+			DetectorType:          detectorspb.DetectorType_HashiCorpVaultAuth,
+			Verified:              true,
+			VerificationFromCache: false,
+			Raw:                   []byte(secretId),
+			RawV2:                 []byte(fmt.Sprintf("%s:%s", roleId, secretId)),
+			ExtraData: map[string]string{
+				"URL": vaultUrl,
+			},
+			StructuredData: nil,
+		},
+	}
+
+	ignoreOpts := cmpopts.IgnoreUnexported(detectors.Result{})
+	if diff := cmp.Diff(results, want, ignoreOpts); diff != "" {
+		t.Errorf("HashiCorpVaultAuth.FromData() %s diff: (-got +want)\n%s", "TestHashiCorpVaultAuth_WithCustomEndpoint", diff)
 	}
 }
 
