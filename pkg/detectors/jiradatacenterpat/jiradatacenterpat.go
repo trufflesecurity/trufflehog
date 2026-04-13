@@ -17,12 +17,14 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.EndpointSetter
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var (
-	_ detectors.Detector           = (*Scanner)(nil)
-	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.Detector                    = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer          = (*Scanner)(nil)
+	_ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
 )
 
 var (
