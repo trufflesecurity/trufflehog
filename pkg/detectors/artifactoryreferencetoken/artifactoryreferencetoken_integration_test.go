@@ -6,6 +6,7 @@ package artifactoryreferencetoken
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -146,6 +147,57 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
+	instanceURL := testSecrets.MustGetField("ARTIFACTORY_URL")
+	secret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN")
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	err = s.SetConfiguredEndpoints(instanceURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", secret))
+	want := []detectors.Result{
+		{
+			DetectorType: detectorspb.DetectorType_ArtifactoryReferenceToken,
+			Verified:     true,
+			RawV2:        []byte(secret + strings.TrimPrefix(instanceURL, "https://")),
+		},
+	}
+	got, err := s.FromData(ctx, true, data)
+	if err != nil {
+		t.Fatalf("unexpected error from FromData: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatal("expected at least one result from FromData, got 0")
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d results", len(want))
+	}
+	for i := range got {
+		if len(got[i].RawV2) == 0 {
+			t.Fatalf("no raw secret present: \n %+v", got[i])
+		}
+		if string(got[i].RawV2) != string(want[i].RawV2) {
+			t.Fatalf("expected rawV2 to be %s, got %s", string(want[i].RawV2), string(got[i].RawV2))
+		}
+	}
+
+	ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "AnalysisInfo")
+	if diff := cmp.Diff(got, want, ignoreOpts); diff != "" {
+		t.Errorf("Artifactoryreferencetoken.FromData() diff: (-got +want)\n%s", diff)
+	}
+
 }
 
 func BenchmarkFromData(benchmark *testing.B) {
