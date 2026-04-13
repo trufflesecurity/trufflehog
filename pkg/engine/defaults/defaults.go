@@ -161,9 +161,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/closecrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudconvert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudelements"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
+	cloudflareapitokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken/v1"
+	cloudflareapitokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflarecakey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
+	cloudflareglobalapikeyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey/v1"
+	cloudflareglobalapikeyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudimage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudmersive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudplan"
@@ -1031,9 +1033,11 @@ func buildDetectorList() []detectors.Detector {
 		&closecrm.Scanner{},
 		&cloudconvert.Scanner{},
 		&cloudelements.Scanner{},
-		&cloudflareapitoken.Scanner{},
+		&cloudflareapitokenv1.Scanner{},
+		&cloudflareapitokenv2.Scanner{},
 		&cloudflarecakey.Scanner{},
-		&cloudflareglobalapikey.Scanner{},
+		&cloudflareglobalapikeyv1.Scanner{},
+		&cloudflareglobalapikeyv2.Scanner{},
 		&cloudimage.Scanner{},
 		&cloudmersive.Scanner{},
 		&cloudplan.Scanner{},
