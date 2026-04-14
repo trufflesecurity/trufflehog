@@ -96,7 +96,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 	}
 }
 
-func TestArtifactory_FromChunk_FoundUnverified(t *testing.T) {
+func TestArtifactory_FromChunk_FoundUnverified_With_Confiured_Ep(t *testing.T) {
 	// NOTE: Using mock secrets because JFrog deprecated AKCp API keys.
 	mockSecret := "AKCp5bueTFpfypEqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM"
 	appURL := "trufflehog.jfrog.io"
