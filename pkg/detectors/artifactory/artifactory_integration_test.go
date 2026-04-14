@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
@@ -112,12 +113,10 @@ func TestArtifactory_FromChunk_WithCustomEndpoint(t *testing.T) {
 	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", mockSecret))
 
 	got, err := s.FromData(ctx, true, data)
-	if err != nil {
-		t.Fatalf("unexpected error from FromData: %v", err)
-	}
-	if len(got) == 0 {
-		t.Fatal("expected at least one result from FromData, got 0")
-	}
+
+	require.NoError(t, err, "unexpected error from FromData")
+	require.Greaterf(t, len(got), 0, "Expected Alteast 1 result")
+
 	expectedRawV2 := []byte(mockSecret + appURL)
 	if string(got[0].RawV2) != string(expectedRawV2) {
 		t.Errorf("Artifactory.FromData() rawV2 secret mismatch: got %s, want %s", string(got[0].RawV2), string(expectedRawV2))

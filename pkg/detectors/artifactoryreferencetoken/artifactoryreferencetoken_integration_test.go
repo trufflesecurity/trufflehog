@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -169,21 +170,15 @@ func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
 	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", secret))
 	want := []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType_ArtifactoryReferenceToken,
+			DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
 			Verified:     true,
 			RawV2:        []byte(secret + strings.TrimPrefix(instanceURL, "https://")),
 		},
 	}
 	got, err := s.FromData(ctx, true, data)
-	if err != nil {
-		t.Fatalf("unexpected error from FromData: %v", err)
-	}
-	if len(got) == 0 {
-		t.Fatal("expected at least one result from FromData, got 0")
-	}
-	if len(got) != len(want) {
-		t.Fatalf("expected %d results", len(want))
-	}
+	require.NoError(t, err, "unexpected error from FromData")
+	require.Equalf(t, len(want), len(got), "expected %d results", len(want))
+
 	for i := range got {
 		if len(got[i].RawV2) == 0 {
 			t.Fatalf("no raw secret present: \n %+v", got[i])
