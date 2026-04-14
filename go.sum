@@ -528,8 +528,6 @@ github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0/go.mod h1:zJYVVT2
 github.com/magiconair/properties v1.8.7 h1:IeQXZAiQcpL9mgcAe1Nu6cX9LLw6ExEHKjN0VQdvPDY=
 github.com/magiconair/properties v1.8.7/go.mod h1:Dhd985XPs7jluiymwWYZ0G4Z61jb3vdS329zhj2hYo0=
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
-github.com/mariduv/ldap-verify v0.0.2 h1:NBdDTYyWDr71CONVcizasqL/AA9tQ2RNgLhTgnyfquI=
-github.com/mariduv/ldap-verify v0.0.2/go.mod h1:d/7+kkMBGDs9LPZ/7hmduYqtOkRIJcgpa8dL+9CsveE=
 github.com/marusama/semaphore/v2 v2.5.0 h1:o/1QJD9DBYOWRnDhPwDVAXQn6mQYD0gZaS1Tpx6DJGM=
 github.com/marusama/semaphore/v2 v2.5.0/go.mod h1:z9nMiNUekt/LTpTUQdpp+4sJeYqUGpwMHfW0Z8V8fnQ=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
@@ -731,6 +729,8 @@ github.com/tklauser/numcpus v0.6.1 h1:ng9scYS7az0Bk4OZLvrNXNSAO2Pxr1XXRAPyjhIx+F
 github.com/tklauser/numcpus v0.6.1/go.mod h1:1XfjsgE2zo8GVw7POkMbHENHzVg3GzmoZ9fESEdAacY=
 github.com/trufflesecurity/disk-buffer-reader v0.2.1 h1:K9nNpX3xeWT2E6YRjlcc1X5c1NjgV9JS5T9aw2FjA8Q=
 github.com/trufflesecurity/disk-buffer-reader v0.2.1/go.mod h1:uYwTCdxzV0o+qaeBMxflOsq4eu2WjrE46qGR2e80O9Y=
+github.com/trufflesecurity/ldap-verify v0.0.0-20260401205135-1cad02b26426 h1:vCSA2SQHtO1k6F6IIwHisjgkegy78w6w10QsPbdXppo=
+github.com/trufflesecurity/ldap-verify v0.0.0-20260401205135-1cad02b26426/go.mod h1:ziPWHgmsF3s1VmgP0eTrR0i7fHxlSOqch60dfjHUxHw=
 github.com/trufflesecurity/overseer v1.2.8 h1:VXlWPiwYaQmwNxY2W1rVulEAG9O6iF1S0LX3wionWYM=
 github.com/trufflesecurity/overseer v1.2.8/go.mod h1:Dt6Y9LFpM+C/3rRWpy4//4iS5qrbb0pL3XvZqMd4zhg=
 github.com/trufflesecurity/touchfile v0.1.1 h1:Snhd5VEa8Cxd+D60nvLEj2kVeb1omY2tWwnhDhjTqdo=
