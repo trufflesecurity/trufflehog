@@ -28,7 +28,6 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 	instanceURL := testSecrets.MustGetField("ARTIFACTORY_URL")
 	secret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN")
 	inactiveSecret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN_INACTIVE")
-	fmt.Println(instanceURL, secret, inactiveSecret)
 
 	type args struct {
 		ctx    context.Context
