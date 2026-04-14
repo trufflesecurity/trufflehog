@@ -12,7 +12,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestMailchimp_FromChunk(t *testing.T) {
@@ -46,7 +46,7 @@ func TestMailchimp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mailchimp,
+					DetectorType: detector_typepb.DetectorType_Mailchimp,
 					Verified:     true,
 				},
 			},
@@ -62,7 +62,7 @@ func TestMailchimp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mailchimp,
+					DetectorType: detector_typepb.DetectorType_Mailchimp,
 					Verified:     false,
 				},
 			},

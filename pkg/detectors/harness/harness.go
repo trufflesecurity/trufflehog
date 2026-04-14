@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // Response struct for decoding API responses.
@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Harness,
+			DetectorType: detector_typepb.DetectorType_Harness,
 			Raw:          []byte(match),
 		}
 
@@ -127,8 +127,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Harness
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Harness
 }
 
 func (s Scanner) Description() string {

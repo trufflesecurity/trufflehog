@@ -7,12 +7,14 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestArtifactory_FromChunk(t *testing.T) {
@@ -45,7 +47,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 					Verified:     false,
 				},
 			},
@@ -93,6 +95,31 @@ func TestArtifactory_FromChunk(t *testing.T) {
 				t.Errorf("Artifactory.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestArtifactory_FromChunk_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	mockSecret := "AKCp5bueTFpfypEqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM"
+	appURL := "trufflesecurity.com"
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	err := s.SetConfiguredEndpoints(appURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", mockSecret))
+
+	got, err := s.FromData(ctx, true, data)
+
+	require.NoError(t, err, "unexpected error from FromData")
+	require.Greaterf(t, len(got), 0, "Expected Alteast 1 result")
+
+	expectedRawV2 := []byte(mockSecret + appURL)
+	if string(got[0].RawV2) != string(expectedRawV2) {
+		t.Errorf("Artifactory.FromData() rawV2 secret mismatch: got %s, want %s", string(got[0].RawV2), string(expectedRawV2))
 	}
 }
 

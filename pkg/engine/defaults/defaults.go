@@ -670,6 +670,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shipday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shodankey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopify"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopifyoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shortcut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shotstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shutterstock"
@@ -707,7 +708,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squarespace"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareup"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sslmate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuscake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuspage"
@@ -858,7 +858,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func buildDetectorList() []detectors.Detector {
@@ -1556,6 +1556,7 @@ func buildDetectorList() []detectors.Detector {
 		&shipday.Scanner{},
 		&shodankey.Scanner{},
 		&shopify.Scanner{},
+		&shopifyoauth.Scanner{},
 		&shortcut.Scanner{},
 		&shotstack.Scanner{},
 		&shutterstock.Scanner{},
@@ -1595,7 +1596,6 @@ func buildDetectorList() []detectors.Detector {
 		&square.Scanner{},
 		&squareapp.Scanner{},
 		&squarespace.Scanner{},
-		&squareup.Scanner{},
 		&sslmate.Scanner{},
 		&statuscake.Scanner{},
 		&statuspage.Scanner{},
@@ -1773,8 +1773,8 @@ func DefaultDetectors() []detectors.Detector {
 	return detectorList
 }
 
-func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {
-	out := make(map[detectorspb.DetectorType]struct{})
+func DefaultDetectorTypesImplementing[T any]() map[detector_typepb.DetectorType]struct{} {
+	out := make(map[detector_typepb.DetectorType]struct{})
 	for _, detector := range DefaultDetectors() {
 		if _, ok := detector.(T); ok {
 			out[detector.Type()] = struct{}{}

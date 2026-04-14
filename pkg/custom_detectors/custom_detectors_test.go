@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/protoyaml"
 )
 
@@ -321,7 +321,7 @@ func TestDetectorValidations(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorType: detector_typepb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStr0ngP@ssword!"),
@@ -368,7 +368,7 @@ func TestDetectorValidations(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorType: detector_typepb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongPassword!"),
@@ -415,7 +415,7 @@ func TestDetectorValidations(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorType: detector_typepb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongPassword!"),
@@ -462,7 +462,7 @@ func TestDetectorValidations(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorType: detector_typepb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStr@ngP@ssword!"),
@@ -510,7 +510,7 @@ func TestDetectorValidations(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorType: detector_typepb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongP@ssword"),
@@ -558,7 +558,7 @@ func TestDetectorValidations(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorType: detector_typepb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("mystrongp@ssword"),
@@ -594,7 +594,7 @@ func TestDetectorValidations(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CustomRegex,
+					DetectorType: detector_typepb.DetectorType_CustomRegex,
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("c392c9837d69b44c764cbf260b-e6184MyStrongP@ssword"),
