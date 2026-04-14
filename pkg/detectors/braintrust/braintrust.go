@@ -15,7 +15,6 @@ import (
 
 type Scanner struct {
 	client *http.Client
-	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Compile-time interface check
@@ -129,5 +128,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Braintrust is an AI evaluation and observability platform. This detector identifies Braintrust API keys."
+	return "Braintrust is an AI evaluation and observability platform. Braintrust API keys can be used to access evaluation, observability, and AI development resources within the Braintrust platform."
 }
