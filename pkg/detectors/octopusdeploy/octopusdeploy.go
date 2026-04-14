@@ -145,5 +145,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Octopus Deploy is a DevOps deployment automation platform. This detector identifies Octopus Deploy API keys."
+	return "Octopus Deploy is a DevOps deployment automation platform. Octopus Deploy API keys can be used to automate deployments, manage projects, environments, and infrastructure resources."
 }
