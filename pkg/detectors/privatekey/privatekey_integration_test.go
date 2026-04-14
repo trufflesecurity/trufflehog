@@ -14,7 +14,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPrivatekey_FromChunk(t *testing.T) {
@@ -52,12 +52,12 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
+					DetectorType: detector_typepb.DetectorType_PrivateKey,
 					Verified:     false,
 					Redacted:     "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYw",
 				},
 				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
+					DetectorType: detector_typepb.DetectorType_PrivateKey,
 					Verified:     false,
 					Redacted:     "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgw",
 				},
@@ -74,7 +74,7 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
+					DetectorType: detector_typepb.DetectorType_PrivateKey,
 					Verified:     true,
 					Redacted:     "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgw",
 					ExtraData: map[string]string{
@@ -94,7 +94,7 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
+					DetectorType: detector_typepb.DetectorType_PrivateKey,
 					Verified:     true,
 					Redacted:     "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5v",
 					ExtraData: map[string]string{
@@ -114,7 +114,7 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
+					DetectorType: detector_typepb.DetectorType_PrivateKey,
 					Verified:     true,
 					Redacted:     "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFl",
 					ExtraData: map[string]string{

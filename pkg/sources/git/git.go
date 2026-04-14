@@ -30,6 +30,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/gitcmd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -57,12 +58,27 @@ type Source struct {
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
 func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
+// SourceMetadataInfo contains the metadata fields passed to SourceMetadataFunc.
+// Using a struct allows adding new fields without breaking existing consumers.
+type SourceMetadataInfo struct {
+	File                string
+	Email               string
+	Commit              string
+	Timestamp           string
+	Repository          string
+	RepositoryLocalPath string
+	Line                int64
+}
+
+// SourceMetadataFunc is a function that maps git source metadata to a protobuf MetaData message.
+type SourceMetadataFunc func(info SourceMetadataInfo) *source_metadatapb.MetaData
+
 type Git struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
 	sourceID           sources.SourceID
 	jobID              sources.JobID
-	sourceMetadataFunc func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData
+	sourceMetadataFunc SourceMetadataFunc
 	verify             bool
 	metrics            metricsCollector
 	concurrency        *semaphore.Weighted
@@ -76,7 +92,7 @@ type Git struct {
 // Config for a Git source.
 type Config struct {
 	Concurrency        int
-	SourceMetadataFunc func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData
+	SourceMetadataFunc SourceMetadataFunc
 
 	SourceName   string
 	JobID        sources.JobID
@@ -199,7 +215,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		concurrency = runtime.NumCPU()
 	}
 
-	if err = CmdCheck(); err != nil {
+	if err = gitcmd.CheckVersion(); err != nil {
 		return err
 	}
 
@@ -212,17 +228,17 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info SourceMetadataInfo) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
-						Commit:              sanitizer.UTF8(commit),
-						File:                sanitizer.UTF8(file),
-						Email:               sanitizer.UTF8(email),
-						Repository:          sanitizer.UTF8(repository),
-						Timestamp:           sanitizer.UTF8(timestamp),
-						Line:                line,
-						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+						Commit:              sanitizer.UTF8(info.Commit),
+						File:                sanitizer.UTF8(info.File),
+						Email:               sanitizer.UTF8(info.Email),
+						Repository:          sanitizer.UTF8(info.Repository),
+						Timestamp:           sanitizer.UTF8(info.Timestamp),
+						Line:                info.Line,
+						RepositoryLocalPath: sanitizer.UTF8(info.RepositoryLocalPath),
 					},
 				},
 			}
@@ -599,7 +615,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 //
 // Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
 func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
-	if err := CmdCheck(); err != nil {
+	if err := gitcmd.CheckVersion(); err != nil {
 		return err
 	}
 	lsUrl, err := GitURLParse(gitUrl)
@@ -747,8 +763,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// Scan the commit metadata.
 			// See https://github.com/trufflesecurity/trufflehog/issues/2683
 			var (
-				metadata = s.sourceMetadataFunc("", email, fullHash, when, remoteURL, path, 0)
-				sb       strings.Builder
+				metadata = s.sourceMetadataFunc(SourceMetadataInfo{
+					Email:               email,
+					Commit:              fullHash,
+					Timestamp:           when,
+					Repository:          remoteURL,
+					RepositoryLocalPath: path,
+				})
+				sb strings.Builder
 			)
 			sb.WriteString(email)
 			sb.WriteString("\n")
@@ -789,7 +811,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				continue
 			}
 
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, path, 0)
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              fullHash,
+				Timestamp:           when,
+				Repository:          remoteURL,
+				RepositoryLocalPath: path,
+			})
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
@@ -816,7 +845,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 
 		chunkData := func(d *gitparse.Diff) error {
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, path, int64(diff.LineStart))
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              fullHash,
+				Timestamp:           when,
+				Repository:          remoteURL,
+				RepositoryLocalPath: path,
+				Line:                int64(diff.LineStart),
+			})
 
 			reader, err := d.ReadCloser()
 			if err != nil {
@@ -875,7 +912,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			// Add oversize chunk info
 			if newChunkBuffer.Len() > 0 {
 				// Send the existing fragment.
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+lastOffset))
+				metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+					File:       fileName,
+					Email:      email,
+					Commit:     hash,
+					Timestamp:  when,
+					Repository: urlMetadata,
+					Line:       int64(diff.LineStart + lastOffset),
+				})
 				chunk := sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -895,7 +939,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			}
 			if len(line) > sources.DefaultChunkSize {
 				// Send the oversize line.
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+offset))
+				metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+					File:       fileName,
+					Email:      email,
+					Commit:     hash,
+					Timestamp:  when,
+					Repository: urlMetadata,
+					Line:       int64(diff.LineStart + offset),
+				})
 				chunk := sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -919,7 +970,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 	}
 	// Send anything still in the new chunk buffer
 	if newChunkBuffer.Len() > 0 {
-		metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+lastOffset))
+		metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+			File:       fileName,
+			Email:      email,
+			Commit:     hash,
+			Timestamp:  when,
+			Repository: urlMetadata,
+			Line:       int64(diff.LineStart + lastOffset),
+		})
 		chunk := sources.Chunk{
 			SourceName:     s.sourceName,
 			SourceID:       s.sourceID,
@@ -1020,7 +1078,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				continue
 			}
 
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, path, 0)
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              "Staged",
+				Timestamp:           when,
+				Repository:          urlMetadata,
+				RepositoryLocalPath: path,
+			})
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
@@ -1036,7 +1101,15 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		}
 
 		chunkData := func(d *gitparse.Diff) error {
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, path, int64(diff.LineStart))
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              "Staged",
+				Timestamp:           when,
+				Repository:          urlMetadata,
+				RepositoryLocalPath: path,
+				Line:                int64(diff.LineStart),
+			})
 
 			reader, err := d.ReadCloser()
 			if err != nil {

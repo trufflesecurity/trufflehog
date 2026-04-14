@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestArtifactory_FromChunk(t *testing.T) {
@@ -46,7 +46,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 					Verified:     false,
 				},
 			},

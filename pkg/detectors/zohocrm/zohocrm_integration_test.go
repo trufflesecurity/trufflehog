@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // TestZohocrm_FromChunk verifies the validity of a ZohoCRM access token
@@ -56,7 +56,7 @@ func TestZohocrm_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZohoCRM,
+					DetectorType: detector_typepb.DetectorType_ZohoCRM,
 					Verified:     true,
 				},
 			},
@@ -73,7 +73,7 @@ func TestZohocrm_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZohoCRM,
+					DetectorType: detector_typepb.DetectorType_ZohoCRM,
 					Verified:     false,
 				},
 			},
@@ -102,7 +102,7 @@ func TestZohocrm_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZohoCRM,
+					DetectorType: detector_typepb.DetectorType_ZohoCRM,
 					Verified:     false,
 				},
 			},
@@ -119,7 +119,7 @@ func TestZohocrm_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZohoCRM,
+					DetectorType: detector_typepb.DetectorType_ZohoCRM,
 					Verified:     false,
 				},
 			},

@@ -11,7 +11,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for clientSecretRes := range uniqueSecrets {
 			for domainRes := range uniqueDomainMatches {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					DetectorType: detector_typepb.DetectorType_Auth0oauth,
 					Redacted:     clientIdRes,
 					Raw:          []byte(clientSecretRes),
 					RawV2:        []byte(clientIdRes + clientSecretRes),
@@ -139,8 +139,8 @@ func verifyTuple(ctx context.Context, client *http.Client, domainRes, clientId, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Auth0oauth
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Auth0oauth
 }
 
 func (s Scanner) Description() string {

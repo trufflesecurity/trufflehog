@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestOpenAI_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestOpenAI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAI,
+					DetectorType: detector_typepb.DetectorType_OpenAI,
 					Redacted:     "sk-...gOPc",
 					Verified:     false,
 				},
@@ -67,7 +67,7 @@ func TestOpenAI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAI,
+					DetectorType: detector_typepb.DetectorType_OpenAI,
 					Verified:     true,
 					Redacted:     "sk-...gOPb",
 				},
