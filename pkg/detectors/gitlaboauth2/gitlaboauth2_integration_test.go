@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGitlabOauth_FromChunk(t *testing.T) {
@@ -57,7 +57,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GitLabOauth2,
+					DetectorType: detector_typepb.DetectorType_GitLabOauth2,
 					Verified:     true,
 				},
 			},
@@ -78,7 +78,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GitLabOauth2,
+					DetectorType: detector_typepb.DetectorType_GitLabOauth2,
 					Verified:     false,
 				},
 			},
@@ -111,7 +111,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GitLabOauth2,
+					DetectorType: detector_typepb.DetectorType_GitLabOauth2,
 					Verified:     false,
 				},
 			},
@@ -132,7 +132,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GitLabOauth2,
+					DetectorType: detector_typepb.DetectorType_GitLabOauth2,
 					Verified:     false,
 				},
 			},

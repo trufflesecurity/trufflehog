@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -152,8 +152,8 @@ func verifyMatch(ctx context.Context, client *http.Client, endpoint string, clie
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GitLabOauth2
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GitLabOauth2
 }
 
 func (s Scanner) Description() string {
