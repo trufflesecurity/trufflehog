@@ -96,6 +96,57 @@ func TestArtifactory_FromChunk(t *testing.T) {
 	}
 }
 
+func TestArtifactory_FromChunk_FoundUnverified(t *testing.T) {
+	// NOTE: Using mock secrets because JFrog deprecated AKCp API keys.
+	mockSecret := "AKCp5bueTFpfypEqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM"
+	appURL := "trufflehog.jfrog.io"
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	s.SetConfiguredEndpoints(appURL)
+
+	data := []byte(fmt.Sprintf(
+		"You can find a artifactory secret %s",
+		mockSecret,
+	))
+
+	got, err := s.FromData(context.Background(), false, data) // verify = false
+	if err != nil {
+		t.Fatalf("FromData() unexpected error: %v", err)
+	}
+
+	if len(got) == 0 {
+		t.Fatalf("expected at least one result, got none")
+	}
+
+	// Validate results
+	for i := range got {
+		if len(got[i].Raw) == 0 {
+			t.Fatalf("no raw secret present: \n %+v", got[i])
+		}
+
+		if got[i].VerificationError() != nil {
+			t.Fatalf("unexpected verification error: %v", got[i].VerificationError())
+		}
+	}
+
+	want := []detectors.Result{
+		{
+			DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
+			Verified:     false,
+		},
+	}
+
+	ignoreOpts := cmpopts.IgnoreFields(
+		detectors.Result{},
+		"Raw", "RawV2", "verificationError", "primarySecret",
+	)
+
+	if diff := cmp.Diff(got, want, ignoreOpts); diff != "" {
+		t.Errorf("FromData() diff (-got +want):\n%s", diff)
+	}
+}
+
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}

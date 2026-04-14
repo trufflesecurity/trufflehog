@@ -28,6 +28,7 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 	instanceURL := testSecrets.MustGetField("ARTIFACTORY_URL")
 	secret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN")
 	inactiveSecret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN_INACTIVE")
+	fmt.Println(instanceURL, secret, inactiveSecret)
 
 	type args struct {
 		ctx    context.Context
@@ -145,6 +146,60 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 				t.Errorf("Artifactoryreferencetoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+func TestArtifactoryreferencetoken_FromChunk_with_configured_ep(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
+	instanceURL := testSecrets.MustGetField("ARTIFACTORY_URL")
+	secret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN")
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	s.SetConfiguredEndpoints(instanceURL)
+
+	data := []byte(fmt.Sprintf("You can find a artifactoryreferencetoken secret %s", secret))
+
+	got, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() unexpected error: %v", err)
+	}
+
+	if len(got) == 0 {
+		t.Fatalf("expected at least one result, got none")
+	}
+
+	// Validate each result
+	for i := range got {
+		if len(got[i].Raw) == 0 {
+			t.Fatalf("no raw secret present: \n %+v", got[i])
+		}
+
+		if got[i].VerificationError() != nil {
+			t.Fatalf("unexpected verification error: %v", got[i].VerificationError())
+		}
+	}
+
+	want := []detectors.Result{
+		{
+			DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
+			Verified:     true,
+		},
+	}
+
+	ignoreOpts := cmpopts.IgnoreFields(
+		detectors.Result{},
+		"Raw", "RawV2", "verificationError", "primarySecret", "AnalysisInfo",
+	)
+
+	if diff := cmp.Diff(got, want, ignoreOpts); diff != "" {
+		t.Errorf("FromData() diff (-got +want):\n%s", diff)
 	}
 }
 
