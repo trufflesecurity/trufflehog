@@ -1046,4 +1046,5 @@ enum DetectorType {
   ArtifactoryReferenceToken = 1042;
   DatadogApikey = 1043;
   ShopifyOAuth = 1044;
+  NewRelicUserKey = 1045;
 }
