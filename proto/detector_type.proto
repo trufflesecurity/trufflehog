@@ -1065,4 +1065,5 @@ enum DetectorType {
   HashiCorpVaultBatchToken = 1061;
   HashiCorpVaultToken = 1062;
   Duo = 1063;
+  NewRelicLicenseKey = 1064;
 }
