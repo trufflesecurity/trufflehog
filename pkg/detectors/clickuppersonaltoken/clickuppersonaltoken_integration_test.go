@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestClickupPersonalToken_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestClickupPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ClickupPersonalToken,
+					DetectorType: detector_typepb.DetectorType_ClickupPersonalToken,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestClickupPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ClickupPersonalToken,
+					DetectorType: detector_typepb.DetectorType_ClickupPersonalToken,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,7 @@ func TestClickupPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ClickupPersonalToken,
+					DetectorType: detector_typepb.DetectorType_ClickupPersonalToken,
 					Verified:     false,
 				},
 			},
