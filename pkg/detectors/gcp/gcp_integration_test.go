@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGCP_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestGCP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GCP,
+					DetectorType: detector_typepb.DetectorType_GCP,
 					Verified:     true,
 					Redacted:     "detector-tester@thog-sandbox.iam.gserviceaccount.com",
 					ExtraData: map[string]string{
@@ -72,7 +72,7 @@ func TestGCP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GCP,
+					DetectorType: detector_typepb.DetectorType_GCP,
 					Verified:     false,
 					Redacted:     "detector-tester@thog-sandbox.iam.gserviceaccount.com",
 					ExtraData: map[string]string{
@@ -94,7 +94,7 @@ func TestGCP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GCP,
+					DetectorType: detector_typepb.DetectorType_GCP,
 					Verified:     false,
 					Redacted:     "detector-test@trufflehog-testing.iam.gserviceaccount.com",
 					ExtraData: map[string]string{

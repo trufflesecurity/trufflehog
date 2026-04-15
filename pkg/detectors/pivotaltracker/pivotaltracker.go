@@ -7,7 +7,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -39,7 +39,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		token := match[1]
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_PivotalTracker,
+			DetectorType: detector_typepb.DetectorType_PivotalTracker,
 			Raw:          []byte(token),
 		}
 
@@ -68,8 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PivotalTracker
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PivotalTracker
 }
 
 func (s Scanner) Description() string {
