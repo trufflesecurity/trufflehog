@@ -25,12 +25,12 @@ func (a *Analyzer) Type() analyzers.AnalyzerType {
 func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credentialInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentialInfo"))
 	}
 
 	sid, ok := credentialInfo["sid"]
 	if !ok {
-		return nil, errors.New("sid not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("sid not found in credentialInfo"))
 	}
 
 	if a.Cfg == nil {
@@ -39,13 +39,13 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 
 	info, err := AnalyzePermissions(a.Cfg, sid, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 
 	// List parent and subaccounts
 	accounts, err := listTwilioAccounts(a.Cfg, sid, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 
 	var permissions []Permission
