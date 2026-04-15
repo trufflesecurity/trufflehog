@@ -32,7 +32,7 @@ func TestDetectorParsing(t *testing.T) {
 		"invalid version no number": {"gitlab.github", nil},
 		"capital V is fine":         {"GiTlAb.V2", []DetectorID{{ID: detector_typepb.DetectorType_Gitlab, Version: 2}}},
 		"id number with version":    {"8.v2", []DetectorID{{ID: 8, Version: 2}}},
-		"new detector by name":      {"teleriklicensekey", []DetectorID{{ID: dpb.DetectorType_TelerikLicenseKey}}},
+		"new detector by name":      {"teleriklicensekey", []DetectorID{{ID: detector_typepb.DetectorType_TelerikLicenseKey}}},
 	}
 
 	for name, tt := range tests {
@@ -48,5 +48,5 @@ func TestDetectorParsing(t *testing.T) {
 }
 
 func TestDetectorIDString(t *testing.T) {
-	assert.Equal(t, "TelerikLicenseKey", DetectorID{ID: dpb.DetectorType_TelerikLicenseKey}.String())
+	assert.Equal(t, "TelerikLicenseKey", DetectorID{ID: detector_typepb.DetectorType_TelerikLicenseKey}.String())
 }

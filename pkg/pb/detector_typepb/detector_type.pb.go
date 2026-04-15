@@ -7,10 +7,11 @@
 package detector_typepb
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -1098,6 +1099,7 @@ const (
 	DetectorType_ArtifactoryReferenceToken               DetectorType = 1042
 	DetectorType_DatadogApikey                           DetectorType = 1043
 	DetectorType_ShopifyOAuth                            DetectorType = 1044
+	DetectorType_TelerikLicenseKey                       DetectorType = 1045
 )
 
 // Enum value maps for DetectorType.
@@ -2144,6 +2146,7 @@ var (
 		1042: "ArtifactoryReferenceToken",
 		1043: "DatadogApikey",
 		1044: "ShopifyOAuth",
+		1045: "TelerikLicenseKey",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3187,6 +3190,7 @@ var (
 		"ArtifactoryReferenceToken":         1042,
 		"DatadogApikey":                     1043,
 		"ShopifyOAuth":                      1044,
+		"TelerikLicenseKey":                 1045,
 	}
 )
 
