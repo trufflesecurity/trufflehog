@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_AsanaPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_AsanaPersonalAccessToken,
 			Raw:          []byte(resMatch),
 		}
 
@@ -52,6 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, err := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, resMatch)
+			if isVerified {
+				s1.AnalysisInfo = map[string]string{"key": resMatch}
+			}
 		}
 
 		results = append(results, s1)
@@ -84,8 +87,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AsanaPersonalAccessToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AsanaPersonalAccessToken
 }
 
 func (s Scanner) Description() string {

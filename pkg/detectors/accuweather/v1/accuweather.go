@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -54,7 +54,7 @@ func (s Scanner) ProcessMatches(ctx context.Context, matches [][]string, verify 
 	uniqueMatches := getUniqueMatches(matches)
 	for key := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Accuweather,
+			DetectorType: detector_typepb.DetectorType_Accuweather,
 			Raw:          []byte(key),
 		}
 
@@ -106,8 +106,8 @@ func verifyAccuweather(ctx context.Context, client *http.Client, key string) (bo
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Accuweather
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Accuweather
 }
 
 func (s Scanner) Description() string {

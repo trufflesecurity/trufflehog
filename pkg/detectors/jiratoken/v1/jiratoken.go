@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -98,7 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Raw:          []byte(token),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", email, token, domain)),
 					ExtraData: map[string]string{
@@ -117,6 +117,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 
 						s1.SetVerificationError(verificationErr, token)
+					}
+					if isVerified {
+						s1.AnalysisInfo = map[string]string{
+							"token":  token,
+							"domain": domain,
+							"email":  email,
+						}
 					}
 				}
 
@@ -181,8 +188,8 @@ func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, to
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_JiraToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_JiraToken
 }
 
 func (s Scanner) Description() string {
