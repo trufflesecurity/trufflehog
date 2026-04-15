@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -39,8 +39,8 @@ func (s Scanner) getClient() *http.Client {
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string { return []string{"-nrma"} }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_NewRelicMobileAppToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_NewRelicMobileAppToken
 }
 
 func (s Scanner) Description() string {
