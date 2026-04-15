@@ -12,7 +12,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestOnelogin_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestOnelogin_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OneLogin,
+					DetectorType: detector_typepb.DetectorType_OneLogin,
 					Verified:     true,
 					Redacted:     id,
 				},
@@ -65,7 +65,7 @@ func TestOnelogin_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OneLogin,
+					DetectorType: detector_typepb.DetectorType_OneLogin,
 					Verified:     false,
 					Redacted:     id,
 				},

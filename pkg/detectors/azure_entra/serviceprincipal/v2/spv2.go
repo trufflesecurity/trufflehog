@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -42,8 +42,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"q~"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Azure
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Azure
 }
 
 func (s Scanner) Description() string {
@@ -74,7 +74,6 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 	logCtx := logContext.AddLogger(ctx)
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 
-SecretLoop:
 	for clientSecret := range clientSecrets {
 		var (
 			r        *detectors.Result
@@ -116,7 +115,8 @@ SecretLoop:
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretInvalid):
 							continue ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretExpired):
-							continue SecretLoop
+							r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
+							break ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrTenantNotFound):
 							// Tenant doesn't exist. This shouldn't happen with the check above.
 							delete(tenantIds, tenantId)
@@ -155,7 +155,7 @@ SecretLoop:
 
 func createResult(tenantId string, clientId string, clientSecret string, verified bool, extraData map[string]string, err error) *detectors.Result {
 	r := &detectors.Result{
-		DetectorType: detectorspb.DetectorType_Azure,
+		DetectorType: detector_typepb.DetectorType_Azure,
 		Raw:          []byte(clientSecret),
 		ExtraData:    extraData,
 		Verified:     verified,

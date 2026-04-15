@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestCexIO_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestCexIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CexIO,
+					DetectorType: detector_typepb.DetectorType_CexIO,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestCexIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CexIO,
+					DetectorType: detector_typepb.DetectorType_CexIO,
 					Verified:     false,
 				},
 			},

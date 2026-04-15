@@ -190,3 +190,22 @@ func TestArtifactory_Pattern(t *testing.T) {
 		})
 	}
 }
+
+func TestArtifactory_Endpoint_Contains_CustomEndpoint(t *testing.T) {
+	appURL := "example.com"
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	err := s.SetConfiguredEndpoints(appURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+	configuredEndpoints := s.Endpoints()
+	if len(configuredEndpoints) == 0 {
+		t.Fatal("No Confiured endpoint found")
+	}
+	for _, ep := range configuredEndpoints {
+		if ep != appURL {
+			t.Fatalf("expected endpoint %s to be present in endpoints list, got %s", appURL, ep)
+		}
+	}
+}
