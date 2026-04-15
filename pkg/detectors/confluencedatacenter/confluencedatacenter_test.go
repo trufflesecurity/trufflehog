@@ -127,7 +127,7 @@ func TestConfluenceDataCenter_Verification(t *testing.T) {
 	}{
 		{"200 verified", http.StatusOK, true, false},
 		{"401 invalid", http.StatusUnauthorized, false, false},
-		{"403 invalid", http.StatusForbidden, false, false},
+		{"403 unexpected", http.StatusForbidden, false, true},
 		{"500 unknown", http.StatusInternalServerError, false, true},
 	}
 

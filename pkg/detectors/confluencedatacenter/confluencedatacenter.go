@@ -36,7 +36,7 @@ var (
 	keywords = []string{"confluence", "atlassian", "wiki"}
 
 	// 44-char base64 PAT; decoded form must match the structural check below.
-	tokenPat = regexp.MustCompile(detectors.PrefixRegex(keywords) + `\b([A-Za-z0-9+/]{44})\b`)
+	tokenPat = regexp.MustCompile(detectors.PrefixRegex(keywords) + `\b([MNO][A-Za-z0-9+/]{43})(?:[^A-Za-z0-9+/=]|\z)`)
 
 	// Self-hosted instance URL: scheme + host + optional port. Keyword-scoped
 	// so unrelated URLs in the same chunk don't get paired with tokens.
@@ -107,18 +107,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueURLs[strings.TrimRight(endpoint, "/")] = struct{}{}
 	}
 
-	for token := range uniqueTokens {
-		if len(uniqueURLs) == 0 {
-			// Token-only: report unverified since we can't reach a host.
-			results = append(results, detectors.Result{
-				DetectorType: detector_typepb.DetectorType_ConfluenceDataCenter,
-				Raw:          []byte(token),
-				RawV2:        []byte(token),
-			})
-			continue
+	// Filter hosts cached as unreachable from prior calls once up front.
+	// invalidHosts may also grow during this call (see the verify branch
+	// below); those are skipped lazily inside the inner loop.
+	liveURLs := make([]string, 0, len(uniqueURLs))
+	for u := range uniqueURLs {
+		if !invalidHosts.Exists(u) {
+			liveURLs = append(liveURLs, u)
 		}
+	}
 
-		for baseURL := range uniqueURLs {
+	for token := range uniqueTokens {
+		emitted := false
+		for _, baseURL := range liveURLs {
 			if invalidHosts.Exists(baseURL) {
 				continue
 			}
@@ -144,6 +145,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, r)
+			emitted = true
+		}
+
+		if !emitted {
+			// No reachable URL in context — emit an unverified token-only
+			// result and annotate why we couldn't verify.
+			results = append(results, detectors.Result{
+				DetectorType: detector_typepb.DetectorType_ConfluenceDataCenter,
+				Raw:          []byte(token),
+				RawV2:        []byte(token),
+				ExtraData: map[string]string{
+					"verification_note": "no reachable Confluence Data Center URL found in context; token reported unverified",
+				},
+			})
 		}
 	}
 
@@ -174,9 +189,13 @@ func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) 
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusUnauthorized:
+		// Auth header outright rejected — unambiguously an invalid credential.
 		return false, nil
 	default:
+		// 403 included: /rest/api/user/current should always be readable by a
+		// valid PAT, so a Forbidden here signals something unexpected rather
+		// than a definitively invalid token.
 		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
 	}
 }
