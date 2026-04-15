@@ -1,7 +1,9 @@
 package jiradatacenterpat
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,7 +11,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -28,7 +29,7 @@ var (
 )
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 
 	// PATs are base64-encoded strings of the form <12-digit-id>:<20-random-bytes> (33 bytes, 44 chars, no padding).
 	// Since the first byte is always an ASCII digit (0x30–0x39), the first base64 character is always M, N, or O.
@@ -56,7 +57,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	var tokens []string
 	for _, match := range patPat.FindAllStringSubmatch(dataStr, -1) {
-		tokens = append(tokens, match[1])
+		if isStructuralPAT(match[1]) {
+			tokens = append(tokens, match[1])
+		}
 	}
 
 	foundURLs := make(map[string]struct{})
@@ -69,7 +72,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for _, token := range tokens {
-		for _, endpoint := range s.Endpoints(uniqueURLs...) {
+		endpoints := s.Endpoints(uniqueURLs...)
+		if len(endpoints) == 0 {
+			results = append(results, detectors.Result{
+				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
+				Raw:          []byte(token),
+				Redacted:     token[:3] + "..." + token[len(token)-3:],
+				ExtraData:    map[string]string{"message": "No Jira Data Center URL was found or configured. To verify this token, set the Jira instance base URL as a custom endpoint."},
+			})
+			continue
+		}
+
+		for _, endpoint := range endpoints {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
@@ -142,6 +156,26 @@ func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) 
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
 	}
+}
+
+// isStructuralPAT decodes a candidate base64 string and checks that it matches
+// the "<numeric id>:<random bytes>" structure used by Jira DC PATs:
+// one or more ASCII digits, a colon, then at least one more byte.
+func isStructuralPAT(candidate string) bool {
+	raw, err := base64.StdEncoding.DecodeString(candidate)
+	if err != nil {
+		return false
+	}
+	colon := bytes.IndexByte(raw, ':')
+	if colon <= 0 || colon == len(raw)-1 {
+		return false
+	}
+	for _, b := range raw[:colon] {
+		if b < '0' || b > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

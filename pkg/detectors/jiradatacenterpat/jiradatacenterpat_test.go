@@ -2,6 +2,7 @@ package jiradatacenterpat
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"testing"
@@ -78,6 +79,13 @@ func TestJiraDataCenterPAT_Pattern(t *testing.T) {
 		{
 			name:  "too short - not a match",
 			input: `jira_token: NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0`,
+			want:  []string{},
+		},
+		{
+			// Passes the regex (44 chars, starts with M) but decodes to "0a:xxx..."
+			// where the byte before the colon is not purely digits.
+			name:  "not a match - fails structural check",
+			input: `jira_token: MGE6eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4`,
 			want:  []string{},
 		},
 	}
@@ -263,4 +271,73 @@ func TestJiraDataCenterPAT_FromData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsStructuralPAT(t *testing.T) {
+	encode := func(b []byte) string { return base64.StdEncoding.EncodeToString(b) }
+
+	// helper to build a 33-byte payload with a numeric id and random suffix
+	numericIDPayload := func(id, suffix string) []byte {
+		return []byte(id + ":" + suffix)
+	}
+
+	tests := []struct {
+		name      string
+		candidate string
+		want      bool
+	}{
+		{
+			name:      "valid real token",
+			candidate: testToken,
+			want:      true,
+		},
+		{
+			name:      "valid - digits before colon",
+			candidate: encode(numericIDPayload("123456789012", "01234567890123456789")),
+			want:      true,
+		},
+		{
+			name:      "invalid base64",
+			candidate: "!!!not-base64!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+			want:      false,
+		},
+		{
+			name:      "no colon",
+			candidate: encode([]byte("588925395905012345678901234567890")),
+			want:      false,
+		},
+		{
+			name:      "colon at position 0",
+			candidate: encode([]byte(":01234567890123456789012345678901")),
+			want:      false,
+		},
+		{
+			name:      "colon at last position",
+			candidate: encode([]byte("58892539590501234567890123456789:")),
+			want:      false,
+		},
+		{
+			name: "non-digit before colon",
+			// decodes to "0a:xxx..." — 'a' is not a digit
+			candidate: "MGE6eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4",
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isStructuralPAT(tt.candidate))
+		})
+	}
+}
+
+func TestJiraDataCenterPAT_NoURL(t *testing.T) {
+	d := Scanner{client: common.SaneHttpClient()}
+
+	results, err := d.FromData(context.Background(), true, []byte(fmt.Sprintf("jira token: %s", testToken)))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.False(t, results[0].Verified)
+	assert.Equal(t, map[string]string{"message": "No Jira Data Center URL was found or configured. To verify this token, set the Jira instance base URL as a custom endpoint."}, results[0].ExtraData)
+	assert.Empty(t, results[0].RawV2)
 }
