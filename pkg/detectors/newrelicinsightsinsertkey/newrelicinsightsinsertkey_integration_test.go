@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestNewRelicInsightsInsertKey_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestNewRelicInsightsInsertKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NewRelicInsightsInsertKey,
+					DetectorType: detector_typepb.DetectorType_NewRelicInsightsInsertKey,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"region": "us",
@@ -69,7 +69,7 @@ func TestNewRelicInsightsInsertKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NewRelicInsightsInsertKey,
+					DetectorType: detector_typepb.DetectorType_NewRelicInsightsInsertKey,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"region": "eu",
@@ -88,7 +88,7 @@ func TestNewRelicInsightsInsertKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NewRelicInsightsInsertKey,
+					DetectorType: detector_typepb.DetectorType_NewRelicInsightsInsertKey,
 					Verified:     false,
 				},
 			},
