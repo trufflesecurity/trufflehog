@@ -28,6 +28,8 @@ type apiResponse struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	defaultClient = common.SaneHttpClient()
+
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"mesibo"}) + `\b([0-9A-Za-z]{64})\b`)
 )
@@ -36,7 +38,7 @@ func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
 		return s.client
 	}
-	return common.SaneHttpClient()
+	return defaultClient
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
