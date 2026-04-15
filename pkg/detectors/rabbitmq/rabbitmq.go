@@ -11,7 +11,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_RabbitMQ,
+			DetectorType: detector_typepb.DetectorType_RabbitMQ,
 			Raw:          []byte(urlMatch),
 			Redacted:     strings.TrimSpace(strings.Replace(parsedURL.String(), password, "********", -1)),
 		}
@@ -114,8 +114,8 @@ func (s Scanner) verify(url string) (bool, error) {
 	return false, err
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_RabbitMQ
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_RabbitMQ
 }
 
 func (s Scanner) Description() string {

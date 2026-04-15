@@ -10,7 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci/v1"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -43,8 +43,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"CCIPAT_"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Circle
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Circle
 }
 
 func (s Scanner) Description() string {
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueTokens {
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Circle,
+			DetectorType: detector_typepb.DetectorType_Circle,
 			Raw:          []byte(token),
 			ExtraData: map[string]string{
 				"Version": strconv.Itoa(s.Version()),
