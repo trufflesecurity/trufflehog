@@ -12,8 +12,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestNewRelicLicenseKey_FromChunk(t *testing.T) {
@@ -50,7 +49,7 @@ func TestNewRelicLicenseKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NewRelicLicenseKey,
+					DetectorType: detector_typepb.DetectorType_NewRelicLicenseKey,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"region": "us",
@@ -69,7 +68,7 @@ func TestNewRelicLicenseKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NewRelicLicenseKey,
+					DetectorType: detector_typepb.DetectorType_NewRelicLicenseKey,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"region": "eu",
@@ -88,7 +87,7 @@ func TestNewRelicLicenseKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NewRelicLicenseKey,
+					DetectorType: detector_typepb.DetectorType_NewRelicLicenseKey,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"region": "us",
