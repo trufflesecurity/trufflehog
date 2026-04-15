@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_SatismeterWritekey,
+					DetectorType: detector_typepb.DetectorType_SatismeterWritekey,
 					Raw:          []byte(projectID),
 					RawV2:        []byte(projectID + writeKey),
 				}
@@ -82,8 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SatismeterWritekey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SatismeterWritekey
 }
 
 func (s Scanner) Description() string {

@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for id := range idMatches {
 			for domain := range domainMatches {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detector_typepb.DetectorType_ZulipChat,
 					Raw:          []byte(key),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", key, id, domain)),
 					ExtraData: map[string]string{
@@ -128,8 +128,8 @@ type member struct {
 	Email    string `json:"email"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ZulipChat
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ZulipChat
 }
 
 func (s Scanner) Description() string {

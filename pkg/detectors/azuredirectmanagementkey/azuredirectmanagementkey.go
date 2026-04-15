@@ -17,7 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const RFC3339WithoutMicroseconds = "2006-01-02T15:04:05"
@@ -64,7 +64,7 @@ EndpointLoop:
 	for baseUrl, serviceName := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureDirectManagementKey,
+				DetectorType: detector_typepb.DetectorType_AzureDirectManagementKey,
 				Raw:          []byte(baseUrl),
 				RawV2:        []byte(baseUrl + ":" + key),
 			}
@@ -98,8 +98,8 @@ EndpointLoop:
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureDirectManagementKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureDirectManagementKey
 }
 
 func (s Scanner) Description() string {

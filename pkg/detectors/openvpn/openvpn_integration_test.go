@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestOpenvpn_FromChunk(t *testing.T) {
@@ -54,7 +54,7 @@ func TestOpenvpn_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenVpn,
+					DetectorType: detector_typepb.DetectorType_OpenVpn,
 					Verified:     true,
 					RawV2:        []byte(clientId + clientSecret),
 				},
@@ -72,7 +72,7 @@ func TestOpenvpn_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenVpn,
+					DetectorType: detector_typepb.DetectorType_OpenVpn,
 					Verified:     false,
 					RawV2:        []byte(clientId + inactiveClientSecret),
 				},

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestEndorlabs_FromChunk(t *testing.T) {
@@ -52,11 +52,11 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     true,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     false,
 				},
 			},
@@ -73,11 +73,11 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     false,
 				},
 			},
@@ -106,11 +106,11 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     false,
 				},
 			},
@@ -127,11 +127,11 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_EndorLabs,
+					DetectorType: detector_typepb.DetectorType_EndorLabs,
 					Verified:     false,
 				},
 			},
