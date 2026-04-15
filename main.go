@@ -276,6 +276,15 @@ var (
 	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
 	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
 
+	webScan         = cli.Command("web", "Scan websites for leaked credentials.")
+	webUrls         = webScan.Flag("url", "URL to scan. Repeat the flag for multiple targets, e.g. --url https://a.com --url https://b.com. Supports http:// and https://.").Required().Strings()
+	webCrawl        = webScan.Flag("crawl", "Follow links found on each page. Without this flag only the seed URL(s) are scanned.").Default("false").Bool()
+	webDepth        = webScan.Flag("depth", "Maximum link depth to follow when --crawl is enabled. 1 = seed; 2 = one level deeper; 0 = unlimited.").Default("1").Int()
+	webDelay        = webScan.Flag("delay", "Seconds to wait between requests to the same domain. Increase this to reduce load on the target server.").Default("1").Int()
+	webTimeout      = webScan.Flag("timeout", "Seconds to spend crawling URLs before aborting. Total time shared across all URLs when multiple --url flags are given.").Default("30").Int()
+	webUserAgent    = webScan.Flag("user-agent", "User-Agent header to send with each request. Defaults to a TruffleHog identifier if not set.").String()
+	webIgnoreRobots = webScan.Flag("ignore-robots", "Ignore robots.txt restrictions. Only use this if you have explicit permission to crawl the target site.").Default("false").Bool()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
@@ -1153,6 +1162,26 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
 		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
+	case webScan.FullCommand():
+		if len(*webUrls) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one url")
+		}
+
+		cfg := sources.WebConfig{
+			URLs:         *webUrls,
+			Crawl:        *webCrawl,
+			Depth:        *webDepth,
+			Delay:        *webDelay,
+			Timeout:      *webTimeout,
+			UserAgent:    *webUserAgent,
+			IgnoreRobots: *webIgnoreRobots,
+		}
+
+		if ref, err := eng.ScanWeb(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan web: %v", err)
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
