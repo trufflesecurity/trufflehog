@@ -28,7 +28,7 @@ var (
 	clientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"secret"}) + `\b([a-zA-Z0-9]{32})\b`)
 	// Box enterprise and user IDs are numeric strings.
 	subjectIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{
-		"enterprise", "enterprise_id", "user_id", "subject", "box_subject",
+		"enterprise", "enterprise_id", "user", "user_id", "subject", "box_subject",
 	}) + `\b([0-9]{6,20})\b`)
 )
 
@@ -67,53 +67,47 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range subjectIdPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueSubjectIdMatches[match[1]] = struct{}{}
 	}
-	// Sentinel empty entry so a single loop body handles the "no subject_id
-	// found" case alongside the normal one.
-	if len(uniqueSubjectIdMatches) == 0 {
-		uniqueSubjectIdMatches[""] = struct{}{}
-	}
 
 	for resIdMatch := range uniqueIdMatches {
-	clientSecretLoop:
 		for resSecretMatch := range uniqueSecretMatches {
 			if resIdMatch == resSecretMatch {
 				continue
-			}
-			var isVerified bool
-			var verificationErr error
-			if verify {
-				isVerified, verificationErr = verifyMatch(ctx, s.getClient(), resIdMatch, resSecretMatch)
 			}
 
 			s1 := detectors.Result{
 				DetectorType: s.Type(),
 				Raw:          []byte(resIdMatch),
 				RawV2:        []byte(resIdMatch + resSecretMatch),
-				Verified:     isVerified,
 			}
-			s1.SetVerificationError(verificationErr, resIdMatch)
-			for subjectId := range uniqueSubjectIdMatches {
-				// AnalysisInfo is what triggers the analyzer downstream. It is
-				// only meaningful when (a) the credential pair verified - an
-				// unverified pair would just cause the analyzer to fail auth -
-				// and (b) we actually have a subject_id, since Box CCG auth
-				// requires all three values and the analyzer hard-fails
-				// without subject_id.
-				if isVerified && subjectId != "" {
-					s1.AnalysisInfo = map[string]string{
-						"client_id":     resIdMatch,
-						"client_secret": resSecretMatch,
-						"subject_id":    subjectId,
+
+			if verify {
+				isVerified, verificationErr := verifyMatch(ctx, s.getClient(), resIdMatch, resSecretMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resIdMatch)
+
+				// When the credential pair is valid and subject IDs are
+				// present, try each one via the full CCG auth flow to find
+				// one that actually works. Only a verified triple is useful
+				// to the downstream analyzer.
+				if isVerified {
+					for subjectId := range uniqueSubjectIdMatches {
+						if verifySubjectID(ctx, s.getClient(), resIdMatch, resSecretMatch, subjectId) {
+							s1.AnalysisInfo = map[string]string{
+								"client_id":     resIdMatch,
+								"client_secret": resSecretMatch,
+								"subject_id":    subjectId,
+							}
+							break
+						}
 					}
 				}
-				results = append(results, s1)
-
 			}
-			// A Box application has exactly one client_id/client_secret pair,
-			// so once we've verified a pair there is no value in trying other
-			// id/secret combinations from the same chunk.
-			if isVerified {
-				break clientSecretLoop
+
+			results = append(results, s1)
+
+			// box client supports only one client id and secret pair
+			if s1.Verified {
+				break
 			}
 		}
 	}
@@ -166,6 +160,39 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+}
+
+// verifySubjectID checks whether a subject ID is valid for the given client
+// credentials by attempting the Box CCG (Client Credentials Grant) auth flow.
+// It mirrors the analyzer's Authenticate logic: try enterprise subject type
+// first, then fall back to user subject type. Returns true on the first
+// successful authentication (HTTP 200).
+func verifySubjectID(ctx context.Context, client *http.Client, clientID, clientSecret, subjectID string) bool {
+	for _, subjectType := range []string{"enterprise", "user"} {
+		payload := fmt.Sprintf(
+			"grant_type=client_credentials&client_id=%s&client_secret=%s&box_subject_type=%s&box_subject_id=%s",
+			clientID, clientSecret, subjectType, subjectID,
+		)
+
+		req, err := http.NewRequestWithContext(
+			ctx, http.MethodPost, "https://api.box.com/oauth2/token", strings.NewReader(payload))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		res, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+
+		if res.StatusCode == http.StatusOK {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

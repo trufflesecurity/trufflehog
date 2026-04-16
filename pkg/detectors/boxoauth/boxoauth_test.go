@@ -3,10 +3,12 @@ package boxoauth
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/h2non/gock.v1"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -49,7 +51,7 @@ func TestBoxOauth_Pattern(t *testing.T) {
 		{
 			name:        "valid pattern - with multiple subject ids",
 			input:       fmt.Sprintf("box id = '%s' box secret = '%s' enterprise = '%s' subject = '%s'", clientId, clientSecret, subjectId, subjectId2),
-			wantCount:   2,
+			wantCount:   1,
 			wantRawV2:   clientId + clientSecret,
 			wantMatched: true,
 		},
@@ -95,4 +97,125 @@ func TestBoxOauth_Pattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBoxOauth_AnalysisInfo_VerifiedWithValidSubjectId(t *testing.T) {
+	client := common.SaneHttpClient()
+	d := Scanner{client: client}
+
+	defer gock.Off()
+	defer gock.RestoreClient(client)
+	gock.InterceptClient(client)
+
+	// Mock 1: verifyMatch → valid pair (400 with "unauthorized_client")
+	gock.New("https://api.box.com").
+		Post("/oauth2/token").
+		Reply(http.StatusBadRequest).
+		BodyString(`{"error":"unauthorized_client","error_description":"The grant type is unauthorized for this client_id"}`)
+
+	// Mock 2: verifySubjectID enterprise attempt → success (200)
+	gock.New("https://api.box.com").
+		Post("/oauth2/token").
+		Reply(http.StatusOK).
+		BodyString(`{"access_token":"test_token","expires_in":4169,"token_type":"bearer"}`)
+
+	input := fmt.Sprintf("box id = '%s' box secret = '%s' enterprise = '%s'", clientId, clientSecret, subjectId)
+
+	results, err := d.FromData(context.Background(), true, []byte(input))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	r := results[0]
+	assert.True(t, r.Verified)
+	require.NotNil(t, r.AnalysisInfo)
+	assert.Equal(t, clientId, r.AnalysisInfo["client_id"])
+	assert.Equal(t, clientSecret, r.AnalysisInfo["client_secret"])
+	assert.Equal(t, subjectId, r.AnalysisInfo["subject_id"])
+}
+
+func TestBoxOauth_AnalysisInfo_VerifiedNoSubjectId(t *testing.T) {
+	client := common.SaneHttpClient()
+	d := Scanner{client: client}
+
+	defer gock.Off()
+	defer gock.RestoreClient(client)
+	gock.InterceptClient(client)
+
+	// Mock: verifyMatch → valid pair
+	gock.New("https://api.box.com").
+		Post("/oauth2/token").
+		Reply(http.StatusBadRequest).
+		BodyString(`{"error":"unauthorized_client","error_description":"The grant type is unauthorized for this client_id"}`)
+
+	input := fmt.Sprintf("box id = '%s' box secret = '%s'", clientId, clientSecret)
+
+	results, err := d.FromData(context.Background(), true, []byte(input))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	r := results[0]
+	assert.True(t, r.Verified)
+	assert.Nil(t, r.AnalysisInfo)
+}
+
+func TestBoxOauth_AnalysisInfo_VerifiedInvalidSubjectId(t *testing.T) {
+	client := common.SaneHttpClient()
+	d := Scanner{client: client}
+
+	defer gock.Off()
+	defer gock.RestoreClient(client)
+	gock.InterceptClient(client)
+
+	// Mock 1: verifyMatch → valid pair
+	gock.New("https://api.box.com").
+		Post("/oauth2/token").
+		Reply(http.StatusBadRequest).
+		BodyString(`{"error":"unauthorized_client","error_description":"The grant type is unauthorized for this client_id"}`)
+
+	// Mock 2: verifySubjectID enterprise attempt → fail (400)
+	gock.New("https://api.box.com").
+		Post("/oauth2/token").
+		Reply(http.StatusBadRequest).
+		BodyString(`{"error":"invalid_grant","error_description":"Cannot obtain token based on the enterprise configuration for your app"}`)
+
+	// Mock 3: verifySubjectID user attempt → fail (400)
+	gock.New("https://api.box.com").
+		Post("/oauth2/token").
+		Reply(http.StatusBadRequest).
+		BodyString(`{"error":"invalid_grant","error_description":"Cannot obtain token based on the enterprise configuration for your app"}`)
+
+	input := fmt.Sprintf("box id = '%s' box secret = '%s' enterprise = '%s'", clientId, clientSecret, subjectId)
+
+	results, err := d.FromData(context.Background(), true, []byte(input))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	r := results[0]
+	assert.True(t, r.Verified)
+	assert.Nil(t, r.AnalysisInfo)
+}
+
+func TestBoxOauth_AnalysisInfo_UnverifiedWithSubjectId(t *testing.T) {
+	client := common.SaneHttpClient()
+	d := Scanner{client: client}
+
+	defer gock.Off()
+	defer gock.RestoreClient(client)
+	gock.InterceptClient(client)
+
+	// Mock: verifyMatch → invalid pair (400 with "invalid_client")
+	gock.New("https://api.box.com").
+		Post("/oauth2/token").
+		Reply(http.StatusBadRequest).
+		BodyString(`{"error":"invalid_client","error_description":"The client_id is invalid"}`)
+
+	input := fmt.Sprintf("box id = '%s' box secret = '%s' enterprise = '%s'", clientId, clientSecret, subjectId)
+
+	results, err := d.FromData(context.Background(), true, []byte(input))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	r := results[0]
+	assert.False(t, r.Verified)
+	assert.Nil(t, r.AnalysisInfo)
 }
