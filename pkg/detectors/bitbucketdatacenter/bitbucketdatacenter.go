@@ -24,14 +24,14 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
+	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 
 	// Bitbucket pat start with BBDC- prefix
 	// and are usually between the length of 40-50 character
 	// consisting of both alphanumeric and some special character like +, _, @ and etc
 	userPat = regexp.MustCompile(`\b(BBDC-[A-Za-z0-9+/@_-]{40,50})(?:[^A-Za-z0-9+/@_-]|$)`)
 
-	urlPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "bitbucket"}) + `(https://[a-zA-Z0-9.-]+(?::\d+)?)`)
+	urlPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "bitbucket"}) + `(https?://[a-zA-Z0-9.-]+(?::\d+)?)`)
 )
 
 func (s Scanner) Keywords() []string {
