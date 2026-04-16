@@ -28,9 +28,9 @@ func TestBoxOauth_Pattern(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
-		wantCount   int    // expected number of results
-		wantRawV2   string // expected RawV2 on every result (always clientId+clientSecret)
-		wantMatched bool   // whether keywords should match at all
+		wantCount   int
+		wantRawV2   string
+		wantMatched bool
 	}{
 		{
 			name:        "valid pattern - no subject id",
@@ -49,7 +49,7 @@ func TestBoxOauth_Pattern(t *testing.T) {
 		{
 			name:        "valid pattern - with multiple subject ids",
 			input:       fmt.Sprintf("box id = '%s' box secret = '%s' enterprise = '%s' subject = '%s'", clientId, clientSecret, subjectId, subjectId2),
-			wantCount:   2, // one result per subject id
+			wantCount:   2,
 			wantRawV2:   clientId + clientSecret,
 			wantMatched: true,
 		},

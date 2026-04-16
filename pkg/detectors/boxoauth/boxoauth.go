@@ -32,6 +32,13 @@ var (
 	}) + `\b([0-9]{6,20})\b`)
 )
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -60,61 +67,53 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range subjectIdPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueSubjectIdMatches[match[1]] = struct{}{}
 	}
+	// Sentinel empty entry so a single loop body handles the "no subject_id
+	// found" case alongside the normal one.
+	if len(uniqueSubjectIdMatches) == 0 {
+		uniqueSubjectIdMatches[""] = struct{}{}
+	}
 
 	for resIdMatch := range uniqueIdMatches {
+	clientSecretLoop:
 		for resSecretMatch := range uniqueSecretMatches {
-
-			// ignore if the id and secret are the same
 			if resIdMatch == resSecretMatch {
 				continue
 			}
-
 			var isVerified bool
 			var verificationErr error
 			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, verificationErr = verifyMatch(ctx, client, resIdMatch, resSecretMatch)
+				isVerified, verificationErr = verifyMatch(ctx, s.getClient(), resIdMatch, resSecretMatch)
 			}
 
-			if len(uniqueSubjectIdMatches) > 0 {
-				// Emit one result per subject_id
-				for subjectId := range uniqueSubjectIdMatches {
-					s1 := detectors.Result{
-						DetectorType: detector_typepb.DetectorType_BoxOauth,
-						Raw:          []byte(resIdMatch),
-						RawV2:        []byte(resIdMatch + resSecretMatch),
-						Verified:     isVerified,
+			s1 := detectors.Result{
+				DetectorType: s.Type(),
+				Raw:          []byte(resIdMatch),
+				RawV2:        []byte(resIdMatch + resSecretMatch),
+				Verified:     isVerified,
+			}
+			s1.SetVerificationError(verificationErr, resIdMatch)
+			for subjectId := range uniqueSubjectIdMatches {
+				// AnalysisInfo is what triggers the analyzer downstream. It is
+				// only meaningful when (a) the credential pair verified - an
+				// unverified pair would just cause the analyzer to fail auth -
+				// and (b) we actually have a subject_id, since Box CCG auth
+				// requires all three values and the analyzer hard-fails
+				// without subject_id.
+				if isVerified && subjectId != "" {
+					s1.AnalysisInfo = map[string]string{
+						"client_id":     resIdMatch,
+						"client_secret": resSecretMatch,
+						"subject_id":    subjectId,
 					}
-					s1.SetVerificationError(verificationErr, resIdMatch)
-					if isVerified {
-						s1.AnalysisInfo = map[string]string{
-							"client_id":     resIdMatch,
-							"client_secret": resSecretMatch,
-							"subject_id":    subjectId,
-						}
-					}
-					results = append(results, s1)
 				}
-				if isVerified {
-					// box supports only one client id and secret pair
-					break
-				}
-			} else {
-				s1 := detectors.Result{
-					DetectorType: detector_typepb.DetectorType_BoxOauth,
-					Raw:          []byte(resIdMatch),
-					RawV2:        []byte(resIdMatch + resSecretMatch),
-					Verified:     isVerified,
-				}
-				s1.SetVerificationError(verificationErr, resIdMatch)
 				results = append(results, s1)
-				if isVerified {
-					break
-				}
+
+			}
+			// A Box application has exactly one client_id/client_secret pair,
+			// so once we've verified a pair there is no value in trying other
+			// id/secret combinations from the same chunk.
+			if isVerified {
+				break clientSecretLoop
 			}
 		}
 	}
