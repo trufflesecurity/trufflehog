@@ -598,13 +598,12 @@ func (s *Source) pageChunker(
 				},
 				SourceVerify: s.verify,
 			}
-
+			atomic.AddUint64(state.objectCount, 1)
 			if err := handlers.HandleFile(ctx, res.Body, chunkSkel, reporter); err != nil {
 				ctx.Logger().Error(err, "error handling file")
 				s.metricsCollector.RecordObjectError(metadata.bucket)
 				return nil
 			}
-			atomic.AddUint64(state.objectCount, 1)
 			ctx.Logger().V(5).Info("S3 object scanned.", "object_count", state.objectCount)
 			nErr, ok = state.errorCount.Load(prefix)
 			if !ok {
