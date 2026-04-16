@@ -941,6 +941,51 @@ func TestVerificationWithConfigurableRanges(t *testing.T) {
 	}
 }
 
+func TestVerificationMixedRangedAndLegacyVerifiers(t *testing.T) {
+	t.Parallel()
+
+	// Verifier 1 has ranges configured but returns a status matching neither.
+	// Verifier 2 is legacy (no ranges) and returns 200.
+	// The result should be Verified=true with NO verification error.
+	tsRanged := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer tsRanged.Close()
+
+	tsLegacy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`ok`))
+	}))
+	defer tsLegacy.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-zA-Z0-9]{10})`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint:      tsRanged.URL,
+				Unsafe:        true,
+				Headers:       []string{"A: b"},
+				SuccessRanges: []string{"200"},
+				RotatedRanges: []string{"401"},
+			},
+			{
+				Endpoint: tsLegacy.URL,
+				Unsafe:   true,
+				Headers:  []string{"A: b"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_ABCDEFGHIJ"))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(results))
+	assert.True(t, results[0].Verified, "expected Verified=true from legacy fallback")
+	assert.Nil(t, results[0].VerificationError(), "legacy success must not produce a spurious verification error")
+}
+
 func BenchmarkProductIndices(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = productIndices(3, 2, 6)

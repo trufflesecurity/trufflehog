@@ -320,6 +320,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			// Backward compat: no ranges configured, use legacy behavior.
 			if resp.StatusCode == http.StatusOK {
 				result.Verified = true
+				definitive = true
 				storeResponseBody(resp, result.ExtraData)
 				break
 			}
