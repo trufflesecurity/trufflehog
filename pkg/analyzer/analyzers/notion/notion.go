@@ -30,11 +30,13 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeNot
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("missing key in credInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("missing key in credInfo"),
+		)
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
+		)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
