@@ -119,12 +119,14 @@ func (p *Page) Update(msg tea.Msg) (app.Page, tea.Cmd) {
 	return p.forwardToActive(msg)
 }
 
+// advanceTab cycles the active tab with wraparound: forward past the last
+// tab returns to the first, and back past the first returns to the last.
 func (p *Page) advanceTab(back bool) {
-	switch {
-	case back && p.active > tabSource:
-		p.active--
-	case !back && p.active < tabRun:
-		p.active++
+	n := tabIndex(len(tabLabels))
+	if back {
+		p.active = (p.active - 1 + n) % n
+	} else {
+		p.active = (p.active + 1) % n
 	}
 }
 
