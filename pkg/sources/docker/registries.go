@@ -413,3 +413,106 @@ func discardBody(resp *http.Response) {
 		_ = resp.Body.Close()
 	}
 }
+
+// === Generic OCI Registry ===
+
+// GenericOCIRegistry implements the Registry interface for any OCI Distribution Spec
+// compliant registry (Harbor, Nexus, Artifactory, etc.) using the /v2/_catalog endpoint.
+type GenericOCIRegistry struct {
+	Host   string
+	Token  string
+	Client *http.Client
+	scheme string // defaults to "https"; overridable for testing
+}
+
+// catalogResp models the JSON response from the /v2/_catalog endpoint.
+type catalogResp struct {
+	Repositories []string `json:"repositories"`
+}
+
+func (g *GenericOCIRegistry) Name() string {
+	return g.Host
+}
+
+func (g *GenericOCIRegistry) WithRegistryToken(token string) {
+	g.Token = token
+}
+
+func (g *GenericOCIRegistry) WithClient(client *http.Client) {
+	g.Client = client
+}
+
+// ListImages enumerates all repositories from an OCI Distribution Spec compliant registry
+// using the /v2/_catalog endpoint. The namespace parameter is unused.
+// Pagination is handled via the Link response header.
+func (g *GenericOCIRegistry) ListImages(ctx context.Context, _ string) ([]string, error) {
+	scheme := g.scheme
+	if scheme == "" {
+		scheme = "https"
+	}
+
+	baseURL := &url.URL{
+		Scheme: scheme,
+		Host:   g.Host,
+		Path:   "v2/_catalog",
+	}
+
+	query := baseURL.Query()
+	query.Set("n", fmt.Sprint(maxRegistryPageSize))
+	baseURL.RawQuery = query.Encode()
+
+	allImages := []string{}
+	nextURL := baseURL.String()
+
+	for nextURL != "" {
+		if err := registryRateLimiter.Wait(ctx); err != nil {
+			return nil, err
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, nextURL, http.NoBody)
+		if err != nil {
+			return nil, err
+		}
+
+		if g.Token != "" {
+			req.Header.Set("Authorization", "Bearer "+g.Token)
+		}
+
+		client := g.Client
+		if client == nil {
+			client = defaultHTTPClient
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		discardBody(resp)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("failed to list registry images: unexpected status code: %d", resp.StatusCode)
+		}
+
+		var page catalogResp
+		if err := json.Unmarshal(body, &page); err != nil {
+			return nil, err
+		}
+
+		for _, repo := range page.Repositories {
+			allImages = append(allImages, fmt.Sprintf("%s/%s", g.Host, repo))
+		}
+
+		nextURL = parseNextLinkURL(resp.Header.Get("Link"))
+	}
+
+	return allImages, nil
+}
+
+// MakeRegistryFromHost returns a GenericOCIRegistry for the given registry host.
+func MakeRegistryFromHost(host string) Registry {
+	return &GenericOCIRegistry{Host: host}
+}

@@ -202,6 +202,7 @@ var (
 	dockerExcludePaths      = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
 	dockerScanNamespace     = dockerScan.Flag("namespace", "Docker namespace (organization or user). For non-Docker Hub registries, include the registry address as well (e.g., ghcr.io/namespace or quay.io/namespace).").String()
 	dockerScanRegistryToken = dockerScan.Flag("registry-token", "Optional Docker registry access token. Provide this if you want to include private images within the specified namespace.").String()
+	dockerScanRegistry      = dockerScan.Flag("registry", "Scan all images in a registry host. Supports OCI Distribution Spec compliant registries (Harbor, Nexus, Artifactory, etc.). Use --registry-token for authentication.").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -1008,21 +1009,26 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both images and namespace at the same time")
 		}
 
-		if *dockerScanImages == nil && *dockerScanNamespace == "" {
-			return scanMetrics, fmt.Errorf("invalid config: both images and namespace cannot be empty; one is required")
+		if *dockerScanImages == nil && *dockerScanNamespace == "" && *dockerScanRegistry == "" {
+			return scanMetrics, fmt.Errorf("invalid config: one of --image, --namespace, or --registry is required")
 		}
 
-		if *dockerScanRegistryToken != "" && *dockerScanNamespace == "" {
-			return scanMetrics, fmt.Errorf("invalid config: registry token can only be used with registry namespace")
+		if *dockerScanRegistry != "" && (*dockerScanImages != nil || *dockerScanNamespace != "") {
+			return scanMetrics, fmt.Errorf("invalid config: --registry cannot be combined with --image or --namespace")
+		}
+
+		if *dockerScanRegistryToken != "" && *dockerScanNamespace == "" && *dockerScanRegistry == "" {
+			return scanMetrics, fmt.Errorf("invalid config: --registry-token requires --namespace or --registry")
 		}
 
 		cfg := sources.DockerConfig{
 			BearerToken:       *dockerScanToken,
 			Images:            *dockerScanImages,
-			UseDockerKeychain: *dockerScanToken == "",
+			UseDockerKeychain: *dockerScanToken == "" && *dockerScanRegistry == "" && *dockerScanNamespace == "",
 			ExcludePaths:      strings.Split(*dockerExcludePaths, ","),
 			Namespace:         *dockerScanNamespace,
 			RegistryToken:     *dockerScanRegistryToken,
+			Registry:          *dockerScanRegistry,
 		}
 		if ref, err := eng.ScanDocker(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
