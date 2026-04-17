@@ -90,6 +90,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	uniqueTokens := make(map[string]struct{})
 	for _, m := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
+		if _, seen := uniqueTokens[m[1]]; seen {
+			continue
+		}
 		if isStructuralPAT(m[1]) {
 			uniqueTokens[m[1]] = struct{}{}
 		}
