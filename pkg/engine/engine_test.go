@@ -1379,6 +1379,7 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 		detector_typepb.DetectorType_ArtifactoryReferenceToken:  {},
 		detector_typepb.DetectorType_TableauPersonalAccessToken: {},
 		detector_typepb.DetectorType_HashiCorpVaultAuth:         {},
+		detector_typepb.DetectorType_JiraDataCenterPAT:          {},
 		detector_typepb.DetectorType_ConfluenceDataCenter:       {},
 		// these do not have any cloud endpoint
 	}
