@@ -175,7 +175,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.resizeActive()
 
 	case tea.KeyMsg:
-		if cmd := m.handleGlobalKey(msg); cmd != nil {
+		if cmd, handled := m.handleGlobalKey(msg); handled {
 			return m, cmd
 		}
 
@@ -207,25 +207,31 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleGlobalKey(msg tea.KeyMsg) tea.Cmd {
+// handleGlobalKey inspects the key against the router-level bindings and
+// returns (cmd, handled). When handled is true the caller MUST NOT forward the
+// key to the active page, even if cmd is nil: bubbles/list (and other
+// widgets) treat esc/q as "quit", so forwarding a consumed Back key after a
+// successful pop would immediately tear the program down.
+func (m *Model) handleGlobalKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch {
 	case key.Matches(msg, m.keymap.Quit):
 		m.args = nil
-		return tea.Quit
+		return tea.Quit, true
 	case key.Matches(msg, m.keymap.CmdQuit):
 		p := m.active()
 		if p != nil && len(m.stack) == 1 && p.AllowQKey() {
 			m.args = nil
-			return tea.Quit
+			return tea.Quit, true
 		}
+		return nil, false
 	case key.Matches(msg, m.keymap.Back):
 		if len(m.stack) <= 1 {
 			m.args = nil
-			return tea.Quit
+			return tea.Quit, true
 		}
-		return m.pop()
+		return m.pop(), true
 	}
-	return nil
+	return nil, false
 }
 
 // View implements tea.Model.

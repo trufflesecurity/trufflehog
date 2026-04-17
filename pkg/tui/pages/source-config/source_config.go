@@ -147,7 +147,20 @@ func (p *Page) forwardToActive(msg tea.Msg) (app.Page, tea.Cmd) {
 // form.BuildArgs via form.Args().
 func (p *Page) truffleCmd() []string { return p.truffleForm.Args() }
 
+// runCmd validates both forms before emitting an ExitMsg. If either form
+// has a validation error, the page jumps to the offending tab (so the
+// per-field error messages Valid() just stored are visible) and no exit
+// message is emitted. This prevents tab-to-run-and-enter from shipping an
+// incomplete argv to kingpin.
 func (p *Page) runCmd() tea.Cmd {
+	if !p.sourceAdapter.Valid() {
+		p.active = tabSource
+		return nil
+	}
+	if !p.truffleForm.Valid() {
+		p.active = tabTrufflehog
+		return nil
+	}
 	args := append([]string{}, p.sourceAdapter.Cmd()...)
 	args = append(args, p.truffleCmd()...)
 	return func() tea.Msg { return app.ExitMsg{Args: args} }
