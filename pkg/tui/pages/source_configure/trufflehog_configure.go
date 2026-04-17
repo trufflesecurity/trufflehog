@@ -5,112 +5,91 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type truffleCmdModel struct {
-	textinputs.Model
+// trufflehogAdapter wraps the TruffleHog-wide flags form. It doesn't have a
+// subcommand of its own; its Cmd() is just the flag tokens that get appended
+// to whatever the source adapter emits.
+type trufflehogAdapter struct {
+	form *form.Form
 }
 
-func GetTrufflehogConfiguration() truffleCmdModel {
-	verification := textinputs.InputConfig{
-		Label:       "Skip Verification",
-		Key:         "no-verification",
-		Required:    false,
-		Help:        "Check if a suspected secret is real or not",
-		Placeholder: "false",
+// GetTrufflehogConfiguration builds the TruffleHog-wide flags form.
+//
+// Booleans are rendered as checkboxes (no more typing "true"/"false"):
+// --json, --no-verification, and --only-verified (which expands to
+// --results=verified to match the pre-checkbox behavior).
+func GetTrufflehogConfiguration() sources.CmdModel {
+	specs := []form.FieldSpec{
+		{
+			Key:   "json",
+			Label: "JSON output",
+			Help:  "Output results to JSON",
+			Kind:  form.KindCheckbox,
+			Emit:  form.EmitPresence,
+		},
+		{
+			Key:   "no-verification",
+			Label: "Skip Verification",
+			Help:  "Check if a suspected secret is real or not",
+			Kind:  form.KindCheckbox,
+			Emit:  form.EmitPresence,
+		},
+		{
+			Key:      "only-verified",
+			Label:    "Verified results only",
+			Help:     "Return only verified results",
+			Kind:     form.KindCheckbox,
+			Emit:     form.EmitConstant,
+			Constant: []string{"--results=verified"},
+		},
+		{
+			Key:         "exclude-detectors",
+			Label:       "Exclude detectors",
+			Help:        "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.",
+			Kind:        form.KindText,
+			Emit:        form.EmitLongFlagEq,
+			Transform:   stripSpaces,
+		},
+		{
+			Key:         "concurrency",
+			Label:       "Concurrency",
+			Help:        "Number of concurrent workers.",
+			Kind:        form.KindText,
+			Placeholder: strconv.Itoa(runtime.NumCPU()),
+			Emit:        form.EmitLongFlagEq,
+			Validators:  []form.Validate{form.Integer(1, 1<<20)},
+		},
 	}
-
-	verifiedResults := textinputs.InputConfig{
-		Label:       "Verified results",
-		Key:         "only-verified",
-		Required:    false,
-		Help:        "Return only verified results",
-		Placeholder: "false",
-	}
-
-	jsonOutput := textinputs.InputConfig{
-		Label:       "JSON output",
-		Key:         "json",
-		Required:    false,
-		Help:        "Output results to JSON",
-		Placeholder: "false",
-	}
-
-	excludeDetectors := textinputs.InputConfig{
-		Label:       "Exclude detectors",
-		Key:         "exclude_detectors",
-		Required:    false,
-		Help:        "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.",
-		Placeholder: "",
-	}
-
-	concurrency := textinputs.InputConfig{
-		Label:       "Concurrency",
-		Key:         "concurrency",
-		Required:    false,
-		Help:        "Number of concurrent workers.",
-		Placeholder: strconv.Itoa(runtime.NumCPU()),
-	}
-
-	return truffleCmdModel{textinputs.New([]textinputs.InputConfig{jsonOutput, verification, verifiedResults, excludeDetectors, concurrency}).SetSkip(true)}
+	return &trufflehogAdapter{form: form.New(specs)}
 }
 
-func (m truffleCmdModel) Cmd() string {
-	var command []string
-	inputs := m.GetInputs()
-
-	if isTrue(inputs["json"].Value) {
-		command = append(command, "--json")
-	}
-
-	if isTrue(inputs["no-verification"].Value) {
-		command = append(command, "--no-verification")
-	}
-
-	if isTrue(inputs["only-verified"].Value) {
-		command = append(command, "--results=verified")
-	}
-
-	if inputs["exclude_detectors"].Value != "" {
-		cmd := "--exclude-detectors=" + strings.ReplaceAll(inputs["exclude_detectors"].Value, " ", "")
-		command = append(command, cmd)
-	}
-
-	if inputs["concurrency"].Value != "" {
-		command = append(command, "--concurrency="+inputs["concurrency"].Value)
-	}
-
-	return strings.Join(command, " ")
+func stripSpaces(v string) string {
+	return strings.ReplaceAll(v, " ", "")
 }
 
-func (m truffleCmdModel) Summary() string {
-	summary := strings.Builder{}
-	keys := []string{"no-verification", "only-verified", "json", "exclude_detectors", "concurrency"}
+func (a *trufflehogAdapter) Init() tea.Cmd { return nil }
 
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-	for _, key := range keys {
-		if inputs[key].Value != "" {
-			summary.WriteString("\t" + labels[key] + ": " + inputs[key].Value + "\n")
-		}
-	}
-
-	if summary.Len() == 0 {
-		summary.WriteString("\tRunning with defaults\n")
-
-	}
-
-	summary.WriteString("\n")
-	return summary.String()
+func (a *trufflehogAdapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	f, cmd := a.form.Update(msg)
+	a.form = f
+	return a, cmd
 }
 
-func isTrue(val string) bool {
-	value := strings.ToLower(val)
-	isTrue, _ := strconv.ParseBool(value)
+func (a *trufflehogAdapter) View() string { return a.form.View() }
 
-	if isTrue || value == "yes" || value == "y" {
-		return true
+func (a *trufflehogAdapter) Cmd() []string { return a.form.Args() }
+
+// Summary renders the non-empty field values; "Running with defaults" when
+// nothing is set, matching the prior UX.
+func (a *trufflehogAdapter) Summary() string {
+	s := a.form.Summary()
+	if strings.TrimSpace(s) == "" {
+		return "\tRunning with defaults\n\n"
 	}
-	return false
+	return s + "\n"
 }

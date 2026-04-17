@@ -5,8 +5,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/tabs"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
@@ -100,7 +100,7 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tabComponents[configTab].(*SourceComponent).SetForm(fields)
 		}
 
-	case textinputs.SelectNextMsg, textinputs.SelectSkipMsg:
+	case form.SubmitMsg:
 		if m.activeTab < runTab {
 			m.activeTab++
 		}

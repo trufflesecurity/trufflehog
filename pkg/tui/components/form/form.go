@@ -48,6 +48,11 @@ const (
 	// EmitPositional renders the value as a single positional argument
 	// (no flag name).
 	EmitPositional
+	// EmitRepeatedLongFlagEq splits the (whitespace-separated) value and
+	// emits one `--key=v` token per non-empty piece. Used by sources like
+	// docker (--image=) and s3 (--bucket=) that accept multiple targets as
+	// a single input.
+	EmitRepeatedLongFlagEq
 	// EmitNone is a non-emitting field, e.g. a checkbox that gates another
 	// field but doesn't itself contribute an argument.
 	EmitNone
@@ -97,6 +102,11 @@ type FieldSpec struct {
 	// Group tags a field for cross-field constraints (e.g. an XOr group
 	// shared by several fields that are mutually exclusive).
 	Group string
+	// Transform, when non-nil, is applied to the trimmed value before
+	// emission. Returning "" makes the field emit nothing. Used for
+	// small, field-local preprocessing (e.g. stripping whitespace inside
+	// a comma-separated list before emitting --exclude-detectors=...).
+	Transform func(string) string
 }
 
 // Constraint is a cross-field validator evaluated on submit. Returning a

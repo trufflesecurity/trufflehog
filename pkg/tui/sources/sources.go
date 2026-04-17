@@ -1,80 +1,39 @@
 package sources
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/circleci"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/docker"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/elasticsearch"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/filesystem"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/gcs"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/git"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/github"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/gitlab"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/huggingface"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/jenkins"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/postman"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/s3"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/syslog"
 )
 
-func GetSourceNotes(sourceName string) string {
-	source := strings.ToLower(sourceName)
-	switch source {
-	case "github":
-		return github.GetNote()
-	case "postman":
-		return postman.GetNote()
-	case "elasticsearch":
-		return elasticsearch.GetNote()
-	case "huggingface":
-		return huggingface.GetNote()
-	case "jenkins":
-		return jenkins.GetNote()
-
-	default:
-		return ""
-	}
-}
-
+// CmdModel is the shim contract consumed by source_configure's tab
+// components while the page layer still owns sequencing.
+//
+// Cmd() returns a kingpin arg vector including the Definition.Command
+// subcommand token. This replaces the old Cmd() string that
+// whitespace-split in pkg/tui/tui.go and broke space-containing values
+// like filesystem paths.
 type CmdModel interface {
 	tea.Model
-	Cmd() string
+	Cmd() []string
 	Summary() string
 }
 
-func GetSourceFields(sourceName string) CmdModel {
-	source := strings.ToLower(sourceName)
-
-	switch source {
-	case "aws s3":
-		return s3.GetFields()
-	case "circleci":
-		return circleci.GetFields()
-	case "docker":
-		return docker.GetFields()
-	case "elasticsearch":
-		return elasticsearch.GetFields()
-	case "filesystem":
-		return filesystem.GetFields()
-	case "gcs (google cloud storage)":
-		return gcs.GetFields()
-	case "git":
-		return git.GetFields()
-	case "github":
-		return github.GetFields()
-	case "gitlab":
-		return gitlab.GetFields()
-	case "hugging face":
-		return huggingface.GetFields()
-	case "jenkins":
-		return jenkins.GetFields()
-	case "postman":
-		return postman.GetFields()
-	case "syslog":
-		return syslog.GetFields()
+// GetSourceNotes returns the Definition.Note matching sourceName (by Title).
+//
+// Kept as a shim while source_configure still dispatches by display name;
+// phase 4 migrates the dispatch to IDs and this helper can be deleted.
+func GetSourceNotes(sourceName string) string {
+	if d, ok := ByTitle(sourceName); ok {
+		return d.Note
 	}
+	return ""
+}
 
-	return nil
+// GetSourceFields returns a FormAdapter for the source whose Title matches
+// sourceName, or nil if no match. Same shim deal as GetSourceNotes.
+func GetSourceFields(sourceName string) CmdModel {
+	d, ok := ByTitle(sourceName)
+	if !ok {
+		return nil
+	}
+	return NewFormAdapter(d)
 }

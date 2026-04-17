@@ -8,10 +8,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
-type SetArgsMsg string
+// SetArgsMsg carries the final argv the parent TUI will re-exec TruffleHog
+// with. It is a string slice so values with spaces (filesystem paths, etc.)
+// survive without shell quoting.
+type SetArgsMsg []string
 
 type RunComponent struct {
 	common.Common
@@ -59,11 +63,8 @@ func (m *RunComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reviewList.SetSize(msg.Width-h, msg.Height/2-v)
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyEnter {
-			command := m.parent.sourceFields.Cmd()
-			if m.parent.truffleFields.Cmd() != "" {
-				command += " " + m.parent.truffleFields.Cmd()
-			}
-			cmd := func() tea.Msg { return SetArgsMsg(command) }
+			args := buildCommand(m.parent.sourceFields, m.parent.truffleFields)
+			cmd := func() tea.Msg { return SetArgsMsg(args) }
 			return m, cmd
 		}
 	}
@@ -94,17 +95,43 @@ func (m *RunComponent) View() string {
 	view.WriteString("Generated TruffleHog command\n")
 	view.WriteString(styles.HintTextStyle.Render("Save this if you want to run it again later!") + "\n")
 
-	command := m.parent.sourceFields.Cmd()
-	if m.parent.truffleFields.Cmd() != "" {
-		command += " " + m.parent.truffleFields.Cmd()
-	}
-	view.WriteString(styles.CodeTextStyle.Render(command))
+	args := buildCommand(m.parent.sourceFields, m.parent.truffleFields)
+	view.WriteString(styles.CodeTextStyle.Render(renderCommand(args)))
 
 	focusedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	view.WriteString("\n\n" + focusedStyle.Render("[ Run TruffleHog ]") + "\n\n")
 
 	// view.WriteString(m.reviewList.View())
 	return view.String()
+}
+
+// buildCommand concatenates the source-specific args with the TruffleHog-wide
+// args. It tolerates nil adapters so the review tab renders even before a
+// source is selected.
+func buildCommand(source, truffle sources.CmdModel) []string {
+	var out []string
+	if source != nil {
+		out = append(out, source.Cmd()...)
+	}
+	if truffle != nil {
+		out = append(out, truffle.Cmd()...)
+	}
+	return out
+}
+
+// renderCommand joins argv with spaces for display only. Tokens that contain
+// spaces get wrapped in single quotes so users can copy/paste the result.
+func renderCommand(args []string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, "trufflehog")
+	for _, a := range args {
+		if strings.ContainsAny(a, " \t") {
+			parts = append(parts, "'"+a+"'")
+			continue
+		}
+		parts = append(parts, a)
+	}
+	return strings.Join(parts, " ")
 }
 
 func (m *RunComponent) ShortHelp() []key.Binding {
