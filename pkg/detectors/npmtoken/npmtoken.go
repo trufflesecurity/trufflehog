@@ -15,7 +15,6 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
@@ -24,20 +23,21 @@ func (s Scanner) Version() int { return 1 }
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"npm"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	
+	npmrcPat = regexp.MustCompile(`//([^/:]+(?:/[^/:]*)*?)/:_authToken\s*=\s*[^\s]+`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"npm"}
 }
 
-// FromData will find and optionally verify NpmToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	
+	registryURLs := extractRegistryURLs(dataStr)
+	
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 
@@ -50,20 +50,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://registry.npmjs.org/-/whoami", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-					s1.AnalysisInfo = map[string]string{
-						"key": resMatch,
-					}
-				}
+			isVerified, extraData := verifyToken(ctx, resMatch, registryURLs)
+			s1.Verified = isVerified
+			if isVerified {
+				s1.AnalysisInfo = extraData
 			}
 		}
 
@@ -71,6 +61,64 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+func extractRegistryURLs(data string) []string {
+	matches := npmrcPat.FindAllStringSubmatch(data, -1)
+	var urls []string
+	seen := make(map[string]bool)
+	
+	for _, match := range matches {
+		if len(match) > 1 {
+			registry := match[1]
+			if !seen[registry] {
+				seen[registry] = true
+				urls = append(urls, registry)
+			}
+		}
+	}
+	
+	return urls
+}
+
+func verifyToken(ctx context.Context, token string, registryURLs []string) (bool, map[string]string) {
+	registriesToCheck := registryURLs
+	if len(registriesToCheck) == 0 {
+		registriesToCheck = []string{"registry.npmjs.org"}
+	}
+	
+	for _, registry := range registriesToCheck {
+		registryURL := buildRegistryURL(registry)
+		
+		req, err := http.NewRequestWithContext(ctx, "GET", registryURL, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+		res, err := client.Do(req)
+		if err == nil {
+			defer res.Body.Close()
+			if res.StatusCode >= 200 && res.StatusCode < 300 {
+				return true, map[string]string{
+					"key":      token,
+					"registry": registry,
+				}
+			}
+		}
+	}
+	
+	return false, nil
+}
+
+func buildRegistryURL(registry string) string {
+	registry = strings.TrimSpace(registry)
+	registry = strings.TrimSuffix(registry, "/")
+	
+	if strings.HasPrefix(registry, "http://") || strings.HasPrefix(registry, "https://") {
+		return registry + "/-/whoami"
+	}
+	
+	return "https://" + registry + "/-/whoami"
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
