@@ -62,18 +62,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	foundURLs := make(map[string]struct{})
+	uniqueURLs := make(map[string]struct{})
 	for _, match := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		foundURLs[match[1]] = struct{}{}
+		uniqueURLs[match[1]] = struct{}{}
 	}
-	uniqueURLs := make([]string, 0, len(foundURLs))
-	for url := range foundURLs {
-		uniqueURLs = append(uniqueURLs, url)
+	foundURLs := make([]string, 0, len(uniqueURLs))
+	for url := range uniqueURLs {
+		foundURLs = append(foundURLs, url)
+	}
+	for _, endpoint := range s.Endpoints(foundURLs...) {
+		uniqueURLs[endpoint] = struct{}{}
 	}
 
 	for token := range tokens {
-		endpoints := s.Endpoints(uniqueURLs...)
-		if len(endpoints) == 0 {
+		if len(uniqueURLs) == 0 {
 			results = append(results, detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
@@ -83,7 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		for _, endpoint := range endpoints {
+		for endpoint := range uniqueURLs {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
@@ -139,12 +141,12 @@ func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) 
 	switch resp.StatusCode {
 	case http.StatusOK:
 		var result map[string]any
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			// 200 confirms the token is valid; failing to decode only means we can't extract extra data.
-			return true, nil, nil
-		}
 		extraData := map[string]string{
 			"endpoint": baseURL,
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			// 200 confirms the token is valid; failing to decode only means we can't extract extra data.
+			return true, extraData, nil
 		}
 		if name, ok := result["displayName"].(string); ok {
 			extraData["display_name"] = name
