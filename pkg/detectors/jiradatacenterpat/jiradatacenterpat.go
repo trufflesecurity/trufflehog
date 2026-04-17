@@ -70,12 +70,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for url := range uniqueURLs {
 		foundURLs = append(foundURLs, url)
 	}
+	endpoints := make(map[string]struct{})
 	for _, endpoint := range s.Endpoints(foundURLs...) {
-		uniqueURLs[endpoint] = struct{}{}
+		endpoints[endpoint] = struct{}{}
 	}
 
 	for token := range tokens {
-		if len(uniqueURLs) == 0 {
+		if len(endpoints) == 0 {
 			results = append(results, detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
@@ -85,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		for endpoint := range uniqueURLs {
+		for endpoint := range endpoints {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
