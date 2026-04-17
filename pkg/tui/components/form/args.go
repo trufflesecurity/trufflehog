@@ -12,6 +12,9 @@ func BuildArgs(specs []FieldSpec, values map[string]string) []string {
 	var out []string
 	for _, s := range specs {
 		v := values[s.Key]
+		if s.Transform != nil {
+			v = s.Transform(strings.TrimSpace(v))
+		}
 		switch s.Emit {
 		case EmitLongFlag:
 			if strings.TrimSpace(v) == "" {
@@ -23,6 +26,10 @@ func BuildArgs(specs []FieldSpec, values map[string]string) []string {
 				continue
 			}
 			out = append(out, "--"+s.Key+"="+v)
+		case EmitRepeatedLongFlagEq:
+			for _, piece := range strings.Fields(v) {
+				out = append(out, "--"+s.Key+"="+piece)
+			}
 		case EmitPresence:
 			if isTruthy(v) {
 				out = append(out, "--"+s.Key)

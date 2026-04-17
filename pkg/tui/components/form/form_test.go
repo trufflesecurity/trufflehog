@@ -114,6 +114,43 @@ func TestBuildArgsEmitModes(t *testing.T) {
 	}
 }
 
+func TestBuildArgsRepeatedLongFlagEq(t *testing.T) {
+	t.Parallel()
+	specs := []FieldSpec{
+		{Key: "image", Emit: EmitRepeatedLongFlagEq},
+	}
+	got := BuildArgs(specs, map[string]string{"image": "  a   b\tc"})
+	want := []string{"--image=a", "--image=b", "--image=c"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("repeated = %v, want %v", got, want)
+	}
+}
+
+func TestBuildArgsTransform(t *testing.T) {
+	t.Parallel()
+	specs := []FieldSpec{
+		{
+			Key:  "exclude-detectors",
+			Emit: EmitLongFlagEq,
+			Transform: func(v string) string {
+				// strip inner whitespace like the legacy code did
+				out := make([]byte, 0, len(v))
+				for i := 0; i < len(v); i++ {
+					if v[i] != ' ' {
+						out = append(out, v[i])
+					}
+				}
+				return string(out)
+			},
+		},
+	}
+	got := BuildArgs(specs, map[string]string{"exclude-detectors": "  foo , bar , baz  "})
+	want := []string{"--exclude-detectors=foo,bar,baz"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("transform = %v, want %v", got, want)
+	}
+}
+
 func TestRequired(t *testing.T) {
 	t.Parallel()
 	r := Required()

@@ -3,6 +3,7 @@ package sources
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
 )
@@ -45,6 +46,15 @@ type Definition struct {
 	// Constraints are cross-field validators evaluated on submit (e.g. an
 	// XOr group between mutually-exclusive target selectors).
 	Constraints []form.Constraint
+	// ExtraArgs are appended verbatim to the emitted arg vector after the
+	// form's fields. Used by sources that need a constant flag (e.g. gcs
+	// always appending --cloud-environment).
+	ExtraArgs []string
+	// BuildArgs, when non-nil, replaces the default form.BuildArgs result
+	// for this source. Provided for the handful of sources whose
+	// arg-emission logic is genuinely not declarative (e.g. elasticsearch's
+	// mutex-of-modes, jenkins's auth gating).
+	BuildArgs func(values map[string]string) []string
 }
 
 // registry is the process-wide source registry. Entries are added at init
@@ -82,4 +92,19 @@ func All() []Definition {
 		return out[i].Title < out[j].Title
 	})
 	return out
+}
+
+// ByTitle looks up a Definition by its Title (case-insensitive).
+//
+// Kept for compatibility with source_select's title-based dispatch; once
+// source-picker switches to IDs in phase 4 this helper becomes unused and
+// can be removed.
+func ByTitle(title string) (Definition, bool) {
+	want := strings.ToLower(strings.TrimSpace(title))
+	for _, d := range registry {
+		if strings.ToLower(d.Title) == want {
+			return d, true
+		}
+	}
+	return Definition{}, false
 }

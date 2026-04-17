@@ -18,6 +18,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/contact_enterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_select"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/circleci"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/docker"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/elasticsearch"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/filesystem"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/gcs"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/git"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/github"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/gitlab"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/huggingface"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/jenkins"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/postman"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/s3"
+	_ "github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/syslog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/view_oss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/wizard_intro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
@@ -193,7 +206,7 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 		}
 	case source_configure.SetArgsMsg:
-		ui.args = strings.Split(string(msg), " ")[1:]
+		ui.args = []string(msg)
 		return ui, tea.Quit
 	case analyze_form.Submission:
 		ui.analyzerType = msg.AnalyzerType

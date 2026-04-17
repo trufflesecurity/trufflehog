@@ -1,43 +1,30 @@
 package gitlab
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type gitlabCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetFields() gitlabCmdModel {
-	token := textinputs.InputConfig{
-		Label:       "GitLab token",
-		Key:         "token",
-		Required:    true,
-		Help:        "Personal access token with read access",
-		Placeholder: "glpat-",
+// Definition returns the gitlab source configuration.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "gitlab",
+		Title:       "GitLab",
+		Description: "Scan GitLab repositories.",
+		Tier:        sources.TierOSS,
+		Command:     "gitlab",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "token",
+				Label:       "GitLab token",
+				Help:        "Personal access token with read access",
+				Kind:        form.KindSecret,
+				Placeholder: "glpat-",
+				Emit:        form.EmitLongFlagEq,
+				Validators:  []form.Validate{form.Required()},
+			},
+		},
 	}
-
-	return gitlabCmdModel{textinputs.New([]textinputs.InputConfig{token})}
-}
-
-func (m gitlabCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "gitlab")
-
-	inputs := m.GetInputs()
-
-	command = append(command, "--token="+inputs["token"].Value)
-
-	return strings.Join(command, " ")
-}
-
-func (m gitlabCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-
-	keys := []string{"token"}
-	return common.SummarizeSource(keys, inputs, labels)
 }

@@ -40,8 +40,8 @@ func New(specs []FieldSpec, constraints ...Constraint) *Form {
 	f := &Form{
 		constraints: constraints,
 		submitKeys:  key.NewBinding(key.WithKeys("ctrl+s")),
-		nextKeys:    key.NewBinding(key.WithKeys("tab", "down")),
-		prevKeys:    key.NewBinding(key.WithKeys("shift+tab", "up")),
+		nextKeys:    key.NewBinding(key.WithKeys("down")),
+		prevKeys:    key.NewBinding(key.WithKeys("up")),
 	}
 	f.fields = make([]Field, 0, len(specs))
 	for _, s := range specs {
