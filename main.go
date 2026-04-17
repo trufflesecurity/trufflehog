@@ -1024,7 +1024,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		cfg := sources.DockerConfig{
 			BearerToken:       *dockerScanToken,
 			Images:            *dockerScanImages,
-			UseDockerKeychain: *dockerScanToken == "" && *dockerScanRegistry == "" && *dockerScanNamespace == "",
+			UseDockerKeychain: *dockerScanToken == "" && *dockerScanRegistry == "",
 			ExcludePaths:      strings.Split(*dockerExcludePaths, ","),
 			Namespace:         *dockerScanNamespace,
 			RegistryToken:     *dockerScanRegistryToken,
