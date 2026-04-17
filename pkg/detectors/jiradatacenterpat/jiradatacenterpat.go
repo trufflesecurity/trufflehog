@@ -29,7 +29,7 @@ var (
 )
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// PATs are base64-encoded strings of the form <12-digit-id>:<20-random-bytes> (33 bytes, 44 chars, no padding).
 	// Since the first byte is always an ASCII digit (0x30–0x39), the first base64 character is always M, N, or O.
@@ -55,10 +55,10 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	var tokens []string
+	tokens := make(map[string]struct{})
 	for _, match := range patPat.FindAllStringSubmatch(dataStr, -1) {
 		if isStructuralPAT(match[1]) {
-			tokens = append(tokens, match[1])
+			tokens[match[1]] = struct{}{}
 		}
 	}
 
@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueURLs = append(uniqueURLs, url)
 	}
 
-	for _, token := range tokens {
+	for token := range tokens {
 		endpoints := s.Endpoints(uniqueURLs...)
 		if len(endpoints) == 0 {
 			results = append(results, detectors.Result{
