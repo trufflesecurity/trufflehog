@@ -35,10 +35,10 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeGit
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	if info == nil {
-		return nil, fmt.Errorf("GitHub analyzer returned no data for token")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", fmt.Errorf("GitHub analyzer returned no data for token"))
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
