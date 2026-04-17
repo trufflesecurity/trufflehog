@@ -27,11 +27,6 @@ var (
 	npmrcPat = regexp.MustCompile(`//([^/]+(?:/[^:]+)*)/:_authToken\s*=\s*([^\s]+)`)
 )
 
-type tokenRegistry struct {
-	token    string
-	registry string
-}
-
 func (s Scanner) Keywords() []string {
 	return []string{"npm_"}
 }
