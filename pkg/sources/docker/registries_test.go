@@ -138,6 +138,30 @@ func TestGenericOCIRegistryListImages_Pagination(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if page == 0 {
+			w.Header().Set("Link", `</v2/_catalog?n=2&last=repo2>; rel="next"`)
+			_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"repo1", "repo2"}})
+			page++
+		} else {
+			_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"repo3"}})
+		}
+	}))
+	defer srv.Close()
+
+	reg := &GenericOCIRegistry{Host: srv.Listener.Addr().String(), scheme: "http"}
+	reg.WithClient(srv.Client())
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.NoError(t, err)
+	assert.Len(t, images, 3)
+}
+
+func TestGenericOCIRegistryListImages_PaginationAbsoluteURL(t *testing.T) {
+	t.Parallel()
+
+	page := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if page == 0 {
 			w.Header().Set("Link", fmt.Sprintf(`<%s/v2/_catalog?n=2&last=repo2>; rel="next"`, "http://"+r.Host))
 			_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"repo1", "repo2"}})
 			page++

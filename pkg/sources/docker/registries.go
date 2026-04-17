@@ -506,10 +506,29 @@ func (g *GenericOCIRegistry) ListImages(ctx context.Context, _ string) ([]string
 			allImages = append(allImages, fmt.Sprintf("%s/%s", g.Host, repo))
 		}
 
-		nextURL = parseNextLinkURL(resp.Header.Get("Link"))
+		linkHeader := resp.Header.Get("Link")
+		if linkHeader != "" {
+			nextURL = resolveNextURL(baseURL, linkHeader)
+		} else {
+			nextURL = ""
+		}
 	}
 
 	return allImages, nil
+}
+
+func resolveNextURL(baseURL *url.URL, linkHeader string) string {
+	nextLink := parseNextLinkURL(linkHeader)
+	if nextLink == "" {
+		return ""
+	}
+
+	parsedNext, err := url.Parse(nextLink)
+	if err != nil {
+		return ""
+	}
+
+	return baseURL.ResolveReference(parsedNext).String()
 }
 
 // MakeRegistryFromHost returns a GenericOCIRegistry for the given registry host.
