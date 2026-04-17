@@ -38,7 +38,13 @@ func New(styles *theme.Styles, data any) *Page {
 
 func (p *Page) ID() app.PageID { return ID }
 
-func (p *Page) Init() tea.Cmd { return nil }
+// Init schedules the router to exit once the first frame of the card has
+// been rendered. bubbletea runs this page's View before flushing queued
+// commands, so the link is painted into the terminal's scrollback before
+// the program quits and the user sees it sitting where it was left.
+func (p *Page) Init() tea.Cmd {
+	return func() tea.Msg { return app.ExitMsg{Args: nil} }
+}
 
 func (p *Page) Update(msg tea.Msg) (app.Page, tea.Cmd) { return p, nil }
 
