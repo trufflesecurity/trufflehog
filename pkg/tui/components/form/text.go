@@ -5,7 +5,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/theme"
 )
@@ -84,7 +83,8 @@ func (t *TextField) View() string {
 		b.WriteString(styles.Hint.Render(t.spec.Help))
 		b.WriteString("\n")
 	}
-	return lipgloss.NewStyle().MarginBottom(1).Render(b.String())
+	b.WriteString("\n")
+	return b.String()
 }
 
 // Error returns the most recent validation error message.
@@ -102,11 +102,18 @@ func (t *TextField) Validate() error {
 	return nil
 }
 
-// SetWidth hints the input width.
+// SetWidth hints the input width. bubbles/textinput pads the value with
+// trailing spaces up to Width, so we cap it to avoid painting hundreds of
+// columns of padding on wide terminals while still leaving headroom under
+// the content area on narrower ones.
 func (t *TextField) SetWidth(w int) {
 	t.width = w
-	t.input.Width = w - 4
-	if t.input.Width < 10 {
-		t.input.Width = 10
+	width := w - 6
+	if width > 80 {
+		width = 80
 	}
+	if width < 10 {
+		width = 10
+	}
+	t.input.Width = width
 }
