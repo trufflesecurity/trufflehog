@@ -80,45 +80,55 @@ func TestNpmToken_New_Pattern(t *testing.T) {
 	}
 }
 
-func TestExtractRegistryURLs(t *testing.T) {
+func TestExtractTokenRegistryPairs(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		want  []string
+		want  map[string]string
 	}{
 		{
 			name:  "single registry from npmrc",
 			input: "//artifactory.example.com/:_authToken=npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY",
-			want:  []string{"artifactory.example.com"},
+			want:  map[string]string{"npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY": "artifactory.example.com"},
 		},
 		{
 			name:  "registry with path",
 			input: "//nexus.example.com/repository/npm-proxy/:_authToken=npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY",
-			want:  []string{"nexus.example.com/repository/npm-proxy"},
+			want:  map[string]string{"npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY": "nexus.example.com/repository/npm-proxy"},
 		},
 		{
-			name: "multiple registries",
+			name: "multiple registries with different tokens",
 			input: `//artifactory.example.com/:_authToken=token1
 //nexus.example.com/:_authToken=token2`,
-			want: []string{"artifactory.example.com", "nexus.example.com"},
+			want: map[string]string{"token1": "artifactory.example.com", "token2": "nexus.example.com"},
 		},
 		{
 			name:  "no registry",
 			input: "npm_ token = npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY",
-			want:  nil,
+			want:  map[string]string{},
 		},
 		{
-			name:  "duplicate registries",
-			input: "//registry.example.com/:_authToken=token1\n//registry.example.com/:_authToken=token2",
-			want:  []string{"registry.example.com"},
+			name:  "duplicate token uses first registry",
+			input: "//registry1.example.com/:_authToken=token1\n//registry2.example.com/:_authToken=token1",
+			want:  map[string]string{"token1": "registry1.example.com"},
+		},
+		{
+			name:  "registry with port number",
+			input: "//localhost:4873/:_authToken=npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY",
+			want:  map[string]string{"npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY": "localhost:4873"},
+		},
+		{
+			name:  "registry with port and path",
+			input: "//nexus.example.com:8081/repository/npm/:_authToken=npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY",
+			want:  map[string]string{"npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY": "nexus.example.com:8081/repository/npm"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := extractRegistryURLs(test.input)
+			got := extractTokenRegistryPairs(test.input)
 			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("extractRegistryURLs() diff: (-want +got)\n%s", diff)
+				t.Errorf("extractTokenRegistryPairs() diff: (-want +got)\n%s", diff)
 			}
 		})
 	}
