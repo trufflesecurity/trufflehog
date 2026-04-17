@@ -87,18 +87,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						body, err := io.ReadAll(res.Body)
 						if err != nil {
-							continue
-						}
-						bodyString := string(body)
-						validResponse := strings.Contains(bodyString, `timestamp`)
+							s1.SetVerificationError(err, resSecretMatch)
+						} else {
+							bodyString := string(body)
+							validResponse := strings.Contains(bodyString, `timestamp`)
 
-						var responseObject Response
-						if err := json.Unmarshal(body, &responseObject); err != nil {
-							continue
-						}
-
-						if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
-							s1.Verified = true
+							var responseObject Response
+							if err := json.Unmarshal(body, &responseObject); err != nil {
+								s1.SetVerificationError(err, resSecretMatch)
+							} else if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
+								s1.Verified = true
+							}
 						}
 					}
 				}

@@ -73,7 +73,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	// Check results.
-UrlLoop:
 	for url, storageAccount := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
@@ -84,24 +83,23 @@ UrlLoop:
 
 			if verify {
 				if invalidStorageAccounts.Exists(storageAccount) {
-					logger.V(3).Info("Skipping invalid storage account", "storage account", storageAccount)
-					break
-				}
-
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, verificationErr := verifyMatch(ctx, client, url, key, true)
-				s1.Verified = isVerified
-
-				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
-						invalidStorageAccounts.Set(storageAccount, struct{}{})
-						continue UrlLoop
+					logger.V(3).Info("Skipping verification: cached invalid storage account", "storage account", storageAccount)
+					s1.SetVerificationError(noSuchHostErr, key)
+				} else {
+					client := s.client
+					if client == nil {
+						client = defaultClient
 					}
-					s1.SetVerificationError(verificationErr, key)
+
+					isVerified, verificationErr := verifyMatch(ctx, client, url, key, true)
+					s1.Verified = isVerified
+
+					if verificationErr != nil {
+						if errors.Is(verificationErr, noSuchHostErr) {
+							invalidStorageAccounts.Set(storageAccount, struct{}{})
+						}
+						s1.SetVerificationError(verificationErr, key)
+					}
 				}
 			}
 

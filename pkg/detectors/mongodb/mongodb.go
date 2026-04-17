@@ -18,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
 )
 
+
 type Scanner struct {
 	timeout time.Duration // Zero value means "default timeout"
 }
@@ -98,9 +99,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, vErr := verifyUri(ctx, connStr, timeout)
 			r.Verified = isVerified
-			if isErrDeterminate(vErr) {
-				continue
-			}
 			r.SetVerificationError(vErr, password)
 
 			if isVerified {
@@ -123,11 +121,6 @@ func (s Scanner) Description() string {
 	return "MongoDB is a NoSQL database that uses a document-oriented data model. MongoDB credentials can be used to access and manipulate the database."
 }
 
-func isErrDeterminate(err error) bool {
-	var authErr *auth.Error
-	return errors.As(err, &authErr)
-}
-
 func verifyUri(ctx context.Context, connStr string, timeout time.Duration) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -144,8 +137,15 @@ func verifyUri(ctx context.Context, connStr string, timeout time.Duration) (bool
 	defer func() {
 		_ = client.Disconnect(ctx)
 	}()
-	err = client.Ping(ctx, readpref.Primary())
-	return err == nil, err
+	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+		var authErr *auth.Error
+		if errors.As(err, &authErr) {
+			// Determinate: bad credentials. Secret is invalid, not a verification failure.
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

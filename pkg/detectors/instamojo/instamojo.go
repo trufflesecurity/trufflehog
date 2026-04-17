@@ -72,14 +72,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					bodyBytes, err := io.ReadAll(res.Body)
 					if err != nil {
-						continue
-					}
-					body := string(bodyBytes)
-					if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "access_token") {
-						s1.Verified = true
-					} else {
-						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 						s1.SetVerificationError(err, resSecret)
+					} else {
+						body := string(bodyBytes)
+						if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "access_token") {
+							s1.Verified = true
+						} else {
+							err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+							s1.SetVerificationError(err, resSecret)
+						}
 					}
 				} else {
 					s1.SetVerificationError(err, resSecret)

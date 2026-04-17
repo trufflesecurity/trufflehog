@@ -56,13 +56,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
-				}
-				validResponse := json.Valid(bodyBytes)
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					validResponse := json.Valid(bodyBytes)
 
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
-					s1.Verified = true
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
+						s1.Verified = true
+					}
 				}
 			}
 		}

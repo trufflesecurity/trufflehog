@@ -68,14 +68,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				req, err := constructRequest(ctx, resSecretMatch, resMatch)
 				if err != nil {
-					continue
-				}
-
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
+					s1.SetVerificationError(err, resSecretMatch)
+				} else {
+					res, err := client.Do(req)
+					if err != nil {
+						s1.SetVerificationError(err, resSecretMatch)
+					} else {
+						defer res.Body.Close()
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							s1.Verified = true
+						}
 					}
 				}
 			}

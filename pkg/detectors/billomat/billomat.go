@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueAPIKeys[match[1]] = struct{}{}
 	}
 
+	invalidIDs := make(map[string]struct{})
 	for apiKey := range uniqueAPIKeys {
 		for id := range uniqueIDs {
 			s1 := detectors.Result{
@@ -69,16 +70,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyBillomat(ctx, client, id, apiKey)
-				s1.Verified = isVerified
-				if verificationErr != nil {
-					// remove the account ID if not found to prevent reuse during other API key checks.
-					if errors.Is(verificationErr, errAccountIDNotFound) {
-						delete(uniqueIDs, id)
-						continue
+				if _, skip := invalidIDs[id]; skip {
+					s1.SetVerificationError(errAccountIDNotFound, apiKey)
+				} else {
+					isVerified, verificationErr := verifyBillomat(ctx, client, id, apiKey)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						if errors.Is(verificationErr, errAccountIDNotFound) {
+							invalidIDs[id] = struct{}{}
+						}
+						s1.SetVerificationError(verificationErr, apiKey)
 					}
-
-					s1.SetVerificationError(verificationErr, apiKey)
 				}
 			}
 
