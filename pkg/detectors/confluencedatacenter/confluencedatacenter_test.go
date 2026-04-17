@@ -20,9 +20,10 @@ import (
 const (
 	validPAT1 = "NTk3MjQzOTIyNTAwOtFOuTsHRIp1E81GApKpC2xpEzfz"
 	validPAT2 = "NDc4MjM3OTUxMzk2OopoSkTDTnBcWIw0Wa4bico9zOLK"
-	// 44-char base64 that decodes to bytes NOT matching "<digits>:...". Used
-	// to exercise the structural post-filter.
-	nonStructural = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	// 44-char base64 that passes tokenPat (leading [MNO]) but decodes to
+	// bytes with no colon, so it must be rejected by isStructuralPAT rather
+	// than by the regex. Exercises the structural post-filter's reject path.
+	nonStructural = "MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 )
 
 func TestConfluenceDataCenter_Pattern(t *testing.T) {
