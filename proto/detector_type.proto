@@ -1047,4 +1047,5 @@ enum DetectorType {
   DatadogApikey = 1043;
   ShopifyOAuth = 1044;
   BitbucketDataCenter = 1045;
+  JiraDataCenterPAT = 1046;
 }
