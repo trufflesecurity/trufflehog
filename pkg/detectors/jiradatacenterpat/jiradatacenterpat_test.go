@@ -38,28 +38,28 @@ func TestJiraDataCenterPAT_Pattern(t *testing.T) {
 		{
 			name:  "valid PAT",
 			input: `jira_token: NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M`,
-			want:  []string{"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6Mhttps://jira.example.com"},
+			want:  []string{"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M:https://jira.example.com"},
 		},
 		{
 			name:  "URL found near jira keyword",
 			input: `# jira server: http://jira.internal:8080` + "\n" + `jira token: NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M`,
 			want: []string{
-				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6Mhttp://jira.internal:8080",
-				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6Mhttps://jira.example.com",
+				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M:http://jira.internal:8080",
+				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M:https://jira.example.com",
 			},
 		},
 		{
 			name:  "URL found near atlassian keyword",
 			input: `# atlassian server: http://jira.internal:8080` + "\n" + `atlassian token: NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M`,
 			want: []string{
-				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6Mhttp://jira.internal:8080",
-				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6Mhttps://jira.example.com",
+				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M:http://jira.internal:8080",
+				"NTg4OTI1Mzk1OTA1OiBb9S4WPEoK6cmOe6pq6VO0lt6M:https://jira.example.com",
 			},
 		},
 		{
 			name:  "valid PAT ending with +",
 			input: `jira_token: MzE3MjgzNDMyNTczOmTaXorACdDy8aVJU6FotdRcz2y+`,
-			want:  []string{"MzE3MjgzNDMyNTczOmTaXorACdDy8aVJU6FotdRcz2y+https://jira.example.com"},
+			want:  []string{"MzE3MjgzNDMyNTczOmTaXorACdDy8aVJU6FotdRcz2y+:https://jira.example.com"},
 		},
 		{
 			name:  "not a match - invalid first character",

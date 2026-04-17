@@ -87,8 +87,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
-				RawV2:        []byte(token + endpoint),
+				RawV2:        []byte(token + ":" + endpoint),
 				Redacted:     token[:3] + "..." + token[len(token)-3:],
+				ExtraData: map[string]string{
+					"endpoint": endpoint,
+				},
 			}
 
 			if verify {
