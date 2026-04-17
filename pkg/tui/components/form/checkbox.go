@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/theme"
 )
@@ -90,7 +89,8 @@ func (c *CheckboxField) View() string {
 		b.WriteString("    " + styles.Hint.Render(c.spec.Help))
 		b.WriteString("\n")
 	}
-	return lipgloss.NewStyle().MarginBottom(1).Render(b.String())
+	b.WriteString("\n")
+	return b.String()
 }
 
 // Error returns the most recent validation error.
