@@ -2,9 +2,9 @@ package theme
 
 import "github.com/charmbracelet/bubbles/key"
 
-// KeyMap is the trimmed replacement for pkg/tui/keymap.KeyMap.
-//
-// Only bindings actually observed in the TUI live here.
+// KeyMap is the set of bindings the TUI listens for. Only bindings actually
+// observed somewhere in the tree live here; adding a binding that nothing
+// matches is a signal to delete it rather than keep it around.
 type KeyMap struct {
 	// Quit closes the TUI at any depth via ctrl+c.
 	Quit key.Binding
