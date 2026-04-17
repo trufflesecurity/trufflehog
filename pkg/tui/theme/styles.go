@@ -2,10 +2,9 @@ package theme
 
 import "github.com/charmbracelet/lipgloss"
 
-// Styles is the consolidated replacement for pkg/tui/styles.Styles.
-//
-// Only fields actually rendered somewhere in the TUI live here. If you find
-// yourself adding a field that isn't rendered on-screen, delete it instead.
+// Styles is the style sheet the TUI renders with. Only fields actually
+// rendered somewhere live here; if you find yourself adding a field that
+// isn't rendered on-screen, delete it instead.
 type Styles struct {
 	// App is applied once at the router level; every page view is rendered
 	// inside its frame.

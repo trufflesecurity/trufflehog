@@ -21,10 +21,11 @@ import (
 // ID is the stable page id.
 const ID = app.PageSourceConfig
 
-// Data is the payload passed via PushMsg to seed the page. SourceTitle is
-// resolved through sources.ByTitle.
+// Data is the payload passed via PushMsg to seed the page. SourceID is the
+// registry id (e.g. "github", "gcs"); the source picker is expected to have
+// resolved the user's selection before pushing.
 type Data struct {
-	SourceTitle string
+	SourceID string
 }
 
 type tabIndex int
@@ -60,7 +61,7 @@ type Page struct {
 // the registry the page renders a "not found" error and nothing else.
 func New(styles *theme.Styles, keymap *theme.KeyMap, data any) *Page {
 	d, _ := data.(Data)
-	def, ok := sources.ByTitle(d.SourceTitle)
+	def, ok := sources.Get(d.SourceID)
 	if !ok {
 		return &Page{styles: styles, keymap: keymap, unknown: true}
 	}

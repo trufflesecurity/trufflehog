@@ -3,7 +3,6 @@ package sources
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
 )
@@ -94,17 +93,3 @@ func All() []Definition {
 	return out
 }
 
-// ByTitle looks up a Definition by its Title (case-insensitive).
-//
-// Kept for compatibility with source_select's title-based dispatch; once
-// source-picker switches to IDs in phase 4 this helper becomes unused and
-// can be removed.
-func ByTitle(title string) (Definition, bool) {
-	want := strings.ToLower(strings.TrimSpace(title))
-	for _, d := range registry {
-		if strings.ToLower(d.Title) == want {
-			return d, true
-		}
-	}
-	return Definition{}, false
-}

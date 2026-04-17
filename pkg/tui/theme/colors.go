@@ -7,11 +7,8 @@ package theme
 
 import "github.com/charmbracelet/lipgloss"
 
-// Named palette. These are the only colors the TUI is allowed to use.
-//
-// The names follow the existing TruffleHog marketing palette that used to live
-// in pkg/tui/styles; anything not listed here must be added before it can be
-// used.
+// Named palette. These are the only colors the TUI is allowed to use; the
+// names follow the TruffleHog marketing palette.
 var (
 	Softblack = lipgloss.Color("#1e1e1e")
 	Charcoal  = lipgloss.Color("#252525")

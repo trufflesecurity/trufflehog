@@ -123,7 +123,7 @@ func (p *Page) choose() tea.Cmd {
 	}
 	return func() tea.Msg {
 		return app.PushMsg{ID: app.PageSourceConfig, Data: sourceconfig.Data{
-			SourceTitle: selected.def.Title,
+			SourceID: selected.def.ID,
 		}}
 	}
 }
