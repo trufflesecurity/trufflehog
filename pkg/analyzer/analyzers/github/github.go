@@ -114,16 +114,17 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 	}
 	var bindings []analyzers.Binding
 	for _, repo := range repos {
-		// A repo without an owner cannot be attributed; skip it rather than
-		// producing a corrupt parent resource with empty name/FQN.
-		if repo.GetOwner() == nil {
-			continue
+		// A repo has identity independent of its owner (name/full_name); if the
+		// owner is absent we still emit the repo but leave Parent unset.
+		var parent *analyzers.Resource
+		if owner := repo.GetOwner(); owner != nil {
+			parent = userToResource(owner)
 		}
 		resource := analyzers.Resource{
 			Name:               repo.GetName(),
 			FullyQualifiedName: fmt.Sprintf("github.com/%s", repo.GetFullName()),
 			Type:               "repository",
-			Parent:             userToResource(repo.Owner),
+			Parent:             parent,
 		}
 		bindings = append(bindings, analyzers.BindAllPermissions(resource, perms...)...)
 	}

@@ -95,6 +95,84 @@ func TestSecretInfoToGistBindings(t *testing.T) {
 	}
 }
 
+// TestSecretInfoToRepoBindings verifies that a repo with a nil Owner is still
+// emitted (with Parent left unset) rather than skipped, since a repo has
+// identity independent of its owner.
+func TestSecretInfoToRepoBindings(t *testing.T) {
+	owner := makeOwner("truffle-sandbox", "User")
+	scope := []analyzers.Permission{{Value: "repo"}}
+
+	tests := []struct {
+		name          string
+		repos         []*gh.Repository
+		wantLen       int
+		wantFQNs      []string
+		wantParentNil []bool // parallel to wantFQNs
+	}{
+		{
+			name: "valid repo produces binding with populated parent",
+			repos: []*gh.Repository{
+				{Name: strPtr("my-repo"), FullName: strPtr("truffle-sandbox/my-repo"), Owner: owner},
+			},
+			wantLen:       1,
+			wantFQNs:      []string{"github.com/truffle-sandbox/my-repo"},
+			wantParentNil: []bool{false},
+		},
+		{
+			name: "nil owner: repo is still included with nil parent",
+			repos: []*gh.Repository{
+				{Name: strPtr("my-repo"), FullName: strPtr("truffle-sandbox/my-repo"), Owner: nil},
+			},
+			wantLen:       1,
+			wantFQNs:      []string{"github.com/truffle-sandbox/my-repo"},
+			wantParentNil: []bool{true},
+		},
+		{
+			name: "mix of valid and nil-owner repos: both included, parent populated only for valid",
+			repos: []*gh.Repository{
+				{Name: strPtr("my-repo"), FullName: strPtr("truffle-sandbox/my-repo"), Owner: owner},
+				{Name: strPtr("other"), FullName: strPtr("truffle-sandbox/other"), Owner: nil},
+			},
+			wantLen:       2,
+			wantFQNs:      []string{"github.com/truffle-sandbox/my-repo", "github.com/truffle-sandbox/other"},
+			wantParentNil: []bool{false, true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := &githubcommon.SecretInfo{
+				Metadata: &githubcommon.TokenMetadata{
+					Type:        githubcommon.TokenTypeClassicPAT,
+					OauthScopes: scope,
+				},
+				Repos: tt.repos,
+			}
+			got := secretInfoToRepoBindings(info)
+			if len(got) != tt.wantLen {
+				t.Errorf("got %d bindings, want %d", len(got), tt.wantLen)
+			}
+			for i, fqn := range tt.wantFQNs {
+				if i >= len(got) {
+					break
+				}
+				if got[i].Resource.FullyQualifiedName != fqn {
+					t.Errorf("binding[%d].FullyQualifiedName = %q, want %q", i, got[i].Resource.FullyQualifiedName, fqn)
+				}
+			}
+			for i, wantNil := range tt.wantParentNil {
+				if i >= len(got) {
+					break
+				}
+				gotNil := got[i].Resource.Parent == nil
+				if gotNil != wantNil {
+					t.Errorf("binding[%d].Parent nil = %v, want %v", i, gotNil, wantNil)
+				}
+			}
+		})
+	}
+}
+
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
