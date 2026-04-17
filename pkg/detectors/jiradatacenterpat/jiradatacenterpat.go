@@ -89,9 +89,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(token),
 				RawV2:        []byte(token + ":" + endpoint),
 				Redacted:     token[:3] + "..." + token[len(token)-3:],
-				ExtraData: map[string]string{
-					"endpoint": endpoint,
-				},
 			}
 
 			if verify {
@@ -146,7 +143,9 @@ func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) 
 			// 200 confirms the token is valid; failing to decode only means we can't extract extra data.
 			return true, nil, nil
 		}
-		extraData := map[string]string{}
+		extraData := map[string]string{
+			"endpoint": baseURL,
+		}
 		if name, ok := result["displayName"].(string); ok {
 			extraData["display_name"] = name
 		}

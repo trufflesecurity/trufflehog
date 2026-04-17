@@ -164,6 +164,7 @@ func TestJiraDataCenterPAT_FromData(t *testing.T) {
 					JSON(map[string]any{
 						"displayName":  "Test User",
 						"emailAddress": "test@example.com",
+						"endpoint":     testEndpoint,
 					})
 			},
 			data:         fmt.Sprintf("jira token: %s", testToken),
@@ -173,6 +174,7 @@ func TestJiraDataCenterPAT_FromData(t *testing.T) {
 			wantExtraData: map[string]string{
 				"display_name":  "Test User",
 				"email_address": "test@example.com",
+				"endpoint":      testEndpoint,
 			},
 		},
 		{
