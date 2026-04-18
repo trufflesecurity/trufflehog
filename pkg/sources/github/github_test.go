@@ -1310,3 +1310,88 @@ func TestExtractRepoNameFromURL(t *testing.T) {
 		})
 	}
 }
+
+func TestSource_ExcludeArchivedRepositories(t *testing.T) {
+	tests := []struct {
+		name            string
+		excludeArchived bool
+		reposJSON       string
+		wantRepoCount   int
+		wantRepos       []string
+	}{
+		{
+			name:            "exclude archived repos when flag is true",
+			excludeArchived: true,
+			reposJSON: `[
+				{"full_name": "test-org/active-repo", "clone_url": "https://github.com/test-org/active-repo.git", "size": 1, "archived": false},
+				{"full_name": "test-org/archived-repo", "clone_url": "https://github.com/test-org/archived-repo.git", "size": 1, "archived": true},
+				{"full_name": "test-org/another-active", "clone_url": "https://github.com/test-org/another-active.git", "size": 1, "archived": false}
+			]`,
+			wantRepoCount: 2, // Only non-archived
+			wantRepos:     []string{"test-org/active-repo", "test-org/another-active"},
+		},
+		{
+			name:            "include archived repos when flag is false",
+			excludeArchived: false,
+			reposJSON: `[
+				{"full_name": "test-org/active-repo", "clone_url": "https://github.com/test-org/active-repo.git", "size": 1, "archived": false},
+				{"full_name": "test-org/archived-repo", "clone_url": "https://github.com/test-org/archived-repo.git", "size": 1, "archived": true},
+				{"full_name": "test-org/another-active", "clone_url": "https://github.com/test-org/another-active.git", "size": 1, "archived": false}
+			]`,
+			wantRepoCount: 3, // All repos
+			wantRepos:     []string{"test-org/active-repo", "test-org/archived-repo", "test-org/another-active"},
+		},
+		{
+			name:            "handle all archived repos",
+			excludeArchived: true,
+			reposJSON: `[
+				{"full_name": "test-org/archived-1", "clone_url": "https://github.com/test-org/archived-1.git", "size": 1, "archived": true},
+				{"full_name": "test-org/archived-2", "clone_url": "https://github.com/test-org/archived-2.git", "size": 1, "archived": true}
+			]`,
+			wantRepoCount: 0, // None included
+			wantRepos:     []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+
+			gock.New("https://api.github.com").
+				Get("/orgs/test-org/repos").
+				Reply(200).
+				JSON(tt.reposJSON)
+
+			s := initTestSource(&sourcespb.GitHub{
+				Credential: &sourcespb.GitHub_Token{
+					Token: "test-token",
+				},
+				ExcludeArchived: tt.excludeArchived,
+			})
+
+			err := s.getReposByOrg(context.Background(), "test-org", noopReporter())
+			assert.Nil(t, err)
+			assert.Equal(t, tt.wantRepoCount, s.filteredRepoCache.Count())
+
+			// Verify expected repos are in cache
+			for _, repo := range tt.wantRepos {
+				ok := s.filteredRepoCache.Exists(repo)
+				assert.True(t, ok, "expected repo %s to be in cache", repo)
+			}
+
+			// Verify archived repos are NOT in cache when excluding
+			if tt.excludeArchived {
+				allRepos := []string{"test-org/archived-repo", "test-org/archived-1", "test-org/archived-2"}
+				for _, repo := range allRepos {
+					if !slices.Contains(tt.wantRepos, repo) {
+						ok := s.filteredRepoCache.Exists(repo)
+						assert.False(t, ok, "archived repo %s should not be in cache when excluding", repo)
+					}
+				}
+			}
+
+			assert.False(t, gock.HasUnmatchedRequest())
+			assert.True(t, gock.IsDone())
+		})
+	}
+}

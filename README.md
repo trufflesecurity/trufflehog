@@ -212,7 +212,13 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 trufflehog github --org=trufflesecurity --results=verified
 ```
 
-## 3: Scan a GitHub Repo for only verified secrets and get JSON output
+## 3: Scan a GitHub Org excluding archived repositories
+
+```bash
+trufflehog github --org=trufflesecurity --exclude-archived
+```
+
+## 4: Scan a GitHub Repo for only verified secrets and get JSON output
 
 Command:
 
@@ -227,37 +233,37 @@ Expected output:
 ...
 ```
 
-## 4: Scan a GitHub Repo + its Issues and Pull Requests
+## 5: Scan a GitHub Repo + its Issues and Pull Requests
 
 ```bash
 trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
 ```
 
-## 5: Scan an S3 bucket for high-confidence results (verified + unknown)
+## 6: Scan an S3 bucket for high-confidence results (verified + unknown)
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --results=verified,unknown
 ```
 
-## 6: Scan S3 buckets using IAM Roles
+## 7: Scan S3 buckets using IAM Roles
 
 ```bash
 trufflehog s3 --role-arn=<iam role arn>
 ```
 
-## 7: Scan a Github Repo using SSH authentication in Docker
+## 8: Scan a Github Repo using SSH authentication in Docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
-## 8: Scan individual files or directories
+## 9: Scan individual files or directories
 
 ```bash
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 9: Scan a local git repo
+## 10: Scan a local git repo
 
 Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
 ```bash
@@ -271,13 +277,13 @@ trufflehog git file://test_keys --results=verified,unknown
 
 To guard against malicious git configs in local scanning (see CVE-2025-41390), TruffleHog clones local git repositories to a temporary directory prior to scanning. This follows [Git's security best practices](https://git-scm.com/docs/git#_security). If you want to specify a custom path to clone the repository to (instead of tmp), you can use the `--clone-path` flag. If you'd like to skip the local cloning process and scan the repository directly (only do this for trusted repos), you can use the `--trust-local-git-config` flag.
 
-## 10: Scan GCS buckets for only verified secrets
+## 11: Scan GCS buckets for only verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified
 ```
 
-## 11: Scan a Docker image for only verified secrets
+## 12: Scan a Docker image for only verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -292,7 +298,7 @@ trufflehog docker --image docker://new_image:tag --results=verified
 trufflehog docker --image file://path_to_image.tar --results=verified
 ```
 
-## 12: Scan in CI
+## 13: Scan in CI
 
 Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
 
@@ -300,7 +306,7 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 trufflehog git file://. --since-commit main --branch feature-1 --results=verified,unknown --fail
 ```
 
-## 13: Scan a Postman workspace
+## 14: Scan a Postman workspace
 
 Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
@@ -308,13 +314,13 @@ Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple time
 trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
-## 14: Scan a Jenkins server
+## 15: Scan a Jenkins server
 
 ```bash
 trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
 ```
 
-## 15: Scan an Elasticsearch server
+## 16: Scan an Elasticsearch server
 
 ### Scan a Local Cluster
 
@@ -342,7 +348,7 @@ trufflehog elasticsearch \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
 ```
 
-## 16. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+## 17. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
 
 The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
 
@@ -356,7 +362,7 @@ In addition to the normal TruffleHog output, the `--object-discovery` flag creat
 
 For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github).
 
-## 17. Scan Hugging Face
+## 18. Scan Hugging Face
 
 ### Scan a Hugging Face Model, Dataset or Space
 
@@ -378,7 +384,7 @@ trufflehog huggingface --org <orgname> --user <username>
 trufflehog huggingface --model <model_id> --include-discussions --include-prs
 ```
 
-## 18. Scan stdin Input
+## 19. Scan stdin Input
 
 ```bash
 aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
