@@ -1,50 +1,33 @@
 package docker
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type dockerCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetFields() dockerCmdModel {
-	images := textinputs.InputConfig{
-		Label:       "Docker image(s)",
-		Key:         "images",
-		Required:    true,
-		Help:        "Separate by space if multiple.",
-		Placeholder: "trufflesecurity/secrets",
+// Definition returns the docker source configuration.
+//
+// The user enters one or more image references separated by whitespace; the
+// form emits one --image=<value> per image, matching the original behavior.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "docker",
+		Title:       "Docker",
+		Description: "Scan a Docker instance, a containerized application.",
+		Tier:        sources.TierOSS,
+		Command:     "docker",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "image",
+				Label:       "Docker image(s)",
+				Help:        "Separate by space if multiple.",
+				Kind:        form.KindText,
+				Placeholder: "trufflesecurity/secrets",
+				Emit:        form.EmitRepeatedLongFlagEq,
+				Validators:  []form.Validate{form.Required()},
+			},
+		},
 	}
-
-	return dockerCmdModel{textinputs.New([]textinputs.InputConfig{images})}
-}
-
-func (m dockerCmdModel) Cmd() string {
-
-	var command []string
-	command = append(command, "trufflehog", "docker")
-
-	inputs := m.GetInputs()
-	vals := inputs["images"].Value
-
-	if vals != "" {
-		images := strings.Fields(vals)
-		for _, image := range images {
-			command = append(command, "--image="+image)
-		}
-	}
-
-	return strings.Join(command, " ")
-}
-
-func (m dockerCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-	keys := []string{"images"}
-
-	return common.SummarizeSource(keys, inputs, labels)
 }
