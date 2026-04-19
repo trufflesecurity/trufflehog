@@ -19,6 +19,7 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (source
 		ExcludePaths:  c.ExcludePaths,
 		Namespace:     c.Namespace,
 		RegistryToken: c.RegistryToken,
+		Registry:      c.Registry,
 	}
 
 	switch {
