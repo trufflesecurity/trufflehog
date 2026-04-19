@@ -721,6 +721,67 @@ func TestGitConfigSanitization(t *testing.T) {
 	}
 }
 
+func TestScanRepo_ShallowLocalCloneWithBranchBaseRef(t *testing.T) {
+	ctx := context.Background()
+
+	sourceRepoPath := setupTestRepo(t, "source-repo")
+	assert.NoError(t, exec.Command("git", "-C", sourceRepoPath, "branch", "-M", "main").Run())
+	addTestFileAndCommit(t, sourceRepoPath, "base.txt", "base one")
+	addTestFileAndCommit(t, sourceRepoPath, "base.txt", "base two")
+
+	assert.NoError(t, exec.Command("git", "-C", sourceRepoPath, "checkout", "-b", "feature").Run())
+	addTestFileAndCommit(t, sourceRepoPath, "feature.txt", "feature secret\nsecret: AKIA1234567890123456\n")
+	assert.NoError(t, exec.Command("git", "-C", sourceRepoPath, "checkout", "main").Run())
+	addTestFileAndCommit(t, sourceRepoPath, "main.txt", "main only")
+
+	originRepoPath := filepath.Join(t.TempDir(), "origin.git")
+	assert.NoError(t, exec.Command("git", "clone", "--bare", sourceRepoPath, originRepoPath).Run())
+
+	ciRepoPath := filepath.Join(t.TempDir(), "ci-repo")
+	assert.NoError(t, exec.Command("git", "clone", "--depth=1", "--branch", "feature", "file://"+originRepoPath, ciRepoPath).Run())
+	assert.NoError(t, exec.Command("git", "-C", ciRepoPath, "fetch", "--depth=1", "origin", "main:main").Run())
+
+	preparedRepoPath, _, err := prepareRepoSinceCommit(ctx, "file://"+ciRepoPath, "", "main", false, false)
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		if preparedRepoPath != "" && preparedRepoPath != ciRepoPath {
+			_ = os.RemoveAll(preparedRepoPath)
+		}
+	})
+
+	repo, err := RepoFromPath(preparedRepoPath)
+	assert.NoError(t, err)
+
+	scanner := NewGit(&Config{
+		Concurrency: 1,
+		SourceMetadataFunc: func(SourceMetadataInfo) *source_metadatapb.MetaData {
+			return nil
+		},
+	})
+	reporter := &sourcestest.TestReporter{}
+	scanOptions := NewScanOptions(
+		ScanOptionBaseHash("main"),
+		ScanOptionHeadCommit("feature"),
+	)
+
+	err = scanner.ScanRepo(ctx, repo, preparedRepoPath, scanOptions, reporter)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, reporter.Chunks)
+	assert.Empty(t, reporter.ChunkErrs)
+
+	var (
+		foundFeatureContent bool
+		foundMainOnly       bool
+	)
+	for _, chunk := range reporter.Chunks {
+		data := string(chunk.Data)
+		foundFeatureContent = foundFeatureContent || strings.Contains(data, "feature secret")
+		foundMainOnly = foundMainOnly || strings.Contains(data, "main only")
+	}
+	assert.True(t, foundFeatureContent)
+	assert.False(t, foundMainOnly)
+}
+
 func TestGitConfigSanitizationWithBareRepo(t *testing.T) {
 	t.Parallel()
 
