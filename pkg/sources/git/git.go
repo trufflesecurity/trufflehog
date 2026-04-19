@@ -1217,6 +1217,12 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 	// If baseCommit is an ancestor of headCommit, update c.BaseRef to be the common ancestor.
 	mergeBase, err := headCommit.MergeBase(baseCommit)
 	if err != nil {
+		// Shallow local clones can omit the common ancestor object even when git can still
+		// enumerate the head-side commits to scan. In that case, keep the resolved base ref
+		// instead of aborting the scan entirely.
+		if errors.Is(err, plumbing.ErrObjectNotFound) {
+			return nil
+		}
 		return fmt.Errorf("unable to resolve merge base: %w", err)
 	}
 	if len(mergeBase) == 0 {
