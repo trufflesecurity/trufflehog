@@ -30,6 +30,7 @@ message VerifierConfig {
   bool unsafe = 2;
   repeated string headers = 3;
   repeated string successRanges = 4;
+  repeated string rotatedRanges = 5;
 }
 
 message ValidationConfig {
