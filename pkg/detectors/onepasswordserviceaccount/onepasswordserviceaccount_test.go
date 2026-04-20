@@ -11,6 +11,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
+var validToken = "ops_eyJzaWduSW5BZGRyZXNzIjoiZXhhbXBsZS4xcGFzc3dvcmQuY29tIiwidXNlckF1dGgiOnsibWV0aG9kIjoiU1JQZy00MDk2IiwiYWxnIjoiUEJFUzJnLUhTMjU2In19"
+
 func TestOnepasswordServiceAccount_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -22,18 +24,27 @@ func TestOnepasswordServiceAccount_Pattern(t *testing.T) {
 		{
 			name: "valid pattern",
 			input: `
-				[INFO] Sending request to the ops API
-				[DEBUG] Using Key=ops_abcdefghijklmnopqrstuvwxyzABCDEF
+				[INFO] Connecting to 1Password vault
+				[DEBUG] Using token: ` + validToken + `
 				[INFO] Response received: 200 OK
 			`,
-			want: []string{ "ops_abcdefghijklmnopqrstuvwxyzABCDEF" },
+			want: []string{validToken},
 		},
 		{
-			name: "invalid pattern",
+			name: "invalid pattern - wrong prefix",
 			input: `
-				[INFO] Sending request to the ops API
-				[DEBUG] Using Key=ops_!!invalid!!abcdefghij
-				[ERROR] Response received: 401 UnAuthorized
+				[INFO] Connecting to 1Password vault
+				[DEBUG] Using token: ops_eyJ!!invalid!!notbase64content
+				[ERROR] Response received: 401 Unauthorized
+			`,
+			want: []string{},
+		},
+		{
+			name: "invalid pattern - too short",
+			input: `
+				[INFO] Connecting to 1Password vault
+				[DEBUG] Using token: ops_eyJhbGciOiJSUzI1Ng
+				[ERROR] Response received: 401 Unauthorized
 			`,
 			want: []string{},
 		},
@@ -42,8 +53,8 @@ func TestOnepasswordServiceAccount_Pattern(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
-				t.Errorf("test %%q failed: expected keywords %%v to be found in the input", test.name, d.Keywords())
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
@@ -51,7 +62,7 @@ func TestOnepasswordServiceAccount_Pattern(t *testing.T) {
 			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				t.Errorf("mismatch in result count: expected %%d, got %%d", len(test.want), len(results))
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -70,7 +81,7 @@ func TestOnepasswordServiceAccount_Pattern(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
-				t.Errorf("%%s diff: (-want +got)\n%%s", test.name, diff)
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}
