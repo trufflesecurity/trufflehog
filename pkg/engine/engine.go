@@ -1206,7 +1206,7 @@ func (e *Engine) filterResults(
 		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
 	if e.filterUnverified || ignoreConfig {
-		results = clean(results)
+		results = clean(results, e.verify)
 	}
 
 	if e.filterEntropy != 0 {

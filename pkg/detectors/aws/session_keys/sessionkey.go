@@ -325,8 +325,8 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	}
 }
 
-func (s scanner) CleanResults(results []detectors.Result) []detectors.Result {
-	return aws.CleanResults(results)
+func (s scanner) CleanResults(results []detectors.Result, verificationEnabled bool) []detectors.Result {
+	return aws.CleanResults(results, verificationEnabled)
 }
 
 // Reference: https://nitter.poast.org/TalBeerySec/status/1816449053841838223#m
