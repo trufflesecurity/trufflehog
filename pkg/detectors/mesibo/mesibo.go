@@ -81,7 +81,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, error) {
 	// We use the `useradd` operation as a probe: a valid token will yield
 	// code 400 (bad request due to missing required user parameters, but
 	// authentication succeeded), whereas an invalid or unauthorized
-	// token will yield a different code such as 403.
+	// token will yield a different code such as 401.
 	payload, err := json.Marshal(map[string]string{"op": "useradd", "token": token})
 	if err != nil {
 		return false, fmt.Errorf("failed to marshal request payload: %w", err)
