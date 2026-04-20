@@ -1,15 +1,21 @@
 package handlers
 
 import (
+	"archive/zip"
+	"bytes"
+	stdCtx "context"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 )
 
 func TestAPKHandler(t *testing.T) {
@@ -107,4 +113,80 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 
 	err = handler.processAPK(ctx, newReader, archiveChan)
 	assert.Contains(t, err.Error(), "resources.arsc file not found")
+}
+
+// buildMinimalAPK creates a zip archive containing a minimal valid resources.arsc
+// (empty resource table with 0 packages) and the specified number of dummy XML files.
+func buildMinimalAPK(t *testing.T, fileCount int) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+
+	// Minimal resources.arsc: RES_TABLE_TYPE header with 0 packages.
+	w, err := zw.Create("resources.arsc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resArsc := []byte{
+		0x02, 0x00, // id = RES_TABLE_TYPE
+		0x0c, 0x00, // headerSize = 12
+		0x0c, 0x00, 0x00, 0x00, // totalSize = 12
+		0x00, 0x00, 0x00, 0x00, // packageCount = 0
+	}
+	if _, err := w.Write(resArsc); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < fileCount; i++ {
+		fw, err := zw.Create(fmt.Sprintf("res/layout/file_%04d.xml", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fw.Write([]byte("<xml>data</xml>")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestProcessAPK_ExitsOnContextCancellation(t *testing.T) {
+	apkData := buildMinimalAPK(t, 500)
+
+	rdr := iobuf.NewBufferedReaderSeeker(bytes.NewReader(apkData))
+	defer rdr.Close()
+
+	handler := newAPKHandler()
+	apkChan := make(chan DataOrErr, defaultBufferSize)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := handler.processAPK(context.AddLogger(ctx), fileReader{BufferedReadSeeker: rdr}, apkChan)
+	if err != stdCtx.Canceled {
+		t.Fatalf("expected context.Canceled, got: %v", err)
+	}
+}
+
+func TestProcessAPK_ExitsOnDeadlineExceeded(t *testing.T) {
+	apkData := buildMinimalAPK(t, 500)
+
+	rdr := iobuf.NewBufferedReaderSeeker(bytes.NewReader(apkData))
+	defer rdr.Close()
+
+	handler := newAPKHandler()
+	apkChan := make(chan DataOrErr, defaultBufferSize)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancel()
+	time.Sleep(time.Millisecond)
+
+	err := handler.processAPK(context.AddLogger(ctx), fileReader{BufferedReadSeeker: rdr}, apkChan)
+	if err != stdCtx.DeadlineExceeded {
+		t.Fatalf("expected context.DeadlineExceeded, got: %v", err)
+	}
 }
