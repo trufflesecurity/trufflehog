@@ -398,6 +398,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jdbc"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiradatacenterpat"
 	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
@@ -1276,6 +1277,7 @@ func buildDetectorList() []detectors.Detector {
 		&ipquality.Scanner{},
 		&ipstack.Scanner{},
 		&jdbc.Scanner{},
+		&jiradatacenterpat.Scanner{},
 		&jiratokenv1.Scanner{},
 		&jiratokenv2.Scanner{},
 		&jotform.Scanner{},
