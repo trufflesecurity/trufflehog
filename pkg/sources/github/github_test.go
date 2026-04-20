@@ -302,7 +302,7 @@ func TestAddMembersByApp(t *testing.T) {
 		Get("/app/installations").
 		Reply(200).
 		JSON([]map[string]any{
-			{"account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
+			{"id": 1337, "account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
 		})
 	gock.New("https://api.github.com").
 		Post("/app/installations/1337/access_tokens").
@@ -326,7 +326,7 @@ func TestAddMembersByApp(t *testing.T) {
 				AppId:          "4141",
 			},
 		}})
-	err := s.addMembersByApp(context.Background(), s.connector.(*appConnector).InstallationClient(), noopReporter())
+	err := s.addMembersByApp(context.Background(), s.connector.(*appConnector), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(s.memberCache))
 	_, ok := s.memberCache["ssm1"]
@@ -884,7 +884,7 @@ func TestEnumerateWithApp(t *testing.T) {
 			},
 		},
 	})
-	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector).InstallationClient(), noopReporter())
+	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(s.repos))
 	assert.False(t, gock.HasUnmatchedRequest())

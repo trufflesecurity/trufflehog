@@ -20,6 +20,8 @@ type appConnector struct {
 	graphqlClient      *githubv4.Client
 	installationClient *github.Client
 	installationID     int64
+	appsTransport      *ghinstallation.AppsTransport
+	apiEndpoint        string
 }
 
 var _ Connector = (*appConnector)(nil)
@@ -80,6 +82,8 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 		graphqlClient:      graphqlClient,
 		installationClient: installationClient,
 		installationID:     installationID,
+		appsTransport:      installationTransport,
+		apiEndpoint:        apiEndpoint,
 	}, nil
 }
 
@@ -106,4 +110,22 @@ func (c *appConnector) GraphQLClient() *githubv4.Client {
 
 func (c *appConnector) InstallationClient() *github.Client {
 	return c.installationClient
+}
+
+// APIClientForInstallation creates a GitHub API client scoped to a specific
+// installation. This is needed when a GitHub App is installed across multiple
+// orgs — each org's API calls must use that org's installation token to get
+// proper IP allowlist bypass and permission scoping.
+func (c *appConnector) APIClientForInstallation(installationID int64) (*github.Client, error) {
+	transport := ghinstallation.NewFromAppsTransport(c.appsTransport, installationID)
+	transport.BaseURL = c.apiEndpoint
+
+	httpClient := common.RetryableHTTPClientTimeout(60)
+	httpClient.Transport = transport
+
+	client, err := github.NewClient(httpClient).WithEnterpriseURLs(c.apiEndpoint, c.apiEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("could not create API client for installation %d: %w", installationID, err)
+	}
+	return client, nil
 }
