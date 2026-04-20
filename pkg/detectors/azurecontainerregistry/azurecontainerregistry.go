@@ -73,7 +73,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		passwordMatches[p] = struct{}{}
 	}
 
-EndpointLoop:
 	for username := range registryMatches {
 		for password := range passwordMatches {
 			r := detectors.Result{
@@ -85,26 +84,25 @@ EndpointLoop:
 
 			if verify {
 				if invalidHosts.Exists(username) {
-					logger.V(3).Info("Skipping invalid registry", "username", username)
-					continue EndpointLoop
-				}
-
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, verificationErr := verifyMatch(ctx, client, username, password)
-				if isVerified {
-					delete(passwordMatches, password)
-					r.Verified = true
-				}
-				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
-						invalidHosts.Set(username, struct{}{})
-						continue EndpointLoop
+					logger.V(3).Info("Skipping verification: cached no such host", "username", username)
+					r.SetVerificationError(noSuchHostErr, password)
+				} else {
+					client := s.client
+					if client == nil {
+						client = defaultClient
 					}
-					r.SetVerificationError(verificationErr, password)
+
+					isVerified, verificationErr := verifyMatch(ctx, client, username, password)
+					if isVerified {
+						delete(passwordMatches, password)
+						r.Verified = true
+					}
+					if verificationErr != nil {
+						if errors.Is(verificationErr, noSuchHostErr) {
+							invalidHosts.Set(username, struct{}{})
+						}
+						r.SetVerificationError(verificationErr, password)
+					}
 				}
 			}
 

@@ -80,12 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		return nil, nil
 	}
 
-domainLoop:
 	for domain := range uniqueInstanceMatches {
-		if invalidHosts.Exists(domain) {
-			continue domainLoop
-		}
-
 		for key := range uniqueKeyMatches {
 			for secret := range uniqueSecretMatches {
 				s1 := detectors.Result{
@@ -95,24 +90,25 @@ domainLoop:
 				}
 
 				if verify {
-					isVerified, verificationErr := s.verifyMatch(ctx, s.getClient(), domain, key, secret)
-					s1.Verified = isVerified
-					if verificationErr != nil {
-						if errors.Is(verificationErr, errNoHost) {
-							invalidHosts.Set(domain, struct{}{})
-							continue domainLoop
+					if invalidHosts.Exists(domain) {
+						s1.SetVerificationError(errNoHost, secret)
+					} else {
+						isVerified, verificationErr := s.verifyMatch(ctx, s.getClient(), domain, key, secret)
+						s1.Verified = isVerified
+						if verificationErr != nil {
+							if errors.Is(verificationErr, errNoHost) {
+								invalidHosts.Set(domain, struct{}{})
+							}
+							s1.SetVerificationError(verificationErr, secret)
 						}
 
-						s1.SetVerificationError(verificationErr, secret)
-					}
-
-					if isVerified {
-						s1.AnalysisInfo = map[string]string{
-							"domain":        domain,
-							"client_id":     key,
-							"client_secret": secret,
+						if isVerified {
+							s1.AnalysisInfo = map[string]string{
+								"domain":        domain,
+								"client_id":     key,
+								"client_secret": secret,
+							}
 						}
-
 					}
 				}
 

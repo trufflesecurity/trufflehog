@@ -55,19 +55,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					body := string(bodyBytes)
+					validResponse := strings.Contains(body, `email`) || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
+
+					// if client_id and client_secret is valid -> 403 {"error":"invalid_grant","error_description":"Invalid authorization code"}
+					// if invalid -> 401 {"error":"access_denied","error_description":"Unauthorized"}
+					// ingenious!
+
+					if validResponse {
+						s1.Verified = true
+					}
 				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, `email`) || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
-
-				// if client_id and client_secret is valid -> 403 {"error":"invalid_grant","error_description":"Invalid authorization code"}
-				// if invalid -> 401 {"error":"access_denied","error_description":"Unauthorized"}
-				// ingenious!
-
-				if validResponse {
-					s1.Verified = true
-				}
-
 			}
 		}
 

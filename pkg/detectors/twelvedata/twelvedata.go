@@ -55,18 +55,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					body := string(bodyBytes)
+
+					// if client_id and client_secret is valid -> 403 {"error":"invalid_grant","error_description":"Invalid authorization code"}
+					// if invalid -> 401 {"error":"access_denied","error_description":"Unauthorized"}
+					// ingenious!
+
+					if !strings.Contains(body, "401") {
+						s1.Verified = true
+					}
 				}
-				body := string(bodyBytes)
-
-				// if client_id and client_secret is valid -> 403 {"error":"invalid_grant","error_description":"Invalid authorization code"}
-				// if invalid -> 401 {"error":"access_denied","error_description":"Unauthorized"}
-				// ingenious!
-
-				if !strings.Contains(body, "401") {
-					s1.Verified = true
-				}
-
 			}
 		}
 

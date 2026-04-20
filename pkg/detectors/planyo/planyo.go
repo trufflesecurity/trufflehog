@@ -57,12 +57,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, "data") || strings.Contains(body, "Your Planyo site has expired")
-				if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
-					s1.Verified = true
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					body := string(bodyBytes)
+					validResponse := strings.Contains(body, "data") || strings.Contains(body, "Your Planyo site has expired")
+					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
+						s1.Verified = true
+					}
 				}
 			}
 		}

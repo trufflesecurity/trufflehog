@@ -68,12 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	// Test matches.
 	for key := range keyMatches {
 		for id := range idMatches {
-			if invalidHosts.Exists(id) {
-				logger.V(3).Info("Skipping application id: no such host", "host", id)
-				delete(idMatches, id)
-				continue
-			}
-
 			r := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AlgoliaAdminKey,
 				Raw:          []byte(key),
@@ -81,17 +75,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				// Verify if the key is a valid Algolia Admin Key.
-				isVerified, extraData, verificationErr := verifyMatch(ctx, id, key)
-				r.Verified = isVerified
-				r.ExtraData = extraData
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(id, struct{}{})
-						continue
+				if invalidHosts.Exists(id) {
+					logger.V(3).Info("Skipping verification: cached no such host", "host", id)
+					r.SetVerificationError(errNoHost, key)
+				} else {
+					// Verify if the key is a valid Algolia Admin Key.
+					isVerified, extraData, verificationErr := verifyMatch(ctx, id, key)
+					r.Verified = isVerified
+					r.ExtraData = extraData
+					if verificationErr != nil {
+						if errors.Is(verificationErr, errNoHost) {
+							invalidHosts.Set(id, struct{}{})
+						}
+						r.SetVerificationError(verificationErr, key)
 					}
-
-					r.SetVerificationError(verificationErr, key)
 				}
 			}
 

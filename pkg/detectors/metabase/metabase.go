@@ -72,9 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					body, err := io.ReadAll(res.Body)
 					if err != nil {
-						continue
-					}
-					if res.StatusCode == http.StatusOK && json.Valid(body) {
+						s1.SetVerificationError(err, resMatch)
+					} else if res.StatusCode == http.StatusOK && json.Valid(body) {
 						s1.Verified = true
 					}
 				}

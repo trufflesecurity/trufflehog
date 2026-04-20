@@ -75,24 +75,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					bodyBytes, err := io.ReadAll(res.Body)
 					if err != nil {
-						continue
-					}
-
-					defer res.Body.Close()
-
-					switch {
-					case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
-						// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
-						// we at least know the secret is verified.
-						s1.Verified = true
-					case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
-						s1.Verified = true
-					case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden:
-						// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
-						// You might want to handle this case or log it.
-					default:
-						err = fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
 						s1.SetVerificationError(err, resMatch)
+					} else {
+						defer res.Body.Close()
+
+						switch {
+						case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
+							// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
+							// we at least know the secret is verified.
+							s1.Verified = true
+						case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
+							s1.Verified = true
+						case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden:
+							// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
+							// You might want to handle this case or log it.
+						default:
+							err = fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
+							s1.SetVerificationError(err, resMatch)
+						}
 					}
 				} else {
 					s1.SetVerificationError(err, resMatch)

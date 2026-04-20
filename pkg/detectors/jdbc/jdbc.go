@@ -88,24 +88,24 @@ matchLoop:
 		if verify {
 			j, err := NewJDBC(logCtx, jdbcConn)
 			if err != nil {
-				continue
-			}
-
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-			pingRes := j.ping(ctx)
-			result.Verified = pingRes.err == nil
-			// If there's a ping error that is marked as "determinate" we throw it away. We do this because this was the
-			// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
-			// detectors to use tri-state verification.
-			if pingRes.err != nil && !pingRes.determinate {
-				err = pingRes.err
 				result.SetVerificationError(err, jdbcConn)
+			} else {
+				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				pingRes := j.ping(ctx)
+				result.Verified = pingRes.err == nil
+				// If there's a ping error that is marked as "determinate" we throw it away. We do this because this was the
+				// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
+				// detectors to use tri-state verification.
+				if pingRes.err != nil && !pingRes.determinate {
+					err = pingRes.err
+					result.SetVerificationError(err, jdbcConn)
+				}
+				result.AnalysisInfo = map[string]string{
+					"connection_string": jdbcConn,
+				}
+				// TODO: specialized redaction
 			}
-			result.AnalysisInfo = map[string]string{
-				"connection_string": jdbcConn,
-			}
-			// TODO: specialized redaction
 		}
 
 		results = append(results, result)

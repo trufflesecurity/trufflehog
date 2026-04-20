@@ -55,15 +55,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
-				}
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					bodyString := string(bodyBytes)
+					errorResponse := strings.Contains(bodyString, `"data":[]`)
 
-				bodyString := string(bodyBytes)
-				errorResponse := strings.Contains(bodyString, `"data":[]`)
-
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 && !errorResponse {
-					s1.Verified = true
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 && !errorResponse {
+						s1.Verified = true
+					}
 				}
 			}
 		}

@@ -56,16 +56,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
-				}
-				bodyString := string(bodyBytes)
-				errCode := strings.Contains(bodyString, `"code":"USER_NOT_EXIST"`)
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if errCode {
-						s1.Verified = false
-					} else {
-						s1.Verified = true
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					bodyString := string(bodyBytes)
+					errCode := strings.Contains(bodyString, `"code":"USER_NOT_EXIST"`)
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						if errCode {
+							s1.Verified = false
+						} else {
+							s1.Verified = true
+						}
 					}
 				}
 			}

@@ -63,18 +63,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					bodyBytes, err := io.ReadAll(res.Body)
 					if err != nil {
-						continue
-					}
+						s1.SetVerificationError(err, resMatch)
+					} else {
+						bodyString := string(bodyBytes)
+						validResponse := strings.Contains(bodyString, `total_result`)
 
-					bodyString := string(bodyBytes)
-					validResponse := strings.Contains(bodyString, `total_result`)
-
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						if validResponse {
-							s1.Verified = true
-						} else {
-							s1.Verified = false
+						defer res.Body.Close()
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							if validResponse {
+								s1.Verified = true
+							} else {
+								s1.Verified = false
+							}
 						}
 					}
 				}
