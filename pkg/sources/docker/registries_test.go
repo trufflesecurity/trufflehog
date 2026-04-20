@@ -210,6 +210,26 @@ func TestGenericOCIRegistryListImages_ErrorStatus(t *testing.T) {
 	assert.Nil(t, images)
 }
 
+func TestGenericOCIRegistryListImages_MalformedLinkHeader(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Link", `<ht!tp://invalid url with spaces>; rel="next"`)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"repositories":["repo1","repo2"]}`))
+	}))
+	defer server.Close()
+
+	reg := &GenericOCIRegistry{Host: server.URL[7:]}
+	reg.scheme = "http"
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "pagination failed")
+	assert.Nil(t, images)
+}
+
 func TestMakeRegistryFromHost(t *testing.T) {
 	t.Parallel()
 

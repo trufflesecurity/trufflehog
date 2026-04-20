@@ -508,7 +508,11 @@ func (g *GenericOCIRegistry) ListImages(ctx context.Context, _ string) ([]string
 
 		linkHeader := resp.Header.Get("Link")
 		if linkHeader != "" {
-			nextURL = resolveNextURL(baseURL, linkHeader)
+			var err error
+			nextURL, err = resolveNextURL(baseURL, linkHeader)
+			if err != nil {
+				return nil, fmt.Errorf("pagination failed: %w", err)
+			}
 		} else {
 			nextURL = ""
 		}
@@ -517,18 +521,18 @@ func (g *GenericOCIRegistry) ListImages(ctx context.Context, _ string) ([]string
 	return allImages, nil
 }
 
-func resolveNextURL(baseURL *url.URL, linkHeader string) string {
+func resolveNextURL(baseURL *url.URL, linkHeader string) (string, error) {
 	nextLink := parseNextLinkURL(linkHeader)
 	if nextLink == "" {
-		return ""
+		return "", nil
 	}
 
 	parsedNext, err := url.Parse(nextLink)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("failed to parse next link URL %q: %w", nextLink, err)
 	}
 
-	return baseURL.ResolveReference(parsedNext).String()
+	return baseURL.ResolveReference(parsedNext).String(), nil
 }
 
 // MakeRegistryFromHost returns a GenericOCIRegistry for the given registry host.
