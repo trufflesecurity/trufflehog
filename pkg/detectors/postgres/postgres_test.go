@@ -82,6 +82,63 @@ func TestPostgres_Pattern(t *testing.T) {
 	}
 }
 
+func TestPostgres_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+		wantDatabase string
+	}{
+		{
+			name:         "standard URI with database",
+			data:         "postgres://myuser:mypass@dbhost.example.com:5432/mydb",
+			wantHost:     "dbhost.example.com:5432",
+			wantUsername: "myuser",
+			wantDatabase: "mydb",
+		},
+		{
+			name:         "postgresql scheme",
+			data:         "postgresql://admin:secret@10.0.0.1:5433/production",
+			wantHost:     "10.0.0.1:5433",
+			wantUsername: "admin",
+			wantDatabase: "production",
+		},
+		{
+			name:         "without database",
+			data:         "postgres://sN19x:d7N8bs@1.2.3.4:5432?sslmode=require",
+			wantHost:     "1.2.3.4:5432",
+			wantUsername: "sN19x",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{detectLoopback: true}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if len(results) == 0 {
+				t.Fatal("expected at least one result")
+			}
+			r := results[0]
+			if got := r.ExtraData["host"]; got != tt.wantHost {
+				t.Errorf("ExtraData[host] = %q, want %q", got, tt.wantHost)
+			}
+			if got := r.ExtraData["username"]; got != tt.wantUsername {
+				t.Errorf("ExtraData[username] = %q, want %q", got, tt.wantUsername)
+			}
+			if got := r.ExtraData["database"]; got != tt.wantDatabase {
+				t.Errorf("ExtraData[database] = %q, want %q", got, tt.wantDatabase)
+			}
+			if _, ok := r.ExtraData["sslmode"]; !ok {
+				t.Error("ExtraData[sslmode] should still be present")
+			}
+		})
+	}
+}
+
 func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
 	s := New(
 		WithIgnorePattern([]string{

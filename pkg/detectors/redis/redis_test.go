@@ -22,6 +22,59 @@ var (
 	keyword           = "redis"
 )
 
+func TestRedis_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+	}{
+		{
+			name:         "standard redis URI",
+			data:         `redis://myuser:mysecretpass@redis.example.com:6379/0`,
+			wantHost:     "redis.example.com:6379",
+			wantUsername: "myuser",
+		},
+		{
+			name:         "redis URI with default username",
+			data:         `redis://default:mysecretpass@redis.example.com:6379`,
+			wantHost:     "redis.example.com:6379",
+			wantUsername: "default",
+		},
+		{
+			name:     "azure redis pattern without username",
+			data:     `mycache.redis.cache.windows.net:6380,password=Xcc3S9d7And6aMdfOcUc0acHJh3CiDh3l9DsapNwGwyS,ssl=True,abortConnect=False`,
+			wantHost: "mycache.redis.cache.windows.net:6380",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if len(results) == 0 {
+				t.Fatal("expected at least one result")
+			}
+			r := results[0]
+			if got := r.ExtraData["host"]; got != tt.wantHost {
+				t.Errorf("ExtraData[host] = %q, want %q", got, tt.wantHost)
+			}
+			if tt.wantUsername != "" {
+				if got := r.ExtraData["username"]; got != tt.wantUsername {
+					t.Errorf("ExtraData[username] = %q, want %q", got, tt.wantUsername)
+				}
+			} else {
+				if got, ok := r.ExtraData["username"]; ok {
+					t.Errorf("ExtraData[username] should be absent, got %q", got)
+				}
+			}
+		})
+	}
+}
+
 func TestRedisIntegration_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})

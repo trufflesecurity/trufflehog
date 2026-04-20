@@ -151,6 +151,92 @@ func TestJdbc_Pattern(t *testing.T) {
 	}
 }
 
+func TestJdbc_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+		wantDatabase string
+	}{
+		{
+			name:         "mysql with basic auth",
+			data:         `jdbc:mysql://root:password@localhost:3306/testdb`,
+			wantHost:     "tcp(localhost:3306)",
+			wantUsername: "root",
+			wantDatabase: "testdb",
+		},
+		{
+			name:         "postgresql with basic auth",
+			data:         `jdbc:postgresql://postgres:secret@dbhost:5432/mydb`,
+			wantHost:     "dbhost:5432",
+			wantUsername: "postgres",
+			wantDatabase: "mydb",
+		},
+		{
+			name:         "sqlserver with semicolon params",
+			data:         `jdbc:sqlserver://server.example.com:1433;database=testdb;user=sa;password=Pass123`,
+			wantHost:     "server.example.com:1433",
+			wantUsername: "sa",
+			wantDatabase: "testdb",
+		},
+		{
+			name:         "mysql with query params for credentials",
+			data:         `jdbc:mysql://dbhost:3307/testdb?user=admin&password=secret`,
+			wantHost:     "tcp(dbhost:3307)",
+			wantUsername: "admin",
+			wantDatabase: "testdb",
+		},
+		{
+			name:         "postgresql with query params for credentials",
+			data:         `jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser`,
+			wantHost:     "localhost:1521",
+			wantUsername: "testuser",
+			wantDatabase: "testdb",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if len(results) == 0 {
+				t.Fatal("expected at least one result")
+			}
+			r := results[0]
+			if got := r.ExtraData["host"]; got != tt.wantHost {
+				t.Errorf("ExtraData[host] = %q, want %q", got, tt.wantHost)
+			}
+			if got := r.ExtraData["username"]; got != tt.wantUsername {
+				t.Errorf("ExtraData[username] = %q, want %q", got, tt.wantUsername)
+			}
+			if got := r.ExtraData["database"]; got != tt.wantDatabase {
+				t.Errorf("ExtraData[database] = %q, want %q", got, tt.wantDatabase)
+			}
+		})
+	}
+}
+
+func TestJdbc_ExtraData_UnsupportedSubprotocol(t *testing.T) {
+	// For unsupported subprotocols (e.g., sqlite), ExtraData should be nil
+	// because we can't parse connection info, but the result should still be returned.
+	s := Scanner{}
+	results, err := s.FromData(context.Background(), false, []byte(`jdbc:sqlite:/data/test.db`))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected at least one result")
+	}
+	r := results[0]
+	if r.ExtraData != nil {
+		t.Errorf("expected nil ExtraData for unsupported subprotocol, got %v", r.ExtraData)
+	}
+}
+
 func TestJdbc_FromDataWithIgnorePattern(t *testing.T) {
 	type args struct {
 		ctx    context.Context
