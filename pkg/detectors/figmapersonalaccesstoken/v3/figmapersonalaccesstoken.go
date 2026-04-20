@@ -21,19 +21,19 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int { return 1 }
+func (Scanner) Version() int { return 3 }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b([0-9]{6}-[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
+	keyPat        = regexp.MustCompile(`(figp_[a-zA-Z0-9_=-]{40,54})`)
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"figma"}
+	return []string{"figp_"}
 }
 
 func (s Scanner) Description() string {
-	return "Figma is a web-based design tool. Personal Access Tokens can be used to access and modify design files and other resources."
+	return "Figma is a collaborative interface design tool. Figma Personal Access Tokens can be used to access and manipulate design files and other resources on behalf of a user."
 }
 
 func (s Scanner) getClient() *http.Client {
