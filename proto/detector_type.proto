@@ -1048,4 +1048,5 @@ enum DetectorType {
   ShopifyOAuth = 1044;
   BitbucketDataCenter = 1045;
   JiraDataCenterPAT = 1046;
+  OnepasswordServiceAccount = 1047;
 }

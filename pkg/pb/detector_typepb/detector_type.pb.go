@@ -1100,6 +1100,7 @@ const (
 	DetectorType_ShopifyOAuth                            DetectorType = 1044
 	DetectorType_BitbucketDataCenter                     DetectorType = 1045
 	DetectorType_JiraDataCenterPAT                       DetectorType = 1046
+	DetectorType_OnepasswordServiceAccount               DetectorType = 1047
 )
 
 // Enum value maps for DetectorType.
@@ -2148,6 +2149,7 @@ var (
 		1044: "ShopifyOAuth",
 		1045: "BitbucketDataCenter",
 		1046: "JiraDataCenterPAT",
+		1047: "OnepasswordServiceAccount",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3193,6 +3195,7 @@ var (
 		"ShopifyOAuth":                      1044,
 		"BitbucketDataCenter":               1045,
 		"JiraDataCenterPAT":                 1046,
+		"OnepasswordServiceAccount":         1047,
 	}
 )
 
