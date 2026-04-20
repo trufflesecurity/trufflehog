@@ -112,9 +112,15 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, error) {
 	}
 	// The `code` field contains an RFC 9110 compliant HTTP status
 	// code indicating the outcome of the operation.
-	// code 400 means valid token (bad request due to missing params, but auth passed)
-	// any other code means invalid/unauthorized
-	return result.Code == http.StatusBadRequest, nil
+	switch result.Code {
+	case http.StatusBadRequest:
+		// code 400 means valid token (bad request due to missing params, but auth passed)
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected code field: %d", result.Code)
+	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
