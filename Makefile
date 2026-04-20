@@ -10,6 +10,7 @@ PROTOS_IMAGE ?= trufflesecurity/protos:1.22
 .PHONY: protos-windows
 .PHONY: vendor
 .PHONY: dogfood
+.PHONY: man
 
 dogfood:
 	CGO_ENABLED=0 go run . git file://. --json --log-level=2
@@ -61,5 +62,9 @@ release-protos-image:
 	docker buildx build --push --platform=linux/amd64,linux/arm64 \
 	-t ${PROTOS_IMAGE} -f hack/Dockerfile.protos .
 
+man:
+	@mkdir -p docs/man
+	CGO_ENABLED=0 go run . --generate-man-page > docs/man/trufflehog.1
+
 test-release:
-	goreleaser release --clean --skip-publish --snapshot
+	goreleaser release --clean --skip=publish,sign --snapshot
