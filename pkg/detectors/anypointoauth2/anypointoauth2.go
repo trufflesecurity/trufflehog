@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AnypointOAuth2,
+				DetectorType: detector_typepb.DetectorType_AnypointOAuth2,
 				Raw:          []byte(secret),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", id, secret)),
 			}
@@ -77,7 +77,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyMatch(ctx, client, id, secret)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr)
-
+				if isVerified {
+					s1.AnalysisInfo = map[string]string{
+						"id":     id,
+						"secret": secret,
+					}
+				}
 			}
 
 			results = append(results, s1)
@@ -122,8 +127,8 @@ func verifyMatch(ctx context.Context, client *http.Client, id, secret string) (b
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AnypointOAuth2
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AnypointOAuth2
 }
 
 func (s Scanner) Description() string {

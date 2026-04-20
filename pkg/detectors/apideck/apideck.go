@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for key := range uniqueKeys {
 		for id := range uniqueIds {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_ApiDeck,
+				DetectorType: detector_typepb.DetectorType_ApiDeck,
 				Raw:          []byte(key),
 				RawV2:        []byte(key + id),
 			}
@@ -103,8 +103,8 @@ func verifyAdobeIOSecret(ctx context.Context, client *http.Client, key string, i
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ApiDeck
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ApiDeck
 }
 
 func (s Scanner) Description() string {

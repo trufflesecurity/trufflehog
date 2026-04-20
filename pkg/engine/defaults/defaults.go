@@ -30,6 +30,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/amplitudeapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypoint"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypointoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apacta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/api2cart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apideck"
@@ -47,6 +48,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactoryreferencetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artsy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanaoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
@@ -337,6 +339,7 @@ import (
 	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
 	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googlegemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
@@ -394,6 +397,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jdbc"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiradatacenterpat"
 	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
@@ -519,6 +523,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openaiadmin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
@@ -666,6 +671,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shipday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shodankey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopify"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopifyoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shortcut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shotstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shutterstock"
@@ -703,7 +709,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squarespace"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareup"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sslmate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuscake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuspage"
@@ -854,7 +859,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func buildDetectorList() []detectors.Detector {
@@ -891,6 +896,7 @@ func buildDetectorList() []detectors.Detector {
 		&amplitudeapikey.Scanner{},
 		&anthropic.Scanner{},
 		&anypoint.Scanner{},
+		&anypointoauth2.Scanner{},
 		&apacta.Scanner{},
 		&api2cart.Scanner{},
 		&apideck.Scanner{},
@@ -909,6 +915,7 @@ func buildDetectorList() []detectors.Detector {
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
 		&artifactory.Scanner{},
+		&artifactoryreferencetoken.Scanner{},
 		&artsy.Scanner{},
 		&asanaoauth.Scanner{},
 		&asanapersonalaccesstoken.Scanner{},
@@ -1208,6 +1215,7 @@ func buildDetectorList() []detectors.Detector {
 		&godaddyv1.Scanner{},
 		&godaddyv2.Scanner{},
 		&goodday.Scanner{},
+		&googlegemini.Scanner{},
 		&googleoauth2.Scanner{},
 		&grafana.Scanner{},
 		&grafanaserviceaccount.Scanner{},
@@ -1267,6 +1275,7 @@ func buildDetectorList() []detectors.Detector {
 		&ipquality.Scanner{},
 		&ipstack.Scanner{},
 		&jdbc.Scanner{},
+		&jiradatacenterpat.Scanner{},
 		&jiratokenv1.Scanner{},
 		&jiratokenv2.Scanner{},
 		&jotform.Scanner{},
@@ -1398,6 +1407,7 @@ func buildDetectorList() []detectors.Detector {
 		&onfleet.Scanner{},
 		&oopspam.Scanner{},
 		&openai.Scanner{},
+		&openaiadmin.Scanner{},
 		&opencagedata.Scanner{},
 		&openuv.Scanner{},
 		&openvpn.Scanner{},
@@ -1548,6 +1558,7 @@ func buildDetectorList() []detectors.Detector {
 		&shipday.Scanner{},
 		&shodankey.Scanner{},
 		&shopify.Scanner{},
+		&shopifyoauth.Scanner{},
 		&shortcut.Scanner{},
 		&shotstack.Scanner{},
 		&shutterstock.Scanner{},
@@ -1587,7 +1598,6 @@ func buildDetectorList() []detectors.Detector {
 		&square.Scanner{},
 		&squareapp.Scanner{},
 		&squarespace.Scanner{},
-		&squareup.Scanner{},
 		&sslmate.Scanner{},
 		&statuscake.Scanner{},
 		&statuspage.Scanner{},
@@ -1765,8 +1775,8 @@ func DefaultDetectors() []detectors.Detector {
 	return detectorList
 }
 
-func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {
-	out := make(map[detectorspb.DetectorType]struct{})
+func DefaultDetectorTypesImplementing[T any]() map[detector_typepb.DetectorType]struct{} {
+	out := make(map[detector_typepb.DetectorType]struct{})
 	for _, detector := range DefaultDetectors() {
 		if _, ok := detector.(T); ok {
 			out[detector.Type()] = struct{}{}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -29,7 +29,7 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b([a-zA-Z0-9]{64,73})\b`)
+	keyPat = regexp.MustCompile(`\b(AKCp[a-zA-Z0-9]{69})\b`)
 	URLPat = regexp.MustCompile(`\b([A-Za-z0-9][A-Za-z0-9\-]{0,61}[A-Za-z0-9]\.jfrog\.io)`)
 
 	invalidHosts = simple.NewCache[struct{}]()
@@ -42,7 +42,7 @@ func (Scanner) CloudEndpoint() string { return "" }
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"artifactory", "jfrog.io"}
+	return []string{"artifactory", "jfrog.io", "AKCp"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -83,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+				DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 				Raw:          []byte(token),
 				RawV2:        []byte(token + url),
 			}
@@ -159,8 +159,8 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ArtifactoryAccessToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ArtifactoryAccessToken
 }
 
 func (s Scanner) Description() string {

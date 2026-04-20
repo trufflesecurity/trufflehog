@@ -1,4 +1,4 @@
-package squareup
+package googlegemini
 
 import (
 	"context"
@@ -12,12 +12,11 @@ import (
 )
 
 var (
-	validPattern   = "sq0idp-CIlelDA4a0mIksYXPGwUzy"
-	invalidPattern = "sq0idp-CIlelDA?a0mIksYXPGwUzy"
-	keyword        = "squareup"
+	validPattern   = "AIzaSyDW1PXXav-TxriHUIrj1djZfHKIuInr7Aw"
+	invalidPattern = "AIzaSyDW1PXXav-TxriHUIrj1djZfHKIuInr7A"
 )
 
-func TestSquareup_Pattern(t *testing.T) {
+func TestGoogleGemini_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,13 +25,13 @@ func TestSquareup_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword squareup",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			name:  "valid pattern",
+			input: fmt.Sprintf("gemini api key = '%s'", validPattern),
 			want:  []string{validPattern},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			input: fmt.Sprintf("gemini api key = '%s'", invalidPattern),
 			want:  []string{},
 		},
 	}

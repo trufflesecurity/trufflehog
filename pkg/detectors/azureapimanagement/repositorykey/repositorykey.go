@@ -3,10 +3,8 @@ package repositorykey
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/url"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -14,7 +12,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/gitcmd"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -64,7 +63,7 @@ EndpointLoop:
 	for urlMatch := range uniqueUrlsMatches {
 		for passwordMatch := range uniquePasswordMatches {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureApiManagementRepositoryKey,
+				DetectorType: detector_typepb.DetectorType_AzureApiManagementRepositoryKey,
 				Raw:          []byte(passwordMatch),
 				RawV2:        []byte(urlMatch + passwordMatch),
 			}
@@ -92,44 +91,16 @@ EndpointLoop:
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureApiManagementRepositoryKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureApiManagementRepositoryKey
 }
 
 func (s Scanner) Description() string {
 	return "Azure API Management Repository Keys provide access to the API Management (APIM) configuration repository, allowing users to directly interact with and modify API definitions, policies, and settings. These keys enable programmatic access to APIM's Git-based repository, where configurations can be cloned, edited, and pushed back to apply changes. They are primarily used for managing API configurations as code, automating deployments, and synchronizing APIM settings across environments."
 }
 
-func gitCmdCheck() error {
-	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
-		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
-	}
-
-	// Check the version is greater than or equal to 2.20.0
-	out, err := exec.Command("git", "--version").Output()
-	if err != nil {
-		return fmt.Errorf("failed to check git version: %w", err)
-	}
-
-	// Extract the version string using a regex to find the version numbers
-	var regex = regexp.MustCompile(`\d+\.\d+\.\d+`)
-
-	versionStr := regex.FindString(string(out))
-	versionParts := strings.Split(versionStr, ".")
-
-	// Parse version numbers
-	major, _ := strconv.Atoi(versionParts[0])
-	minor, _ := strconv.Atoi(versionParts[1])
-
-	// Compare with version 2.20.0<=x<3.0.0
-	if major == 2 && minor >= 20 {
-		return nil
-	}
-	return fmt.Errorf("git version is %s, but must be greater than or equal to 2.20.0, and less than 3.0.0", versionStr)
-}
-
 func verifyUrlPassword(_ context.Context, repoUrl, user, password string) (bool, error) {
-	if err := gitCmdCheck(); err != nil {
+	if err := gitcmd.CheckVersion(); err != nil {
 		return false, err
 	}
 

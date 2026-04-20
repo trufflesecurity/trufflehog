@@ -3,6 +3,7 @@ package ftp
 import (
 	"context"
 	"errors"
+	"net"
 	"net/textproto"
 	"net/url"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const (
@@ -72,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_FTP,
+			DetectorType: detector_typepb.DetectorType_FTP,
 			Raw:          []byte(rawURL.String()),
 			Redacted:     redact,
 		}
@@ -128,7 +129,20 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 		host = host + ":21"
 	}
 
-	c, err := ftp.Dial(host, ftp.DialWithTimeout(timeout))
+	// Use a custom dial function that sets a deadline on the connection so that
+	// the FTP banner read and login are also bounded by the timeout. Without this,
+	// a server that accepts TCP but never sends a banner will block indefinitely.
+	c, err := ftp.Dial(host, ftp.DialWithDialFunc(func(network, address string) (net.Conn, error) {
+		conn, err := net.DialTimeout(network, address, timeout)
+		if err != nil {
+			return nil, err
+		}
+		if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+			conn.Close()
+			return nil, err
+		}
+		return conn, nil
+	}))
 	if err != nil {
 		return err
 	}
@@ -140,8 +154,8 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 	return c.Login(u.User.Username(), password)
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_FTP
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_FTP
 }
 
 func (s Scanner) Description() string {

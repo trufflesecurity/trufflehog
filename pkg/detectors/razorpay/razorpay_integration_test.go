@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestRazorPay_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestRazorPay_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_RazorPay,
+					DetectorType: detector_typepb.DetectorType_RazorPay,
 					Redacted:     "rzp_live_SnDTaP1ncfliDt",
 					Verified:     false,
 				},

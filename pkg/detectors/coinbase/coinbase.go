@@ -16,7 +16,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -103,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Coinbase,
+				DetectorType: detector_typepb.DetectorType_Coinbase,
 				Raw:          []byte(resPrivateKey),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", resKeyName, resPrivateKey)),
 			}
@@ -197,8 +197,8 @@ func makeNonce() []byte {
 	return nonce
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Coinbase
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Coinbase
 }
 
 func (s Scanner) Description() string {

@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPusherChannelKey_FromChunk(t *testing.T) {
@@ -50,12 +50,12 @@ func TestPusherChannelKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PusherChannelKey,
+					DetectorType: detector_typepb.DetectorType_PusherChannelKey,
 					Verified:     true,
 					RawV2:        []byte(appId + key),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_PusherChannelKey,
+					DetectorType: detector_typepb.DetectorType_PusherChannelKey,
 					Verified:     false,
 					RawV2:        []byte(appId + key),
 				},
@@ -72,12 +72,12 @@ func TestPusherChannelKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PusherChannelKey,
+					DetectorType: detector_typepb.DetectorType_PusherChannelKey,
 					Verified:     false,
 					RawV2:        []byte(appId + key),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_PusherChannelKey,
+					DetectorType: detector_typepb.DetectorType_PusherChannelKey,
 					Verified:     false,
 					RawV2:        []byte(appId + key),
 				},

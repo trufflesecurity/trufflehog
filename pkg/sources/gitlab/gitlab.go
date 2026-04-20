@@ -13,6 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/gitcmd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -24,6 +25,7 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -77,7 +79,7 @@ type Source struct {
 
 	printLegacyJSON bool
 
-	projectsPerPage int
+	projectsPerPage int64
 
 	// cache of repo URL to project info, used when generating metadata for chunks
 	repoToProjCache repoToProjectCache
@@ -165,7 +167,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	if err := git.CmdCheck(); err != nil {
+	if err := gitcmd.CheckVersion(); err != nil {
 		return err
 	}
 
@@ -183,7 +185,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
 	s.printLegacyJSON = conn.GetPrintLegacyJson()
-	s.projectsPerPage = int(feature.GitlabProjectsPerPage.Load())
+	s.projectsPerPage = feature.GitlabProjectsPerPage.Load()
 
 	if s.projectsPerPage > 100 {
 		return fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
@@ -230,18 +232,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 			gitlabMetadata := &source_metadatapb.Gitlab{
-				Commit:              sanitizer.UTF8(commit),
-				File:                sanitizer.UTF8(file),
-				Email:               sanitizer.UTF8(email),
-				Repository:          sanitizer.UTF8(repository),
-				RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
-				Link:                giturl.GenerateLink(repository, commit, file, line),
-				Timestamp:           sanitizer.UTF8(timestamp),
-				Line:                line,
+				Commit:              sanitizer.UTF8(info.Commit),
+				File:                sanitizer.UTF8(info.File),
+				Email:               sanitizer.UTF8(info.Email),
+				Repository:          sanitizer.UTF8(info.Repository),
+				RepositoryLocalPath: sanitizer.UTF8(info.RepositoryLocalPath),
+				Link:                giturl.GenerateLink(info.Repository, info.Commit, info.File, info.Line),
+				Timestamp:           sanitizer.UTF8(info.Timestamp),
+				Line:                info.Line,
 			}
-			proj, ok := s.repoToProjCache.get(repository)
+			proj, ok := s.repoToProjCache.get(info.Repository)
 			if ok {
 				gitlabMetadata.ProjectId = int64(proj.id)
 				gitlabMetadata.ProjectName = proj.name
@@ -387,7 +389,7 @@ func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target s
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{Gitlab: meta},
 			},
-			Verify: s.verify,
+			SourceVerify: s.verify,
 		}
 
 		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
@@ -472,8 +474,9 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	// Initialize a new api instance.
 	switch s.authMethod {
 	case "OAUTH":
-		apiClient, err := gitlab.NewOAuthClient(
-			s.token,
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
@@ -482,11 +485,9 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
 		}
 		return apiClient, nil
-
 	case "BASIC_AUTH":
-		apiClient, err := gitlab.NewBasicAuthClient(
-			s.user,
-			s.password,
+		apiClient, err := gitlab.NewAuthSourceClient(
+			&gitlab.PasswordCredentialsAuthSource{Username: s.user, Password: s.password},
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
@@ -503,8 +504,9 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		}
 		fallthrough
 	case "TOKEN":
-		apiClient, err := gitlab.NewOAuthClient(
-			s.token,
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
@@ -548,7 +550,7 @@ func (s *Source) getAllProjectRepos(
 		return fmt.Errorf("unable to authenticate using %s: %w", s.authMethod, err)
 	}
 
-	uniqueProjects := make(map[int]*gitlab.Project)
+	uniqueProjects := make(map[int64]*gitlab.Project)
 	// Record the projectsWithNamespace for logging.
 	var projectsWithNamespace []string
 

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDigitalOceanToken_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestDigitalOceanToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DigitalOceanToken,
+					DetectorType: detector_typepb.DetectorType_DigitalOceanToken,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestDigitalOceanToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DigitalOceanToken,
+					DetectorType: detector_typepb.DetectorType_DigitalOceanToken,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,7 @@ func TestDigitalOceanToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DigitalOceanToken,
+					DetectorType: detector_typepb.DetectorType_DigitalOceanToken,
 					Verified:     false,
 				},
 			},
