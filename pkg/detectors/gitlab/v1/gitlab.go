@@ -34,7 +34,11 @@ func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
+	// Legacy short tokens (20-22 chars).
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
+	// Dotted format tokens without glpat- prefix (from older self-hosted GitLab instances
+	// that adopted the new token structure before adding the glpat- prefix).
+	keyPatDotted = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{26,299}\.[0-9a-z]{2}\.[a-z0-9]{9})\b`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
 )
@@ -65,15 +69,25 @@ func (s Scanner) Description() string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
-		// ignore v2 detectors which have a prefix of `glpat-`
-		if strings.Contains(match[0], "glpat-") {
-			continue
+	// Collect unique matches from both patterns.
+	uniqueMatches := make(map[string]struct{})
+	var allMatches []string
+	for _, pat := range []*regexp.Regexp{keyPat, keyPatDotted} {
+		for _, match := range pat.FindAllStringSubmatch(dataStr, -1) {
+			// ignore v2/v3 detectors which have a prefix of `glpat-`
+			if strings.Contains(match[0], "glpat-") {
+				continue
+			}
+			resMatch := strings.TrimSpace(match[1])
+			if _, seen := uniqueMatches[resMatch]; seen {
+				continue
+			}
+			uniqueMatches[resMatch] = struct{}{}
+			allMatches = append(allMatches, resMatch)
 		}
+	}
 
+	for _, resMatch := range allMatches {
 		// to avoid false positives
 		if detectors.StringShannonEntropy(resMatch) < 3.6 {
 			continue
