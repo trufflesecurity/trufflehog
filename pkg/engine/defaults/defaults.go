@@ -520,6 +520,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onelogin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepagecrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepasswordserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
@@ -672,7 +673,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shodankey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopifyoauth"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepasswordserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shortcut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shotstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shutterstock"
@@ -1405,6 +1405,7 @@ func buildDetectorList() []detectors.Detector {
 		&onelogin.Scanner{},
 		&onepagecrm.Scanner{},
 		&onesignal.Scanner{},
+		&onepasswordserviceaccount.Scanner{},
 		&onfleet.Scanner{},
 		&oopspam.Scanner{},
 		&openai.Scanner{},
@@ -1560,7 +1561,6 @@ func buildDetectorList() []detectors.Detector {
 		&shodankey.Scanner{},
 		&shopify.Scanner{},
 		&shopifyoauth.Scanner{},
-		&onepasswordserviceaccount.Scanner{},
 		&shortcut.Scanner{},
 		&shotstack.Scanner{},
 		&shutterstock.Scanner{},

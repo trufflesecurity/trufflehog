@@ -2,7 +2,7 @@ package onepasswordserviceaccount
 
 import (
 	"context"
-	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -10,16 +10,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct {
-	client *http.Client
-}
+type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// The prefix is part of the token itself, so no PrefixRegex wrapper needed.
-	keyPat = regexp.MustCompile(`\b(ops_eyJ[A-Za-z0-9+/=._-]{50,})\b`)
+	// No trailing \b since tokens are Base64 and may end with non-word chars (=, -, +, /).
+	keyPat = regexp.MustCompile(`(ops_eyJ[A-Za-z0-9+/=._-]{50,})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,7 +33,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	uniqueMatches := make(map[string]struct{})
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueMatches[match[1]] = struct{}{}
+		m := strings.TrimSpace(match[1])
+		uniqueMatches[m] = struct{}{}
 	}
 
 	for match := range uniqueMatches {
