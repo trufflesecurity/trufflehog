@@ -19,28 +19,37 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}
-	if c.CloudCred {
-		if len(c.Key) > 0 || len(c.Secret) > 0 || len(c.SessionToken) > 0 {
-			return sources.JobProgressRef{}, fmt.Errorf("cannot use cloud environment and static credentials together")
-		}
-		connection.Credential = &sourcespb.S3_CloudEnvironment{}
+
+	hasStaticCreds := len(c.Key) > 0 || len(c.Secret) > 0 || len(c.SessionToken) > 0
+	hasProfile := len(c.Profile) > 0
+
+	if hasProfile && (hasStaticCreds || c.CloudCred) {
+		return sources.JobProgressRef{}, fmt.Errorf("cannot use --aws-profile with --key, --secret, --session-token, or --cloud-environment")
 	}
-	if len(c.Key) > 0 && len(c.Secret) > 0 {
-		if len(c.SessionToken) > 0 {
-			connection.Credential = &sourcespb.S3_SessionToken{
-				SessionToken: &credentialspb.AWSSessionTokenSecret{
-					Key:          c.Key,
-					Secret:       c.Secret,
-					SessionToken: c.SessionToken,
-				},
-			}
-		} else {
-			connection.Credential = &sourcespb.S3_AccessKey{
-				AccessKey: &credentialspb.KeySecret{
-					Key:    c.Key,
-					Secret: c.Secret,
-				},
-			}
+	if c.CloudCred && hasStaticCreds {
+		return sources.JobProgressRef{}, fmt.Errorf("cannot use cloud environment and static credentials together")
+	}
+
+	switch {
+	case hasProfile:
+		connection.Credential = &sourcespb.S3_CloudEnvironment{}
+		connection.Profile = c.Profile
+	case c.CloudCred:
+		connection.Credential = &sourcespb.S3_CloudEnvironment{}
+	case len(c.Key) > 0 && len(c.Secret) > 0 && len(c.SessionToken) > 0:
+		connection.Credential = &sourcespb.S3_SessionToken{
+			SessionToken: &credentialspb.AWSSessionTokenSecret{
+				Key:          c.Key,
+				Secret:       c.Secret,
+				SessionToken: c.SessionToken,
+			},
+		}
+	case len(c.Key) > 0 && len(c.Secret) > 0:
+		connection.Credential = &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    c.Key,
+				Secret: c.Secret,
+			},
 		}
 	}
 	if len(c.Buckets) > 0 {
@@ -52,6 +61,16 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 
 	if len(c.Roles) > 0 {
 		connection.Roles = c.Roles
+	}
+
+	if len(c.IncludeExtensions) > 0 && len(c.ExcludeExtensions) > 0 {
+		return sources.JobProgressRef{}, fmt.Errorf("cannot use --include-extensions and --exclude-extensions together")
+	}
+	if len(c.IncludeExtensions) > 0 {
+		connection.IncludeExtensions = c.IncludeExtensions
+	}
+	if len(c.ExcludeExtensions) > 0 {
+		connection.ExcludeExtensions = c.ExcludeExtensions
 	}
 
 	var conn anypb.Any

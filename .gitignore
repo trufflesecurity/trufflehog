@@ -1,6 +1,7 @@
 .idea
 dist
 .env
+.claude
 *.test
 
 # binary
