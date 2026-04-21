@@ -1031,6 +1031,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("invalid config: --registry-token requires --namespace or --registry")
 		}
 
+		// Sanitize registry host to remove protocol prefixes and paths
+		if *dockerScanRegistry != "" {
+			*dockerScanRegistry = sanitizeRegistryHost(*dockerScanRegistry)
+		}
+
 		cfg := sources.DockerConfig{
 			BearerToken:       *dockerScanToken,
 			Images:            *dockerScanImages,
@@ -1330,6 +1335,27 @@ func isPublicRegistry(host string) bool {
 	}
 	
 	return false
+}
+
+// sanitizeRegistryHost removes protocol prefixes and paths from registry host.
+// This ensures clean hostnames are passed to the registry implementation.
+// Examples:
+//   - "https://harbor.corp.io" -> "harbor.corp.io"
+//   - "http://localhost:5000/path" -> "localhost:5000"
+//   - "registry.example.com" -> "registry.example.com"
+func sanitizeRegistryHost(host string) string {
+	host = strings.TrimSpace(host)
+	
+	// Remove protocol prefixes
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	
+	// Remove trailing slashes and paths
+	if idx := strings.Index(host, "/"); idx != -1 {
+		host = host[:idx]
+	}
+	
+	return host
 }
 
 // isPreCommitHook detects if trufflehog is running as a pre-commit hook
