@@ -1034,6 +1034,9 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		// Sanitize registry host to remove protocol prefixes and paths
 		if *dockerScanRegistry != "" {
 			*dockerScanRegistry = sanitizeRegistryHost(*dockerScanRegistry)
+			if *dockerScanRegistry == "" {
+				return scanMetrics, fmt.Errorf("invalid config: --registry value is empty after removing protocol/path (e.g., 'https://' or ' ')")
+			}
 		}
 
 		cfg := sources.DockerConfig{
@@ -1302,20 +1305,39 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	return nil
 }
 
-// isPublicRegistry checks if the given registry host is a known public registry.
-// Public registries (DockerHub, Quay, GHCR) should use --namespace flag instead of --registry
-// because they have dedicated implementations with custom APIs.
-func isPublicRegistry(host string) bool {
-	host = strings.ToLower(strings.TrimSpace(host))
+// normalizeRegistryHost removes protocol prefixes and paths from a registry host string.
+// This is a shared helper used by both isPublicRegistry and sanitizeRegistryHost.
+// Returns the normalized hostname and a boolean indicating if it's empty after normalization.
+func normalizeRegistryHost(host string) (string, bool) {
+	host = strings.TrimSpace(host)
 	
-	// Remove common prefixes
-	host = strings.TrimPrefix(host, "https://")
-	host = strings.TrimPrefix(host, "http://")
+	// Remove protocol prefixes (case-insensitive)
+	lowerHost := strings.ToLower(host)
+	if strings.HasPrefix(lowerHost, "https://") {
+		host = host[8:] // len("https://") = 8
+	} else if strings.HasPrefix(lowerHost, "http://") {
+		host = host[7:] // len("http://") = 7
+	}
 	
 	// Remove trailing slashes and paths
 	if idx := strings.Index(host, "/"); idx != -1 {
 		host = host[:idx]
 	}
+	
+	host = strings.TrimSpace(host)
+	return host, host == ""
+}
+
+// isPublicRegistry checks if the given registry host is a known public registry.
+// Public registries (DockerHub, Quay, GHCR) should use --namespace flag instead of --registry
+// because they have dedicated implementations with custom APIs.
+func isPublicRegistry(host string) bool {
+	host, empty := normalizeRegistryHost(host)
+	if empty {
+		return false
+	}
+	
+	host = strings.ToLower(host)
 	
 	// Check against known public registries
 	publicRegistries := []string{
@@ -1345,22 +1367,8 @@ func isPublicRegistry(host string) bool {
 //   - "http://localhost:5000/path" -> "localhost:5000"
 //   - "registry.example.com" -> "registry.example.com"
 func sanitizeRegistryHost(host string) string {
-	host = strings.TrimSpace(host)
-	
-	// Remove protocol prefixes (case-insensitive)
-	lowerHost := strings.ToLower(host)
-	if strings.HasPrefix(lowerHost, "https://") {
-		host = host[8:] // len("https://") = 8
-	} else if strings.HasPrefix(lowerHost, "http://") {
-		host = host[7:] // len("http://") = 7
-	}
-	
-	// Remove trailing slashes and paths
-	if idx := strings.Index(host, "/"); idx != -1 {
-		host = host[:idx]
-	}
-	
-	return host
+	normalized, _ := normalizeRegistryHost(host)
+	return normalized
 }
 
 // isPreCommitHook detects if trufflehog is running as a pre-commit hook
