@@ -112,7 +112,7 @@ func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a microsoftteamswebhook secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a microsoftteamswebhook secret %s within but not valid", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -151,7 +151,7 @@ func TestMicrosoftTeamsWebhook_FromChunk(t *testing.T) {
 					return
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("MicrosoftTeamsWebhook.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -20,6 +20,9 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (s Scanner) Version() int { return 1 }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
@@ -49,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/microsoftteams/",
+			"version":        fmt.Sprintf("%d", s.Version()),
 		}
 
 		if verify {
