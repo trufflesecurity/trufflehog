@@ -2,16 +2,16 @@ package atlassian
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"encoding/json"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Atlassian,
+			DetectorType: detector_typepb.DetectorType_Atlassian,
 			Raw:          []byte(match),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -80,6 +80,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.ExtraData["Organization"] = orgResponse.Data[0].Attributes.Name
 			}
 			s1.SetVerificationError(verificationErr, match)
+
+			if isVerified {
+				s1.AnalysisInfo = map[string]string{
+					"key": match,
+				}
+			}
 		}
 
 		results = append(results, s1)
@@ -120,6 +126,6 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Atlassian
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Atlassian
 }

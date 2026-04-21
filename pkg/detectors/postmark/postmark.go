@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -42,7 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Postmark,
+			DetectorType: detector_typepb.DetectorType_Postmark,
 			Raw:          []byte(resMatch),
 		}
 
@@ -51,6 +51,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = valid
 			s1.ExtraData = extraData
 			s1.SetVerificationError(err)
+
+			if valid {
+				s1.AnalysisInfo = map[string]string{
+					"key": resMatch,
+				}
+			}
 		}
 
 		results = append(results, s1)
@@ -140,8 +146,8 @@ func verifyKeyWithOptions(ctx context.Context, client *http.Client, key, endpoin
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Postmark
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Postmark
 }
 
 func (s Scanner) Description() string {

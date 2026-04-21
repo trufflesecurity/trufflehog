@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFTP_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     true,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
@@ -68,7 +68,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
@@ -86,7 +86,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com.badhost",
 				},
@@ -105,7 +105,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
@@ -123,7 +123,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://abc:********@ftp.freebsd.org",
 				},
@@ -149,7 +149,7 @@ func TestFTP_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("FTP.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

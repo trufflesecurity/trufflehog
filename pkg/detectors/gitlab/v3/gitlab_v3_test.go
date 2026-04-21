@@ -1,8 +1,7 @@
-package squareup
+package gitlab
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,29 +10,34 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "sq0idp-CIlelDA4a0mIksYXPGwUzy"
-	invalidPattern = "sq0idp-CIlelDA?a0mIksYXPGwUzy"
-	keyword        = "squareup"
-)
-
-func TestSquareup_Pattern(t *testing.T) {
+func TestGitLab_Pattern(t *testing.T) {
 	d := Scanner{}
+	d.SetCloudEndpoint("https://gitlab.com")
+	d.UseCloudEndpoint(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword squareup",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
+			name: "valid pattern",
+			input: `[{
+					"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
+					"name": "Gitlab",
+					"type": "Detector",
+					"api": true,
+					"authentication_type": "",
+					"verification_url": "https://api.example.com/example",
+					"test_secrets": {
+						"gitlab_secret": "glpat-3fZ1p5y4XWcCvMGVlfakeW86MQp1Oml3Ymg0Cw.01.1203afake"
+					},
+					"expected_response": "200",
+					"method": "GET",
+					"deprecated": false
+				}]`,
+			want: []string{"glpat-3fZ1p5y4XWcCvMGVlfakeW86MQp1Oml3Ymg0Cw.01.1203afakehttps://gitlab.com"},
 		},
 	}
 

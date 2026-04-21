@@ -15,10 +15,11 @@ import (
 type provider string
 
 const (
-	providerGithub    provider = "Github"
-	providerGitlab    provider = "Gitlab"
-	providerBitbucket provider = "Bitbucket"
-	providerAzure     provider = "Azure"
+	providerGithub          provider = "Github"
+	providerGitlab          provider = "Gitlab"
+	providerBitbucket       provider = "Bitbucket"
+	providerBitbucketServer provider = "BitbucketServer"
+	providerAzure           provider = "Azure"
 
 	urlGithub    = "github.com/"
 	urlGitlab    = "gitlab.com/"
@@ -36,9 +37,23 @@ func determineProvider(repo string) provider {
 		return providerBitbucket
 	case strings.Contains(repo, urlAzure):
 		return providerAzure
+	case isBitbucketServerURL(repo):
+		return providerBitbucketServer
 	default:
 		return ""
 	}
+}
+
+// isBitbucketServerURL detects Bitbucket Server/Data Center URLs by their
+// distinctive /projects/{KEY}/repos/{SLUG}/... path structure.
+// See: https://developer.atlassian.com/server/bitbucket/rest/v1002/intro/#about
+// See: https://community.atlassian.com/forums/Bitbucket-questions/Bitbucket-Hyperlinking-to-source-code-in-Bitbucket/qaq-p/618967
+func isBitbucketServerURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(u.Path, "/projects/") && strings.Contains(u.Path, "/repos/")
 }
 
 func NormalizeBitbucketRepo(repoURL string) (string, error) {
@@ -127,12 +142,23 @@ func GenerateLink(repo, commit, file string, line int64) string {
 
 	switch determineProvider(repo) {
 	case providerBitbucket:
-		return repo[:len(repo)-4] + "/commits/" + commit
+		baseLink := repo[:len(repo)-4] + "/src/" + commit + "/" + file
+		if line > 0 {
+			baseLink += "#lines-" + strconv.FormatInt(line, 10)
+		}
+		return baseLink
 
 	case providerAzure:
-		baseLink := repo + "/commit/" + commit + "/" + file
+		// Azure Repos format: ?path=/file&version=GC<commit>&line=N&lineEnd=N+1&lineStartColumn=1
+		// where GC prefix stands for "Git Commit" (vs GB for Git Branch, GT for Git Tag)
+		baseLink := repo + "?version=GC" + commit
+		if file != "" {
+			baseLink = repo + "?path=/" + file + "&version=GC" + commit
+		}
 		if line > 0 {
-			baseLink += "?line=" + strconv.FormatInt(line, 10)
+			lineStr := strconv.FormatInt(line, 10)
+			lineEndStr := strconv.FormatInt(line+1, 10)
+			baseLink += "&line=" + lineStr + "&lineEnd=" + lineEndStr + "&lineStartColumn=1"
 		}
 		return baseLink
 
@@ -185,7 +211,10 @@ func GenerateLink(repo, commit, file string, line int64) string {
 	}
 }
 
-var linePattern = regexp.MustCompile(`L\d+`)
+var (
+	linePattern        = regexp.MustCompile(`L\d+`)
+	bbCloudLinePattern = regexp.MustCompile(`lines-\d+(:\d+)?`)
+)
 
 // UpdateLinkLineNumber updates the line number in a repository link.
 // Used post-link generation to refine reported issue locations within large scanned blocks.
@@ -206,14 +235,26 @@ func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) strin
 
 	switch determineProvider(link) {
 	case providerBitbucket:
-		// For Bitbucket, it doesn't support line links (based on the GenerateLink function).
-		// So we don't need to change anything.
-		return link
+		// Bitbucket Cloud uses #lines-N format for source file views.
+		fragment := "lines-" + strconv.FormatInt(newLine, 10)
+		if bbCloudLinePattern.MatchString(parsedURL.Fragment) {
+			parsedURL.Fragment = bbCloudLinePattern.ReplaceAllString(parsedURL.Fragment, fragment)
+		} else {
+			parsedURL.Fragment = fragment
+		}
+
+	case providerBitbucketServer:
+		// Bitbucket Server/Data Center uses a bare line number as fragment: #N
+		parsedURL.Fragment = strconv.FormatInt(newLine, 10)
 
 	case providerAzure:
-		// For Azure, line numbers are appended as ?line=<number>.
+		// For Azure, line numbers use query parameters: ?line=N&lineEnd=N+1&lineStartColumn=1
 		query := parsedURL.Query()
-		query.Set("line", strconv.FormatInt(newLine, 10))
+		lineStr := strconv.FormatInt(newLine, 10)
+		lineEndStr := strconv.FormatInt(newLine+1, 10)
+		query.Set("line", lineStr)
+		query.Set("lineEnd", lineEndStr)
+		query.Set("lineStartColumn", "1")
 		parsedURL.RawQuery = query.Encode()
 
 	case providerGithub, providerGitlab:

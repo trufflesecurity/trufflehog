@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package squareup
+package googlegemini
 
 import (
 	"context"
@@ -10,21 +10,23 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-func TestSquareup_FromChunk(t *testing.T) {
+func TestGoogleGemini_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SQUAREUP")
-	inactiveSecret := testSecrets.MustGetField("SQUAREUP_INACTIVE")
+
+	keyGemini := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY")
+	keyNonGemini := testSecrets.MustGetField("GOOGLE_CLOUD_API_KEY")
+	keyInactive := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,13 +45,35 @@ func TestSquareup_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a squareup secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a google gemini key %s within", keyGemini)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Squareup,
+					DetectorType: detector_typepb.DetectorType_GoogleGeminiAPIKey,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"active_google_key": "true",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, unverified but valid google cloud api key",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyNonGemini)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_GoogleGeminiAPIKey,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"active_google_key": "true",
+					},
 				},
 			},
 			wantErr: false,
@@ -59,12 +83,12 @@ func TestSquareup_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a squareup secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a google api key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Squareup,
+					DetectorType: detector_typepb.DetectorType_GoogleGeminiAPIKey,
 					Verified:     false,
 				},
 			},
@@ -87,7 +111,7 @@ func TestSquareup_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Squareup.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GoogleGeminiAPIKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -95,9 +119,13 @@ func TestSquareup_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if len(got[i].Redacted) == 0 {
+					t.Fatalf("no redacted secret present: \n %+v", got[i])
+				}
+				got[i].Redacted = ""
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Squareup.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("GoogleGeminiAPIKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

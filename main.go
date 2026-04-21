@@ -44,7 +44,7 @@ import (
 )
 
 var (
-	cli = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cli = kingpin.New("trufflehog", "TruffleHog is a tool for finding credentials. Run without a command for interactive mode.")
 	cmd string
 	// https://github.com/trufflesecurity/trufflehog/blob/main/CONTRIBUTING.md#logging-in-trufflehog
 	logLevel            = cli.Flag("log-level", `Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".`).Default("0").Int()
@@ -55,7 +55,7 @@ var (
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").PlaceHolder("N").Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
@@ -66,6 +66,7 @@ var (
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
+	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
 	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
@@ -88,6 +89,7 @@ var (
 	// Add feature flags
 	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
 	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	gitCloneTimeout    = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 
@@ -158,8 +160,9 @@ var (
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Strings()
 	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive = filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
-	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanIncludePaths    = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	filesystemScanExcludePaths    = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanMaxSymlinkDepth = filesystemScan.Flag("max-symlink-depth", "Maximum depth to follow symlinks during filesystem scan.").Short('s').Int32()
 
 	s3Scan              = cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey           = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
@@ -270,9 +273,34 @@ var (
 	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
 	multiScanScan  = cli.Command("multi-scan", "Find credentials in multiple sources defined in configuration.")
 
+	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
+	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
+
+// expandTilde replaces a leading ~ in each argument with the user's home
+// directory. This compensates for bypassing the shell (which would normally
+// perform this expansion) while still avoiding shell metacharacter injection.
+func expandTilde(args []string) []string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return args
+	}
+	out := make([]string, len(args))
+	for i, arg := range args {
+		switch {
+		case arg == "~":
+			out[i] = home
+		case strings.HasPrefix(arg, "~/"):
+			out[i] = home + arg[1:]
+		default:
+			out[i] = arg
+		}
+	}
+	return out
+}
 
 func init() {
 	_, _ = maxprocs.Set()
@@ -291,6 +319,8 @@ func init() {
 	cli.HelpFlag.Short('h')
 	cli.UsageWriter(os.Stdout)
 
+	registerManPageFlag(cli)
+
 	// Check if the TUI environment variable is set.
 	if ok, err := strconv.ParseBool(os.Getenv("TUI_PARENT")); err == nil {
 		usingTUI = ok
@@ -302,12 +332,17 @@ func init() {
 			os.Exit(0)
 		}
 
-		binary, err := exec.LookPath("sh")
+		// The TUI passes user input as literal strings. Since we no longer
+		// invoke a shell, we must expand ~ ourselves so paths like ~/foo
+		// resolve correctly.
+		args = expandTilde(args)
+
+		binary, err := exec.LookPath(os.Args[0])
 		if err == nil {
 			// On success, this call will never return. On failure, fallthrough
 			// to overwriting os.Args.
-			cmd := strings.Join(append(os.Args[:1], args...), " ")
-			_ = syscall.Exec(binary, []string{"sh", "-c", cmd}, append(os.Environ(), "TUI_PARENT=true"))
+			execArgs := append([]string{binary}, args...)
+			_ = syscall.Exec(binary, execArgs, append(os.Environ(), "TUI_PARENT=true"))
 		}
 
 		// Overwrite the Args slice so overseer works properly.
@@ -346,6 +381,13 @@ func init() {
 	}
 }
 
+// syncLogs flushes logs when the program exits.
+func syncLogs(syncFn func() error) {
+	if syncFn != nil {
+		_ = syncFn()
+	}
+}
+
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -357,15 +399,16 @@ func main() {
 	context.SetDefaultLogger(logger)
 
 	if *localDev {
-		run(overseer.State{})
+		run(overseer.State{}, sync)
 		os.Exit(0)
 	}
 
-	defer func() { _ = sync() }()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, sync)
 
 	updateCfg := overseer.Config{
-		Program:       run,
+		Program: func(s overseer.State) {
+			run(s, sync)
+		},
 		Debug:         *debug,
 		RestartSignal: syscall.SIGTERM,
 		// TODO: Eventually add a PreUpgrade func for signature check w/ x509 PKCS1v15
@@ -386,10 +429,10 @@ func main() {
 	}
 }
 
-func run(state overseer.State) {
-
+func run(state overseer.State, logSync func() error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
+	defer syncLogs(logSync)
 
 	go func() {
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
@@ -398,7 +441,7 @@ func run(state overseer.State) {
 	}()
 
 	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, logSync)
 
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -412,6 +455,8 @@ func run(state overseer.State) {
 		} else {
 			logger.Info("cleaned temporary artifacts")
 		}
+
+		syncLogs(logSync)
 		os.Exit(0)
 	}()
 
@@ -421,6 +466,10 @@ func run(state overseer.State) {
 		// NOTE: this kludge is here to do an authenticated shallow commit
 		// TODO: refactor to better pass credentials
 		os.Setenv("GITHUB_TOKEN", *githubScanToken)
+	}
+
+	if *concurrency <= 0 {
+		*concurrency = runtime.NumCPU()
 	}
 
 	// When setting a base commit, chunks must be scanned in order.
@@ -449,6 +498,10 @@ func run(state overseer.State) {
 
 	if *forceSkipArchives {
 		feature.ForceSkipArchives.Store(true)
+	}
+
+	if gitCloneTimeout != nil {
+		feature.GitCloneTimeoutDuration.Store(int64(*gitCloneTimeout))
 	}
 
 	if *skipAdditionalRefs {
@@ -545,6 +598,7 @@ func run(state overseer.State) {
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
 		ShouldScanEntireChunk:    *scanEntireChunk,
+		MaxDecodeDepth:           *maxDecodeDepth,
 		VerificationCacheMetrics: &verificationCacheMetrics,
 	}
 
@@ -601,6 +655,7 @@ func run(state overseer.State) {
 
 	if metrics.hasFoundResults && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
+		syncLogs(logSync)
 		os.Exit(183)
 	}
 }
@@ -760,6 +815,24 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			PrintLegacyJSON:     *jsonLegacy,
 			TrustLocalGitConfig: *gitTrustLocalGitConfig,
 		}
+
+		// detect if trufflehog is running git source as a pre-commit hook
+		if isPreCommitHook() {
+			ctx.Logger().Info("Running as a pre-commit hook, overriding default flags for hook context")
+
+			// Override git configuration for pre-commit hook context
+			gitCfg.TrustLocalGitConfig = true
+			gitCfg.BaseRef = "HEAD" // Only scan staged changes
+
+			// Override result filters for pre-commit hook context
+			// In hook mode, we only want to show verified secrets and unknown findings
+			*results = "verified,unknown"
+
+			// Override failure behavior for pre-commit hook context
+			// In hook mode, we want to fail the commit if any secrets are found
+			*fail = true
+		}
+
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		} else {
@@ -868,6 +941,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Paths:            paths,
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
+			MaxSymlinkDepth:  *filesystemScanMaxSymlinkDepth,
 		}
 		if ref, err := eng.ScanFileSystem(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
@@ -1081,6 +1155,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
+	case jsonEnumeratorScan.FullCommand():
+		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
+		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
 	}
@@ -1142,9 +1223,10 @@ func parseResults(input *string) (map[string]struct{}, error) {
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
 // function will terminate the program without cleanup.
-func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+func logFatalFunc(logger logr.Logger, logSync func() error) func(error, string, ...any) {
 	return func(err error, message string, keyAndVals ...any) {
 		logger.Error(err, message, keyAndVals...)
+		syncLogs(logSync)
 		if err != nil {
 			os.Exit(1)
 			return
@@ -1203,4 +1285,41 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	}
 
 	return nil
+}
+
+// isPreCommitHook detects if trufflehog is running as a pre-commit hook
+func isPreCommitHook() bool {
+	// Pre-commit.com framework detection
+	// Docs: https://pre-commit.com/#pre-commit
+	// Sets PRE_COMMIT=1 environment variable when running hooks
+	if os.Getenv("PRE_COMMIT") == "1" {
+		return true
+	}
+
+	// Husky framework detection (modern versions)
+	// Docs: https://typicode.github.io/husky/get-started.html#disabling-hooks
+	// Sets HUSKY=1 environment variable for all hooks
+	if os.Getenv("HUSKY") == "1" {
+		return true
+	}
+
+	// Husky legacy detection (versions < 4.0)
+	// Sets HUSKY_GIT_PARAMS for git hooks, containing commit parameters
+	// Reference: https://github.com/typicode/husky/tree/v0.14.3
+	if os.Getenv("HUSKY_GIT_PARAMS") != "" {
+		return true
+	}
+
+	// Local Git hook detection (non-framework)
+	// Native Git hooks don't set specific environment variables by default.
+	// To detect local hooks without frameworks, we must explicitly set
+	// an environment variable in the hook script:
+	// Example in .git/hooks/pre-commit:
+	//   export TRUFFLEHOG_PRE_COMMIT=1
+	// Than we can detect it
+	if os.Getenv("TRUFFLEHOG_PRE_COMMIT") == "1" {
+		return true
+	}
+
+	return false
 }

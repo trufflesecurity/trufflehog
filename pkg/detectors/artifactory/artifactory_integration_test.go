@@ -11,22 +11,19 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestArtifactory_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("ARTIFACTORY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("ARTIFACTORY_INACTIVE")
-	appURL := testSecrets.MustGetField("ARTIFACTORY_URL")
+	// NOTE: Using mock secrets because JFrog deprecated AKCp API keys (disabled creation end of Q3 2024).
+	// Real AKCp keys can no longer be generated, so we cannot test actual verification scenarios.
+	// These mock keys follow the correct format: AKCp + 69 alphanumeric characters = 73 total
+	// Reference: https://jfrog.com/help/r/jfrog-release-information/artifactory-7.47.10-cloud-self-hosted
+	mockSecret := "AKCp5bueTFpfypEqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM"
+	appURL := "trufflehog.jfrog.io"
 
 	type args struct {
 		ctx    context.Context
@@ -41,32 +38,16 @@ func TestArtifactory_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, unverified - mock key (cannot verify deprecated AKCp format)",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s and domain %s", secret, appURL)),
-				verify: true,
+				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s and domain %s", mockSecret, appURL)),
+				verify: false, // Cannot verify - AKCp API keys are deprecated and no valid keys available
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a artifactory secret %s but not valid on endpoint %s", inactiveSecret, appURL)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 					Verified:     false,
 				},
 			},
@@ -114,6 +95,31 @@ func TestArtifactory_FromChunk(t *testing.T) {
 				t.Errorf("Artifactory.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestArtifactory_FromChunk_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	mockSecret := "AKCp5bueTFpfypEqQbGJPp7eHFi28fBivfWczrjbPb9erDff9LbXZbj6UsRExVXA8asWGc9fM"
+	appURL := "trufflesecurity.com"
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	err := s.SetConfiguredEndpoints(appURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", mockSecret))
+
+	got, err := s.FromData(ctx, true, data)
+
+	require.NoError(t, err, "unexpected error from FromData")
+	require.Greaterf(t, len(got), 0, "Expected Alteast 1 result")
+
+	expectedRawV2 := []byte(mockSecret + appURL)
+	if string(got[0].RawV2) != string(expectedRawV2) {
+		t.Errorf("Artifactory.FromData() rawV2 secret mismatch: got %s, want %s", string(got[0].RawV2), string(expectedRawV2))
 	}
 }
 

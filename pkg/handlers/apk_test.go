@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestAPKHandler(t *testing.T) {
@@ -21,7 +20,7 @@ func TestAPKHandler(t *testing.T) {
 		matchString     string
 	}{
 		"apk_with_3_leaked_keys": {
-			archiveURL:     "https://github.com/joeleonjr/leakyAPK/raw/refs/heads/main/aws_leak.apk",
+			archiveURL:     "https://raw.githubusercontent.com/trufflesecurity/leakyAPK/main/aws_leak.apk",
 			expectedChunks: 942,
 			// Note: the secret count is 4 instead of 3 b/c we're not actually running the secret detection engine,
 			// we're just looking for a string match. There is one extra string match in the APK (but only 3 detected secrets).
@@ -45,7 +44,7 @@ func TestAPKHandler(t *testing.T) {
 			}
 			defer newReader.Close()
 
-			archiveChan := handler.HandleFile(logContext.Background(), newReader)
+			archiveChan := handler.HandleFile(context.Background(), newReader)
 
 			chunkCount := 0
 			secretCount := 0
@@ -72,7 +71,7 @@ func TestAPKHandler(t *testing.T) {
 func TestOpenInvalidAPK(t *testing.T) {
 	reader := strings.NewReader("invalid apk")
 
-	ctx := logContext.AddLogger(context.Background())
+	ctx := context.AddLogger(context.Background())
 	handler := apkHandler{}
 
 	rdr, err := newFileReader(ctx, io.NopCloser(reader))
@@ -104,7 +103,7 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 	defer newReader.Close()
 
 	archiveChan := make(chan DataOrErr)
-	ctx := logContext.AddLogger(context.Background())
+	ctx := context.AddLogger(context.Background())
 
 	err = handler.processAPK(ctx, newReader, archiveChan)
 	assert.Contains(t, err.Error(), "resources.arsc file not found")

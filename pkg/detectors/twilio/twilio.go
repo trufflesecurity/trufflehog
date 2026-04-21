@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -23,7 +23,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.RetryableHTTPClient()
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
 )
@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, sid := range sidMatches {
 		for _, key := range keyMatches {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Twilio,
+				DetectorType: detector_typepb.DetectorType_Twilio,
 				Raw:          []byte(sid),
 				RawV2:        []byte(sid + key),
 				Redacted:     sid,
@@ -93,8 +93,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Twilio
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Twilio
 }
 
 func (s Scanner) Description() string {

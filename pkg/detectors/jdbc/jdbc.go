@@ -11,7 +11,7 @@ import (
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -50,7 +50,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"'<>,(){}[\]&]{10,512}`)
+	// Matches typical JDBC connection strings.
+	// The terminal character class additionally excludes () and & to avoid
+	// capturing surrounding delimiters (e.g. "(jdbc:…)" or "…&user=x&").
+	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"'<>,{}[\]]{10,511}[^\s"'<>,{}[\]()&]`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -77,13 +80,13 @@ matchLoop:
 		jdbcConn := match[0]
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_JDBC,
+			DetectorType: detector_typepb.DetectorType_JDBC,
 			Raw:          []byte(jdbcConn),
 			Redacted:     tryRedactAnonymousJDBC(jdbcConn),
 		}
 
 		if verify {
-			j, err := newJDBC(logCtx, jdbcConn)
+			j, err := NewJDBC(logCtx, jdbcConn)
 			if err != nil {
 				continue
 			}
@@ -206,22 +209,13 @@ func tryRedactRegex(conn string) (string, bool) {
 	return newConn, true
 }
 
-var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
+var supportedSubprotocols = map[string]func(logContext.Context, string) (JDBC, error){
 	"mysql":      parseMySQL,
 	"postgresql": parsePostgres,
 	"sqlserver":  parseSqlServer,
 }
 
-type pingResult struct {
-	err         error
-	determinate bool
-}
-
-type jdbc interface {
-	ping(context.Context) pingResult
-}
-
-func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
+func NewJDBC(ctx logContext.Context, conn string) (JDBC, error) {
 	// expected format: "jdbc:{subprotocol}:{subname}"
 	if !strings.HasPrefix(strings.ToLower(conn), "jdbc:") {
 		return nil, errors.New("expected jdbc prefix")
@@ -233,11 +227,11 @@ func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
 
-	// get the subprotocol parser
 	parser, ok := supportedSubprotocols[strings.ToLower(subprotocol)]
 	if !ok {
-		return nil, errors.New("unsupported subprotocol")
+		return nil, fmt.Errorf("unsupported subprotocol: %s", subprotocol)
 	}
+
 	return parser(ctx, subname)
 }
 
@@ -266,8 +260,8 @@ func pingErr(ctx context.Context, driverName, conn string) error {
 	return nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_JDBC
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_JDBC
 }
 
 func (s Scanner) Description() string {

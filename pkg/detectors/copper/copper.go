@@ -2,6 +2,9 @@ package copper
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -9,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -26,6 +29,11 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"copper"}) + `\b([a-z0-9]{32})\b`)
 	idPat  = regexp.MustCompile(`\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
 )
+
+type UserApiResponse struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -46,32 +54,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resIdMatch := strings.TrimSpace(idmatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Copper,
+				DetectorType: detector_typepb.DetectorType_Copper,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
 			}
 
 			if verify {
-
-				payload := strings.NewReader(`{
-					"page_size": 25,
-					"sort_by": "name"
-					}`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.copper.com/developer_api/v1/tasks/search", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("X-PW-AccessToken", resMatch)
-				req.Header.Add("X-PW-Application", "developer_api")
-				req.Header.Add("X-PW-UserEmail", resIdMatch)
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyCopper(ctx, client, resIdMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			results = append(results, s1)
@@ -83,8 +74,56 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Copper
+func verifyCopper(ctx context.Context, client *http.Client, email, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		"https://api.copper.com/developer_api/v1/users/me",
+		http.NoBody,
+	)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("X-PW-AccessToken", apiKey)
+	req.Header.Add("X-PW-Application", "developer_api")
+	req.Header.Add("X-PW-UserEmail", email)
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		respBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var respBody UserApiResponse
+		if err := json.Unmarshal(respBytes, &respBody); err != nil {
+			return false, err
+		}
+
+		// strict verification with email in credentials
+		if respBody.Email == email {
+			return true, nil
+		}
+
+		return false, fmt.Errorf("email mismatch in verification response")
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code :%d", res.StatusCode)
+	}
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Copper
 }
 
 func (s Scanner) Description() string {

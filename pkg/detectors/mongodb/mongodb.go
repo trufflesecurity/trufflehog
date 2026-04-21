@@ -9,7 +9,7 @@ import (
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	regexp "github.com/wasilibs/go-re2"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -83,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for connStr, password := range uniqueMatches {
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_MongoDB,
+			DetectorType: detector_typepb.DetectorType_MongoDB,
 			Raw:          []byte(connStr),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -102,6 +102,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			r.SetVerificationError(vErr, password)
+
+			if isVerified {
+				r.AnalysisInfo = map[string]string{
+					"key": connStr,
+				}
+			}
 		}
 		results = append(results, r)
 	}
@@ -142,6 +148,6 @@ func verifyUri(ctx context.Context, connStr string, timeout time.Duration) (bool
 	return err == nil, err
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_MongoDB
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_MongoDB
 }

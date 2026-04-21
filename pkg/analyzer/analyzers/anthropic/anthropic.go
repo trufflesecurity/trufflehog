@@ -51,12 +51,14 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, errors.New("key not found in credentials info")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentials info"),
+		)
 	}
 
 	secretInfo, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
+		)
 	}
 
 	return secretInfoToAnalyzerResult(secretInfo), nil
@@ -125,7 +127,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerAnthropic,
 		Metadata:     map[string]any{"Valid_Key": info.Valid},
-		Bindings:     make([]analyzers.Binding, len(info.AnthropicResources)),
+		Bindings:     make([]analyzers.Binding, 0, len(info.AnthropicResources)), // pre-allocate with zero length
 	}
 
 	// extract information to create bindings and append to result bindings

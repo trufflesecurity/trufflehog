@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueKeys {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_AirbrakeUserKey,
+			DetectorType: detector_typepb.DetectorType_AirbrakeUserKey,
 			Raw:          []byte(key),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/airbrake/",
@@ -61,6 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyAirbrakeUserKey(ctx, client, key)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
+			if isVerified {
+				s1.AnalysisInfo = map[string]string{"key": key}
+			}
 		}
 
 		results = append(results, s1)
@@ -94,8 +97,8 @@ func verifyAirbrakeUserKey(ctx context.Context, client *http.Client, key string)
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AirbrakeUserKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AirbrakeUserKey
 }
 
 func (s Scanner) Description() string {

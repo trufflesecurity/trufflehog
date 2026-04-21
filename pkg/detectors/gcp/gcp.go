@@ -16,7 +16,7 @@ import (
 	"golang.org/x/oauth2/google"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -62,8 +62,8 @@ const startOffset = 4096
 // StartOffset returns the start offset for the secret this detector finds.
 func (Scanner) StartOffset() int64 { return startOffset }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GCP
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GCP
 }
 
 func (s Scanner) Description() string {
@@ -110,7 +110,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		credBytes, _ := json.Marshal(creds)
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_GCP,
+			DetectorType: detector_typepb.DetectorType_GCP,
 			Raw:          raw,
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
@@ -229,7 +229,7 @@ func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := detectors.DetectorHttpClientWithNoLocalAddresses.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]
 }
 
 // parsePrivateKey parses a PEM-encoded private key
-func parsePrivateKey(privateKeyPEM string) (interface{}, error) {
+func parsePrivateKey(privateKeyPEM string) (any, error) {
 	block, _ := pem.Decode([]byte(privateKeyPEM))
 	if block == nil {
 		return nil, nil

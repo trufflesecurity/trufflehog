@@ -20,7 +20,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type scanner struct {
@@ -147,12 +147,16 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AWS,
+				DetectorType: detector_typepb.DetectorType_AWS,
 				Raw:          []byte(idMatch),
 				Redacted:     idMatch,
 				RawV2:        []byte(idMatch + ":" + secretMatch),
 				ExtraData: map[string]string{
 					"resource_type": aws.ResourceTypes[idMatch[:4]],
+				},
+				AnalysisInfo: map[string]string{
+					"access_key_id":     idMatch,
+					"secret_access_key": secretMatch,
 				},
 			}
 
@@ -305,8 +309,8 @@ func (s scanner) CleanResults(results []detectors.Result) []detectors.Result {
 	return aws.CleanResults(results)
 }
 
-func (s scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AWS
+func (s scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AWS
 }
 
 func (s scanner) Description() string {

@@ -81,3 +81,24 @@ func TestTwilioAPIKey_Pattern(t *testing.T) {
 		})
 	}
 }
+
+func TestTwilioAPIKey_SecretRedacted(t *testing.T) {
+	d := Scanner{}
+
+	results, err := d.FromData(
+		context.Background(),
+		false,
+		[]byte(fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validAPIKey, keyword, validSecret)))
+	if err != nil {
+		t.Errorf("error = %v", err)
+		return
+	}
+
+	if len(results) == 0 {
+		t.Errorf("did not receive result")
+	}
+
+	if results[0].Redacted != validSecret[:5]+"..." {
+		t.Errorf("expected redacted secret to be '%s', got '%s'", validSecret[:5]+"...", results[0].Redacted)
+	}
+}

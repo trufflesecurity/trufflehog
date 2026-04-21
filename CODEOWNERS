@@ -1,9 +1,6 @@
 # catch-all
 * @trufflesecurity/product-eng
 
-# Scanning
-pkg/writers/ @trufflesecurity/Scanning
-
 # Shared
 pkg/decoders/ @trufflesecurity/Scanning @trufflesecurity/OSS
 pkg/engine/ @trufflesecurity/Scanning  @trufflesecurity/OSS
@@ -12,14 +9,32 @@ pkg/giturl/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/handlers/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/iobuf/ @trufflesecurity/Scanning  @trufflesecurity/OSS
 pkg/sanitizer/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-pkg/sources/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-proto/ @trufflesecurity/Scanning  @trufflesecurity/OSS
+proto/ @trufflesecurity/Scanning  @trufflesecurity/Integrations
+
+# Scanning
+pkg/sources/ @trufflesecurity/Scanning
+pkg/writers/ @trufflesecurity/Scanning
+
+# Integrations
+pkg/sources/circleci/ @trufflesecurity/Integrations
+pkg/sources/docker/ @trufflesecurity/Integrations
+pkg/sources/elasticsearch/ @trufflesecurity/Integrations
+pkg/sources/filesystem/ @trufflesecurity/Integrations
+pkg/sources/gcs/ @trufflesecurity/Integrations
+pkg/sources/git/ @trufflesecurity/Integrations
+pkg/sources/github/ @trufflesecurity/Integrations
+pkg/sources/gitlab/ @trufflesecurity/Integrations
+pkg/sources/jenkins/ @trufflesecurity/Integrations
+pkg/sources/postman/ @trufflesecurity/Integrations
+pkg/sources/s3/ @trufflesecurity/Integrations
+pkg/sources/travisci/ @trufflesecurity/Integrations
+proto/detector_type.proto @trufflesecurity/Integrations
 
 # OSS
 pkg/detectors/ @trufflesecurity/OSS
 pkg/common/ @trufflesecurity/OSS
 pkg/custom_detectors/ @trufflesecurity/OSS
-pkg/analzyers/ @trufflesecurity/OSS
+pkg/analyzer/ @trufflesecurity/OSS
 pkg/engine/defaults/defaults.go @trufflesecurity/OSS
 pkg/engine/defaults/defaults_test.go @trufflesecurity/OSS
 

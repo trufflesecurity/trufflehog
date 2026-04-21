@@ -9,6 +9,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -162,4 +163,22 @@ func TestSource_Chunks(t *testing.T) {
 			waitFn()
 		})
 	}
+}
+
+func TestSource_UnmarshalSourceUnit(t *testing.T) {
+	s := Source{}
+
+	unitJSON := `{
+		"Bucket": "my-test-bucket",
+		"Role": "my-test-role"
+	}`
+
+	unit, err := s.UnmarshalSourceUnit([]byte(unitJSON))
+	require.NoError(t, err, "UnmarshalSourceUnit should not return an error")
+
+	s3Unit, ok := unit.(S3SourceUnit)
+	require.True(t, ok, "Unmarshaled unit should be of type S3SourceUnit")
+
+	assert.Equal(t, "my-test-bucket", s3Unit.Bucket, "Bucket field should match")
+	assert.Equal(t, "my-test-role", s3Unit.Role, "Role field should match")
 }

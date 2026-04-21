@@ -19,6 +19,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/gitcmd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -169,7 +170,7 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 
 // Init returns an initialized HuggingFace source.
 func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	err := git.CmdCheck()
+	err := gitcmd.CheckVersion()
 	if err != nil {
 		return err
 	}
@@ -235,19 +236,19 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 		SourceType:  s.Type(),
 		Verify:      s.verify,
 		Concurrency: concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Huggingface{
 					Huggingface: &source_metadatapb.Huggingface{
-						Commit:       sanitizer.UTF8(commit),
-						File:         sanitizer.UTF8(file),
-						Email:        sanitizer.UTF8(email),
-						Repository:   sanitizer.UTF8(repository),
-						Link:         giturl.GenerateLink(repository, commit, file, line),
-						Timestamp:    sanitizer.UTF8(timestamp),
-						Line:         line,
-						Visibility:   s.visibilityOf(ctx, repository),
-						ResourceType: s.getResourceType(ctx, repository),
+						Commit:       sanitizer.UTF8(info.Commit),
+						File:         sanitizer.UTF8(info.File),
+						Email:        sanitizer.UTF8(info.Email),
+						Repository:   sanitizer.UTF8(info.Repository),
+						Link:         giturl.GenerateLink(info.Repository, info.Commit, info.File, info.Line),
+						Timestamp:    sanitizer.UTF8(info.Timestamp),
+						Line:         info.Line,
+						Visibility:   s.visibilityOf(ctx, info.Repository),
+						ResourceType: s.getResourceType(ctx, info.Repository),
 					},
 				},
 			}
@@ -663,8 +664,8 @@ func (s *Source) chunkDiscussionComments(ctx context.Context, repoInfo repoInfo,
 					},
 				},
 			},
-			Data:   []byte(comment.Data.Latest.Raw),
-			Verify: s.verify,
+			Data:         []byte(comment.Data.Latest.Raw),
+			SourceVerify: s.verify,
 		}
 		select {
 		case <-ctx.Done():

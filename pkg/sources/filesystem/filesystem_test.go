@@ -1,19 +1,23 @@
 package filesystem
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -21,7 +25,7 @@ import (
 )
 
 func TestSource_Scan(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 
 	type init struct {
@@ -48,6 +52,7 @@ func TestSource_Scan(t *testing.T) {
 				Data: &source_metadatapb.MetaData_Filesystem{
 					Filesystem: &source_metadatapb.Filesystem{
 						File: "filesystem.go",
+						Line: 1, // First chunk starts at line 1
 					},
 				},
 			},
@@ -84,12 +89,12 @@ func TestSource_Scan(t *testing.T) {
 			for chunk := range chunksCh {
 				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
 					counter++
-					if diff := pretty.Compare(chunk.SourceMetadata, tt.wantSourceMetadata); diff != "" {
-						t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+					if diff := cmp.Diff(tt.wantSourceMetadata, chunk.SourceMetadata, protocmp.Transform()); diff != "" && counter == 1 { // First chunk should start at line 1
+						t.Errorf("Source.Chunks() %s metadata mismatch (-want +got):\n%s", tt.name, diff)
 					}
 				}
 			}
-			assert.Equal(t, 1, counter)
+			assert.Equal(t, 2, counter)
 		})
 	}
 }
@@ -108,10 +113,10 @@ func TestScanFile(t *testing.T) {
 	source := &Source{}
 	chunksChan := make(chan *sources.Chunk, 2)
 
-	ctx := context.WithLogger(context.Background(), logr.Discard())
+	ctx := trContext.WithLogger(trContext.Background(), logr.Discard())
 	go func() {
 		defer close(chunksChan)
-		err = source.scanFile(ctx, tmpfile.Name(), chunksChan)
+		err = source.scanFile(ctx, chunksChan, tmpfile.Name())
 		assert.Nil(t, err)
 	}()
 
@@ -139,11 +144,11 @@ func TestScanBinaryFile(t *testing.T) {
 	chunksChan := make(chan *sources.Chunk, 2)
 	errChan := make(chan error, 1)
 
-	ctx := context.WithLogger(context.Background(), logr.Discard())
+	ctx := trContext.WithLogger(trContext.Background(), logr.Discard())
 
 	go func() {
 		defer close(chunksChan)
-		errChan <- source.scanFile(ctx, tmpfile.Name(), chunksChan)
+		errChan <- source.scanFile(ctx, chunksChan, tmpfile.Name())
 	}()
 
 	err = <-errChan
@@ -161,7 +166,7 @@ func TestScanBinaryFile(t *testing.T) {
 func TestEnumerate(t *testing.T) {
 	// TODO: refactor to allow a virtual filesystem.
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup the connection to test enumeration.
 	dir, err := os.MkdirTemp("", "trufflehog-test-enumerate")
@@ -217,7 +222,7 @@ func TestEnumerate(t *testing.T) {
 
 func TestChunkUnit(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup test file to chunk.
 	fileContents := "TestChunkUnit"
@@ -270,7 +275,7 @@ func TestChunkUnit(t *testing.T) {
 
 func TestEnumerateReporterErr(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup the connection to test enumeration.
 	units := []string{
@@ -297,7 +302,7 @@ func TestEnumerateReporterErr(t *testing.T) {
 
 func TestChunkUnitReporterErr(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Setup test file to chunk.
 	tmpfile, err := os.CreateTemp("", "example.txt")
@@ -337,7 +342,7 @@ func TestChunkUnitReporterErr(t *testing.T) {
 
 func TestSkipDir(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// create a temp directory with files
 	ignoreDir, cleanupDir, err := createTempDir("", "ignore1", "ignore2", "ignore3")
@@ -345,7 +350,8 @@ func TestSkipDir(t *testing.T) {
 	defer cleanupDir()
 
 	// create an ExcludePathsFile that contains the ignoreDir path
-	excludeFile, cleanupFile, err := createTempFile("", ignoreDir+"\n")
+	// In windows path contains \ so we escape it by replacing it with \\ in ignoreDir
+	excludeFile, cleanupFile, err := createTempFile("", strings.ReplaceAll(ignoreDir, `\`, `\\`)+"\n")
 	require.NoError(t, err)
 	defer cleanupFile()
 
@@ -371,43 +377,43 @@ func TestSkipDir(t *testing.T) {
 
 func TestScanSubDirFile(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := trContext.Background()
 
-	// create a temp directory with files
-	parentDir, cleanupParentDir, err := createTempDir("", "file1")
+	// Use a fixed directory for the test
+	testDir := filepath.Join(os.TempDir(), "trufflehog-test")
+	err := os.MkdirAll(testDir, 0755)
 	require.NoError(t, err)
-	defer cleanupParentDir()
+	defer os.RemoveAll(testDir)
 
-	childDir, cleanupChildDir, err := createTempDir(parentDir, "file2")
+	// Create a subdirectory and file
+	childDir := filepath.Join(testDir, "child")
+	err = os.MkdirAll(childDir, 0755)
 	require.NoError(t, err)
-	defer cleanupChildDir()
 
-	// create a file in child directory
-	file, cleanupFile, err := createTempFile(childDir, "should scan this file")
+	filePath := filepath.Join(childDir, "testfile.txt")
+	err = os.WriteFile(filePath, []byte("should scan this file"), 0644)
 	require.NoError(t, err)
-	defer cleanupFile()
 
-	// create an IncludePathsFile that contains the file path
-	includeFile, cleanupFile, err := createTempFile("", file.Name()+"\n")
+	// Create an IncludePathsFile with the absolute path of the file
+	includeFilePath := filepath.Join(testDir, "include.txt")
+	err = os.WriteFile(includeFilePath, []byte(strings.ReplaceAll(filePath, `\`, `\\`)+"\n"), 0644)
 	require.NoError(t, err)
-	defer cleanupFile()
 
 	conn, err := anypb.New(&sourcespb.Filesystem{
-		IncludePathsFile: includeFile.Name(),
+		IncludePathsFile: includeFilePath,
 	})
 	require.NoError(t, err)
 
-	// initialize the source.
+	// Initialize the source
 	s := Source{}
 	err = s.Init(ctx, "include sub directory file", 0, 0, true, conn, 1)
 	require.NoError(t, err)
 
 	reporter := sourcestest.TestReporter{}
 	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
-		ID: parentDir,
+		ID: testDir,
 	}, &reporter)
 	require.NoError(t, err)
-
 	require.Equal(t, 1, len(reporter.Chunks), "Expected chunks from included file")
 	require.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors")
 }
@@ -436,7 +442,7 @@ func TestSkipBinaries(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	ctx := context.Background()
+	ctx := trContext.Background()
 
 	// Run the scan
 	go func() {
@@ -459,6 +465,285 @@ func TestSkipBinaries(t *testing.T) {
 	require.Equal(t, 1, chunkCount, "Should have processed exactly one text file")
 	require.Contains(t, processedFiles, textFile, "Should have processed the text file")
 	require.NotContains(t, processedFiles, binaryFile, "Binary file should be skipped")
+}
+
+func TestResumptionInfoDoesNotGrowWithSubdirectories(t *testing.T) {
+	ctx := trContext.AddLogger(t.Context())
+
+	// Create a deeply nested directory structure with files at each level.
+	// Structure: root/dir0/dir1/dir2/.../dir9, each containing a file.
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
+
+	const numSubdirs = 10
+	currentDir := rootDir
+	for i := 0; i < numSubdirs; i++ {
+		// Create a file in the current directory
+		filePath := filepath.Join(currentDir, fmt.Sprintf("file%d.txt", i))
+		err := os.WriteFile(filePath, []byte(fmt.Sprintf("content %d", i)), 0644)
+		require.NoError(t, err)
+
+		// Create the next subdirectory
+		subDir := filepath.Join(currentDir, fmt.Sprintf("subdir%d", i))
+		err = os.Mkdir(subDir, 0755)
+		require.NoError(t, err)
+		currentDir = subDir
+	}
+	// Create a file in the deepest directory
+	err = os.WriteFile(filepath.Join(currentDir, "deepest.txt"), []byte("deepest"), 0644)
+	require.NoError(t, err)
+
+	conn, err := anypb.New(&sourcespb.Filesystem{MaxSymlinkDepth: 0})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption growth", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Track the maximum size of EncodedResumeInfo during the scan.
+	var maxResumeInfoSize int
+	var mu sync.Mutex
+
+	// We need to periodically check the resume info size during scanning.
+	// Run ChunkUnit in a goroutine and poll the progress.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		reporter := sourcestest.TestReporter{}
+		err := s.ChunkUnit(ctx, sources.CommonSourceUnit{
+			ID: rootDir,
+		}, &reporter)
+		require.NoError(t, err)
+	}()
+
+	// Poll the resume info size while scanning is in progress.
+	ticker := time.NewTicker(1 * time.Millisecond)
+	defer ticker.Stop()
+
+polling:
+	for {
+		select {
+		case <-done:
+			break polling
+		case <-ticker.C:
+			progress := s.GetProgress()
+			mu.Lock()
+			if len(progress.EncodedResumeInfo) > maxResumeInfoSize {
+				maxResumeInfoSize = len(progress.EncodedResumeInfo)
+			}
+			mu.Unlock()
+		}
+	}
+
+	// After scan completes, check the final state.
+	finalProgress := s.GetProgress()
+	t.Logf("Final EncodedResumeInfo length: %d", len(finalProgress.EncodedResumeInfo))
+	t.Logf("Max EncodedResumeInfo length during scan: %d", maxResumeInfoSize)
+
+	// Parse the resume info to count entries if it's not empty.
+	if maxResumeInfoSize > 0 {
+		var resumeMap map[string]string
+		err := json.Unmarshal([]byte(finalProgress.EncodedResumeInfo), &resumeMap)
+		if err == nil {
+			t.Logf("Final resume info entries: %d", len(resumeMap))
+		}
+	}
+
+	// The key assertion: resumption info should NOT grow proportionally with
+	// the number of subdirectories. During the scan, it should only track the
+	// current position, not accumulate entries for every directory visited.
+	//
+	// With proper implementation, resume info should have at most a few entries
+	// (e.g., one per directory being actively scanned), not one entry per
+	// directory that has ever been visited.
+	//
+	// A reasonable upper bound for resume info size: each entry is roughly
+	// "rootPath#subPath": "filePath". With temp paths ~50 chars, one entry is
+	// ~150 bytes with JSON overhead. For 10 directories, accumulation would
+	// mean ~1500+ bytes. A non-accumulating implementation should stay well
+	// under that.
+	const maxAcceptableResumeInfoSize = 300 // bytes - allows for ~2 entries max
+	assert.LessOrEqual(t, maxResumeInfoSize, maxAcceptableResumeInfoSize,
+		"Resume info grew to %d bytes during scan, suggesting accumulation across %d subdirectories. "+
+			"Resume info should not accumulate entries for each subdirectory visited.",
+		maxResumeInfoSize, numSubdirs)
+}
+
+func TestResumptionSkipsAlreadyScannedFiles(t *testing.T) {
+	ctx := trContext.Background()
+
+	// Create a directory with files that have predictable alphabetical order.
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
+
+	// Create files with predictable names for sorting.
+	files := []string{"aaa.txt", "bbb.txt", "ccc.txt", "ddd.txt"}
+	for _, name := range files {
+		filePath := filepath.Join(rootDir, name)
+		err := os.WriteFile(filePath, []byte("content of "+name), 0644)
+		require.NoError(t, err)
+	}
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Pre-set the resume point to simulate a previous interrupted scan.
+	// Setting it to bbb.txt means we should skip aaa.txt and bbb.txt,
+	// and only scan ccc.txt and ddd.txt.
+	resumePoint := filepath.Join(rootDir, "bbb.txt")
+	s.SetEncodedResumeInfoFor(rootDir, resumePoint)
+
+	// Run the scan.
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: rootDir}, &reporter)
+	require.NoError(t, err)
+
+	// Collect scanned file names.
+	scannedFiles := make(map[string]bool)
+	for _, chunk := range reporter.Chunks {
+		file := chunk.SourceMetadata.GetFilesystem().GetFile()
+		scannedFiles[filepath.Base(file)] = true
+	}
+
+	// Assert only files after the resume point were scanned.
+	assert.False(t, scannedFiles["aaa.txt"], "aaa.txt should have been skipped (before resume point)")
+	assert.False(t, scannedFiles["bbb.txt"], "bbb.txt should have been skipped (the resume point itself)")
+	assert.True(t, scannedFiles["ccc.txt"], "ccc.txt should have been scanned (after resume point)")
+	assert.True(t, scannedFiles["ddd.txt"], "ddd.txt should have been scanned (after resume point)")
+	assert.Equal(t, 2, len(reporter.Chunks), "expected exactly 2 files to be scanned")
+}
+
+func TestResumptionWithNestedDirectories(t *testing.T) {
+	ctx := trContext.Background()
+
+	// Create a nested directory structure:
+	// root/
+	//   aaa/
+	//     file1.txt
+	//   bbb/
+	//     file2.txt
+	//   ccc/
+	//     file3.txt
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-nested-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
+
+	dirs := []string{"aaa", "bbb", "ccc"}
+	for i, dir := range dirs {
+		dirPath := filepath.Join(rootDir, dir)
+		err := os.Mkdir(dirPath, 0755)
+		require.NoError(t, err)
+
+		filePath := filepath.Join(dirPath, fmt.Sprintf("file%d.txt", i+1))
+		err = os.WriteFile(filePath, []byte(fmt.Sprintf("content of file%d", i+1)), 0644)
+		require.NoError(t, err)
+	}
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption nested", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Pre-set the resume point to bbb/file2.txt.
+	// This should skip aaa/file1.txt and bbb/file2.txt, only scanning ccc/file3.txt.
+	resumePoint := filepath.Join(rootDir, "bbb", "file2.txt")
+	s.SetEncodedResumeInfoFor(rootDir, resumePoint)
+
+	// Run the scan.
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: rootDir}, &reporter)
+	require.NoError(t, err)
+
+	// Collect scanned file names.
+	scannedFiles := make(map[string]bool)
+	for _, chunk := range reporter.Chunks {
+		file := chunk.SourceMetadata.GetFilesystem().GetFile()
+		scannedFiles[filepath.Base(file)] = true
+	}
+
+	// Assert only file3.txt was scanned.
+	assert.False(t, scannedFiles["file1.txt"], "file1.txt should have been skipped (in aaa/, before resume point)")
+	assert.False(t, scannedFiles["file2.txt"], "file2.txt should have been skipped (the resume point itself)")
+	assert.True(t, scannedFiles["file3.txt"], "file3.txt should have been scanned (in ccc/, after resume point)")
+	assert.Equal(t, 1, len(reporter.Chunks), "expected exactly 1 file to be scanned")
+}
+
+func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
+	ctx := trContext.Background()
+
+	// Create a directory structure:
+	// root/
+	//   aaa/
+	//     file1.txt
+	//   bbb/
+	//     file2.txt
+	//   ccc/
+	//     file3.txt
+	//
+	// This test verifies correct behavior when scanDir is called for a directory
+	// with a resume point OUTSIDE that directory's subtree. Since os.ReadDir
+	// returns entries sorted by filename, directories that lexicographically
+	// precede the resume point were already fully scanned and should be skipped.
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-subtree-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
+
+	dirs := []string{"aaa", "bbb", "ccc"}
+	for i, dir := range dirs {
+		dirPath := filepath.Join(rootDir, dir)
+		err := os.Mkdir(dirPath, 0755)
+		require.NoError(t, err)
+
+		filePath := filepath.Join(dirPath, fmt.Sprintf("file%d.txt", i+1))
+		err = os.WriteFile(filePath, []byte(fmt.Sprintf("content of file%d", i+1)), 0644)
+		require.NoError(t, err)
+	}
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test resumption subtree", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Pre-set the resume point to bbb/file2.txt using aaaDir as the key.
+	// This simulates an edge case where scanDir is called directly for a
+	// directory with a resume point outside its subtree.
+	aaaDir := filepath.Join(rootDir, "aaa")
+	resumePoint := filepath.Join(rootDir, "bbb", "file2.txt")
+	s.SetEncodedResumeInfoFor(aaaDir, resumePoint)
+
+	// Scan the aaa directory with a resume point outside its subtree.
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: aaaDir}, &reporter)
+	require.NoError(t, err)
+
+	// Collect scanned file names.
+	scannedFiles := make(map[string]bool)
+	for _, chunk := range reporter.Chunks {
+		file := chunk.SourceMetadata.GetFilesystem().GetFile()
+		scannedFiles[filepath.Base(file)] = true
+	}
+
+	// file1.txt should NOT be scanned because aaa/ comes before bbb/
+	// lexicographically, meaning aaa/ would have been fully processed
+	// before reaching the resume point.
+	assert.False(t, scannedFiles["file1.txt"],
+		"file1.txt should NOT be scanned because aaa/ comes before resume point bbb/file2.txt lexicographically")
+	assert.Equal(t, 0, len(reporter.Chunks),
+		"expected 0 files to be scanned since aaa/ was already fully processed before the resume point")
 }
 
 // createTempFile is a helper function to create a temporary file in the given
