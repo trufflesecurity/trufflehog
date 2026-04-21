@@ -1341,14 +1341,19 @@ func isPublicRegistry(host string) bool {
 // This ensures clean hostnames are passed to the registry implementation.
 // Examples:
 //   - "https://harbor.corp.io" -> "harbor.corp.io"
+//   - "HTTPS://harbor.corp.io" -> "harbor.corp.io"
 //   - "http://localhost:5000/path" -> "localhost:5000"
 //   - "registry.example.com" -> "registry.example.com"
 func sanitizeRegistryHost(host string) string {
 	host = strings.TrimSpace(host)
 	
-	// Remove protocol prefixes
-	host = strings.TrimPrefix(host, "https://")
-	host = strings.TrimPrefix(host, "http://")
+	// Remove protocol prefixes (case-insensitive)
+	lowerHost := strings.ToLower(host)
+	if strings.HasPrefix(lowerHost, "https://") {
+		host = host[8:] // len("https://") = 8
+	} else if strings.HasPrefix(lowerHost, "http://") {
+		host = host[7:] // len("http://") = 7
+	}
 	
 	// Remove trailing slashes and paths
 	if idx := strings.Index(host, "/"); idx != -1 {
