@@ -1023,6 +1023,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("invalid config: --registry cannot be combined with --image or --namespace")
 		}
 
+		if *dockerScanRegistry != "" && isPublicRegistry(*dockerScanRegistry) {
+			return scanMetrics, fmt.Errorf("invalid config: --registry is for private registries only. Use --namespace for public registries (hub.docker.com, quay.io, ghcr.io)")
+		}
+
 		if *dockerScanRegistryToken != "" && *dockerScanNamespace == "" && *dockerScanRegistry == "" {
 			return scanMetrics, fmt.Errorf("invalid config: --registry-token requires --namespace or --registry")
 		}
@@ -1291,6 +1295,41 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	}
 
 	return nil
+}
+
+// isPublicRegistry checks if the given registry host is a known public registry.
+// Public registries (DockerHub, Quay, GHCR) should use --namespace flag instead of --registry
+// because they have dedicated implementations with custom APIs.
+func isPublicRegistry(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	
+	// Remove common prefixes
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	
+	// Remove trailing slashes and paths
+	if idx := strings.Index(host, "/"); idx != -1 {
+		host = host[:idx]
+	}
+	
+	// Check against known public registries
+	publicRegistries := []string{
+		"hub.docker.com",
+		"docker.io",
+		"registry-1.docker.io",
+		"index.docker.io",
+		"registry.hub.docker.com",
+		"quay.io",
+		"ghcr.io",
+	}
+	
+	for _, registry := range publicRegistries {
+		if host == registry {
+			return true
+		}
+	}
+	
+	return false
 }
 
 // isPreCommitHook detects if trufflehog is running as a pre-commit hook
