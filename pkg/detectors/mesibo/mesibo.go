@@ -1,28 +1,45 @@
 package mesibo
 
 import (
+	"bytes"
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
+
+type apiResponse struct {
+	Code int `json:"code"`
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"mesibo"}) + `\b([0-9A-Za-z]{64})\b`)
 )
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -45,22 +62,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.mesibo.com/api.php?op=useradd&token="+resMatch, nil)
+			s1.Verified, err = s.verify(ctx, resMatch)
 			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-
-				if !strings.Contains(body, "AUTHFAIL") {
-					s1.Verified = true
-				}
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 
@@ -68,6 +72,55 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+// verify checks the validity of a Mesibo app token against the backend API.
+// https://docs.mesibo.com/api/backend-api/
+func (s Scanner) verify(ctx context.Context, token string) (bool, error) {
+
+	// We use the `useradd` operation as a probe: a valid token will yield
+	// code 400 (bad request due to missing required user parameters, but
+	// authentication succeeded), whereas an invalid or unauthorized
+	// token will yield a different code such as 401.
+	payload, err := json.Marshal(map[string]string{"op": "useradd", "token": token})
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal request payload: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.mesibo.com/backend", bytes.NewBuffer(payload))
+	if err != nil {
+		return false, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := s.getClient().Do(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer res.Body.Close()
+
+	// The backend API always returns HTTP 200, with the actual result encoded in the
+	// JSON response body.
+	if res.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, fmt.Errorf("failed to read response body: %w", err)
+	}
+	var result apiResponse
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return false, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	// The `code` field contains an RFC 9110 compliant HTTP status
+	// code indicating the outcome of the operation.
+	switch result.Code {
+	case http.StatusBadRequest:
+		// code 400 means valid token (bad request due to missing params, but auth passed)
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected code field: %d", result.Code)
+	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
