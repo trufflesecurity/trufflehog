@@ -53,13 +53,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, "continent_code") || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					body := string(bodyBytes)
+					validResponse := strings.Contains(body, "continent_code") || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
 
-				if validResponse {
-					s1.Verified = true
+					if validResponse {
+						s1.Verified = true
+					}
 				}
 			}
 

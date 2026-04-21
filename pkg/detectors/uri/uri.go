@@ -36,6 +36,8 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	hostNotFoundCache = simple.NewCache[struct{}]()
+
+	errNoHost = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -107,21 +109,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			hostname := parsedURL.Hostname()
 			if hostNotFoundCache.Exists(hostname) {
-				logger.V(3).Info("Skipping uri: no such host", "host", hostname)
-				continue
-			}
-
-			if s.client == nil {
-				s.client = defaultClient
-			}
-			isVerified, vErr := verifyURL(ctx, s.client, parsedURL)
-			r.Verified = isVerified
-			if vErr != nil {
-				var dnsErr *net.DNSError
-				if errors.As(vErr, &dnsErr) && dnsErr.IsNotFound {
-					hostNotFoundCache.Set(hostname, struct{}{})
+				logger.V(3).Info("Skipping uri verification: cached no such host", "host", hostname)
+				r.SetVerificationError(errNoHost, password)
+			} else {
+				if s.client == nil {
+					s.client = defaultClient
 				}
-				r.SetVerificationError(vErr, password)
+				isVerified, vErr := verifyURL(ctx, s.client, parsedURL)
+				r.Verified = isVerified
+				if vErr != nil {
+					var dnsErr *net.DNSError
+					if errors.As(vErr, &dnsErr) && dnsErr.IsNotFound {
+						hostNotFoundCache.Set(hostname, struct{}{})
+					}
+					r.SetVerificationError(vErr, password)
+				}
 			}
 		}
 

@@ -59,7 +59,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniquePasswordMatches[strings.TrimSpace(matches[1])] = struct{}{}
 	}
 
-EndpointLoop:
 	for urlMatch := range uniqueUrlsMatches {
 		for passwordMatch := range uniquePasswordMatches {
 			s1 := detectors.Result{
@@ -70,18 +69,17 @@ EndpointLoop:
 
 			if verify {
 				if invalidHosts.Exists(urlMatch) {
-					logger.V(3).Info("Skipping invalid registry", "url", urlMatch)
-					continue EndpointLoop
-				}
-
-				isVerified, err := verifyUrlPassword(ctx, urlMatch, azureGitUsername, passwordMatch)
-				s1.Verified = isVerified
-				if err != nil {
-					if errors.Is(err, noSuchHostErr) {
-						invalidHosts.Set(urlMatch, struct{}{})
-						continue EndpointLoop
+					logger.V(3).Info("Skipping verification: cached no such host", "url", urlMatch)
+					s1.SetVerificationError(noSuchHostErr, urlMatch)
+				} else {
+					isVerified, err := verifyUrlPassword(ctx, urlMatch, azureGitUsername, passwordMatch)
+					s1.Verified = isVerified
+					if err != nil {
+						if errors.Is(err, noSuchHostErr) {
+							invalidHosts.Set(urlMatch, struct{}{})
+						}
+						s1.SetVerificationError(err, urlMatch)
 					}
-					s1.SetVerificationError(err, urlMatch)
 				}
 			}
 			results = append(results, s1)

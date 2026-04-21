@@ -74,11 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueKeyMatches {
 		for accountUrl := range uniqueAccountMatches {
-			if invalidHosts.Exists(accountUrl) {
-				delete(uniqueAccountMatches, accountUrl)
-				continue
-			}
-
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureCosmosDBKeyIdentifiable,
 				Raw:          []byte(key),
@@ -87,29 +82,31 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				var verified bool
-				var verificationErr error
+				if invalidHosts.Exists(accountUrl) {
+					s1.SetVerificationError(errNoHost)
+				} else {
+					var verified bool
+					var verificationErr error
 
-				client := s.getClient()
+					client := s.getClient()
 
-				// perform verification based on db type
-				if strings.Contains(accountUrl, ".documents.azure.com") {
-					verified, verificationErr = verifyCosmosDocumentDB(client, accountUrl, key)
-					s1.ExtraData["DB Type"] = "Document"
+					// perform verification based on db type
+					if strings.Contains(accountUrl, ".documents.azure.com") {
+						verified, verificationErr = verifyCosmosDocumentDB(client, accountUrl, key)
+						s1.ExtraData["DB Type"] = "Document"
 
-				} else if strings.Contains(accountUrl, ".table.cosmos.azure.com") {
-					verified, verificationErr = verifyCosmosTableDB(client, accountUrl, key)
-					s1.ExtraData["DB Type"] = "Table"
-				}
-
-				s1.Verified = verified
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(accountUrl, struct{}{})
-						continue
+					} else if strings.Contains(accountUrl, ".table.cosmos.azure.com") {
+						verified, verificationErr = verifyCosmosTableDB(client, accountUrl, key)
+						s1.ExtraData["DB Type"] = "Table"
 					}
 
-					s1.SetVerificationError(verificationErr)
+					s1.Verified = verified
+					if verificationErr != nil {
+						if errors.Is(verificationErr, errNoHost) {
+							invalidHosts.Set(accountUrl, struct{}{})
+						}
+						s1.SetVerificationError(verificationErr)
+					}
 				}
 			}
 

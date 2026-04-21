@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		keyMatchesUnique[strings.TrimSpace(keyMatch[1])] = struct{}{}
 	}
 
-EndpointLoop:
 	for baseUrl := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
@@ -65,23 +64,22 @@ EndpointLoop:
 
 			if verify {
 				if invalidHosts.Exists(baseUrl) {
-					logger.V(3).Info("Skipping invalid registry", "baseUrl", baseUrl)
-					continue EndpointLoop
-				}
-
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, key)
-				s1.Verified = isVerified
-				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
-						invalidHosts.Set(baseUrl, struct{}{})
-						continue EndpointLoop
+					logger.V(3).Info("Skipping verification: cached no such host", "baseUrl", baseUrl)
+					s1.SetVerificationError(noSuchHostErr, baseUrl)
+				} else {
+					client := s.client
+					if client == nil {
+						client = defaultClient
 					}
-					s1.SetVerificationError(verificationErr, baseUrl)
+
+					isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, key)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						if errors.Is(verificationErr, noSuchHostErr) {
+							invalidHosts.Set(baseUrl, struct{}{})
+						}
+						s1.SetVerificationError(verificationErr, baseUrl)
+					}
 				}
 			}
 

@@ -54,11 +54,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				if strings.Contains(body, "CreatedOn") {
-					s1.Verified = true
+					s1.SetVerificationError(err, resMatch)
+				} else {
+					body := string(bodyBytes)
+					if strings.Contains(body, "CreatedOn") {
+						s1.Verified = true
+					}
 				}
 			}
 		}

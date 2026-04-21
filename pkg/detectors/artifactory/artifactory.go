@@ -77,11 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueTokens {
 		for url := range uniqueUrls {
-			if invalidHosts.Exists(url) {
-				delete(uniqueUrls, url)
-				continue
-			}
-
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 				Raw:          []byte(token),
@@ -89,16 +84,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyArtifactory(ctx, s.getClient(), url, token)
-				s1.Verified = isVerified
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(url, struct{}{})
-						continue
+				if invalidHosts.Exists(url) {
+					s1.SetVerificationError(errNoHost, token)
+				} else {
+					isVerified, verificationErr := verifyArtifactory(ctx, s.getClient(), url, token)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						if errors.Is(verificationErr, errNoHost) {
+							invalidHosts.Set(url, struct{}{})
+						}
+						s1.SetVerificationError(verificationErr, token)
 					}
-
-					s1.SetVerificationError(verificationErr, token)
-
 					if isVerified {
 						s1.AnalysisInfo = map[string]string{
 							"domain": url,
