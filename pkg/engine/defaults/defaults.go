@@ -185,6 +185,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commodities"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/companyhub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluencedatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/contentfulpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/conversiontools"
@@ -1056,6 +1057,7 @@ func buildDetectorList() []detectors.Detector {
 		&commercejs.Scanner{},
 		&commodities.Scanner{},
 		&companyhub.Scanner{},
+		&confluencedatacenter.Scanner{},
 		&confluent.Scanner{},
 		&contentfulpersonalaccesstoken.Scanner{},
 		&conversiontools.Scanner{},
