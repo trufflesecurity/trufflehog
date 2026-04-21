@@ -35,7 +35,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	
-	tokenRegistryMap := extractTokenRegistryPairs(dataStr)
+	var tokenRegistryMap map[string]string
+	if verify {
+		tokenRegistryMap = extractTokenRegistryPairs(dataStr)
+	}
 	
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
