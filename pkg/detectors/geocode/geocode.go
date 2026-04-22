@@ -20,7 +20,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"geocode"}) + `\b([a-z0-9]{28})\b`)
@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Geocode, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://geocode.xyz/51.4647,0.0079?json=1&auth=%s", resMatch), nil)
 			if err != nil {
 				continue

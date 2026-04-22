@@ -4,13 +4,18 @@
 package detectors
 
 import (
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	regexp "github.com/wasilibs/go-re2"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPrefixRegex(t *testing.T) {
@@ -71,64 +76,70 @@ func TestPrefixRegexKeywords(t *testing.T) {
 	}
 }
 
-// The https://httpbin.org/uuid API returns a new UUID on each call.
-// However, because we're using singleflight and issuing concurrent requests,
-// all response bodies should be identical (only one actual HTTP request is made).
-func TestVerificationRequest_Singleflight(t *testing.T) {
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+// TestNewClientWithDedup_Singleflight verifies that concurrent requests sharing the
+// same WithDedupKey context are coalesced into one network call. Each request the
+// server receives returns a distinct body, so all goroutines should observe the body
+// from exactly one actual server-side request.
+func TestNewClientWithDedup_Singleflight(t *testing.T) {
+	var requestCount int32
 
-	// Create two separate *http.Request instances pointing to same endpoint
-	request1, err := http.NewRequest(http.MethodGet, "https://httpbin.org/uuid", http.NoBody)
-	assert.NoError(t, err)
+	// The 20 ms sleep keeps the first request in-flight long enough for all
+	// goroutines to call client.Do before the result is ready.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		n := atomic.AddInt32(&requestCount, 1)
+		time.Sleep(20 * time.Millisecond)
+		fmt.Fprintf(w, `{"request":%d}`, n)
+	}))
+	defer server.Close()
 
-	request2, err := http.NewRequest(http.MethodGet, "https://httpbin.org/uuid", http.NoBody)
-	assert.NoError(t, err)
+	client := NewClientWithDedup(server.Client())
 
-	const key = "uuid-test"
+	const goroutines = 5
+	bodies := make([]string, goroutines)
+	statuses := make([]int, goroutines)
+	errs := make([]error, goroutines)
 
 	var wg sync.WaitGroup
-	const goroutines = 5
-	results := make([]*VerificationResult, goroutines)
-	errors := make([]error, goroutines)
-
-	// launch several concurrent goroutines all requesting the same identifier
 	for i := range goroutines {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			// alternate between two identical requests just to prove it doesn't matter
-			req := request1
-			if i%2 == 0 {
-				req = request2
+			// Each goroutine creates its own request but shares the same dedup key.
+			ctx := WithDedupKey(t.Context(), detector_typepb.DetectorType_Meraki, "test-credential")
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, http.NoBody)
+			if err != nil {
+				errs[i] = err
+				return
 			}
-
-			res, err := VerificationRequest(key, req, client)
-			results[i] = res
-			errors[i] = err
+			resp, err := client.Do(req)
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			defer resp.Body.Close()
+			var buf [512]byte
+			n, _ := resp.Body.Read(buf[:])
+			bodies[i] = string(buf[:n])
+			statuses[i] = resp.StatusCode
 		}(i)
 	}
-
 	wg.Wait()
 
-	for _, err := range errors {
+	for _, err := range errs {
 		assert.NoError(t, err)
 	}
-
-	// all goroutines should get a non-nil result
-	for _, r := range results {
-		assert.NotNil(t, r)
+	for _, s := range statuses {
+		assert.Equal(t, http.StatusOK, s)
 	}
 
-	// since singleflight coalesces concurrent calls, all results should have identical bodies
-	firstBody := results[0].Body
+	// Exactly one HTTP request must have reached the server.
+	assert.Equal(t, int32(1), atomic.LoadInt32(&requestCount),
+		"singleflight should coalesce all concurrent calls into one HTTP request")
+
+	// Every goroutine must see the same response body.
 	for i := 1; i < goroutines; i++ {
-		assert.Equal(t, string(firstBody), string(results[i].Body),
-			"Expected all results to share the same response body (one HTTP call only)")
+		assert.Equal(t, bodies[0], bodies[i])
 	}
-
-	t.Logf("All %d goroutines received the same UUID: %s", goroutines, string(firstBody))
 }
 
 func BenchmarkPrefixRegex(b *testing.B) {

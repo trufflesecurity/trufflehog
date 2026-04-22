@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitter"}) + `\b([a-z0-9-]{40})\b`)
@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Gitter, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.gitter.im/v1/user/me", nil)
 			if err != nil {
 				continue

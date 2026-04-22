@@ -1,9 +1,11 @@
 package detectors
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -338,38 +340,86 @@ func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
-type VerificationResult struct {
-	StatusCode int
-	Body       []byte
+type dedupKeyContextKey struct{}
+
+// WithDedupKey returns a context that carries a deduplication key for the given
+// detector type and credential. Requests made through a client from NewClientWithDedup
+// that share the same key are coalesced into a single network call.
+//
+// Adoption per detector is one line before building the request:
+//
+//	ctx = detectors.WithDedupKey(ctx, s.Type(), credential)
+//	req, _ := http.NewRequestWithContext(ctx, ...)
+//	resp, err := client.Do(req) // unchanged - body/status readable as normal
+func WithDedupKey(ctx context.Context, detType detector_typepb.DetectorType, credential string) context.Context {
+	key := fmt.Sprintf("%d:%s", int32(detType), credential)
+	return context.WithValue(ctx, dedupKeyContextKey{}, key)
 }
 
-var verificationGroup = new(singleflight.Group)
+// bufferedResponse holds a fully-read HTTP response so it can be replayed to
+// every goroutine that was coalesced by singleflight.
+type bufferedResponse struct {
+	statusCode int
+	header     http.Header
+	body       []byte
+}
 
-func VerificationRequest(identifier string, request *http.Request, client *http.Client) (*VerificationResult, error) {
-	result, err, _ := verificationGroup.Do(identifier, func() (any, error) {
-		resp, err := client.Do(request)
+// singleflightTransport is an http.RoundTripper that coalesces concurrent requests
+// sharing the same deduplication key into a single network call. It is a no-op for
+// requests whose context does not carry a dedup key.
+type singleflightTransport struct {
+	base  http.RoundTripper
+	group singleflight.Group
+}
+
+func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	key, ok := req.Context().Value(dedupKeyContextKey{}).(string)
+	if !ok || key == "" {
+		return t.base.RoundTrip(req)
+	}
+
+	result, err, _ := t.group.Do(key, func() (any, error) {
+		resp, err := t.base.RoundTrip(req)
 		if err != nil {
 			return nil, err
 		}
+		defer resp.Body.Close()
 
-		defer func() {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
 			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-		}()
-
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
 			return nil, err
 		}
 
-		return &VerificationResult{
-			StatusCode: resp.StatusCode,
-			Body:       bodyBytes,
+		return &bufferedResponse{
+			statusCode: resp.StatusCode,
+			header:     resp.Header.Clone(),
+			body:       body,
 		}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return result.(*VerificationResult), nil
+	br := result.(*bufferedResponse)
+	return &http.Response{
+		StatusCode: br.statusCode,
+		Status:     fmt.Sprintf("%d %s", br.statusCode, http.StatusText(br.statusCode)),
+		Header:     br.header.Clone(),
+		Body:       io.NopCloser(bytes.NewReader(br.body)),
+	}, nil
+}
+
+// NewClientWithDedup wraps base with a transport that deduplicates concurrent
+// verification requests sharing the same key. Detectors opt in per credential by
+// calling WithDedupKey on the request context before client.Do — no other changes
+// to request building or response reading are needed.
+func NewClientWithDedup(base *http.Client) *http.Client {
+	clone := *base
+	transport := base.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	clone.Transport = &singleflightTransport{base: transport}
+	return &clone
 }

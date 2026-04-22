@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cliengo"}) + `\b([0-9a-f]{8}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{12})\b`)
@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Cliengo, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cliengo.com/1.0/account?api_key="+resMatch, nil)
 			if err != nil {
 				continue

@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(API_KEY[0-9A-Z]{32})\b`)
@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Finage, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.finage.co.uk/symbol-list/crypto?apikey=%s", resMatch), nil)
 			if err != nil {
 				continue

@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"proxycrawl"}) + `\b([a-zA-Z0-9_]{22})\b`)
@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_ProxyCrawl, resMatch)
 			timeout := 10 * time.Second
 			client.Timeout = timeout
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.proxycrawl.com/leads?token=%s&domain=slack.com", resMatch), nil)

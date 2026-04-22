@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -28,7 +29,7 @@ type merakiOrganizations struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	apiKey = regexp.MustCompile(detectors.PrefixRegex([]string{"meraki"}) + `([0-9a-f]{40})`)
 )
@@ -56,14 +57,12 @@ func (s Scanner) Description() string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	// uniqueMatches will hold unique match values and ensure we only process unique matches found in the data string
-	var matches = make([]string, 0)
-
+	uniqueMatches := make(map[string]struct{})
 	for _, match := range apiKey.FindAllStringSubmatch(dataStr, -1) {
-		matches = append(matches, match[1])
+		uniqueMatches[match[1]] = struct{}{}
 	}
 
-	for _, match := range matches {
+	for match := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Meraki,
 			Raw:          []byte(match),
@@ -101,31 +100,32 @@ verifyMerakiApiKey verifies if the passed matched api key for meraki is active o
 docs: https://developer.cisco.com/meraki/api-v1/authorization/#authorization
 */
 func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) ([]merakiOrganizations, bool, error) {
+	ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Meraki, match)
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.meraki.com/api/v1/organizations", http.NoBody)
 	if err != nil {
 		return nil, false, err
 	}
-
-	// set the required auth header
 	req.Header.Set("X-Cisco-Meraki-API-Key", match)
 
-	result, err := detectors.VerificationRequest(match, req, client)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, false, err
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	switch result.StatusCode {
+	switch resp.StatusCode {
 	case http.StatusOK:
-		// in case token is verified, capture the organization id's and name which are accessible via token.
 		var organizations []merakiOrganizations
-		if err = json.Unmarshal(result.Body, &organizations); err != nil {
+		if err = json.NewDecoder(resp.Body).Decode(&organizations); err != nil {
 			return nil, false, err
 		}
-
 		return organizations, true, nil
 	case http.StatusUnauthorized:
 		return nil, false, nil
 	default:
-		return nil, false, fmt.Errorf("unexpected status code: %d", result.StatusCode)
+		return nil, false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }

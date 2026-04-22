@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tickettailor"}) + `\b(sk_[0-9]{4}_[0-9]{6}_[a-f0-9]{32})`)
@@ -68,6 +68,7 @@ func (s Scanner) Description() string {
 }
 
 func verifyTicketTailor(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
+	ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Tickettailor, apiKey)
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.tickettailor.com/v1/orders", nil)
 	if err != nil {
 		return false, err

@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"opencagedata"}) + `\b([a-z0-9]{32})\b`)
@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_OpenCageData, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.opencagedata.com/geocode/v1/json?q=12.8797,121.7740&key=%s", resMatch), nil)
 			if err != nil {
 				continue
