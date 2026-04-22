@@ -1182,6 +1182,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			results = e.filterResults(ctx, data.detector, results)
 		}
 
+		AssignDuplicateLineOffsets(&data.chunk, results)
+
 		for _, res := range results {
 			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
 		}
@@ -1335,7 +1337,27 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		secret = string(result.Raw)
 	}
 
-	before, after, found := bytes.Cut(chunk.Data, []byte(secret))
+	secretBytes := []byte(secret)
+
+	// If a chunk offset was pre-assigned (for duplicate secrets), use it directly
+	// to find the correct occurrence instead of always matching the first one.
+	if result.HasChunkOffset() {
+		offset := int(result.ChunkOffset())
+		lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
+		result.SetPrimarySecretLine(lineNumber)
+
+		afterSecret := chunk.Data[offset+len(secretBytes):]
+		endLine := bytes.Index(afterSecret, []byte("\n"))
+		if endLine == -1 {
+			endLine = len(afterSecret)
+		}
+		if bytes.Contains(afterSecret[:endLine], []byte(ignoreTag)) {
+			return lineNumber, true
+		}
+		return lineNumber, false
+	}
+
+	before, after, found := bytes.Cut(chunk.Data, secretBytes)
 	if !found {
 		return 0, false
 	}
@@ -1350,6 +1372,49 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		return lineNumber, true
 	}
 	return lineNumber, false
+}
+
+// AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same
+// secret value within a chunk. This allows FragmentLineOffset to locate the correct
+// occurrence instead of always finding the first one.
+func AssignDuplicateLineOffsets(chunk *sources.Chunk, results []detectors.Result) {
+	// Group result indices by their secret value.
+	type group struct {
+		secret  string
+		indices []int
+	}
+	seen := make(map[string]int) // secret -> index into groups slice
+	var groups []group
+
+	for i := range results {
+		secret := results[i].GetPrimarySecretValue()
+		if secret == "" {
+			secret = string(results[i].Raw)
+		}
+		if idx, ok := seen[secret]; ok {
+			groups[idx].indices = append(groups[idx].indices, i)
+		} else {
+			seen[secret] = len(groups)
+			groups = append(groups, group{secret: secret, indices: []int{i}})
+		}
+	}
+
+	for _, g := range groups {
+		if len(g.indices) <= 1 {
+			continue
+		}
+		secretBytes := []byte(g.secret)
+		searchStart := 0
+		for _, ri := range g.indices {
+			pos := bytes.Index(chunk.Data[searchStart:], secretBytes)
+			if pos == -1 {
+				break
+			}
+			absPos := searchStart + pos
+			results[ri].SetChunkOffset(int64(absPos))
+			searchStart = absPos + len(secretBytes)
+		}
+	}
 }
 
 // FragmentFirstLineAndLink extracts the first line number and the link from the chunk metadata.
