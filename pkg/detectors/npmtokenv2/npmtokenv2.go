@@ -4,40 +4,42 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
 func (s Scanner) Version() int { return 2 }
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(npm_[0-9a-zA-Z]{36})`)
+	
+	npmrcPat = regexp.MustCompile(`//([^/]+(?:/[^:]+)*)/:_authToken\s*=\s*([^\s]+)`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"npm_"}
 }
 
-// FromData will find and optionally verify NpmTokenV2 secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	
+	var tokenRegistryMap map[string]string
+	if verify {
+		tokenRegistryMap = extractTokenRegistryPairs(dataStr)
+	}
 
 	for _, match := range matches {
 		resMatch := match[1]
@@ -51,20 +53,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://registry.npmjs.org/-/whoami", nil)
-			if err != nil {
-				continue
+			registry, found := tokenRegistryMap[resMatch]
+			if !found {
+				registry = "registry.npmjs.org"
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-					s1.AnalysisInfo = map[string]string{
-						"key": resMatch,
-					}
-				}
+			
+			isVerified, extraData := verifyToken(ctx, resMatch, registry)
+			s1.Verified = isVerified
+			if isVerified {
+				s1.AnalysisInfo = extraData
 			}
 		}
 
@@ -72,6 +69,58 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+func extractTokenRegistryPairs(data string) map[string]string {
+	matches := npmrcPat.FindAllStringSubmatch(data, -1)
+	tokenMap := make(map[string]string)
+	
+	for _, match := range matches {
+		if len(match) > 2 {
+			registry := match[1]
+			token := match[2]
+			
+			token = strings.TrimSpace(token)
+			if _, exists := tokenMap[token]; !exists {
+				tokenMap[token] = registry
+			}
+		}
+	}
+	
+	return tokenMap
+}
+
+func verifyToken(ctx context.Context, token string, registry string) (bool, map[string]string) {
+	registryURL := buildRegistryURL(registry)
+	
+	req, err := http.NewRequestWithContext(ctx, "GET", registryURL, nil)
+	if err != nil {
+		return false, nil
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	res, err := client.Do(req)
+	if err == nil {
+		defer res.Body.Close()
+		if res.StatusCode >= 200 && res.StatusCode < 300 {
+			return true, map[string]string{
+				"key":      token,
+				"registry": registry,
+			}
+		}
+	}
+	
+	return false, nil
+}
+
+func buildRegistryURL(registry string) string {
+	registry = strings.TrimSpace(registry)
+	registry = strings.TrimSuffix(registry, "/")
+	
+	if strings.HasPrefix(registry, "http://") || strings.HasPrefix(registry, "https://") {
+		return registry + "/-/whoami"
+	}
+	
+	return "https://" + registry + "/-/whoami"
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
