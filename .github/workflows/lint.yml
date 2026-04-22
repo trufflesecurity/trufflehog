@@ -50,3 +50,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: semgrep --config=hack/semgrep-rules/detectors.yaml pkg/detectors/
+  checksecretparts:
+    # Warning-only: reports detector packages that construct detectors.Result
+    # without populating SecretParts. Flip to hard-fail (drop continue-on-error
+    # and run with -fail) after every detector has been migrated. See
+    # hack/checksecretparts/README.md.
+    name: checksecretparts (warning)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Run checksecretparts
+        run: go run ./hack/checksecretparts ./pkg/detectors
