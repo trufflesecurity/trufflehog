@@ -30,11 +30,18 @@ func GetDCTokenPat(prefixes []string) *regexp.Regexp {
 	)
 }
 
-// FindEndpoints extracts all URLs from data that are near the given keywords,
-// passes them through the resolve function (typically s.Endpoints), deduplicates
-// the results, and returns them as a slice with trailing slashes stripped.
-func FindEndpoints(data string, keywords []string, resolve func(...string) []string) []string {
-	urlPat := regexp.MustCompile(detectors.PrefixRegex(keywords) + `(https?://[a-zA-Z0-9][a-zA-Z0-9.\-]*(?::\d{1,5})?)`)
+// GetURLPat returns a compiled regex that matches self-hosted Atlassian instance
+// URLs (scheme + alphanumeric-starting host + optional port up to 5 digits),
+// scoped to the given keyword prefixes. Callers should store the result in a
+// package-level var so the regex is compiled once at init time rather than per chunk.
+func GetURLPat(prefixes []string) *regexp.Regexp {
+	return regexp.MustCompile(detectors.PrefixRegex(prefixes) + `(https?://[a-zA-Z0-9][a-zA-Z0-9.\-]*(?::\d{1,5})?)`)
+}
+
+// FindEndpoints extracts all URLs matching urlPat from data, passes them through
+// the resolve function (typically s.Endpoints), deduplicates the results, and
+// returns them as a slice with trailing slashes stripped.
+func FindEndpoints(data string, urlPat *regexp.Regexp, resolve func(...string) []string) []string {
 	seen := make(map[string]struct{})
 	for _, m := range urlPat.FindAllStringSubmatch(data, -1) {
 		seen[m[1]] = struct{}{}

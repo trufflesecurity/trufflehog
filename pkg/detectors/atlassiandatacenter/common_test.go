@@ -119,7 +119,7 @@ func TestGetDCTokenPat(t *testing.T) {
 }
 
 func TestFindEndpoints(t *testing.T) {
-	keywords := []string{"jira", "atlassian"}
+	urlPat := GetURLPat([]string{"jira", "atlassian"})
 
 	// identity resolver: returns exactly what it receives (simulates UseFoundEndpoints only)
 	identity := func(urls ...string) []string { return urls }
@@ -192,7 +192,7 @@ func TestFindEndpoints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FindEndpoints(tt.data, keywords, tt.resolve)
+			got := FindEndpoints(tt.data, urlPat, tt.resolve)
 			assert.ElementsMatch(t, tt.want, got)
 		})
 	}

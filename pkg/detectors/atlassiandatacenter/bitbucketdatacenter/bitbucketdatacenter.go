@@ -30,7 +30,7 @@ var (
 	// and are usually between the length of 40-50 character
 	// consisting of both alphanumeric and some special character like +, _, @ and etc
 	userPat = regexp.MustCompile(`\b(BBDC-[A-Za-z0-9+/@_-]{40,50})(?:[^A-Za-z0-9+/@_-]|$)`)
-
+	urlPat  = atlassiandatacenter.GetURLPat([]string{"atlassian", "bitbucket"})
 )
 
 func (s Scanner) Keywords() []string {
@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		return results, nil
 	}
 
-	endpoints := atlassiandatacenter.FindEndpoints(dataStr, []string{"atlassian", "bitbucket"}, s.Endpoints)
+	endpoints := atlassiandatacenter.FindEndpoints(dataStr, urlPat, s.Endpoints)
 
 	// create combination results that can be verified
 	for secret := range uniqueSecretPat {

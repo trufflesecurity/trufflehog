@@ -33,6 +33,7 @@ var (
 
 	// 44-char base64 PAT; decoded form must match the structural check in atlassiandatacenter.IsStructuralPAT.
 	tokenPat = atlassiandatacenter.GetDCTokenPat(keywords)
+	urlPat   = atlassiandatacenter.GetURLPat(keywords)
 
 	invalidHosts = simple.NewCache[struct{}]()
 	errNoHost    = errors.New("no such host")
@@ -73,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		return nil, nil
 	}
 
-	allURLs := atlassiandatacenter.FindEndpoints(dataStr, keywords, s.Endpoints)
+	allURLs := atlassiandatacenter.FindEndpoints(dataStr, urlPat, s.Endpoints)
 
 	// Filter hosts cached as unreachable from prior calls once up front.
 	// invalidHosts may also grow during this call (see the verify branch

@@ -31,7 +31,8 @@ var (
 	// Since the first byte is always an ASCII digit (0x30–0x39), the first base64 character is always M, N, or O.
 	// This is also verified by generating 25+ tokens.
 	// The trailing boundary (?:[^A-Za-z0-9+/=]|\z) is used instead of \b to correctly handle tokens ending in + or /.
-	patPat = atlassiandatacenter.GetDCTokenPat(keywords)
+	patPat  = atlassiandatacenter.GetDCTokenPat(keywords)
+	urlPat  = atlassiandatacenter.GetURLPat(keywords)
 )
 
 func (s Scanner) getClient() *http.Client {
@@ -57,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	endpoints := atlassiandatacenter.FindEndpoints(dataStr, keywords, s.Endpoints)
+	endpoints := atlassiandatacenter.FindEndpoints(dataStr, urlPat, s.Endpoints)
 
 	for token := range tokens {
 		if len(endpoints) == 0 {
