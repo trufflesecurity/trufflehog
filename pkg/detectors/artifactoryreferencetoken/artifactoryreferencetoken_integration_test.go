@@ -142,7 +142,7 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Artifactoryreferencetoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
@@ -188,7 +188,7 @@ func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
 		}
 	}
 
-	ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "AnalysisInfo")
+	ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts")
 	if diff := cmp.Diff(got, want, ignoreOpts); diff != "" {
 		t.Errorf("Artifactoryreferencetoken.FromData() diff: (-got +want)\n%s", diff)
 	}
