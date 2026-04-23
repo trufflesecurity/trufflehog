@@ -1329,15 +1329,20 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	}
 }
 
+// effectiveSecret returns the canonical secret string for a result, preferring
+// the primary secret value and falling back to Raw. Callers that compute or
+// consume chunk offsets must go through this helper so the two stay in sync.
+func effectiveSecret(r *detectors.Result) string {
+	secret := r.GetPrimarySecretValue()
+	if secret == "" {
+		secret = string(r.Raw)
+	}
+	return secret
+}
+
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	// get the primary secret value from the result if set
-	secret := result.GetPrimarySecretValue()
-	if secret == "" {
-		secret = string(result.Raw)
-	}
-
-	secretBytes := []byte(secret)
+	secretBytes := []byte(effectiveSecret(result))
 
 	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
 	// pre-assigned (for duplicate secrets), use it directly to find the correct
@@ -1380,10 +1385,7 @@ func AssignDuplicateLineOffsets(chunk *sources.Chunk, results []detectors.Result
 	var groups []group
 
 	for i := range results {
-		secret := results[i].GetPrimarySecretValue()
-		if secret == "" {
-			secret = string(results[i].Raw)
-		}
+		secret := effectiveSecret(&results[i])
 		if idx, ok := seen[secret]; ok {
 			groups[idx].indices = append(groups[idx].indices, i)
 		} else {
