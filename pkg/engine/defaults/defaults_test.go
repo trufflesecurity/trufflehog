@@ -233,7 +233,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Createsend:                              {},
 	detector_typepb.DetectorType_Cricket:                                 {},
 	detector_typepb.DetectorType_DigitalOceanSpaces:                      {},
-	detector_typepb.DetectorType_Distribusion:                            {},
+	detector_typepb.DetectorType_Distribusion:                            {}, //nolint:misspell // proto enum name is intentionally spelled this way
 	detector_typepb.DetectorType_Duda:                                    {},
 	detector_typepb.DetectorType_Duffel:                                  {},
 	detector_typepb.DetectorType_Dynadot:                                 {},
