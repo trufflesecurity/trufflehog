@@ -235,19 +235,6 @@ func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, er
 	}, nil
 }
 
-// WithDedup is a ClientOption that wraps the client's transport with singleflightTransport,
-// coalescing concurrent requests that share the same dedup key (set via WithDedupKey) into
-// a single network call. Compose with other options via NewDetectorHttpClient.
-func WithDedup() ClientOption {
-	return func(c *http.Client) {
-		transport := c.Transport
-		if transport == nil {
-			transport = http.DefaultTransport
-		}
-		c.Transport = &singleflightTransport{base: transport}
-	}
-}
-
 // NewClientWithDedup wraps base with a transport that deduplicates concurrent
 // verification requests sharing the same key. Detectors opt in per credential by
 // calling WithDedupKey on the request context before client.Do — no other changes
