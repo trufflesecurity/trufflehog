@@ -203,8 +203,14 @@ func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, er
 		return t.base.RoundTrip(req)
 	}
 
-	result, err, _ := t.group.Do(key, func() (any, error) {
-		resp, err := t.base.RoundTrip(req)
+	// DoChan is used instead of Do so each caller can independently respect its
+	// own context cancellation without blocking on the shared in-flight call.
+	ch := t.group.DoChan(key, func() (any, error) {
+		// Detach the in-flight request from the first caller's cancellation so
+		// that one goroutine timing out doesn't abort the shared network call
+		// and propagate an error to all coalesced waiters.
+		sharedReq := req.WithContext(context.WithoutCancel(req.Context()))
+		resp, err := t.base.RoundTrip(sharedReq)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +218,6 @@ func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, er
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			_, _ = io.Copy(io.Discard, resp.Body)
 			return nil, err
 		}
 
@@ -222,17 +227,22 @@ func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, er
 			body:       body,
 		}, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	br := result.(*bufferedResponse)
-	return &http.Response{
-		StatusCode: br.statusCode,
-		Status:     fmt.Sprintf("%d %s", br.statusCode, http.StatusText(br.statusCode)),
-		Header:     br.header.Clone(),
-		Body:       io.NopCloser(bytes.NewReader(br.body)),
-	}, nil
+	select {
+	case result := <-ch:
+		if result.Err != nil {
+			return nil, result.Err
+		}
+		br := result.Val.(*bufferedResponse)
+		return &http.Response{
+			StatusCode: br.statusCode,
+			Status:     fmt.Sprintf("%d %s", br.statusCode, http.StatusText(br.statusCode)),
+			Header:     br.header.Clone(),
+			Body:       io.NopCloser(bytes.NewReader(br.body)),
+		}, nil
+	case <-req.Context().Done():
+		return nil, req.Context().Err()
+	}
 }
 
 // NewClientWithDedup wraps base with a transport that deduplicates concurrent
