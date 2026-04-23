@@ -143,12 +143,13 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 
 	// If the current read position is within the in-memory buffer.
 	if br.index < int64(br.buf.Len()) {
-		totalBytesRead = copy(out, br.buf.Bytes()[br.index:])
-		br.index += int64(totalBytesRead)
-		if totalBytesRead == len(out) {
+		n := copy(out, br.buf.Bytes()[br.index:])
+		totalBytesRead += n
+		br.index += int64(n)
+		if n == len(out) {
 			return totalBytesRead, nil
 		}
-		out = out[totalBytesRead:]
+		out = out[n:]
 	}
 
 	// If we've exceeded the in-memory threshold and have a temp file.
@@ -162,10 +163,10 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		if err != nil && !errors.Is(err, io.EOF) {
 			return totalBytesRead, err
 		}
-		if totalBytesRead == len(out) {
+		if m == len(out) {
 			return totalBytesRead, nil
 		}
-		out = out[totalBytesRead:]
+		out = out[m:]
 	}
 
 	if len(out) == 0 {
