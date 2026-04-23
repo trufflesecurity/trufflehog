@@ -209,7 +209,19 @@ func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, er
 		// Detach the in-flight request from the first caller's cancellation so
 		// that one goroutine timing out doesn't abort the shared network call
 		// and propagate an error to all coalesced waiters.
-		sharedReq := req.WithContext(context.WithoutCancel(req.Context()))
+		//
+		// context.WithoutCancel also strips any deadline (e.g. from
+		// http.Client.Timeout), so we re-attach the original deadline if
+		// present. Without this the shared request has no timeout and a
+		// hanging server would leak the goroutine and pin the singleflight
+		// key indefinitely.
+		sharedCtx := context.WithoutCancel(req.Context())
+		if deadline, ok := req.Context().Deadline(); ok {
+			var cancel context.CancelFunc
+			sharedCtx, cancel = context.WithDeadline(sharedCtx, deadline)
+			defer cancel()
+		}
+		sharedReq := req.WithContext(sharedCtx)
 		resp, err := t.base.RoundTrip(sharedReq)
 		if err != nil {
 			return nil, err
