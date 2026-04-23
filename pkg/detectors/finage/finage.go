@@ -46,13 +46,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Finage, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.finage.co.uk/symbol-list/crypto?apikey=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
 			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Finage, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

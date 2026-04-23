@@ -1,13 +1,18 @@
 package detectors
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"slices"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -174,4 +179,85 @@ func NewDetectorHttpClient(opts ...ClientOption) *http.Client {
 
 	client.Transport = common.NewInstrumentedTransport(client.Transport)
 	return client
+}
+
+// bufferedResponse holds a fully-read HTTP response so it can be replayed to
+// every goroutine that was coalesced by singleflight.
+type bufferedResponse struct {
+	statusCode int
+	header     http.Header
+	body       []byte
+}
+
+// singleflightTransport is an http.RoundTripper that coalesces concurrent requests
+// sharing the same deduplication key into a single network call. It is a no-op for
+// requests whose context does not carry a dedup key.
+type singleflightTransport struct {
+	base  http.RoundTripper
+	group singleflight.Group
+}
+
+func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	key, ok := req.Context().Value(dedupKeyContextKey{}).(string)
+	if !ok || key == "" {
+		return t.base.RoundTrip(req)
+	}
+
+	result, err, _ := t.group.Do(key, func() (any, error) {
+		resp, err := t.base.RoundTrip(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			return nil, err
+		}
+
+		return &bufferedResponse{
+			statusCode: resp.StatusCode,
+			header:     resp.Header.Clone(),
+			body:       body,
+		}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	br := result.(*bufferedResponse)
+	return &http.Response{
+		StatusCode: br.statusCode,
+		Status:     fmt.Sprintf("%d %s", br.statusCode, http.StatusText(br.statusCode)),
+		Header:     br.header.Clone(),
+		Body:       io.NopCloser(bytes.NewReader(br.body)),
+	}, nil
+}
+
+// WithDedup is a ClientOption that wraps the client's transport with singleflightTransport,
+// coalescing concurrent requests that share the same dedup key (set via WithDedupKey) into
+// a single network call. Compose with other options via NewDetectorHttpClient.
+func WithDedup() ClientOption {
+	return func(c *http.Client) {
+		transport := c.Transport
+		if transport == nil {
+			transport = http.DefaultTransport
+		}
+		c.Transport = &singleflightTransport{base: transport}
+	}
+}
+
+// NewClientWithDedup wraps base with a transport that deduplicates concurrent
+// verification requests sharing the same key. Detectors opt in per credential by
+// calling WithDedupKey on the request context before client.Do — no other changes
+// to request building or response reading are needed.
+func NewClientWithDedup(base *http.Client) *http.Client {
+	clone := *base
+	transport := base.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	clone.Transport = &singleflightTransport{base: transport}
+	return &clone
 }

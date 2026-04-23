@@ -76,15 +76,15 @@ func TestPrefixRegexKeywords(t *testing.T) {
 	}
 }
 
-// TestNewClientWithDedup_Singleflight verifies that concurrent requests sharing the
-// same WithDedupKey context are coalesced into one network call. Each request the
-// server receives returns a distinct body, so all goroutines should observe the body
-// from exactly one actual server-side request.
-func TestNewClientWithDedup_Singleflight(t *testing.T) {
+// TestDoWithDedup_Singleflight verifies that concurrent DoWithDedup calls sharing the
+// same detector type and credential are coalesced into one network call. Each request
+// the server receives returns a distinct body, so all goroutines should observe the
+// body from exactly one actual server-side request.
+func TestDoWithDedup_Singleflight(t *testing.T) {
 	var requestCount int32
 
 	// The 20 ms sleep keeps the first request in-flight long enough for all
-	// goroutines to call client.Do before the result is ready.
+	// goroutines to call DoWithDedup before the result is ready.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		n := atomic.AddInt32(&requestCount, 1)
 		time.Sleep(20 * time.Millisecond)
@@ -104,14 +104,12 @@ func TestNewClientWithDedup_Singleflight(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			// Each goroutine creates its own request but shares the same dedup key.
-			ctx := WithDedupKey(t.Context(), detector_typepb.DetectorType_Meraki, "test-credential")
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, http.NoBody)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, http.NoBody)
 			if err != nil {
 				errs[i] = err
 				return
 			}
-			resp, err := client.Do(req)
+			resp, err := DoWithDedup(client, detector_typepb.DetectorType_Meraki, "test-credential", req)
 			if err != nil {
 				errs[i] = err
 				return

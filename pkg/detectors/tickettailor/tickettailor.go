@@ -68,7 +68,6 @@ func (s Scanner) Description() string {
 }
 
 func verifyTicketTailor(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
-	ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Tickettailor, apiKey)
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.tickettailor.com/v1/orders", nil)
 	if err != nil {
 		return false, err
@@ -77,7 +76,7 @@ func verifyTicketTailor(ctx context.Context, client *http.Client, apiKey string)
 	req.Header.Add("Accept", "application/json")
 	// as per API docs we only need to use apiKey as username in basic auth and leave password as empty: https://developers.tickettailor.com/#authentication
 	req.SetBasicAuth(apiKey, "")
-	resp, err := client.Do(req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Tickettailor, apiKey, req)
 	if err != nil {
 		return false, nil
 	}

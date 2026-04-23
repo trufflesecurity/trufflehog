@@ -51,12 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_IPInfo, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://ipinfo.io/json?token="+resMatch, nil)
 			if err != nil {
 				continue
 			}
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_IPInfo, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

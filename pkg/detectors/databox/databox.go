@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Databox, resMatch)
 			data := fmt.Sprintf("%s:", resMatch)
 			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 			payload := strings.NewReader(`{
@@ -65,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Accept", "application/vnd.databox.v2+json")
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Databox, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

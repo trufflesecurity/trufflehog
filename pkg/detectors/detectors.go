@@ -1,12 +1,10 @@
 package detectors
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -18,7 +16,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"golang.org/x/sync/singleflight"
 )
 
 // Detector defines an interface for scanning for and verifying secrets.
@@ -342,84 +339,17 @@ func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
 
 type dedupKeyContextKey struct{}
 
-// WithDedupKey returns a context that carries a deduplication key for the given
-// detector type and credential. Requests made through a client from NewClientWithDedup
-// that share the same key are coalesced into a single network call.
-//
-// Adoption per detector is one line before building the request:
-//
-//	ctx = detectors.WithDedupKey(ctx, s.Type(), credential)
-//	req, _ := http.NewRequestWithContext(ctx, ...)
-//	resp, err := client.Do(req) // unchanged - body/status readable as normal
-func WithDedupKey(ctx context.Context, detType detector_typepb.DetectorType, credential string) context.Context {
+func withDedupKey(ctx context.Context, detType detector_typepb.DetectorType, credential string) context.Context {
 	key := fmt.Sprintf("%d:%s", int32(detType), credential)
 	return context.WithValue(ctx, dedupKeyContextKey{}, key)
 }
 
-// bufferedResponse holds a fully-read HTTP response so it can be replayed to
-// every goroutine that was coalesced by singleflight.
-type bufferedResponse struct {
-	statusCode int
-	header     http.Header
-	body       []byte
-}
-
-// singleflightTransport is an http.RoundTripper that coalesces concurrent requests
-// sharing the same deduplication key into a single network call. It is a no-op for
-// requests whose context does not carry a dedup key.
-type singleflightTransport struct {
-	base  http.RoundTripper
-	group singleflight.Group
-}
-
-func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	key, ok := req.Context().Value(dedupKeyContextKey{}).(string)
-	if !ok || key == "" {
-		return t.base.RoundTrip(req)
-	}
-
-	result, err, _ := t.group.Do(key, func() (any, error) {
-		resp, err := t.base.RoundTrip(req)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			return nil, err
-		}
-
-		return &bufferedResponse{
-			statusCode: resp.StatusCode,
-			header:     resp.Header.Clone(),
-			body:       body,
-		}, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	br := result.(*bufferedResponse)
-	return &http.Response{
-		StatusCode: br.statusCode,
-		Status:     fmt.Sprintf("%d %s", br.statusCode, http.StatusText(br.statusCode)),
-		Header:     br.header.Clone(),
-		Body:       io.NopCloser(bytes.NewReader(br.body)),
-	}, nil
-}
-
-// NewClientWithDedup wraps base with a transport that deduplicates concurrent
-// verification requests sharing the same key. Detectors opt in per credential by
-// calling WithDedupKey on the request context before client.Do — no other changes
-// to request building or response reading are needed.
-func NewClientWithDedup(base *http.Client) *http.Client {
-	clone := *base
-	transport := base.Transport
-	if transport == nil {
-		transport = http.DefaultTransport
-	}
-	clone.Transport = &singleflightTransport{base: transport}
-	return &clone
+// DoWithDedup executes req through client, coalescing concurrent requests that share
+// the same detector type and credential into a single network call via singleflight.
+// The response body is fully buffered and replayed to every waiting caller.
+//
+// Use this instead of client.Do for all verification requests on a client created
+// with NewClientWithDedup or WithDedup — it is the only way to activate deduplication.
+func DoWithDedup(client *http.Client, detType detector_typepb.DetectorType, credential string, req *http.Request) (*http.Response, error) {
+	return client.Do(req.WithContext(withDedupKey(req.Context(), detType, credential)))
 }

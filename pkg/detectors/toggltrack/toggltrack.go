@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_TogglTrack, resMatch)
 			data := fmt.Sprintf("%s:api_token", resMatch)
 			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 
@@ -55,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_TogglTrack, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

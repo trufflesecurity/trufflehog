@@ -100,14 +100,13 @@ verifyMerakiApiKey verifies if the passed matched api key for meraki is active o
 docs: https://developer.cisco.com/meraki/api-v1/authorization/#authorization
 */
 func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) ([]merakiOrganizations, bool, error) {
-	ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Meraki, match)
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.meraki.com/api/v1/organizations", http.NoBody)
 	if err != nil {
 		return nil, false, err
 	}
 	req.Header.Set("X-Cisco-Meraki-API-Key", match)
 
-	resp, err := client.Do(req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Meraki, match, req)
 	if err != nil {
 		return nil, false, err
 	}

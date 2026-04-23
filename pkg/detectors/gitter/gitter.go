@@ -46,13 +46,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Gitter, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.gitter.im/v1/user/me", nil)
 			if err != nil {
 				continue
 			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Gitter, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

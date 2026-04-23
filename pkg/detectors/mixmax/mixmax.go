@@ -44,14 +44,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Mixmax, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.mixmax.com/v1/users/me", nil)
 			if err != nil {
 				continue
 			}
 
 			req.Header.Add("X-API-Token", resMatch)
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Mixmax, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

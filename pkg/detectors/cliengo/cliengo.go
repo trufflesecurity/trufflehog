@@ -45,12 +45,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Cliengo, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cliengo.com/1.0/account?api_key="+resMatch, nil)
 			if err != nil {
 				continue
 			}
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Cliengo, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

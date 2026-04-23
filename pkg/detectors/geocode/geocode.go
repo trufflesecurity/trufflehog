@@ -47,12 +47,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			ctx = detectors.WithDedupKey(ctx, detector_typepb.DetectorType_Geocode, resMatch)
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://geocode.xyz/51.4647,0.0079?json=1&auth=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Geocode, resMatch, req)
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err == nil {
