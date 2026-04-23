@@ -66,7 +66,11 @@ func main() {
 	}
 
 	if len(findings) > 0 {
-		fmt.Fprintf(os.Stderr, "checksecretparts: %d package(s) construct detectors.Result without SecretParts\n", len(findings))
+		pkgs := map[string]struct{}{}
+		for _, f := range findings {
+			pkgs[f.Package] = struct{}{}
+		}
+		fmt.Fprintf(os.Stderr, "checksecretparts: %d finding(s) across %d package(s) constructing detectors.Result without SecretParts\n", len(findings), len(pkgs))
 		if failOnFindings {
 			os.Exit(1)
 		}
