@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Swell,
 				Raw:          []byte(tokenPatMatch),
+				SecretParts:  map[string]string{"key": tokenPatMatch},
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.swell.store/products?limit=100", nil)

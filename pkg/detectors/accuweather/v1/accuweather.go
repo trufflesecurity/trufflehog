@@ -56,6 +56,7 @@ func (s Scanner) ProcessMatches(ctx context.Context, matches [][]string, verify 
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Accuweather,
 			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
 		}
 
 		if verify {

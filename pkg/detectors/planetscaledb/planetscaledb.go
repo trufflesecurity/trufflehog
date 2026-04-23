@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_PlanetScaleDb,
 					Raw:          []byte(strings.Join([]string{host, username[0], password[0]}, "\t")),
+					SecretParts:  map[string]string{"key": strings.Join([]string{host, username[0], password[0]}, "\t")},
 				}
 
 				if verify {

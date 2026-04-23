@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		r := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_ScrapingBee,
 			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
 		}
 
 		if verify {

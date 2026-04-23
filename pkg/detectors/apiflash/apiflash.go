@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Apiflash,
 			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
 		}
 
 		if verify {
