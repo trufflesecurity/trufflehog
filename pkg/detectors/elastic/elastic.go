@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b(essu_[A-Za-z0-9+/=]{92})`)
+	keyPat        = regexp.MustCompile(`\b(essu_[A-Za-z0-9+/=]{92})(?:[^A-Za-z0-9+/=]|\z)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

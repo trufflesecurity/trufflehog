@@ -51,6 +51,15 @@ func TestElastic_Pattern(t *testing.T) {
 			`,
 			want: []string{},
 		},
+		{
+			name: "does not match truncated prefix of overlong token",
+			input: `
+				[INFO] Sending request to the elastic API
+				[DEBUG] Using Key=essu_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBB
+				[ERROR] Response received: 401 Unauthorized
+			`,
+			want: []string{},
+		},
 	}
 
 	for _, test := range tests {
