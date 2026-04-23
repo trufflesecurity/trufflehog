@@ -119,10 +119,11 @@ type Result struct {
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
 
-	// AnalysisInfo should be set with information required for credential
-	// analysis to run. The keys of the map are analyzer specific and
-	// should match what is expected in the corresponding analyzer.
-	AnalysisInfo map[string]string
+	// SecretParts holds the individual components of a (potentially multi-part)
+	// credential, keyed by a component name. It is used by analyzers where
+	// the keys are analyzer specific and should match what the
+	// corresponding analyzer expects.
+	SecretParts map[string]string
 
 	// primarySecret is used when a detector has multiple secret patterns.
 	// This secret is designated to determine the line number.

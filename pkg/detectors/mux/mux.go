@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 				if s1.Verified {
-					s1.AnalysisInfo = map[string]string{
+					s1.SecretParts = map[string]string{
 						"key":    resMatch,
 						"secret": resSecretMatch,
 					}

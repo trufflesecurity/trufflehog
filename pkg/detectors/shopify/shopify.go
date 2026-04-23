@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.ExtraData = map[string]string{
 								"access_scopes": strings.Join(handleArray, ","),
 							}
-							s1.AnalysisInfo = map[string]string{
+							s1.SecretParts = map[string]string{
 								"key":       key,
 								"store_url": domainRes,
 							}

@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueOrgIdMatches[match[1]] = struct{}{}
 	}
 	if len(uniqueOrgIdMatches) == 0 {
-		// we only need an org ID to pass into AnalysisInfo
+		// we only need an org ID to pass into SecretParts
 		// if we don't find one, we can still verify the key
 		// we can add a dummy entry here just to make sure a result is returned
 		uniqueOrgIdMatches[""] = struct{}{}
@@ -97,11 +97,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				s1.SetVerificationError(verificationErr, match)
 				if s1.Verified {
-					s1.AnalysisInfo = map[string]string{
+					s1.SecretParts = map[string]string{
 						"key": match,
 					}
 					if orgId != "" {
-						s1.AnalysisInfo["organization_id"] = orgId
+						s1.SecretParts["organization_id"] = orgId
 					}
 				}
 			}

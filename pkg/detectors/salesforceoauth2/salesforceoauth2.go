@@ -107,7 +107,7 @@ domainLoop:
 					}
 
 					if isVerified {
-						s1.AnalysisInfo = map[string]string{
+						s1.SecretParts = map[string]string{
 							"domain":        domain,
 							"client_id":     key,
 							"client_secret": secret,

@@ -88,7 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", environment)}
 					s1.SetVerificationError(verificationErr, id, secret)
 					if s1.Verified {
-						s1.AnalysisInfo = map[string]string{
+						s1.SecretParts = map[string]string{
 							"secret": secret,
 							"id":     id,
 							"token":  token,
