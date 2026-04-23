@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					result.Verified = true
 				}
 			}
-			result.AnalysisInfo = map[string]string{"key": resMatch}
+			result.SecretParts = map[string]string{"key": resMatch}
 		}
 
 		results = append(results, result)
