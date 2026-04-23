@@ -79,8 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr)
 				if isVerified {
 					s1.AnalysisInfo = map[string]string{
-						"id":     id,
-						"secret": secret,
+						"client_id":     id,
+						"client_secret": secret,
 					}
 				}
 			}
