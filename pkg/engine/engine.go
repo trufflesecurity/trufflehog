@@ -1339,31 +1339,24 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 
 	secretBytes := []byte(secret)
 
-	// If a chunk offset was pre-assigned (for duplicate secrets), use it directly
-	// to find the correct occurrence instead of always matching the first one.
+	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
+	// pre-assigned (for duplicate secrets), use it directly to find the correct
+	// occurrence instead of always matching the first one.
+	var offset int
 	if result.HasChunkOffset() {
-		offset := int(result.ChunkOffset())
-		lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
-		result.SetPrimarySecretLine(lineNumber)
-
-		afterSecret := chunk.Data[offset+len(secretBytes):]
-		endLine := bytes.Index(afterSecret, []byte("\n"))
-		if endLine == -1 {
-			endLine = len(afterSecret)
+		offset = int(result.ChunkOffset())
+	} else {
+		offset = bytes.Index(chunk.Data, secretBytes)
+		if offset == -1 {
+			return 0, false
 		}
-		if bytes.Contains(afterSecret[:endLine], []byte(ignoreTag)) {
-			return lineNumber, true
-		}
-		return lineNumber, false
 	}
 
-	before, after, found := bytes.Cut(chunk.Data, secretBytes)
-	if !found {
-		return 0, false
-	}
-	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
 	result.SetPrimarySecretLine(lineNumber)
-	// If the line contains the ignore tag, we should ignore the result.
+
+	// If the line containing the secret has the ignore tag, we should ignore the result.
+	after := chunk.Data[offset+len(secretBytes):]
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
 		endLine = len(after)
