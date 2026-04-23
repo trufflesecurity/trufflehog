@@ -49,7 +49,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_ClockworkSMS,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + tokenRes),
+				SecretParts: map[string]string{
+					"key":   resMatch,
+					"token": tokenRes,
+				},
+				RawV2: []byte(resMatch + tokenRes),
 			}
 
 			if verify {

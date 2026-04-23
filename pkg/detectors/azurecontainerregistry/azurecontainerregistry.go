@@ -79,8 +79,12 @@ EndpointLoop:
 			r := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureContainerRegistry,
 				Raw:          []byte(password),
-				RawV2:        []byte(`{"username":"` + username + `","password":"` + password + `"}`),
-				Redacted:     username,
+				SecretParts: map[string]string{
+					"username": username,
+					"password": password,
+				},
+				RawV2:    []byte(`{"username":"` + username + `","password":"` + password + `"}`),
+				Redacted: username,
 			}
 
 			if verify {

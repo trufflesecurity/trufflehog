@@ -58,7 +58,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_Auth0ManagementApiToken,
 				Redacted:     domainRes,
 				Raw:          []byte(managementAPITokenRes),
-				RawV2:        []byte(managementAPITokenRes + domainRes),
+				SecretParts: map[string]string{
+					"token":  managementAPITokenRes,
+					"domain": domainRes,
+				},
+				RawV2: []byte(managementAPITokenRes + domainRes),
 			}
 
 			if verify {

@@ -53,6 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_AzureAppConfigConnectionString,
 			Raw:          []byte(id),
 			RawV2:        []byte(connectionString),
+			SecretParts: map[string]string{
+				"endpoint": endpoint,
+				"id":       id,
+				"secret":   secret,
+			},
 		}
 
 		if verify {

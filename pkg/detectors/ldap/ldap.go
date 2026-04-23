@@ -70,7 +70,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_LDAP,
 					Raw:          []byte(strings.Join([]string{ldapURL.String(), username[1], password[1]}, "\t")),
-					SecretParts:  map[string]string{"key": strings.Join([]string{ldapURL.String(), username[1], password[1]}, "\t")},
+					SecretParts: map[string]string{
+						"url":      ldapURL.String(),
+						"username": username[1],
+						"password": password[1],
+					},
 				}
 
 				if verify {
@@ -101,7 +105,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_LDAP,
 			Raw:          []byte(strings.Join([]string{ldapURL.String(), username, password}, "\t")),
-			SecretParts:  map[string]string{"key": strings.Join([]string{ldapURL.String(), username, password}, "\t")},
+			SecretParts: map[string]string{
+				"url":      ldapURL.String(),
+				"username": username,
+				"password": password,
+			},
 		}
 
 		if verify {

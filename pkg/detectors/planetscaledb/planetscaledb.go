@@ -44,7 +44,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_PlanetScaleDb,
 					Raw:          []byte(strings.Join([]string{host, username[0], password[0]}, "\t")),
-					SecretParts:  map[string]string{"key": strings.Join([]string{host, username[0], password[0]}, "\t")},
+					SecretParts: map[string]string{
+						"host":     host,
+						"username": username[0],
+						"password": password[0],
+					},
 				}
 
 				if verify {

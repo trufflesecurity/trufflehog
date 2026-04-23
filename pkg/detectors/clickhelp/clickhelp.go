@@ -67,7 +67,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_ClickHelp,
 					Raw:          []byte(portalLink),
-					RawV2:        []byte(portalLink + email),
+					SecretParts: map[string]string{
+						"url":   portalLink,
+						"email": email,
+					},
+					RawV2: []byte(portalLink + email),
 				}
 
 				if verify {
