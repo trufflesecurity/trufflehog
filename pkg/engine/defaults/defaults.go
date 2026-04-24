@@ -558,6 +558,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/photoroom"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinecone"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedream"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedrive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pivotaltracker"
@@ -1443,6 +1444,7 @@ func buildDetectorList() []detectors.Detector {
 		&photoroom.Scanner{},
 		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
+		&pinecone.Scanner{},
 		&pipedream.Scanner{},
 		&pipedrive.Scanner{},
 		&pivotaltracker.Scanner{},
