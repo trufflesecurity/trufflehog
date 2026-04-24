@@ -99,6 +99,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: s.Type(),
 				Raw:          []byte(key),
 				RawV2:        []byte(fmt.Sprintf(`{"accountName":"%s","accountKey":"%s"}`, name, key)),
+				SecretParts: map[string]string{
+					"account_name": name,
+					"account_key":  key,
+				},
 				ExtraData: map[string]string{
 					"Account_name": name,
 				},

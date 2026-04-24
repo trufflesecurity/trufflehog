@@ -73,7 +73,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_BitbucketDataCenter,
 				Raw:          []byte(secret),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", secret, bitBucketURL)),
+				SecretParts: map[string]string{
+					"secret": secret,
+					"url":    bitBucketURL,
+				},
+				RawV2: []byte(fmt.Sprintf("%s:%s", secret, bitBucketURL)),
 				ExtraData: map[string]string{
 					"URL": bitBucketURL,
 				},

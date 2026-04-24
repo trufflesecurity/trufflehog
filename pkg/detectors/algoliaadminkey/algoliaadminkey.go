@@ -77,7 +77,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			r := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AlgoliaAdminKey,
 				Raw:          []byte(key),
-				RawV2:        []byte(id + ":" + key),
+				SecretParts: map[string]string{
+					"id":  id,
+					"key": key,
+				},
+				RawV2: []byte(id + ":" + key),
 			}
 
 			if verify {

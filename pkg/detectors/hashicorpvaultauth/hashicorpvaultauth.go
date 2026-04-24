@@ -84,7 +84,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_HashiCorpVaultAuth,
 					Raw:          []byte(secretId),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", roleId, secretId)),
+					SecretParts: map[string]string{
+						"role_id":   roleId,
+						"secret_id": secretId,
+					},
+					RawV2: []byte(fmt.Sprintf("%s:%s", roleId, secretId)),
 					ExtraData: map[string]string{
 						"URL": vaultUrl,
 					},

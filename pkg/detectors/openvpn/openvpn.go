@@ -53,7 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_OpenVpn,
 					Raw:          []byte(clientSecretRes),
-					RawV2:        []byte(clientIDRes + clientSecretRes),
+					SecretParts: map[string]string{
+						"client_id":     clientIDRes,
+						"client_secret": clientSecretRes,
+					},
+					RawV2: []byte(clientIDRes + clientSecretRes),
 				}
 
 				if verify {

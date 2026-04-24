@@ -50,7 +50,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_MattermostPersonalToken,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + serverRes),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"url": serverRes,
+				},
+				RawV2: []byte(resMatch + serverRes),
 			}
 
 			if verify {

@@ -80,6 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			results = append(results, detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
+				SecretParts:  map[string]string{"token": token},
 				Redacted:     token[:3] + "..." + token[len(token)-3:],
 				ExtraData:    map[string]string{"message": "No Jira Data Center URL was found or configured. To verify this token, set the Jira instance base URL as a custom endpoint."},
 			})
@@ -90,8 +91,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
-				RawV2:        []byte(token + ":" + endpoint),
-				Redacted:     token[:3] + "..." + token[len(token)-3:],
+				SecretParts: map[string]string{
+					"token": token,
+					"url":   endpoint,
+				},
+				RawV2:    []byte(token + ":" + endpoint),
+				Redacted: token[:3] + "..." + token[len(token)-3:],
 			}
 
 			if verify {

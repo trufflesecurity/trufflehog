@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Verifier,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://verifier.meetchopra.com/verify/%s?token=%s", emailMatch, resMatch), nil)
