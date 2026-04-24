@@ -36,6 +36,34 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    - **`regex`**: Defines the patterns to identify potential secrets. You can specify one or more named regular expressions. For a detection to be successful, each named regex must find a match. Capture groups `()` within these regular expressions are used to extract specific portions of the matched text, enabling the detector to process and report on particular segments of the identified patterns.
 
    - **`verify`**: An optional section to validate detected secrets. If you want to verify or unverify detected secrets, this section needs to be configured. If not configured, all detected secrets will be marked as unverified. Read [verification server examples](#verification-server-examples)
+     - **`successRanges`**: A list of HTTP status codes (or ranges) that indicate the secret is **live** (active). When the verification server responds with a matching status code, the secret is marked as verified. Each entry can be a single code (`"200"`) or an inclusive range (`"200-202"`). If omitted (along with `rotatedRanges`), only `200` is treated as verified (backward compatible).
+     - **`rotatedRanges`**: A list of HTTP status codes (or ranges) that indicate the secret has been **rotated** (no longer active). When the verification server responds with a matching status code, the secret is definitively marked as unverified.
+
+     When only one of the two fields is configured, non-matching responses are treated as the opposite state (e.g., if only `successRanges` is set, any response that doesn't match is treated as rotated; if only `rotatedRanges` is set, any non-matching response is treated as live). When both fields are configured and the response matches neither, the result is treated as unknown/inconclusive.
+
+   Here's an example with configurable verification ranges:
+
+   ```yaml
+   # config.yaml
+   detectors:
+     - name: HogTokenDetector
+       keywords:
+         - hog
+       regex:
+         token: '[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}'
+       verify:
+         - endpoint: http://localhost:8000/
+           unsafe: true
+           headers:
+             - "Authorization: super secret authorization header"
+           successRanges:
+             - "200"
+           rotatedRanges:
+             - "401"
+             - "403"
+   ```
+
+   In this example, a `200` response from the verification server means the secret is live and needs rotation. A `401` or `403` means the secret has been rotated and is no longer active. Any other response is treated as inconclusive.
 
    **Other allowed parameters:**
    - **`primary_regex_name`**: This parameter allows you designate the primary regex pattern when multiple regex patterns are defined in the regex section. If a match is found, the match for the designated primary regex will be used to determine the line number. The value must be one of the names specified in the regex section. If not provided, the first regex name in sorted order will be used as the primary regex by default.

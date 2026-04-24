@@ -2,6 +2,8 @@ package custom_detectors
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -45,6 +47,30 @@ verify:
 	assert.Equal(t, true, got.Verify[0].Unsafe)
 	assert.Equal(t, []string{"Authorization: Bearer {secret_pat_example.0}"}, got.Verify[0].Headers)
 	assert.Equal(t, []string{"200-250", "288"}, got.Verify[0].SuccessRanges)
+}
+
+func TestCustomRegexTemplateParsingWithRotatedRanges(t *testing.T) {
+	testYaml := `name: test
+keywords:
+- secret
+regex:
+  token: ([a-zA-Z0-9]{32})
+verify:
+- endpoint: http://localhost:8000/
+  unsafe: true
+  headers:
+  - 'Authorization: Bearer token'
+  successRanges:
+  - '200'
+  rotatedRanges:
+  - '401'
+  - 403-404`
+
+	var got custom_detectorspb.CustomRegex
+	assert.NoError(t, protoyaml.UnmarshalStrict([]byte(testYaml), &got))
+	assert.Equal(t, 1, len(got.Verify))
+	assert.Equal(t, []string{"200"}, got.Verify[0].SuccessRanges)
+	assert.Equal(t, []string{"401", "403-404"}, got.Verify[0].RotatedRanges)
 }
 
 func TestCustomRegexWebhookParsing(t *testing.T) {
@@ -738,6 +764,26 @@ func TestNewWebhookCustomRegex_Validation(t *testing.T) {
 			wantErr:       true,
 			wantErrSubstr: `must contain a colon`,
 		},
+		{
+			name: "ValidateVerifyRanges: invalid successRanges",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify = []*custom_detectorspb.VerifierConfig{
+					{Endpoint: "https://example.com/verify", Headers: []string{"A: b"}, SuccessRanges: []string{"abc"}},
+				}
+			},
+			wantErr:       true,
+			wantErrSubstr: "unable to convert http code to int",
+		},
+		{
+			name: "ValidateVerifyRanges: invalid rotatedRanges",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify = []*custom_detectorspb.VerifierConfig{
+					{Endpoint: "https://example.com/verify", Headers: []string{"A: b"}, RotatedRanges: []string{"999"}},
+				}
+			},
+			wantErr:       true,
+			wantErrSubstr: "invalid http status code",
+		},
 	}
 
 	for _, tt := range tests {
@@ -777,6 +823,167 @@ func TestNewWebhookCustomRegex_EnsurePrimaryRegexNameSet(t *testing.T) {
 	detector, err := NewWebhookCustomRegex(pb)
 	assert.NoError(t, err)
 	assert.Equal(t, "regex_a", detector.GetPrimaryRegexName(), "expected PrimaryRegexName to be set to regex_a")
+}
+
+func TestVerificationWithConfigurableRanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		serverStatus      int
+		successRanges     []string
+		rotatedRanges     []string
+		wantVerified      bool
+		wantVerifyErr     bool
+	}{
+		{
+			name:          "backward compat: no ranges, 200 -> verified",
+			serverStatus:  200,
+			wantVerified:  true,
+			wantVerifyErr: false,
+		},
+		{
+			name:          "backward compat: no ranges, 401 -> unverified",
+			serverStatus:  401,
+			wantVerified:  false,
+			wantVerifyErr: false,
+		},
+		{
+			name:          "successRanges match -> verified",
+			serverStatus:  201,
+			successRanges: []string{"200-202"},
+			wantVerified:  true,
+			wantVerifyErr: false,
+		},
+		{
+			name:          "rotatedRanges match -> not verified, no error",
+			serverStatus:  401,
+			successRanges: []string{"200"},
+			rotatedRanges: []string{"401", "403"},
+			wantVerified:  false,
+			wantVerifyErr: false,
+		},
+		{
+			name:          "neither match -> not verified, verification error",
+			serverStatus:  500,
+			successRanges: []string{"200"},
+			rotatedRanges: []string{"401"},
+			wantVerified:  false,
+			wantVerifyErr: true,
+		},
+		{
+			name:          "successRanges range boundary inclusive",
+			serverStatus:  250,
+			successRanges: []string{"200-250"},
+			wantVerified:  true,
+			wantVerifyErr: false,
+		},
+		{
+			name:          "only successRanges: non-match means rotated",
+			serverStatus:  401,
+			successRanges: []string{"200"},
+			wantVerified:  false,
+			wantVerifyErr: false,
+		},
+		{
+			name:          "only rotatedRanges: non-match means live",
+			serverStatus:  200,
+			rotatedRanges: []string{"401", "403"},
+			wantVerified:  true,
+			wantVerifyErr: false,
+		},
+		{
+			name:          "only rotatedRanges: match means rotated",
+			serverStatus:  401,
+			rotatedRanges: []string{"401"},
+			wantVerified:  false,
+			wantVerifyErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.serverStatus)
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
+			}))
+			defer ts.Close()
+
+			detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+				Name:     "test",
+				Keywords: []string{"secret"},
+				Regex:    map[string]string{"token": `(secret_[a-zA-Z0-9]{10})`},
+				Verify: []*custom_detectorspb.VerifierConfig{
+					{
+						Endpoint:      ts.URL,
+						Unsafe:        true,
+						Headers:       []string{"Authorization: Bearer test"},
+						SuccessRanges: tt.successRanges,
+						RotatedRanges: tt.rotatedRanges,
+					},
+				},
+			})
+			assert.NoError(t, err)
+
+			results, err := detector.FromData(context.Background(), true, []byte("secret_ABCDEFGHIJ"))
+			assert.NoError(t, err)
+			assert.Equal(t, 1, len(results), "expected exactly one result")
+
+			result := results[0]
+			assert.Equal(t, tt.wantVerified, result.Verified, "Verified mismatch")
+			if tt.wantVerifyErr {
+				assert.NotNil(t, result.VerificationError(), "expected a verification error")
+			} else {
+				assert.Nil(t, result.VerificationError(), "expected no verification error")
+			}
+		})
+	}
+}
+
+func TestVerificationMixedRangedAndLegacyVerifiers(t *testing.T) {
+	t.Parallel()
+
+	// Verifier 1 has ranges configured but returns a status matching neither.
+	// Verifier 2 is legacy (no ranges) and returns 200.
+	// The result should be Verified=true with NO verification error.
+	tsRanged := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer tsRanged.Close()
+
+	tsLegacy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`ok`))
+	}))
+	defer tsLegacy.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-zA-Z0-9]{10})`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint:      tsRanged.URL,
+				Unsafe:        true,
+				Headers:       []string{"A: b"},
+				SuccessRanges: []string{"200"},
+				RotatedRanges: []string{"401"},
+			},
+			{
+				Endpoint: tsLegacy.URL,
+				Unsafe:   true,
+				Headers:  []string{"A: b"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	results, err := detector.FromData(context.Background(), true, []byte("secret_ABCDEFGHIJ"))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(results))
+	assert.True(t, results[0].Verified, "expected Verified=true from legacy fallback")
+	assert.Nil(t, results[0].VerificationError(), "legacy success must not produce a spurious verification error")
 }
 
 func BenchmarkProductIndices(b *testing.B) {
