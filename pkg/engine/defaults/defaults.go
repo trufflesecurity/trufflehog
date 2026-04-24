@@ -7,6 +7,7 @@ import (
 	accuweatherv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather/v1"
 	accuweatherv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adafruitio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adobeims"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adzuna"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aeroworkflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/agora"
@@ -872,6 +873,7 @@ func buildDetectorList() []detectors.Detector {
 		&accuweatherv2.Scanner{},
 		&adafruitio.Scanner{},
 		// &adobeio.Scanner{},
+		&adobeims.Scanner{},
 		&adzuna.Scanner{},
 		&aeroworkflow.Scanner{},
 		&agora.Scanner{},
