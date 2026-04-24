@@ -3,7 +3,6 @@ package kraken
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -13,10 +12,15 @@ import (
 )
 
 var (
-	validKeyPattern       = "m=MN/0yYJ/5xqpE15JYDJtCFdDF7RDLuiXtTiSF1FU1H9waiub1kgwI= "
-	invalidKeyPattern     = "m=MN/0yYJ/5xqpE15JYDJtCFdDF7RDLuiXtTiSF1FU1H9waiub1kgwI="
-	validPrivKeyPattern   = "Oe1xUe+sNT7F5SboHSpfCubMhJlAaghB3SZ=NMmkIHTSzWVoF3uTOnxv32cgI+WuEDXYS+z5MvX+q9IUJ1cYo=+ "
-	invalidPrivKeyPattern = "Oe1xUe+sNT7F5SboHSpfCubMhJlAaghB3SZ=NMmkIHTSzWVoF3uTOnxv32cgI+WuEDXYS+z5MvX+q9IUJ1cYo=+"
+	// Valid base64-encoded API key (56 chars) with trailing space for the regex boundary.
+	// Realistic Kraken API keys are base64-encoded, so padding (=) only appears at the end.
+	validKeyPattern = "mz86TyFYqxUxjCWKbGAYP0PD5qyVBh03M5QFW50vKYb/Sz5Oa9C75e5p "
+	// Invalid: contains a character (!) not in the allowed set [0-9A-Za-z/+=].
+	invalidKeyPattern = "mz86TyFYqxUxjCWKbGAYP0PD5qyVBh03M5QFW50vKY!/Sz5Oa9C75e5p "
+	// Valid base64-encoded private key (88 chars) with trailing space.
+	validPrivKeyPattern = "jsam46Au9OZarsbalvCHJ8uEcIVCxDEe+W5jLoeABWj4wzVnCpJw+9qZk1JLhgwa2m8XeqoGuN/OV1jlcvh+Jw== "
+	// Invalid: contains a character (!) not in the allowed set.
+	invalidPrivKeyPattern = "jsam46Au9OZarsbalvCHJ8uEcIVCxDEe+W5jLoeABWj4wzVnCpJw+9qZk1JLhgwa2m8XeqoGuN/OV1jlcvh+!w== "
 	keyword               = "kraken"
 )
 
@@ -29,19 +33,26 @@ func TestKraken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword kraken",
-			input: fmt.Sprintf("%s '%s' %s '%s'", keyword, validKeyPattern, keyword, validPrivKeyPattern),
-			want:  []string{strings.TrimSpace(validKeyPattern) + strings.TrimSpace(validPrivKeyPattern)},
+			name: "valid pattern - realistic API credentials",
+			input: fmt.Sprintf(`kraken api_key = "%s"
+kraken api_secret = "%s"`,
+				validKeyPattern, validPrivKeyPattern),
+			want: []string{"mz86TyFYqxUxjCWKbGAYP0PD5qyVBh03M5QFW50vKYb/Sz5Oa9C75e5p" +
+				"jsam46Au9OZarsbalvCHJ8uEcIVCxDEe+W5jLoeABWj4wzVnCpJw+9qZk1JLhgwa2m8XeqoGuN/OV1jlcvh+Jw=="},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n key = '%s' domain: '%s'", keyword, validKeyPattern, validPrivKeyPattern),
-			want:  []string{},
+			name: "valid pattern - key out of prefix range",
+			input: fmt.Sprintf(
+				"%s keyword is not close to the real key in the data\n key = '%s' domain: '%s'",
+				keyword, validKeyPattern, validPrivKeyPattern),
+			want: []string{},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s key = '%s' secret = '%s'", keyword, invalidKeyPattern, invalidPrivKeyPattern),
-			want:  []string{},
+			name: "invalid pattern - bad characters in key and secret",
+			input: fmt.Sprintf(`kraken api_key = "%s"
+kraken api_secret = "%s"`,
+				invalidKeyPattern, invalidPrivKeyPattern),
+			want: []string{},
 		},
 	}
 
