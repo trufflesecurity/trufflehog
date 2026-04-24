@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_Pinecone,
 			Redacted:     token[:8] + "..." + token[len(token)-4:],
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -59,7 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = verified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
-			s1.AnalysisInfo = map[string]string{"key": token}
 		}
 
 		// The key ID is embedded in the token structure (pcsk_{key_id}_{secret}).
@@ -107,25 +107,30 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case 200:
-		var resData listIndexesResponse
-		if err = json.Unmarshal(bodyBytes, &resData); err != nil {
+		var rawBody map[string]json.RawMessage
+		if err = json.Unmarshal(bodyBytes, &rawBody); err != nil {
 			return false, nil, fmt.Errorf("failed to decode 200 response: %w", err)
 		}
-		// Body must contain the "indexes" key (even if empty array) to confirm
-		// this is a genuine Pinecone response and not a generic 200.
-		if !hasIndexesKey(bodyBytes) {
+
+		indexesBody, ok := rawBody["indexes"]
+		if !ok {
 			return false, nil, fmt.Errorf("unexpected response body structure")
 		}
 
+		var indexes []indexInfo
+		if err = json.Unmarshal(indexesBody, &indexes); err != nil {
+			return false, nil, fmt.Errorf("failed to decode 200 response: %w", err)
+		}
+
 		extraData := map[string]string{
-			"total_indexes": strconv.Itoa(len(resData.Indexes)),
+			"total_indexes": strconv.Itoa(len(indexes)),
 		}
 
 		// Extract the project ID from the host field. Pinecone hosts follow the
 		// pattern: {index-name}-{project_id}.svc.{env}.pinecone.io
 		// The project ID is shared across all indexes, so we only need one.
 		var projectID string
-		for _, idx := range resData.Indexes {
+		for _, idx := range indexes {
 			if pid := extractProjectID(idx.Host); pid != "" {
 				projectID = pid
 				break
@@ -135,7 +140,7 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 			extraData["project_id"] = projectID
 		}
 
-		for i, idx := range resData.Indexes {
+		for i, idx := range indexes {
 			if i >= 5 {
 				break
 			}
@@ -178,16 +183,6 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-// hasIndexesKey checks that the JSON body contains an "indexes" top-level key.
-func hasIndexesKey(body []byte) bool {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return false
-	}
-	_, ok := raw["indexes"]
-	return ok
-}
-
 // extractKeyID pulls the key identifier from a Pinecone API key.
 // Keys follow the format pcsk_{key_id}_{secret}, where key_id is a short
 // identifier (5-6 chars) that maps to the key entry in the Pinecone console.
@@ -225,16 +220,12 @@ func (s Scanner) Description() string {
 	return "Pinecone is a vector database service. API keys can be used to manage indexes and perform vector operations."
 }
 
-type listIndexesResponse struct {
-	Indexes []indexInfo `json:"indexes"`
-}
-
 type indexInfo struct {
-	Name   string    `json:"name"`
-	Host   string    `json:"host"`
-	Metric string    `json:"metric"`
+	Name   string      `json:"name"`
+	Host   string      `json:"host"`
+	Metric string      `json:"metric"`
 	Status indexStatus `json:"status"`
-	Spec   indexSpec  `json:"spec"`
+	Spec   indexSpec   `json:"spec"`
 }
 
 type indexStatus struct {
