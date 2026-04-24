@@ -20,25 +20,25 @@ func TestStripeWebhookSecret_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern 32-char hex",
+			name: "valid pattern 32-char base64-style",
 			input: `
 				[INFO] Configuring Stripe webhook
-				[DEBUG] endpoint_secret=whsec_0123456789abcdef0123456789abcdef
+				[DEBUG] endpoint_secret=whsec_abcdefghijklmnopqrstuvwxyz012345
 				[INFO] Webhook ready
 			`,
-			want: []string{"whsec_0123456789abcdef0123456789abcdef"},
+			want: []string{"whsec_abcdefghijklmnopqrstuvwxyz012345"},
 		},
 		{
-			name: "valid pattern 64-char hex",
+			name: "valid pattern 64-char base64-style with uppercase and plus",
 			input: `
 				[INFO] Configuring Stripe webhook
-				[DEBUG] endpoint_secret=whsec_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+				[DEBUG] endpoint_secret=whsec_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789++
 				[INFO] Webhook ready
 			`,
-			want: []string{"whsec_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+			want: []string{"whsec_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789++"},
 		},
 		{
-			name: "valid pattern stripe-cli-style (mid-length hex)",
+			name: "valid pattern stripe-cli-style (hex)",
 			input: `
 				[INFO] Configuring Stripe webhook
 				[DEBUG] endpoint_secret=whsec_7e6a1452a9117826e207a03c19a965e81e65f30a96aa06bbc09b6745cf77bef

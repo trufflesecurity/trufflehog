@@ -13,7 +13,10 @@ type Scanner struct{}
 
 var _ detectors.Detector = (*Scanner)(nil)
 
-var keyPat = regexp.MustCompile(`\b(whsec_[a-f0-9]{32,64})\b`)
+// No trailing \b: webhook secrets are base64-style and may end with '+',
+// which is a non-word char that breaks \b. The {32,64} greedy quantifier
+// combined with the restrictive char class is sufficient to delimit matches.
+var keyPat = regexp.MustCompile(`\b(whsec_[A-Za-z0-9+]{32,64})`)
 
 func (s Scanner) Keywords() []string {
 	return []string{"whsec_"}
