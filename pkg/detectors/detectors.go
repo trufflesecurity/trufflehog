@@ -47,7 +47,7 @@ type Detector interface {
 type CustomResultsCleaner interface {
 	// CleanResults removes "superfluous" results from a result set (where the definition of "superfluous" is detector-
 	// specific).
-	CleanResults(results []Result) []Result
+	CleanResults(results []Result, verificationEnabled bool) []Result
 	// ShouldCleanResultsIrrespectiveOfConfiguration allows a custom cleaner to instruct the engine to ignore
 	// user-provided configuration that controls whether results are cleaned. (User-provided configuration is not the
 	// only factor that determines whether the engine runs cleaning logic.)
@@ -246,7 +246,7 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 
 // CleanResults returns all verified secrets, and if there are no verified secrets,
 // just one unverified secret if there are any.
-func CleanResults(results []Result) []Result {
+func CleanResults(results []Result, _ bool) []Result {
 	if len(results) == 0 {
 		return results
 	}
