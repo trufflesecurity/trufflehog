@@ -82,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			// only api keys can be analyzed
 			if strings.HasPrefix(resMatch, "api-") {
-				s1.AnalysisInfo = map[string]string{
+				s1.SecretParts = map[string]string{
 					"key": resMatch,
 				}
 			}
