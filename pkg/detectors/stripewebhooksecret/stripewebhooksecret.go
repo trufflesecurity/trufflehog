@@ -13,7 +13,7 @@ type Scanner struct{}
 
 var _ detectors.Detector = (*Scanner)(nil)
 
-var keyPat = regexp.MustCompile(`\b(whsec_[A-Za-z0-9+]{32,64})\b`)
+var keyPat = regexp.MustCompile(`\b(whsec_[a-f0-9]{32,64})\b`)
 
 func (s Scanner) Keywords() []string {
 	return []string{"whsec_"}
