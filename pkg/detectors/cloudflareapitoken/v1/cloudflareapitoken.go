@@ -15,8 +15,11 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (Scanner) Version() int { return 1 }
 
 var (
 	client = common.SaneHttpClient()
@@ -45,25 +48,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/user/tokens/verify", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			s1.Verified = VerifyUserToken(ctx, client, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+// VerifyUserToken checks if a Cloudflare user API token is valid.
+func VerifyUserToken(ctx context.Context, client *http.Client, token string) bool {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/user/tokens/verify", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	res, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+	return res.StatusCode >= 200 && res.StatusCode < 300
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
