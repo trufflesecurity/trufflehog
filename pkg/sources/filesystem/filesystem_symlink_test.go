@@ -558,7 +558,7 @@ func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
 	close(chunks)
 
 	require.Error(t, err)
-	require.EqualError(t, err, "max symlink depth reached")
+	require.EqualError(t, err, "depth 3 exceeds max symlink depth of 2")
 }
 
 func TestScanSymlink_FileTarget(t *testing.T) {
@@ -622,7 +622,7 @@ func TestScanSymlink_SelfLoop(t *testing.T) {
 	err = src.scanSymlink(ctx, chunks, symlinkPath, 0, symlinkPath)
 	close(chunks)
 	require.Error(t, err)
-	require.EqualError(t, err, "max symlink depth reached")
+	require.EqualError(t, err, "depth 6 exceeds max symlink depth of 5")
 }
 
 func TestScanSymlink_BrokenSymlink(t *testing.T) {
@@ -677,5 +677,5 @@ func TestScanSymlink_TwoFileLoop(t *testing.T) {
 	err = src.scanSymlink(ctx, chunks, fileA, 0, fileA)
 	close(chunks)
 	require.Error(t, err)
-	require.EqualError(t, err, "max symlink depth reached")
+	require.EqualError(t, err, "depth 6 exceeds max symlink depth of 5")
 }
