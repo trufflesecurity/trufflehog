@@ -465,7 +465,9 @@ func run(state overseer.State, logSync func() error) {
 	if *githubScanToken != "" {
 		// NOTE: this kludge is here to do an authenticated shallow commit
 		// TODO: refactor to better pass credentials
-		os.Setenv("GITHUB_TOKEN", *githubScanToken)
+		if err := os.Setenv("GITHUB_TOKEN", *githubScanToken); err != nil {
+			logFatal(err, "error setting github token in environment")
+		}
 	}
 
 	if *concurrency <= 0 {
@@ -1179,7 +1181,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 				retErr = fmt.Errorf("encountered errors during scan")
 			}
 			errMsgs := make([]string, len(errs))
-			for i := 0; i < len(errs); i++ {
+			for i := range len(errs) {
 				errMsgs[i] = errs[i].Error()
 			}
 			ctx.Logger().Error(nil, "encountered errors during scan",
@@ -1238,7 +1240,7 @@ func logFatalFunc(logger logr.Logger, logSync func() error) func(error, string, 
 func commaSeparatedToSlice(s []string) []string {
 	var result []string
 	for _, items := range s {
-		for _, item := range strings.Split(items, ",") {
+		for item := range strings.SplitSeq(items, ",") {
 			item = strings.TrimSpace(item)
 			if item == "" {
 				continue
