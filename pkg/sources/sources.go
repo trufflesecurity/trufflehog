@@ -411,6 +411,12 @@ type S3Config struct {
 	Roles []string
 	// MaxObjectSize is the maximum object size to scan.
 	MaxObjectSize int64
+	// Profile is the name of an AWS shared credentials profile to use.
+	Profile string
+	// IncludeExtensions is a list of file extensions to include in scanning.
+	IncludeExtensions []string
+	// ExcludeExtensions is a list of file extensions to exclude from scanning.
+	ExcludeExtensions []string
 }
 
 // SyslogConfig defines the optional configuration for a syslog source.
