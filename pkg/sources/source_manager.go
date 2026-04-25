@@ -16,6 +16,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
+const sourceEntryPointLogKey = "source_entry_point"
+
 // SourceManager provides an interface for starting and managing running
 // sources.
 type SourceManager struct {
@@ -471,6 +473,7 @@ func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUni
 			report.ReportError(Fatal{err})
 			catchFirstFatal(Fatal{err})
 		})
+		ctx := context.WithValue(ctx, sourceEntryPointLogKey, "Enumerate")
 		if err := source.Enumerate(ctx, reporter); err != nil {
 			report.ReportError(Fatal{err})
 			catchFirstFatal(Fatal{err})
@@ -508,7 +511,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 	// stack.
 	defer wg.Wait()
 	defer close(ch)
-	if err := source.Chunks(ctx, ch, targets...); err != nil {
+	if err := source.Chunks(context.WithValue(ctx, sourceEntryPointLogKey, "Chunks"), ch, targets...); err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
@@ -543,6 +546,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 			report.ReportError(Fatal{err})
 			catchFirstFatal(Fatal{err})
 		})
+		ctx := context.WithValues(ctx, sourceEntryPointLogKey, "Enumerate")
 		if err := source.Enumerate(ctx, unitReporter); err != nil {
 			report.ReportError(Fatal{err})
 			catchFirstFatal(Fatal{err})
@@ -572,6 +576,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 				catchFirstFatal(Fatal{err})
 			})
+			ctx = context.WithValues(ctx, sourceEntryPointLogKey, "ChunkUnit")
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 				catchFirstFatal(Fatal{err})
@@ -621,6 +626,7 @@ func (s *SourceManager) scanWithUnit(ctx context.Context, source SourceUnitChunk
 			report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 			chunkErr = Fatal{err}
 		})
+		ctx = context.WithValues(ctx, sourceEntryPointLogKey, "ChunkUnit")
 		if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 			report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 			chunkErr = Fatal{err}
