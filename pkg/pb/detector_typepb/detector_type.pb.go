@@ -1101,6 +1101,7 @@ const (
 	DetectorType_BitbucketDataCenter                     DetectorType = 1045
 	DetectorType_JiraDataCenterPAT                       DetectorType = 1046
 	DetectorType_ConfluenceDataCenter                    DetectorType = 1047
+	DetectorType_StripeWebhookSecret                     DetectorType = 1048
 )
 
 // Enum value maps for DetectorType.
@@ -2150,6 +2151,7 @@ var (
 		1045: "BitbucketDataCenter",
 		1046: "JiraDataCenterPAT",
 		1047: "ConfluenceDataCenter",
+		1048: "StripeWebhookSecret",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3196,6 +3198,7 @@ var (
 		"BitbucketDataCenter":               1045,
 		"JiraDataCenterPAT":                 1046,
 		"ConfluenceDataCenter":              1047,
+		"StripeWebhookSecret":               1048,
 	}
 )
 
