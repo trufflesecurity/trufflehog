@@ -22,6 +22,14 @@ func (s Scanner) Keywords() []string {
 	return []string{"whsec_"}
 }
 
+// FromData is pattern-only. Unlike webhook URL detectors (Discord, Slack,
+// Teams, Tines) where the URL itself is a callable endpoint, a Stripe
+// whsec_ is a symmetric HMAC signing secret used server-side to verify
+// signatures on events Stripe delivers. Stripe exposes no API that
+// accepts a whsec_ as a credential: GET /v1/webhook_endpoints requires
+// an sk_* API key and does not return `secret` for existing endpoints
+// (it is only returned at creation time). A whsec_ therefore cannot be
+// independently verified against Stripe.
 func (s Scanner) FromData(_ context.Context, _ bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
