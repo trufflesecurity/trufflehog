@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestBraintrust_FromData(t *testing.T) {
@@ -54,7 +54,7 @@ func TestBraintrust_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BrainTrustApiKey,
+					DetectorType: detector_typepb.DetectorType_BrainTrustApiKey,
 					Verified:     true,
 					Raw:          []byte(activeToken),
 					Redacted:     activeToken[:8] + "...",
@@ -71,7 +71,7 @@ func TestBraintrust_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BrainTrustApiKey,
+					DetectorType: detector_typepb.DetectorType_BrainTrustApiKey,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 					Redacted:     activeToken[:8] + "...",
@@ -89,7 +89,7 @@ func TestBraintrust_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BrainTrustApiKey,
+					DetectorType: detector_typepb.DetectorType_BrainTrustApiKey,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 					Redacted:     activeToken[:8] + "...",
@@ -107,7 +107,7 @@ func TestBraintrust_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BrainTrustApiKey,
+					DetectorType: detector_typepb.DetectorType_BrainTrustApiKey,
 					Verified:     false,
 					Raw:          []byte(inactiveToken),
 					Redacted:     inactiveToken[:8] + "...",
@@ -151,6 +151,7 @@ func TestBraintrust_FromData(t *testing.T) {
 				"ExtraData",
 				"verificationError",
 				"primarySecret",
+				"SecretParts",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {

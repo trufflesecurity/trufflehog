@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -58,9 +58,12 @@ func (s Scanner) FromData(
 
 	for token := range uniqueTokens {
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_BrainTrustApiKey,
+			DetectorType: detector_typepb.DetectorType_BrainTrustApiKey,
 			Raw:          []byte(token),
 			Redacted:     token[:8] + "...",
+			SecretParts: map[string]string{
+				"token": token,
+			},
 		}
 
 		if verify {
@@ -123,8 +126,8 @@ func verifyBraintrustToken(
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_BrainTrustApiKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_BrainTrustApiKey
 }
 
 func (s Scanner) Description() string {
