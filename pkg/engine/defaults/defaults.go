@@ -243,6 +243,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dronahq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/droneci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dropbox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duffeltesttoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dwolla"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dynalist"
@@ -1114,6 +1115,7 @@ func buildDetectorList() []detectors.Detector {
 		&dronahq.Scanner{},
 		&droneci.Scanner{},
 		&dropbox.Scanner{},
+		&duffeltesttoken.Scanner{},
 		&duply.Scanner{},
 		&dwolla.Scanner{},
 		&dynalist.Scanner{},
