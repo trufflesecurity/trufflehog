@@ -60,7 +60,11 @@ EndpointLoop:
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureAPIManagementSubscriptionKey,
 				Raw:          []byte(baseUrl),
-				RawV2:        []byte(baseUrl + ":" + key),
+				SecretParts: map[string]string{
+					"url": baseUrl,
+					"key": key,
+				},
+				RawV2: []byte(baseUrl + ":" + key),
 			}
 
 			if verify {

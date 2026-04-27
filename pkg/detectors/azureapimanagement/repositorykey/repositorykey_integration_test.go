@@ -110,7 +110,7 @@ func TestAxonaut_FromChunk(t *testing.T) {
 				}
 			}
 
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AzureApiManagementRepositoryKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

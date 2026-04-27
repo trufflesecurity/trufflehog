@@ -164,7 +164,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
-			result.AnalysisInfo = map[string]string{
+			result.SecretParts = map[string]string{
 				"connection_string": string(raw),
 			}
 		}

@@ -102,7 +102,7 @@ matchLoop:
 				err = pingRes.err
 				result.SetVerificationError(err, jdbcConn)
 			}
-			result.AnalysisInfo = map[string]string{
+			result.SecretParts = map[string]string{
 				"connection_string": jdbcConn,
 			}
 			// TODO: specialized redaction

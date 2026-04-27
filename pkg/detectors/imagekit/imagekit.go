@@ -41,6 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Imagekit,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.imagekit.io/v1/files", nil)

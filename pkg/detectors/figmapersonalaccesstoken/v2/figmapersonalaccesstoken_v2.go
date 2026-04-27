@@ -80,7 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(err, resMatch)
 			}
 			if s1.Verified {
-				s1.AnalysisInfo = map[string]string{"token": resMatch}
+				s1.SecretParts = map[string]string{"token": resMatch}
 			}
 		}
 
