@@ -27,7 +27,7 @@ var (
 	// Duffel test token pattern
 	// Format: duffel_test_ + 43 alphanumeric / dash / underscore characters
 	duffelTestTokenPat = regexp.MustCompile(
-		`\b(duffel_test_[A-Za-z0-9_-]{43})\b`,
+		`\b(duffel_test_[A-Za-z0-9_-]{43})(?:$|[^A-Za-z0-9_-])`,
 	)
 )
 
@@ -133,5 +133,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Duffel provides APIs for flight search and booking. This detector identifies Duffel test API tokens."
+	return "Duffel is a flight search and booking API service. Duffel test API tokens can be used to access and interact with flight search and booking APIs in test environments."
 }
