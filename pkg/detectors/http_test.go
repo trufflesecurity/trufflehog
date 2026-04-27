@@ -298,7 +298,11 @@ func TestDoWithDedup_DeadlinePreserved(t *testing.T) {
 
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, http.NoBody)
 	start := time.Now()
-	_, err := DoWithDedup(client, detector_typepb.DetectorType_Meraki, "cred", req)
+	resp, err := DoWithDedup(client, detector_typepb.DetectorType_Meraki, "cred", req)
+	if err == nil {
+		defer resp.Body.Close()
+	}
+
 	elapsed := time.Since(start)
 
 	assert.Error(t, err, "request to hanging server should fail")
