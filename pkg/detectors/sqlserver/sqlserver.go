@@ -13,7 +13,7 @@ import (
 	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/microsoft/go-mssqldb/msdsn"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
@@ -79,10 +79,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_SQLServer,
+			DetectorType: detector_typepb.DetectorType_SQLServer,
 			Raw:          []byte(paramsUnsafe.Password),
 			RawV2:        []byte(paramsUnsafe.URL().String()),
-			Redacted:     detectors.RedactURL(*paramsUnsafe.URL()),
+			SecretParts: map[string]string{
+				"host":     paramsUnsafe.Host,
+				"database": paramsUnsafe.Database,
+				"user":     paramsUnsafe.User,
+				"password": paramsUnsafe.Password,
+			},
+			Redacted: detectors.RedactURL(*paramsUnsafe.URL()),
 		}
 
 		if verify {
@@ -167,8 +173,8 @@ var ping = func(ctx context.Context, config msdsn.Config) (bool, error) {
 	return true, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SQLServer
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SQLServer
 }
 
 func (s Scanner) Description() string {

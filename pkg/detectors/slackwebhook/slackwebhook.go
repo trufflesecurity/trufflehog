@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	regexp "github.com/wasilibs/go-re2"
 )
 
@@ -48,8 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_SlackWebhook,
+				DetectorType: detector_typepb.DetectorType_SlackWebhook,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/",
@@ -106,8 +107,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SlackWebhook
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SlackWebhook
 }
 
 func (s Scanner) Description() string {

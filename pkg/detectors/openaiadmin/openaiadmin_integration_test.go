@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestOpenAIAdmin_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestOpenAIAdmin_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAIAdmin,
+					DetectorType: detector_typepb.DetectorType_OpenAIAdmin,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestOpenAIAdmin_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAIAdmin,
+					DetectorType: detector_typepb.DetectorType_OpenAIAdmin,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,7 @@ func TestOpenAIAdmin_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAIAdmin,
+					DetectorType: detector_typepb.DetectorType_OpenAIAdmin,
 					Verified:     false,
 				},
 			},
@@ -113,7 +113,7 @@ func TestOpenAIAdmin_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenAIAdmin,
+					DetectorType: detector_typepb.DetectorType_OpenAIAdmin,
 					Verified:     false,
 				},
 			},
@@ -136,7 +136,7 @@ func TestOpenAIAdmin_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo", "Redacted")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts", "Redacted")
 			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
 			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("OpenAIAdmin.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

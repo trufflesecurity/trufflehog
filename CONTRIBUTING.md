@@ -40,3 +40,7 @@ Example: `Logger().V(2).Info("skipping file: extension is ignored", "ext", mimeE
 **Either log an error or return it**. Doing one or the other will help defer logging for when there is more context for it and prevent duplicate “bubbling up” logs.
 
 **Log contextual information**. Every log emitted should contain this context via fields to easily filter and search.
+
+## Updating the man page
+
+If you add, remove, or rename CLI flags or subcommands, regenerate the man page with `make man` and commit the updated `docs/man/trufflehog.1`. CI will fail if the checked-in man page is stale.

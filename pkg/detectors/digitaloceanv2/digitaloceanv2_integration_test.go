@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDigitalOceanV2_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestDigitalOceanV2_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DigitalOceanV2,
+					DetectorType: detector_typepb.DetectorType_DigitalOceanV2,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestDigitalOceanV2_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DigitalOceanV2,
+					DetectorType: detector_typepb.DetectorType_DigitalOceanV2,
 					Verified:     false,
 				},
 			},
@@ -93,7 +93,7 @@ func TestDigitalOceanV2_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DigitalOceanV2,
+					DetectorType: detector_typepb.DetectorType_DigitalOceanV2,
 					Verified:     false,
 				},
 			},
@@ -116,7 +116,7 @@ func TestDigitalOceanV2_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("DigitalOceanV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

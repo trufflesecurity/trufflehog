@@ -26,6 +26,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -46,32 +47,32 @@ var _ detectors.Versioner = (*fakeDetectorV2)(nil)
 func (f fakeDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType(-1),
+			DetectorType: detector_typepb.DetectorType(-1),
 			Verified:     true,
 			Raw:          []byte("fake secret v1"),
 		},
 	}, nil
 }
 
-func (f fakeDetectorV1) Keywords() []string             { return []string{fakeDetectorKeyword} }
-func (f fakeDetectorV1) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
-func (f fakeDetectorV1) Version() int                   { return 1 }
+func (f fakeDetectorV1) Keywords() []string                 { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV1) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
+func (f fakeDetectorV1) Version() int                       { return 1 }
 
 func (f fakeDetectorV1) Description() string { return "fake detector v1" }
 
 func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType(-1),
+			DetectorType: detector_typepb.DetectorType(-1),
 			Verified:     true,
 			Raw:          []byte("fake secret v2"),
 		},
 	}, nil
 }
 
-func (f fakeDetectorV2) Keywords() []string             { return []string{fakeDetectorKeyword} }
-func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
-func (f fakeDetectorV2) Version() int                   { return 2 }
+func (f fakeDetectorV2) Keywords() []string                 { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV2) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
+func (f fakeDetectorV2) Version() int                       { return 2 }
 
 func (f fakeDetectorV2) Description() string { return "fake detector v2" }
 
@@ -659,7 +660,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 
 	// Arrange: Create a Result
 	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType(-1),
+		DetectorType: detector_typepb.DetectorType(-1),
 		ExtraData:    map[string]string{"key": "value"},
 		Raw:          []byte("something"),
 		RawV2:        []byte("something:else"),
@@ -681,7 +682,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	assert.Equal(t, []byte("something:else"), r.RawV2)
 	assert.Equal(t, "someth***", r.Redacted)
 	assert.True(t, r.Verified)
-	assert.Equal(t, detectorspb.DetectorType(-1), r.DetectorType)
+	assert.Equal(t, detector_typepb.DetectorType(-1), r.DetectorType)
 	assert.Equal(t, sources.SourceID(1), r.SourceID)
 	assert.Equal(t, sources.JobID(2), r.JobID)
 	assert.Equal(t, int64(3), r.SecretID)
@@ -817,7 +818,7 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "no overlap, retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
 			},
 			retainFalsePositives:      true,
 			wantUnverifiedSecretCount: 1,
@@ -825,7 +826,7 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "no overlap, do not retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
 			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
@@ -833,8 +834,8 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "overlap, retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
 			},
 			retainFalsePositives:      true,
 			wantUnverifiedSecretCount: 2,
@@ -842,8 +843,8 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "overlap, do not retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
 			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
@@ -1175,8 +1176,8 @@ func (c customCleaner) FromData(aCtx.Context, bool, []byte) ([]detectors.Result,
 	return []detectors.Result{}, nil
 }
 
-func (c customCleaner) Keywords() []string             { return []string{} }
-func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+func (c customCleaner) Keywords() []string                 { return []string{} }
+func (c customCleaner) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
 
 func (customCleaner) Description() string { return "" }
 
@@ -1312,25 +1313,25 @@ func TestEngine_ShouldVerifyChunk(t *testing.T) {
 		{
 			name:        "detector override by exact version",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 2},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 2},
 			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
 		},
 		{
 			name:        "detector override by versionless config",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 0},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 0},
 			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
 		},
 		{
 			name:        "no detector override because of detector type mismatch",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_NpmToken, Version: 2},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_NpmToken, Version: 2},
 			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
 		},
 		{
 			name:        "no detector override because of detector version mismatch",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 1},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 1},
 			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
 		},
 	}
@@ -1373,11 +1374,13 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	assert.NoError(t, err)
 
 	var count int
-	noCloudEndpointDetectors := map[detectorspb.DetectorType]struct{}{
-		detectorspb.DetectorType_ArtifactoryAccessToken:     {},
-		detectorspb.DetectorType_ArtifactoryReferenceToken:  {},
-		detectorspb.DetectorType_TableauPersonalAccessToken: {},
-		detectorspb.DetectorType_HashiCorpVaultToken:        {},
+	noCloudEndpointDetectors := map[detector_typepb.DetectorType]struct{}{
+		detector_typepb.DetectorType_ArtifactoryAccessToken:     {},
+		detector_typepb.DetectorType_ArtifactoryReferenceToken:  {},
+		detector_typepb.DetectorType_TableauPersonalAccessToken: {},
+		detector_typepb.DetectorType_HashiCorpVaultAuth:         {},
+		detector_typepb.DetectorType_JiraDataCenterPAT:          {},
+		detector_typepb.DetectorType_ConfluenceDataCenter:       {},
 		// these do not have any cloud endpoint
 	}
 
@@ -1479,7 +1482,7 @@ def test_something():
 }
 
 type passthroughDetector struct {
-	detectorType detectorspb.DetectorType
+	detectorType detector_typepb.DetectorType
 	keywords     []string
 	secret       string
 }
@@ -1497,9 +1500,9 @@ func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) 
 	}, nil
 }
 
-func (p passthroughDetector) Keywords() []string             { return p.keywords }
-func (p passthroughDetector) Type() detectorspb.DetectorType { return p.detectorType }
-func (p passthroughDetector) Description() string            { return "fake detector for testing" }
+func (p passthroughDetector) Keywords() []string                 { return p.keywords }
+func (p passthroughDetector) Type() detector_typepb.DetectorType { return p.detectorType }
+func (p passthroughDetector) Description() string                { return "fake detector for testing" }
 
 type passthroughDecoder struct{}
 
@@ -1510,7 +1513,9 @@ func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableC
 	}
 }
 
-func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
+func (p passthroughDecoder) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType(-1)
+}
 
 // TestEngine_DetectChunk_UsesVerifyFlag validates that detectChunk correctly forwards detectableChunk.verify to
 // detectors.
@@ -1653,8 +1658,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		// Arrange: Create overlapping detector matches. We can't create them directly, so we have to use a minimal A-H
 		// core.
 		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
-			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}},
-			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"keyw"}},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"keyword"}},
 		})
 		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
 		require.Len(t, detectorMatches, 2)
@@ -1714,8 +1719,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		// Arrange: Create non-overlapping detector matches. We can't create them directly, so we have to use a minimal
 		// A-H core.
 		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
-			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}, secret: "oahpow"},
-			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}, secret: "blaisd"},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"keyw"}, secret: "oahpow"},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"keyword"}, secret: "blaisd"},
 		})
 		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
 		require.Len(t, detectorMatches, 2)
@@ -1852,7 +1857,7 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 
 			detector := &passthroughDetector{
 				keywords:     []string{detectorKeyword},
-				detectorType: detectorspb.DetectorType(9999),
+				detectorType: detector_typepb.DetectorType(9999),
 			}
 			e := &Engine{
 				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
