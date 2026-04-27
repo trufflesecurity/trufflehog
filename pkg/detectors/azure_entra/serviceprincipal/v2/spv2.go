@@ -157,6 +157,7 @@ func createResult(tenantId string, clientId string, clientSecret string, verifie
 	r := &detectors.Result{
 		DetectorType: detector_typepb.DetectorType_Azure,
 		Raw:          []byte(clientSecret),
+		SecretParts:  map[string]string{"key": clientSecret},
 		ExtraData:    extraData,
 		Verified:     verified,
 		Redacted:     clientSecret[:5] + "...",

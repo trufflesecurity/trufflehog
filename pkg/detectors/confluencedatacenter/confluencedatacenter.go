@@ -130,7 +130,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			r := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_ConfluenceDataCenter,
 				Raw:          []byte(token),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", token, baseURL)),
+				SecretParts: map[string]string{
+					"token": token,
+					"url":   baseURL,
+				},
+				RawV2: []byte(fmt.Sprintf("%s:%s", token, baseURL)),
 				ExtraData: map[string]string{
 					"base_url": baseURL,
 				},
@@ -157,6 +161,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			results = append(results, detectors.Result{
 				DetectorType: detector_typepb.DetectorType_ConfluenceDataCenter,
 				Raw:          []byte(token),
+				SecretParts:  map[string]string{"token": token},
 				RawV2:        []byte(token),
 				ExtraData: map[string]string{
 					"verification_note": "no reachable Confluence Data Center URL found in context; token reported unverified",

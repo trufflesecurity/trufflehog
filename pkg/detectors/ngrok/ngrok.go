@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			r.Verified = isVerified
 			r.SetVerificationError(vErr, token)
 			if isVerified {
-				r.AnalysisInfo = map[string]string{"key": token}
+				r.SecretParts = map[string]string{"key": token}
 			}
 		}
 

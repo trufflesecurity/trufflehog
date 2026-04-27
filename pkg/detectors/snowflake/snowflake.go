@@ -123,6 +123,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_Snowflake,
 					Raw:          []byte(resPasswordMatch),
+					SecretParts:  map[string]string{"key": resPasswordMatch},
 					ExtraData: map[string]string{
 						"account":  resAccountMatch,
 						"username": resUsernameMatch,

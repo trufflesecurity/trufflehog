@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -51,6 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_Roaring,
 				Raw:          []byte(resClient),
 				RawV2:        []byte(resClient + resSecret),
+				SecretParts: map[string]string{
+					"client_id":     resClient,
+					"client_secret": resSecret,
+				},
 			}
 
 			if verify {
