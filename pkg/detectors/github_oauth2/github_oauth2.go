@@ -49,7 +49,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_GitHubOauth2,
 				Raw:          []byte(idMatch[1]),
-				RawV2:        []byte(idMatch[1] + secretMatch[1]),
+				SecretParts: map[string]string{
+					"id":     idMatch[1],
+					"secret": secretMatch[1],
+				},
+				RawV2: []byte(idMatch[1] + secretMatch[1]),
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",

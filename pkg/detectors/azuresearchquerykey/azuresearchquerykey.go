@@ -50,7 +50,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureSearchQueryKey,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resUrlMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"url": resUrlMatch,
+				},
+				RawV2: []byte(resMatch + resUrlMatch),
 			}
 			if verify {
 				client := s.client

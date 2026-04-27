@@ -78,6 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: s.Type(),
 			Redacted:     token[:3] + "..." + token[25:],
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		for url := range urls {

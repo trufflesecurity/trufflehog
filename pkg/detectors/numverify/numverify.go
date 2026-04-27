@@ -39,6 +39,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Numverify,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://apilayer.net/api/validate?access_key=%s&number=14158586273", resMatch), nil)

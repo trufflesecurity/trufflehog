@@ -88,7 +88,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1 := detectors.Result{
 							DetectorType: detector_typepb.DetectorType_Netsuite,
 							Raw:          []byte(consumerKey),
-							RawV2:        []byte(consumerKey + consumerSecret),
+							SecretParts: map[string]string{
+								"consumer_key":    consumerKey,
+								"consumer_secret": consumerSecret,
+							},
+							RawV2: []byte(consumerKey + consumerSecret),
 						}
 
 						if verify {

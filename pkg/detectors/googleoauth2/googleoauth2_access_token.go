@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
