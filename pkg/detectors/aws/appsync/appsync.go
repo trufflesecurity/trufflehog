@@ -73,6 +73,10 @@ func (s Scanner) FromData(
 				DetectorType: detector_typepb.DetectorType_AWSAppSync,
 				Raw:          []byte(key),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", normalizedEndpoint, key)),
+				SecretParts: map[string]string{
+					"key":      key,
+					"endpoint": normalizedEndpoint,
+				},
 			}
 
 			if verify {
