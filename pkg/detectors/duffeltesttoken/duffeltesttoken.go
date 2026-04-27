@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -59,9 +59,12 @@ func (s Scanner) FromData(
 
 	for token := range uniqueTokens {
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_DuffelTestToken,
+			DetectorType: detector_typepb.DetectorType_DuffelTestToken,
 			Raw:          []byte(token),
 			Redacted:     token[:15] + "...",
+			SecretParts: map[string]string{
+				"token": token,
+			},
 		}
 
 		if verify {
@@ -132,8 +135,8 @@ func verifyDuffelToken(
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_DuffelTestToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_DuffelTestToken
 }
 
 func (s Scanner) Description() string {

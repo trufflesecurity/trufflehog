@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDuffelTestToken_FromData(t *testing.T) {
@@ -54,7 +54,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
 					Verified:     true,
 					Raw:          []byte(activeToken),
 				},
@@ -70,7 +70,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 				},
@@ -87,7 +87,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 				},
@@ -104,7 +104,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
 					Verified:     false,
 					Raw:          []byte(inactiveToken),
 				},
