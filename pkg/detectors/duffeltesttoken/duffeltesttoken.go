@@ -110,15 +110,19 @@ func verifyDuffelToken(
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
-
+	fmt.Println(res.StatusCode)
 	switch res.StatusCode {
 
 	case http.StatusOK:
 		return true, nil
 
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusUnauthorized:
 		// Token invalid or revoked
 		return false, nil
+
+	case http.StatusForbidden:
+		// Token valid but insufficient permissions - treat as verified since the token is active
+		return true, nil
 
 	default:
 		return false, fmt.Errorf(
