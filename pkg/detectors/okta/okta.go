@@ -53,7 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Okta,
 				Raw:          []byte(token),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, token)),
+				SecretParts: map[string]string{
+					"domain": domain,
+					"token":  token,
+				},
+				RawV2: []byte(fmt.Sprintf("%s:%s", domain, token)),
 			}
 
 			if verify {

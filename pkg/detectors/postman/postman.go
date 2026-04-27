@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyPostman(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
-			s1.AnalysisInfo = map[string]string{
+			s1.SecretParts = map[string]string{
 				"key": resMatch,
 			}
 		}

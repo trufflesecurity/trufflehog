@@ -10,7 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_RechargePayments,
 				Raw:          []byte(token),
+				SecretParts:  map[string]string{"key": token},
 			}
 			if verify {
 				client := common.SaneHttpClient()

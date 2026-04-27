@@ -60,7 +60,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_ZulipChat,
 					Raw:          []byte(key),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", key, id, domain)),
+					SecretParts: map[string]string{
+						"key":    key,
+						"id":     id,
+						"domain": domain,
+					},
+					RawV2: []byte(fmt.Sprintf("%s:%s:%s", key, id, domain)),
 					ExtraData: map[string]string{
 						"Domain": domain,
 						"Id":     id,
