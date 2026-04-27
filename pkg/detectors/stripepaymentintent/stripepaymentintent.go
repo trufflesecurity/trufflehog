@@ -65,7 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_StripePaymentIntent,
 				Raw:          []byte(clientSecret),
-				RawV2:        []byte(clientSecret + key),
+				SecretParts: map[string]string{
+					"client_secret": clientSecret,
+					"key":           key,
+				},
+				RawV2: []byte(clientSecret + key),
 				ExtraData: map[string]string{
 					"key_type": "secret",
 				},
@@ -84,7 +88,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_StripePaymentIntent,
 				Raw:          []byte(clientSecret),
-				RawV2:        []byte(clientSecret + key),
+				SecretParts: map[string]string{
+					"client_secret": clientSecret,
+					"key":           key,
+				},
+				RawV2: []byte(clientSecret + key),
 				ExtraData: map[string]string{
 					"key_type": "publishable",
 				},

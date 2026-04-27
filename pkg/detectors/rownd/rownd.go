@@ -54,7 +54,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_Rownd,
 					Raw:          []byte(keyMatch),
-					RawV2:        []byte(keyMatch + secretMatch),
+					SecretParts: map[string]string{
+						"key":    keyMatch,
+						"secret": secretMatch,
+					},
+					RawV2: []byte(keyMatch + secretMatch),
 				}
 
 				if verify {

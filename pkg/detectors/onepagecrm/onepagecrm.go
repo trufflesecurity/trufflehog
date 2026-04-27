@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_OnepageCRM,
 				Raw:          []byte(tokenPatMatch),
+				SecretParts:  map[string]string{"key": tokenPatMatch},
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://app.onepagecrm.com/api/v3/contacts.json?per_page=20&page=1", nil)
