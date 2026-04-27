@@ -96,7 +96,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// returns verfied=true if credentials are valid and belong to auth api, false if creds are invalid, and error if creds belong to auth api or for anything else (e.g., network error)
+// returns verified=true if credentials are valid and belong to auth api, false if creds are invalid, and error if creds belong to auth api or for anything else (e.g., network error)
 func VerifyAuthToken(
 	ctx context.Context,
 	client *http.Client,
