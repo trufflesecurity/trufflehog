@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		r := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_MicrosoftTeamsWebhook,
 			Raw:          []byte(secret),
+			SecretParts:  map[string]string{"key": secret},
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},
