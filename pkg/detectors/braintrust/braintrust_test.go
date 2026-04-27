@@ -68,7 +68,7 @@ func TestBraintrust_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern - invalid characters",
 			input: `
-				[DEBUG] braintrust_key=sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!
+				[DEBUG] braintrust_key=sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!
 			`,
 			want: nil,
 		},
