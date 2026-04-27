@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSpectralOps_FromData(t *testing.T) {
@@ -54,10 +54,9 @@ func TestSpectralOps_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SpectralOps,
+					DetectorType: detector_typepb.DetectorType_SpectralOps,
 					Verified:     true,
 					Raw:          []byte(activeToken),
-					RawV2:        []byte(activeToken),
 				},
 			},
 		},
@@ -71,10 +70,9 @@ func TestSpectralOps_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SpectralOps,
+					DetectorType: detector_typepb.DetectorType_SpectralOps,
 					Verified:     false,
 					Raw:          []byte(activeToken),
-					RawV2:        []byte(activeToken),
 				},
 			},
 			wantVerificationErr: true,
@@ -89,10 +87,9 @@ func TestSpectralOps_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SpectralOps,
+					DetectorType: detector_typepb.DetectorType_SpectralOps,
 					Verified:     false,
 					Raw:          []byte(activeToken),
-					RawV2:        []byte(activeToken),
 				},
 			},
 			wantVerificationErr: true,
@@ -107,10 +104,9 @@ func TestSpectralOps_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SpectralOps,
+					DetectorType: detector_typepb.DetectorType_SpectralOps,
 					Verified:     false,
 					Raw:          []byte(inactiveToken),
-					RawV2:        []byte(inactiveToken),
 				},
 			},
 		},
@@ -151,6 +147,7 @@ func TestSpectralOps_FromData(t *testing.T) {
 				"ExtraData",
 				"verificationError",
 				"primarySecret",
+				"SecretParts",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {

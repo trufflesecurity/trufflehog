@@ -10,12 +10,11 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
 	client *http.Client
-	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Compile-time interface check
@@ -59,9 +58,11 @@ func (s Scanner) FromData(
 
 	for token := range uniqueTokens {
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_SpectralOps,
+			DetectorType: detector_typepb.DetectorType_SpectralOps,
 			Raw:          []byte(token),
-			RawV2:        []byte(token),
+			SecretParts: map[string]string{
+				"token": token,
+			},
 		}
 
 		if verify {
@@ -121,10 +122,10 @@ func verifySpectralToken(
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SpectralOps
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SpectralOps
 }
 
 func (s Scanner) Description() string {
-	return "SpectralOps is a DevSecOps platform for detecting secrets and misconfigurations. This detector identifies Spectral personal API tokens."
+	return "SpectralOps is a DevSecOps platform for detecting secrets and misconfigurations. Spectral personal API tokens can be used to access and interact with Spectral services and resources."
 }
