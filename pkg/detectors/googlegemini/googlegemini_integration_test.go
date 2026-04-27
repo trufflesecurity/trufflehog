@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGoogleGemini_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
+					DetectorType: detector_typepb.DetectorType_GoogleGeminiAPIKey,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"active_google_key": "true",
@@ -69,7 +69,7 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
+					DetectorType: detector_typepb.DetectorType_GoogleGeminiAPIKey,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"active_google_key": "true",
@@ -88,7 +88,7 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleGeminiAPIKey,
+					DetectorType: detector_typepb.DetectorType_GoogleGeminiAPIKey,
 					Verified:     false,
 				},
 			},

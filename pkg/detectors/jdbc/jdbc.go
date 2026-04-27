@@ -11,7 +11,7 @@ import (
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -80,7 +80,7 @@ matchLoop:
 		jdbcConn := match[0]
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_JDBC,
+			DetectorType: detector_typepb.DetectorType_JDBC,
 			Raw:          []byte(jdbcConn),
 			Redacted:     tryRedactAnonymousJDBC(jdbcConn),
 		}
@@ -102,7 +102,7 @@ matchLoop:
 				err = pingRes.err
 				result.SetVerificationError(err, jdbcConn)
 			}
-			result.AnalysisInfo = map[string]string{
+			result.SecretParts = map[string]string{
 				"connection_string": jdbcConn,
 			}
 			// TODO: specialized redaction
@@ -260,8 +260,8 @@ func pingErr(ctx context.Context, driverName, conn string) error {
 	return nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_JDBC
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_JDBC
 }
 
 func (s Scanner) Description() string {

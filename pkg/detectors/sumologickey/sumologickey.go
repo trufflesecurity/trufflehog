@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	regexp "github.com/wasilibs/go-re2"
 )
@@ -140,8 +140,9 @@ func verifyMatch(ctx context.Context, client *http.Client, endpoint string, id s
 
 func createResult(accessId string, accessKey string, endpoint string, verified bool, err error) *detectors.Result {
 	r := &detectors.Result{
-		DetectorType: detectorspb.DetectorType_SumoLogicKey,
+		DetectorType: detector_typepb.DetectorType_SumoLogicKey,
 		Raw:          []byte(accessKey),
+		SecretParts:  map[string]string{"key": accessKey},
 		Verified:     verified,
 		ExtraData: map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/sumologic/",
@@ -165,8 +166,8 @@ func createResult(accessId string, accessKey string, endpoint string, verified b
 	return r
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SumoLogicKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SumoLogicKey
 }
 
 func (s Scanner) Description() string {
