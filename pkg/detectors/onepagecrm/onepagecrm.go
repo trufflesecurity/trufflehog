@@ -8,7 +8,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -47,8 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			userPatMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_OnepageCRM,
+				DetectorType: detector_typepb.DetectorType_OnepageCRM,
 				Raw:          []byte(tokenPatMatch),
+				SecretParts:  map[string]string{"key": tokenPatMatch},
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://app.onepagecrm.com/api/v3/contacts.json?per_page=20&page=1", nil)
@@ -71,8 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OnepageCRM
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OnepageCRM
 }
 
 func (s Scanner) Description() string {

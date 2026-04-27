@@ -10,10 +10,10 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -55,9 +55,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Metabase,
+				DetectorType: detector_typepb.DetectorType_Metabase,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resURLMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"url": resURLMatch,
+				},
+				RawV2: []byte(resMatch + resURLMatch),
 			}
 
 			if verify {
@@ -87,8 +91,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Metabase
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Metabase
 }
 
 func (s Scanner) Description() string {

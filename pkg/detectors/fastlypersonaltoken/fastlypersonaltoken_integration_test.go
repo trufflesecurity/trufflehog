@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFastlyPersonalToken_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
+					DetectorType: detector_typepb.DetectorType_FastlyPersonalToken,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"token_id":         "2ICO7ArmhY8OMiiOyNpXfc",
@@ -71,7 +71,7 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
+					DetectorType: detector_typepb.DetectorType_FastlyPersonalToken,
 					Verified:     false,
 					ExtraData:    nil,
 				},
@@ -102,7 +102,7 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("FastlyPersonalToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -48,10 +48,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			apiSecretRes := strings.TrimSpace(apiSecretMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_FacebookOAuth,
+				DetectorType: detector_typepb.DetectorType_FacebookOAuth,
 				Redacted:     apiIdRes,
 				Raw:          []byte(apiSecretRes),
-				RawV2:        []byte(apiIdRes + apiSecretRes),
+				SecretParts: map[string]string{
+					"id":     apiIdRes,
+					"secret": apiSecretRes,
+				},
+				RawV2: []byte(apiIdRes + apiSecretRes),
 			}
 
 			if verify {
@@ -77,8 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_FacebookOAuth
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_FacebookOAuth
 }
 
 func (s Scanner) Description() string {

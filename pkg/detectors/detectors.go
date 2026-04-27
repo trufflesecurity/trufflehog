@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -30,8 +31,8 @@ type Detector interface {
 	// That is, if any of the keywords are found in a chunk, the chunk will be run through the detector.
 	Keywords() []string
 
-	// Type returns the DetectorType number from detectors.proto for the given detector.
-	Type() detectorspb.DetectorType
+	// Type returns the DetectorType number from detector_type.proto for the given detector.
+	Type() detector_typepb.DetectorType
 
 	// Description returns a description for the result being detected
 	Description() string
@@ -95,7 +96,7 @@ type CloudProvider interface {
 
 type Result struct {
 	// DetectorType is the type of Detector.
-	DetectorType detectorspb.DetectorType
+	DetectorType detector_typepb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
 	// Verified indicates whether the result was verified or not.
@@ -118,10 +119,11 @@ type Result struct {
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
 
-	// AnalysisInfo should be set with information required for credential
-	// analysis to run. The keys of the map are analyzer specific and
-	// should match what is expected in the corresponding analyzer.
-	AnalysisInfo map[string]string
+	// SecretParts holds the individual components of a (potentially multi-part)
+	// credential, keyed by a component name. It is used by analyzers where
+	// the keys are analyzer specific and should match what the
+	// corresponding analyzer expects.
+	SecretParts map[string]string
 
 	// primarySecret is used when a detector has multiple secret patterns.
 	// This secret is designated to determine the line number.
