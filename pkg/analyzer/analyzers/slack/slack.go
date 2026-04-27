@@ -141,7 +141,7 @@ func getSlackOAuthScopes(cfg *config.Config, key string) (scopes string, userDat
 	if err != nil {
 		return scopes, userData, err
 	}
-	defer resp.Body.Close() // Close the response body when the function returns
+	defer func() { _ = resp.Body.Close() }() // Close the response body when the function returns
 
 	// print body
 	body, err := io.ReadAll(resp.Body)

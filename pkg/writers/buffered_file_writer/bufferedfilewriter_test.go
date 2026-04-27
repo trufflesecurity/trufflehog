@@ -118,7 +118,7 @@ func BenchmarkBufferedFileWriterString_BufferOnly_Small(b *testing.B) {
 
 	rc, err := writer.ReadCloser()
 	assert.NoError(b, err)
-	rc.Close()
+	_ = rc.Close()
 }
 
 func BenchmarkBufferedFileWriterString_BufferOnly_Medium(b *testing.B) {
@@ -135,7 +135,7 @@ func BenchmarkBufferedFileWriterString_BufferOnly_Medium(b *testing.B) {
 
 	rc, err := writer.ReadCloser()
 	assert.NoError(b, err)
-	rc.Close()
+	_ = rc.Close()
 }
 
 func BenchmarkBufferedFileWriterString_OnlyFile_Small(b *testing.B) {
@@ -153,7 +153,7 @@ func BenchmarkBufferedFileWriterString_OnlyFile_Small(b *testing.B) {
 
 	rc, err := writer.ReadCloser()
 	assert.NoError(b, err)
-	rc.Close()
+	_ = rc.Close()
 }
 
 func BenchmarkBufferedFileWriterString_OnlyFile_Medium(b *testing.B) {
@@ -171,7 +171,7 @@ func BenchmarkBufferedFileWriterString_OnlyFile_Medium(b *testing.B) {
 
 	rc, err := writer.ReadCloser()
 	assert.NoError(b, err)
-	rc.Close()
+	_ = rc.Close()
 }
 
 func BenchmarkBufferedFileWriterString_BufferWithFile_Small(b *testing.B) {
@@ -193,7 +193,7 @@ func BenchmarkBufferedFileWriterString_BufferWithFile_Small(b *testing.B) {
 
 	rc, err := writer.ReadCloser()
 	assert.NoError(b, err)
-	rc.Close()
+	_ = rc.Close()
 }
 
 func BenchmarkBufferedFileWriterString_BufferWithFile_Medium(b *testing.B) {
@@ -215,7 +215,7 @@ func BenchmarkBufferedFileWriterString_BufferWithFile_Medium(b *testing.B) {
 
 	rc, err := writer.ReadCloser()
 	assert.NoError(b, err)
-	rc.Close()
+	_ = rc.Close()
 }
 
 func benchmarkBufferedFileWriterString(b *testing.B, w *BufferedFileWriter) {
@@ -458,7 +458,7 @@ func BenchmarkBufferedFileWriterWriteLarge(b *testing.B) {
 
 		rc, err := writer.ReadCloser()
 		assert.NoError(b, err)
-		rc.Close()
+		_ = rc.Close()
 	}
 }
 
@@ -487,7 +487,7 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 
 		rc, err := writer.ReadCloser()
 		assert.NoError(b, err)
-		rc.Close()
+		_ = rc.Close()
 	}
 }
 
@@ -512,7 +512,7 @@ func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
 
 	rdr, err := writer.ReadCloser()
 	assert.NoError(t, err)
-	defer rdr.Close()
+	defer func() { _ = rdr.Close() }()
 
 	// Get a buffer from the pool and check if it is the same buffer used in the writer.
 	bufFromPool := bufPool.Get()
@@ -584,7 +584,7 @@ func TestBufferedFileWriter_ReadFrom(t *testing.T) {
 
 			rc, err := writer.ReadCloser()
 			assert.NoError(t, err)
-			defer rc.Close()
+			defer func() { _ = rc.Close() }()
 
 			var result bytes.Buffer
 

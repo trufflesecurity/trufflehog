@@ -430,7 +430,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	metadata.FolderID = item.Uid
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
-		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
+		metadata.FolderName = strings.ReplaceAll(metadata.FolderName, (" > " + item.Name), "")
 		metadata.FolderID = parentItemId
 		if metadata.FolderID == "" {
 			metadata.FolderName = ""
@@ -470,7 +470,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	// Prep direct links. Ignore updating link if it's a local JSON file
 	if !metadata.fromLocal {
-		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID
+		metadata.Link = LINK_BASE_URL + (strings.ReplaceAll(metadata.Type, " > event", "")) + "/" + metadata.FullID
 		if event.Listen == "prerequest" {
 			metadata.Link += "?tab=pre-request-scripts"
 		} else {
@@ -817,13 +817,13 @@ func unpackWorkspace(workspacePath string) (Workspace, error) {
 	if err != nil {
 		return workspace, err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	for _, file := range r.File {
 		rc, err := file.Open()
 		if err != nil {
 			return workspace, err
 		}
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 		contents, err := io.ReadAll(rc)
 		if err != nil {
 			return workspace, err

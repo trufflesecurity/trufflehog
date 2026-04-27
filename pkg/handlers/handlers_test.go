@@ -44,7 +44,7 @@ func TestHandleFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
@@ -58,7 +58,7 @@ func TestHandleHTTPJson(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
@@ -82,7 +82,7 @@ func TestHandleHTTPJsonZip(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
@@ -110,7 +110,7 @@ func BenchmarkHandleHTTPJsonZip(b *testing.B) {
 
 			defer func() {
 				if resp != nil && resp.Body != nil {
-					resp.Body.Close()
+					_ = resp.Body.Close()
 				}
 			}()
 
@@ -134,7 +134,7 @@ func BenchmarkHandleHTTPJsonZip(b *testing.B) {
 func BenchmarkHandleFile(b *testing.B) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(b, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -323,7 +323,7 @@ func TestHandleFileDOC(t *testing.T) {
 func BenchmarkHandleAR(b *testing.B) {
 	file, err := os.Open("testdata/test.deb")
 	assert.Nil(b, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -382,7 +382,7 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 func TestHandleTar(t *testing.T) {
 	file, err := os.Open("testdata/test.tar")
 	assert.Nil(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
@@ -402,7 +402,7 @@ func TestHandleTar(t *testing.T) {
 func BenchmarkHandleTar(b *testing.B) {
 	file, err := os.Open("testdata/test.tar")
 	assert.Nil(b, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -432,7 +432,7 @@ func TestHandleLargeHTTPJson(t *testing.T) {
 
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
@@ -455,10 +455,10 @@ func TestHandlePipe(t *testing.T) {
 	r, w := io.Pipe()
 
 	go func() {
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 		file, err := os.Open("testdata/test.tar")
 		assert.NoError(t, err)
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		_, err = io.Copy(w, file)
 		assert.NoError(t, err)
 	}()
@@ -543,7 +543,7 @@ func TestHandleGitCatFile(t *testing.T) {
 			} else {
 				gitDir = setupTempGitRepoWithUnsupportedFile(t, tt.fileName, tt.fileSize)
 			}
-			defer os.RemoveAll(gitDir)
+			defer func() { _ = os.RemoveAll(gitDir) }()
 
 			cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
 			hashBytes, err := cmd.Output()
@@ -634,7 +634,7 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if isUnsupported {
 		// Write ELF header for unsupported file.
@@ -758,7 +758,7 @@ func TestHandleGitCatFileWithPipeError(t *testing.T) {
 	simulatedError := errors.New("simulated error during newFileReader")
 
 	gitDir := setupTempGitRepo(t, fileName, fileSize)
-	defer os.RemoveAll(gitDir)
+	defer func() { _ = os.RemoveAll(gitDir) }()
 
 	commitHash := getGitCommitHash(t, gitDir)
 

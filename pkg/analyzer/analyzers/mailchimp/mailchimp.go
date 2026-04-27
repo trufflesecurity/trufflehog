@@ -146,7 +146,7 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 		return metadata, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
 		return metadata, err
@@ -177,7 +177,7 @@ func getDomains(cfg *config.Config, key string) (DomainsJSON, error) {
 		return domains, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := json.NewDecoder(resp.Body).Decode(&domains); err != nil {
 		return domains, err
@@ -198,7 +198,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, err
 	}
 	if metadata.AccountID == "" {
-		return nil, fmt.Errorf("Invalid Mailchimp API key")
+		return nil, fmt.Errorf("invalid Mailchimp API key")
 	}
 
 	// get sending domains

@@ -31,8 +31,7 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeOpe
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -214,7 +213,7 @@ func openAIRequest(cfg *config.Config, method string, url string, key string, da
 		return nil, nil, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	outBody, err := io.ReadAll(resp.Body)
 	if err != nil {

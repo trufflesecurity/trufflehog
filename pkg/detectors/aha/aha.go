@@ -106,7 +106,7 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// https://www.aha.io/api
 	switch res.StatusCode {

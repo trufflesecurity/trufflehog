@@ -127,7 +127,7 @@ func (s Scanner) Description() string {
 
 func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSet) (bool, error) {
 	// for url, filter or replace underscore in accountID if needed and lower case the accountID
-	urlAccountId := strings.ToLower(strings.Replace(cs.accountID, "_", "-", -1))
+	urlAccountId := strings.ToLower(strings.ReplaceAll(cs.accountID, "_", "-"))
 
 	baseUrl := "https://" + urlAccountId + ".suitetalk.api.netsuite.com"
 
@@ -169,7 +169,7 @@ func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSe
 		}
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil

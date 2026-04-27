@@ -8,7 +8,7 @@ import (
 
 type ChunkFunc func(chunk *Chunk) error
 
-var MatchError = errors.New("chunk doesn't match")
+var errMatch = errors.New("chunk doesn't match")
 
 func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
 	for {
@@ -16,7 +16,7 @@ func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
 		case gotChunk := <-chunksCh:
 			err := cf(gotChunk)
 			if err != nil {
-				if errors.Is(err, MatchError) {
+				if errors.Is(err, errMatch) {
 					continue
 				}
 				return err

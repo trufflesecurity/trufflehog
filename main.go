@@ -465,7 +465,7 @@ func run(state overseer.State, logSync func() error) {
 	if *githubScanToken != "" {
 		// NOTE: this kludge is here to do an authenticated shallow commit
 		// TODO: refactor to better pass credentials
-		os.Setenv("GITHUB_TOKEN", *githubScanToken)
+		_ = os.Setenv("GITHUB_TOKEN", *githubScanToken)
 	}
 
 	if *concurrency <= 0 {
@@ -725,7 +725,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	handleFinishedMetrics := func(ctx context.Context, finishedMetrics <-chan sources.UnitMetrics, jobReportWriter io.WriteCloser) {
 		go func() {
 			defer func() {
-				jobReportWriter.Close()
+				_ = jobReportWriter.Close()
 				if namer, ok := jobReportWriter.(interface{ Name() string }); ok {
 					ctx.Logger().Info("report written", "path", namer.Name())
 				} else {

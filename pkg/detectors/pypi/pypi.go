@@ -80,7 +80,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	_ = writer.WriteField("content", "dummy-content")
 
 	// Close the writer to finalize the form
-	writer.Close()
+	_ = writer.Close()
 
 	// Create a new POST request to the PyPI legacy upload URL
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://upload.pypi.org/legacy/", &body)
@@ -104,7 +104,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}()
 
 	// Check for expected status codes for verification
-	if res.StatusCode == http.StatusBadRequest {
+	switch res.StatusCode {
+	case http.StatusBadRequest:
 		verified, err := common.ResponseContainsSubstring(res.Body, "Include at least one message digest.")
 		if err != nil {
 			return false, nil, err
@@ -112,7 +113,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		if verified {
 			return true, nil, nil
 		}
-	} else if res.StatusCode == http.StatusForbidden {
+	case http.StatusForbidden:
 		// If we get a 403 status, the key is invalid
 		return false, nil, nil
 	}

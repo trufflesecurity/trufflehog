@@ -98,7 +98,7 @@ func verifyOktaToken(ctx context.Context, client *http.Client, domain, token str
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

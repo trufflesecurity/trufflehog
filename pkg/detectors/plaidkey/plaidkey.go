@@ -116,7 +116,7 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 	if err != nil {
 		return false, nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:

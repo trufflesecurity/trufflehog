@@ -108,7 +108,7 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:

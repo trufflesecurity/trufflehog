@@ -223,7 +223,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 	if err != nil {
 		return false, fmt.Errorf("failed to perform OIDC discovery: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		return false, fmt.Errorf("bad status for OIDC discovery document: %v", resp.Status)
 	}
@@ -250,7 +250,7 @@ func verifyJWT(ctx context.Context, client *http.Client, tokenParts []string, pa
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch JWKS: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		return false, fmt.Errorf("bad status for JWKS: %v", resp.Status)
 	}

@@ -78,7 +78,7 @@ func permissionFormatter(key, val any) (string, string) {
 	if perm, ok := val.(Permission); ok {
 		permStr, err := perm.ToString()
 		if err != nil {
-			log.Fatal(fmt.Errorf("Error converting permission to string: %v", err))
+			log.Fatal(fmt.Errorf("error converting permission to string: %v", err))
 		}
 		var permissionStr string
 		switch {
@@ -217,7 +217,7 @@ func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, cur
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/code-scanning/alerts
 	_, resp, err := client.CodeScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch {
 	case resp.StatusCode == 403:
@@ -427,7 +427,7 @@ func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, curre
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/dependabot/alerts
 	_, resp, err := client.Dependabot.ListRepoAlerts(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListAlertsOptions{})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case 403:

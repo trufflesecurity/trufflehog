@@ -208,7 +208,7 @@ func TestHTML_FromChunk(t *testing.T) {
 		{
 			// Block elements (<p>) produce newline boundaries so adjacent
 			// paragraphs don't merge tokens.
-			name: "block elements produce newlines",
+			name:  "block elements produce newlines",
 			chunk: &sources.Chunk{Data: []byte(`<div><p>first</p><p>second</p></div>`)},
 			want:  "first\nsecond",
 		},
@@ -336,39 +336,39 @@ func TestHTML_FromChunk(t *testing.T) {
 		{
 			// Zero-width spaces inserted between characters by rich text editors
 			// are stripped so detector regexes can match the full token.
-			name: "zero-width space stripped from secret",
+			name:  "zero-width space stripped from secret",
 			chunk: &sources.Chunk{Data: []byte("<p>TOKEN_\u200BABCDEF_1234</p>")},
-			want: "TOKEN_ABCDEF_1234",
+			want:  "TOKEN_ABCDEF_1234",
 		},
 		{
 			// Multiple invisible codepoint types mixed into a single token.
-			name: "multiple invisible character types stripped",
+			name:  "multiple invisible character types stripped",
 			chunk: &sources.Chunk{Data: []byte("<p>SECRET\u200C_VALUE\u00AD_HERE\u2060_END\uFEFF</p>")},
-			want: "SECRET_VALUE_HERE_END",
+			want:  "SECRET_VALUE_HERE_END",
 		},
 
 		// --- SVG xlink:href attribute extraction ---
 		{
 			// SVG elements use xlink:href for URLs which may contain tokens.
-			name: "xlink:href extracted from SVG element",
+			name:  "xlink:href extracted from SVG element",
 			chunk: &sources.Chunk{Data: []byte(`<svg><a xlink:href="https://api.example.com?token=secret_value_123">icon</a></svg>`)},
-			want: "https://api.example.com?token=secret_value_123\nicon",
+			want:  "https://api.example.com?token=secret_value_123\nicon",
 		},
 
 		// --- Double-encoded HTML entity decoding ---
 		{
 			// Content double-encoded as &amp;amp; becomes &amp; after the parser's
 			// first pass; the residual entity replacer decodes it to &.
-			name: "double-encoded ampersand decoded",
+			name:  "double-encoded ampersand decoded",
 			chunk: &sources.Chunk{Data: []byte(`<p>key=abc&amp;amp;secret=val</p>`)},
-			want: "key=abc&secret=val",
+			want:  "key=abc&secret=val",
 		},
 		{
 			// Single-encoded entities are handled by the parser; verify the
 			// residual replacer does not corrupt already-decoded content.
-			name: "single-encoded entities not double-decoded",
+			name:  "single-encoded entities not double-decoded",
 			chunk: &sources.Chunk{Data: []byte(`<p>5 &gt; 3 &amp; 2 &lt; 4</p>`)},
-			want: "5 > 3 & 2 < 4",
+			want:  "5 > 3 & 2 < 4",
 		},
 
 		// --- Integration: all extraction types in one chunk ---
@@ -398,7 +398,7 @@ func TestHTML_FromChunk(t *testing.T) {
 
 			if tt.wantNil {
 				if got != nil {
-					t.Errorf("FromChunk() = %q, want nil", string(got.Chunk.Data))
+					t.Errorf("FromChunk() = %q, want nil", string(got.Data))
 				}
 				return
 			}
@@ -409,8 +409,8 @@ func TestHTML_FromChunk(t *testing.T) {
 			if got.DecoderType != detectorspb.DecoderType_HTML {
 				t.Errorf("DecoderType = %v, want %v", got.DecoderType, detectorspb.DecoderType_HTML)
 			}
-			if string(got.Chunk.Data) != tt.want {
-				t.Errorf("FromChunk() data =\n%q\nwant:\n%q", string(got.Chunk.Data), tt.want)
+			if string(got.Data) != tt.want {
+				t.Errorf("FromChunk() data =\n%q\nwant:\n%q", string(got.Data), tt.want)
 			}
 		})
 	}
@@ -423,7 +423,7 @@ func TestHTML_FeatureFlagDisabled(t *testing.T) {
 	d := &HTML{}
 	chunk := &sources.Chunk{Data: []byte(`<p>secret: hunter2</p>`)}
 	if got := d.FromChunk(chunk); got != nil {
-		t.Errorf("FromChunk() should return nil when disabled, got %q", string(got.Chunk.Data))
+		t.Errorf("FromChunk() should return nil when disabled, got %q", string(got.Data))
 	}
 }
 
@@ -439,8 +439,8 @@ func TestHTML_FeatureFlagEnabled(t *testing.T) {
 	if got == nil {
 		t.Fatal("FromChunk() returned nil, want decoded chunk")
 	}
-	if string(got.Chunk.Data) != "secret: hunter2" {
-		t.Errorf("FromChunk() data = %q, want %q", string(got.Chunk.Data), "secret: hunter2")
+	if string(got.Data) != "secret: hunter2" {
+		t.Errorf("FromChunk() data = %q, want %q", string(got.Data), "secret: hunter2")
 	}
 }
 

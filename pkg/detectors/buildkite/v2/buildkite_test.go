@@ -39,7 +39,7 @@ func TestBuildKiteV2_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"bkua_hqlh73m51jtho0jh12wcf2758c8fcdbv05z023ly"},
@@ -77,7 +77,7 @@ func TestBuildKiteV2_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,
