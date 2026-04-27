@@ -149,6 +149,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 				"verificationError",
 				"primarySecret",
 				"Redacted",
+				"SecretParts",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
