@@ -10,12 +10,11 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
 	client *http.Client
-	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Compile-time interface check
@@ -33,7 +32,7 @@ var (
 
 // Keywords used for fast pre-filtering
 func (s Scanner) Keywords() []string {
-	return []string{"shippo_live_", "shippo_test_"} // remove this line
+	return []string{"shippo_live_", "shippo_test_"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -59,9 +58,12 @@ func (s Scanner) FromData(
 
 	for token := range uniqueTokens {
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Shippo,
+			DetectorType: detector_typepb.DetectorType_Shippo,
 			Raw:          []byte(token),
 			Redacted:     token[:10] + "...",
+			SecretParts: map[string]string{
+				"token": token,
+			},
 		}
 
 		if verify {
@@ -121,8 +123,8 @@ func verifyShippoToken(
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Shippo
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Shippo
 }
 
 func (s Scanner) Description() string {

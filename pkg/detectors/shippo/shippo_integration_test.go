@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestShippo_FromData(t *testing.T) {
@@ -54,7 +54,7 @@ func TestShippo_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Shippo,
+					DetectorType: detector_typepb.DetectorType_Shippo,
 					Verified:     true,
 					Raw:          []byte(activeToken),
 					Redacted:     activeToken[:10] + "...",
@@ -71,7 +71,7 @@ func TestShippo_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Shippo,
+					DetectorType: detector_typepb.DetectorType_Shippo,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 					Redacted:     activeToken[:10] + "...",
@@ -89,7 +89,7 @@ func TestShippo_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Shippo,
+					DetectorType: detector_typepb.DetectorType_Shippo,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 					Redacted:     activeToken[:10] + "...",
@@ -107,7 +107,7 @@ func TestShippo_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Shippo,
+					DetectorType: detector_typepb.DetectorType_Shippo,
 					Verified:     false,
 					Raw:          []byte(inactiveToken),
 					Redacted:     inactiveToken[:10] + "...",
@@ -151,7 +151,7 @@ func TestShippo_FromData(t *testing.T) {
 				"ExtraData",
 				"verificationError",
 				"primarySecret",
-				"RawV2",
+				"SecretParts",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
