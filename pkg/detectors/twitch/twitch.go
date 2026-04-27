@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -61,9 +61,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Twitch,
+				DetectorType: detector_typepb.DetectorType_Twitch,
 				Raw:          []byte(id),
-				RawV2:        []byte(id + ":" + secret),
+				SecretParts: map[string]string{
+					"id":     id,
+					"secret": secret,
+				},
+				RawV2: []byte(id + ":" + secret),
 			}
 
 			if verify {
@@ -116,8 +120,8 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Twitch
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Twitch
 }
 
 func (s Scanner) Description() string {

@@ -28,6 +28,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -648,7 +649,7 @@ func (e *Engine) sanityChecks(ctx context.Context) {
 	seenDetectors := make(map[config.DetectorID]struct{}, len(e.detectors))
 	for _, det := range e.detectors {
 		id := config.GetDetectorID(det)
-		if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
+		if _, ok := seenDetectors[id]; ok && id.ID != detector_typepb.DetectorType_CustomRegex {
 			ctx.Logger().Info("possible duplicate detector configured", "detector", id)
 		}
 		seenDetectors[id] = struct{}{}
@@ -854,6 +855,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		startTime := time.Now()
 		sourceVerify := chunk.SourceVerify
 
+		chunk.OriginalData = chunk.Data
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
 		for _, d := range decoded {

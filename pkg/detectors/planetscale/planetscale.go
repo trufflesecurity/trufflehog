@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -43,7 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			credentials := fmt.Sprintf("%s:%s", username, password)
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_PlanetScale,
+				DetectorType: detector_typepb.DetectorType_PlanetScale,
 				Raw:          []byte(credentials),
 			}
 
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-						s1.AnalysisInfo = map[string]string{
+						s1.SecretParts = map[string]string{
 							"id":    username,
 							"token": password,
 						}
@@ -90,8 +90,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PlanetScale
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PlanetScale
 }
 
 func (s Scanner) Description() string {

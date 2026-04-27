@@ -36,7 +36,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     true,
 				},
 			},
@@ -53,7 +53,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     false,
 				},
 			},
@@ -82,7 +82,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     false,
 				},
 			},
@@ -99,7 +99,7 @@ func TestDocker_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Docker,
+					DetectorType: detector_typepb.DetectorType_Docker,
 					Verified:     false,
 				},
 			},
