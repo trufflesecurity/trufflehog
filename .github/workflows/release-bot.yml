@@ -1,0 +1,36 @@
+name: Run release bot
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  run:
+    if: ${{ github.repository == 'trufflesecurity/trufflehog' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Login to GCP
+      id: auth
+      uses: "google-github-actions/auth@v2"
+      with:
+        credentials_json: ${{ secrets.GCP_SA_TRUFFLE_RELEASE_BOT }}
+
+    - name: Login to GAR
+      uses: docker/login-action@v3
+      with:
+        registry: us-central1-docker.pkg.dev
+        username: _json_key
+        password: ${{ secrets.GCP_SA_TRUFFLE_RELEASE_BOT }}
+
+    - name: Run release bot
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+      run: |
+        docker run \
+        -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/GCP_SA_TRUFFLE_RELEASE_BOT.json \
+        -v ${{ steps.auth.outputs.credentials_file_path }}:/tmp/keys/GCP_SA_TRUFFLE_RELEASE_BOT.json:ro \
+        us-central1-docker.pkg.dev/truffle-release-bot/releases/bot:latest \
+        --repository trufflehog "$RELEASE_TAG"

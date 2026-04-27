@@ -20,7 +20,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestJdbcVerified(t *testing.T) {
@@ -121,11 +121,11 @@ func TestJdbcVerified(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
 						postgresHost, postgresPort.Port(), postgresDB, strings.Repeat("*", len(postgresPass)), postgresUser),
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"connection_string": fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
 							postgresHost, postgresPort.Port(), postgresDB, postgresPass, postgresUser),
 					},
@@ -143,11 +143,11 @@ func TestJdbcVerified(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     true,
 					Redacted: fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
 						mysqlUser, strings.Repeat("*", len(mysqlPass)), mysqlHost, mysqlPort.Port(), mysqlDatabase),
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"connection_string": fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
 							mysqlUser, mysqlPass, mysqlHost, mysqlPort.Port(), mysqlDatabase),
 					},
@@ -165,11 +165,11 @@ func TestJdbcVerified(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
 						sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, strings.Repeat("*", len(sqlServerPass))),
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"connection_string": fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
 							sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, sqlServerPass),
 					},
@@ -224,7 +224,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:mysql://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
 				},
@@ -240,7 +240,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:postgresql://host:5342/testdb?password=******",
 				},
@@ -266,7 +266,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
 				},
@@ -282,7 +282,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
 				},
@@ -298,7 +298,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=*********************",
 				},
@@ -322,7 +322,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

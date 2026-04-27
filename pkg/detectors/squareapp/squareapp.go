@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -43,8 +43,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"sq0i"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SquareApp
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SquareApp
 }
 
 func (s Scanner) Description() string {
@@ -73,8 +73,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_SquareApp,
+				DetectorType: detector_typepb.DetectorType_SquareApp,
 				Raw:          []byte(id),
+				SecretParts:  map[string]string{"key": id},
 				Redacted:     id,
 				ExtraData:    map[string]string{},
 			}
