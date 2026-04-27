@@ -31,7 +31,7 @@ var (
 	// newer vault tokens are around 90-120 chars and start with hvs. (HashiCorp Vault Service token)
 	// legacy tokens are around 18-40 chars and start with s.
 	vaultTokenPat = regexp.MustCompile(
-		`\b(hvs\.[A-Za-z0-9_-]{90,120}|s\.[A-Za-z0-9_-]{18,40})\b`,
+		`\b(hvs\.[A-Za-z0-9_-]{90,120}|s\.[A-Za-z0-9_-]{18,40})(?:$|[^A-Za-z0-9_-])`,
 	)
 
 	vaultUrlPat = regexp.MustCompile(`(https?:\/\/[^\s\/]*\.hashicorp\.cloud(?::\d+)?)(?:\/[^\s]*)?`)
@@ -45,7 +45,7 @@ func (s Scanner) Keywords() []string {
 func (Scanner) CloudEndpoint() string { return "" }
 
 func (s Scanner) Description() string {
-	return "This detector detects and verifies HashiCorp Vault periodic tokens, standard service tokens and admin tokens"
+	return "HashiCorp Vault is a secrets management service. Vault tokens (periodic, service, and admin) can be used to access and manage stored secrets and resources."
 }
 
 func (s Scanner) getClient() *http.Client {
