@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -40,7 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Notion,
+			DetectorType: detector_typepb.DetectorType_Notion,
 			Raw:          []byte(resMatch),
 		}
 
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Notion returns 401 for all non-valid keys, thus 403 indicates it has fine-tuned permissions,
 					// /v1/search, /v1/databases/*, etc. may work.
 					s1.Verified = true
-					s1.AnalysisInfo = map[string]string{"key": resMatch}
+					s1.SecretParts = map[string]string{"key": resMatch}
 
 				}
 			} else {
@@ -74,8 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Notion
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Notion
 }
 
 func (s Scanner) Description() string {

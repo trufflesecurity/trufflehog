@@ -9,10 +9,10 @@ import (
 	"github.com/go-sql-driver/mysql"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -42,8 +42,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, password := range passwordMatches {
 			for _, host := range hostMatches {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_PlanetScaleDb,
+					DetectorType: detector_typepb.DetectorType_PlanetScaleDb,
 					Raw:          []byte(strings.Join([]string{host, username[0], password[0]}, "\t")),
+					SecretParts: map[string]string{
+						"host":     host,
+						"username": username[0],
+						"password": password[0],
+					},
 				}
 
 				if verify {
@@ -77,8 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PlanetScaleDb
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PlanetScaleDb
 }
 
 func (s Scanner) Description() string {

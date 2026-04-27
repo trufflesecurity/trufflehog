@@ -10,7 +10,7 @@ import (
 	"github.com/go-redis/redis"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -59,9 +59,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "*******", -1))
 
 		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Redis,
+			DetectorType: detector_typepb.DetectorType_Redis,
 			Raw:          []byte(urlMatch),
-			Redacted:     redact,
+			SecretParts: map[string]string{
+				"host":     parsedURL.Host,
+				"password": password,
+			},
+			Redacted: redact,
 		}
 
 		if verify {
@@ -98,9 +102,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "*******", -1))
 
 		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Redis,
+			DetectorType: detector_typepb.DetectorType_Redis,
 			Raw:          []byte(urlMatch),
-			Redacted:     redact,
+			SecretParts: map[string]string{
+				"host":     parsedURL.Host,
+				"password": password,
+			},
+			Redacted: redact,
 		}
 
 		if verify {
@@ -136,8 +144,8 @@ func verifyRedis(ctx context.Context, u *url.URL) bool {
 	return false
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Redis
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Redis
 }
 
 func (s Scanner) Description() string {
