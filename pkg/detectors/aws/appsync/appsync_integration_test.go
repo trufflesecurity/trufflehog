@@ -50,7 +50,7 @@ func TestAppSync_FromData(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"data":{"__typename":"Query"}}`)},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, activeKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), activeKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -58,7 +58,7 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     true,
 					Raw:          []byte(activeKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), activeKey)),
 				},
 			},
 		},
@@ -67,7 +67,7 @@ func TestAppSync_FromData(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, activeKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), activeKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -75,7 +75,7 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(activeKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), activeKey)),
 				},
 			},
 			wantVerificationErr: true,
@@ -85,7 +85,7 @@ func TestAppSync_FromData(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(500, "{}")},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, activeKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), activeKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -93,7 +93,7 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(activeKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), activeKey)),
 				},
 			},
 			wantVerificationErr: true,
@@ -103,7 +103,7 @@ func TestAppSync_FromData(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(403, "{}")},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, inactiveKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), inactiveKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -111,7 +111,7 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(inactiveKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, inactiveKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), inactiveKey)),
 				},
 			},
 		},
