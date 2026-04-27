@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -30,7 +31,7 @@ var (
 	)
 
 	endpointPat = regexp.MustCompile(
-		`(https:\/\/[a-z0-9]{26}\.appsync-api\.[a-z0-9-]+\.amazonaws\.com\/graphql)`,
+		`(https:\/\/[a-z0-9]{26}\.appsync-api\.[a-z0-9-]+\.amazonaws\.com(?:\/graphql)?)`,
 	)
 )
 
@@ -66,18 +67,19 @@ func (s Scanner) FromData(
 
 	for key := range keys {
 		for endpoint := range endpoints {
+			normalizedEndpoint := normalizeEndpoint(endpoint)
 
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AWSAppSync,
+				DetectorType: detector_typepb.DetectorType_AWSAppSync,
 				Raw:          []byte(key),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, key)),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", normalizedEndpoint, key)),
 			}
 
 			if verify {
 				verified, verificationErr := verifyAppSyncKey(
 					ctx,
 					s.getClient(),
-					endpoint,
+					normalizedEndpoint,
 					key,
 				)
 
@@ -141,8 +143,15 @@ func verifyAppSyncKey(
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AWSAppSync
+func normalizeEndpoint(endpoint string) string {
+	if !strings.HasSuffix(endpoint, "/graphql") {
+		return endpoint + "/graphql"
+	}
+	return endpoint
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AWSAppSync
 }
 
 func (s Scanner) Description() string {

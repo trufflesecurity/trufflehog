@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAppSync_FromData(t *testing.T) {
@@ -55,7 +55,7 @@ func TestAppSync_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWSAppSync,
+					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     true,
 					Raw:          []byte(activeKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
@@ -72,7 +72,7 @@ func TestAppSync_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWSAppSync,
+					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(activeKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
@@ -90,7 +90,7 @@ func TestAppSync_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWSAppSync,
+					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(activeKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
@@ -108,7 +108,7 @@ func TestAppSync_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWSAppSync,
+					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(inactiveKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, inactiveKey)),

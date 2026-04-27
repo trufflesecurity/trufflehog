@@ -31,6 +31,16 @@ func TestAppSync_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name: "valid pattern - key and endpoint(endpoint without /graphql)",
+			input: `
+				const endpoint = "https://abcdefghijklmnopqrstuvwxyz.appsync-api.us-east-1.amazonaws.com";
+				const key = "da2-abcdefghijklmnopqrstuvwxyz";
+			`,
+			want: []string{
+				"https://abcdefghijklmnopqrstuvwxyz.appsync-api.us-east-1.amazonaws.com/graphql:da2-abcdefghijklmnopqrstuvwxyz",
+			},
+		},
+		{
 			name: "valid pattern - multiple keys and endpoints",
 			input: `
 				https://aaaaaaaaaaaaaaaaaaaaaaaaaa.appsync-api.us-west-2.amazonaws.com/graphql
