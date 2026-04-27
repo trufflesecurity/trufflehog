@@ -113,7 +113,7 @@ func verifyDuffelToken(
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
-	fmt.Println(res.StatusCode)
+
 	switch res.StatusCode {
 
 	case http.StatusOK:
