@@ -6,15 +6,17 @@ package artifactoryreferencetoken
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
@@ -52,7 +54,7 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryReferenceToken,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
 					Verified:     true,
 				},
 			},
@@ -69,7 +71,7 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryReferenceToken,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
 					Verified:     false,
 				},
 			},
@@ -98,7 +100,7 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryReferenceToken,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
 					Verified:     false,
 				},
 			},
@@ -115,7 +117,7 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryReferenceToken,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
 					Verified:     false,
 				},
 			},
@@ -140,12 +142,57 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Artifactoryreferencetoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
+}
+
+func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
+	instanceURL := testSecrets.MustGetField("ARTIFACTORY_URL")
+	secret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN")
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	err = s.SetConfiguredEndpoints(instanceURL)
+	if err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+	data := []byte(fmt.Sprintf("You can find a artifactory secret %s ", secret))
+	want := []detectors.Result{
+		{
+			DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
+			Verified:     true,
+			RawV2:        []byte(secret + strings.TrimPrefix(instanceURL, "https://")),
+		},
+	}
+	got, err := s.FromData(ctx, true, data)
+	require.NoError(t, err, "unexpected error from FromData")
+	require.Equalf(t, len(want), len(got), "expected %d results", len(want))
+
+	for i := range got {
+		if len(got[i].RawV2) == 0 {
+			t.Fatalf("no raw secret present: \n %+v", got[i])
+		}
+		if string(got[i].RawV2) != string(want[i].RawV2) {
+			t.Fatalf("expected rawV2 to be %s, got %s", string(want[i].RawV2), string(got[i].RawV2))
+		}
+	}
+
+	ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts")
+	if diff := cmp.Diff(got, want, ignoreOpts); diff != "" {
+		t.Errorf("Artifactoryreferencetoken.FromData() diff: (-got +want)\n%s", diff)
+	}
+
 }
 
 func BenchmarkFromData(benchmark *testing.B) {

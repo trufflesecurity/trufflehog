@@ -10,7 +10,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -44,8 +44,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
+			DetectorType: detector_typepb.DetectorType_MicrosoftTeamsWebhook,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/microsoftteams/",
@@ -100,8 +101,8 @@ func verifyWebhook(ctx context.Context, client *http.Client, webhookURL string) 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_MicrosoftTeamsWebhook
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_MicrosoftTeamsWebhook
 }
 
 func (s Scanner) Description() string {

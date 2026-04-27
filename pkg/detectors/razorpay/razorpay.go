@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -46,10 +46,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, secret := range secMatches {
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_RazorPay,
+				DetectorType: detector_typepb.DetectorType_RazorPay,
 				Raw:          []byte(key),
-				RawV2:        []byte(key + secret),
-				Redacted:     key,
+				SecretParts: map[string]string{
+					"key":    key,
+					"secret": secret,
+				},
+				RawV2:    []byte(key + secret),
+				Redacted: key,
 			}
 
 			if verify {
@@ -81,8 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_RazorPay
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_RazorPay
 }
 
 func (s Scanner) Description() string {
