@@ -1049,5 +1049,8 @@ enum DetectorType {
   BitbucketDataCenter = 1045;
   JiraDataCenterPAT = 1046;
   ConfluenceDataCenter = 1047;
+<<<<<<< braintrust-detector
   BrainTrustApiKey = 1048;
+=======
+>>>>>>> main
 }
