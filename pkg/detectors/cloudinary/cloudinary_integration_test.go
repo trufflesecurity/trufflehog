@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestCloudinary_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestCloudinary_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Cloudinary,
+					DetectorType: detector_typepb.DetectorType_Cloudinary,
 					Verified:     true,
 					Raw:          []byte(apiKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", cloudName, apiKey, apiSecret)),
@@ -70,7 +70,7 @@ func TestCloudinary_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Cloudinary,
+					DetectorType: detector_typepb.DetectorType_Cloudinary,
 					Verified:     false,
 					Raw:          []byte(apiKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", cloudName, apiKey, apiSecret)),
@@ -89,7 +89,7 @@ func TestCloudinary_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Cloudinary,
+					DetectorType: detector_typepb.DetectorType_Cloudinary,
 					Verified:     false,
 					Raw:          []byte(apiKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", cloudName, apiKey, apiSecret)),
@@ -108,7 +108,7 @@ func TestCloudinary_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Cloudinary,
+					DetectorType: detector_typepb.DetectorType_Cloudinary,
 					Verified:     false,
 					Raw:          []byte(apiKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", cloudName, apiKey, inactiveSecret)),
@@ -143,7 +143,7 @@ func TestCloudinary_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "ExtraData", "verificationError", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "ExtraData", "verificationError", "primarySecret", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Cloudinary.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

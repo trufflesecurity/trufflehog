@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -71,9 +71,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for apiKey := range uniqueApiKeys {
 			for apiSecret := range uniqueApiSecret {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Cloudinary,
+					DetectorType: detector_typepb.DetectorType_Cloudinary,
 					Raw:          []byte(apiKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", cloudName, apiKey, apiSecret)),
+					SecretParts: map[string]string{
+						"cloud_name": cloudName,
+						"api_key":    apiKey,
+						"api_secret": apiSecret,
+					},
 				}
 				if verify {
 					verified, verificationErr := verifyToken(ctx, s.getClient(), cloudName, apiKey, apiSecret)
@@ -120,10 +125,10 @@ func verifyToken(ctx context.Context, client *http.Client, cloudName, apiKey, ap
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Cloudinary
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Cloudinary
 }
 
 func (s Scanner) Description() string {
-	return "Cloudinary is a cloud-based media management platform that provides image and video upload, storage, optimization, and delivery services via APIs and SDKs."
+	return "Cloudinary is a cloud-based media management platform. Cloudinary API keys can be used to upload, manage, and deliver media assets."
 }
