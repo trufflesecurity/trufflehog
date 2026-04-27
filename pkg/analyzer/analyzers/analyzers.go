@@ -227,7 +227,7 @@ func (h *HttpStatusTest) RunTest(headers map[string]string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status code
 	switch {

@@ -56,7 +56,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		conn, err := transport.DialContext(context.Background(), "tcp", "google.com:80")
 		assert.NoError(t, err)
 		assert.NotNil(t, conn)
-		conn.Close()
+		_ = conn.Close()
 	})
 
 	t.Run("Allows dialing non-local IP", func(t *testing.T) {
@@ -69,7 +69,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		conn, err := transport.DialContext(context.Background(), "tcp", "1.1.1.1:80")
 		assert.NoError(t, err)
 		assert.NotNil(t, conn)
-		conn.Close()
+		_ = conn.Close()
 	})
 
 	t.Run("Handles invalid address", func(t *testing.T) {

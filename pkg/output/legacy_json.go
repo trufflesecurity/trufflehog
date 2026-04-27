@@ -85,7 +85,7 @@ func convertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*Leg
 
 	diff := GenerateDiff(commit, fileName)
 
-	foundString := string(r.Result.Raw)
+	foundString := string(r.Raw)
 
 	// Add highlighting to the offending bit of string.
 	printableDiff := strings.ReplaceAll(diff, foundString, fmt.Sprintf("\u001b[93m%s\u001b[0m", foundString))
@@ -99,7 +99,7 @@ func convertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*Leg
 		Diff:         diff,
 		Path:         fileName,
 		PrintDiff:    printableDiff,
-		Reason:       r.Result.DetectorType.String(),
+		Reason:       r.DetectorType.String(),
 		StringsFound: []string{foundString},
 	}
 	return output, nil

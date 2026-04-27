@@ -30,7 +30,7 @@ var (
 	passwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", "password"}) + `\b(git&[0-9]{12}&[a-zA-Z0-9\/+]{85}[a-zA-Z0-9]==)`)
 
 	invalidHosts  = simple.NewCache[struct{}]()
-	noSuchHostErr = errors.New("Could not resolve host")
+	errNoSuchHost = errors.New("could not resolve host")
 )
 
 const (
@@ -82,7 +82,7 @@ EndpointLoop:
 				isVerified, err := verifyUrlPassword(ctx, urlMatch, azureGitUsername, passwordMatch)
 				s1.Verified = isVerified
 				if err != nil {
-					if errors.Is(err, noSuchHostErr) {
+					if errors.Is(err, errNoSuchHost) {
 						invalidHosts.Set(urlMatch, struct{}{})
 						continue EndpointLoop
 					}
@@ -156,7 +156,7 @@ func verifyUrlPassword(_ context.Context, repoUrl, user, password string) (bool,
 		if strings.Contains(outputString, "Authentication failed") {
 			return false, nil
 		} else if strings.Contains(outputString, "Could not resolve host") {
-			return false, noSuchHostErr
+			return false, errNoSuchHost
 		}
 		return false, err
 	}

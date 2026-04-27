@@ -283,7 +283,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString st
 		}
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	c.Metrics.apiRequests.WithLabelValues(urlString).Inc()
 

@@ -33,14 +33,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeHug
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok || key == "" {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", fmt.Errorf("key not found in credentialInfo"),
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", fmt.Errorf("key not found in credentialInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -99,15 +97,17 @@ func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analyze
 			Value: string(analyzers.NONE),
 		}
 		for _, perm := range permission.Permissions {
-			if perm == "repo.content.read" {
+			switch perm {
+			case "repo.content.read":
 				privs.Value = string(analyzers.READ)
-			} else if perm == "repo.write" {
+			case "repo.write":
 				privs.Value = string(analyzers.WRITE)
 			}
 		}
-		if permission.Entity.Type == "user" || permission.Entity.Type == "org" {
+		switch permission.Entity.Type {
+		case "user", "org":
 			nameToPermissions[permission.Entity.Name] = privs
-		} else if permission.Entity.Type == "model" {
+		case "model":
 			nameToPermissions[modelNameLookup(allModels, permission.Entity.ID)] = privs
 		}
 	}
@@ -334,7 +334,7 @@ func getModelsByAuthor(cfg *config.Config, key string, author string) ([]Model, 
 	}
 
 	// defer the response body closing
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// read response
 	if err := json.NewDecoder(resp.Body).Decode(&modelsJSON); err != nil {
@@ -370,7 +370,7 @@ func getTokenInfo(cfg *config.Config, key string) (HFTokenJSON, bool, error) {
 	}
 
 	// defer the response body closing
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// read response
 	if err := json.NewDecoder(resp.Body).Decode(&tokenJSON); err != nil {
@@ -392,7 +392,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	if !success {
-		return nil, fmt.Errorf("Invalid HuggingFace Access Token")
+		return nil, fmt.Errorf("invalid HuggingFace Access Token")
 	}
 
 	// get all models by username
@@ -609,15 +609,17 @@ func printAccessibleModels(allModels []Model, tokenJSON HFTokenJSON) {
 		read := false
 		write := false
 		for _, perm := range permission.Permissions {
-			if perm == "repo.content.read" {
+			switch perm {
+			case "repo.content.read":
 				read = true
-			} else if perm == "repo.write" {
+			case "repo.write":
 				write = true
 			}
 		}
-		if permission.Entity.Type == "user" || permission.Entity.Type == "org" {
+		switch permission.Entity.Type {
+		case "user", "org":
 			nameToPermissions[permission.Entity.Name] = Permissions{Read: read, Write: write}
-		} else if permission.Entity.Type == "model" {
+		case "model":
 			nameToPermissions[modelNameLookup(allModels, permission.Entity.ID)] = Permissions{Read: read, Write: write}
 		}
 	}

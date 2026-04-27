@@ -86,14 +86,12 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	// check if the `key` exist in the credentials info
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentials info"),
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentials info"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil
@@ -242,9 +240,10 @@ func fetchUser(client *http.Client, key string) (*User, error) {
 			return nil, err
 		}
 
-		if errorResp.Detail.Status == InvalidAPIKey || errorResp.Detail.Status == NotVerifiable {
+		switch errorResp.Detail.Status {
+		case InvalidAPIKey, NotVerifiable:
 			return nil, errors.New("invalid api key")
-		} else if errorResp.Detail.Status == MissingPermissions {
+		case MissingPermissions:
 			// key is missing user read permissions but is valid
 			return nil, nil
 		}

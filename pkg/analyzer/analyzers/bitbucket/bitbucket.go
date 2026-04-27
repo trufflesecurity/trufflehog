@@ -146,7 +146,7 @@ func getScopesAndType(cfg *config.Config, key string) (string, []string, error) 
 	if err != nil {
 		return "", nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// parse response headers
 	credentialType := resp.Header.Get("x-credential-type")
@@ -198,7 +198,7 @@ func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, err
 	if err != nil {
 		return repos, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// parse response body
 	err = json.NewDecoder(resp.Body).Decode(&repos)

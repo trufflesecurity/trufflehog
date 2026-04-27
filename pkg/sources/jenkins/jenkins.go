@@ -250,7 +250,7 @@ func (s *Source) GetJenkinsObjectsForPath(ctx context.Context, absolutePath stri
 		if err != nil {
 			return res, errors.WrapPrefix(err, "Failed to do get jenkins jobs request", 0)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			return res, errors.New(fmt.Sprintf("Received non-200 status from get jenkins jobs request: %d", resp.StatusCode))
@@ -297,7 +297,7 @@ func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (
 		if err != nil {
 			return builds, errors.WrapPrefix(err, "Failed to do get jenkins builds request", 0)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			return builds, errors.New(fmt.Sprintf("Received non-200 status from get jenkins builds request: %d", resp.StatusCode))
@@ -404,7 +404,7 @@ func (s *Source) chunkBuild(
 	if err != nil {
 		return fmt.Errorf("could not retrieve build log from %q: %w", buildLogURL.String(), err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("got unexpected HTTP status code %v when trying to retrieve build log from %q",

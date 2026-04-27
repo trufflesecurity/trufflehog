@@ -132,7 +132,7 @@ func TestScanFile(t *testing.T) {
 func TestScanBinaryFile(t *testing.T) {
 	tmpfile, err := os.CreateTemp("", "example.bin")
 	require.NoError(t, err)
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	// binary data that decodes to "TuffleHog"
 	fileContents := []byte{0x54, 0x75, 0x66, 0x66, 0x6C, 0x65, 0x48, 0x6F, 0x67}
@@ -171,7 +171,7 @@ func TestEnumerate(t *testing.T) {
 	// Setup the connection to test enumeration.
 	dir, err := os.MkdirTemp("", "trufflehog-test-enumerate")
 	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	units := []string{
 		"/one", "/two", "/three",
@@ -184,14 +184,14 @@ func TestEnumerate(t *testing.T) {
 		if i < 3 {
 			f, err := os.Create(fullPath)
 			assert.NoError(t, err)
-			f.Close()
+			_ = f.Close()
 		} else {
 			assert.NoError(t, os.MkdirAll(fullPath, 0755))
 			// Create a file in the directory for enumeration to find.
 			f, err := os.CreateTemp(fullPath, "file")
 			assert.NoError(t, err)
 			units[i] = f.Name()
-			f.Close()
+			_ = f.Close()
 		}
 	}
 	conn, err := anypb.New(&sourcespb.Filesystem{
@@ -309,7 +309,7 @@ func TestChunkUnitReporterErr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	fileContents := []byte("TestChunkUnit")
 	_, err = tmpfile.Write(fileContents)
@@ -383,7 +383,7 @@ func TestScanSubDirFile(t *testing.T) {
 	testDir := filepath.Join(os.TempDir(), "trufflehog-test")
 	err := os.MkdirAll(testDir, 0755)
 	require.NoError(t, err)
-	defer os.RemoveAll(testDir)
+	defer func() { _ = os.RemoveAll(testDir) }()
 
 	// Create a subdirectory and file
 	childDir := filepath.Join(testDir, "child")
@@ -422,7 +422,7 @@ func TestSkipBinaries(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "trufflehog_test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a binary file (executable)
 	binaryFile := filepath.Join(tempDir, "test.exe")

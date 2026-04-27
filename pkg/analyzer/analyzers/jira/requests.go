@@ -428,13 +428,12 @@ func captureAuditLogs(client *http.Client, domain, email, token string, secretIn
 }
 
 func handleStatusCode(statusCode int, endpoint string) error {
-	switch {
-	case statusCode == http.StatusOK:
+	switch statusCode {
+	case http.StatusOK:
 		return nil
-	case statusCode == http.StatusBadRequest:
+	case http.StatusBadRequest:
 		return fmt.Errorf("bad request for API: %s", endpoint)
-	case statusCode == http.StatusUnauthorized, statusCode == http.StatusForbidden,
-		statusCode == http.StatusNotFound, statusCode == http.StatusConflict:
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusConflict:
 		return nil
 	default:
 		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)

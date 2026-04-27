@@ -119,7 +119,7 @@ func determineScope(token string, perm common.Permission, requiredIDs map[string
 	if requiredIDs != nil {
 		for _, key := range endpoint.RequiredIDs {
 			if value, ok := requiredIDs[key]; ok {
-				url = strings.Replace(url, fmt.Sprintf("{%s}", key), value, -1)
+				url = strings.ReplaceAll(url, fmt.Sprintf("{%s}", key), value)
 			}
 		}
 	}
@@ -128,7 +128,7 @@ func determineScope(token string, perm common.Permission, requiredIDs map[string
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == endpoint.ExpectedSuccessStatus {
 		scopeStatusMap[scopeString] = true

@@ -70,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		rawURL, _ := url.Parse(urlMatch)
 		rawURL.Path = ""
-		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
+		redact := strings.TrimSpace(strings.ReplaceAll(rawURL.String(), password, "********"))
 
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_FTP,
@@ -139,7 +139,7 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 			return nil, err
 		}
 		if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
-			conn.Close()
+			_ = conn.Close()
 			return nil, err
 		}
 		return conn, nil

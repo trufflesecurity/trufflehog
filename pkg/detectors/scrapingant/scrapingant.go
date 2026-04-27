@@ -89,11 +89,12 @@ func verifyScrapingAnt(ctx context.Context, client *http.Client, apiKey string) 
 		_ = resp.Body.Close()
 	}()
 
-	if resp.StatusCode == http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
-	} else {
+	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }

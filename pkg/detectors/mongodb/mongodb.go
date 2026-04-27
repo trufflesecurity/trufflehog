@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		// If the query string contains `&amp;` the options will not be parsed.
-		connStr := strings.Replace(strings.TrimSpace(match[1]), "&amp;", "&", -1)
+		connStr := strings.ReplaceAll(strings.TrimSpace(match[1]), "&amp;", "&")
 		connUrl, err := url.Parse(connStr)
 		if err != nil {
 			logger.V(3).Info("Skipping invalid URL", "err", err)

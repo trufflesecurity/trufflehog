@@ -116,7 +116,7 @@ func verifyMatch(ctx context.Context, client *http.Client, endpoint, accountName
 		}
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

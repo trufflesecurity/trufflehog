@@ -108,7 +108,7 @@ func getPlaidAccounts(client *http.Client, clientID string, secret string, acces
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("received non-OK HTTP status: %d", resp.StatusCode)

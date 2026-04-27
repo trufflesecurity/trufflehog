@@ -209,7 +209,7 @@ func writeCommitsToDisk(commits []string, commitsType, folder string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	for _, commit := range commits {
 		if _, err := file.WriteString(commit + "\n"); err != nil {
@@ -413,7 +413,7 @@ func checkHashes(ctx context.Context, client *github.Client, owner, repo string,
 	if err != nil {
 		return nil, fmt.Errorf("python request error: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -564,7 +564,7 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 		return fmt.Errorf("failed to clone the repository: %w", err)
 	}
 
-	defer os.RemoveAll(path)
+	defer func() { _ = os.RemoveAll(path) }()
 
 	// count total valid hashes
 	validHashes, err := getExistingHashes(path)

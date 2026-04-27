@@ -3,11 +3,12 @@ package paralleldots
 import (
 	"bytes"
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -66,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			writer.Close()
+			_ = writer.Close()
 			req, err := http.NewRequestWithContext(ctx, "POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader(payload.Bytes()))
 			if err != nil {
 				continue
@@ -74,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", writer.FormDataContentType())
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					continue

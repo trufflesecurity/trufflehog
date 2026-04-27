@@ -39,7 +39,7 @@ func FetchAirtableUserInfo(token string) (*AirtableUserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch Airtable user info, status: %d", resp.StatusCode)
@@ -62,7 +62,7 @@ func FetchAirtableBases(token string) (*AirtableBases, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch Airtable bases, status: %d", resp.StatusCode)
@@ -96,7 +96,7 @@ func fetchBaseSchema(token string, baseID string) (*Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch schema for base %s, status: %d", baseID, resp.StatusCode)
