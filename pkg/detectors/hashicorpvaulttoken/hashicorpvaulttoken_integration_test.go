@@ -53,6 +53,16 @@ func TestVaultToken_FromData_Integration(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
+			name:   "valid token without URL, verify",
+			input:  fmt.Sprintf("%s", token),
+			verify: true,
+			wantTokens: []string{
+				token,
+			},
+			wantVerified:        []bool{false},
+			wantVerificationErr: false,
+		},
+		{
 			name:   "invalid token with URL, verify",
 			input:  fmt.Sprintf("%s\n%s", fakeToken, vaultURL),
 			verify: true,
