@@ -152,6 +152,7 @@ func TestAppSync_FromData(t *testing.T) {
 				"ExtraData",
 				"verificationError",
 				"primarySecret",
+				"SecretParts",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
