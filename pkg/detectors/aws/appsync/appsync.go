@@ -62,20 +62,20 @@ func (s Scanner) FromData(
 	}
 
 	for _, m := range endpointPat.FindAllStringSubmatch(dataStr, -1) {
-		endpoints[m[1]] = struct{}{}
+		normalizedEndpoint := normalizeEndpoint(m[1])
+		endpoints[normalizedEndpoint] = struct{}{}
 	}
 
 	for key := range keys {
 		for endpoint := range endpoints {
-			normalizedEndpoint := normalizeEndpoint(endpoint)
 
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AWSAppSync,
 				Raw:          []byte(key),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", normalizedEndpoint, key)),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, key)),
 				SecretParts: map[string]string{
 					"key":      key,
-					"endpoint": normalizedEndpoint,
+					"endpoint": endpoint,
 				},
 			}
 
@@ -83,7 +83,7 @@ func (s Scanner) FromData(
 				verified, verificationErr := verifyAppSyncKey(
 					ctx,
 					s.getClient(),
-					normalizedEndpoint,
+					endpoint,
 					key,
 				)
 
