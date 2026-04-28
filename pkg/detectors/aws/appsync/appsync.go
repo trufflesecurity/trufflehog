@@ -151,8 +151,9 @@ func verifyAppSyncKey(
 		}
 		return false, fmt.Errorf("502 Bad Gateway: unexpected response")
 
-	// Appsync return 401 for invalid keys,
-	case http.StatusUnauthorized:
+	// Appsync return 401 for invalid keys
+	// Appsync return 403 for some time after the token is deleted
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 
 	default:
