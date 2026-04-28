@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -31,7 +30,7 @@ var (
 	)
 
 	endpointPat = regexp.MustCompile(
-		`(https:\/\/[a-z0-9]{26}\.appsync-api\.[a-z0-9-]+\.amazonaws\.com(?:\/graphql)?)`,
+		`(https:\/\/[a-z0-9]{26}\.appsync-api\.[a-z0-9-]+\.amazonaws\.com)`,
 	)
 )
 
@@ -62,7 +61,7 @@ func (s Scanner) FromData(
 	}
 
 	for _, m := range endpointPat.FindAllStringSubmatch(dataStr, -1) {
-		normalizedEndpoint := normalizeEndpoint(m[1])
+		normalizedEndpoint := m[1] + "/graphql"
 		endpoints[normalizedEndpoint] = struct{}{}
 	}
 
@@ -76,6 +75,9 @@ func (s Scanner) FromData(
 				SecretParts: map[string]string{
 					"key":      key,
 					"endpoint": endpoint,
+				},
+				ExtraData: map[string]string{
+					"base_url": endpoint,
 				},
 			}
 
@@ -130,13 +132,26 @@ func verifyAppSyncKey(
 		_ = res.Body.Close()
 	}()
 
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
 	switch res.StatusCode {
 
 	case http.StatusOK:
 		return true, nil
 
-	case http.StatusUnauthorized,
-		http.StatusForbidden:
+	case http.StatusBadGateway:
+		// Appsync returns 502 with a specific error message in the body when the key is valid but has no schema defined,
+		// so we treat that as a valid key
+		if bytes.Contains(bodyBytes, []byte("No schema definition exists")) {
+			return true, nil
+		}
+		return false, fmt.Errorf("502 Bad Gateway: unexpected response")
+
+	// Appsync return 401 for invalid keys,
+	case http.StatusUnauthorized:
 		return false, nil
 
 	default:
@@ -145,13 +160,6 @@ func verifyAppSyncKey(
 			res.StatusCode,
 		)
 	}
-}
-
-func normalizeEndpoint(endpoint string) string {
-	if !strings.HasSuffix(endpoint, "/graphql") {
-		return endpoint + "/graphql"
-	}
-	return endpoint
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

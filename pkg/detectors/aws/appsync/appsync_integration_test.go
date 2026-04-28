@@ -29,6 +29,8 @@ func TestAppSync_FromData(t *testing.T) {
 
 	activeKey := testSecrets.MustGetField("APPSYNC_API_KEY")
 	endpoint := testSecrets.MustGetField("APPSYNC_API_URL")
+
+	revokedEndpoint := "https://nr2nchyfwvc53lgrlvsa2pfpzq.appsync-api.us-east-1.amazonaws.com/graphql"
 	inactiveKey := "da2-abcdefghijklmnopqrstuvwxyz"
 
 	type args struct {
@@ -47,10 +49,10 @@ func TestAppSync_FromData(t *testing.T) {
 	}{
 		{
 			name: "found, verified",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"data":{"__typename":"Query"}}`)},
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), activeKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, activeKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -58,7 +60,7 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     true,
 					Raw:          []byte(activeKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), activeKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
 				},
 			},
 		},
@@ -67,7 +69,7 @@ func TestAppSync_FromData(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), activeKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, activeKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -75,7 +77,7 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(activeKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), activeKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
 				},
 			},
 			wantVerificationErr: true,
@@ -85,7 +87,7 @@ func TestAppSync_FromData(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(500, "{}")},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), activeKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, activeKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -93,17 +95,18 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(activeKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), activeKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, activeKey)),
 				},
 			},
 			wantVerificationErr: true,
 		},
+		// Host will be unreachable for such cases
 		{
-			name: "found, unverified key",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, "{}")},
+			name: "found, Revoked key and endpoint",
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", normalizeEndpoint(endpoint), inactiveKey),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", revokedEndpoint, inactiveKey),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -111,7 +114,25 @@ func TestAppSync_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_AWSAppSync,
 					Verified:     false,
 					Raw:          []byte(inactiveKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s", normalizeEndpoint(endpoint), inactiveKey)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", revokedEndpoint, inactiveKey)),
+				},
+			},
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, valid endpoint and invalid key",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   fmt.Appendf([]byte{}, "endpoint=%s key=%s", endpoint, inactiveKey),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_AWSAppSync,
+					Verified:     false,
+					Raw:          []byte(inactiveKey),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", endpoint, inactiveKey)),
 				},
 			},
 		},
