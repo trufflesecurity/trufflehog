@@ -77,11 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: s.Type(),
 				Raw:          []byte(resIdMatch),
-				SecretParts: map[string]string{
-					"id":     resIdMatch,
-					"secret": resSecretMatch,
-				},
-				RawV2: []byte(resIdMatch + resSecretMatch),
+				RawV2:        []byte(resIdMatch + resSecretMatch),
 			}
 
 			if verify {
@@ -89,14 +85,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resIdMatch)
 
-				// When the credential pair is valid and subject IDs are
-				// present, try each one via the full CCG auth flow to find
-				// one that actually works. Only a verified triple is useful
-				// to the downstream analyzer.
+				// SecretParts is only populated for a verified triple
+				// (client_id + client_secret + subject_id). The Box analyzer
+				// uses CCG auth, which hard-fails without all three; emitting
+				// partial data would just cause downstream auth errors.
 				if isVerified {
 					for subjectId := range uniqueSubjectIdMatches {
 						if verifySubjectID(ctx, s.getClient(), resIdMatch, resSecretMatch, subjectId) {
-							s1.AnalysisInfo = map[string]string{
+							s1.SecretParts = map[string]string{
 								"client_id":     resIdMatch,
 								"client_secret": resSecretMatch,
 								"subject_id":    subjectId,
