@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"mixmax"}) + `\b([a-zA-Z0-9_-]{36})\b`)
@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			req.Header.Add("X-API-Token", resMatch)
-			res, err := client.Do(req)
+			res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Mixmax, resMatch, req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
