@@ -29,7 +29,7 @@ type merakiOrganizations struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	apiKey = regexp.MustCompile(detectors.PrefixRegex([]string{"meraki"}) + `([0-9a-f]{40})`)
 )
@@ -57,9 +57,7 @@ func (s Scanner) Description() string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	// uniqueMatches will hold unique match values and ensure we only process unique matches found in the data string
-	var uniqueMatches = make(map[string]struct{})
-
+	uniqueMatches := make(map[string]struct{})
 	for _, match := range apiKey.FindAllStringSubmatch(dataStr, -1) {
 		uniqueMatches[match[1]] = struct{}{}
 	}
@@ -107,11 +105,9 @@ func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) 
 	if err != nil {
 		return nil, false, err
 	}
-
-	// set the required auth header
 	req.Header.Set("X-Cisco-Meraki-API-Key", match)
 
-	resp, err := client.Do(req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Meraki, match, req)
 	if err != nil {
 		return nil, false, err
 	}
@@ -122,12 +118,10 @@ func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) 
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		// in case token is verified, capture the organization id's and name which are accessible via token.
 		var organizations []merakiOrganizations
 		if err = json.NewDecoder(resp.Body).Decode(&organizations); err != nil {
 			return nil, false, err
 		}
-
 		return organizations, true, nil
 	case http.StatusUnauthorized:
 		return nil, false, nil

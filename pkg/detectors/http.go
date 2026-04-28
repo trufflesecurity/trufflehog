@@ -1,13 +1,18 @@
 package detectors
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"slices"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -174,4 +179,94 @@ func NewDetectorHttpClient(opts ...ClientOption) *http.Client {
 
 	client.Transport = common.NewInstrumentedTransport(client.Transport)
 	return client
+}
+
+// bufferedResponse holds a fully-read HTTP response so it can be replayed to
+// every goroutine that was coalesced by singleflight.
+type bufferedResponse struct {
+	statusCode int
+	header     http.Header
+	body       []byte
+}
+
+// singleflightTransport is an http.RoundTripper that coalesces concurrent requests
+// sharing the same deduplication key into a single network call. It is a no-op for
+// requests whose context does not carry a dedup key.
+type singleflightTransport struct {
+	base  http.RoundTripper
+	group singleflight.Group
+}
+
+func (t *singleflightTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	key, ok := req.Context().Value(dedupKeyContextKey{}).(string)
+	if !ok || key == "" {
+		return t.base.RoundTrip(req)
+	}
+
+	// DoChan is used instead of Do so each caller can independently respect its
+	// own context cancellation without blocking on the shared in-flight call.
+	ch := t.group.DoChan(key, func() (any, error) {
+		// Detach the in-flight request from the first caller's cancellation so
+		// that one goroutine timing out doesn't abort the shared network call
+		// and propagate an error to all coalesced waiters.
+		//
+		// context.WithoutCancel also strips any deadline (e.g. from
+		// http.Client.Timeout), so we re-attach the original deadline if
+		// present. Without this the shared request has no timeout and a
+		// hanging server would leak the goroutine and pin the singleflight
+		// key indefinitely.
+		sharedCtx := context.WithoutCancel(req.Context())
+		if deadline, ok := req.Context().Deadline(); ok {
+			var cancel context.CancelFunc
+			sharedCtx, cancel = context.WithDeadline(sharedCtx, deadline)
+			defer cancel()
+		}
+		sharedReq := req.WithContext(sharedCtx)
+		resp, err := t.base.RoundTrip(sharedReq)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		return &bufferedResponse{
+			statusCode: resp.StatusCode,
+			header:     resp.Header.Clone(),
+			body:       body,
+		}, nil
+	})
+
+	select {
+	case result := <-ch:
+		if result.Err != nil {
+			return nil, result.Err
+		}
+		br := result.Val.(*bufferedResponse)
+		return &http.Response{
+			StatusCode: br.statusCode,
+			Status:     fmt.Sprintf("%d %s", br.statusCode, http.StatusText(br.statusCode)),
+			Header:     br.header.Clone(),
+			Body:       io.NopCloser(bytes.NewReader(br.body)),
+		}, nil
+	case <-req.Context().Done():
+		return nil, req.Context().Err()
+	}
+}
+
+// NewClientWithDedup wraps base with a transport that deduplicates concurrent
+// verification requests sharing the same key. Detectors opt in per credential by
+// calling WithDedupKey on the request context before client.Do — no other changes
+// to request building or response reading are needed.
+func NewClientWithDedup(base *http.Client) *http.Client {
+	clone := *base
+	transport := base.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	clone.Transport = &singleflightTransport{base: transport}
+	return &clone
 }
