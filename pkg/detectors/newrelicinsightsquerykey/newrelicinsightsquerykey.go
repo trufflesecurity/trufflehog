@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     keyResMatch[:8] + "...",
 			}
 
-			if verify && accountIDResMatch != "" {
+			if verify {
 				isVerified, extraData, verificationErr := s.verify(ctx, keyResMatch, accountIDResMatch)
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
