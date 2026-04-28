@@ -1,6 +1,7 @@
 package access_keys
 
 import (
+	"maps"
 	"context"
 	"fmt"
 	"net"
@@ -220,9 +221,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 
 					// Append the extraData to the existing ExtraData map.
-					for k, v := range extraData {
-						s1.ExtraData[k] = v
-					}
+					maps.Copy(s1.ExtraData, extraData)
 					s1.SetVerificationError(verificationErr, secretMatch)
 				}
 			}
