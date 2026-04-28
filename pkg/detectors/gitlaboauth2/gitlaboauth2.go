@@ -79,6 +79,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.SetVerificationError(verificationErr)
 
 					if s1.Verified {
+						s1.SecretParts = map[string]string{
+							"client_id":     clientId,
+							"client_secret": clientSecret,
+							"endpoint":      endpoint,
+						}
 						// A client_id is bound to a single secret; skip remaining
 						// endpoints and secrets for this client_id.
 						results = append(results, s1)
