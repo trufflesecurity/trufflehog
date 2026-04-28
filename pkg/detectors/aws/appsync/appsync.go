@@ -137,6 +137,7 @@ func verifyAppSyncKey(
 		return false, err
 	}
 
+	// https://docs.aws.amazon.com/appsync/latest/APIReference/CommonErrors.html
 	switch res.StatusCode {
 
 	case http.StatusOK:
