@@ -2,13 +2,13 @@ package cloudflareglobalapikey
 
 import (
 	"context"
-	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	cfglobalapikey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -64,7 +64,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				s1.Verified = VerifyGlobalAPIKey(ctx, client, apiKeyRes, emailMatch)
+				isVerified, verificationErr := cfglobalapikey.VerifyGlobalAPIKey(ctx, client, apiKeyRes, emailMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, apiKeyRes)
 			}
 
 			results = append(results, s1)
@@ -72,24 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
-}
-
-// VerifyGlobalAPIKey checks if a Cloudflare Global API Key is valid.
-func VerifyGlobalAPIKey(ctx context.Context, client *http.Client, apiKey, email string) bool {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/user", nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Add("X-Auth-Email", email)
-	req.Header.Add("X-Auth-Key", apiKey)
-	req.Header.Add("Content-Type", "application/json")
-
-	res, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	defer res.Body.Close()
-	return res.StatusCode >= 200 && res.StatusCode < 300
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

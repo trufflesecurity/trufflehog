@@ -8,11 +8,13 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	cfglobalapikey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	v1.Scanner
 }
 
@@ -55,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			results = append(results, detectors.Result{
 				DetectorType: detector_typepb.DetectorType_CloudflareGlobalApiKey,
 				Raw:          []byte(apiKeyRes),
+				SecretParts:  map[string]string{"key": apiKeyRes},
 			})
 			continue
 		}
@@ -65,10 +68,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     emailMatch,
 				Raw:          []byte(apiKeyRes),
 				RawV2:        []byte(apiKeyRes + emailMatch),
+				SecretParts: map[string]string{
+					"key":   apiKeyRes,
+					"email": emailMatch,
+				},
 			}
 
 			if verify {
-				s1.Verified = v1.VerifyGlobalAPIKey(ctx, client, apiKeyRes, emailMatch)
+				isVerified, verificationErr := cfglobalapikey.VerifyGlobalAPIKey(ctx, client, apiKeyRes, emailMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, apiKeyRes)
 			}
 
 			results = append(results, s1)
