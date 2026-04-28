@@ -2,19 +2,19 @@ package cloudflareapitoken
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	cfapitoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	v1.Scanner
 }
 
@@ -53,59 +53,51 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 
-		if verify {
-			if strings.HasPrefix(resMatch, "cfat_") {
-				// Account tokens require per-account verification.
-				for accountID := range uniqueAccountIDs {
-					s1 := detectors.Result{
-						DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
-						Raw:          []byte(resMatch),
-						RawV2:        []byte(resMatch + accountID),
-					}
-					s1.Verified = verifyAccountToken(ctx, resMatch, accountID)
-					results = append(results, s1)
-				}
-				if len(uniqueAccountIDs) == 0 {
-					// No account ID found; still report the token unverified.
-					results = append(results, detectors.Result{
-						DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
-						Raw:          []byte(resMatch),
-					})
-				}
-			} else {
-				// cfut_ tokens use the user token verification endpoint.
+		if strings.HasPrefix(resMatch, "cfat_") {
+			// Account tokens: pair with each nearby account ID.
+			if len(uniqueAccountIDs) == 0 {
+				// No account ID found; still report the token.
+				results = append(results, detectors.Result{
+					DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
+					Raw:          []byte(resMatch),
+					SecretParts:  map[string]string{"key": resMatch},
+				})
+				continue
+			}
+			for accountID := range uniqueAccountIDs {
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
 					Raw:          []byte(resMatch),
+					RawV2:        []byte(resMatch + accountID),
+					SecretParts: map[string]string{
+						"key":        resMatch,
+						"account_id": accountID,
+					},
 				}
-				s1.Verified = v1.VerifyUserToken(ctx, client, resMatch)
+				if verify {
+					isVerified, verificationErr := cfapitoken.VerifyAccountToken(ctx, client, resMatch, accountID)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr, resMatch)
+				}
 				results = append(results, s1)
 			}
 		} else {
-			results = append(results, detectors.Result{
+			// cfut_ tokens use the user token verification endpoint.
+			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
 				Raw:          []byte(resMatch),
-			})
+				SecretParts:  map[string]string{"key": resMatch},
+			}
+			if verify {
+				isVerified, verificationErr := cfapitoken.VerifyUserToken(ctx, client, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
+			}
+			results = append(results, s1)
 		}
 	}
 
 	return results, nil
-}
-
-func verifyAccountToken(ctx context.Context, token, accountID string) bool {
-	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/tokens/verify", accountID)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-	res, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	defer res.Body.Close()
-	return res.StatusCode >= 200 && res.StatusCode < 300
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

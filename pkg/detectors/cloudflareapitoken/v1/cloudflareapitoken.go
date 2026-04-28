@@ -2,14 +2,13 @@ package cloudflareapitoken
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	cfapitoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -49,29 +48,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			s1.Verified = VerifyUserToken(ctx, client, resMatch)
+			isVerified, verificationErr := cfapitoken.VerifyUserToken(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
-}
-
-// VerifyUserToken checks if a Cloudflare user API token is valid.
-func VerifyUserToken(ctx context.Context, client *http.Client, token string) bool {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/user/tokens/verify", nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-	res, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	defer res.Body.Close()
-	return res.StatusCode >= 200 && res.StatusCode < 300
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
