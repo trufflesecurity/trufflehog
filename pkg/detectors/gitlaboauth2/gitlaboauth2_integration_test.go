@@ -158,7 +158,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{},
-				"Raw", "RawV2", "verificationError", "ExtraData", "primarySecret")
+				"Raw", "RawV2", "verificationError", "ExtraData", "primarySecret", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("GitlabOauth.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
