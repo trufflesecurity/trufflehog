@@ -120,6 +120,8 @@ type Config struct {
 
 	// FilterEntropy filters out unverified results using Shannon entropy.
 	FilterEntropy float64
+	// FilterTokenize filters out unverified results using tokenization.
+	FilterTokenize bool
 	// FilterUnverified sets the filterUnverified flag on the engine. If set to
 	// true, the engine will only return the first unverified result for a chunk for a detector.
 	FilterUnverified      bool
@@ -181,7 +183,9 @@ type Engine struct {
 	// only the first one will be kept.
 	filterUnverified bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
-	filterEntropy           float64
+	filterEntropy float64
+	// filterTokenize is used to filter out unverified results using tokenization.
+	filterTokenize          bool
 	notifyVerifiedResults   bool
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
@@ -246,6 +250,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
 		filterEntropy:                       cfg.FilterEntropy,
+		filterTokenize:                      cfg.FilterTokenize,
 		printAvgDetectorTime:                cfg.PrintAvgDetectorTime,
 		retainFalsePositives:                cfg.LogFilteredUnverified,
 		verificationOverlap:                 cfg.VerificationOverlap,
@@ -565,6 +570,10 @@ func (e *Engine) AhoCorasickCoreKeywords() map[string]struct{} {
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
 	return atomic.LoadUint32(&e.numFoundResults) > 0
+}
+
+func (e *Engine) NumFoundResults() uint32 {
+	return atomic.LoadUint32(&e.numFoundResults)
 }
 
 // GetMetrics returns a copy of Metrics.
@@ -997,6 +1006,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
 			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
+			isTokenizerFalsePositive := detectors.GetTokenizerFalsePositiveCheck(detector.Detector)
 
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
@@ -1058,6 +1068,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 							chunk.decoder,
 							detector.Detector.Description(),
 							isFalsePositive,
+							isTokenizerFalsePositive,
 						)
 
 						// Remove the detector key from the list of detector keys with results.
@@ -1121,6 +1132,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
+	isTokenizerFalsePositive := detectors.GetTokenizerFalsePositiveCheck(data.detector.Detector)
+
 	var matchCount int
 	// To reduce the overhead of regex calls in the detector,
 	// we limit the amount of data passed to each detector.
@@ -1183,7 +1196,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		}
 
 		for _, res := range results {
-			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
+			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive, isTokenizerFalsePositive)
 		}
 	}
 
@@ -1225,6 +1238,7 @@ func (e *Engine) processResult(
 	decoderType detectorspb.DecoderType,
 	detectorDescription string,
 	isFalsePositive func(detectors.Result) (bool, string),
+	isTokenizerFalsePositive func(ctx context.Context, res detectors.Result) bool,
 ) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(chunk.SourceType) {
@@ -1252,6 +1266,12 @@ func (e *Engine) processResult(
 	if !res.Verified && res.Raw != nil {
 		isFp, _ := isFalsePositive(res)
 		secret.IsWordlistFalsePositive = isFp
+		if e.filterTokenize {
+			isTokenizerFp := isTokenizerFalsePositive(ctx, res)
+			secret.IsTokenizerFalsePositive = isTokenizerFp
+		} else {
+			fmt.Println("Filter tokenize is off", e.filterTokenize)
+		}
 	}
 
 	e.results <- secret
@@ -1264,6 +1284,9 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		if !result.Verified {
 			if result.IsWordlistFalsePositive && !e.retainFalsePositives {
 				// Skip false positives
+				continue
+			} else if e.filterTokenize && result.IsTokenizerFalsePositive {
+				// Skip tokenizer false positives
 				continue
 			} else if result.VerificationError() != nil {
 				if !e.notifyUnknownResults {

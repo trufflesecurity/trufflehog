@@ -597,7 +597,7 @@ func TestProcessResult_SourceSupportsLineNumbers_LinkUpdated(t *testing.T) {
 	}
 
 	// Act
-	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil, nil)
 
 	// Assert that the link has been correctly updated
 	require.Len(t, e.results, 1)
@@ -629,7 +629,7 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 	}
 
 	// Act
-	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil, nil)
 
 	// Assert that no results were generated
 	assert.Empty(t, e.results)
@@ -669,7 +669,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	}
 
 	// Act
-	e.processResult(context.AddLogger(t.Context()), result, chunk, detectorspb.DecoderType_PLAIN, "a detector that detects", nil)
+	e.processResult(context.AddLogger(t.Context()), result, chunk, detectorspb.DecoderType_PLAIN, "a detector that detects", nil, nil)
 
 	// Assert that the single generated result has the correct fields
 	require.Len(t, e.results, 1)
@@ -740,7 +740,7 @@ func TestProcessResult_FalsePositiveFlagSetCorrectly(t *testing.T) {
 			isFalsePositive := func(_ detectors.Result) (bool, string) { return tt.isFalsePositive, "" }
 
 			// Act
-			e.processResult(context.AddLogger(t.Context()), res, sources.Chunk{}, 0, "", isFalsePositive)
+			e.processResult(context.AddLogger(t.Context()), res, sources.Chunk{}, 0, "", isFalsePositive, nil)
 
 			// Assert that the single generated result has the correct false positive flag
 			require.Len(t, e.results, 1)
