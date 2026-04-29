@@ -425,7 +425,7 @@ func handleChunksWithError(
 				if isFatal(dataOrErr.Err) {
 					return dataOrErr.Err
 				}
-				ctx.Logger().Error(dataOrErr.Err, "non-critical error processing chunk")
+				ctx.Logger().V(2).Info("non-critical error processing chunk", "error", dataOrErr.Err)
 				continue
 			}
 			if len(dataOrErr.Data) > 0 {
