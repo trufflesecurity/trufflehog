@@ -1,0 +1,68 @@
+name: Corpora Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'pkg/detectors/**'
+      - '.github/workflows/detector-corpora-test.yml'
+      - 'scripts/detector_corpora_test.sh'
+
+env:
+  DATASETS: |
+    s3://trufflehog-corpora-datasets/contents.2025-11-04.jsonl.zstd
+
+jobs:
+  corpora-test:
+    if: ${{ github.repository == 'trufflesecurity/trufflehog' && !github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Install dependencies
+        run: sudo apt-get install -y zstd jq
+
+      - name: Install DuckDB
+        run: |
+          wget -q https://github.com/duckdb/duckdb/releases/latest/download/duckdb_cli-linux-amd64.zip
+          unzip duckdb_cli-linux-amd64.zip
+          sudo mv duckdb /usr/local/bin/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Run corpora test
+        run: |
+          files=()
+          while IFS= read -r dataset; do
+            [[ -z "$dataset" ]] && continue
+            files+=("$dataset")
+          done <<< "$DATASETS"
+          ./scripts/detector_corpora_test.sh "${files[@]}" | tee /tmp/corpora-results.txt
+
+      - name: Post results to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('/tmp/corpora-results.txt', 'utf8');
+            const body = `## Corpora Test Results\n\n\`\`\`\n${results}\n\`\`\``;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
