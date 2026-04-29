@@ -9,6 +9,10 @@ fi
 OUTPUT_JSONL="/tmp/corpora_results.jsonl"
 > "$OUTPUT_JSONL"
 
+# Captures trufflehog stderr (incl. --print-avg-detector-time output) for downstream phases.
+STDERR_FILE="/tmp/corpora-stderr.txt"
+> "$STDERR_FILE"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 TRUFFLEHOG_BIN="${REPO_ROOT}/trufflehog"
@@ -24,7 +28,7 @@ scan() {
         --concurrency=6 \
         --json \
         --print-avg-detector-time \
-        stdin >> "$OUTPUT_JSONL" 2>/dev/null
+        stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
     set -e
 }
 

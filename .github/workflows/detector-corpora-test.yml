@@ -46,7 +46,9 @@ jobs:
           aws-region: us-east-1
 
       - name: Run corpora test
+        shell: bash
         run: |
+          set -o pipefail
           files=()
           while IFS= read -r dataset; do
             [[ -z "$dataset" ]] && continue
