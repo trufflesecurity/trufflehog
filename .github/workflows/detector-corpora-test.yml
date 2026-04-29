@@ -6,9 +6,11 @@ on:
     # types: [opened, reopened] TODO: Decide if we should run this on every push
     paths:
       - 'pkg/detectors/**'
+      - 'pkg/engine/defaults/defaults.go'
       - '.github/workflows/detector-corpora-test.yml'
       - 'scripts/detector_corpora_test.sh'
       - 'scripts/diff_corpora_results.py'
+      - 'scripts/detect_changed_detectors.sh'
 
 env:
   DATASETS: |
@@ -42,34 +44,95 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Resolve merge-base and prepare main worktree
+      - name: Resolve merge-base
+        id: merge_base
         shell: bash
         run: |
           set -o pipefail
           git fetch --no-tags --prune origin main
           MERGE_BASE=$(git merge-base origin/main HEAD)
           echo "Merge base: $MERGE_BASE"
+          echo "sha=$MERGE_BASE" >> "$GITHUB_OUTPUT"
+
+      # Determine which detectors changed in this PR. The PR build scopes its
+      # scan to the full set; the main build excludes detectors that don't
+      # exist there yet (new detectors). If the set is empty, the workflow
+      # short-circuits with a skip comment — scoping is the entire point of
+      # Phase 2, falling back to scan-all defeats it.
+      - name: Detect changed detectors
+        id: detect
+        shell: bash
+        env:
+          BASE_REF: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          set -o pipefail
+          chmod +x scripts/detect_changed_detectors.sh
+          PR_CSV=$(./scripts/detect_changed_detectors.sh --pr-csv || true)
+          MAIN_CSV=$(./scripts/detect_changed_detectors.sh --main-csv || true)
+          NEW_LIST=$(./scripts/detect_changed_detectors.sh --new-only || true)
+          NEW_CSV=$(echo "$NEW_LIST" | paste -sd, -)
+          echo "PR detectors:   $PR_CSV"
+          echo "Main detectors: $MAIN_CSV"
+          echo "New detectors:  $NEW_CSV"
+          echo "pr_csv=$PR_CSV" >> "$GITHUB_OUTPUT"
+          echo "main_csv=$MAIN_CSV" >> "$GITHUB_OUTPUT"
+          echo "new_csv=$NEW_CSV" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PR_CSV" ]]; then
+            echo "any_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip comment (no detector source changed)
+        if: steps.detect.outputs.any_changed != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') return;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '## Corpora Test Results\n\nNo detector source files changed in this PR. Bench skipped.',
+            });
+
+      - name: Prepare main worktree
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          set -o pipefail
           git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
 
       - name: Build trufflehog (PR HEAD)
+        if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         run: |
           set -o pipefail
           CGO_ENABLED=0 go build -o /tmp/trufflehog-pr .
 
       - name: Build trufflehog (main merge-base)
+        if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         working-directory: /tmp/trufflehog-main-src
         run: |
           set -o pipefail
           CGO_ENABLED=0 go build -o /tmp/trufflehog-main .
 
-      - name: Run corpora test (main build)
+      # The PR scan always runs (any_changed=true means at least one detector
+      # is in pr_csv). It also captures the corpus byte total for the diff
+      # script's blast-radius column — same content streams to both binaries,
+      # so measuring once is enough.
+      - name: Run corpora test (PR build)
+        if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
-          TRUFFLEHOG_BIN: /tmp/trufflehog-main
-          OUTPUT_JSONL: /tmp/results-main.jsonl
-          STDERR_FILE: /tmp/corpora-stderr-main.txt
+          TRUFFLEHOG_BIN: /tmp/trufflehog-pr
+          OUTPUT_JSONL: /tmp/results-pr.jsonl
+          STDERR_FILE: /tmp/corpora-stderr-pr.txt
+          INCLUDE_DETECTORS: ${{ steps.detect.outputs.pr_csv }}
+          CORPUS_BYTES_FILE: /tmp/corpus-bytes.txt
         run: |
           set -o pipefail
           files=()
@@ -79,14 +142,25 @@ jobs:
           done <<< "$DATASETS"
           ./scripts/detector_corpora_test.sh "${files[@]}"
 
-      - name: Run corpora test (PR build)
+      # Main scan is skipped when main_csv is empty (PR adds only new
+      # detectors — nothing to compare against on main). The diff step is
+      # safe with an empty main JSONL: every PR finding is treated as NEW,
+      # which is correct semantics for new detectors.
+      - name: Run corpora test (main build)
+        if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
-          TRUFFLEHOG_BIN: /tmp/trufflehog-pr
-          OUTPUT_JSONL: /tmp/results-pr.jsonl
-          STDERR_FILE: /tmp/corpora-stderr-pr.txt
+          TRUFFLEHOG_BIN: /tmp/trufflehog-main
+          OUTPUT_JSONL: /tmp/results-main.jsonl
+          STDERR_FILE: /tmp/corpora-stderr-main.txt
+          INCLUDE_DETECTORS: ${{ steps.detect.outputs.main_csv }}
         run: |
           set -o pipefail
+          if [[ -z "$INCLUDE_DETECTORS" ]]; then
+            echo "No overlapping detectors in main; skipping main scan."
+            : > "$OUTPUT_JSONL"
+            exit 0
+          fi
           files=()
           while IFS= read -r dataset; do
             [[ -z "$dataset" ]] && continue
@@ -95,13 +169,27 @@ jobs:
           ./scripts/detector_corpora_test.sh "${files[@]}"
 
       - name: Diff results
+        if: steps.detect.outputs.any_changed == 'true'
         shell: bash
+        env:
+          CHANGED: ${{ steps.detect.outputs.pr_csv }}
+          NEW_DETECTORS: ${{ steps.detect.outputs.new_csv }}
         run: |
           set -o pipefail
-          python3 scripts/diff_corpora_results.py /tmp/results-main.jsonl /tmp/results-pr.jsonl > /tmp/diff-report.md
+          CORPUS_BYTES=0
+          if [[ -s /tmp/corpus-bytes.txt ]]; then
+            CORPUS_BYTES=$(cat /tmp/corpus-bytes.txt)
+          fi
+          python3 scripts/diff_corpora_results.py \
+            /tmp/results-main.jsonl /tmp/results-pr.jsonl \
+            --changed-detectors="$CHANGED" \
+            --new-detectors="$NEW_DETECTORS" \
+            --corpus-bytes="$CORPUS_BYTES" \
+            > /tmp/diff-report.md
           cat /tmp/diff-report.md
 
       - name: Post results to PR
+        if: steps.detect.outputs.any_changed == 'true'
         uses: actions/github-script@v7
         with:
           script: |

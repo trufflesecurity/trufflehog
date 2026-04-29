@@ -29,6 +29,24 @@ if [[ ! -x "$TRUFFLEHOG_BIN" ]]; then
     CGO_ENABLED=0 go build -o "$TRUFFLEHOG_BIN" "$REPO_ROOT"
 fi
 
+# When set, scope the scan to specific detectors. Comma-separated, lowercase
+# proto enum names with optional ".v<n>" suffix (matches the format produced
+# by scripts/detect_changed_detectors.sh).
+INCLUDE_DETECTORS="${INCLUDE_DETECTORS:-}"
+INCLUDE_FLAG=()
+if [[ -n "$INCLUDE_DETECTORS" ]]; then
+    INCLUDE_FLAG=(--include-detectors="$INCLUDE_DETECTORS")
+fi
+
+# When set, total uncompressed content bytes streamed to trufflehog (across
+# all datasets in this run) are written to this path. Used by the diff
+# script to compute blast-radius density. Awk inline-counts the post-jq
+# stream so we don't double-read; END block runs before stdin EOF
+# propagates out of the pipeline, so the value is written by the time the
+# scan exits.
+CORPUS_BYTES_FILE="${CORPUS_BYTES_FILE:-}"
+TOTAL_BYTES=0
+
 # --no-verification and --allow-verification-overlap are paired intentionally.
 # This bench measures per-detector regex behavior in isolation:
 #   - --no-verification: avoids network-flake noise (rate limits, transient 5xx
@@ -46,17 +64,41 @@ fi
 #     Bypassing it gives each detector independent regex measurement.
 scan() {
     local input="$1"
+    local bytes_tmp=""
+    if [[ -n "$CORPUS_BYTES_FILE" ]]; then
+        bytes_tmp=$(mktemp)
+    fi
     set +e
-    unzstd -c "$input" | jq -r .content | "$TRUFFLEHOG_BIN" \
-        --no-update \
-        --no-verification \
-        --allow-verification-overlap \
-        --log-level=3 \
-        --concurrency=6 \
-        --json \
-        --print-avg-detector-time \
-        stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+    if [[ -n "$bytes_tmp" ]]; then
+        unzstd -c "$input" | jq -r .content \
+            | awk -v BF="$bytes_tmp" '{ b += length($0) + 1; print } END { printf "%d", b > BF; close(BF) }' \
+            | "$TRUFFLEHOG_BIN" \
+                --no-update \
+                --no-verification \
+                --allow-verification-overlap \
+                --log-level=3 \
+                --concurrency=6 \
+                --json \
+                --print-avg-detector-time \
+                "${INCLUDE_FLAG[@]}" \
+                stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+    else
+        unzstd -c "$input" | jq -r .content | "$TRUFFLEHOG_BIN" \
+            --no-update \
+            --no-verification \
+            --allow-verification-overlap \
+            --log-level=3 \
+            --concurrency=6 \
+            --json \
+            --print-avg-detector-time \
+            "${INCLUDE_FLAG[@]}" \
+            stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+    fi
     set -e
+    if [[ -n "$bytes_tmp" ]]; then
+        TOTAL_BYTES=$((TOTAL_BYTES + $(cat "$bytes_tmp")))
+        rm -f "$bytes_tmp"
+    fi
 }
 
 for CORPORA_FILE in "$@"; do
@@ -66,6 +108,10 @@ for CORPORA_FILE in "$@"; do
         scan "$CORPORA_FILE"
     fi
 done
+
+if [[ -n "$CORPUS_BYTES_FILE" ]]; then
+    echo "$TOTAL_BYTES" > "$CORPUS_BYTES_FILE"
+fi
 
 if [[ "$RUN_DUCKDB_SUMMARY" == "1" ]]; then
     duckdb -c "
