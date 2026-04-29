@@ -3,7 +3,7 @@ name: Corpora Test
 on:
   workflow_dispatch:
   pull_request:
-    types: [opened, reopened]
+    # types: [opened, reopened] TODO: Decide if we should run this on every push
     paths:
       - 'pkg/detectors/**'
       - '.github/workflows/detector-corpora-test.yml'
