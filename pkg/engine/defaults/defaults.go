@@ -135,6 +135,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/carboninterface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cashboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/caspio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/castai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/censys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/centralstationcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cexio"
@@ -1007,6 +1008,7 @@ func buildDetectorList() []detectors.Detector {
 		&carboninterface.Scanner{},
 		&cashboard.Scanner{},
 		&caspio.Scanner{},
+		castai.New(),
 		&censys.Scanner{},
 		&centralstationcrm.Scanner{},
 		&cexio.Scanner{},
