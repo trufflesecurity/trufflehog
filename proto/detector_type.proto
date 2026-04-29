@@ -1049,4 +1049,5 @@ enum DetectorType {
   BitbucketDataCenter = 1045;
   JiraDataCenterPAT = 1046;
   ConfluenceDataCenter = 1047;
+  StripeWebhookSecret = 1048;
 }
