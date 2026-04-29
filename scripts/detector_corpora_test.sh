@@ -29,12 +29,28 @@ if [[ ! -x "$TRUFFLEHOG_BIN" ]]; then
     CGO_ENABLED=0 go build -o "$TRUFFLEHOG_BIN" "$REPO_ROOT"
 fi
 
+# --no-verification and --allow-verification-overlap are paired intentionally.
+# This bench measures per-detector regex behavior in isolation:
+#   - --no-verification: avoids network-flake noise (rate limits, transient 5xx
+#     errors) that would otherwise produce verified/unverified deltas
+#     indistinguishable from real regex regressions. Verifier behavior is
+#     covered by detector unit tests.
+#   - --allow-verification-overlap: bypasses the engine's cross-detector
+#     overlap routing (pkg/engine/engine.go:862-872 + likelyDuplicate). That
+#     routing exists for verification safety — when one chunk has matches from
+#     multiple detectors, it dedups near-identical results so the same secret
+#     isn't sent to multiple verifiers. With verification off, the routing has
+#     no purpose, but its dedup side-effect (silently dropping a detector's
+#     other matches in a multi-match chunk) makes a regex change in detector A
+#     shift raw match counts in unrelated detector B, contaminating the diff.
+#     Bypassing it gives each detector independent regex measurement.
 scan() {
     local input="$1"
     set +e
     unzstd -c "$input" | jq -r .content | "$TRUFFLEHOG_BIN" \
         --no-update \
         --no-verification \
+        --allow-verification-overlap \
         --log-level=3 \
         --concurrency=6 \
         --json \

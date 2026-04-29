@@ -19,8 +19,9 @@ from collections import defaultdict
 
 
 PREAMBLE = (
-    "This bench measures regex match regressions only. Verification is "
-    "disabled to avoid network-flake noise; verifier behavior is tested "
+    "This bench measures regex match regressions only. It runs with "
+    "`--no-verification --allow-verification-overlap` so each detector's "
+    "regex behavior is measured independently — verifier behavior is tested "
     "separately by detector unit tests."
 )
 
@@ -55,7 +56,11 @@ def render(main, pr):
         p = pr.get(d, {"identities": set(), "total": 0})
         new = p["identities"] - m["identities"]
         removed = m["identities"] - p["identities"]
-        if new or removed:
+        # A row is "diff-clean" only when NEW, REMOVED, AND raw totals all match.
+        # Total-count differences without identity changes are still real (e.g.,
+        # a regex change in one detector can shift duplicate-match counts via
+        # cross-detector dedup), so they must not be reported as ✅.
+        if new or removed or m["total"] != p["total"]:
             has_diff = True
         rows.append({
             "detector": d,
