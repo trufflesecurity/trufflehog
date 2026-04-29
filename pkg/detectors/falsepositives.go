@@ -81,10 +81,10 @@ func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {
 }
 
 func GetTokenizerFalsePositiveCheck(detector Detector) func(ctx context.Context, res Result) bool {
-	_, ok := detector.(TokenizerFalsePositiveChecker)
+	checker, ok := detector.(TokenizerFalsePositiveChecker)
 	if ok {
 		return func(ctx context.Context, res Result) bool {
-			return false
+			return checker.IsTokenizerFpDisabled()
 		}
 	}
 
@@ -99,7 +99,7 @@ func IsTokenizerFalsePositive(ctx context.Context, res Result) bool {
 			tokens := getTokens(string(res.Raw), "cl100k_base")
 			if len(tokens) > 0 {
 				ratio := float64(len(tokens)) / float64(len(res.Raw))
-				// Ratio of 0.39 is good to avoid normal words and similar digits like 111111111111
+				// Ratio of less than 0.39 is good to avoid normal words and similar digits like 111111111111
 				if ratio > 0.39 {
 					return true
 				} else {
