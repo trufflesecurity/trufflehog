@@ -1,8 +1,7 @@
 package handlers
 
 import (
-	stdctx "context"
-	"errors"
+	"context"
 	"io"
 	"os"
 	"testing"
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -20,7 +19,7 @@ func TestHandleARFile(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	rdr, err := newFileReader(ctx, file)
@@ -28,7 +27,7 @@ func TestHandleARFile(t *testing.T) {
 	defer rdr.Close()
 
 	handler := newARHandler()
-	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
+	dataOrErrChan := handler.HandleFile(trContext.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
 	wantChunkCount := 102
@@ -54,7 +53,7 @@ func TestARHandler_NonArchiveErrPreservesIdentity(t *testing.T) {
 	require.NoError(t, err)
 	defer file.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := trContext.WithCancel(trContext.Background())
 	defer cancel()
 
 	rdr, err := newFileReader(ctx, file)
@@ -66,7 +65,7 @@ func TestARHandler_NonArchiveErrPreservesIdentity(t *testing.T) {
 	// chunk's data sees the cancelled context and returns context.Canceled,
 	// which handleNonArchiveContent returns and processARFiles wraps. This
 	// is the only path that exercises the ar.go:107-110 wrap.
-	cancellingChunkReader := sources.ChunkReader(func(_ context.Context, _ io.Reader) <-chan sources.ChunkResult {
+	cancellingChunkReader := sources.ChunkReader(func(_ trContext.Context, _ io.Reader) <-chan sources.ChunkResult {
 		ch := make(chan sources.ChunkResult, 1)
 		cancel()
 		ch <- sources.NewChunkResult([]byte("data"), 4)
@@ -79,22 +78,22 @@ func TestARHandler_NonArchiveErrPreservesIdentity(t *testing.T) {
 	}
 
 	var got []DataOrErr
-	for d := range handler.HandleFile(context.AddLogger(ctx), rdr) {
+	for d := range handler.HandleFile(trContext.AddLogger(ctx), rdr) {
 		got = append(got, d)
 	}
 
 	var warnErr error
 	for _, d := range got {
-		if d.Err != nil && errors.Is(d.Err, ErrProcessingWarning) {
+		if d.Err != nil {
 			warnErr = d.Err
 			break
 		}
 	}
 	require.Error(t, warnErr, "expected wrapped warning from ar.go non-archive error path")
 
-	assert.True(t, errors.Is(warnErr, ErrProcessingWarning),
+	assert.ErrorIs(t, warnErr, ErrProcessingWarning,
 		"outer ErrProcessingWarning wrap should be preserved")
-	assert.True(t, errors.Is(warnErr, stdctx.Canceled),
+	assert.ErrorIs(t, warnErr, context.Canceled,
 		"inner cancellation cause should be inspectable via errors.Is")
 	assert.True(t, isFatal(warnErr),
 		"isFatal should classify the wrapped error based on the inner cause")
