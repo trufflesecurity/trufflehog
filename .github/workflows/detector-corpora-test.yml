@@ -3,6 +3,7 @@ name: Corpora Test
 on:
   workflow_dispatch:
   pull_request:
+    types: [opened, reopened]
     paths:
       - 'pkg/detectors/**'
       - '.github/workflows/detector-corpora-test.yml'
@@ -59,10 +60,41 @@ jobs:
           script: |
             const fs = require('fs');
             const results = fs.readFileSync('/tmp/corpora-results.txt', 'utf8');
-            const body = `## Corpora Test Results\n\n\`\`\`\n${results}\n\`\`\``;
+            const body = [
+              `## Corpora Test Results`,
+              ``,
+              `This test scans a real-world dataset of public content to measure how often this detector fires. A high number of unverified or unknown results may indicate the detector is too noisy and could impact signal quality in production.`,
+              ``,
+              `| Column | Meaning |`,
+              `|--------|---------|`,
+              `| \`total\` | All findings for this detector |`,
+              `| \`verified\` | Confirmed valid credentials |`,
+              `| \`unverified\` | Matched pattern but could not verify (credential may be invalid or service unreachable) |`,
+              `| \`unknown\` | Verification attempted but errored |`,
+              ``,
+              `\`\`\``,
+              results,
+              `\`\`\``,
+            ].join('\n');
+            let issue_number;
+            if (context.eventName === 'workflow_dispatch') {
+              const pulls = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`,
+                state: 'open',
+              });
+              if (pulls.data.length === 0) {
+                core.setFailed(`No open PR found for branch ${context.ref}`);
+                return;
+              }
+              issue_number = pulls.data[0].number;
+            } else {
+              issue_number = context.issue.number;
+            }
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number,
               body,
             });
