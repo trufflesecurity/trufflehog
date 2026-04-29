@@ -40,7 +40,9 @@ func TestHandleRPMFile(t *testing.T) {
 }
 
 // TestRPMHandler_NonArchiveErrPreservesIdentity is a regression test for the
-// %v wrap at rpm.go:120. Same shape as TestARHandler_NonArchiveErrPreservesIdentity:
+// %v wrap on the ErrProcessingWarning send to dataOrErrChan in
+// processRPMFiles' handleNonArchiveContent error path. Same shape as
+// TestARHandler_NonArchiveErrPreservesIdentity:
 // inject a cancelling chunk reader so handleNonArchiveContent's CancellableWrite
 // returns context.Canceled, which processRPMFiles wraps with ErrProcessingWarning.
 // Asserts the outer warning wrap and inner cancellation cause are both

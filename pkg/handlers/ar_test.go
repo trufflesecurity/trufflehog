@@ -40,7 +40,9 @@ func TestHandleARFile(t *testing.T) {
 }
 
 // TestARHandler_NonArchiveErrPreservesIdentity is a regression test for the
-// %v wrap at ar.go:109. Before the fix, wrapping handleNonArchiveContent's
+// %v wrap on the ErrProcessingWarning send to dataOrErrChan in
+// processARFiles' handleNonArchiveContent error path. Before the fix, wrapping
+// handleNonArchiveContent's
 // return value with %v dropped the inner error's identity from the errors.Is
 // chain, causing isFatal in handleChunksWithError to misclassify cancellation
 // (and other fatal causes) as a non-fatal warning. The test injects a
@@ -64,7 +66,8 @@ func TestARHandler_NonArchiveErrPreservesIdentity(t *testing.T) {
 	// chunks, then deliver a single non-error chunk. CancellableWrite of that
 	// chunk's data sees the cancelled context and returns context.Canceled,
 	// which handleNonArchiveContent returns and processARFiles wraps. This
-	// is the only path that exercises the ar.go:107-110 wrap.
+	// is the only path that exercises the processARFiles dataOrErrChan
+	// ErrProcessingWarning wrap.
 	cancellingChunkReader := sources.ChunkReader(func(_ trContext.Context, _ io.Reader) <-chan sources.ChunkResult {
 		ch := make(chan sources.ChunkResult, 1)
 		cancel()
