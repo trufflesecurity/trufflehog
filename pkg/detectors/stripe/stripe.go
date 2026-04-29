@@ -19,7 +19,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// doesn't include test keys with "sk_test"
-	secretKey = regexp.MustCompile(`[rs]k_live_[a-zA-Z0-9]{20,247}`)
+	secretKey = regexp.MustCompile(`[a-zA-Z0-9]{20,247}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
