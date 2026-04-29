@@ -134,7 +134,7 @@ func (h *defaultHandler) handleNonArchiveContent(
 		dataOrErr := DataOrErr{}
 		if err := chunkResult.Error(); err != nil {
 			h.metrics.incErrors()
-			dataOrErr.Err = fmt.Errorf("%w: error reading chunk: %w", ErrProcessingWarning, err)
+			dataOrErr.Err = fmt.Errorf("%w: error reading chunk: %v", ErrProcessingWarning, err)
 			if writeErr := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); writeErr != nil {
 				return fmt.Errorf("%w: error writing to data channel: %v", ErrProcessingFatal, writeErr)
 			}
