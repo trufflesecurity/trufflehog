@@ -98,7 +98,7 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, dataO
 			rdr, err := newMimeTypeReader(arEntry.Data)
 			if err != nil {
 				dataOrErrChan <- DataOrErr{
-					Err: fmt.Errorf("%w: error creating AR mime-type reader: %v", ErrProcessingWarning, err),
+					Err: fmt.Errorf("%w: error creating AR mime-type reader: %w", ErrProcessingWarning, err),
 				}
 				h.metrics.incErrors()
 				continue
