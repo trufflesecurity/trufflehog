@@ -25,7 +25,7 @@ var (
 	// See: https://github.com/trufflesecurity/trufflehog/issues/2942
 	maxDepth   = 5 * 2
 	maxSize    = 2 << 30 // 2 GB
-	maxTimeout = time.Duration(100) * time.Second
+	maxTimeout = time.Duration(60) * time.Second
 )
 
 // SetArchiveMaxSize sets the maximum size of the archive.

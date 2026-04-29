@@ -1269,8 +1269,6 @@ func (e *Engine) processResult(
 		if e.filterTokenize {
 			isTokenizerFp := isTokenizerFalsePositive(ctx, res)
 			secret.IsTokenizerFalsePositive = isTokenizerFp
-		} else {
-			fmt.Println("Filter tokenize is off", e.filterTokenize)
 		}
 	}
 
