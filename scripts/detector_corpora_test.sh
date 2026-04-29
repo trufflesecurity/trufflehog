@@ -6,24 +6,35 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-OUTPUT_JSONL="/tmp/corpora_results.jsonl"
+# CI sets OUTPUT_JSONL to per-run paths and skips the human-readable DuckDB
+# summary. Local invocations leave it unset and get the summary table for
+# debugging.
+if [[ -z "${OUTPUT_JSONL+x}" ]]; then
+    OUTPUT_JSONL="/tmp/corpora_results.jsonl"
+    RUN_DUCKDB_SUMMARY=1
+else
+    RUN_DUCKDB_SUMMARY=0
+fi
 > "$OUTPUT_JSONL"
 
 # Captures trufflehog stderr (incl. --print-avg-detector-time output) for downstream phases.
-STDERR_FILE="/tmp/corpora-stderr.txt"
+STDERR_FILE="${STDERR_FILE:-/tmp/corpora-stderr.txt}"
 > "$STDERR_FILE"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-TRUFFLEHOG_BIN="${REPO_ROOT}/trufflehog"
+TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-${REPO_ROOT}/trufflehog}"
 
-CGO_ENABLED=0 go build -o "$TRUFFLEHOG_BIN" "$REPO_ROOT"
+if [[ ! -x "$TRUFFLEHOG_BIN" ]]; then
+    CGO_ENABLED=0 go build -o "$TRUFFLEHOG_BIN" "$REPO_ROOT"
+fi
 
 scan() {
     local input="$1"
     set +e
     unzstd -c "$input" | jq -r .content | "$TRUFFLEHOG_BIN" \
         --no-update \
+        --no-verification \
         --log-level=3 \
         --concurrency=6 \
         --json \
@@ -40,7 +51,8 @@ for CORPORA_FILE in "$@"; do
     fi
 done
 
-duckdb -c "
+if [[ "$RUN_DUCKDB_SUMMARY" == "1" ]]; then
+    duckdb -c "
 CREATE TABLE t AS FROM read_json_auto('$OUTPUT_JSONL', ignore_errors=true);
 
 SELECT
@@ -54,3 +66,4 @@ GROUP BY all
 ORDER BY total DESC, detector
 LIMIT 50;
 "
+fi
