@@ -88,12 +88,15 @@ func TestScanner_FromData(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: %+v", got[i])
 				}
+				if len(got[i].SecretParts) == 0 {
+					t.Fatalf("no secret parts present: %+v", got[i])
+				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Errorf("verificationError = %v, wantVerificationErr %v",
 						got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError", "primarySecret", "SecretParts")
 			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
 				t.Errorf("FromData() diff (-want +got):\n%s", diff)
 			}

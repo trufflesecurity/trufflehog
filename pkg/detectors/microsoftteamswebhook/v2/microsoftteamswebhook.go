@@ -79,10 +79,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // verifyWebhook sends a POST request to the webhook URL to verify it is active.
 // A 202 response indicates the credential is valid; 400 means the webhook is disabled
 // or deleted; 401 means unauthorized.
-// The payload intentionally omits the "type" field so the Power Automate flow accepts
+// The payload sends an empty text and intentionally omits the "type" field so the Power Automate flow accepts
 // the request (returning 202) but does not deliver any message to the Teams channel.
 func verifyWebhook(ctx context.Context, client *http.Client, webhookURL string) (bool, error) {
-	payload := strings.NewReader(`{"text":"hi from trufflehog"}`)
+	payload := strings.NewReader(`{"text":""}`)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, payload)
 	if err != nil {
 		return false, fmt.Errorf("failed to create request: %w", err)
