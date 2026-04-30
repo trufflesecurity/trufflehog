@@ -82,6 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				if verify {
 					verified, verificationErr := VerifyAdminToken(ctx, s.getClient(), host, apiKey, apiSecret)
+					// we will try auth api verification if admin api verification fails without error,
+					// which is in the case of it returning 401 unauthorized due to invalid credentials.
 					if !verified && verificationErr == nil {
 						verified, verificationErr = VerifyAuthToken(ctx, s.getClient(), host, apiKey, apiSecret)
 						s1.ExtraData["application"] = "Auth API"
@@ -187,7 +189,7 @@ func verifyDuoRequest(
 	case http.StatusUnauthorized:
 		return false, nil
 	case http.StatusForbidden: // Auth API returns 403 if credentials are admin keys be it active or inactive
-		return false, nil
+		return true, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP status %d", res.StatusCode)
 	}

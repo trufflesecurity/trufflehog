@@ -21,7 +21,7 @@ func TestDuo_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors-duo")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -181,7 +181,7 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors-duo")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -189,6 +189,7 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 	// Auth API credentials
 	host := testSecrets.MustGetField("DUO_APIHOST")
 	inactiveSKey := "CWZZCIOF2aEHdx2PfexiNC3Bedai2axLMC3C2IFe"
+	inactiveIKey := "DIBJ9FGFZDD8BQKF6PN1"
 
 	// Admin API credentials
 	adminIKey := testSecrets.MustGetField("DUO_ADMIN_IKEY")
@@ -240,7 +241,7 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 				data: fmt.Appendf(
 					[]byte{},
 					"Using DUO_APIHOST=%s DUO_IKEY=%s DUO_SKEY=%s",
-					host, adminIKey, inactiveSKey,
+					host, inactiveIKey, inactiveSKey,
 				),
 				verify: true,
 			},
@@ -248,10 +249,10 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Duo,
 					Verified:     false,
-					Raw:          []byte(adminIKey),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, adminIKey, inactiveSKey)),
+					Raw:          []byte(inactiveIKey),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, inactiveIKey, inactiveSKey)),
 					ExtraData: map[string]string{
-						"application": "Auth API", // Admin API credentials can sometimes be valid for Auth API, so we check Auth API if Admin API verification fails
+						"application": "Auth API",
 					},
 				},
 			},
