@@ -8,10 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
@@ -26,7 +25,7 @@ func probeSymlinkSupport(t *testing.T, baseDir string) {
 }
 
 func TestScanDir_VisitedPath_PreventInfiniteRecursion(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
 	if err != nil {
@@ -78,7 +77,7 @@ func TestScanDir_VisitedPath_PreventInfiniteRecursion(t *testing.T) {
 }
 
 func TestChunks_DirectorySymlinkLoop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
 	if err != nil {
@@ -122,7 +121,7 @@ func TestChunks_DirectorySymlinkLoop(t *testing.T) {
 }
 
 func TestChunkUnit_DirectorySymlinkLoop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
 	if err != nil {
@@ -164,7 +163,7 @@ func TestChunkUnit_DirectorySymlinkLoop(t *testing.T) {
 }
 
 func TestChunks_FileSymlinkLoop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
 	if err != nil {
@@ -210,7 +209,7 @@ func TestChunks_FileSymlinkLoop(t *testing.T) {
 }
 
 func TestChunkUnit_FileSymlinkLoop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	baseDir, cleanup, err := createTempDir("")
@@ -253,7 +252,7 @@ func TestChunkUnit_FileSymlinkLoop(t *testing.T) {
 }
 
 func TestChunks_ValidDirectorySymlink(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	// Create a temporary base directory
@@ -314,7 +313,7 @@ func TestChunks_ValidDirectorySymlink(t *testing.T) {
 }
 
 func TestChunkUnit_ValidDirectorySymlink(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	// Create a temporary base directory
@@ -362,7 +361,7 @@ func TestChunkUnit_ValidDirectorySymlink(t *testing.T) {
 }
 
 func TestChunks_ValidFileSymlink(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	// Create a temporary base directory
@@ -427,7 +426,7 @@ func TestChunks_ValidFileSymlink(t *testing.T) {
 }
 
 func TestChunkUnit_ValidFileSymlink(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	// Create a temporary base directory
@@ -471,7 +470,7 @@ func TestChunkUnit_ValidFileSymlink(t *testing.T) {
 }
 
 func TestScanSymlink_NoError(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
 	if err != nil {
@@ -506,10 +505,8 @@ func TestScanSymlink_NoError(t *testing.T) {
 	}
 	chunks := make(chan *sources.Chunk, 10)
 	go func() {
-		workerPool := new(errgroup.Group)
-		workerPool.SetLimit(src.concurrency)
-		err := src.scanSymlink(ctx, filepath.Join(baseDir, "A"), chunks, workerPool, 1, filepath.Join(baseDir, "A"))
-		_ = workerPool.Wait()
+		path := filepath.Join(baseDir, "A")
+		err := src.scanSymlink(ctx, chunks, path, 0, path)
 		require.NoError(t, err)
 		close(chunks)
 	}()
@@ -521,7 +518,7 @@ func TestScanSymlink_NoError(t *testing.T) {
 }
 
 func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), time.Second*3)
 	defer cancel()
 	baseDir, cleanup, err := createTempDir("")
 	if err != nil {
@@ -555,25 +552,17 @@ func TestScanSymlink_MaxDepthExceeded(t *testing.T) {
 		maxSymlinkDepth: 2,
 	}
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
 
-	err = src.scanSymlink(
-		ctx,
-		filepath.Join(baseDir, "A"),
-		chunks,
-		workerPool,
-		1,
-		filepath.Join(baseDir, "A"),
-	)
-	_ = workerPool.Wait()
+	path := filepath.Join(baseDir, "A")
+	err = src.scanSymlink(ctx, chunks, path, 0, path)
 	close(chunks)
+
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")
 }
 
 func TestScanSymlink_FileTarget(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	baseDir, cleanup, err := createTempDir("")
@@ -597,18 +586,8 @@ func TestScanSymlink_FileTarget(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
 
-	err = src.scanSymlink(
-		ctx,
-		symlinkPath,
-		chunks,
-		workerPool,
-		1,
-		symlinkPath,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, chunks, symlinkPath, 0, symlinkPath)
 	require.NoError(t, err)
 	close(chunks)
 	var chunkCount int
@@ -621,7 +600,7 @@ func TestScanSymlink_FileTarget(t *testing.T) {
 }
 
 func TestScanSymlink_SelfLoop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	baseDir, cleanup, err := createTempDir("")
@@ -639,25 +618,15 @@ func TestScanSymlink_SelfLoop(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
 
-	err = src.scanSymlink(
-		ctx,
-		symlinkPath,
-		chunks,
-		workerPool,
-		1,
-		symlinkPath,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, chunks, symlinkPath, 0, symlinkPath)
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")
 }
 
 func TestScanSymlink_BrokenSymlink(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	baseDir, cleanup, err := createTempDir("")
@@ -675,25 +644,15 @@ func TestScanSymlink_BrokenSymlink(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
 
-	err = src.scanSymlink(
-		ctx,
-		symlinkPath,
-		chunks,
-		workerPool,
-		0,
-		symlinkPath,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, chunks, symlinkPath, 0, symlinkPath)
 	close(chunks)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "lstat error")
 }
 
 func TestScanSymlink_TwoFileLoop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := trContext.WithTimeout(trContext.Background(), 3*time.Second)
 	defer cancel()
 
 	baseDir, cleanup, err := createTempDir("")
@@ -714,18 +673,8 @@ func TestScanSymlink_TwoFileLoop(t *testing.T) {
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
-	workerPool := new(errgroup.Group)
-	workerPool.SetLimit(src.concurrency)
 
-	err = src.scanSymlink(
-		ctx,
-		fileA,
-		chunks,
-		workerPool,
-		0,
-		fileA,
-	)
-	_ = workerPool.Wait()
+	err = src.scanSymlink(ctx, chunks, fileA, 0, fileA)
 	close(chunks)
 	require.Error(t, err)
 	require.EqualError(t, err, "max symlink depth reached")

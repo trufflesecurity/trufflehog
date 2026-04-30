@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -30,8 +33,8 @@ type Detector interface {
 	// That is, if any of the keywords are found in a chunk, the chunk will be run through the detector.
 	Keywords() []string
 
-	// Type returns the DetectorType number from detectors.proto for the given detector.
-	Type() detectorspb.DetectorType
+	// Type returns the DetectorType number from detector_type.proto for the given detector.
+	Type() detector_typepb.DetectorType
 
 	// Description returns a description for the result being detected
 	Description() string
@@ -95,7 +98,7 @@ type CloudProvider interface {
 
 type Result struct {
 	// DetectorType is the type of Detector.
-	DetectorType detectorspb.DetectorType
+	DetectorType detector_typepb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
 	// Verified indicates whether the result was verified or not.
@@ -118,10 +121,11 @@ type Result struct {
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
 
-	// AnalysisInfo should be set with information required for credential
-	// analysis to run. The keys of the map are analyzer specific and
-	// should match what is expected in the corresponding analyzer.
-	AnalysisInfo map[string]string
+	// SecretParts holds the individual components of a (potentially multi-part)
+	// credential, keyed by a component name. It is used by analyzers where
+	// the keys are analyzer specific and should match what the
+	// corresponding analyzer expects.
+	SecretParts map[string]string
 
 	// primarySecret is used when a detector has multiple secret patterns.
 	// This secret is designated to determine the line number.
@@ -217,10 +221,19 @@ type ResultWithMetadata struct {
 	DetectorDescription string
 	// DecoderType is the type of decoder that was used to generate this result's data.
 	DecoderType detectorspb.DecoderType
+	// ChunkData holds the original pre-decode source chunk data, preserved
+	// for secret storage encryption in the dispatcher.
+	ChunkData []byte
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
 func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
+	// OriginalData may be nil when CopyMetadata is called outside the engine
+	// pipeline (e.g., in tests or external consumers that construct chunks directly).
+	chunkData := chunk.OriginalData
+	if chunkData == nil {
+		chunkData = chunk.Data
+	}
 	return ResultWithMetadata{
 		SourceMetadata: chunk.SourceMetadata,
 		SourceID:       chunk.SourceID,
@@ -229,6 +242,7 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
 		Result:         result,
+		ChunkData:      chunkData,
 	}
 }
 
@@ -322,4 +336,21 @@ func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
 	parsedURL.Path = ""
 	parsedURL.RawQuery = ""
 	return parsedURL, nil
+}
+
+type dedupKeyContextKey struct{}
+
+func withDedupKey(ctx context.Context, detType detector_typepb.DetectorType, credential string) context.Context {
+	key := fmt.Sprintf("%d:%s", int32(detType), credential)
+	return context.WithValue(ctx, dedupKeyContextKey{}, key)
+}
+
+// DoWithDedup executes req through client, coalescing concurrent requests that share
+// the same detector type and credential into a single network call via singleflight.
+// The response body is fully buffered and replayed to every waiting caller.
+//
+// Use this instead of client.Do for all verification requests on a client created
+// with NewClientWithDedup or WithDedup — it is the only way to activate deduplication.
+func DoWithDedup(client *http.Client, detType detector_typepb.DetectorType, credential string, req *http.Request) (*http.Response, error) {
+	return client.Do(req.WithContext(withDedupKey(req.Context(), detType, credential)))
 }

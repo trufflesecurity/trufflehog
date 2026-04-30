@@ -12,7 +12,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestLarksuiteApiKey_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestLarksuiteApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LarkSuiteApiKey,
+					DetectorType: detector_typepb.DetectorType_LarkSuiteApiKey,
 					Verified:     true,
 					Raw:          []byte(id),
 					RawV2:        []byte(id + secret),
@@ -66,7 +66,7 @@ func TestLarksuiteApiKey_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_LarkSuiteApiKey,
+					DetectorType: detector_typepb.DetectorType_LarkSuiteApiKey,
 					Verified:     false,
 					Raw:          []byte(id),
 					RawV2:        []byte(id + inactiveSecret),

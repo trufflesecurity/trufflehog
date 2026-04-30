@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -41,8 +41,8 @@ func (s Scanner) Keywords() []string {
 	return []string{".azurecr.io"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureContainerRegistry
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureContainerRegistry
 }
 
 func (s Scanner) Description() string {
@@ -77,10 +77,14 @@ EndpointLoop:
 	for username := range registryMatches {
 		for password := range passwordMatches {
 			r := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureContainerRegistry,
+				DetectorType: detector_typepb.DetectorType_AzureContainerRegistry,
 				Raw:          []byte(password),
-				RawV2:        []byte(`{"username":"` + username + `","password":"` + password + `"}`),
-				Redacted:     username,
+				SecretParts: map[string]string{
+					"username": username,
+					"password": password,
+				},
+				RawV2:    []byte(`{"username":"` + username + `","password":"` + password + `"}`),
+				Redacted: username,
 			}
 
 			if verify {

@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -58,9 +58,13 @@ EndpointLoop:
 	for baseUrl := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureAPIManagementSubscriptionKey,
+				DetectorType: detector_typepb.DetectorType_AzureAPIManagementSubscriptionKey,
 				Raw:          []byte(baseUrl),
-				RawV2:        []byte(baseUrl + ":" + key),
+				SecretParts: map[string]string{
+					"url": baseUrl,
+					"key": key,
+				},
+				RawV2: []byte(baseUrl + ":" + key),
 			}
 
 			if verify {
@@ -92,8 +96,8 @@ EndpointLoop:
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureAPIManagementSubscriptionKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureAPIManagementSubscriptionKey
 }
 
 func (s Scanner) Description() string {

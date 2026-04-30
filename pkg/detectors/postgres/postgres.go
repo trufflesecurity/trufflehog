@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const (
@@ -136,7 +136,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		raw := []byte(fmt.Sprintf("%s://%s:%s@%s:%s", dbType, user, password, host, port))
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Postgres,
+			DetectorType: detector_typepb.DetectorType_Postgres,
 			Raw:          raw,
 			RawV2:        raw,
 		}
@@ -164,7 +164,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
-			result.AnalysisInfo = map[string]string{
+			result.SecretParts = map[string]string{
 				"connection_string": string(raw),
 			}
 		}
@@ -302,8 +302,8 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Postgres
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Postgres
 }
 
 func (s Scanner) Description() string {

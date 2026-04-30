@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGoogleoauth2_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestGoogleoauth2_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleOauth2,
+					DetectorType: detector_typepb.DetectorType_GoogleOauth2,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestGoogleoauth2_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleOauth2,
+					DetectorType: detector_typepb.DetectorType_GoogleOauth2,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,7 @@ func TestGoogleoauth2_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleOauth2,
+					DetectorType: detector_typepb.DetectorType_GoogleOauth2,
 					Verified:     false,
 				},
 			},
@@ -113,7 +113,7 @@ func TestGoogleoauth2_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_GoogleOauth2,
+					DetectorType: detector_typepb.DetectorType_GoogleOauth2,
 					Verified:     false,
 				},
 			},
