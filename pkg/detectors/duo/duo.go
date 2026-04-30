@@ -79,6 +79,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					ExtraData: map[string]string{
 						"application": "Admin API",
 					},
+					SecretParts: map[string]string{
+						"host":        host,
+						"ikey":        apiKey,
+						"skey":        apiSecret,
+						"application": "Admin API",
+					},
 				}
 				if verify {
 					verified, verificationErr := VerifyAdminToken(ctx, s.getClient(), host, apiKey, apiSecret)
@@ -87,6 +93,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if !verified && verificationErr == nil {
 						verified, verificationErr = VerifyAuthToken(ctx, s.getClient(), host, apiKey, apiSecret)
 						s1.ExtraData["application"] = "Auth API"
+						s1.SecretParts["application"] = "Auth API"
 					}
 					s1.SetVerificationError(verificationErr, host, apiKey, apiSecret)
 					s1.Verified = verified
