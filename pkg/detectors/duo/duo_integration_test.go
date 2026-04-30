@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDuo_FromChunk(t *testing.T) {
@@ -59,7 +59,7 @@ func TestDuo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Duo,
+					DetectorType: detector_typepb.DetectorType_Duo,
 					Verified:     true,
 					Raw:          []byte(ikey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, ikey, skey)),
@@ -80,7 +80,7 @@ func TestDuo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Duo,
+					DetectorType: detector_typepb.DetectorType_Duo,
 					Verified:     false,
 					Raw:          []byte(ikey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, ikey, skey)),
@@ -102,7 +102,7 @@ func TestDuo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Duo,
+					DetectorType: detector_typepb.DetectorType_Duo,
 					Verified:     false,
 					Raw:          []byte(ikey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, ikey, skey)),
@@ -124,7 +124,7 @@ func TestDuo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Duo,
+					DetectorType: detector_typepb.DetectorType_Duo,
 					Verified:     false,
 					Raw:          []byte(ikey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, ikey, inactiveSKey)),
@@ -223,7 +223,7 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Duo,
+					DetectorType: detector_typepb.DetectorType_Duo,
 					Verified:     true,
 					Raw:          []byte(adminIKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, adminIKey, adminSKey)),
@@ -247,7 +247,7 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Duo,
+					DetectorType: detector_typepb.DetectorType_Duo,
 					Verified:     false,
 					Raw:          []byte(inactiveIKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, inactiveIKey, inactiveSKey)),
