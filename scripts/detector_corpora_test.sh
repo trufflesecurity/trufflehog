@@ -68,9 +68,13 @@ scan() {
     if [[ -n "$CORPUS_BYTES_FILE" ]]; then
         bytes_tmp=$(mktemp)
     fi
+    # jq stderr is folded into STDERR_FILE so benign "Broken pipe" notices
+    # (trufflehog exits before jq finishes draining the corpus) don't pollute
+    # CI logs. Real jq parse errors land in the same file for postmortem.
     set +e
     if [[ -n "$bytes_tmp" ]]; then
-        unzstd -c "$input" | jq -r .content \
+        unzstd -c "$input" 2>> "$STDERR_FILE" \
+            | jq -r .content 2>> "$STDERR_FILE" \
             | awk -v BF="$bytes_tmp" '{ b += length($0) + 1; print } END { printf "%d", b > BF; close(BF) }' \
             | "$TRUFFLEHOG_BIN" \
                 --no-update \
@@ -83,20 +87,28 @@ scan() {
                 "${INCLUDE_FLAG[@]}" \
                 stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
     else
-        unzstd -c "$input" | jq -r .content | "$TRUFFLEHOG_BIN" \
-            --no-update \
-            --no-verification \
-            --allow-verification-overlap \
-            --log-level=3 \
-            --concurrency=6 \
-            --json \
-            --print-avg-detector-time \
-            "${INCLUDE_FLAG[@]}" \
-            stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+        unzstd -c "$input" 2>> "$STDERR_FILE" \
+            | jq -r .content 2>> "$STDERR_FILE" \
+            | "$TRUFFLEHOG_BIN" \
+                --no-update \
+                --no-verification \
+                --allow-verification-overlap \
+                --log-level=3 \
+                --concurrency=6 \
+                --json \
+                --print-avg-detector-time \
+                "${INCLUDE_FLAG[@]}" \
+                stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
     fi
     set -e
+    # awk's END block may not run if trufflehog exits before draining stdin
+    # (SIGPIPE kills awk first), leaving bytes_tmp empty. Default to 0 and
+    # require a clean integer before arithmetic so a partial read can't
+    # break the step with `$((TOTAL_BYTES + ))`.
     if [[ -n "$bytes_tmp" ]]; then
-        TOTAL_BYTES=$((TOTAL_BYTES + $(cat "$bytes_tmp")))
+        bytes=$(cat "$bytes_tmp" 2>/dev/null || echo 0)
+        [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+        TOTAL_BYTES=$((TOTAL_BYTES + bytes))
         rm -f "$bytes_tmp"
     fi
 }
