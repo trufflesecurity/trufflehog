@@ -171,9 +171,6 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	case StatusContains(resp.StatusCode, h.InvalidStatuses):
 		return false, nil
 	default:
-		fmt.Println(h)
-		fmt.Println(resp.Body)
-		fmt.Println(resp.StatusCode)
 		return false, errors.New("error checking response status code")
 	}
 }
@@ -333,8 +330,7 @@ func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCate
 				testCount++
 				status, err := test.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key})
 				if err != nil {
-					color.Red("[x] Error running test: %s", err.Error())
-					return nil, err
+					continue
 				}
 				if status {
 					value = typ
