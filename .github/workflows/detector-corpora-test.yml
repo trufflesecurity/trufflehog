@@ -216,10 +216,20 @@ jobs:
       # Render the per-(detector × decoder) Δ heatmap. Decoder columns are
       # the only stable per-finding signal post-stdin (file metadata is lost
       # — see render_heatmap.py docstring), and they're real diagnostic
-      # signal: regressions in the BASE64 path mean something different from
-      # regressions in PLAIN. The script silently no-ops (no PNG written)
-      # when the grid would be empty or all-zero, so the diff step's
-      # `[[ -s ... ]]` guard handles "nothing to embed" cleanly.
+      # signal: regressions in the BASE64 path mean something different
+      # from regressions in PLAIN. Two outputs:
+      #
+      #   - heatmap-grid.json: the actual data the comment renders from
+      #     (via diff_corpora_results.py's emoji table). The comment never
+      #     embeds the PNG — GitHub's PR-comment Markdown sanitizer strips
+      #     ``data:`` URLs and serves artifact zips behind auth, so neither
+      #     inline nor artifact-link images render.
+      #   - heatmap.png: archived as a workflow artifact for reviewers
+      #     who want the colored matplotlib version. The comment includes
+      #     a click-through link to it.
+      #
+      # Both outputs are skipped when the grid would be empty/all-zero;
+      # the diff step's `[[ -s ... ]]` guards handle that cleanly.
       - name: Render heatmap
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
@@ -230,18 +240,17 @@ jobs:
           python3 scripts/render_heatmap.py \
             /tmp/results-main.jsonl /tmp/results-pr.jsonl \
             --changed-detectors="$CHANGED" \
-            --output=/tmp/heatmap.png || true
-          if [[ -s /tmp/heatmap.png ]]; then
-            ls -lh /tmp/heatmap.png
+            --output=/tmp/heatmap.png \
+            --grid-output=/tmp/heatmap-grid.json || true
+          if [[ -s /tmp/heatmap-grid.json ]]; then
+            ls -lh /tmp/heatmap-grid.json /tmp/heatmap.png 2>/dev/null || true
           else
             echo "No heatmap produced (empty grid or no diff)."
           fi
 
-      # Archive the heatmap regardless of whether it inlines into the
-      # comment — storage is cheap, comments can be pruned. Capturing
-      # artifact-url lets the diff step fall back to a clickable link if
-      # the inline base64 would push the comment past GitHub's 65 KB body
-      # cap.
+      # Archive the colored PNG so reviewers who want the rich version can
+      # click through. The comment never embeds the image — see the render
+      # step comment for why — so this is artifact-only.
       - name: Upload heatmap artifact
         id: upload_heatmap
         if: steps.detect.outputs.any_changed == 'true'
@@ -270,8 +279,8 @@ jobs:
             META_ARG=(--keyword-corpus-meta=/tmp/keyword-corpus-meta.json)
           fi
           HEATMAP_ARG=()
-          if [[ -s /tmp/heatmap.png ]]; then
-            HEATMAP_ARG=(--heatmap-png=/tmp/heatmap.png)
+          if [[ -s /tmp/heatmap-grid.json ]]; then
+            HEATMAP_ARG=(--heatmap-grid=/tmp/heatmap-grid.json)
             if [[ -n "$HEATMAP_ARTIFACT_URL" ]]; then
               HEATMAP_ARG+=(--heatmap-artifact-url="$HEATMAP_ARTIFACT_URL")
             fi
@@ -284,12 +293,7 @@ jobs:
             "${META_ARG[@]}" \
             "${HEATMAP_ARG[@]}" \
             > /tmp/diff-report.md
-          # Skip dumping report to logs when the heatmap is inlined — a
-          # 60+ KB base64 blob makes CI logs unreadable. Print size + the
-          # non-image lines instead.
-          REPORT_BYTES=$(wc -c < /tmp/diff-report.md)
-          echo "diff-report.md: ${REPORT_BYTES} bytes"
-          grep -v '^!\[.*data:image' /tmp/diff-report.md || true
+          cat /tmp/diff-report.md
 
       - name: Post results to PR
         if: steps.detect.outputs.any_changed == 'true'

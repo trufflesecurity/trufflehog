@@ -24,12 +24,15 @@ rendered above the per-detector details — they're flagged so reviewers
 know the bench's verdict for those detectors leans entirely on the S3
 corpus and may be under-sampled.
 
-Phase 4: --heatmap-png and --heatmap-artifact-url embed the heatmap
-rendered by scripts/render_heatmap.py at the top of the report. We try
-inline base64 first (no auth, renders everywhere GitHub Markdown does);
-if the encoded image would push the comment near GitHub's 65 KB body
-limit, we fall back to a clickable artifact link instead. Missing PNG
-or zero-length file → no heatmap section, no error.
+Phase 4: --heatmap-grid points at the JSON sidecar emitted by
+scripts/render_heatmap.py — same Δ matrix as the PNG render. We turn that
+into an emoji-bucketed Markdown table at the top of the report so reviewers
+can see the per-(detector, decoder) breakdown at a glance. Inline image
+embedding was tried and abandoned: GitHub strips ``data:`` URLs from PR
+comments, and artifact-zip URLs are auth-gated rather than served as
+images. The PNG still ships as a workflow artifact — when
+--heatmap-artifact-url is supplied we link to it under the table for
+reviewers who want the colored version.
 
 Usage:
     diff_corpora_results.py <main.jsonl> <pr.jsonl>
@@ -37,11 +40,10 @@ Usage:
         [--new-detectors=<csv>]
         [--corpus-bytes=<n>]
         [--keyword-corpus-meta=<path>]
-        [--heatmap-png=<path>]
+        [--heatmap-grid=<path>]
         [--heatmap-artifact-url=<url>]
 """
 import argparse
-import base64
 import json
 import os
 import sys
@@ -62,11 +64,14 @@ BLAST_RADIUS_BYTES = 10 * 1024 * 1024 * 1024
 SAMPLE_LIMIT = 10
 SAMPLE_TRUNCATE = 120
 
-# GitHub issue/PR comment bodies are capped at 65536 chars. The summary table
-# plus per-detector details routinely consume 5-15 KB; budgeting ~50 KB for the
-# inline PNG keeps comfortable headroom while still permitting most heatmaps
-# to embed directly. Larger images fall back to the artifact-URL link.
-HEATMAP_INLINE_LIMIT_BYTES = 50 * 1024
+# Heatmap cell color buckets, applied to per-(detector, decoder) Δ unique
+# findings. Thresholds line up with status_emoji's NEW threshold (>5 trips
+# 🔴) so a 🟥 cell carries the same "this is real" weight as a 🔴 row in the
+# summary table. 🟦 covers any decrease — recall regressions are rarer than
+# FP regressions, and we haven't seen real data justifying a removal
+# gradient yet.
+HEATMAP_BUCKET_HOT = 6  # Δ ≥ this → 🟥
+HEATMAP_BUCKET_WARM = 1  # +1..+5 → 🟧
 
 
 def parse_csv(s):
@@ -165,56 +170,98 @@ def load_keyword_corpus_meta(path):
     return {"thin_l1": thin, "reports": raw.get("reports") or []}
 
 
-def build_heatmap_section(png_path, artifact_url):
-    """Return the Markdown lines that embed the heatmap, or [] if there's
-    nothing to embed.
+def heatmap_cell(delta):
+    """Render one (emoji, signed-int) cell for the heatmap table."""
+    if delta >= HEATMAP_BUCKET_HOT:
+        emoji = "🟥"
+    elif delta >= HEATMAP_BUCKET_WARM:
+        emoji = "🟧"
+    elif delta == 0:
+        emoji = "⬜"
+    else:
+        emoji = "🟦"
+    sign = "+" if delta > 0 else ""  # Negative numbers carry their own minus.
+    return f"{emoji} {sign}{delta}"
 
-    Strategy:
-      1. If the PNG file is missing/empty, nothing to do.
-      2. Try inline base64 if the encoded body fits the inline budget.
-         Inline survives comment pruning of artifacts and renders without
-         GitHub auth on mobile/desktop alike.
-      3. Otherwise fall back to a plain Markdown link to the workflow
-         artifact URL with a one-line explainer. Artifact URLs require
-         GitHub login, so no embedded ``![](...)`` — that would render as
-         a broken image.
+
+def load_heatmap_grid(path):
+    """Read the grid sidecar from render_heatmap.py.
+
+    Returns ``None`` for any failure mode (missing file, malformed JSON,
+    schema mismatch). The heatmap is informational; if the grid isn't
+    readable the diff still posts without it.
     """
-    if not png_path or not os.path.isfile(png_path):
-        return []
+    if not path or not os.path.isfile(path):
+        return None
     try:
-        size = os.path.getsize(png_path)
-    except OSError:
-        return []
-    if size <= 0:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    detectors = data.get("detectors") or []
+    decoders = data.get("decoders") or []
+    deltas = data.get("deltas") or []
+    if not detectors or not decoders or not deltas:
+        return None
+    if len(deltas) != len(detectors):
+        return None
+    if any(len(row) != len(decoders) for row in deltas):
+        return None
+    return {"detectors": detectors, "decoders": decoders, "deltas": deltas}
+
+
+def build_heatmap_section(grid_path, artifact_url):
+    """Return the Markdown lines for the per-(detector, decoder) Δ heatmap.
+
+    Renders an emoji-bucketed table from the JSON grid emitted by
+    render_heatmap.py rather than an inline image, because GitHub's
+    PR-comment sanitizer strips ``data:`` URLs and artifact-zip URLs are
+    auth-gated. The table renders identically on web, mobile, email
+    notifications, and CI log replay — all surfaces a PR comment lands on.
+
+    The colored PNG is still produced as a workflow artifact; when
+    ``artifact_url`` is supplied we tack a click-through link onto the
+    table for reviewers who want the rich version.
+
+    Returns ``[]`` if no grid is available — the rest of the report
+    renders unchanged.
+    """
+    grid = load_heatmap_grid(grid_path)
+    if grid is None:
         return []
 
-    if size <= HEATMAP_INLINE_LIMIT_BYTES:
-        try:
-            with open(png_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("ascii")
-        except OSError:
-            return []
-        return [
-            "### Δ heatmap (changed detectors × decoder)",
-            "",
-            f"![PR vs main — Δ unique findings per (detector, decoder)]"
-            f"(data:image/png;base64,{encoded})",
-            "",
-        ]
+    detectors = grid["detectors"]
+    decoders = grid["decoders"]
+    deltas = grid["deltas"]
+
+    lines = [
+        "### Δ heatmap (changed detectors × decoder)",
+        "",
+        "_Per-cell Δ = unique findings (PR − main). 🟥 ≥+6, 🟧 +1..+5, "
+        "⬜ 0, 🟦 ≤−1._",
+        "",
+    ]
+
+    header = ["Detector"] + decoders
+    align = ["---"] + ["---:" for _ in decoders]
+    lines.append("| " + " | ".join(header) + " |")
+    lines.append("|" + "|".join(align) + "|")
+    for i, det in enumerate(detectors):
+        row = [f"**{det}**"] + [heatmap_cell(deltas[i][j])
+                                for j in range(len(decoders))]
+        lines.append("| " + " | ".join(row) + " |")
+    lines.append("")
 
     if artifact_url:
-        return [
-            "### Δ heatmap (changed detectors × decoder)",
-            "",
-            f"_Heatmap PNG too large to inline ({size // 1024} KB); "
-            f"[download from workflow artifacts]({artifact_url})._",
-            "",
-        ]
-    return []
+        lines.append(
+            f"_Colored PNG version: [download from workflow artifacts]({artifact_url})._"
+        )
+        lines.append("")
+    return lines
 
 
 def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
-           keyword_meta=None, heatmap_png=None, heatmap_artifact_url=None):
+           keyword_meta=None, heatmap_grid=None, heatmap_artifact_url=None):
     new_detectors = new_detectors or set()
     keyword_meta = keyword_meta or {"thin_l1": set(), "reports": []}
 
@@ -275,7 +322,7 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
         )
         parts.append("")
 
-    parts += build_heatmap_section(heatmap_png, heatmap_artifact_url)
+    parts += build_heatmap_section(heatmap_grid, heatmap_artifact_url)
 
     if not rows and not missing:
         parts += ["_(No findings on either side for the changed detectors.)_", ""]
@@ -421,11 +468,12 @@ def main():
                         help="Total uncompressed bytes scanned; enables blast-radius column.")
     parser.add_argument("--keyword-corpus-meta", default="",
                         help="Path to build_keyword_corpus.py sidecar; surfaces thin-L1 warnings.")
-    parser.add_argument("--heatmap-png", default="",
-                        help="Path to heatmap PNG produced by render_heatmap.py.")
+    parser.add_argument("--heatmap-grid", default="",
+                        help="Path to grid JSON produced by render_heatmap.py; "
+                             "drives the emoji-bucketed Δ table.")
     parser.add_argument("--heatmap-artifact-url", default="",
-                        help="Workflow artifact URL for the heatmap; used as fallback link "
-                             "when the PNG exceeds the inline budget.")
+                        help="Workflow artifact URL for the colored PNG; "
+                             "rendered as a click-through link below the table.")
     args = parser.parse_args()
 
     main_findings = load_findings(args.main_jsonl)
@@ -442,7 +490,7 @@ def main():
         new_detectors=new_detectors,
         corpus_bytes=corpus_bytes,
         keyword_meta=keyword_meta,
-        heatmap_png=args.heatmap_png or None,
+        heatmap_grid=args.heatmap_grid or None,
         heatmap_artifact_url=args.heatmap_artifact_url or None,
     ))
 
