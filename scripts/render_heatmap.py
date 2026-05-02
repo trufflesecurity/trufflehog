@@ -44,12 +44,28 @@ Identity bucketing:
   That's the desired behavior — the heatmap diagnoses *which decoder path
   changed*, not *how many distinct secrets changed overall*.
 
-Skips rendering and exits with code 0 (no file written) when the grid would
-be all-zero or empty. The diff script handles a missing file gracefully.
+Outputs:
+
+  - PNG (``--output``, default /tmp/heatmap.png): the matplotlib render.
+    Archived as a workflow artifact for reviewers who want the colored
+    version; not embedded inline in the comment because GitHub's
+    Markdown sanitizer strips ``data:`` URLs and artifact-zip URLs are
+    auth-gated, neither of which renders as ``<img>`` in PR comments.
+
+  - Grid JSON (``--grid-output``, default /tmp/heatmap-grid.json): same
+    Δ matrix as the PNG. The diff script reads this and renders an
+    emoji-bucketed Markdown table — that's what actually shows up in the
+    PR comment. Always emitted when a non-empty grid exists, even if
+    matplotlib isn't available, so the comment renders without the PNG
+    if needed.
+
+Skips both outputs (no files written) when the grid would be all-zero or
+empty. The diff script handles missing files gracefully.
 
 Usage:
     render_heatmap.py <main.jsonl> <pr.jsonl> --changed-detectors=<csv>
         [--output=/tmp/heatmap.png]
+        [--grid-output=/tmp/heatmap-grid.json]
 """
 from __future__ import annotations
 
@@ -227,6 +243,38 @@ def render(detectors, decoders, deltas, output_path):
     plt.close(fig)
 
 
+def write_grid_json(path, detectors, decoders, deltas):
+    """Persist the grid the diff script renders the emoji table from.
+
+    The ``_layout`` field is a human-readable note for future readers — it
+    has no behavioral effect. We emit it inline rather than relying solely
+    on this docstring because the JSON is the long-lived contract between
+    the renderer and the diff script.
+    """
+    payload = {
+        "detectors": detectors,
+        "decoders": decoders,
+        "deltas": deltas,
+        "_layout": "deltas[i][j] = (PR - main) unique-finding count for detectors[i] / decoders[j]",
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+        f.write("\n")
+
+
+def try_render_png(detectors, decoders, deltas, output_path):
+    """Attempt to render the PNG; on matplotlib import failure, log and
+    move on. The PNG is artifact-only — the comment doesn't need it — so a
+    missing matplotlib should not fail the workflow."""
+    try:
+        render(detectors, decoders, deltas, output_path)
+    except ImportError as exc:
+        print(f"[render_heatmap] matplotlib unavailable, skipping PNG: {exc}",
+              file=sys.stderr)
+        return False
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("main_jsonl")
@@ -235,6 +283,8 @@ def main():
                         help="CSV of detectors changed in PR; restricts heatmap rows.")
     parser.add_argument("--output", default="/tmp/heatmap.png",
                         help="PNG output path (default /tmp/heatmap.png).")
+    parser.add_argument("--grid-output", default="/tmp/heatmap-grid.json",
+                        help="Grid JSON output path; consumed by diff_corpora_results.py.")
     args = parser.parse_args()
 
     changed = parse_csv(args.changed_detectors)
@@ -252,8 +302,10 @@ def main():
               file=sys.stderr)
         return 0
 
-    render(detectors, decoders, deltas, args.output)
-    print(f"[render_heatmap] wrote {args.output} "
+    write_grid_json(args.grid_output, detectors, decoders, deltas)
+    png_ok = try_render_png(detectors, decoders, deltas, args.output)
+    suffix = f" + {args.output}" if png_ok else " (PNG skipped)"
+    print(f"[render_heatmap] wrote {args.grid_output}{suffix} "
           f"({len(detectors)} rows × {len(decoders)} cols)",
           file=sys.stderr)
     return 0
