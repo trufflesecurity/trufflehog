@@ -57,6 +57,11 @@ PREAMBLE = (
     "separately by detector unit tests."
 )
 
+# Marker on the very first line of the body so peter-evans/find-comment can
+# locate the sticky comment via substring match. Workflow file references the
+# same literal — keep the two in sync.
+STICKY_COMMENT_MARKER = "<!-- detector-bench -->"
+
 # 10 GB notional monorepo for blast-radius projection.
 BLAST_RADIUS_BYTES = 10 * 1024 * 1024 * 1024
 
@@ -125,6 +130,23 @@ def status_emoji(new_count, removed_count, unique_main):
     if new_count > 0:
         return "⚠️"
     return "✅"
+
+
+def build_top_line_summary(rows):
+    """One-line bold verdict rendered above the preamble.
+
+    Three buckets keyed off the locked emoji semantics:
+      - regressed: 🔴 (severe) + ⚠️ (soft warning, NEW > 0 but below the
+        🔴 threshold). ⚠️ folds in here because the bench's whole job is
+        flagging regex behavior changes; a separate "warned" bucket would
+        split the headline and dilute the reviewer signal.
+      - new: 🆕 detectors added by the PR.
+      - unchanged: ✅ no diff vs main.
+    """
+    regressed = sum(1 for r in rows if not r["is_new"] and r["emoji"] in ("🔴", "⚠️"))
+    new_count = sum(1 for r in rows if r["is_new"])
+    unchanged = sum(1 for r in rows if r["emoji"] == "✅")
+    return f"**{regressed} regressed, {new_count} new, {unchanged} unchanged.**"
 
 
 def truncate(s, n=SAMPLE_TRUNCATE):
@@ -314,7 +336,14 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
             "blast": blast,
         })
 
-    parts = ["## Corpora Test Results — Diff (PR vs main)", "", PREAMBLE, ""]
+    parts = [
+        STICKY_COMMENT_MARKER,
+        "## Corpora Test Results — Diff (PR vs main)",
+        "",
+    ]
+    if rows:
+        parts += [build_top_line_summary(rows), ""]
+    parts += [PREAMBLE, ""]
     if changed:
         parts.append(
             f"_Scoped to {len(changed)} detector(s) changed in this PR; "
