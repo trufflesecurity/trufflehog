@@ -12,6 +12,7 @@ on:
       - 'scripts/diff_corpora_results.py'
       - 'scripts/detect_changed_detectors.sh'
       - 'scripts/build_keyword_corpus.py'
+      - 'scripts/render_heatmap.py'
       - 'hack/extract-keywords/**'
 
 env:
@@ -38,6 +39,11 @@ jobs:
 
       - name: Install dependencies
         run: sudo apt-get install -y zstd jq
+
+      # matplotlib drives the Phase 4 heatmap render. Pinned-major install
+      # to keep CI deterministic; ~30s cold install, fine at current scale.
+      - name: Install matplotlib
+        run: pip install --quiet 'matplotlib>=3.7,<4'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -207,12 +213,52 @@ jobs:
           done <<< "$DATASETS"
           ./scripts/detector_corpora_test.sh "${files[@]}"
 
+      # Render the per-(detector × decoder) Δ heatmap. Decoder columns are
+      # the only stable per-finding signal post-stdin (file metadata is lost
+      # — see render_heatmap.py docstring), and they're real diagnostic
+      # signal: regressions in the BASE64 path mean something different from
+      # regressions in PLAIN. The script silently no-ops (no PNG written)
+      # when the grid would be empty or all-zero, so the diff step's
+      # `[[ -s ... ]]` guard handles "nothing to embed" cleanly.
+      - name: Render heatmap
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          CHANGED: ${{ steps.detect.outputs.pr_csv }}
+        run: |
+          set -o pipefail
+          python3 scripts/render_heatmap.py \
+            /tmp/results-main.jsonl /tmp/results-pr.jsonl \
+            --changed-detectors="$CHANGED" \
+            --output=/tmp/heatmap.png || true
+          if [[ -s /tmp/heatmap.png ]]; then
+            ls -lh /tmp/heatmap.png
+          else
+            echo "No heatmap produced (empty grid or no diff)."
+          fi
+
+      # Archive the heatmap regardless of whether it inlines into the
+      # comment — storage is cheap, comments can be pruned. Capturing
+      # artifact-url lets the diff step fall back to a clickable link if
+      # the inline base64 would push the comment past GitHub's 65 KB body
+      # cap.
+      - name: Upload heatmap artifact
+        id: upload_heatmap
+        if: steps.detect.outputs.any_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: detector-bench-heatmap
+          path: /tmp/heatmap.png
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Diff results
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
           CHANGED: ${{ steps.detect.outputs.pr_csv }}
           NEW_DETECTORS: ${{ steps.detect.outputs.new_csv }}
+          HEATMAP_ARTIFACT_URL: ${{ steps.upload_heatmap.outputs.artifact-url }}
         run: |
           set -o pipefail
           CORPUS_BYTES=0
@@ -223,14 +269,27 @@ jobs:
           if [[ -s /tmp/keyword-corpus-meta.json ]]; then
             META_ARG=(--keyword-corpus-meta=/tmp/keyword-corpus-meta.json)
           fi
+          HEATMAP_ARG=()
+          if [[ -s /tmp/heatmap.png ]]; then
+            HEATMAP_ARG=(--heatmap-png=/tmp/heatmap.png)
+            if [[ -n "$HEATMAP_ARTIFACT_URL" ]]; then
+              HEATMAP_ARG+=(--heatmap-artifact-url="$HEATMAP_ARTIFACT_URL")
+            fi
+          fi
           python3 scripts/diff_corpora_results.py \
             /tmp/results-main.jsonl /tmp/results-pr.jsonl \
             --changed-detectors="$CHANGED" \
             --new-detectors="$NEW_DETECTORS" \
             --corpus-bytes="$CORPUS_BYTES" \
             "${META_ARG[@]}" \
+            "${HEATMAP_ARG[@]}" \
             > /tmp/diff-report.md
-          cat /tmp/diff-report.md
+          # Skip dumping report to logs when the heatmap is inlined — a
+          # 60+ KB base64 blob makes CI logs unreadable. Print size + the
+          # non-image lines instead.
+          REPORT_BYTES=$(wc -c < /tmp/diff-report.md)
+          echo "diff-report.md: ${REPORT_BYTES} bytes"
+          grep -v '^!\[.*data:image' /tmp/diff-report.md || true
 
       - name: Post results to PR
         if: steps.detect.outputs.any_changed == 'true'

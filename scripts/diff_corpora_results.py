@@ -24,15 +24,26 @@ rendered above the per-detector details — they're flagged so reviewers
 know the bench's verdict for those detectors leans entirely on the S3
 corpus and may be under-sampled.
 
+Phase 4: --heatmap-png and --heatmap-artifact-url embed the heatmap
+rendered by scripts/render_heatmap.py at the top of the report. We try
+inline base64 first (no auth, renders everywhere GitHub Markdown does);
+if the encoded image would push the comment near GitHub's 65 KB body
+limit, we fall back to a clickable artifact link instead. Missing PNG
+or zero-length file → no heatmap section, no error.
+
 Usage:
     diff_corpora_results.py <main.jsonl> <pr.jsonl>
         [--changed-detectors=<csv>]
         [--new-detectors=<csv>]
         [--corpus-bytes=<n>]
         [--keyword-corpus-meta=<path>]
+        [--heatmap-png=<path>]
+        [--heatmap-artifact-url=<url>]
 """
 import argparse
+import base64
 import json
+import os
 import sys
 from collections import defaultdict
 
@@ -50,6 +61,12 @@ BLAST_RADIUS_BYTES = 10 * 1024 * 1024 * 1024
 # Cap how many sample Raw values we render in the per-detector details.
 SAMPLE_LIMIT = 10
 SAMPLE_TRUNCATE = 120
+
+# GitHub issue/PR comment bodies are capped at 65536 chars. The summary table
+# plus per-detector details routinely consume 5-15 KB; budgeting ~50 KB for the
+# inline PNG keeps comfortable headroom while still permitting most heatmaps
+# to embed directly. Larger images fall back to the artifact-URL link.
+HEATMAP_INLINE_LIMIT_BYTES = 50 * 1024
 
 
 def parse_csv(s):
@@ -148,7 +165,56 @@ def load_keyword_corpus_meta(path):
     return {"thin_l1": thin, "reports": raw.get("reports") or []}
 
 
-def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None, keyword_meta=None):
+def build_heatmap_section(png_path, artifact_url):
+    """Return the Markdown lines that embed the heatmap, or [] if there's
+    nothing to embed.
+
+    Strategy:
+      1. If the PNG file is missing/empty, nothing to do.
+      2. Try inline base64 if the encoded body fits the inline budget.
+         Inline survives comment pruning of artifacts and renders without
+         GitHub auth on mobile/desktop alike.
+      3. Otherwise fall back to a plain Markdown link to the workflow
+         artifact URL with a one-line explainer. Artifact URLs require
+         GitHub login, so no embedded ``![](...)`` — that would render as
+         a broken image.
+    """
+    if not png_path or not os.path.isfile(png_path):
+        return []
+    try:
+        size = os.path.getsize(png_path)
+    except OSError:
+        return []
+    if size <= 0:
+        return []
+
+    if size <= HEATMAP_INLINE_LIMIT_BYTES:
+        try:
+            with open(png_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode("ascii")
+        except OSError:
+            return []
+        return [
+            "### Δ heatmap (changed detectors × decoder)",
+            "",
+            f"![PR vs main — Δ unique findings per (detector, decoder)]"
+            f"(data:image/png;base64,{encoded})",
+            "",
+        ]
+
+    if artifact_url:
+        return [
+            "### Δ heatmap (changed detectors × decoder)",
+            "",
+            f"_Heatmap PNG too large to inline ({size // 1024} KB); "
+            f"[download from workflow artifacts]({artifact_url})._",
+            "",
+        ]
+    return []
+
+
+def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
+           keyword_meta=None, heatmap_png=None, heatmap_artifact_url=None):
     new_detectors = new_detectors or set()
     keyword_meta = keyword_meta or {"thin_l1": set(), "reports": []}
 
@@ -208,6 +274,8 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None, keywor
             f"unchanged detectors are not measured._"
         )
         parts.append("")
+
+    parts += build_heatmap_section(heatmap_png, heatmap_artifact_url)
 
     if not rows and not missing:
         parts += ["_(No findings on either side for the changed detectors.)_", ""]
@@ -353,6 +421,11 @@ def main():
                         help="Total uncompressed bytes scanned; enables blast-radius column.")
     parser.add_argument("--keyword-corpus-meta", default="",
                         help="Path to build_keyword_corpus.py sidecar; surfaces thin-L1 warnings.")
+    parser.add_argument("--heatmap-png", default="",
+                        help="Path to heatmap PNG produced by render_heatmap.py.")
+    parser.add_argument("--heatmap-artifact-url", default="",
+                        help="Workflow artifact URL for the heatmap; used as fallback link "
+                             "when the PNG exceeds the inline budget.")
     args = parser.parse_args()
 
     main_findings = load_findings(args.main_jsonl)
@@ -369,6 +442,8 @@ def main():
         new_detectors=new_detectors,
         corpus_bytes=corpus_bytes,
         keyword_meta=keyword_meta,
+        heatmap_png=args.heatmap_png or None,
+        heatmap_artifact_url=args.heatmap_artifact_url or None,
     ))
 
 
