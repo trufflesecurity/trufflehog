@@ -153,6 +153,59 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 	}
 }
 
+// TestBufferedReaderSeekerRead_SpansBufferAndTempFile is a regression test
+// for issue #4569: when a single Read() satisfies its request from both the
+// in-memory buffer and the on-disk temp file, the slice arithmetic must use
+// the per-branch read count (not the cumulative total) when re-slicing
+// `out`. Previously this panicked with `slice bounds out of range [N:M]`
+// where N was the cumulative count and M the remaining length.
+func TestBufferedReaderSeekerRead_SpansBufferAndTempFile(t *testing.T) {
+	t.Parallel()
+
+	const (
+		// Small threshold so the first writeData() flushes to disk and
+		// subsequent writes accumulate in the buffer again — gives us a
+		// state where both `buf` and `tempFile` contain data.
+		threshold = 32
+		// Reader payload is large enough that the read spans buffer + disk.
+		payloadSize = 256
+	)
+
+	payload := make([]byte, payloadSize)
+	for i := range payload {
+		payload[i] = byte(i % 251)
+	}
+
+	// Wrap the bytes in a non-seekable reader so the buffered/disk path runs.
+	brs := NewBufferedReaderSeeker(io.MultiReader(bytes.NewReader(payload)))
+	defer brs.Close()
+	brs.threshold = threshold
+
+	// Force an initial fill so part of the payload lives on disk.
+	primer := make([]byte, threshold*2)
+	if _, err := io.ReadFull(brs, primer); err != nil {
+		t.Fatalf("primer read: %v", err)
+	}
+
+	// Seek back to the start and read a window that crosses the
+	// buf/tempFile boundary in a single Read() call.
+	if _, err := brs.Seek(0, io.SeekStart); err != nil {
+		t.Fatalf("seek: %v", err)
+	}
+
+	out := make([]byte, threshold*2+16)
+	n, err := brs.Read(out)
+	if err != nil && !errors.Is(err, io.EOF) {
+		t.Fatalf("read: unexpected error: %v", err)
+	}
+	if n == 0 {
+		t.Fatalf("read returned 0 bytes; expected partial fill")
+	}
+	if !bytes.Equal(out[:n], payload[:n]) {
+		t.Fatalf("read returned wrong bytes; first 16 = %x want %x", out[:16], payload[:16])
+	}
+}
+
 func TestBufferedReaderSeekerSeek(t *testing.T) {
 	tests := []struct {
 		name         string
