@@ -11,6 +11,8 @@ on:
       - 'scripts/detector_corpora_test.sh'
       - 'scripts/diff_corpora_results.py'
       - 'scripts/detect_changed_detectors.sh'
+      - 'scripts/build_keyword_corpus.py'
+      - 'hack/extract-keywords/**'
 
 env:
   DATASETS: |
@@ -96,6 +98,43 @@ jobs:
               body: '## Corpora Test Results\n\nNo detector source files changed in this PR. Bench skipped.',
             });
 
+      # Layer 1 keyword corpus — fetch real-world snippets from GitHub Code
+      # Search for each changed detector's pre-filter keywords. Output is a
+      # zstd-compressed JSONL whose shape matches the S3 corpus, so the
+      # corpora script picks it up unchanged via the DATASETS append below.
+      # The same corpus file is fed to both PR and main builds; thin-L1
+      # detectors and per-detector counts are written to a sidecar JSON the
+      # diff step renders.
+      - name: Build extract-keywords helper
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        run: |
+          set -o pipefail
+          CGO_ENABLED=0 go build -o /tmp/extract-keywords ./hack/extract-keywords
+
+      - name: Build keyword corpus (Layer 1)
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DETECTORS: ${{ steps.detect.outputs.pr_csv }}
+        run: |
+          set -o pipefail
+          python3 scripts/build_keyword_corpus.py \
+            --detectors="$DETECTORS" \
+            --extract-keywords-bin=/tmp/extract-keywords \
+            --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
+            --output-meta=/tmp/keyword-corpus-meta.json \
+            --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
+          # Append to DATASETS for downstream scan steps. The python script
+          # always writes a (possibly empty) corpus, so the path is safe to
+          # append unconditionally — empty zstd frames decompress to 0
+          # bytes and pass through the existing scan pipeline cleanly.
+          echo "DATASETS<<EOF" >> "$GITHUB_ENV"
+          echo "$DATASETS" >> "$GITHUB_ENV"
+          echo "/tmp/keyword-corpus.jsonl.zstd" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
       - name: Prepare main worktree
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
@@ -180,11 +219,16 @@ jobs:
           if [[ -s /tmp/corpus-bytes.txt ]]; then
             CORPUS_BYTES=$(cat /tmp/corpus-bytes.txt)
           fi
+          META_ARG=()
+          if [[ -s /tmp/keyword-corpus-meta.json ]]; then
+            META_ARG=(--keyword-corpus-meta=/tmp/keyword-corpus-meta.json)
+          fi
           python3 scripts/diff_corpora_results.py \
             /tmp/results-main.jsonl /tmp/results-pr.jsonl \
             --changed-detectors="$CHANGED" \
             --new-detectors="$NEW_DETECTORS" \
             --corpus-bytes="$CORPUS_BYTES" \
+            "${META_ARG[@]}" \
             > /tmp/diff-report.md
           cat /tmp/diff-report.md
 
