@@ -3,114 +3,98 @@ package elasticsearch
 import (
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type elasticSearchCmdModel struct {
-	textinputs.Model
-}
-
-func GetNote() string {
-	return "To connect to a local cluster, please provide the node IPs and either (username AND password) OR service token. ⭐\n⭐ To connect to a cloud cluster, please provide cloud ID AND API key."
-}
-
-func GetFields() elasticSearchCmdModel {
-	return elasticSearchCmdModel{textinputs.New([]textinputs.InputConfig{
-		{
-			Label:    "Elastic node(s)",
-			Key:      "nodes",
-			Required: false,
-			Help:     "Elastic node IPs - for scanning local clusters. Separate by space if multiple.",
-		},
-		{
-			Label:    "Username",
-			Key:      "username",
-			Required: false,
-			Help:     "Elasticsearch username. Pairs with password. For scanning local clusters.",
-		},
-		{
-			Label:    "Password",
-			Key:      "password",
-			Required: false,
-			Help:     "Elasticsearch password. Pairs with username. For scanning local clusters.",
-		},
-		{
-			Label:    "Service Token",
-			Key:      "serviceToken",
-			Required: false,
-			Help:     "Elastic service token. For scanning local clusters.",
-		},
-		{
-			Label:    "Cloud ID",
-			Key:      "cloudId",
-			Required: false,
-			Help:     "Elastic cloud ID. Pairs with API key. For scanning cloud clusters.",
-		},
-		{
-			Label:    "API Key",
-			Key:      "apiKey",
-			Required: false,
-			Help:     "Elastic API key. Pairs with cloud ID. For scanning cloud clusters.",
-		}})}
-}
-
-func findFirstNonEmptyKey(inputs map[string]textinputs.Input, keys []string) string {
-	for _, key := range keys {
-		if val, ok := inputs[key]; ok && val.Value != "" {
-			return key
+// connectionKeysFor returns the subset of keys that should be emitted based
+// on which field the user filled in first. The original textinputs-based
+// implementation locked the connection mode on the first non-empty value and
+// only emitted keys that belong to that mode, which is what we replicate
+// here.
+func connectionKeysFor(values map[string]string) []string {
+	keys := []string{"username", "password", "serviceToken", "cloudId", "apiKey"}
+	for _, k := range keys {
+		if strings.TrimSpace(values[k]) == "" {
+			continue
+		}
+		switch k {
+		case "username", "password":
+			return []string{"username", "password", "nodes"}
+		case "serviceToken":
+			return []string{"serviceToken", "nodes"}
+		case "cloudId", "apiKey":
+			return []string{"cloudId", "apiKey"}
 		}
 	}
-	return ""
-}
-
-func getConnectionKeys(inputs map[string]textinputs.Input) []string {
-	keys := []string{"username", "password", "serviceToken", "cloudId", "apiKey"}
-	key := findFirstNonEmptyKey(inputs, keys)
-
-	keyMap := map[string][]string{
-		"username":     {"username", "password", "nodes"},
-		"password":     {"username", "password", "nodes"},
-		"serviceToken": {"serviceToken", "nodes"},
-		"cloudId":      {"cloudId", "apiKey"},
-		"apiKey":       {"cloudId", "apiKey"},
-	}
-
-	if val, ok := keyMap[key]; ok {
-		return val
-	}
-
 	return nil
 }
 
-func (m elasticSearchCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "elasticsearch")
-	inputs := m.GetInputs()
+func init() { sources.Register(Definition()) }
 
-	for _, key := range getConnectionKeys(inputs) {
-		val, ok := inputs[key]
-		if !ok || val.Value == "" {
-			continue
-		}
-
-		if key == "nodes" {
-			nodes := strings.Fields(val.Value)
-			for _, node := range nodes {
-				command = append(command, "--nodes="+node)
+// Definition returns the elasticsearch source configuration.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "elasticsearch",
+		Title:       "Elasticsearch",
+		Description: "Scan your Elasticsearch cluster or Elastic Cloud instance.",
+		Tier:        sources.TierOSS,
+		Note:        "To connect to a local cluster, please provide the node IPs and either (username AND password) OR service token. ⭐\n⭐ To connect to a cloud cluster, please provide cloud ID AND API key.",
+		Command:     "elasticsearch",
+		Fields: []form.FieldSpec{
+			{
+				Key:   "nodes",
+				Label: "Elastic node(s)",
+				Help:  "Elastic node IPs - for scanning local clusters. Separate by space if multiple.",
+				Kind:  form.KindText,
+			},
+			{
+				Key:   "username",
+				Label: "Username",
+				Help:  "Elasticsearch username. Pairs with password. For scanning local clusters.",
+				Kind:  form.KindText,
+			},
+			{
+				Key:   "password",
+				Label: "Password",
+				Help:  "Elasticsearch password. Pairs with username. For scanning local clusters.",
+				Kind:  form.KindSecret,
+			},
+			{
+				Key:   "serviceToken",
+				Label: "Service Token",
+				Help:  "Elastic service token. For scanning local clusters.",
+				Kind:  form.KindSecret,
+			},
+			{
+				Key:   "cloudId",
+				Label: "Cloud ID",
+				Help:  "Elastic cloud ID. Pairs with API key. For scanning cloud clusters.",
+				Kind:  form.KindText,
+			},
+			{
+				Key:   "apiKey",
+				Label: "API Key",
+				Help:  "Elastic API key. Pairs with cloud ID. For scanning cloud clusters.",
+				Kind:  form.KindSecret,
+			},
+		},
+		BuildArgs: func(values map[string]string) []string {
+			var out []string
+			for _, key := range connectionKeysFor(values) {
+				val := strings.TrimSpace(values[key])
+				if val == "" {
+					continue
+				}
+				if key == "nodes" {
+					for _, node := range strings.Fields(val) {
+						out = append(out, "--nodes="+node)
+					}
+					continue
+				}
+				out = append(out, "--"+key+"="+val)
 			}
-		} else {
-			command = append(command, "--"+key+"="+val.Value)
-		}
+			return out
+		},
 	}
-
-	return strings.Join(command, " ")
-}
-
-func (m elasticSearchCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-
-	summaryKeys := getConnectionKeys(inputs)
-	return common.SummarizeSource(summaryKeys, inputs, labels)
 }
