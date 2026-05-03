@@ -142,8 +142,15 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	)
 
 	// If the current read position is within the in-memory buffer.
-	if br.index < int64(br.buf.Len()) {
-		totalBytesRead = copy(out, br.buf.Bytes()[br.index:])
+	//
+	// The buffer holds bytes [diskBufferSize, diskBufferSize+buf.Len()) of the
+	// virtual stream: any bytes flushed to disk live in tempFile, and the buffer
+	// only retains data appended after the most recent flush. Translate the
+	// logical index into a buffer-relative offset before slicing; otherwise a
+	// post-flush read whose index falls below diskBufferSize would silently
+	// return data from the wrong offset.
+	if br.index >= br.diskBufferSize && br.index < br.diskBufferSize+int64(br.buf.Len()) {
+		totalBytesRead = copy(out, br.buf.Bytes()[br.index-br.diskBufferSize:])
 		br.index += int64(totalBytesRead)
 		if totalBytesRead == len(out) {
 			return totalBytesRead, nil
@@ -153,7 +160,12 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 
 	// If we've exceeded the in-memory threshold and have a temp file.
 	if br.tempFile != nil && br.index < br.diskBufferSize {
-		if _, err := br.tempFile.Seek(br.index-int64(br.buf.Len()), io.SeekStart); err != nil {
+		// The temp file holds bytes [0, diskBufferSize) of the virtual stream,
+		// so seek directly to br.index. Subtracting buf.Len() (the prior
+		// behaviour) was only correct when the buffer was empty — after a
+		// flush followed by additional buffered writes, the subtraction
+		// produced a negative offset and a wrong-region read.
+		if _, err := br.tempFile.Seek(br.index, io.SeekStart); err != nil {
 			return totalBytesRead, err
 		}
 		m, err := br.tempFile.Read(out)
