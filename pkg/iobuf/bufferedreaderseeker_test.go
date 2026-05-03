@@ -457,6 +457,127 @@ func TestBufferedReadSeekerSize(t *testing.T) {
 	}
 }
 
+// TestBufferedReaderSeekerReadAfterFlushBackwardSeek guards against a
+// regression where Read mishandled the offset translation between the
+// virtual stream index and the in-memory buffer / on-disk temp file.
+//
+// After the in-memory buffer was flushed to disk and then refilled with
+// subsequent data, two paths were broken:
+//
+//  1. The in-memory branch sliced `buf.Bytes()[br.index:]`, treating the
+//     logical stream index as a buffer-relative offset, so a backward seek
+//     would silently return data from the wrong offset within the buffer.
+//  2. The on-disk branch seeked the temp file to `br.index - buf.Len()`,
+//     producing a negative offset (and seek error) once the buffer had
+//     been refilled with post-flush data.
+func TestBufferedReaderSeekerReadAfterFlushBackwardSeek(t *testing.T) {
+	payload := make([]byte, 48)
+	for i := range payload {
+		payload[i] = byte(i)
+	}
+
+	// bytes.NewBuffer is non-seekable, so the BufferedReadSeeker must buffer.
+	brs := NewBufferedReaderSeeker(bytes.NewBuffer(payload))
+	defer brs.Close()
+	// Use a small threshold so the prime read flushes to disk.
+	brs.threshold = 32
+
+	// Fill exactly to the threshold to trigger a flush on writeData.
+	first := make([]byte, 32)
+	n, err := brs.Read(first)
+	assert.NoError(t, err)
+	assert.Equal(t, 32, n)
+	assert.Equal(t, payload[:32], first)
+
+	// Read 16 more bytes; these are appended back into the (now-empty) buffer.
+	second := make([]byte, 16)
+	n, err = brs.Read(second)
+	assert.NoError(t, err)
+	assert.Equal(t, 16, n)
+	assert.Equal(t, payload[32:48], second)
+
+	// Sanity: buffer holds the post-flush tail, disk holds the prefix.
+	assert.Equal(t, int64(32), brs.diskBufferSize)
+	assert.Equal(t, 16, brs.buf.Len())
+
+	// Seek back to the start and read 8 bytes — these live on disk.
+	_, err = brs.Seek(0, io.SeekStart)
+	assert.NoError(t, err)
+
+	got := make([]byte, 8)
+	n, err = brs.Read(got)
+	assert.NoError(t, err)
+	assert.Equal(t, 8, n)
+	assert.Equal(t, payload[0:8], got, "backward seek after flush returned wrong bytes")
+
+	// Backward read into the disk region followed by a forward read into
+	// the buffered tail must also return the right bytes (exercises both
+	// branches in the same Read sequence).
+	_, err = brs.Seek(40, io.SeekStart)
+	assert.NoError(t, err)
+	tail := make([]byte, 4)
+	n, err = brs.Read(tail)
+	assert.NoError(t, err)
+	assert.Equal(t, 4, n)
+	assert.Equal(t, payload[40:44], tail, "buffered tail read returned wrong bytes")
+}
+
+// TestBufferedReaderSeekerReadSpansDiskAndBuffer covers the disk→buffer
+// spanning read: a single Read() that begins inside the on-disk region and
+// extends into the post-flush in-memory buffer. Before the fix, the buffer
+// branch ran first (and skipped because index < diskBufferSize), the disk
+// branch only filled the disk portion, and the call fell through to the
+// underlying reader. Once the reader returned io.EOF the code set
+// sizeKnown=true without flushing the buffer to disk, leaving the buffered
+// tail bytes permanently inaccessible.
+func TestBufferedReaderSeekerReadSpansDiskAndBuffer(t *testing.T) {
+	payload := make([]byte, 48)
+	for i := range payload {
+		payload[i] = byte(i)
+	}
+
+	brs := NewBufferedReaderSeeker(bytes.NewBuffer(payload))
+	defer brs.Close()
+	brs.threshold = 32
+
+	// Fill exactly to the threshold to trigger a flush on writeData.
+	if _, err := io.ReadFull(brs, make([]byte, 32)); err != nil {
+		t.Fatalf("priming disk read: %v", err)
+	}
+	// Read 16 more bytes; these are appended back into the (now-empty)
+	// in-memory buffer without triggering another flush.
+	if _, err := io.ReadFull(brs, make([]byte, 16)); err != nil {
+		t.Fatalf("priming buffer read: %v", err)
+	}
+	assert.Equal(t, int64(32), brs.diskBufferSize)
+	assert.Equal(t, 16, brs.buf.Len())
+
+	// Seek into the disk tail and read past the disk/buffer boundary in a
+	// single call. The read must complete from disk + buffer without
+	// touching the underlying reader (which is exhausted).
+	if _, err := brs.Seek(28, io.SeekStart); err != nil {
+		t.Fatalf("seek: %v", err)
+	}
+	got := make([]byte, 12)
+	n, err := brs.Read(got)
+	assert.NoError(t, err)
+	assert.Equal(t, 12, n)
+	assert.Equal(t, payload[28:40], got, "spanning read returned wrong bytes")
+
+	// The buffered tail (bytes 32-48) must remain accessible after the
+	// spanning read; before the fix sizeKnown was set with the buffer still
+	// holding 16 unflushed bytes, and the fast path at the top of Read
+	// would only see the 32 bytes already on disk.
+	if _, err := brs.Seek(40, io.SeekStart); err != nil {
+		t.Fatalf("seek: %v", err)
+	}
+	tail := make([]byte, 8)
+	n, err = brs.Read(tail)
+	assert.NoError(t, err)
+	assert.Equal(t, 8, n)
+	assert.Equal(t, payload[40:48], tail, "buffered tail orphaned by spanning read")
+}
+
 // errorReader is an io.Reader that returns an error after reading a specified number of bytes.
 // It's used to simulate non-EOF errors during read operations.
 type errorReader struct {

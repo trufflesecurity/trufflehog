@@ -141,22 +141,35 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		err            error
 	)
 
-	// If the current read position is within the in-memory buffer.
-	if br.index < int64(br.buf.Len()) {
-		totalBytesRead = copy(out, br.buf.Bytes()[br.index:])
-		br.index += int64(totalBytesRead)
-		if totalBytesRead == len(out) {
-			return totalBytesRead, nil
-		}
-		out = out[totalBytesRead:]
-	}
+	// The virtual stream is laid out as [0, diskBufferSize) on disk followed
+	// by [diskBufferSize, diskBufferSize+buf.Len()) in the post-flush buffer.
+	// A single Read may span the disk→buffer boundary (e.g. seek into the
+	// disk tail then read past it), so the disk branch runs first and the
+	// buffer branch handles whatever remains. If the buffer branch ran first
+	// it would skip on the spanning case (index < diskBufferSize) and the
+	// disk branch would only fill the disk portion; the reader would then
+	// be hit prematurely, mark sizeKnown, and orphan the buffered tail.
 
 	// If we've exceeded the in-memory threshold and have a temp file.
 	if br.tempFile != nil && br.index < br.diskBufferSize {
-		if _, err := br.tempFile.Seek(br.index-int64(br.buf.Len()), io.SeekStart); err != nil {
+		// The temp file holds bytes [0, diskBufferSize) of the virtual stream,
+		// so seek directly to br.index. Subtracting buf.Len() (the prior
+		// behaviour) was only correct when the buffer was empty — after a
+		// flush followed by additional buffered writes, the subtraction
+		// produced a negative offset and a wrong-region read.
+		if _, err := br.tempFile.Seek(br.index, io.SeekStart); err != nil {
 			return totalBytesRead, err
 		}
-		m, err := br.tempFile.Read(out)
+		// Cap the disk read at the disk region so a spanning read does not
+		// pull buffered bytes from the underlying file (writeData appends to
+		// buf and may flush to disk later, so reading past diskBufferSize
+		// here could either short-read or surface stale data).
+		diskRemaining := br.diskBufferSize - br.index
+		diskSlice := out
+		if int64(len(diskSlice)) > diskRemaining {
+			diskSlice = diskSlice[:diskRemaining]
+		}
+		m, err := br.tempFile.Read(diskSlice)
 		totalBytesRead += m
 		br.index += int64(m)
 		if err != nil && !errors.Is(err, io.EOF) {
@@ -165,7 +178,22 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		if totalBytesRead == len(out) {
 			return totalBytesRead, nil
 		}
-		out = out[totalBytesRead:]
+		out = out[m:]
+	}
+
+	// If the current read position is within the in-memory buffer.
+	//
+	// Translate the logical index into a buffer-relative offset before
+	// slicing; otherwise a post-flush read whose index falls below
+	// diskBufferSize would silently return data from the wrong offset.
+	if br.index >= br.diskBufferSize && br.index < br.diskBufferSize+int64(br.buf.Len()) {
+		bufBytesRead := copy(out, br.buf.Bytes()[br.index-br.diskBufferSize:])
+		totalBytesRead += bufBytesRead
+		br.index += int64(bufBytesRead)
+		if bufBytesRead == len(out) {
+			return totalBytesRead, nil
+		}
+		out = out[bufBytesRead:]
 	}
 
 	if len(out) == 0 {
