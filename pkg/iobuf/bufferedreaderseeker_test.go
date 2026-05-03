@@ -153,6 +153,120 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 	}
 }
 
+// TestBufferedReaderSeekerRead_SpansBufferAndTempFile is a regression test
+// for issue #4569: when a single Read() runs both the in-memory buffer
+// branch and the on-disk temp file branch, the slice arithmetic must use
+// the per-branch read count (not the cumulative total) when re-slicing
+// `out`. Previously this panicked with `slice bounds out of range [N:M]`
+// where N was the cumulative count and M the remaining length.
+//
+// The bug requires a state where buf.Len() > 0 AND diskBufferSize > 0 AND
+// the read position falls inside both ranges. Reaching that state needs
+// a flush followed by additional buffered writes that do not flush again,
+// then a Seek back so the next Read enters branch 1 with a small `out`.
+func TestBufferedReaderSeekerRead_SpansBufferAndTempFile(t *testing.T) {
+	t.Parallel()
+
+	type primingStep struct {
+		// size is the number of bytes to Read from brs in this step.
+		size int
+	}
+
+	tests := []struct {
+		name string
+		// threshold controls when writeData() flushes buf to tempFile.
+		threshold int64
+		// payloadSize must be larger than every read so reader.Read never
+		// hits EOF (sizeKnown stays false, keeping the buffered/disk path
+		// active instead of the sizeKnown fast path).
+		payloadSize int
+		// priming reads run before the seek-back; each one drives writeData()
+		// and shapes the buf / tempFile state.
+		priming []primingStep
+		// seekTo is the virtual position to seek to before the final Read.
+		seekTo int64
+		// finalReadSize is the size of the read that must span both branches.
+		// Picked so that the cumulative-count bug would slice past the
+		// already-shortened tail of `out`.
+		finalReadSize int
+	}{
+		{
+			// Original #4569 shape: one flush, then a small follow-up read
+			// leaves a few bytes in buf. Seek to 0 and request 20 bytes;
+			// branch 1 returns 8, branch 2 returns the remaining 12, and
+			// the pre-fix code re-slices with totalBytesRead=20 against a
+			// 12-byte tail, panicking with "slice bounds out of range".
+			name:          "small-read across boundary",
+			threshold:     32,
+			payloadSize:   1 << 12,
+			priming:       []primingStep{{size: 32}, {size: 8}},
+			seekTo:        0,
+			finalReadSize: 20,
+		},
+		{
+			// Adjacent edge case: branch 2 fully fills the post-branch-1
+			// tail of `out`. Pre-fix this also panicked because the
+			// `if totalBytesRead == len(out)` guard compared the cumulative
+			// count to the shortened slice length.
+			name:          "branch 2 exactly fills tail",
+			threshold:     32,
+			payloadSize:   1 << 12,
+			priming:       []primingStep{{size: 32}, {size: 16}},
+			seekTo:        0,
+			finalReadSize: 32, // 16 from buf + 16 from tempFile
+		},
+		{
+			// Branch 1 alone satisfies the read; branch 2 must not run.
+			// Verifies the early-return short-circuit still works after
+			// the per-branch counter rewrite.
+			name:          "branch 1 satisfies read",
+			threshold:     32,
+			payloadSize:   1 << 12,
+			priming:       []primingStep{{size: 32}, {size: 16}},
+			seekTo:        0,
+			finalReadSize: 8,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			payload := make([]byte, tt.payloadSize)
+			for i := range payload {
+				payload[i] = byte(i % 251)
+			}
+
+			// Wrap so the reader is not detected as seekable; this forces
+			// the buffered/disk path through Read() instead of delegating
+			// to the underlying Seeker.
+			brs := NewBufferedReaderSeeker(io.MultiReader(bytes.NewReader(payload)))
+			defer brs.Close()
+			brs.threshold = tt.threshold
+
+			for i, step := range tt.priming {
+				buf := make([]byte, step.size)
+				if _, err := io.ReadFull(brs, buf); err != nil {
+					t.Fatalf("priming step %d: %v", i, err)
+				}
+			}
+
+			if _, err := brs.Seek(tt.seekTo, io.SeekStart); err != nil {
+				t.Fatalf("seek: %v", err)
+			}
+
+			out := make([]byte, tt.finalReadSize)
+			n, err := brs.Read(out)
+			if err != nil && !errors.Is(err, io.EOF) {
+				t.Fatalf("read: unexpected error: %v", err)
+			}
+			if n != tt.finalReadSize {
+				t.Fatalf("read: got n=%d, want %d", n, tt.finalReadSize)
+			}
+		})
+	}
+}
+
 func TestBufferedReaderSeekerSeek(t *testing.T) {
 	tests := []struct {
 		name         string
