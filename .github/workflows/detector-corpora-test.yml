@@ -114,80 +114,65 @@ jobs:
 
             No detector source files changed in this PR. Bench skipped.
 
-      # Layer 1 keyword corpus — fetch real-world snippets from GitHub Code
-      # Search for each changed detector's pre-filter keywords. Output is a
-      # zstd-compressed JSONL whose shape matches the S3 corpus, so the
-      # corpora script picks it up unchanged via the DATASETS append below.
-      # The same corpus file is fed to both PR and main builds; thin-L1
-      # detectors and per-detector counts are written to a sidecar JSON the
-      # diff step renders.
-      - name: Build extract-keywords helper
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        run: |
-          set -o pipefail
-          CGO_ENABLED=0 go build -o /tmp/extract-keywords ./hack/extract-keywords
-
-      - name: Build keyword corpus (Layer 1)
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DETECTORS: ${{ steps.detect.outputs.pr_csv }}
-        run: |
-          set -o pipefail
-          python3 scripts/test/build_keyword_corpus.py \
-            --detectors="$DETECTORS" \
-            --extract-keywords-bin=/tmp/extract-keywords \
-            --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
-            --output-meta=/tmp/keyword-corpus-meta.json \
-            --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
-          # Append to DATASETS for downstream scan steps. The python script
-          # always writes a (possibly empty) corpus, so the path is safe to
-          # append unconditionally — empty zstd frames decompress to 0
-          # bytes and pass through the existing scan pipeline cleanly.
-          echo "DATASETS<<EOF" >> "$GITHUB_ENV"
-          echo "$DATASETS" >> "$GITHUB_ENV"
-          echo "/tmp/keyword-corpus.jsonl.zstd" >> "$GITHUB_ENV"
-          echo "EOF" >> "$GITHUB_ENV"
-
-      - name: Prepare main worktree
+      # Three independent chains run in parallel:
+      #   A) extract-keywords → keyword corpus (network I/O via GitHub API)
+      #   B) prepare main worktree → build main binary (git I/O then CPU)
+      #   C) build PR binary (CPU, no dependencies)
+      # A and B+C are complementary workloads (network vs CPU), so they
+      # overlap efficiently. The GITHUB_ENV write for DATASETS happens inside
+      # chain A's subshell and is flushed before the step exits (after wait),
+      # so the scan step sees the updated value.
+      - name: Build binaries and keyword corpus
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DETECTORS: ${{ steps.detect.outputs.pr_csv }}
         run: |
           set -o pipefail
-          git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
 
-      - name: Build trufflehog (PR HEAD)
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        run: |
-          set -o pipefail
-          CGO_ENABLED=0 go build -o /tmp/trufflehog-pr .
+          # Chain A: build extract-keywords, then fetch keyword corpus from GitHub.
+          (
+            CGO_ENABLED=0 go build -o /tmp/extract-keywords ./hack/extract-keywords
+            python3 scripts/test/build_keyword_corpus.py \
+              --detectors="$DETECTORS" \
+              --extract-keywords-bin=/tmp/extract-keywords \
+              --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
+              --output-meta=/tmp/keyword-corpus-meta.json \
+              --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
+            printf 'DATASETS<<EOF\n%s\n/tmp/keyword-corpus.jsonl.zstd\nEOF\n' \
+              "$DATASETS" >> "$GITHUB_ENV"
+          ) &
+          PID_CORPUS=$!
 
-      - name: Build trufflehog (main merge-base)
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        working-directory: /tmp/trufflehog-main-src
-        run: |
-          set -o pipefail
-          CGO_ENABLED=0 go build -o /tmp/trufflehog-main .
+          # Chain B: prepare worktree, then build main binary.
+          (
+            git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
+            cd /tmp/trufflehog-main-src
+            CGO_ENABLED=0 go build -o /tmp/trufflehog-main .
+          ) &
+          PID_MAIN_BUILD=$!
 
-      # The PR scan always runs (any_changed=true means at least one detector
-      # is in pr_csv). It also captures the corpus byte total for the diff
-      # script's blast-radius column — same content streams to both binaries,
-      # so measuring once is enough.
-      - name: Run corpora test (PR build)
+          # Chain C: build PR binary (no dependencies).
+          CGO_ENABLED=0 go build -o /tmp/trufflehog-pr . &
+          PID_PR_BUILD=$!
+
+          wait $PID_CORPUS    || { echo "Keyword corpus build failed" >&2; exit 1; }
+          wait $PID_MAIN_BUILD || { echo "Main binary build failed"   >&2; exit 1; }
+          wait $PID_PR_BUILD   || { echo "PR binary build failed"     >&2; exit 1; }
+
+      # PR and main scans run in parallel. Each streams the corpus files
+      # independently from S3 — no shared state, different output files,
+      # different binaries. The main scan is skipped when main_csv is empty
+      # (PR adds only new detectors). CORPUS_BYTES_FILE is only written by
+      # the PR scan (blast-radius needs one consistent byte count).
+      - name: Run corpora tests
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
-          TRUFFLEHOG_BIN: /tmp/trufflehog-pr
-          OUTPUT_JSONL: /tmp/results-pr.jsonl
-          STDERR_FILE: /tmp/corpora-stderr-pr.txt
-          INCLUDE_DETECTORS: ${{ steps.detect.outputs.pr_csv }}
-          CORPUS_BYTES_FILE: /tmp/corpus-bytes.txt
+          PR_CSV: ${{ steps.detect.outputs.pr_csv }}
+          MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
         run: |
           set -o pipefail
           files=()
@@ -195,33 +180,35 @@ jobs:
             [[ -z "$dataset" ]] && continue
             files+=("$dataset")
           done <<< "$DATASETS"
-          ./scripts/test/detector_corpora_test.sh "${files[@]}"
 
-      # Main scan is skipped when main_csv is empty (PR adds only new
-      # detectors — nothing to compare against on main). The diff step is
-      # safe with an empty main JSONL: every PR finding is treated as NEW,
-      # which is correct semantics for new detectors.
-      - name: Run corpora test (main build)
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        env:
-          TRUFFLEHOG_BIN: /tmp/trufflehog-main
-          OUTPUT_JSONL: /tmp/results-main.jsonl
-          STDERR_FILE: /tmp/corpora-stderr-main.txt
-          INCLUDE_DETECTORS: ${{ steps.detect.outputs.main_csv }}
-        run: |
-          set -o pipefail
-          if [[ -z "$INCLUDE_DETECTORS" ]]; then
+          # PR scan.
+          (
+            export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
+            export OUTPUT_JSONL=/tmp/results-pr.jsonl
+            export STDERR_FILE=/tmp/corpora-stderr-pr.txt
+            export INCLUDE_DETECTORS="$PR_CSV"
+            export CORPUS_BYTES_FILE=/tmp/corpus-bytes.txt
+            ./scripts/test/detector_corpora_test.sh "${files[@]}"
+          ) &
+          PID_PR=$!
+
+          # Main scan (skipped when no detectors overlap with main).
+          if [[ -n "$MAIN_CSV" ]]; then
+            (
+              export TRUFFLEHOG_BIN=/tmp/trufflehog-main
+              export OUTPUT_JSONL=/tmp/results-main.jsonl
+              export STDERR_FILE=/tmp/corpora-stderr-main.txt
+              export INCLUDE_DETECTORS="$MAIN_CSV"
+              ./scripts/test/detector_corpora_test.sh "${files[@]}"
+            ) &
+            PID_MAIN=$!
+          else
             echo "No overlapping detectors in main; skipping main scan."
-            : > "$OUTPUT_JSONL"
-            exit 0
+            : > /tmp/results-main.jsonl
           fi
-          files=()
-          while IFS= read -r dataset; do
-            [[ -z "$dataset" ]] && continue
-            files+=("$dataset")
-          done <<< "$DATASETS"
-          ./scripts/test/detector_corpora_test.sh "${files[@]}"
+
+          wait $PID_PR || { echo "PR scan failed" >&2; exit 1; }
+          [[ -n "${PID_MAIN:-}" ]] && { wait $PID_MAIN || { echo "Main scan failed" >&2; exit 1; }; }
 
       - name: Diff results
         if: steps.detect.outputs.any_changed == 'true'

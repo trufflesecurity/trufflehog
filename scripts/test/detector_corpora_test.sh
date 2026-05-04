@@ -46,10 +46,9 @@ fi
 CORPUS_BYTES_FILE="${CORPUS_BYTES_FILE:-}"
 TOTAL_BYTES=0
 
-# Verification is enabled intentionally. The scan is scoped via --include-detectors
-# to only the detectors changed in the PR (typically 1-3), so the number of
-# verification API calls is small and rate limiting is not a concern. This lets
-# the bench surface verified/unknown deltas alongside regex match changes.
+# --no-verification avoids network calls against a large corpus where thousands
+# of matches could trigger API calls, dominating runtime. Verifier behavior is
+# covered by detector unit and integration tests.
 scan() {
     local input="$1"
     local bytes_tmp=""
@@ -66,6 +65,8 @@ scan() {
             | awk -v BF="$bytes_tmp" '{ b += length($0) + 1; print } END { printf "%d", b > BF; close(BF) }' \
             | "$TRUFFLEHOG_BIN" \
                 --no-update \
+                --no-verification \
+                --allow-verification-overlap \
                 --log-level=3 \
                 --concurrency=6 \
                 --json \
@@ -77,6 +78,8 @@ scan() {
             | jq -r .content 2>> "$STDERR_FILE" \
             | "$TRUFFLEHOG_BIN" \
                 --no-update \
+                --no-verification \
+                --allow-verification-overlap \
                 --log-level=3 \
                 --concurrency=6 \
                 --json \

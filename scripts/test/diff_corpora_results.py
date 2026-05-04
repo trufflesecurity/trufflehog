@@ -7,9 +7,9 @@ Identity per finding: (DetectorName, Raw or RawV2 fallback). Set semantics —
 duplicates within a single scan collapse into one identity, so a regex change
 either adds a new (detector, secret) identity or removes one.
 
-Verification is enabled at scan time and scoped to the changed detectors via
---include-detectors (typically 1-3 per PR). The report surfaces verified and
-unknown (verification error) counts alongside regex match deltas.
+Verification is disabled at scan time (--no-verification) to avoid network
+calls against a large corpus where thousands of matches could dominate runtime.
+The diff measures regex match changes only.
 
 Phase 2: when --changed-detectors is provided, the report focuses on the
 detectors changed by the PR. Detectors flagged via --new-detectors are
@@ -38,9 +38,10 @@ from collections import defaultdict
 
 
 PREAMBLE = (
-    "This bench measures regex match changes and verification behavior. "
-    "The scan is scoped to changed detectors only via `--include-detectors`, "
-    "so verification API calls are limited to the detectors touched by this PR."
+    "This bench measures regex match regressions only. It runs with "
+    "`--no-verification --allow-verification-overlap` so each detector's "
+    "regex behavior is measured independently — verifier behavior is tested "
+    "separately by detector unit tests."
 )
 
 # Marker on the very first line of the body so peter-evans/find-comment can
@@ -74,12 +75,8 @@ def parse_csv(s):
 
 
 def load_findings(path):
-    """Returns dict: detector_name -> {"identities": set[str], "total": int,
-    "verified": int, "unverified": int, "unknown": int}."""
-    by_detector = defaultdict(lambda: {
-        "identities": set(), "total": 0,
-        "verified": 0, "unverified": 0, "unknown": 0,
-    })
+    """Returns dict: detector_name -> {"identities": set[str], "total": int}."""
+    by_detector = defaultdict(lambda: {"identities": set(), "total": 0})
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
@@ -95,12 +92,6 @@ def load_findings(path):
             raw = obj.get("Raw") or obj.get("RawV2") or ""
             by_detector[detector]["identities"].add(raw)
             by_detector[detector]["total"] += 1
-            if obj.get("VerificationError"):
-                by_detector[detector]["unknown"] += 1
-            elif obj.get("Verified"):
-                by_detector[detector]["verified"] += 1
-            else:
-                by_detector[detector]["unverified"] += 1
     return by_detector
 
 
@@ -187,7 +178,7 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
         all_names = set(main) | set(pr)
         missing = []
 
-    _empty = {"identities": set(), "total": 0, "verified": 0, "unverified": 0, "unknown": 0}
+    _empty = {"identities": set(), "total": 0}
     rows = []
     has_diff = False
     for d in sorted(all_names):
@@ -220,9 +211,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
             "unique_pr": len(p["identities"]),
             "new_count": len(new_ids),
             "removed_count": len(removed_ids),
-            "verified_main": m["verified"],
-            "verified_pr": p["verified"],
-            "unknown_pr": p["unknown"],
             "blast": blast,
         })
 
@@ -263,10 +251,8 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
 
         show_blast = corpus_bytes is not None and corpus_bytes > 0
         cols = ["Status", "Detector", "total main", "total PR",
-                "unique main", "unique PR", "NEW", "REMOVED",
-                "verified (main)", "verified (PR)", "unknown (PR)"]
-        aligns = ["", "", "---:", "---:", "---:", "---:", "---:", "---:",
-                  "---:", "---:", "---:"]
+                "unique main", "unique PR", "NEW", "REMOVED"]
+        aligns = ["", "", "---:", "---:", "---:", "---:", "---:", "---:"]
         if show_blast:
             cols.append("Blast radius (Δ per 10 GB)")
             aligns.append("---:")
@@ -286,9 +272,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
                     str(r["unique_pr"]),
                     "—",
                     "—",
-                    "—",
-                    str(r["verified_pr"]),
-                    str(r["unknown_pr"]),
                 ]
             else:
                 cells = [
@@ -300,9 +283,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
                     str(r["unique_pr"]),
                     str(r["new_count"]),
                     str(r["removed_count"]),
-                    str(r["verified_main"]),
-                    str(r["verified_pr"]),
-                    str(r["unknown_pr"]),
                 ]
             if show_blast:
                 cells.append(r["blast"] or "—")
