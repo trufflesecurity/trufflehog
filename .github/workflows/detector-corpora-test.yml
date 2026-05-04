@@ -14,6 +14,7 @@ on:
 env:
   DATASETS: |
     s3://trufflehog-corpora-datasets/contents.2025-11-04.jsonl.zstd
+    s3://trufflehog-corpora-datasets/contents.jsonl.zstd
 
 jobs:
   corpora-test:
