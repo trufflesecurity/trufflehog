@@ -103,7 +103,7 @@ func verifyBearerToken(ctx context.Context, client *http.Client, token string) (
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
 	if err == nil {
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		switch res.StatusCode {
 		case http.StatusOK, http.StatusForbidden:
 			// 403 indicates lack of permission, but valid token (could be due to twitter free tier)
@@ -132,7 +132,7 @@ func fetchBearerToken(ctx context.Context, client *http.Client, key, secret stri
 	if err != nil {
 		return "", err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:

@@ -50,22 +50,22 @@ func New(common common.Common, items []IdentifiableItem, delegate ItemDelegate) 
 
 // PerPage returns the number of items per page.
 func (s *Selector) PerPage() int {
-	return s.Model.Paginator.PerPage
+	return s.Paginator.PerPage
 }
 
 // SetPage sets the current page.
 func (s *Selector) SetPage(page int) {
-	s.Model.Paginator.Page = page
+	s.Paginator.Page = page
 }
 
 // Page returns the current page.
 func (s *Selector) Page() int {
-	return s.Model.Paginator.Page
+	return s.Paginator.Page
 }
 
 // TotalPages returns the total number of pages.
 func (s *Selector) TotalPages() int {
-	return s.Model.Paginator.TotalPages
+	return s.Paginator.TotalPages
 }
 
 // Select selects the item at the given index.
@@ -138,7 +138,7 @@ func (s *Selector) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, 0)
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		filterState := s.Model.FilterState()
+		filterState := s.FilterState()
 		switch {
 		case key.Matches(msg, s.common.KeyMap.Help):
 			if filterState == list.Filtering {
@@ -158,7 +158,7 @@ func (s *Selector) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 	// Track filter state and update active item when filter state changes.
-	filterState := s.Model.FilterState()
+	filterState := s.FilterState()
 	if s.filterState != filterState {
 		cmds = append(cmds, s.activeFilterCmd)
 	}
@@ -182,7 +182,7 @@ func (s *Selector) SelectItem() tea.Msg {
 }
 
 func (s *Selector) selectCmd() tea.Msg {
-	item := s.Model.SelectedItem()
+	item := s.SelectedItem()
 	i, ok := item.(IdentifiableItem)
 	if !ok {
 		return SelectMsg{}
@@ -191,7 +191,7 @@ func (s *Selector) selectCmd() tea.Msg {
 }
 
 func (s *Selector) activeCmd() tea.Msg {
-	item := s.Model.SelectedItem()
+	item := s.SelectedItem()
 	i, ok := item.(IdentifiableItem)
 	if !ok {
 		return ActiveMsg{}
@@ -203,7 +203,7 @@ func (s *Selector) activeFilterCmd() tea.Msg {
 	// Here we use VisibleItems because when list.FilterMatchesMsg is sent,
 	// VisibleItems is the only way to get the list of filtered items. The list
 	// bubble should export something like list.FilterMatchesMsg.Items().
-	items := s.Model.VisibleItems()
+	items := s.VisibleItems()
 	if len(items) == 0 {
 		return nil
 	}

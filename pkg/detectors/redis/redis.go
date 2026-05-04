@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "*******", -1))
+		redact := strings.TrimSpace(strings.ReplaceAll(urlMatch, password, "*******"))
 
 		s := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Redis,
@@ -99,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "*******", -1))
+		redact := strings.TrimSpace(strings.ReplaceAll(urlMatch, password, "*******"))
 
 		s := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Redis,

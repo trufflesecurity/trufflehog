@@ -53,7 +53,7 @@ func getDomains(client *http.Client, apiKey string, secretInfo *SecretInfo) erro
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("invalid Mailgun API key")
@@ -83,7 +83,7 @@ func getKeys(client *http.Client, apiKey string, secretInfo *SecretInfo) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("invalid Mailgun API key")

@@ -267,7 +267,7 @@ func TestDockerImageScanFromLocalDaemon(t *testing.T) {
 		return
 	}
 
-	defer resp.Close()
+	defer func() { _ = resp.Close() }()
 
 	// if we don't read the response, the image will not be available in the local Docker daemon
 	_, err = io.ReadAll(resp)

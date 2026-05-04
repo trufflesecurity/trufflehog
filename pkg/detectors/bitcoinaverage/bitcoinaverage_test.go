@@ -43,7 +43,7 @@ func TestBitCoinAverage_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"WZizqeWvRnhZmFlpc5pMc92NP1Du19wxxpd5zjsYY8F"},
@@ -85,7 +85,7 @@ func TestBitCoinAverage_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

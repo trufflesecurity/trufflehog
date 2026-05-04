@@ -18,10 +18,10 @@ type GitHubActionsPrinter struct{ mu sync.Mutex }
 
 func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := gitHubActionsOutputFormat{
-		DetectorType:        r.Result.DetectorType.String(),
+		DetectorType:        r.DetectorType.String(),
 		DetectorDescription: r.DetectorDescription,
 		DecoderType:         r.DecoderType.String(),
-		Verified:            r.Result.Verified,
+		Verified:            r.Verified,
 	}
 
 	meta, err := structToMap(r.SourceMetadata.Data)
@@ -61,7 +61,7 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 	dedupeCache[key] = struct{}{}
 
 	name := ""
-	if nameValue, ok := r.Result.ExtraData["name"]; ok {
+	if nameValue, ok := r.ExtraData["name"]; ok {
 		name = fmt.Sprintf(" (%s)", nameValue)
 	}
 

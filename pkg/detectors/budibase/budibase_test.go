@@ -38,7 +38,7 @@ func TestBudiBase_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"b256def166fcdf4a429a1e83175105d5-fd36f3da1e934bf533cd0e68dbb80ed6a42e1178bd4200428d83e876e7d05e40b21e3a68888f826d"},
@@ -75,7 +75,7 @@ func TestBudiBase_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

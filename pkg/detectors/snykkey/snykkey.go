@@ -80,7 +80,8 @@ func (s Scanner) doVerification(ctx context.Context, token string) (bool, map[st
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		userDetails := userDetailsResponse{}
 		err := json.NewDecoder(res.Body).Decode(&userDetails)
 		if err != nil {
@@ -103,10 +104,10 @@ func (s Scanner) doVerification(ctx context.Context, token string) (bool, map[st
 			extraData["Organizations"] = strings.Join(orgs, ",")
 		}
 		return true, extraData, nil
-	} else if res.StatusCode == http.StatusUnauthorized {
+	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
-	} else {
+	default:
 		err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		return false, nil, err
 	}

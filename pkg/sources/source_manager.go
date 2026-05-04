@@ -408,7 +408,7 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 		ctx.Logger().Info("running source", "with_units", true)
 		return s.enumerateWithUnits(ctx, enumChunker, report, reporter)
 	}
-	return fmt.Errorf("Enumeration not supported or configured for source: %s", source.Type().String())
+	return fmt.Errorf("enumeration not supported or configured for source: %s", source.Type().String())
 }
 
 // scan runs a scan against a single SourceUnit as its only job. This method

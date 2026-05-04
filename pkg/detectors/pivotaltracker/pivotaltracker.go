@@ -2,8 +2,9 @@ package pivotaltracker
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -55,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("X-TrackerToken", token)
 			res, err := client.Do(req)
 			if err == nil {
-				res.Body.Close() // The request body is unused.
+				_ = res.Body.Close() // The request body is unused.
 
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					result.Verified = true
