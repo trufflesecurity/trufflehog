@@ -277,7 +277,10 @@ func globToRegex(glob string) (*regexp.Regexp, error) {
 			continue
 		}
 		// trailing "/**" → everything under
-		if i+2 == len(body) && body[i] == '/' && body[i+1] == '*' && body[i+2] == '*' {
+		// i indexes the leading '/', so i+2 must be the last valid byte ('*'),
+		// which means i+3 == len(body). Using i+2 == len(body) here would index
+		// past the end of the slice when the condition fired.
+		if i+3 == len(body) && body[i] == '/' && body[i+1] == '*' && body[i+2] == '*' {
 			b.WriteString("/.*")
 			i += 3
 			continue

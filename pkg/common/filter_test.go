@@ -280,6 +280,8 @@ func TestGlobToRegex(t *testing.T) {
 		{"/secrets/key.txt", []string{"secrets/key.txt"}, []string{"src/secrets/key.txt"}},
 		{"src/**/*.go", []string{"src/main.go", "src/a/b/c.go"}, []string{"main.go"}},
 		{"foo?bar", []string{"foo1bar", "fooXbar"}, []string{"foo/bar", "foobar"}},
+		{"build/**", []string{"build/foo", "build/foo/bar/baz", "build/x.txt"}, []string{"build", "src/build.go"}},
+		{"**/test", []string{"test", "src/test", "a/b/c/test"}, []string{"testless", "test.go"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.glob, func(t *testing.T) {
