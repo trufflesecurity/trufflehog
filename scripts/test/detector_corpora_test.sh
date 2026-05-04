@@ -61,6 +61,7 @@ scan() {
         main_include_flag=(--include-detectors="$INCLUDE_DETECTORS_MAIN")
     fi
 
+    local rc=0
     if [[ -n "${TRUFFLEHOG_BIN_MAIN:-}" ]]; then
         # Single S3 download teed to both binaries simultaneously.
         unzstd -c "$input" 2>> "$STDERR_FILE" \
@@ -86,6 +87,7 @@ scan() {
                 --print-avg-detector-time \
                 "${INCLUDE_FLAG[@]}" \
                 stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+        rc=$?
         wait
     else
         unzstd -c "$input" 2>> "$STDERR_FILE" \
@@ -100,8 +102,10 @@ scan() {
                 --print-avg-detector-time \
                 "${INCLUDE_FLAG[@]}" \
                 stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+        rc=$?
     fi
     set -e
+    return $rc
 }
 
 for CORPORA_FILE in "$@"; do
