@@ -50,9 +50,6 @@ STATUS_KEY = (
 # same literal — keep the two in sync.
 STICKY_COMMENT_MARKER = "<!-- detector-bench -->"
 
-# 10 GB notional monorepo for blast-radius projection.
-BLAST_RADIUS_BYTES = 10 * 1024 * 1024 * 1024
-
 
 def parse_csv(s):
     """Parse a comma-separated detector list into normalized name set.
@@ -118,18 +115,7 @@ def build_top_line_summary(rows, changed):
     return summary
 
 
-def render_blast_radius(matches, corpus_bytes, signed=False):
-    if corpus_bytes is None or corpus_bytes <= 0:
-        return ""
-    density = matches / corpus_bytes  # matches per byte
-    projected = density * BLAST_RADIUS_BYTES
-    if signed:
-        sign = "+" if projected > 0 else ("−" if projected < 0 else "")
-        return f"{sign}{abs(projected):,.0f}"
-    return f"{projected:,.0f}"
-
-
-def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None):
+def render(main, pr, changed=None, new_detectors=None):
     new_detectors = new_detectors or set()
 
     if changed:
@@ -162,11 +148,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None):
         if new_ids or removed_ids or m["total"] != p["total"]:
             has_diff = True
 
-        if is_new:
-            blast = render_blast_radius(p["total"], corpus_bytes, signed=False)
-        else:
-            blast = render_blast_radius(p["total"] - m["total"], corpus_bytes, signed=True)
-
         rows.append({
             "detector": d,
             "is_new": is_new,
@@ -177,7 +158,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None):
             "unique_pr": len(p["identities"]),
             "new_count": len(new_ids),
             "removed_count": len(removed_ids),
-            "blast": blast,
         })
 
     parts = [
@@ -206,13 +186,9 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None):
         else:
             rows.sort(key=lambda r: r["detector"])
 
-        show_blast = corpus_bytes is not None and corpus_bytes > 0
         cols = ["Status", "Detector", "Unique matches (main)", "Unique matches (PR)",
                 "New", "Removed"]
         aligns = ["", "", "---:", "---:", "---:", "---:"]
-        if show_blast:
-            cols.append("Δ per 10 GB")
-            aligns.append("---:")
         parts += [
             "| " + " | ".join(cols) + " |",
             "|" + "|".join(a if a else "---" for a in aligns) + "|",
@@ -237,8 +213,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None):
                     str(r["new_count"]),
                     str(r["removed_count"]),
                 ]
-            if show_blast:
-                cells.append(r["blast"] or "—")
             parts.append("| " + " | ".join(cells) + " |")
         parts.append("")
         parts.append(STATUS_KEY)
@@ -269,22 +243,18 @@ def main():
                         help="CSV of detectors changed in PR; filters report.")
     parser.add_argument("--new-detectors", default="",
                         help="CSV of detectors present in PR but not main; rendered with 🆕.")
-    parser.add_argument("--corpus-bytes", type=int, default=0,
-                        help="Total uncompressed bytes scanned; enables blast-radius column.")
     args = parser.parse_args()
 
     main_findings = load_findings(args.main_jsonl)
     pr_findings = load_findings(args.pr_jsonl)
     changed = parse_csv(args.changed_detectors)
     new_detectors = parse_csv(args.new_detectors)
-    corpus_bytes = args.corpus_bytes if args.corpus_bytes > 0 else None
 
     sys.stdout.write(render(
         main_findings,
         pr_findings,
         changed=changed if changed else None,
         new_detectors=new_detectors,
-        corpus_bytes=corpus_bytes,
     ))
 
 

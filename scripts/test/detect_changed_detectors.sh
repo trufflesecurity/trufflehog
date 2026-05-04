@@ -107,7 +107,7 @@ detector_id_for_dir() {
     # the most common, so the modal value wins.
     local proto
     proto=$(
-        grep -hE 'return[[:space:]]+\S*DetectorType_[A-Za-z0-9]+' "$dir"/*.go 2>/dev/null \
+        grep -E 'return[[:space:]]+\S*DetectorType_[A-Za-z0-9]+' "$dir"/*.go 2>/dev/null \
             | grep -v '_test\.go' \
             | grep -oE 'DetectorType_[A-Za-z0-9]+' \
             | sort | uniq -c | sort -rn \

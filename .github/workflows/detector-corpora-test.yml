@@ -163,7 +163,6 @@ jobs:
             export OUTPUT_JSONL=/tmp/results-pr.jsonl
             export STDERR_FILE=/tmp/corpora-stderr-pr.txt
             export INCLUDE_DETECTORS="$PR_CSV"
-            export CORPUS_BYTES_FILE=/tmp/corpus-bytes.txt
             ./scripts/test/detector_corpora_test.sh "${files[@]}"
           ) &
           PID_PR=$!
@@ -194,15 +193,10 @@ jobs:
           NEW_DETECTORS: ${{ steps.detect.outputs.new_csv }}
         run: |
           set -o pipefail
-          CORPUS_BYTES=0
-          if [[ -s /tmp/corpus-bytes.txt ]]; then
-            CORPUS_BYTES=$(cat /tmp/corpus-bytes.txt)
-          fi
           python3 scripts/test/diff_corpora_results.py \
             /tmp/results-main.jsonl /tmp/results-pr.jsonl \
             --changed-detectors="$CHANGED" \
             --new-detectors="$NEW_DETECTORS" \
-            --corpus-bytes="$CORPUS_BYTES" \
             > /tmp/diff-report.md
           cat /tmp/diff-report.md
 
