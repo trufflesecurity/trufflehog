@@ -62,7 +62,7 @@ func main() {
 	}
 
 	for _, f := range findings {
-		fmt.Printf("%s: warning: detectors.Result constructed without SecretParts (no reference to SecretParts anywhere in package)\n", f.Position)
+		fmt.Printf("%s: warning: detectors.Result constructed without SecretParts\n", f.Position)
 	}
 
 	if len(findings) > 0 {
