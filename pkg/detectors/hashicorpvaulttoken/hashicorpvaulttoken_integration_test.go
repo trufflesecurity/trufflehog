@@ -47,7 +47,7 @@ func TestVaultToken_FromData_Integration(t *testing.T) {
 			input:  fmt.Sprintf("%s\n%s", token, vaultURL),
 			verify: true,
 			wantTokens: []string{
-				token + vaultURL,
+				token + ":" + vaultURL,
 			},
 			wantVerified:        []bool{true},
 			wantVerificationErr: false,
@@ -67,7 +67,7 @@ func TestVaultToken_FromData_Integration(t *testing.T) {
 			input:  fmt.Sprintf("%s\n%s", fakeToken, vaultURL),
 			verify: true,
 			wantTokens: []string{
-				fakeToken + vaultURL,
+				fakeToken + ":" + vaultURL,
 			},
 			wantVerified:        []bool{false},
 			wantVerificationErr: false, // invalid tokens are not errors, just not verified
@@ -77,7 +77,7 @@ func TestVaultToken_FromData_Integration(t *testing.T) {
 			input:  fmt.Sprintf("%s\n%s", token, vaultURL),
 			verify: false,
 			wantTokens: []string{
-				token + vaultURL,
+				token + ":" + vaultURL,
 			},
 			wantVerified:        []bool{false},
 			wantVerificationErr: false,

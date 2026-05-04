@@ -84,7 +84,7 @@ func (s Scanner) FromData(
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_HashiCorpVaultToken,
 				Raw:          []byte(token),
-				RawV2:        []byte(token + endpoint),
+				RawV2:        []byte(token + ":" + endpoint),
 				Redacted:     token[:8] + "...",
 				SecretParts: map[string]string{
 					"token": token,
@@ -121,6 +121,7 @@ func (s Scanner) FromData(
 			results = append(results, detectors.Result{
 				DetectorType: detector_typepb.DetectorType_HashiCorpVaultToken,
 				Raw:          []byte(token),
+				RawV2:        []byte(token),
 				Redacted:     token[:8] + "...",
 				ExtraData: map[string]string{
 					"verification_note": "no reachable Vault URL found in context; tokens reported unverified",

@@ -27,7 +27,7 @@ func TestVaultToken_PatternWithURL(t *testing.T) {
 				https://vault-cluster-abc123.hashicorp.cloud:8200
 			`,
 			want: []string{
-				"hvs.CAESIL37MuN9DnoD8RIri7rEi1TnNI2DCvyXNAC5X3a6qmpxGh4KHGh2cy5DR0loRzZXWm5MQlFYNmRQcFNsb1ZxYnchttps://vault-cluster-abc123.hashicorp.cloud:8200",
+				"hvs.CAESIL37MuN9DnoD8RIri7rEi1TnNI2DCvyXNAC5X3a6qmpxGh4KHGh2cy5DR0loRzZXWm5MQlFYNmRQcFNsb1ZxYnc:https://vault-cluster-abc123.hashicorp.cloud:8200",
 			},
 		},
 		{
@@ -37,7 +37,7 @@ func TestVaultToken_PatternWithURL(t *testing.T) {
 				https://vault-cluster-abc123.hashicorp.cloud:8200
 			`,
 			want: []string{
-				"s.1234567890abcdefdddhttps://vault-cluster-abc123.hashicorp.cloud:8200",
+				"s.1234567890abcdefddd:https://vault-cluster-abc123.hashicorp.cloud:8200",
 			},
 		},
 		{
