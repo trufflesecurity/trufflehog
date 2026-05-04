@@ -21,8 +21,7 @@ fi
 STDERR_FILE="${STDERR_FILE:-/tmp/corpora-stderr.txt}"
 > "$STDERR_FILE"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-${REPO_ROOT}/trufflehog}"
 
 if [[ ! -x "$TRUFFLEHOG_BIN" ]]; then
