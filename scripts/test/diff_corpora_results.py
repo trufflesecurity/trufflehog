@@ -102,11 +102,18 @@ def status_emoji(new_count, removed_count, unique_main):
 
 
 def build_top_line_summary(rows, changed):
-    regressed = sum(1 for r in rows if not r["is_new"] and r["emoji"] in ("🔴", "⚠️"))
+    regressed = sum(1 for r in rows if not r["is_new"] and r["emoji"] == "🔴")
+    warned = sum(1 for r in rows if not r["is_new"] and r["emoji"] == "⚠️")
     new_count = sum(1 for r in rows if r["is_new"])
     clean = sum(1 for r in rows if r["emoji"] == "✅")
     scoped = ", ".join(f"`{d}`" for d in sorted(changed)) if changed else ""
-    summary = f"**{regressed} regressed · {new_count} new · {clean} clean**"
+    parts = []
+    if regressed:
+        parts.append(f"{regressed} regressed")
+    if warned:
+        parts.append(f"{warned} warned")
+    parts += [f"{new_count} new", f"{clean} clean"]
+    summary = f"**{' · '.join(parts)}**"
     if scoped:
         summary += f" \u00a0|\u00a0 Scoped to: {scoped}"
     return summary
@@ -131,7 +138,13 @@ def render(main, pr, changed=None, new_detectors=None):
     rows = []
     has_diff = False
     for d in sorted(all_names):
-        is_new = d.lower() in new_detectors
+        # A detector is only treated as fully new if the new_detectors set
+        # says so AND main produced no findings for it. When a PR modifies an
+        # existing version and adds a new version of the same detector (e.g.
+        # jdbc.v1 + jdbc.v2), both collapse to "jdbc" in new_detectors but
+        # main still ran against the existing version — its results must not
+        # be discarded.
+        is_new = d.lower() in new_detectors and d not in main
         m = main.get(d, _empty)
         p = pr.get(d, _empty)
         new_ids = p["identities"] - m["identities"]
