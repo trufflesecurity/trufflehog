@@ -28,9 +28,9 @@ var (
 
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
-	// Reference tokens are base64-encoded strings starting with "reftkn:01|<version>:<expiry>:<random>"
-	// The base64 encoding of "reftkn" is "cmVmdGtu", total length is always 64 characters
-	tokenPat = regexp.MustCompile(`\b(cmVmdGtu[A-Za-z0-9]{56})\b`)
+	// Reference tokens are base64-encoded strings of "reftkn:01:<expiry>:<random>"
+	// Fixed format: prefix "cmVmdGtuOj" (base64 of "reftkn:") + exactly 54 base64 chars = 64 total
+	tokenPat = regexp.MustCompile(`\b(cmVmdGtuOj[a-zA-Z0-9]{54})\b`)
 	urlPat   = regexp.MustCompile(`\b([A-Za-z0-9][A-Za-z0-9\-]{0,61}[A-Za-z0-9]\.jfrog\.io)`)
 
 	invalidHosts = simple.NewCache[struct{}]()
@@ -41,7 +41,7 @@ func (Scanner) CloudEndpoint() string { return "" }
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
-	return []string{"cmVmdGtu"}
+	return []string{"cmVmdGtuOj"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -75,6 +75,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for token := range uniqueTokens {
+		if len(uniqueUrls) == 0 {
+			// No domain found in this chunk — emit unverified so the token is not silently dropped.
+			results = append(results, detectors.Result{
+				DetectorType: detector_typepb.DetectorType_ArtifactoryReferenceToken,
+				Raw:          []byte(token),
+				SecretParts:  map[string]string{"token": token},
+			})
+			continue
+		}
+
 		for url := range uniqueUrls {
 			if invalidHosts.Exists(url) {
 				continue
