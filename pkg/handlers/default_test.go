@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	stdctx "context"
+	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -116,4 +119,59 @@ func TestHandleFileLineNumbers(t *testing.T) {
 		// Second chunk should start at line 11 (only 10 lines counted from first chunk's content)
 		assert.Equal(t, int64(11), results[1].LineNumber, "peek data should not be counted")
 	})
+}
+
+// TestDefaultHandler_ChunkErrorPreservesIdentity is a regression test for the
+// %v wrap at default.go:137. Before the fix, wrapping the inner chunk-reader
+// error with %v dropped its identity from the errors.Is chain, which caused
+// isFatal in handleChunksWithError to misclassify real per-chunk timeouts as
+// non-fatal warnings. The test asserts both that the outer ErrProcessingWarning
+// wrap is preserved (so warning-class consumers still see it) and that the
+// inner cause remains inspectable.
+func TestDefaultHandler_ChunkErrorPreservesIdentity(t *testing.T) {
+	cases := []struct {
+		name      string
+		innerErr  error
+		wantFatal bool
+	}{
+		{
+			name:      "context.DeadlineExceeded is fatal",
+			innerErr:  stdctx.DeadlineExceeded,
+			wantFatal: true,
+		},
+		{
+			name:      "context.Canceled is fatal",
+			innerErr:  stdctx.Canceled,
+			wantFatal: true,
+		},
+		{
+			name:      "io.EOF is non-fatal",
+			innerErr:  io.EOF,
+			wantFatal: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			chunks := []sources.ChunkResult{sources.NewChunkResultError(tc.innerErr)}
+			handler := newDefaultHandler(defaultHandlerType, withChunkReader(mockChunkReader(chunks)))
+			reader, err := newFileReader(context.Background(), strings.NewReader("ignored"))
+			require.NoError(t, err)
+
+			var got []DataOrErr
+			for dataOrErr := range handler.HandleFile(context.Background(), reader) {
+				got = append(got, dataOrErr)
+			}
+
+			require.Len(t, got, 1)
+			require.Error(t, got[0].Err)
+
+			assert.True(t, errors.Is(got[0].Err, ErrProcessingWarning),
+				"outer ErrProcessingWarning wrap should be preserved")
+			assert.True(t, errors.Is(got[0].Err, tc.innerErr),
+				"inner cause should be inspectable via errors.Is")
+			assert.Equal(t, tc.wantFatal, isFatal(got[0].Err),
+				"isFatal should classify based on the inner cause")
+		})
+	}
 }
