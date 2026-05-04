@@ -1,0 +1,16 @@
+---
+description: Detector invariants for detector Go changes
+globs: pkg/detectors/**/*.go
+alwaysApply: false
+---
+
+# Detector Invariants
+
+- Keep detector signal high. `Keywords()` are a union prefilter, so keep them selective and avoid regex or verifier changes that broaden noisy matches.
+- Verification must separate determinate invalid credentials from indeterminate verification failures. Invalid credentials leave `VerificationError` unset; only timeouts, transport failures, and unexpected responses should call `SetVerificationError(...)`, with secrets redacted.
+- Verifiers must use non-destructive API checks and never leak secret keys, tokens, or passwords into errors.
+- `Raw` and `RawV2` are compatibility boundaries. Single-part credentials use `Raw` only, set to the token. Multi-part credentials set `Raw` to the key or secret value and `RawV2` to every piece needed for verification, including varying URL or host, IDs, and token. Once defined, do not change the shape or effective value.
+- `Redacted` is display-only and must stay non-sensitive. When a stable key, account, or credential ID exists, set `Redacted` to that ID; never put the actual secret value there.
+- `SecretParts` is the credential source of truth, and analyzer-facing keys must stay aligned with what analyzers expect.
+- Do not weaken result-cleaning invariants: by default, keep all verified results or a single unverified result unless a detector-specific cleaner intentionally overrides that behavior.
+- `FromData` must stay concurrency-safe, and verification changes should preserve the standard detector test matrix: verified, determinate unverified, indeterminate timeout, indeterminate unexpected response, and not found.
