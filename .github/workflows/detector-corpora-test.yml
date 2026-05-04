@@ -114,14 +114,60 @@ jobs:
 
             No detector source files changed in this PR. Bench skipped.
 
+      # Build extract-keywords first — it's a fast go build (~5s) and is
+      # needed to extract keywords for the cache key before we can restore
+      # the corpus cache.
+      - name: Build extract-keywords helper
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        run: CGO_ENABLED=0 go build -o /tmp/extract-keywords ./hack/extract-keywords
+
+      # Compute a cache key from the actual Keywords() output of each changed
+      # detector. This is more precise than hashing detector source files —
+      # the cache only invalidates when keywords change, not when regex or
+      # verification logic changes.
+      - name: Compute keyword corpus cache key
+        id: corpus_key
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          set -o pipefail
+          KEYWORDS=""
+          while IFS= read -r dir; do
+            [[ -z "$dir" ]] && continue
+            kws=$(/tmp/extract-keywords "$dir" 2>/dev/null || echo "[]")
+            KEYWORDS+="$dir:$kws"$'\n'
+          done < <(
+            git diff --name-only "$MERGE_BASE"...HEAD -- 'pkg/detectors/**/*.go' \
+              | grep -Ev '_test\.go$' \
+              | grep -Ev '^pkg/detectors/(common|custom_detectors)/' \
+              | sed -E 's|^(pkg/detectors/[^/]+(/v[0-9]+)?)/[^/]+\.go$|\1|' \
+              | sort -u
+          )
+          HASH=$(echo "$KEYWORDS" | sha256sum | cut -d' ' -f1)
+          echo "Keyword corpus cache key: keyword-corpus-v1-${HASH}"
+          echo "key=keyword-corpus-v1-${HASH}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore keyword corpus cache
+        id: corpus_cache
+        if: steps.detect.outputs.any_changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/keyword-corpus.jsonl.zstd
+            /tmp/keyword-corpus-meta.json
+          key: ${{ steps.corpus_key.outputs.key }}
+
       # Three independent chains run in parallel:
-      #   A) extract-keywords → keyword corpus (network I/O via GitHub API)
+      #   A) fetch keyword corpus from GitHub API (skipped on cache hit)
       #   B) prepare main worktree → build main binary (git I/O then CPU)
       #   C) build PR binary (CPU, no dependencies)
       # A and B+C are complementary workloads (network vs CPU), so they
-      # overlap efficiently. The GITHUB_ENV write for DATASETS happens inside
-      # chain A's subshell and is flushed before the step exits (after wait),
-      # so the scan step sees the updated value.
+      # overlap efficiently on a cache miss. On a cache hit, only B and C
+      # run. The GITHUB_ENV write for DATASETS is always performed so the
+      # scan step picks up the corpus regardless of cache hit/miss.
       - name: Build binaries and keyword corpus
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
@@ -129,22 +175,24 @@ jobs:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DETECTORS: ${{ steps.detect.outputs.pr_csv }}
+          CORPUS_CACHE_HIT: ${{ steps.corpus_cache.outputs.cache-hit }}
         run: |
           set -o pipefail
 
-          # Chain A: build extract-keywords, then fetch keyword corpus from GitHub.
-          (
-            CGO_ENABLED=0 go build -o /tmp/extract-keywords ./hack/extract-keywords
-            python3 scripts/test/build_keyword_corpus.py \
-              --detectors="$DETECTORS" \
-              --extract-keywords-bin=/tmp/extract-keywords \
-              --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
-              --output-meta=/tmp/keyword-corpus-meta.json \
-              --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
-            printf 'DATASETS<<EOF\n%s\n/tmp/keyword-corpus.jsonl.zstd\nEOF\n' \
-              "$DATASETS" >> "$GITHUB_ENV"
-          ) &
-          PID_CORPUS=$!
+          # Chain A: fetch keyword corpus from GitHub (skipped on cache hit).
+          if [[ "$CORPUS_CACHE_HIT" != 'true' ]]; then
+            (
+              python3 scripts/test/build_keyword_corpus.py \
+                --detectors="$DETECTORS" \
+                --extract-keywords-bin=/tmp/extract-keywords \
+                --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
+                --output-meta=/tmp/keyword-corpus-meta.json \
+                --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
+            ) &
+            PID_CORPUS=$!
+          else
+            echo "Keyword corpus cache hit; skipping GitHub fetch."
+          fi
 
           # Chain B: prepare worktree, then build main binary.
           (
@@ -158,9 +206,13 @@ jobs:
           CGO_ENABLED=0 go build -o /tmp/trufflehog-pr . &
           PID_PR_BUILD=$!
 
-          wait $PID_CORPUS    || { echo "Keyword corpus build failed" >&2; exit 1; }
-          wait $PID_MAIN_BUILD || { echo "Main binary build failed"   >&2; exit 1; }
-          wait $PID_PR_BUILD   || { echo "PR binary build failed"     >&2; exit 1; }
+          [[ -n "${PID_CORPUS:-}" ]] && { wait $PID_CORPUS    || { echo "Keyword corpus build failed" >&2; exit 1; }; }
+          wait $PID_MAIN_BUILD        || { echo "Main binary build failed"   >&2; exit 1; }
+          wait $PID_PR_BUILD          || { echo "PR binary build failed"     >&2; exit 1; }
+
+          # Always append keyword corpus to DATASETS for the scan step.
+          printf 'DATASETS<<EOF\n%s\n/tmp/keyword-corpus.jsonl.zstd\nEOF\n' \
+            "$DATASETS" >> "$GITHUB_ENV"
 
       # PR and main scans run in parallel. Each streams the corpus files
       # independently from S3 — no shared state, different output files,
