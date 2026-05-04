@@ -2,21 +2,23 @@ package cloudflareapitoken
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	cfapitoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (Scanner) Version() int { return 1 }
 
 var (
 	client = common.SaneHttpClient()
@@ -46,19 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/user/tokens/verify", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := cfapitoken.VerifyUserToken(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
