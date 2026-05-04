@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	stdctx "context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -116,4 +118,67 @@ func TestHandleFileLineNumbers(t *testing.T) {
 		// Second chunk should start at line 11 (only 10 lines counted from first chunk's content)
 		assert.Equal(t, int64(11), results[1].LineNumber, "peek data should not be counted")
 	})
+}
+
+// TestDefaultHandler_DataChannelWriteErrorPreservesIdentity is a regression test
+// for the %v wrap at default.go:139. When CancellableWrite fails because the
+// handler context terminated mid-processing, the returned error must preserve
+// the underlying ctx.Err() identity. measureLatencyAndHandleErrors uses
+// errors.Is(err, context.DeadlineExceeded) to drive the timeout metric and the
+// "error processing chunk" framing; with %v that branch is unreachable for the
+// data-channel write failure path.
+func TestDefaultHandler_DataChannelWriteErrorPreservesIdentity(t *testing.T) {
+	cases := []struct {
+		name    string
+		makeCtx func() (stdctx.Context, stdctx.CancelFunc)
+		want    error
+	}{
+		{
+			name: "DeadlineExceeded preserved through writeErr wrap",
+			makeCtx: func() (stdctx.Context, stdctx.CancelFunc) {
+				return stdctx.WithDeadline(stdctx.Background(), time.Now().Add(-time.Second))
+			},
+			want: stdctx.DeadlineExceeded,
+		},
+		{
+			name: "Canceled preserved through writeErr wrap",
+			makeCtx: func() (stdctx.Context, stdctx.CancelFunc) {
+				ctx, cancel := stdctx.WithCancel(stdctx.Background())
+				cancel()
+				return ctx, cancel
+			},
+			want: stdctx.Canceled,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			deadCtx, cancel := tc.makeCtx()
+			defer cancel()
+			ctx := context.AddLogger(deadCtx)
+
+			// Any non-nil error works here; what matters is that the chunk-error
+			// branch runs and reaches CancellableWrite, which then fails because
+			// ctx is already terminal.
+			chunks := []sources.ChunkResult{sources.NewChunkResultError(errors.New("simulated chunk read failure"))}
+			handler := newDefaultHandler(defaultHandlerType, withChunkReader(mockChunkReader(chunks)))
+
+			reader, err := newFileReader(context.Background(), strings.NewReader("ignored"))
+			require.NoError(t, err)
+			defer reader.Close()
+
+			// Unbuffered channel forces CancellableWrite to consult ctx.Done() and
+			// return ctx.Err() since no reader is draining.
+			dataOrErrChan := make(chan DataOrErr)
+
+			err = handler.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), dataOrErrChan)
+			require.Error(t, err)
+
+			assert.True(t, errors.Is(err, ErrProcessingFatal),
+				"outer ErrProcessingFatal wrap must be preserved so isFatal classifies the failure")
+			assert.True(t, errors.Is(err, tc.want),
+				"inner ctx.Err() must remain inspectable so measureLatencyAndHandleErrors "+
+					"can correctly increment the timeout metric")
+		})
+	}
 }
