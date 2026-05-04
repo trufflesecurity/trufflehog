@@ -202,6 +202,7 @@ var (
 	dockerExcludePaths      = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
 	dockerScanNamespace     = dockerScan.Flag("namespace", "Docker namespace (organization or user). For non-Docker Hub registries, include the registry address as well (e.g., ghcr.io/namespace or quay.io/namespace).").String()
 	dockerScanRegistryToken = dockerScan.Flag("registry-token", "Optional Docker registry access token. Provide this if you want to include private images within the specified namespace.").String()
+	dockerScanRegistry      = dockerScan.Flag("registry", "Scan all images in a registry host. Supports OCI Distribution Spec compliant registries (Harbor, Nexus, Artifactory, etc.). Use --registry-token for authentication.").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -1014,21 +1015,38 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both images and namespace at the same time")
 		}
 
-		if *dockerScanImages == nil && *dockerScanNamespace == "" {
-			return scanMetrics, fmt.Errorf("invalid config: both images and namespace cannot be empty; one is required")
+		if *dockerScanImages == nil && *dockerScanNamespace == "" && *dockerScanRegistry == "" {
+			return scanMetrics, fmt.Errorf("invalid config: one of --image, --namespace, or --registry is required")
 		}
 
-		if *dockerScanRegistryToken != "" && *dockerScanNamespace == "" {
-			return scanMetrics, fmt.Errorf("invalid config: registry token can only be used with registry namespace")
+		if *dockerScanRegistry != "" && (*dockerScanImages != nil || *dockerScanNamespace != "") {
+			return scanMetrics, fmt.Errorf("invalid config: --registry cannot be combined with --image or --namespace")
+		}
+
+		if *dockerScanRegistry != "" && isPublicRegistry(*dockerScanRegistry) {
+			return scanMetrics, fmt.Errorf("invalid config: --registry is for private registries only. Use --namespace for public registries (hub.docker.com, quay.io, ghcr.io)")
+		}
+
+		if *dockerScanRegistryToken != "" && *dockerScanNamespace == "" && *dockerScanRegistry == "" {
+			return scanMetrics, fmt.Errorf("invalid config: --registry-token requires --namespace or --registry")
+		}
+
+		// Sanitize registry host to remove protocol prefixes and paths
+		if *dockerScanRegistry != "" {
+			*dockerScanRegistry = sanitizeRegistryHost(*dockerScanRegistry)
+			if *dockerScanRegistry == "" {
+				return scanMetrics, fmt.Errorf("invalid config: --registry value is empty after removing protocol/path (e.g., 'https://' or ' ')")
+			}
 		}
 
 		cfg := sources.DockerConfig{
 			BearerToken:       *dockerScanToken,
 			Images:            *dockerScanImages,
-			UseDockerKeychain: *dockerScanToken == "",
+			UseDockerKeychain: *dockerScanToken == "" && *dockerScanRegistry == "",
 			ExcludePaths:      strings.Split(*dockerExcludePaths, ","),
 			Namespace:         *dockerScanNamespace,
 			RegistryToken:     *dockerScanRegistryToken,
+			Registry:          *dockerScanRegistry,
 		}
 		if ref, err := eng.ScanDocker(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
@@ -1285,6 +1303,72 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	}
 
 	return nil
+}
+
+// normalizeRegistryHost removes protocol prefixes and paths from a registry host string.
+// This is a shared helper used by both isPublicRegistry and sanitizeRegistryHost.
+// Returns the normalized hostname and a boolean indicating if it's empty after normalization.
+func normalizeRegistryHost(host string) (string, bool) {
+	host = strings.TrimSpace(host)
+	
+	// Remove protocol prefixes (case-insensitive)
+	lowerHost := strings.ToLower(host)
+	if strings.HasPrefix(lowerHost, "https://") {
+		host = host[8:] // len("https://") = 8
+	} else if strings.HasPrefix(lowerHost, "http://") {
+		host = host[7:] // len("http://") = 7
+	}
+	
+	// Remove trailing slashes and paths
+	if idx := strings.Index(host, "/"); idx != -1 {
+		host = host[:idx]
+	}
+	
+	host = strings.TrimSpace(host)
+	return host, host == ""
+}
+
+// isPublicRegistry checks if the given registry host is a known public registry.
+// Public registries (DockerHub, Quay, GHCR) should use --namespace flag instead of --registry
+// because they have dedicated implementations with custom APIs.
+func isPublicRegistry(host string) bool {
+	host, empty := normalizeRegistryHost(host)
+	if empty {
+		return false
+	}
+	
+	host = strings.ToLower(host)
+	
+	// Check against known public registries
+	publicRegistries := []string{
+		"hub.docker.com",
+		"docker.io",
+		"registry-1.docker.io",
+		"index.docker.io",
+		"registry.hub.docker.com",
+		"quay.io",
+		"ghcr.io",
+	}
+	
+	for _, registry := range publicRegistries {
+		if host == registry {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// sanitizeRegistryHost removes protocol prefixes and paths from registry host.
+// This ensures clean hostnames are passed to the registry implementation.
+// Examples:
+//   - "https://harbor.corp.io" -> "harbor.corp.io"
+//   - "HTTPS://harbor.corp.io" -> "harbor.corp.io"
+//   - "http://localhost:5000/path" -> "localhost:5000"
+//   - "registry.example.com" -> "registry.example.com"
+func sanitizeRegistryHost(host string) string {
+	normalized, _ := normalizeRegistryHost(host)
+	return normalized
 }
 
 // isPreCommitHook detects if trufflehog is running as a pre-commit hook
