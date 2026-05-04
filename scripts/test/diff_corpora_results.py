@@ -36,13 +36,10 @@ PREAMBLE = (
 )
 
 STATUS_KEY = (
-    "🔴 regression: >5 new, >20% increase over main, or any removed"
-    " \u00a0·\u00a0 "
-    "⚠️ warning: 1–5 new and ≤20% increase over main"
-    " \u00a0·\u00a0 "
-    "✅ clean"
-    " \u00a0·\u00a0 "
-    "🆕 new detector (no baseline)"
+    "- 🔴 regression: >5 new, >20% increase over main, or any removed\n"
+    "- ⚠️ warning: 1–5 new and ≤20% increase over main\n"
+    "- ✅ clean\n"
+    "- 🆕 new detector (no baseline)"
 )
 
 # Marker on the very first line of the body so peter-evans/find-comment can

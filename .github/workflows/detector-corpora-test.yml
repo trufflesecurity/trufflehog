@@ -127,20 +127,23 @@ jobs:
 
       # Two independent builds run in parallel:
       #   A) prepare main worktree → build main binary (git I/O then CPU)
-      #      Skipped on main scan cache hit — binary is not needed.
+      #      Skipped on main scan cache hit or when main_csv is empty
+      #      (all changed detectors are new — no baseline needed).
       #   B) build PR binary (CPU, no dependencies)
       - name: Build binaries
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+          MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
           MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
         run: |
           set -o pipefail
 
           # Chain A: prepare worktree, then build main binary.
-          # Skipped when main scan results are already cached.
-          if [[ "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
+          # Skipped when main scan results are already cached, or when all
+          # changed detectors are new (main_csv empty — no baseline needed).
+          if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
             (
               git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
               cd /tmp/trufflehog-main-src
