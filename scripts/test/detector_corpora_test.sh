@@ -86,6 +86,7 @@ scan() {
                 --print-avg-detector-time \
                 "${INCLUDE_FLAG[@]}" \
                 stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+        wait
     else
         unzstd -c "$input" 2>> "$STDERR_FILE" \
             | jq -r .content 2>> "$STDERR_FILE" \

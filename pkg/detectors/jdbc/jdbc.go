@@ -53,8 +53,7 @@ var (
 	// Matches typical JDBC connection strings.
 	// The terminal character class additionally excludes () and & to avoid
 	// capturing surrounding delimiters (e.g. "(jdbc:…)" or "…&user=x&").
-	// TODO: revert before merging — regex intentionally loosened to trigger corpora test CI on this PR.
-	keyPat = regexp.MustCompile(`(?i)[\w]{3,10}:[^\s"'<>,{}[\]]{10,511}[^\s"'<>,{}[\]()&]`)
+	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"'<>,{}[\]]{10,511}[^\s"'<>,{}[\]()&]`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
