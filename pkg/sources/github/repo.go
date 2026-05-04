@@ -199,7 +199,7 @@ const (
 )
 
 // getReposByOrgOrUser retrieves repositories for an organization or user.
-func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, authenticated bool, reporter sources.UnitReporter) (userType, error) {
+func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter sources.UnitReporter) (userType, error) {
 	var err error
 
 	// try to get repositories for the organization first.
@@ -215,7 +215,10 @@ func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, authentic
 	}
 
 	// if organization repos aren't found, try user repos.
-	err = s.getReposByUser(ctx, name, authenticated, reporter)
+	// Always use unauthenticated user listing since `name` is the target user,
+	// not the authenticated user. Using authenticated listing would incorrectly
+	// return the authenticated user's repos instead of the specified user's.
+	err = s.getReposByUser(ctx, name, false, reporter)
 	if err == nil {
 		if err := s.addUserGistsToCache(ctx, name, reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to add user to cache")
