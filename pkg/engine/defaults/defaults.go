@@ -473,7 +473,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metabase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metrilo"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
+	microsoftteamswebhookv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook/v1"
+	microsoftteamswebhookv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/miro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mite"
@@ -1357,7 +1358,8 @@ func buildDetectorList() []detectors.Detector {
 		&metaapi.Scanner{},
 		&metabase.Scanner{},
 		&metrilo.Scanner{},
-		&microsoftteamswebhook.Scanner{},
+		&microsoftteamswebhookv1.Scanner{},
+		&microsoftteamswebhookv2.Scanner{},
 		&mindmeister.Scanner{},
 		&miro.Scanner{},
 		&mite.Scanner{},
