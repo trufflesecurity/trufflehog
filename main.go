@@ -65,6 +65,7 @@ var (
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	filterTokenize             = cli.Flag("filter-tokenize", "Filter unverified results with an LLM tokenizer to reduce false positives.").Bool()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
 	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
@@ -594,6 +595,7 @@ func run(state overseer.State, logSync func() error) {
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
+		FilterTokenize:           *filterTokenize,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
@@ -646,6 +648,7 @@ func run(state overseer.State, logSync func() error) {
 	logger.Info("finished scanning",
 		"chunks", metrics.ChunksScanned,
 		"bytes", metrics.BytesScanned,
+		"total_results_found", metrics.totalResults,
 		"verified_secrets", metrics.VerifiedSecretsFound,
 		"unverified_secrets", metrics.UnverifiedSecretsFound,
 		"scan_duration", metrics.ScanDuration.String(),
@@ -711,6 +714,7 @@ func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
 type metrics struct {
 	engine.Metrics
 	hasFoundResults bool
+	totalResults    uint32
 }
 
 func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics, error) {
@@ -1194,7 +1198,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		printAverageDetectorTime(eng)
 	}
 
-	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, retErr
+	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults(), totalResults: eng.NumFoundResults()}, retErr
 }
 
 // parseResults ensures that users provide valid CSV input to `--results`.
