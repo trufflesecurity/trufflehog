@@ -11,25 +11,16 @@ Verification is disabled at scan time (--no-verification) to avoid network
 calls against a large corpus where thousands of matches could dominate runtime.
 The diff measures regex match changes only.
 
-Phase 2: when --changed-detectors is provided, the report focuses on the
-detectors changed by the PR. Detectors flagged via --new-detectors are
-rendered with 🆕 status and absolute density (no main baseline). When
---corpus-bytes is provided, a blast-radius column projects matches per
-10 GB of scanned content.
-
-Phase 3a: --keyword-corpus-meta points at the sidecar JSON written by
-scripts/test/build_keyword_corpus.py. When present, detectors whose Layer 1
-(GitHub Code Search) fetch returned zero results get a concise warning
-rendered above the summary table — they're flagged so reviewers know the
-bench's verdict for those detectors leans entirely on the S3 corpus and
-may be under-sampled.
+When --changed-detectors is provided, the report focuses on the detectors
+changed by the PR. Detectors flagged via --new-detectors are rendered with 🆕
+status and absolute density (no main baseline). When --corpus-bytes is
+provided, a blast-radius column projects matches per 10 GB of scanned content.
 
 Usage:
     diff_corpora_results.py <main.jsonl> <pr.jsonl>
         [--changed-detectors=<csv>]
         [--new-detectors=<csv>]
         [--corpus-bytes=<n>]
-        [--keyword-corpus-meta=<path>]
 """
 import argparse
 import json
@@ -138,37 +129,8 @@ def render_blast_radius(matches, corpus_bytes, signed=False):
     return f"{projected:,.0f}"
 
 
-def load_keyword_corpus_meta(path):
-    """Read the sidecar emitted by build_keyword_corpus.py.
-
-    Returns a dict with `thin_l1` (set of detector names, lowercase, dotted
-    suffix stripped to match identity normalization elsewhere in this
-    file) and `reports` (kept as-is for future use). Missing/unreadable
-    file → empty result, surfaced silently — Phase 3a coverage is a
-    nice-to-have, not load-bearing.
-    """
-    if not path:
-        return {"thin_l1": set(), "reports": []}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return {"thin_l1": set(), "reports": []}
-    thin = set()
-    for name in raw.get("thin_l1") or []:
-        if not isinstance(name, str):
-            continue
-        norm = name.split(".", 1)[0].strip().lower()
-        if norm:
-            thin.add(norm)
-    return {"thin_l1": thin, "reports": raw.get("reports") or []}
-
-
-
-def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
-           keyword_meta=None):
+def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None):
     new_detectors = new_detectors or set()
-    keyword_meta = keyword_meta or {"thin_l1": set(), "reports": []}
 
     if changed:
         all_names = {d for d in (set(main) | set(pr))
@@ -296,22 +258,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
             parts.append(f"- `{d}`")
         parts.append("")
 
-    thin_l1 = sorted(keyword_meta.get("thin_l1") or set())
-    if changed:
-        thin_l1 = [d for d in thin_l1 if d in changed]
-    if thin_l1:
-        # Single contiguous blockquote: `>` on the spacer line keeps GitHub
-        # Markdown from splitting the bullet list into a second quote.
-        parts.append(
-            "> ⚠️ **Thin Layer 1 coverage:** GitHub Code Search returned no "
-            "snippets for the detectors below. The bench's verdict for them "
-            "leans entirely on the S3 corpus and may be under-sampled."
-        )
-        parts.append(">")
-        for d in thin_l1:
-            parts.append(f"> - `{d}`")
-        parts.append("")
-
     return "\n".join(parts)
 
 
@@ -325,8 +271,6 @@ def main():
                         help="CSV of detectors present in PR but not main; rendered with 🆕.")
     parser.add_argument("--corpus-bytes", type=int, default=0,
                         help="Total uncompressed bytes scanned; enables blast-radius column.")
-    parser.add_argument("--keyword-corpus-meta", default="",
-                        help="Path to build_keyword_corpus.py sidecar; surfaces thin-L1 warnings.")
     args = parser.parse_args()
 
     main_findings = load_findings(args.main_jsonl)
@@ -334,7 +278,6 @@ def main():
     changed = parse_csv(args.changed_detectors)
     new_detectors = parse_csv(args.new_detectors)
     corpus_bytes = args.corpus_bytes if args.corpus_bytes > 0 else None
-    keyword_meta = load_keyword_corpus_meta(args.keyword_corpus_meta)
 
     sys.stdout.write(render(
         main_findings,
@@ -342,7 +285,6 @@ def main():
         changed=changed if changed else None,
         new_detectors=new_detectors,
         corpus_bytes=corpus_bytes,
-        keyword_meta=keyword_meta,
     ))
 
 

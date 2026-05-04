@@ -10,8 +10,6 @@ on:
       - 'scripts/test/detector_corpora_test.sh'
       - 'scripts/test/diff_corpora_results.py'
       - 'scripts/test/detect_changed_detectors.sh'
-      - 'scripts/test/build_keyword_corpus.py'
-      - 'hack/extract-keywords/**'
 
 env:
   DATASETS: |
@@ -113,83 +111,18 @@ jobs:
 
             No detector source files changed in this PR. Bench skipped.
 
-      # Build extract-keywords first — it's a fast go build (~5s) and is
-      # needed to extract keywords for the cache key before we can restore
-      # the corpus cache.
-      - name: Build extract-keywords helper
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        run: CGO_ENABLED=0 go build -o /tmp/extract-keywords ./hack/extract-keywords
-
-      # Compute a cache key from the actual Keywords() output of each changed
-      # detector. This is more precise than hashing detector source files —
-      # the cache only invalidates when keywords change, not when regex or
-      # verification logic changes.
-      - name: Compute keyword corpus cache key
-        id: corpus_key
+      # Two independent builds run in parallel:
+      #   A) prepare main worktree → build main binary (git I/O then CPU)
+      #   B) build PR binary (CPU, no dependencies)
+      - name: Build binaries
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
           set -o pipefail
-          KEYWORDS=""
-          while IFS= read -r dir; do
-            [[ -z "$dir" ]] && continue
-            kws=$(/tmp/extract-keywords "$dir" 2>/dev/null || echo "[]")
-            KEYWORDS+="$dir:$kws"$'\n'
-          done < <(
-            git diff --name-only "$MERGE_BASE"...HEAD -- 'pkg/detectors/**/*.go' \
-              | grep -Ev '_test\.go$' \
-              | grep -Ev '^pkg/detectors/(common|custom_detectors)/' \
-              | sed -E 's|^(pkg/detectors/[^/]+(/v[0-9]+)?)/[^/]+\.go$|\1|' \
-              | sort -u
-          )
-          HASH=$(echo "$KEYWORDS" | sha256sum | cut -d' ' -f1)
-          echo "Keyword corpus cache key: keyword-corpus-v1-${HASH}"
-          echo "key=keyword-corpus-v1-${HASH}" >> "$GITHUB_OUTPUT"
 
-      - name: Restore keyword corpus cache
-        id: corpus_cache
-        if: steps.detect.outputs.any_changed == 'true'
-        uses: actions/cache/restore@v4
-        with:
-          path: /tmp/keyword-corpus-cache
-          key: ${{ steps.corpus_key.outputs.key }}
-          # Partial hit: fetch only the keywords not already in the cache dir.
-          restore-keys: keyword-corpus-v1-
-
-      # Three independent chains run in parallel:
-      #   A) build keyword corpus — loads per-keyword cache files, fetches
-      #      only keywords not already cached. Always runs (fast on hit).
-      #   B) prepare main worktree → build main binary (git I/O then CPU)
-      #   C) build PR binary (CPU, no dependencies)
-      - name: Build binaries and keyword corpus
-        id: build
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        env:
-          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DETECTORS: ${{ steps.detect.outputs.pr_csv }}
-        run: |
-          set -o pipefail
-
-          # Chain A: build keyword corpus. Loads per-keyword cache files from
-          # /tmp/keyword-corpus-cache/ and only calls the GitHub API for keywords
-          # not present there, so it's fast when most keywords are cached.
-          (
-            python3 scripts/test/build_keyword_corpus.py \
-              --detectors="$DETECTORS" \
-              --extract-keywords-bin=/tmp/extract-keywords \
-              --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
-              --output-meta=/tmp/keyword-corpus-meta.json \
-              --cache-dir=/tmp/keyword-corpus-cache \
-              --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
-          ) &
-          PID_CORPUS=$!
-
-          # Chain B: prepare worktree, then build main binary.
+          # Chain A: prepare worktree, then build main binary.
           (
             git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
             cd /tmp/trufflehog-main-src
@@ -197,38 +130,12 @@ jobs:
           ) &
           PID_MAIN_BUILD=$!
 
-          # Chain C: build PR binary (no dependencies).
+          # Chain B: build PR binary (no dependencies).
           CGO_ENABLED=0 go build -o /tmp/trufflehog-pr . &
           PID_PR_BUILD=$!
 
-          wait $PID_CORPUS     || { echo "Keyword corpus build failed" >&2; exit 1; }
-          wait $PID_MAIN_BUILD || { echo "Main binary build failed"   >&2; exit 1; }
-          wait $PID_PR_BUILD   || { echo "PR binary build failed"     >&2; exit 1; }
-
-          # Save the per-keyword cache dir only when there were no keyword
-          # failures. A partial run leaves the cache dir incomplete — skipping
-          # the save lets the next push retry the missing keywords.
-          CORPUS_USEFUL=false
-          if [[ -s /tmp/keyword-corpus-meta.json ]]; then
-            failures=$(jq '[.reports[].keyword_failures | length] | add // 0' /tmp/keyword-corpus-meta.json)
-            [[ "$failures" -eq 0 ]] && CORPUS_USEFUL=true
-          fi
-          echo "corpus_useful=$CORPUS_USEFUL" >> "$GITHUB_OUTPUT"
-
-          # Always append keyword corpus to DATASETS for the scan step.
-          printf 'DATASETS<<EOF\n%s\n/tmp/keyword-corpus.jsonl.zstd\nEOF\n' \
-            "$DATASETS" >> "$GITHUB_ENV"
-
-      # Save the per-keyword cache dir when the run completed without failures.
-      # Uses the exact key so subsequent pushes with the same keyword set get
-      # an exact hit and the Python script runs in cache-only mode (no API calls).
-      # Skipped on exact cache hit (cache-hit == 'true') since the dir is unchanged.
-      - name: Save keyword corpus cache
-        if: steps.detect.outputs.any_changed == 'true' && steps.corpus_cache.outputs.cache-hit != 'true' && steps.build.outputs.corpus_useful == 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: /tmp/keyword-corpus-cache
-          key: ${{ steps.corpus_key.outputs.key }}
+          wait $PID_MAIN_BUILD || { echo "Main binary build failed" >&2; exit 1; }
+          wait $PID_PR_BUILD   || { echo "PR binary build failed"   >&2; exit 1; }
 
       # PR and main scans run in parallel. Each streams the corpus files
       # independently from S3 — no shared state, different output files,
@@ -290,16 +197,11 @@ jobs:
           if [[ -s /tmp/corpus-bytes.txt ]]; then
             CORPUS_BYTES=$(cat /tmp/corpus-bytes.txt)
           fi
-          META_ARG=()
-          if [[ -s /tmp/keyword-corpus-meta.json ]]; then
-            META_ARG=(--keyword-corpus-meta=/tmp/keyword-corpus-meta.json)
-          fi
           python3 scripts/test/diff_corpora_results.py \
             /tmp/results-main.jsonl /tmp/results-pr.jsonl \
             --changed-detectors="$CHANGED" \
             --new-detectors="$NEW_DETECTORS" \
             --corpus-bytes="$CORPUS_BYTES" \
-            "${META_ARG[@]}" \
             > /tmp/diff-report.md
           cat /tmp/diff-report.md
 
