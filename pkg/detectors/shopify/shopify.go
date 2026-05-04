@@ -51,6 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_Shopify,
 				Redacted:     domainRes,
 				Raw:          []byte(key + domainRes),
+				SecretParts: map[string]string{
+					"key":       key,
+					"store_url": domainRes,
+				},
 			}
 
 			// set key as the primary secret for engine to find the line number
@@ -76,10 +80,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.Verified = true
 							s1.ExtraData = map[string]string{
 								"access_scopes": strings.Join(handleArray, ","),
-							}
-							s1.SecretParts = map[string]string{
-								"key":       key,
-								"store_url": domainRes,
 							}
 						}
 						res.Body.Close()

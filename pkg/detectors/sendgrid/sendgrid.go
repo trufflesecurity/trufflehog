@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_SendGrid,
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -60,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = verified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
-			s1.SecretParts = map[string]string{"key": token}
 		}
 
 		results = append(results, s1)

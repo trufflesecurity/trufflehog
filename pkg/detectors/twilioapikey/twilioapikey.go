@@ -65,6 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				RawV2:        []byte(apiKey + secret),
 				Redacted:     secret[:5] + "...",
 				ExtraData:    make(map[string]string),
+				SecretParts:  map[string]string{"key": apiKey, "sid": secret},
 			}
 
 			if verify {
@@ -74,10 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				for key, value := range extraData {
 					s1.ExtraData[key] = value
-				}
-
-				if s1.Verified {
-					s1.SecretParts = map[string]string{"key": apiKey, "sid": secret}
 				}
 			}
 
