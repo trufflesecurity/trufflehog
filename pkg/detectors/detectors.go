@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
@@ -355,4 +357,21 @@ func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
 	parsedURL.Path = ""
 	parsedURL.RawQuery = ""
 	return parsedURL, nil
+}
+
+type dedupKeyContextKey struct{}
+
+func withDedupKey(ctx context.Context, detType detector_typepb.DetectorType, credential string) context.Context {
+	key := fmt.Sprintf("%d:%s", int32(detType), credential)
+	return context.WithValue(ctx, dedupKeyContextKey{}, key)
+}
+
+// DoWithDedup executes req through client, coalescing concurrent requests that share
+// the same detector type and credential into a single network call via singleflight.
+// The response body is fully buffered and replayed to every waiting caller.
+//
+// Use this instead of client.Do for all verification requests on a client created
+// with NewClientWithDedup or WithDedup — it is the only way to activate deduplication.
+func DoWithDedup(client *http.Client, detType detector_typepb.DetectorType, credential string, req *http.Request) (*http.Response, error) {
+	return client.Do(req.WithContext(withDedupKey(req.Context(), detType, credential)))
 }
