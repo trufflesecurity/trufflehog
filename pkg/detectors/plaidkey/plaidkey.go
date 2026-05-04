@@ -76,6 +76,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detector_typepb.DetectorType_PlaidKey,
 					Raw:          []byte(secret),
 					RawV2:        []byte(fmt.Sprintf(`%s:%s:%s`, secret, id, token)),
+					SecretParts: map[string]string{
+						"secret": secret,
+						"id":     id,
+						"token":  token,
+					},
 				}
 
 				if verify {
@@ -87,13 +92,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.Verified = isVerified
 					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", environment)}
 					s1.SetVerificationError(verificationErr, id, secret)
-					if s1.Verified {
-						s1.SecretParts = map[string]string{
-							"secret": secret,
-							"id":     id,
-							"token":  token,
-						}
-					}
 				}
 				results = append(results, s1)
 			}

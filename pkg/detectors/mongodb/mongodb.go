@@ -88,6 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
 			},
+			SecretParts: map[string]string{"key": connStr},
 		}
 
 		if verify {
@@ -102,12 +103,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			r.SetVerificationError(vErr, password)
-
-			if isVerified {
-				r.SecretParts = map[string]string{
-					"key": connStr,
-				}
-			}
 		}
 		results = append(results, r)
 	}

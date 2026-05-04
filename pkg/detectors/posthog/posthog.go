@@ -42,6 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_PosthogApp,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -59,9 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-					s1.SecretParts = map[string]string{
-						"key": resMatch,
-					}
 				} else if res.StatusCode == 401 {
 					// Try EU Endpoint only if other one fails.
 					res, err := client.Do(reqEU)
@@ -69,9 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
-							s1.SecretParts = map[string]string{
-								"key": resMatch,
-							}
 						}
 					}
 				}

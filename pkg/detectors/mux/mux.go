@@ -50,6 +50,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_Mux,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
+				SecretParts: map[string]string{
+					"key":    resMatch,
+					"secret": resSecretMatch,
+				},
 			}
 
 			if verify {
@@ -64,12 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					}
-				}
-				if s1.Verified {
-					s1.SecretParts = map[string]string{
-						"key":    resMatch,
-						"secret": resSecretMatch,
 					}
 				}
 			}

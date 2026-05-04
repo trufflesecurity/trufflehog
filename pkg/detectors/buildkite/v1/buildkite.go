@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_Buildkite,
 			Raw:          []byte(resMatch),
 			ExtraData:    make(map[string]string),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -60,12 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 			s1.ExtraData = extraData
-
-			if isVerified {
-				s1.SecretParts = map[string]string{
-					"key": resMatch,
-				}
-			}
 		}
 
 		results = append(results, s1)

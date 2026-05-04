@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Postmark,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -51,12 +52,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = valid
 			s1.ExtraData = extraData
 			s1.SetVerificationError(err)
-
-			if valid {
-				s1.SecretParts = map[string]string{
-					"key": resMatch,
-				}
-			}
 		}
 
 		results = append(results, s1)

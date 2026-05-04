@@ -139,6 +139,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			DetectorType: detector_typepb.DetectorType_Postgres,
 			Raw:          raw,
 			RawV2:        raw,
+			SecretParts:  map[string]string{"connection_string": string(raw)},
 		}
 
 		// We don't need to normalize the (deprecated) requiressl option into the (up-to-date) sslmode option - pq can
@@ -164,9 +165,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
-			result.SecretParts = map[string]string{
-				"connection_string": string(raw),
-			}
 		}
 
 		// We gather SSL information into ExtraData in case it's useful for later reporting.

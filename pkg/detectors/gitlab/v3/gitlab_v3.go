@@ -71,6 +71,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
 					"version":        fmt.Sprintf("%d", s.Version()),
 				},
+				SecretParts: map[string]string{
+					"key":  resMatch,
+					"host": endpoint,
+				},
 			}
 
 			if verify {
@@ -81,14 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				s1.SetVerificationError(verificationErr)
 
-				// for verified keys set the analysis info
+				// for verified keys break out of the endpoint loop to continue to next secret
 				if s1.Verified {
-					s1.SecretParts = map[string]string{
-						"key":  resMatch,
-						"host": endpoint,
-					}
-
-					// if secret is verified with one endpoint, break the loop to continue to next secret
 					results = append(results, s1)
 					break
 				}

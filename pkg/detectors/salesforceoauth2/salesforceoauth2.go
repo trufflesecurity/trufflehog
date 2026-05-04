@@ -92,6 +92,11 @@ domainLoop:
 					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Raw:          []byte(secret),
 					RawV2:        fmt.Appendf([]byte{}, "%s:%s:%s", domain, key, secret),
+					SecretParts: map[string]string{
+						"domain":        domain,
+						"client_id":     key,
+						"client_secret": secret,
+					},
 				}
 
 				if verify {
@@ -104,15 +109,6 @@ domainLoop:
 						}
 
 						s1.SetVerificationError(verificationErr, secret)
-					}
-
-					if isVerified {
-						s1.SecretParts = map[string]string{
-							"domain":        domain,
-							"client_id":     key,
-							"client_secret": secret,
-						}
-
 					}
 				}
 

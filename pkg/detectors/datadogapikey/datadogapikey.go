@@ -66,6 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_DatadogApikey,
 			Raw:          []byte(resApiMatch),
+			SecretParts:  map[string]string{"api_key": resApiMatch},
 		}
 
 		if verify {
@@ -74,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, baseURL)
 				if isVerified {
 					s1.Verified = isVerified
-					s1.SecretParts = map[string]string{"api_key": resApiMatch, "endpoint": baseURL}
+					s1.SecretParts["endpoint"] = baseURL
 					// break the loop once we've successfully validated the token against a baseURL
 					break
 				}

@@ -89,6 +89,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(tokenName),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", tokenName, tokenSecret, endpoint)),
 					ExtraData:    make(map[string]string),
+					SecretParts:  map[string]string{"token_name": tokenName, "pat_secret": tokenSecret, "endpoint": endpoint},
 				}
 
 				if verify {
@@ -97,9 +98,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					result.Verified = isVerified
 					maps.Copy(result.ExtraData, extraData)
 					result.SetVerificationError(verificationErr, tokenName, tokenSecret, endpoint)
-					if isVerified {
-						result.SecretParts = map[string]string{"token_name": tokenName, "pat_secret": tokenSecret, "endpoint": endpoint}
-					}
 				}
 				results = append(results, result)
 			}

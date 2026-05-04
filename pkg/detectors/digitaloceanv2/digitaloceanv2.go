@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_DigitalOceanV2,
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -64,19 +65,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr)
 				s1.Verified = verified
 				if s1.Verified {
-					s1.SecretParts = map[string]string{
-						"key": newAccessToken,
-					}
+					s1.SecretParts["key"] = newAccessToken
 				}
 			case strings.HasPrefix(token, "doo_v1_"), strings.HasPrefix(token, "dop_v1_"):
 				verified, verificationErr := verifyAccessToken(ctx, client, token)
 				s1.Verified = verified
 				s1.SetVerificationError(verificationErr)
-				if s1.Verified {
-					s1.SecretParts = map[string]string{
-						"key": token,
-					}
-				}
 			}
 		}
 

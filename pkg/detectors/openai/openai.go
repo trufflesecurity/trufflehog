@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_OpenAI,
 			Redacted:     token[:3] + "..." + token[min(len(token)-1, 47):],
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -66,7 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = verified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
-			s1.SecretParts = map[string]string{"key": token}
 		}
 
 		results = append(results, s1)
