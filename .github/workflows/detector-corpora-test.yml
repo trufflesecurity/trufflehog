@@ -8,11 +8,10 @@ on:
       - 'pkg/detectors/**'
       - 'pkg/engine/defaults/defaults.go'
       - '.github/workflows/detector-corpora-test.yml'
-      - 'scripts/detector_corpora_test.sh'
-      - 'scripts/diff_corpora_results.py'
-      - 'scripts/detect_changed_detectors.sh'
-      - 'scripts/build_keyword_corpus.py'
-      - 'scripts/render_heatmap.py'
+      - 'scripts/test/detector_corpora_test.sh'
+      - 'scripts/test/diff_corpora_results.py'
+      - 'scripts/test/detect_changed_detectors.sh'
+      - 'scripts/test/build_keyword_corpus.py'
       - 'hack/extract-keywords/**'
 
 env:
@@ -39,11 +38,6 @@ jobs:
 
       - name: Install dependencies
         run: sudo apt-get install -y zstd jq
-
-      # matplotlib drives the Phase 4 heatmap render. Pinned-major install
-      # to keep CI deterministic; ~30s cold install, fine at current scale.
-      - name: Install matplotlib
-        run: pip install --quiet 'matplotlib>=3.7,<4'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -74,10 +68,10 @@ jobs:
           BASE_REF: ${{ steps.merge_base.outputs.sha }}
         run: |
           set -o pipefail
-          chmod +x scripts/detect_changed_detectors.sh
-          PR_CSV=$(./scripts/detect_changed_detectors.sh --pr-csv || true)
-          MAIN_CSV=$(./scripts/detect_changed_detectors.sh --main-csv || true)
-          NEW_LIST=$(./scripts/detect_changed_detectors.sh --new-only || true)
+          chmod +x scripts/test/detect_changed_detectors.sh
+          PR_CSV=$(./scripts/test/detect_changed_detectors.sh --pr-csv || true)
+          MAIN_CSV=$(./scripts/test/detect_changed_detectors.sh --main-csv || true)
+          NEW_LIST=$(./scripts/test/detect_changed_detectors.sh --new-only || true)
           NEW_CSV=$(echo "$NEW_LIST" | paste -sd, -)
           echo "PR detectors:   $PR_CSV"
           echo "Main detectors: $MAIN_CSV"
@@ -93,7 +87,7 @@ jobs:
 
       # Sticky comment: find any prior detector-bench comment on the PR by
       # the marker substring and update it in place. The marker — kept in
-      # sync with STICKY_COMMENT_MARKER in scripts/diff_corpora_results.py —
+      # sync with STICKY_COMMENT_MARKER in scripts/test/diff_corpora_results.py —
       # has to appear in BOTH the skip body and the diff body so the same
       # comment flips between them as iterative pushes change which path
       # fires. Skip body is only posted on pull_request events; the original
@@ -142,7 +136,7 @@ jobs:
           DETECTORS: ${{ steps.detect.outputs.pr_csv }}
         run: |
           set -o pipefail
-          python3 scripts/build_keyword_corpus.py \
+          python3 scripts/test/build_keyword_corpus.py \
             --detectors="$DETECTORS" \
             --extract-keywords-bin=/tmp/extract-keywords \
             --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
@@ -201,7 +195,7 @@ jobs:
             [[ -z "$dataset" ]] && continue
             files+=("$dataset")
           done <<< "$DATASETS"
-          ./scripts/detector_corpora_test.sh "${files[@]}"
+          ./scripts/test/detector_corpora_test.sh "${files[@]}"
 
       # Main scan is skipped when main_csv is empty (PR adds only new
       # detectors — nothing to compare against on main). The diff step is
@@ -227,55 +221,7 @@ jobs:
             [[ -z "$dataset" ]] && continue
             files+=("$dataset")
           done <<< "$DATASETS"
-          ./scripts/detector_corpora_test.sh "${files[@]}"
-
-      # Render the per-(detector × decoder) Δ heatmap. Decoder columns are
-      # the only stable per-finding signal post-stdin (file metadata is lost
-      # — see render_heatmap.py docstring), and they're real diagnostic
-      # signal: regressions in the BASE64 path mean something different
-      # from regressions in PLAIN. Two outputs:
-      #
-      #   - heatmap-grid.json: the actual data the comment renders from
-      #     (via diff_corpora_results.py's emoji table). The comment never
-      #     embeds the PNG — GitHub's PR-comment Markdown sanitizer strips
-      #     ``data:`` URLs and serves artifact zips behind auth, so neither
-      #     inline nor artifact-link images render.
-      #   - heatmap.png: archived as a workflow artifact for reviewers
-      #     who want the colored matplotlib version. The comment includes
-      #     a click-through link to it.
-      #
-      # Both outputs are skipped when the grid would be empty/all-zero;
-      # the diff step's `[[ -s ... ]]` guards handle that cleanly.
-      - name: Render heatmap
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        env:
-          CHANGED: ${{ steps.detect.outputs.pr_csv }}
-        run: |
-          set -o pipefail
-          python3 scripts/render_heatmap.py \
-            /tmp/results-main.jsonl /tmp/results-pr.jsonl \
-            --changed-detectors="$CHANGED" \
-            --output=/tmp/heatmap.png \
-            --grid-output=/tmp/heatmap-grid.json || true
-          if [[ -s /tmp/heatmap-grid.json ]]; then
-            ls -lh /tmp/heatmap-grid.json /tmp/heatmap.png 2>/dev/null || true
-          else
-            echo "No heatmap produced (empty grid or no diff)."
-          fi
-
-      # Archive the colored PNG so reviewers who want the rich version can
-      # click through. The comment never embeds the image — see the render
-      # step comment for why — so this is artifact-only.
-      - name: Upload heatmap artifact
-        id: upload_heatmap
-        if: steps.detect.outputs.any_changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: detector-bench-heatmap
-          path: /tmp/heatmap.png
-          if-no-files-found: ignore
-          retention-days: 14
+          ./scripts/test/detector_corpora_test.sh "${files[@]}"
 
       - name: Diff results
         if: steps.detect.outputs.any_changed == 'true'
@@ -283,7 +229,6 @@ jobs:
         env:
           CHANGED: ${{ steps.detect.outputs.pr_csv }}
           NEW_DETECTORS: ${{ steps.detect.outputs.new_csv }}
-          HEATMAP_ARTIFACT_URL: ${{ steps.upload_heatmap.outputs.artifact-url }}
         run: |
           set -o pipefail
           CORPUS_BYTES=0
@@ -294,20 +239,12 @@ jobs:
           if [[ -s /tmp/keyword-corpus-meta.json ]]; then
             META_ARG=(--keyword-corpus-meta=/tmp/keyword-corpus-meta.json)
           fi
-          HEATMAP_ARG=()
-          if [[ -s /tmp/heatmap-grid.json ]]; then
-            HEATMAP_ARG=(--heatmap-grid=/tmp/heatmap-grid.json)
-            if [[ -n "$HEATMAP_ARTIFACT_URL" ]]; then
-              HEATMAP_ARG+=(--heatmap-artifact-url="$HEATMAP_ARTIFACT_URL")
-            fi
-          fi
-          python3 scripts/diff_corpora_results.py \
+          python3 scripts/test/diff_corpora_results.py \
             /tmp/results-main.jsonl /tmp/results-pr.jsonl \
             --changed-detectors="$CHANGED" \
             --new-detectors="$NEW_DETECTORS" \
             --corpus-bytes="$CORPUS_BYTES" \
             "${META_ARG[@]}" \
-            "${HEATMAP_ARG[@]}" \
             > /tmp/diff-report.md
           cat /tmp/diff-report.md
 
