@@ -606,7 +606,10 @@ func TestDetectorValidations(t *testing.T) {
 			results, err := detector.FromData(context.Background(), false, []byte(tt.input.Data))
 			assert.NoError(t, err)
 
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "ExtraData", "verificationError", "primarySecret")
+			ignoreOpts := cmp.Options{
+				cmpopts.IgnoreUnexported(detectors.Result{}),
+				cmpopts.IgnoreFields(detectors.Result{}, "ExtraData"),
+			}
 			if diff := cmp.Diff(results, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("CustomDetector.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

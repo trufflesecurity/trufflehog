@@ -1182,6 +1182,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			results = e.filterResults(ctx, data.detector, results)
 		}
 
+		AssignDuplicateLineOffsets(&data.chunk, results)
+
 		for _, res := range results {
 			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
 		}
@@ -1327,21 +1329,39 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	}
 }
 
+// effectiveSecret returns the canonical secret string for a result, preferring
+// the primary secret value and falling back to Raw. Callers that compute or
+// consume chunk offsets must go through this helper so the two stay in sync.
+func effectiveSecret(r *detectors.Result) string {
+	secret := r.GetPrimarySecretValue()
+	if secret == "" {
+		secret = string(r.Raw)
+	}
+	return secret
+}
+
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	// get the primary secret value from the result if set
-	secret := result.GetPrimarySecretValue()
-	if secret == "" {
-		secret = string(result.Raw)
+	secretBytes := []byte(effectiveSecret(result))
+
+	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
+	// pre-assigned (for duplicate secrets), use it directly to find the correct
+	// occurrence instead of always matching the first one.
+	var offset int
+	if result.HasChunkOffset() {
+		offset = int(result.ChunkOffset())
+	} else {
+		offset = bytes.Index(chunk.Data, secretBytes)
+		if offset == -1 {
+			return 0, false
+		}
 	}
 
-	before, after, found := bytes.Cut(chunk.Data, []byte(secret))
-	if !found {
-		return 0, false
-	}
-	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
 	result.SetPrimarySecretLine(lineNumber)
-	// If the line contains the ignore tag, we should ignore the result.
+
+	// If the line containing the secret has the ignore tag, we should ignore the result.
+	after := chunk.Data[offset+len(secretBytes):]
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
 		endLine = len(after)
@@ -1350,6 +1370,46 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		return lineNumber, true
 	}
 	return lineNumber, false
+}
+
+// AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same
+// secret value within a chunk. This allows FragmentLineOffset to locate the correct
+// occurrence instead of always finding the first one.
+func AssignDuplicateLineOffsets(chunk *sources.Chunk, results []detectors.Result) {
+	// Group result indices by their secret value.
+	type group struct {
+		secret  string
+		indices []int
+	}
+	seen := make(map[string]int) // secret -> index into groups slice
+	var groups []group
+
+	for i := range results {
+		secret := effectiveSecret(&results[i])
+		if idx, ok := seen[secret]; ok {
+			groups[idx].indices = append(groups[idx].indices, i)
+		} else {
+			seen[secret] = len(groups)
+			groups = append(groups, group{secret: secret, indices: []int{i}})
+		}
+	}
+
+	for _, g := range groups {
+		if len(g.indices) <= 1 {
+			continue
+		}
+		secretBytes := []byte(g.secret)
+		searchStart := 0
+		for _, ri := range g.indices {
+			pos := bytes.Index(chunk.Data[searchStart:], secretBytes)
+			if pos == -1 {
+				break
+			}
+			absPos := searchStart + pos
+			results[ri].SetChunkOffset(int64(absPos))
+			searchStart = absPos + len(secretBytes)
+		}
+	}
 }
 
 // FragmentFirstLineAndLink extracts the first line number and the link from the chunk metadata.
