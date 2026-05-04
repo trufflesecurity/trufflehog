@@ -38,10 +38,20 @@ from collections import defaultdict
 
 
 PREAMBLE = (
-    "This bench measures regex match regressions only. It runs with "
-    "`--no-verification --allow-verification-overlap` so each detector's "
-    "regex behavior is measured independently — verifier behavior is tested "
-    "separately by detector unit tests."
+    "Scans a corpus of real-world public code against only the detectors "
+    "changed in this PR, then compares unique match counts between the PR "
+    "build and the main baseline to catch regex regressions. Verification "
+    "is disabled — each detector's regex is measured independently."
+)
+
+STATUS_KEY = (
+    "🔴 regression: >5 new, >20% increase over main, or any removed"
+    " \u00a0·\u00a0 "
+    "⚠️ warning: 1–5 new"
+    " \u00a0·\u00a0 "
+    "✅ clean"
+    " \u00a0·\u00a0 "
+    "🆕 new detector (no baseline)"
 )
 
 # Marker on the very first line of the body so peter-evans/find-comment can
@@ -106,21 +116,15 @@ def status_emoji(new_count, removed_count, unique_main):
     return "✅"
 
 
-def build_top_line_summary(rows):
-    """One-line bold verdict rendered above the preamble.
-
-    Three buckets keyed off the locked emoji semantics:
-      - regressed: 🔴 (severe) + ⚠️ (soft warning, NEW > 0 but below the
-        🔴 threshold). ⚠️ folds in here because the bench's whole job is
-        flagging regex behavior changes; a separate "warned" bucket would
-        split the headline and dilute the reviewer signal.
-      - new: 🆕 detectors added by the PR.
-      - unchanged: ✅ no diff vs main.
-    """
+def build_top_line_summary(rows, changed):
     regressed = sum(1 for r in rows if not r["is_new"] and r["emoji"] in ("🔴", "⚠️"))
     new_count = sum(1 for r in rows if r["is_new"])
-    unchanged = sum(1 for r in rows if r["emoji"] == "✅")
-    return f"**{regressed} regressed, {new_count} new, {unchanged} unchanged.**"
+    clean = sum(1 for r in rows if r["emoji"] == "✅")
+    scoped = ", ".join(f"`{d}`" for d in sorted(changed)) if changed else ""
+    summary = f"**{regressed} regressed · {new_count} new · {clean} clean**"
+    if scoped:
+        summary += f" \u00a0|\u00a0 Scoped to: {scoped}"
+    return summary
 
 
 def render_blast_radius(matches, corpus_bytes, signed=False):
@@ -216,18 +220,13 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
 
     parts = [
         STICKY_COMMENT_MARKER,
-        "## Corpora Test Results — Diff (PR vs main)",
+        "## Corpora Test Results",
+        "",
+        PREAMBLE,
         "",
     ]
     if rows:
-        parts += [build_top_line_summary(rows), ""]
-    parts += [PREAMBLE, ""]
-    if changed:
-        parts.append(
-            f"_Scoped to {len(changed)} detector(s) changed in this PR; "
-            f"unchanged detectors are not measured._"
-        )
-        parts.append("")
+        parts += [build_top_line_summary(rows, changed), ""]
 
     if not rows and not missing:
         parts += ["_(No findings on either side for the changed detectors.)_", ""]
@@ -243,18 +242,14 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
                 )
             )
         else:
-            parts += [
-                "✅ No diff vs main — regex matches are identical across both builds.",
-                "",
-            ]
             rows.sort(key=lambda r: r["detector"])
 
         show_blast = corpus_bytes is not None and corpus_bytes > 0
-        cols = ["Status", "Detector", "total main", "total PR",
-                "unique main", "unique PR", "NEW", "REMOVED"]
-        aligns = ["", "", "---:", "---:", "---:", "---:", "---:", "---:"]
+        cols = ["Status", "Detector", "Unique matches (main)", "Unique matches (PR)",
+                "New", "Removed"]
+        aligns = ["", "", "---:", "---:", "---:", "---:"]
         if show_blast:
-            cols.append("Blast radius (Δ per 10 GB)")
+            cols.append("Δ per 10 GB")
             aligns.append("---:")
         parts += [
             "| " + " | ".join(cols) + " |",
@@ -267,8 +262,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
                     r["emoji"],
                     r["detector"],
                     "—",
-                    str(r["total_pr"]),
-                    "—",
                     str(r["unique_pr"]),
                     "—",
                     "—",
@@ -277,8 +270,6 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
                 cells = [
                     r["emoji"],
                     r["detector"],
-                    str(r["total_main"]),
-                    str(r["total_pr"]),
                     str(r["unique_main"]),
                     str(r["unique_pr"]),
                     str(r["new_count"]),
@@ -288,14 +279,8 @@ def render(main, pr, changed=None, new_detectors=None, corpus_bytes=None,
                 cells.append(r["blast"] or "—")
             parts.append("| " + " | ".join(cells) + " |")
         parts.append("")
-
-        if show_blast:
-            parts += [
-                "_Blast radius projects PR-vs-main match-count delta to a 10 GB "
-                "monorepo (positive = added matches, negative = removed). For 🆕 "
-                "rows it shows absolute projected matches with no baseline._",
-                "",
-            ]
+        parts.append(STATUS_KEY)
+        parts.append("")
 
     if missing:
         parts += [
