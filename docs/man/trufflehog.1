@@ -552,6 +552,30 @@ Find credentials in multiple sources defined in configuration.
 \fBjson-enumerator [<path>...]\fR
 Find credentials from a JSON enumerator input.
 .SS
+\fBweb --url=URL [<flags>]\fR
+Scan websites for leaked credentials.
+.TP
+\fB--url=URL\fR
+URL to scan. Repeat the flag for multiple targets, e.g. --url https://a.com --url https://b.com. Supports http:// and https://.
+.TP
+\fB--crawl\fR
+Follow links found on each page. Without this flag only the seed URL(s) are scanned.
+.TP
+\fB--depth=1\fR
+Maximum link depth to follow when --crawl is enabled. 1 = seed; 2 = one level deeper; 0 = unlimited.
+.TP
+\fB--delay=1\fR
+Seconds to wait between requests to the same domain. Increase this to reduce load on the target server.
+.TP
+\fB--timeout=30\fR
+Seconds to spend crawling URLs before aborting. Total time shared across all URLs when multiple --url flags are given.
+.TP
+\fB--user-agent=USER-AGENT\fR
+User-Agent header to send with each request. Defaults to a TruffleHog identifier if not set.
+.TP
+\fB--ignore-robots\fR
+Ignore robots.txt restrictions. Only use this if you have explicit permission to crawl the target site.
+.SS
 \fBanalyze\fR
 Analyze API keys for fine-grained permissions information.
 .SH "EXIT STATUS"
