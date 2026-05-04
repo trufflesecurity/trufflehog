@@ -18,13 +18,13 @@ jobs:
       id-token: "write"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25"
       - id: "auth"
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@v3"
         with:
           workload_identity_provider: "projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "github-ci-external@trufflehog-testing.iam.gserviceaccount.com"
@@ -48,7 +48,7 @@ jobs:
           secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
           tags: integration
       - name: Annotate test results
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         if: success() || failure() # always run even if the previous step fails
         with:
           report_paths: "tmp/test-results/*.xml"
@@ -60,9 +60,9 @@ jobs:
       contents: "read"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25"
       - name: Test

@@ -57,8 +57,9 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 			_, _ = yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
 		}
 	}
+
 	if r.VerificationFromCache {
-		_, _ = cyanPrinter.Print("(Verification info cached)\n")
+		_, _ = cyanPrinter.Print("🔍 Using cached verification)\n")
 	}
 	_, _ = printer.Printf("Detector Type: %s\n", out.DetectorType)
 	_, _ = printer.Printf("Decoder Type: %s\n", out.DecoderType)

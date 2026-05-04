@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tickettailor"}) + `\b(sk_[0-9]{4}_[0-9]{6}_[a-f0-9]{32})`)
@@ -77,7 +77,7 @@ func verifyTicketTailor(ctx context.Context, client *http.Client, apiKey string)
 	req.Header.Add("Accept", "application/json")
 	// as per API docs we only need to use apiKey as username in basic auth and leave password as empty: https://developers.tickettailor.com/#authentication
 	req.SetBasicAuth(apiKey, "")
-	resp, err := client.Do(req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Tickettailor, apiKey, req)
 	if err != nil {
 		return false, nil
 	}
