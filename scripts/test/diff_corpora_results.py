@@ -18,7 +18,7 @@ rendered with 🆕 status and absolute density (no main baseline). When
 10 GB of scanned content.
 
 Phase 3a: --keyword-corpus-meta points at the sidecar JSON written by
-scripts/build_keyword_corpus.py. When present, detectors whose Layer 1
+scripts/test/build_keyword_corpus.py. When present, detectors whose Layer 1
 (GitHub Code Search) fetch returned zero results get a concise warning
 rendered above the summary table — they're flagged so reviewers know the
 bench's verdict for those detectors leans entirely on the S3 corpus and

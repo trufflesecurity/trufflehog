@@ -17,7 +17,7 @@ else
 fi
 > "$OUTPUT_JSONL"
 
-# Captures trufflehog stderr (incl. --print-avg-detector-time output) for downstream phases.
+# Captures trufflehog stderr (incl. --print-avg-detector-time output) for postmortem inspection.
 STDERR_FILE="${STDERR_FILE:-/tmp/corpora-stderr.txt}"
 > "$STDERR_FILE"
 
@@ -30,7 +30,7 @@ fi
 
 # When set, scope the scan to specific detectors. Comma-separated, lowercase
 # proto enum names with optional ".v<n>" suffix (matches the format produced
-# by scripts/detect_changed_detectors.sh).
+# by scripts/test/detect_changed_detectors.sh).
 INCLUDE_DETECTORS="${INCLUDE_DETECTORS:-}"
 INCLUDE_FLAG=()
 if [[ -n "$INCLUDE_DETECTORS" ]]; then
@@ -40,9 +40,7 @@ fi
 # When set, total uncompressed content bytes streamed to trufflehog (across
 # all datasets in this run) are written to this path. Used by the diff
 # script to compute blast-radius density. Awk inline-counts the post-jq
-# stream so we don't double-read; END block runs before stdin EOF
-# propagates out of the pipeline, so the value is written by the time the
-# scan exits.
+# stream so we don't double-read the corpus for byte accounting.
 CORPUS_BYTES_FILE="${CORPUS_BYTES_FILE:-}"
 TOTAL_BYTES=0
 

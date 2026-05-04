@@ -3,7 +3,6 @@ name: Corpora Test
 on:
   workflow_dispatch:
   pull_request:
-    # types: [opened, reopened] TODO: Decide if we should run this on every push
     paths:
       - 'pkg/detectors/**'
       - 'pkg/engine/defaults/defaults.go'
@@ -90,8 +89,8 @@ jobs:
       # sync with STICKY_COMMENT_MARKER in scripts/test/diff_corpora_results.py —
       # has to appear in BOTH the skip body and the diff body so the same
       # comment flips between them as iterative pushes change which path
-      # fires. Skip body is only posted on pull_request events; the original
-      # workflow_dispatch early-return is preserved by the event-name guard.
+      # fires. Skip body is only posted on pull_request events; workflow_dispatch
+      # runs with no changed detectors silently finish without posting.
       - name: Find existing skip comment
         if: steps.detect.outputs.any_changed != 'true' && github.event_name == 'pull_request'
         id: find_skip_comment
@@ -153,46 +152,42 @@ jobs:
       - name: Restore keyword corpus cache
         id: corpus_cache
         if: steps.detect.outputs.any_changed == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: |
-            /tmp/keyword-corpus.jsonl.zstd
-            /tmp/keyword-corpus-meta.json
+          path: /tmp/keyword-corpus-cache
           key: ${{ steps.corpus_key.outputs.key }}
+          # Partial hit: fetch only the keywords not already in the cache dir.
+          restore-keys: keyword-corpus-v1-
 
       # Three independent chains run in parallel:
-      #   A) fetch keyword corpus from GitHub API (skipped on cache hit)
+      #   A) build keyword corpus — loads per-keyword cache files, fetches
+      #      only keywords not already cached. Always runs (fast on hit).
       #   B) prepare main worktree → build main binary (git I/O then CPU)
       #   C) build PR binary (CPU, no dependencies)
-      # A and B+C are complementary workloads (network vs CPU), so they
-      # overlap efficiently on a cache miss. On a cache hit, only B and C
-      # run. The GITHUB_ENV write for DATASETS is always performed so the
-      # scan step picks up the corpus regardless of cache hit/miss.
       - name: Build binaries and keyword corpus
+        id: build
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DETECTORS: ${{ steps.detect.outputs.pr_csv }}
-          CORPUS_CACHE_HIT: ${{ steps.corpus_cache.outputs.cache-hit }}
         run: |
           set -o pipefail
 
-          # Chain A: fetch keyword corpus from GitHub (skipped on cache hit).
-          if [[ "$CORPUS_CACHE_HIT" != 'true' ]]; then
-            (
-              python3 scripts/test/build_keyword_corpus.py \
-                --detectors="$DETECTORS" \
-                --extract-keywords-bin=/tmp/extract-keywords \
-                --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
-                --output-meta=/tmp/keyword-corpus-meta.json \
-                --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
-            ) &
-            PID_CORPUS=$!
-          else
-            echo "Keyword corpus cache hit; skipping GitHub fetch."
-          fi
+          # Chain A: build keyword corpus. Loads per-keyword cache files from
+          # /tmp/keyword-corpus-cache/ and only calls the GitHub API for keywords
+          # not present there, so it's fast when most keywords are cached.
+          (
+            python3 scripts/test/build_keyword_corpus.py \
+              --detectors="$DETECTORS" \
+              --extract-keywords-bin=/tmp/extract-keywords \
+              --output-corpus=/tmp/keyword-corpus.jsonl.zstd \
+              --output-meta=/tmp/keyword-corpus-meta.json \
+              --cache-dir=/tmp/keyword-corpus-cache \
+              --max-results-per-detector="${KEYWORD_CORPUS_CAP:-100}"
+          ) &
+          PID_CORPUS=$!
 
           # Chain B: prepare worktree, then build main binary.
           (
@@ -206,13 +201,34 @@ jobs:
           CGO_ENABLED=0 go build -o /tmp/trufflehog-pr . &
           PID_PR_BUILD=$!
 
-          [[ -n "${PID_CORPUS:-}" ]] && { wait $PID_CORPUS    || { echo "Keyword corpus build failed" >&2; exit 1; }; }
-          wait $PID_MAIN_BUILD        || { echo "Main binary build failed"   >&2; exit 1; }
-          wait $PID_PR_BUILD          || { echo "PR binary build failed"     >&2; exit 1; }
+          wait $PID_CORPUS     || { echo "Keyword corpus build failed" >&2; exit 1; }
+          wait $PID_MAIN_BUILD || { echo "Main binary build failed"   >&2; exit 1; }
+          wait $PID_PR_BUILD   || { echo "PR binary build failed"     >&2; exit 1; }
+
+          # Save the per-keyword cache dir only when there were no keyword
+          # failures. A partial run leaves the cache dir incomplete — skipping
+          # the save lets the next push retry the missing keywords.
+          CORPUS_USEFUL=false
+          if [[ -s /tmp/keyword-corpus-meta.json ]]; then
+            failures=$(jq '[.reports[].keyword_failures | length] | add // 0' /tmp/keyword-corpus-meta.json)
+            [[ "$failures" -eq 0 ]] && CORPUS_USEFUL=true
+          fi
+          echo "corpus_useful=$CORPUS_USEFUL" >> "$GITHUB_OUTPUT"
 
           # Always append keyword corpus to DATASETS for the scan step.
           printf 'DATASETS<<EOF\n%s\n/tmp/keyword-corpus.jsonl.zstd\nEOF\n' \
             "$DATASETS" >> "$GITHUB_ENV"
+
+      # Save the per-keyword cache dir when the run completed without failures.
+      # Uses the exact key so subsequent pushes with the same keyword set get
+      # an exact hit and the Python script runs in cache-only mode (no API calls).
+      # Skipped on exact cache hit (cache-hit == 'true') since the dir is unchanged.
+      - name: Save keyword corpus cache
+        if: steps.detect.outputs.any_changed == 'true' && steps.corpus_cache.outputs.cache-hit != 'true' && steps.build.outputs.corpus_useful == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/keyword-corpus-cache
+          key: ${{ steps.corpus_key.outputs.key }}
 
       # PR and main scans run in parallel. Each streams the corpus files
       # independently from S3 — no shared state, different output files,
