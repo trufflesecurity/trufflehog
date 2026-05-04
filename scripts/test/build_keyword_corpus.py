@@ -36,6 +36,7 @@ Dependencies:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -94,6 +95,7 @@ class DetectorReport:
     detector: str
     keywords: list[str] = field(default_factory=list)
     fetched: int = 0
+    cache_hits: int = 0
     keyword_failures: list[str] = field(default_factory=list)
     thin_l1: bool = False
 
@@ -125,8 +127,12 @@ def main() -> int:
     # Anything below can take time and touch the network. We want a written
     # corpus + meta sidecar regardless of whether we got partway through, so
     # downstream workflow steps stay deterministic even on fetch failures.
+    cache_dir = getattr(args, "cache_dir", None) or None
+    if cache_dir:
+        os.makedirs(cache_dir, exist_ok=True)
+
     try:
-        run_main_loop(args, detectors, token, rate, reports, corpus_lines, seen_global)
+        run_main_loop(args, detectors, token, rate, reports, corpus_lines, seen_global, cache_dir)
     finally:
         summary = build_summary(reports)
         write_outputs(args.output_corpus, args.output_meta, corpus_lines, summary)
@@ -145,6 +151,7 @@ def build_summary(reports: list[DetectorReport]) -> dict[str, Any]:
                 "detector": r.detector,
                 "keywords": r.keywords,
                 "fetched": r.fetched,
+                "cache_hits": r.cache_hits,
                 "keyword_failures": r.keyword_failures,
                 "thin_l1": r.thin_l1,
             }
@@ -162,6 +169,7 @@ def run_main_loop(
     reports: list[DetectorReport],
     corpus_lines: list[dict[str, Any]],
     seen_global: set[tuple[str, str, str]],
+    cache_dir: str | None = None,
 ) -> None:
     for raw_name in detectors:
         # detect_changed_detectors.sh emits names like "github.v2"; the
@@ -210,7 +218,7 @@ def run_main_loop(
             if cap_remaining <= 0:
                 break
             try:
-                added = fetch_keyword_results(
+                added, from_cache = fetch_keyword_results(
                     keyword=kw,
                     detector_label=raw_name,
                     cap_remaining=cap_remaining,
@@ -219,6 +227,7 @@ def run_main_loop(
                     token=token,
                     seen_global=seen_global,
                     corpus_lines=corpus_lines,
+                    cache_dir=cache_dir,
                 )
             except KeywordFetchError as exc:
                 print(
@@ -238,7 +247,10 @@ def run_main_loop(
                 )
                 report.keyword_failures.append(kw)
                 continue
-            report.fetched += added
+            if from_cache:
+                report.cache_hits += added
+            else:
+                report.fetched += added
             cap_remaining -= added
 
         if report.fetched == 0:
@@ -271,6 +283,11 @@ def parse_args() -> argparse.Namespace:
         "--output-meta",
         default="/tmp/keyword-corpus-meta.json",
         help="Path for the per-detector meta sidecar JSON.",
+    )
+    p.add_argument(
+        "--cache-dir",
+        default="",
+        help="Directory for per-keyword result cache. Populated on fetch, read on subsequent runs.",
     )
     p.add_argument(
         "--max-results-per-detector",
@@ -344,6 +361,11 @@ class KeywordFetchError(Exception):
     """Wraps a fatal failure for a single keyword lookup."""
 
 
+def _keyword_cache_key(keyword: str) -> str:
+    """Stable filename-safe key for a keyword's cache file."""
+    return hashlib.sha256(keyword.encode()).hexdigest()
+
+
 def fetch_keyword_results(
     *,
     keyword: str,
@@ -354,9 +376,45 @@ def fetch_keyword_results(
     token: str,
     seen_global: set[tuple[str, str, str]],
     corpus_lines: list[dict[str, Any]],
-) -> int:
-    """Returns the number of new corpus lines added for this keyword."""
+    cache_dir: str | None = None,
+) -> tuple[int, bool]:
+    """Returns (added, from_cache).
+
+    added: number of corpus lines added for this keyword.
+    from_cache: True if results came from the on-disk keyword cache.
+    """
+    # --- cache read ---
+    if cache_dir:
+        cache_file = os.path.join(cache_dir, _keyword_cache_key(keyword) + ".json")
+        if os.path.isfile(cache_file):
+            try:
+                with open(cache_file, encoding="utf-8") as f:
+                    cached_lines: list[dict[str, Any]] = json.load(f)
+                added = 0
+                for line in cached_lines:
+                    if added >= per_kw_cap or (cap_remaining - added) <= 0:
+                        break
+                    prov = line.get("provenance") or {}
+                    key = (prov.get("repo", ""), prov.get("path", ""), prov.get("sha", ""))
+                    if not key[0] or key in seen_global:
+                        continue
+                    seen_global.add(key)
+                    corpus_lines.append(line)
+                    added += 1
+                print(
+                    f"[build_keyword_corpus] cache hit: keyword='{keyword}' loaded {added} lines",
+                    file=sys.stderr,
+                )
+                return added, True
+            except (OSError, json.JSONDecodeError) as exc:
+                print(
+                    f"[build_keyword_corpus] cache read failed for '{keyword}': {exc}; fetching fresh",
+                    file=sys.stderr,
+                )
+
+    # --- fresh fetch ---
     added = 0
+    fetched_lines: list[dict[str, Any]] = []
     page = 1
     while added < per_kw_cap and (cap_remaining - added) > 0:
         items, has_more = search_code(keyword, page, rate, token)
@@ -380,25 +438,38 @@ def fetch_keyword_results(
             if content is None:
                 continue
             seen_global.add(key)
-            corpus_lines.append(
-                {
-                    "provenance": {
-                        "layer": "L1",
-                        "detector": detector_label,
-                        "keyword": keyword,
-                        "repo": repo,
-                        "path": path,
-                        "sha": sha,
-                        "url": download_url or "",
-                    },
-                    "content": content,
-                }
-            )
+            line = {
+                "provenance": {
+                    "layer": "L1",
+                    "detector": detector_label,
+                    "keyword": keyword,
+                    "repo": repo,
+                    "path": path,
+                    "sha": sha,
+                    "url": download_url or "",
+                },
+                "content": content,
+            }
+            corpus_lines.append(line)
+            fetched_lines.append(line)
             added += 1
         if not has_more:
             break
         page += 1
-    return added
+
+    # --- cache write ---
+    if cache_dir and fetched_lines:
+        cache_file = os.path.join(cache_dir, _keyword_cache_key(keyword) + ".json")
+        try:
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(fetched_lines, f)
+        except OSError as exc:
+            print(
+                f"[build_keyword_corpus] cache write failed for '{keyword}': {exc}",
+                file=sys.stderr,
+            )
+
+    return added, False
 
 
 def search_code(
