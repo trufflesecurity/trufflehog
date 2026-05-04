@@ -83,6 +83,16 @@ func (s *Source) Init(aCtx trContext.Context, name string, jobId sources.JobID, 
 	if err != nil {
 		return fmt.Errorf("unable to create filter: %w", err)
 	}
+	// Auto-discover .trufflehogignore in each scan root and merge its
+	// patterns into the filter's exclude set. See
+	// https://github.com/trufflesecurity/trufflehog/issues/2687.
+	if loaded, err := filter.AddTrufflehogIgnoreFiles(s.paths...); err != nil {
+		return fmt.Errorf("unable to load .trufflehogignore: %w", err)
+	} else {
+		for _, path := range loaded {
+			s.log.V(2).Info("loaded ignore file", "file", path)
+		}
+	}
 	s.filter = filter
 	err = s.setMaxSymlinkDepth(&conn)
 	if err != nil {
