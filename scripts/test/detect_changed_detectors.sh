@@ -94,6 +94,35 @@ is_new_detector() {
     grep -qxF "$1" "$NEW_DIRS_FILE"
 }
 
+# Step 2b — skip detectors whose diff doesn't touch regex patterns or Keywords.
+# Corpora results only change when the matching logic changes; verification,
+# redaction, or structural changes don't affect match counts.
+has_pattern_change() {
+    local dir="$1"
+
+    # Fast path: regex or Keywords() signature on a changed line.
+    git diff "$MERGE_BASE...$HEAD_REF" -- "$dir"/*.go 2>/dev/null \
+        | grep -qE '^[+-][^+-].*(regexp\.|MustCompile|Keywords)' && return 0
+
+    # Slow path: compare the Keywords() function body between refs to catch
+    # changes to the return value (e.g. []string{"old"} → []string{"new"})
+    # where the changed lines don't mention "Keywords" themselves.
+    local file
+    while IFS= read -r file; do
+        [[ "$file" == *_test.go ]] && continue
+        local head_body base_body
+        head_body=$(git show "$HEAD_REF:$file" 2>/dev/null \
+            | awk '/func[[:space:]].*Keywords\(\)[[:space:]]*\[\]string/,/^[[:space:]]*\}/' \
+            | tail -n +2)
+        base_body=$(git show "$MERGE_BASE:$file" 2>/dev/null \
+            | awk '/func[[:space:]].*Keywords\(\)[[:space:]]*\[\]string/,/^[[:space:]]*\}/' \
+            | tail -n +2)
+        [[ "$head_body" != "$base_body" ]] && return 0
+    done < <(git diff --name-only "$MERGE_BASE...$HEAD_REF" -- "$dir"/*.go 2>/dev/null)
+
+    return 1
+}
+
 # Step 3 — for a dir, derive `<protoname>[.v<n>]`.
 detector_id_for_dir() {
     local dir="$1"
@@ -127,6 +156,7 @@ emit_list() {
     local dir id
     for dir in "${CHANGED_DIRS[@]:-}"; do
         [[ -z "$dir" ]] && continue
+        has_pattern_change "$dir" || continue
         if id=$(detector_id_for_dir "$dir"); then
             echo "$id"
         else
@@ -139,6 +169,7 @@ emit_main_list() {
     local dir id
     for dir in "${CHANGED_DIRS[@]:-}"; do
         [[ -z "$dir" ]] && continue
+        has_pattern_change "$dir" || continue
         # Strip `pkg/detectors/` prefix to get the import-path form, then
         # check against the new-detector set.
         local import_form="${dir#pkg/detectors/}"
@@ -155,6 +186,7 @@ emit_new_list() {
     local dir id
     for dir in "${CHANGED_DIRS[@]:-}"; do
         [[ -z "$dir" ]] && continue
+        has_pattern_change "$dir" || continue
         local import_form="${dir#pkg/detectors/}"
         if ! is_new_detector "$import_form"; then
             continue
