@@ -38,7 +38,7 @@ PREAMBLE = (
 STATUS_KEY = (
     "🔴 regression: >5 new, >20% increase over main, or any removed"
     " \u00a0·\u00a0 "
-    "⚠️ warning: 1–5 new"
+    "⚠️ warning: 1–5 new and ≤20% increase over main"
     " \u00a0·\u00a0 "
     "✅ clean"
     " \u00a0·\u00a0 "

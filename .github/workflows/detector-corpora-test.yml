@@ -113,43 +113,60 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      # Cache the main scan results by merge-base + scoped detector set.
+      # On subsequent pushes to the same PR without a rebase, both are
+      # identical, so the main scan (35 GB of S3 streaming + trufflehog) is
+      # skipped entirely.
+      - name: Restore main scan cache
+        id: main_scan_cache
+        if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/results-main.jsonl
+          key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
+
       # Two independent builds run in parallel:
       #   A) prepare main worktree → build main binary (git I/O then CPU)
+      #      Skipped on main scan cache hit — binary is not needed.
       #   B) build PR binary (CPU, no dependencies)
       - name: Build binaries
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+          MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
         run: |
           set -o pipefail
 
           # Chain A: prepare worktree, then build main binary.
-          (
-            git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
-            cd /tmp/trufflehog-main-src
-            CGO_ENABLED=0 go build -o /tmp/trufflehog-main .
-          ) &
-          PID_MAIN_BUILD=$!
+          # Skipped when main scan results are already cached.
+          if [[ "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
+            (
+              git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
+              cd /tmp/trufflehog-main-src
+              CGO_ENABLED=0 go build -o /tmp/trufflehog-main .
+            ) &
+            PID_MAIN_BUILD=$!
+          fi
 
           # Chain B: build PR binary (no dependencies).
           CGO_ENABLED=0 go build -o /tmp/trufflehog-pr . &
           PID_PR_BUILD=$!
 
-          wait $PID_MAIN_BUILD || { echo "Main binary build failed" >&2; exit 1; }
-          wait $PID_PR_BUILD   || { echo "PR binary build failed"   >&2; exit 1; }
+          [[ -n "${PID_MAIN_BUILD:-}" ]] && { wait $PID_MAIN_BUILD || { echo "Main binary build failed" >&2; exit 1; }; }
+          wait $PID_PR_BUILD || { echo "PR binary build failed" >&2; exit 1; }
 
-      # PR and main scans run in parallel. Each streams the corpus files
-      # independently from S3 — no shared state, different output files,
-      # different binaries. The main scan is skipped when main_csv is empty
-      # (PR adds only new detectors). CORPUS_BYTES_FILE is only written by
-      # the PR scan (blast-radius needs one consistent byte count).
+      # PR and main scans share a single S3 stream per dataset file, teed to
+      # both binaries simultaneously. The main side is skipped on a cache hit
+      # (results already in /tmp/results-main.jsonl) or when main_csv is empty
+      # (PR adds only new detectors — no overlap with main).
       - name: Run corpora tests
         if: steps.detect.outputs.any_changed == 'true'
         shell: bash
         env:
           PR_CSV: ${{ steps.detect.outputs.pr_csv }}
           MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
+          MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
         run: |
           set -o pipefail
           files=()
@@ -158,33 +175,32 @@ jobs:
             files+=("$dataset")
           done <<< "$DATASETS"
 
-          # PR scan.
-          (
-            export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
-            export OUTPUT_JSONL=/tmp/results-pr.jsonl
-            export STDERR_FILE=/tmp/corpora-stderr-pr.txt
-            export INCLUDE_DETECTORS="$PR_CSV"
-            ./scripts/test/detector_corpora_test.sh "${files[@]}"
-          ) &
-          PID_PR=$!
+          export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
+          export OUTPUT_JSONL=/tmp/results-pr.jsonl
+          export STDERR_FILE=/tmp/corpora-stderr-pr.txt
+          export INCLUDE_DETECTORS="$PR_CSV"
 
-          # Main scan (skipped when no detectors overlap with main).
-          if [[ -n "$MAIN_CSV" ]]; then
-            (
-              export TRUFFLEHOG_BIN=/tmp/trufflehog-main
-              export OUTPUT_JSONL=/tmp/results-main.jsonl
-              export STDERR_FILE=/tmp/corpora-stderr-main.txt
-              export INCLUDE_DETECTORS="$MAIN_CSV"
-              ./scripts/test/detector_corpora_test.sh "${files[@]}"
-            ) &
-            PID_MAIN=$!
-          else
+          if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
+            # Dual-binary: single S3 download teed to both PR and main binaries.
+            export TRUFFLEHOG_BIN_MAIN=/tmp/trufflehog-main
+            export OUTPUT_JSONL_MAIN=/tmp/results-main.jsonl
+            export INCLUDE_DETECTORS_MAIN="$MAIN_CSV"
+          elif [[ -z "$MAIN_CSV" ]]; then
             echo "No overlapping detectors in main; skipping main scan."
             : > /tmp/results-main.jsonl
+          else
+            echo "Main scan cache hit; skipping main scan."
           fi
 
-          wait $PID_PR || { echo "PR scan failed" >&2; exit 1; }
-          [[ -n "${PID_MAIN:-}" ]] && { wait $PID_MAIN || { echo "Main scan failed" >&2; exit 1; }; }
+          ./scripts/test/detector_corpora_test.sh "${files[@]}" \
+            || { echo "Corpora scan failed" >&2; exit 1; }
+
+      - name: Save main scan cache
+        if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != '' && steps.main_scan_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/results-main.jsonl
+          key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
 
       - name: Diff results
         if: steps.detect.outputs.any_changed == 'true'

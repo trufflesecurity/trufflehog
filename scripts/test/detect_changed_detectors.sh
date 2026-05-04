@@ -86,8 +86,8 @@ mapfile -t BASE_IMPORTS < <(parse_defaults_imports "$MERGE_BASE")
 NEW_DIRS_FILE=$(mktemp)
 trap 'rm -f "$NEW_DIRS_FILE"' EXIT
 comm -23 \
-    <(printf '%s\n' "${HEAD_IMPORTS[@]}") \
-    <(printf '%s\n' "${BASE_IMPORTS[@]}") \
+    <(printf '%s\n' "${HEAD_IMPORTS[@]+"${HEAD_IMPORTS[@]}"}") \
+    <(printf '%s\n' "${BASE_IMPORTS[@]+"${BASE_IMPORTS[@]}"}") \
     > "$NEW_DIRS_FILE"
 
 is_new_detector() {
