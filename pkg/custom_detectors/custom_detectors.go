@@ -285,7 +285,6 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		if err != nil {
 			continue
 		}
-		req.Header.Set("Content-Type", "application/json")
 		for _, header := range verifyConfig.GetHeaders() {
 			key, value, found := strings.Cut(header, ":")
 			if !found {
@@ -293,6 +292,9 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 				continue
 			}
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
+		}
+		if _, ok := req.Header["Content-Type"]; !ok {
+			req.Header.Set("Content-Type", "application/json")
 		}
 		resp, err := httpClient.Do(req)
 		if err != nil {
