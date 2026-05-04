@@ -24,14 +24,15 @@ var (
 	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(`\b(shppa_|shpat_)([0-9A-Fa-f]{32})\b`)
+	// Covers: shpca_, shpat_, shptka_, shppa_ (custom app, private app, token app, partner app)
+	keyPat    = regexp.MustCompile(`\b(shp(?:ca|at|tka|pa)_)([a-f0-9]{32})\b`)
 	domainPat = regexp.MustCompile(`[a-zA-Z0-9-]+\.myshopify\.com`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"shppa_", "shpat_"}
+	return []string{"shpca_", "shpat_", "shptka_", "shppa_"}
 }
 
 // FromData will find and optionally verify Shopify secrets in a given set of bytes.
