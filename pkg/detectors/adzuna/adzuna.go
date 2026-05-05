@@ -59,7 +59,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Adzuna,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"id":  resIdMatch,
+				},
+				RawV2: []byte(resMatch + resIdMatch),
 			}
 
 			if verify {

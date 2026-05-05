@@ -48,8 +48,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_RazorPay,
 				Raw:          []byte(key),
-				RawV2:        []byte(key + secret),
-				Redacted:     key,
+				SecretParts: map[string]string{
+					"key":    key,
+					"secret": secret,
+				},
+				RawV2:    []byte(key + secret),
+				Redacted: key,
 			}
 
 			if verify {

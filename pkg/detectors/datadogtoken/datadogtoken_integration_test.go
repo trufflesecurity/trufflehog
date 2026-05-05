@@ -55,7 +55,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"Type": "Application+APIKey",
 					},
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"api_key":  apiKey,
 						"app_key":  appKey,
 						"endpoint": endpoint,

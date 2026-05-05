@@ -61,7 +61,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Redis,
 			Raw:          []byte(urlMatch),
-			Redacted:     redact,
+			SecretParts: map[string]string{
+				"host":     parsedURL.Host,
+				"password": password,
+			},
+			Redacted: redact,
 		}
 
 		if verify {
@@ -100,7 +104,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Redis,
 			Raw:          []byte(urlMatch),
-			Redacted:     redact,
+			SecretParts: map[string]string{
+				"host":     parsedURL.Host,
+				"password": password,
+			},
+			Redacted: redact,
 		}
 
 		if verify {

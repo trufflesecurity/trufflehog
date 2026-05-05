@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -58,7 +58,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_KuCoin,
 					Raw:          []byte(resKeyMatch),
-					RawV2:        []byte(resKeyMatch + resPassphraseMatch),
+					SecretParts: map[string]string{
+						"key":        resKeyMatch,
+						"passphrase": resPassphraseMatch,
+					},
+					RawV2: []byte(resKeyMatch + resPassphraseMatch),
 				}
 
 				if verify {

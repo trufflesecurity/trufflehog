@@ -82,6 +82,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		result := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_BitbucketAppPassword,
 			Raw:          fmt.Appendf(nil, "%s:%s", username, password),
+			SecretParts: map[string]string{
+				"username": username,
+				"password": password,
+			},
 		}
 		if verify {
 			client := s.client

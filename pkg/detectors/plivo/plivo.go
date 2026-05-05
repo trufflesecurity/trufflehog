@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -48,7 +48,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_Plivo,
 				Redacted:     id,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + id),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"id":  id,
+				},
+				RawV2: []byte(resMatch + id),
 			}
 			stringResMatch := fmt.Sprintf("%s:%s", id, resMatch)
 			decodeSecret := b64.StdEncoding.EncodeToString([]byte(stringResMatch))

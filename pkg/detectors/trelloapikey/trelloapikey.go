@@ -11,7 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detector_typepb.DetectorType_TrelloApiKey,
 					Redacted:     resMatch,
 					Raw:          []byte(resMatch),
+					SecretParts:  map[string]string{"key": resMatch},
 				}
 
 				if verify {

@@ -128,9 +128,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_AWSSessionKey,
 					Raw:          []byte(idMatch),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", idMatch, secretMatch, sessionMatch)),
-					Redacted:     idMatch,
-					ExtraData:    make(map[string]string),
+					SecretParts: map[string]string{
+						"access_key_id":     idMatch,
+						"secret_access_key": secretMatch,
+						"session_token":     sessionMatch,
+					},
+					RawV2:     []byte(fmt.Sprintf("%s:%s:%s", idMatch, secretMatch, sessionMatch)),
+					Redacted:  idMatch,
+					ExtraData: make(map[string]string),
 				}
 
 				if verify {
