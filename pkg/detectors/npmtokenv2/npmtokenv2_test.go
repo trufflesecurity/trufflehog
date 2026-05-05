@@ -122,6 +122,18 @@ func TestExtractRegistries(t *testing.T) {
 			input: "//nexus.example.com:8081/repository/npm/:_authToken=npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY",
 			want:  map[string]struct{}{"nexus.example.com:8081/repository/npm": {}},
 		},
+		{
+			name: "ignore registry= URL lines",
+			input: `registry=https://registry.example.com/
+//registry.example.com/:_authToken=npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY`,
+			want: map[string]struct{}{"registry.example.com": {}},
+		},
+		{
+			name: "ignore // inside URLs",
+			input: `some text https://example.com/ more text
+//registry.example.com/:_authToken=token123`,
+			want: map[string]struct{}{"registry.example.com": {}},
+		},
 	}
 
 	for _, test := range tests {

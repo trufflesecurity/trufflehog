@@ -25,7 +25,9 @@ var (
 
 	keyPat = regexp.MustCompile(`(npm_[0-9a-zA-Z]{36})`)
 	
-	npmrcPat = regexp.MustCompile(`//([^/]+(?:/[^:]+)*)/:_authToken\s*=\s*[^\s]+`)
+	// Match .npmrc format: //registry.example.com/:_authToken=token
+	// (?m) enables multiline mode, ^ ensures line start, \s excludes newlines
+	npmrcPat = regexp.MustCompile(`(?m)^//([^/\s]+(?:/[^:\s]+)*)/:_authToken\s*=\s*[^\s]+`)
 )
 
 func (s Scanner) Keywords() []string {
