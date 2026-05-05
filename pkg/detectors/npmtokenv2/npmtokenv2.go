@@ -96,6 +96,7 @@ func extractRegistries(data string) map[string]struct{} {
 
 func verifyToken(ctx context.Context, token string, registries []string) (bool, error) {
 	var verificationErr error
+	sawUnauthorized := false
 
 	for _, registry := range registries {
 		registryURL, err := buildRegistryURL(registry)
@@ -115,17 +116,25 @@ func verifyToken(ctx context.Context, token string, registries []string) (bool, 
 			verificationErr = err
 			continue
 		}
-		defer res.Body.Close()
 
-		switch res.StatusCode {
+		statusCode := res.StatusCode
+		res.Body.Close()
+
+		switch statusCode {
 		case http.StatusOK:
 			return true, nil
 		case http.StatusUnauthorized:
-			// Definitively invalid token - not a verification error
-			return false, nil
+			// Track that we saw 401, but continue trying other registries
+			sawUnauthorized = true
 		default:
-			verificationErr = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+			verificationErr = fmt.Errorf("unexpected HTTP response status %d", statusCode)
 		}
+	}
+
+	// If we tried all registries and at least one returned 401 (and none succeeded),
+	// the token is definitively invalid
+	if sawUnauthorized {
+		return false, nil
 	}
 
 	return false, verificationErr
