@@ -104,7 +104,7 @@ jobs:
             <!-- detector-bench -->
             ## Corpora Test Results
 
-            No detector source files changed in this PR. Bench skipped.
+            No detector regex or keyword changes in this PR. Bench skipped.
 
       - name: Configure AWS credentials
         if: steps.detect.outputs.any_changed == 'true'
