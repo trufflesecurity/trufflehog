@@ -72,20 +72,7 @@ func decodeJWTPayload(token string) (*jwtPayload, error) {
 		return nil, fmt.Errorf("not a JWT: expected 3 parts, got %d", len(parts))
 	}
 
-	seg := parts[1]
-	seg = strings.ReplaceAll(seg, "-", "+")
-	seg = strings.ReplaceAll(seg, "_", "/")
-	// Add back the '=' padding that base64url omits.
-	// base64 strings must have a length that is a multiple of 4.
-	switch len(seg) % 4 {
-	case 2:
-		seg += "=="
-	case 3:
-		seg += "="
-	}
-
-	// Decode the base64 string into raw bytes.
-	decoded, err := base64.StdEncoding.DecodeString(seg)
+	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return nil, fmt.Errorf("base64 decode failed: %w", err)
 	}
@@ -194,12 +181,10 @@ func validateToken(ctx context.Context, client *http.Client, baseURL, token stri
 
 	// Send the request to Adobe
 	resp, err := client.Do(req)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
 	if err != nil {
 		return false, err
 	}
+	defer resp.Body.Close()
 
 	// Read the full response body into memory.
 	body, err := io.ReadAll(resp.Body)
