@@ -767,6 +767,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tineswebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tmetric"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/todoist"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/togetherai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tokeet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tomorrowio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tomtom"
@@ -1659,6 +1660,7 @@ func buildDetectorList() []detectors.Detector {
 		&tmetric.Scanner{},
 		&todoist.Scanner{},
 		// &toggltrack.Scanner{},
+		&togetherai.Scanner{},
 		&tokeet.Scanner{},
 		&tomorrowio.Scanner{},
 		&tomtom.Scanner{},
