@@ -54,23 +54,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			registry := "registry.npmjs.org"
+			registries := []string{"registry.npmjs.org"}
 			if len(registrySet) > 0 {
-				// Use the first registry found, or default to npmjs
+				registries = make([]string, 0, len(registrySet))
 				for reg := range registrySet {
-					registry = reg
-					break
+					registries = append(registries, reg)
 				}
 			}
-			
-			verificationErr := verifyToken(ctx, resMatch, registry)
-			if verificationErr == nil {
-				s1.Verified = true
+
+			isVerified, verificationErr := verifyToken(ctx, resMatch, registries)
+			s1.Verified = isVerified
+			if isVerified {
 				s1.SecretParts = map[string]string{
-					"key":      resMatch,
-					"registry": registry,
+					"key": resMatch,
 				}
-			} else {
+			} else if verificationErr != nil {
 				s1.SetVerificationError(verificationErr, resMatch)
 			}
 		}
@@ -95,28 +93,41 @@ func extractRegistries(data string) map[string]struct{} {
 	return registrySet
 }
 
-func verifyToken(ctx context.Context, token string, registry string) error {
-	registryURL, err := buildRegistryURL(registry)
-	if err != nil {
-		return err
+func verifyToken(ctx context.Context, token string, registries []string) (bool, error) {
+	var verificationErr error
+
+	for _, registry := range registries {
+		registryURL, err := buildRegistryURL(registry)
+		if err != nil {
+			verificationErr = err
+			continue
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", registryURL, nil)
+		if err != nil {
+			verificationErr = err
+			continue
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+		res, err := client.Do(req)
+		if err != nil {
+			verificationErr = err
+			continue
+		}
+		defer res.Body.Close()
+
+		switch res.StatusCode {
+		case http.StatusOK:
+			return true, nil
+		case http.StatusUnauthorized:
+			// Definitively invalid token - not a verification error
+			return false, nil
+		default:
+			verificationErr = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		}
 	}
-	
-	req, err := http.NewRequestWithContext(ctx, "GET", registryURL, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-	res, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		return nil
-	}
-	
-	return fmt.Errorf("verification failed with status code %d", res.StatusCode)
+
+	return false, verificationErr
 }
 
 func buildRegistryURL(registry string) (string, error) {
