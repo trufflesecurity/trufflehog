@@ -126,9 +126,13 @@ func verifyToken(ctx context.Context, token string, registries []string) (bool, 
 		statusCode := res.StatusCode
 		res.Body.Close()
 
-		switch statusCode {
-		case http.StatusOK:
+		// Accept any 2xx status code as successful verification
+		// Custom registries may return 200, 202, 204, etc.
+		if statusCode >= 200 && statusCode < 300 {
 			return true, nil
+		}
+
+		switch statusCode {
 		case http.StatusUnauthorized:
 			// Track that we saw 401, but continue trying other registries
 			sawUnauthorized = true
