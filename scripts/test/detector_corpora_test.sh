@@ -122,10 +122,7 @@ CREATE TABLE t AS FROM read_json_auto('$OUTPUT_JSONL', ignore_errors=true);
 
 SELECT
     t.DetectorName detector,
-    COUNT(*) total,
-    SUM(CASE WHEN Verified AND VerificationError IS NULL THEN 1 ELSE 0 END) verified,
-    SUM(CASE WHEN NOT Verified AND VerificationError IS NULL THEN 1 ELSE 0 END) unverified,
-    SUM(CASE WHEN VerificationError IS NOT NULL THEN 1 ELSE 0 END) \"unknown\"
+    COUNT(*) total
 FROM t
 GROUP BY all
 ORDER BY total DESC, detector

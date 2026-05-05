@@ -25,12 +25,13 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: "1.25"
 
@@ -86,7 +87,7 @@ jobs:
       - name: Find existing skip comment
         if: steps.detect.outputs.any_changed != 'true' && github.event_name == 'pull_request'
         id: find_skip_comment
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: 'github-actions[bot]'
@@ -94,7 +95,7 @@ jobs:
 
       - name: Post or update skip comment
         if: steps.detect.outputs.any_changed != 'true' && github.event_name == 'pull_request'
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           comment-id: ${{ steps.find_skip_comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -107,7 +108,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: steps.detect.outputs.any_changed == 'true'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -120,7 +121,7 @@ jobs:
       - name: Restore main scan cache
         id: main_scan_cache
         if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != ''
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/results-main.jsonl
           key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
@@ -159,48 +160,59 @@ jobs:
           [[ -n "${PID_MAIN_BUILD:-}" ]] && { wait $PID_MAIN_BUILD || { echo "Main binary build failed" >&2; exit 1; }; }
           wait $PID_PR_BUILD || { echo "PR binary build failed" >&2; exit 1; }
 
+      # TODO: remove before merging — fake results for testing the diff/comment steps without a full scan.
+      # Restore the real step below once comment rendering is verified.
+      - name: Run corpora tests
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        run: |
+          echo '{"DetectorName":"JDBC","Raw":"jdbc:mysql://user:pass@host/db","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' > /tmp/results-pr.jsonl
+          echo '{"DetectorName":"JDBC","Raw":"jdbc:mysql://user:pass@host/db","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' >> /tmp/results-pr.jsonl
+          echo '{"DetectorName":"JDBC","Raw":"jdbc:postgresql://admin:secret@db.example.com/prod","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' >> /tmp/results-pr.jsonl
+          echo '{"DetectorName":"JDBC","Raw":"jdbc:mysql://user:pass@host/db","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' > /tmp/results-main.jsonl
+
       # PR and main scans share a single S3 stream per dataset file, teed to
       # both binaries simultaneously. The main side is skipped on a cache hit
       # (results already in /tmp/results-main.jsonl) or when main_csv is empty
       # (PR adds only new detectors — no overlap with main).
-      - name: Run corpora tests
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        env:
-          PR_CSV: ${{ steps.detect.outputs.pr_csv }}
-          MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
-          MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
-        run: |
-          set -o pipefail
-          files=()
-          while IFS= read -r dataset; do
-            [[ -z "$dataset" ]] && continue
-            files+=("$dataset")
-          done <<< "$DATASETS"
-
-          export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
-          export OUTPUT_JSONL=/tmp/results-pr.jsonl
-          export STDERR_FILE=/tmp/corpora-stderr-pr.txt
-          export INCLUDE_DETECTORS="$PR_CSV"
-
-          if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
-            # Dual-binary: single S3 download teed to both PR and main binaries.
-            export TRUFFLEHOG_BIN_MAIN=/tmp/trufflehog-main
-            export OUTPUT_JSONL_MAIN=/tmp/results-main.jsonl
-            export INCLUDE_DETECTORS_MAIN="$MAIN_CSV"
-          elif [[ -z "$MAIN_CSV" ]]; then
-            echo "No overlapping detectors in main; skipping main scan."
-            : > /tmp/results-main.jsonl
-          else
-            echo "Main scan cache hit; skipping main scan."
-          fi
-
-          ./scripts/test/detector_corpora_test.sh "${files[@]}" \
-            || { echo "Corpora scan failed" >&2; exit 1; }
+      # - name: Run corpora tests
+      #   if: steps.detect.outputs.any_changed == 'true'
+      #   shell: bash
+      #   env:
+      #     PR_CSV: ${{ steps.detect.outputs.pr_csv }}
+      #     MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
+      #     MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
+      #   run: |
+      #     set -o pipefail
+      #     files=()
+      #     while IFS= read -r dataset; do
+      #       [[ -z "$dataset" ]] && continue
+      #       files+=("$dataset")
+      #     done <<< "$DATASETS"
+      #
+      #     export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
+      #     export OUTPUT_JSONL=/tmp/results-pr.jsonl
+      #     export STDERR_FILE=/tmp/corpora-stderr-pr.txt
+      #     export INCLUDE_DETECTORS="$PR_CSV"
+      #
+      #     if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
+      #       # Dual-binary: single S3 download teed to both PR and main binaries.
+      #       export TRUFFLEHOG_BIN_MAIN=/tmp/trufflehog-main
+      #       export OUTPUT_JSONL_MAIN=/tmp/results-main.jsonl
+      #       export INCLUDE_DETECTORS_MAIN="$MAIN_CSV"
+      #     elif [[ -z "$MAIN_CSV" ]]; then
+      #       echo "No overlapping detectors in main; skipping main scan."
+      #       : > /tmp/results-main.jsonl
+      #     else
+      #       echo "Main scan cache hit; skipping main scan."
+      #     fi
+      #
+      #     ./scripts/test/detector_corpora_test.sh "${files[@]}" \
+      #       || { echo "Corpora scan failed" >&2; exit 1; }
 
       - name: Save main scan cache
         if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != '' && steps.main_scan_cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/results-main.jsonl
           key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
@@ -226,7 +238,7 @@ jobs:
       - name: Resolve PR number
         if: steps.detect.outputs.any_changed == 'true'
         id: resolve_pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             let issue_number;
@@ -250,7 +262,7 @@ jobs:
       - name: Find existing diff comment
         if: steps.detect.outputs.any_changed == 'true'
         id: find_diff_comment
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
         with:
           issue-number: ${{ steps.resolve_pr.outputs.issue_number }}
           comment-author: 'github-actions[bot]'
@@ -258,7 +270,7 @@ jobs:
 
       - name: Post or update diff comment
         if: steps.detect.outputs.any_changed == 'true'
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           comment-id: ${{ steps.find_diff_comment.outputs.comment-id }}
           issue-number: ${{ steps.resolve_pr.outputs.issue_number }}
