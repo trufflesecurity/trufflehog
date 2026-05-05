@@ -293,7 +293,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			}
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
 		}
-		if _, ok := req.Header["Content-Type"]; !ok {
+		if req.Header.Get("Content-Type") == "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
 		resp, err := httpClient.Do(req)
