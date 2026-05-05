@@ -36,6 +36,10 @@ var (
 
 	// Matches any JWT; Adobe IMS tokens are identified by decoding the payload and checking the "as" field.
 	jwtPat = regexp.MustCompile(`(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})`)
+
+	// imsRegionPat validates the "as" field from the JWT payload before interpolating it into a URL.
+	// Prevents SSRF via crafted values like "ims-x@evil.com/".
+	imsRegionPat = regexp.MustCompile(`^ims-[a-z0-9]+$`)
 )
 
 
@@ -96,6 +100,9 @@ func decodeJWTPayload(token string) (*jwtPayload, error) {
 
 
 func imsBaseURL(as string) string {
+	if !imsRegionPat.MatchString(as) {
+		return "https://ims-na1.adobelogin.com"
+	}
 	return fmt.Sprintf("https://%s.adobelogin.com", as)
 }
 
