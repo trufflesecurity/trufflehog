@@ -90,67 +90,71 @@ func TestNpmToken_Pattern(t *testing.T) {
 	}
 }
 
-func TestExtractRegistries(t *testing.T) {
+func TestExtractTokenRegistryPairs(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		want  map[string]struct{}
+		want  map[string]string
 	}{
 		{
-			name:  "single registry from npmrc",
+			name:  "single token-registry pair",
 			input: "//artifactory.example.com/:_authToken=3aAcac6c-9847-23d9-ce65-917590b81cf0",
-			want:  map[string]struct{}{"artifactory.example.com": {}},
+			want:  map[string]string{"3aAcac6c-9847-23d9-ce65-917590b81cf0": "artifactory.example.com"},
 		},
 		{
 			name:  "registry with path",
 			input: "//nexus.example.com/repository/npm-proxy/:_authToken=3aAcac6c-9847-23d9-ce65-917590b81cf0",
-			want:  map[string]struct{}{"nexus.example.com/repository/npm-proxy": {}},
+			want:  map[string]string{"3aAcac6c-9847-23d9-ce65-917590b81cf0": "nexus.example.com/repository/npm-proxy"},
 		},
 		{
-			name: "multiple registries",
-			input: `//artifactory.example.com/:_authToken=token1
-//nexus.example.com/:_authToken=token2`,
-			want: map[string]struct{}{"artifactory.example.com": {}, "nexus.example.com": {}},
+			name: "multiple token-registry pairs",
+			input: `//artifactory.example.com/:_authToken=3aAcac6c-9847-23d9-ce65-917590b81cf0
+//nexus.example.com/:_authToken=4bBdbdc7d-9847-23d9-ce65-917590b81cf1`,
+			want: map[string]string{
+				"3aAcac6c-9847-23d9-ce65-917590b81cf0": "artifactory.example.com",
+				"4bBdbdc7d-9847-23d9-ce65-917590b81cf1": "nexus.example.com",
+			},
 		},
 		{
 			name:  "no registry",
 			input: "npm token = 3aAcac6c-9847-23d9-ce65-917590b81cf0",
-			want:  map[string]struct{}{},
-		},
-		{
-			name:  "duplicate registries",
-			input: "//registry.example.com/:_authToken=token1\n//registry.example.com/:_authToken=token2",
-			want:  map[string]struct{}{"registry.example.com": {}},
+			want:  map[string]string{},
 		},
 		{
 			name:  "registry with port number",
 			input: "//localhost:4873/:_authToken=3aAcac6c-9847-23d9-ce65-917590b81cf0",
-			want:  map[string]struct{}{"localhost:4873": {}},
+			want:  map[string]string{"3aAcac6c-9847-23d9-ce65-917590b81cf0": "localhost:4873"},
 		},
 		{
 			name:  "registry with port and path",
 			input: "//nexus.example.com:8081/repository/npm/:_authToken=3aAcac6c-9847-23d9-ce65-917590b81cf0",
-			want:  map[string]struct{}{"nexus.example.com:8081/repository/npm": {}},
+			want:  map[string]string{"3aAcac6c-9847-23d9-ce65-917590b81cf0": "nexus.example.com:8081/repository/npm"},
 		},
 		{
 			name: "ignore registry= URL lines",
 			input: `registry=https://registry.example.com/
 //registry.example.com/:_authToken=3aAcac6c-9847-23d9-ce65-917590b81cf0`,
-			want: map[string]struct{}{"registry.example.com": {}},
+			want: map[string]string{"3aAcac6c-9847-23d9-ce65-917590b81cf0": "registry.example.com"},
 		},
 		{
 			name: "ignore // inside URLs",
 			input: `some text https://example.com/ more text
-//registry.example.com/:_authToken=token123`,
-			want: map[string]struct{}{"registry.example.com": {}},
+//registry.example.com/:_authToken=3aAcac6c-9847-23d9-ce65-917590b81cf0`,
+			want: map[string]string{"3aAcac6c-9847-23d9-ce65-917590b81cf0": "registry.example.com"},
+		},
+		{
+			name: "prevent token cross-leakage",
+			input: `//evil.com/:_authToken=fake-token-123
+npm token = 3aAcac6c-9847-23d9-ce65-917590b81cf0`,
+			want: map[string]string{"fake-token-123": "evil.com"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := extractRegistries(test.input)
+			got := extractTokenRegistryPairs(test.input)
 			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("extractRegistries() diff: (-want +got)\n%s", diff)
+				t.Errorf("extractTokenRegistryPairs() diff: (-want +got)\n%s", diff)
 			}
 		})
 	}

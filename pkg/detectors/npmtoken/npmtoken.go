@@ -27,7 +27,8 @@ var (
 	
 	// Match .npmrc format: //registry.example.com/:_authToken=token
 	// (?m) enables multiline mode, ^ ensures line start, \s excludes newlines
-	npmrcPat = regexp.MustCompile(`(?m)^//([^/\s]+(?:/[^:\s]+)*)/:_authToken\s*=\s*[^\s]+`)
+	// Captures both registry and token to prevent token cross-leakage
+	npmrcPat = regexp.MustCompile(`(?m)^//([^/\s]+(?:/[^:\s]+)*)/:_authToken\s*=\s*([^\s]+)`)
 )
 
 func (s Scanner) Keywords() []string {
@@ -38,9 +39,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	
-	var registrySet map[string]struct{}
+	var tokenRegistryMap map[string]string
 	if verify {
-		registrySet = extractRegistries(dataStr)
+		tokenRegistryMap = extractTokenRegistryPairs(dataStr)
 	}
 	
 	for _, match := range matches {
@@ -56,12 +57,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			// Only use the registry associated with this specific token
+			// to prevent token cross-leakage to attacker-controlled registries
 			registries := []string{"registry.npmjs.org"}
-			if len(registrySet) > 0 {
-				registries = make([]string, 0, len(registrySet))
-				for reg := range registrySet {
-					registries = append(registries, reg)
-				}
+			if registry, found := tokenRegistryMap[resMatch]; found {
+				registries = []string{registry}
 			}
 
 			isVerified, verificationErr := verifyToken(ctx, resMatch, registries)
@@ -81,18 +81,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func extractRegistries(data string) map[string]struct{} {
+// extractTokenRegistryPairs extracts token-to-registry associations from .npmrc format
+// to prevent token cross-leakage to attacker-controlled registries
+func extractTokenRegistryPairs(data string) map[string]string {
 	matches := npmrcPat.FindAllStringSubmatch(data, -1)
-	registrySet := make(map[string]struct{})
+	tokenRegistryMap := make(map[string]string)
 	
 	for _, match := range matches {
-		if len(match) > 1 {
+		if len(match) > 2 {
 			registry := strings.TrimSpace(match[1])
-			registrySet[registry] = struct{}{}
+			token := strings.TrimSpace(match[2])
+			// Associate this token with its specific registry
+			tokenRegistryMap[token] = registry
 		}
 	}
 	
-	return registrySet
+	return tokenRegistryMap
 }
 
 func verifyToken(ctx context.Context, token string, registries []string) (bool, error) {
