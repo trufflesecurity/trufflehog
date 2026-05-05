@@ -160,55 +160,44 @@ jobs:
           [[ -n "${PID_MAIN_BUILD:-}" ]] && { wait $PID_MAIN_BUILD || { echo "Main binary build failed" >&2; exit 1; }; }
           wait $PID_PR_BUILD || { echo "PR binary build failed" >&2; exit 1; }
 
-      # TODO: remove before merging — fake results for testing the diff/comment steps without a full scan.
-      # Restore the real step below once comment rendering is verified.
-      - name: Run corpora tests
-        if: steps.detect.outputs.any_changed == 'true'
-        shell: bash
-        run: |
-          echo '{"DetectorName":"JDBC","Raw":"jdbc:mysql://user:pass@host/db","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' > /tmp/results-pr.jsonl
-          echo '{"DetectorName":"JDBC","Raw":"jdbc:mysql://user:pass@host/db","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' >> /tmp/results-pr.jsonl
-          echo '{"DetectorName":"JDBC","Raw":"jdbc:postgresql://admin:secret@db.example.com/prod","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' >> /tmp/results-pr.jsonl
-          echo '{"DetectorName":"JDBC","Raw":"jdbc:mysql://user:pass@host/db","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null,"Verified":false,"VerificationError":null}' > /tmp/results-main.jsonl
-
       # PR and main scans share a single S3 stream per dataset file, teed to
       # both binaries simultaneously. The main side is skipped on a cache hit
       # (results already in /tmp/results-main.jsonl) or when main_csv is empty
       # (PR adds only new detectors — no overlap with main).
-      # - name: Run corpora tests
-      #   if: steps.detect.outputs.any_changed == 'true'
-      #   shell: bash
-      #   env:
-      #     PR_CSV: ${{ steps.detect.outputs.pr_csv }}
-      #     MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
-      #     MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
-      #   run: |
-      #     set -o pipefail
-      #     files=()
-      #     while IFS= read -r dataset; do
-      #       [[ -z "$dataset" ]] && continue
-      #       files+=("$dataset")
-      #     done <<< "$DATASETS"
-      #
-      #     export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
-      #     export OUTPUT_JSONL=/tmp/results-pr.jsonl
-      #     export STDERR_FILE=/tmp/corpora-stderr-pr.txt
-      #     export INCLUDE_DETECTORS="$PR_CSV"
-      #
-      #     if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
-      #       # Dual-binary: single S3 download teed to both PR and main binaries.
-      #       export TRUFFLEHOG_BIN_MAIN=/tmp/trufflehog-main
-      #       export OUTPUT_JSONL_MAIN=/tmp/results-main.jsonl
-      #       export INCLUDE_DETECTORS_MAIN="$MAIN_CSV"
-      #     elif [[ -z "$MAIN_CSV" ]]; then
-      #       echo "No overlapping detectors in main; skipping main scan."
-      #       : > /tmp/results-main.jsonl
-      #     else
-      #       echo "Main scan cache hit; skipping main scan."
-      #     fi
-      #
-      #     ./scripts/test/detector_corpora_test.sh "${files[@]}" \
-      #       || { echo "Corpora scan failed" >&2; exit 1; }
+      - name: Run corpora tests
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          PR_CSV: ${{ steps.detect.outputs.pr_csv }}
+          MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
+          MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
+        run: |
+          set -o pipefail
+          files=()
+          while IFS= read -r dataset; do
+            [[ -z "$dataset" ]] && continue
+            files+=("$dataset")
+          done <<< "$DATASETS"
+
+          export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
+          export OUTPUT_JSONL=/tmp/results-pr.jsonl
+          export STDERR_FILE=/tmp/corpora-stderr-pr.txt
+          export INCLUDE_DETECTORS="$PR_CSV"
+
+          if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
+            # Dual-binary: single S3 download teed to both PR and main binaries.
+            export TRUFFLEHOG_BIN_MAIN=/tmp/trufflehog-main
+            export OUTPUT_JSONL_MAIN=/tmp/results-main.jsonl
+            export INCLUDE_DETECTORS_MAIN="$MAIN_CSV"
+          elif [[ -z "$MAIN_CSV" ]]; then
+            echo "No overlapping detectors in main; skipping main scan."
+            : > /tmp/results-main.jsonl
+          else
+            echo "Main scan cache hit; skipping main scan."
+          fi
+
+          ./scripts/test/detector_corpora_test.sh "${files[@]}" \
+            || { echo "Corpora scan failed" >&2; exit 1; }
 
       - name: Save main scan cache
         if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != '' && steps.main_scan_cache.outputs.cache-hit != 'true'
