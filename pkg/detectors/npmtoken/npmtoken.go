@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_NpmToken,
 			Raw:          []byte(resMatch),
 			RawV2:        []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/npm/",
@@ -69,6 +70,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if isVerified {
 				s1.SecretParts = map[string]string{
 					"key": resMatch,
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+			res, err := client.Do(req)
+			if err == nil {
+				defer res.Body.Close()
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					s1.Verified = true
 				}
 			} else if verificationErr != nil {
 				s1.SetVerificationError(verificationErr, resMatch)

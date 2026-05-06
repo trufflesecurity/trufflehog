@@ -59,6 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"version":        "1",
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/elevenlabs/",
 			},
+			SecretParts: map[string]string{"key": match},
 		}
 
 		if verify {
@@ -74,12 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.ExtraData["Tier"] = userResponse.Subscription.Tier
 			}
 			s1.SetVerificationError(verificationErr, match)
-
-			if s1.Verified {
-				s1.SecretParts = map[string]string{
-					"key": match,
-				}
-			}
 		}
 
 		results = append(results, s1)
