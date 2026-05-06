@@ -40,6 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		result := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Stripe,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 		}
 		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/stripe/",
@@ -66,7 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					result.Verified = true
 				}
 			}
-			result.SecretParts = map[string]string{"key": match}
 		}
 
 		results = append(results, result)

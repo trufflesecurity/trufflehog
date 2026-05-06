@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/groq/",
 			},
+			SecretParts: map[string]string{"key": match},
 		}
 
 		if verify {
@@ -57,12 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, match)
-
-			if isVerified {
-				s1.SecretParts = map[string]string{
-					"key": match,
-				}
-			}
 		}
 
 		results = append(results, s1)

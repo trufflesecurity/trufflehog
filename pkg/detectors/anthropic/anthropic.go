@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_Anthropic,
 			Raw:          []byte(keyMatch),
 			ExtraData:    make(map[string]string),
+			SecretParts:  map[string]string{"key": keyMatch},
 		}
 
 		if verify {
@@ -74,12 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, keyMatch)
-
-			if s1.Verified {
-				s1.SecretParts = map[string]string{
-					"key": keyMatch,
-				}
-			}
 		}
 
 		results = append(results, s1)
