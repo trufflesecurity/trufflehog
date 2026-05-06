@@ -11,6 +11,10 @@ import (
 )
 
 var (
+	grafanaDomain = "1VV04Zn7iJ0B8w2nBWqG5rB-dVUL3ELSE0zMqnMHjWp-AecPbpdwSde.grafana.net"
+	legacyToken   = "glsa_HU0WvVk_sl4PunHK8JtC7U6fywRm3FJuEFJwct3qi"
+	checksumToken = "glsa_KFr2aBZfhnrcxcyDPAA1M8xd6L5y6dWe_f8ac0a10"
+
 	validPattern = `[{
 		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
 		"name": "GrafanaServiceAccount",
@@ -26,7 +30,8 @@ var (
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "1VV04Zn7iJ0B8w2nBWqG5rB-dVUL3ELSE0zMqnMHjWp-AecPbpdwSde.grafana.net:glsa_HU0WvVk_sl4PunHK8JtC7U6fywRm3FJuEFJwct3qi"
+	secret         = grafanaDomain + ":" + legacyToken
+	checksumSecret = grafanaDomain + ":" + checksumToken
 )
 
 func TestGrafanaServiceAccount_Pattern(t *testing.T) {
@@ -39,9 +44,14 @@ func TestGrafanaServiceAccount_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
+			name:  "legacy pattern with underscore",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "checksum pattern",
+			input: "grafana service account " + checksumToken + " for " + grafanaDomain,
+			want:  []string{checksumSecret},
 		},
 	}
 

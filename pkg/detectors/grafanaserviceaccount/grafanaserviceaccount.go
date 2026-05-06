@@ -25,8 +25,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// Pattern: glsa_ + 32 alphanumeric chars + _ + 8 hex chars = total 46 chars
-	keyPat    = regexp.MustCompile(`\b(glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8})\b`)
+	// Grafana service account tokens have a 41-character body after glsa_.
+	// Older tokens can contain underscores in that body, so keep accepting them
+	// instead of requiring only the newer checksum-style separator.
+	keyPat    = regexp.MustCompile(`\b(glsa_[0-9A-Za-z_]{41})\b`)
 	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9-]+\.grafana\.net)\b`)
 )
 
