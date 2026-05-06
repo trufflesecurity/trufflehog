@@ -15,14 +15,17 @@ import (
 )
 
 func TestTogetherAI_FromData(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	secretCtx, secretCancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer secretCancel()
+	testSecrets, err := common.GetSecret(secretCtx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("TOGETHERAI")
 	inactiveSecret := testSecrets.MustGetField("TOGETHERAI_INACTIVE")
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer timeoutCancel()
 
 	type args struct {
 		ctx    context.Context
@@ -84,7 +87,7 @@ func TestTogetherAI_FromData(t *testing.T) {
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{},
 			args: args{
-				ctx:    ctx,
+				ctx:    timeoutCtx,
 				data:   []byte(fmt.Sprintf("together ai key: %s", secret)),
 				verify: true,
 			},
