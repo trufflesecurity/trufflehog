@@ -61,6 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Slack,
 				Raw:          []byte(token),
+				SecretParts:  map[string]string{"key": token},
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
@@ -112,9 +113,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				} else {
 					s1.SetVerificationError(err, token)
-				}
-				s1.SecretParts = map[string]string{
-					"key": token,
 				}
 			}
 

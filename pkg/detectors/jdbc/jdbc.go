@@ -83,6 +83,7 @@ matchLoop:
 			DetectorType: detector_typepb.DetectorType_JDBC,
 			Raw:          []byte(jdbcConn),
 			Redacted:     tryRedactAnonymousJDBC(jdbcConn),
+			SecretParts:  map[string]string{"connection_string": jdbcConn},
 		}
 
 		if verify {
@@ -101,9 +102,6 @@ matchLoop:
 			if pingRes.err != nil && !pingRes.determinate {
 				err = pingRes.err
 				result.SetVerificationError(err, jdbcConn)
-			}
-			result.SecretParts = map[string]string{
-				"connection_string": jdbcConn,
 			}
 			// TODO: specialized redaction
 		}
