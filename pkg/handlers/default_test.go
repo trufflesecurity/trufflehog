@@ -2,7 +2,6 @@ package handlers
 
 import (
 	stdctx "context"
-	"errors"
 	"io"
 	"os"
 	"strings"
@@ -166,10 +165,8 @@ func TestDefaultHandler_ChunkErrorPreservesIdentity(t *testing.T) {
 			require.Len(t, got, 1)
 			require.Error(t, got[0].Err)
 
-			assert.True(t, errors.Is(got[0].Err, ErrProcessingWarning),
-				"outer ErrProcessingWarning wrap should be preserved")
-			assert.True(t, errors.Is(got[0].Err, tc.innerErr),
-				"inner cause should be inspectable via errors.Is")
+			assert.ErrorIs(t, got[0].Err, ErrProcessingWarning)
+			assert.ErrorIs(t, got[0].Err, tc.innerErr)
 			assert.Equal(t, tc.wantFatal, isFatal(got[0].Err),
 				"isFatal should classify based on the inner cause")
 		})
