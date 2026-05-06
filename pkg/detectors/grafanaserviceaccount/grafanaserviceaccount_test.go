@@ -87,3 +87,9 @@ func TestGrafanaServiceAccount_Pattern(t *testing.T) {
 		})
 	}
 }
+
+func TestGrafanaServiceAccount_DefaultClientBlocksLocalAddresses(t *testing.T) {
+	if defaultClient != detectors.DetectorHttpClientWithNoLocalAddresses {
+		t.Fatal("default client must block local addresses because verification URLs are built from extracted domains")
+	}
+}
