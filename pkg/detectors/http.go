@@ -75,6 +75,7 @@ type detectorTransport struct {
 
 func (t *detectorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Add("User-Agent", userAgent())
+	common.ApplyCustomHeaders(req)
 	return t.T.RoundTrip(req)
 }
 

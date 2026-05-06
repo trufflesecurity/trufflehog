@@ -96,8 +96,29 @@ func UserAgent() string {
 	return "TruffleHog"
 }
 
+// ApplyCustomHeaders applies any globally configured custom headers to req.
+// User-supplied headers fully override existing values for the same name: the
+// first value Sets (replacing anything previously assigned, e.g. the default
+// User-Agent), and any further values for that name Add. This lets a user
+// pass --header 'User-Agent: MyScanner' and actually replace the default
+// rather than ending up with two User-Agent values on the wire.
+func ApplyCustomHeaders(req *http.Request) {
+	if hdr := feature.CustomHeaders.Load(); hdr != nil {
+		for k, vals := range hdr {
+			for i, v := range vals {
+				if i == 0 {
+					req.Header.Set(k, v)
+				} else {
+					req.Header.Add(k, v)
+				}
+			}
+		}
+	}
+}
+
 func (t *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Add("User-Agent", UserAgent())
+	ApplyCustomHeaders(req)
 	return t.T.RoundTrip(req)
 }
 

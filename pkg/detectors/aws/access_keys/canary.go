@@ -59,7 +59,7 @@ func (s scanner) verifyCanary(ctx context.Context, resIDMatch, resSecretMatch st
 		return false, "", err
 	}
 	svc := sns.NewFromConfig(cfg, func(o *sns.Options) {
-		o.APIOptions = append(o.APIOptions, replaceUserAgentMiddleware)
+		o.APIOptions = append(o.APIOptions, replaceUserAgentMiddleware, applyCustomHeadersMiddleware)
 	})
 
 	// Prep vars and Publish to SNS
