@@ -86,6 +86,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 				Raw:          []byte(token),
 				RawV2:        []byte(token + url),
+				SecretParts: map[string]string{
+					"domain": url,
+					"token":  token,
+				},
 			}
 
 			if verify {
@@ -98,13 +102,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 
 					s1.SetVerificationError(verificationErr, token)
-
-					if isVerified {
-						s1.SecretParts = map[string]string{
-							"domain": url,
-							"token":  token,
-						}
-					}
 				}
 			}
 

@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_OpenAIAdmin,
 			Redacted:     token[:11] + "..." + token[len(token)-4:],
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -59,9 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyMatch(ctx, client, token)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, token)
-			s1.SecretParts = map[string]string{
-				"key": token,
-			}
 		}
 
 		results = append(results, s1)
