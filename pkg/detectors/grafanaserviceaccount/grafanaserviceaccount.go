@@ -112,7 +112,10 @@ func verifyGrafanaServiceAccount(ctx context.Context, client *http.Client, domai
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusForbidden:
+		// 403 means the token is authenticated but lacks this endpoint's permissions.
+		return true, nil
+	case http.StatusUnauthorized:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)

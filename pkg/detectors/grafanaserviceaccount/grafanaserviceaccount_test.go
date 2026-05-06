@@ -2,10 +2,12 @@ package grafanaserviceaccount
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -85,6 +87,53 @@ func TestGrafanaServiceAccount_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestVerifyGrafanaServiceAccountStatusCodes(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		wantValid  bool
+		wantErr    bool
+	}{
+		{
+			name:       "ok verifies token",
+			statusCode: http.StatusOK,
+			wantValid:  true,
+		},
+		{
+			name:       "unauthorized rejects token",
+			statusCode: http.StatusUnauthorized,
+		},
+		{
+			name:       "forbidden verifies token",
+			statusCode: http.StatusForbidden,
+			wantValid:  true,
+		},
+		{
+			name:       "unexpected status returns error",
+			statusCode: http.StatusNotFound,
+			wantErr:    true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotValid, err := verifyGrafanaServiceAccount(
+				context.Background(),
+				common.ConstantResponseHttpClient(test.statusCode, ""),
+				validDomain,
+				validKey,
+			)
+
+			if gotValid != test.wantValid {
+				t.Fatalf("valid = %v, want %v", gotValid, test.wantValid)
+			}
+			if (err != nil) != test.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, test.wantErr)
 			}
 		})
 	}
