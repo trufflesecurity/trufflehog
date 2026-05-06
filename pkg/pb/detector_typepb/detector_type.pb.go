@@ -1102,6 +1102,7 @@ const (
 	DetectorType_JiraDataCenterPAT                       DetectorType = 1046
 	DetectorType_ConfluenceDataCenter                    DetectorType = 1047
 	DetectorType_Cloudinary                              DetectorType = 1048
+	DetectorType_TogetherAI                              DetectorType = 1049
 )
 
 // Enum value maps for DetectorType.
@@ -2152,6 +2153,7 @@ var (
 		1046: "JiraDataCenterPAT",
 		1047: "ConfluenceDataCenter",
 		1048: "Cloudinary",
+		1049: "TogetherAI",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3199,6 +3201,7 @@ var (
 		"JiraDataCenterPAT":                 1046,
 		"ConfluenceDataCenter":              1047,
 		"Cloudinary":                        1048,
+		"TogetherAI":                        1049,
 	}
 )
 
