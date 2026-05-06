@@ -11,6 +11,8 @@ import (
 )
 
 var (
+	validKey     = "glsa_0123456789ABCDEFGHIJKLMNOPQRSTUV_a1b2c3d4"
+	validDomain  = "1VV04Zn7iJ0B8w2nBWqG5rB-dVUL3ELSE0zMqnMHjWp-AecPbpdwSde.grafana.net"
 	validPattern = `[{
 		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
 		"name": "GrafanaServiceAccount",
@@ -19,14 +21,14 @@ var (
 		"authentication_type": "",
 		"verification_url": "https://api.example.com/example",
 		"test_secrets": {
-			"grafana_secret": "glsa_HU0WvVk_sl4PunHK8JtC7U6fywRm3FJuEFJwct3qi",
-			"domain: "1VV04Zn7iJ0B8w2nBWqG5rB-dVUL3ELSE0zMqnMHjWp-AecPbpdwSde.grafana.net"
+			"grafana_secret": "` + validKey + `",
+			"domain: "` + validDomain + `"
 		},
 		"expected_response": "200",
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "1VV04Zn7iJ0B8w2nBWqG5rB-dVUL3ELSE0zMqnMHjWp-AecPbpdwSde.grafana.net:glsa_HU0WvVk_sl4PunHK8JtC7U6fywRm3FJuEFJwct3qi"
+	secret = validDomain + ":" + validKey
 )
 
 func TestGrafanaServiceAccount_Pattern(t *testing.T) {
