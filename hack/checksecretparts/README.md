@@ -9,21 +9,8 @@ For each directory under `pkg/detectors/` (recursing into subpackages):
 
 1. Find every composite literal of the form `detectors.Result{...}` or
    `&detectors.Result{...}` in non-test `.go` files.
-2. If the package does not mention `SecretParts` anywhere (neither in the
-   literal nor in a later `x.SecretParts = ...` assignment), emit a warning
+2. If the package does not mention `SecretParts` anywhere, emit a warning
    for each construction site.
-
-Test files (`_test.go`) are ignored on both sides — construction sites in
-tests are not flagged, and `SecretParts` references in tests do not suppress
-findings, because some tests zero the field for comparison.
-
-## Why warning-only
-
-This check ships as **warning-only** because ~907 existing detectors do not
-yet populate `SecretParts` (see the SecretParts design doc, step C).
-Hard-failing today would block every unrelated PR. The check is wired into
-CI with `continue-on-error: true` so the findings are visible without
-gating merges.
 
 ## Running locally
 
@@ -41,8 +28,7 @@ go run ./hack/checksecretparts -fail
 
 ## Flipping warning → fail
 
-Once step C is complete and every detector populates `SecretParts`, make
-this check gating:
+Once every detector populates `SecretParts`, make this check gating:
 
 1. In `.github/workflows/lint.yml`, drop `continue-on-error: true` from the
    `checksecretparts` job and change the run step to pass `-fail`.
@@ -53,7 +39,3 @@ this check gating:
 - It is a syntactic check. It matches `detectors.Result` by selector-expr
   name; packages that rename the import (`d "...detectors"`) would not be
   caught. No such rename exists in the current codebase.
-- It does not verify that `SecretParts` is populated on every code path —
-  only that the package touches the field at all. A finer-grained
-  dataflow check is deliberately out of scope; the rough check is enough
-  to surface unmigrated detectors.

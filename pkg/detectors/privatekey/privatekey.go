@@ -69,6 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(token),
 			Redacted:     token[0:64],
 			ExtraData:    make(map[string]string),
+			SecretParts:  map[string]string{"token": token},
 		}
 
 		// set not normalized match as primary secret value so it is used to calculate line of code
@@ -151,11 +152,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = true
 				for k, v := range extraData.data {
 					s1.ExtraData[k] = v
-				}
-
-				// enabled th
-				s1.SecretParts = map[string]string{
-					"token": token,
 				}
 			} else {
 				s1.ExtraData = nil
