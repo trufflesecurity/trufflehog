@@ -52,10 +52,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_FigmaPersonalAccessToken,
+			DetectorType: s.Type(),
 			Raw:          []byte(resMatch),
 			ExtraData: map[string]string{
-				"version": fmt.Sprintf("%d", s.Version()),
+				"version": fmt.Sprint(s.Version()),
 			},
 			SecretParts: map[string]string{"token": resMatch},
 		}
@@ -64,9 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := figma.VerifyMatch(ctx, s.getClient(), resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
-			if s1.Verified {
-				s1.SecretParts = map[string]string{"token": resMatch}
-			}
 		}
 
 		results = append(results, s1)
