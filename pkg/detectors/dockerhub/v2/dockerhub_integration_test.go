@@ -54,7 +54,7 @@ func TestDockerhub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Dockerhub,
 					Verified:     true,
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"username": username,
 						"pat":      pat,
 					},
@@ -74,7 +74,7 @@ func TestDockerhub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Dockerhub,
 					Verified:     true,
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"username": strings.Split(email, "-")[0],
 						"pat":      pat,
 					},

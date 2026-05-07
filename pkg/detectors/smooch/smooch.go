@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -50,7 +50,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Smooch,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resSecret),
+				SecretParts: map[string]string{
+					"key":    resMatch,
+					"secret": resSecret,
+				},
+				RawV2: []byte(resMatch + resSecret),
 			}
 
 			if verify {

@@ -58,7 +58,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Alegra,
 				Raw:          []byte(token),
-				RawV2:        []byte(token + ":" + id),
+				SecretParts: map[string]string{
+					"token": token,
+					"id":    id,
+				},
+				RawV2: []byte(token + ":" + id),
 			}
 
 			if verify {

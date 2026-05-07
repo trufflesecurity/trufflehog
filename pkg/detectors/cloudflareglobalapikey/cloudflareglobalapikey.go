@@ -52,7 +52,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_CloudflareGlobalApiKey,
 				Redacted:     emailMatch,
 				Raw:          []byte(apiKeyRes),
-				RawV2:        []byte(apiKeyRes + emailMatch),
+				SecretParts: map[string]string{
+					"key":   apiKeyRes,
+					"email": emailMatch,
+				},
+				RawV2: []byte(apiKeyRes + emailMatch),
 			}
 
 			if verify {

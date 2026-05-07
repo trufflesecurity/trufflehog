@@ -79,7 +79,11 @@ UrlLoop:
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureSasToken,
 				Raw:          []byte(url),
-				RawV2:        []byte(url + key),
+				SecretParts: map[string]string{
+					"url": url,
+					"key": key,
+				},
+				RawV2: []byte(url + key),
 			}
 
 			if verify {

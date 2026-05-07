@@ -56,8 +56,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Docusign,
 				Raw:          []byte(resIDMatch),
-				Redacted:     resIDMatch,
-				RawV2:        []byte(resIDMatch + resSecretMatch),
+				SecretParts: map[string]string{
+					"id":     resIDMatch,
+					"secret": resSecretMatch,
+				},
+				Redacted: resIDMatch,
+				RawV2:    []byte(resIDMatch + resSecretMatch),
 			}
 
 			// Verify client id and secret pair by using an *undocumented* client_credentials grant type on the oauth2 endpoint.

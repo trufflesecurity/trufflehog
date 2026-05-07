@@ -62,6 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		r := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_RabbitMQ,
 			Raw:          []byte(urlMatch),
+			SecretParts:  map[string]string{"key": urlMatch},
 			Redacted:     strings.TrimSpace(strings.Replace(parsedURL.String(), password, "********", -1)),
 		}
 

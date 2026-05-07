@@ -49,7 +49,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_GrafanaServiceAccount,
 				Raw:          []byte(key),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", domainRes, key)),
+				SecretParts: map[string]string{
+					"domain": domainRes,
+					"key":    key,
+				},
+				RawV2: []byte(fmt.Sprintf("%s:%s", domainRes, key)),
 			}
 
 			if verify {

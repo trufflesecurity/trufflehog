@@ -61,7 +61,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Dotdigital,
 				Raw:          []byte(email),
-				RawV2:        []byte(email + password),
+				SecretParts: map[string]string{
+					"email":    email,
+					"password": password,
+				},
+				RawV2: []byte(email + password),
 			}
 
 			if verify {

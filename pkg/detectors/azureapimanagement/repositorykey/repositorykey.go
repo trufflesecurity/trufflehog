@@ -66,7 +66,11 @@ EndpointLoop:
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureApiManagementRepositoryKey,
 				Raw:          []byte(passwordMatch),
-				RawV2:        []byte(urlMatch + passwordMatch),
+				SecretParts: map[string]string{
+					"url":      urlMatch,
+					"password": passwordMatch,
+				},
+				RawV2: []byte(urlMatch + passwordMatch),
 			}
 
 			if verify {

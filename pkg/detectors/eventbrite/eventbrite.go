@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Eventbrite,
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 			ExtraData:    map[string]string{},
 		}
 
