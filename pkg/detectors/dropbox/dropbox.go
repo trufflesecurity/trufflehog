@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Dropbox,
 			Raw:          []byte(key),
+			SecretParts:  map[string]string{"token": key},
 		}
 
 		if verify {
@@ -57,9 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyDropboxToken(ctx, client, key)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
-			if s1.Verified {
-				s1.SecretParts = map[string]string{"token": key}
-			}
 		}
 
 		results = append(results, s1)

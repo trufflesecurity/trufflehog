@@ -27,6 +27,7 @@ func TestDataDogApiKey_Pattern_WithValidAPIKey(t *testing.T) {
 		{
 			DetectorType: detector_typepb.DetectorType_DatadogApikey,
 			Raw:          []byte(apiKey),
+			SecretParts:  map[string]string{"api_key": apiKey},
 		},
 	}
 	matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(input))
