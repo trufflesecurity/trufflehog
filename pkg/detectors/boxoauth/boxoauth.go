@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -63,10 +64,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueSecretMatches[match[1]] = struct{}{}
 	}
 
+	var subjectIds []string
 	uniqueSubjectIdMatches := make(map[string]struct{})
 	for _, match := range subjectIdPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueSubjectIdMatches[match[1]] = struct{}{}
+		if _, seen := uniqueSubjectIdMatches[match[1]]; !seen {
+			uniqueSubjectIdMatches[match[1]] = struct{}{}
+			subjectIds = append(subjectIds, match[1])
+		}
 	}
+	slices.Sort(subjectIds)
 
 	for resIdMatch := range uniqueIdMatches {
 		for resSecretMatch := range uniqueSecretMatches {
@@ -90,7 +96,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr, resIdMatch)
 
 				if isVerified {
-					for subjectId := range uniqueSubjectIdMatches {
+					for _, subjectId := range subjectIds {
 						if verifySubjectID(ctx, s.getClient(), resIdMatch, resSecretMatch, subjectId) {
 							s1.SecretParts["subject_id"] = subjectId
 							break
