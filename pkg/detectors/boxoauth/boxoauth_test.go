@@ -155,7 +155,10 @@ func TestBoxOauth_AnalysisInfo_VerifiedNoSubjectId(t *testing.T) {
 
 	r := results[0]
 	assert.True(t, r.Verified)
-	assert.Nil(t, r.SecretParts)
+	require.NotNil(t, r.SecretParts)
+	assert.Equal(t, clientId, r.SecretParts["client_id"])
+	assert.Equal(t, clientSecret, r.SecretParts["client_secret"])
+	assert.Empty(t, r.SecretParts["subject_id"])
 }
 
 func TestBoxOauth_AnalysisInfo_VerifiedInvalidSubjectId(t *testing.T) {
@@ -192,7 +195,10 @@ func TestBoxOauth_AnalysisInfo_VerifiedInvalidSubjectId(t *testing.T) {
 
 	r := results[0]
 	assert.True(t, r.Verified)
-	assert.Nil(t, r.SecretParts)
+	require.NotNil(t, r.SecretParts)
+	assert.Equal(t, clientId, r.SecretParts["client_id"])
+	assert.Equal(t, clientSecret, r.SecretParts["client_secret"])
+	assert.Empty(t, r.SecretParts["subject_id"])
 }
 
 func TestBoxOauth_AnalysisInfo_UnverifiedWithSubjectId(t *testing.T) {
@@ -217,5 +223,8 @@ func TestBoxOauth_AnalysisInfo_UnverifiedWithSubjectId(t *testing.T) {
 
 	r := results[0]
 	assert.False(t, r.Verified)
-	assert.Nil(t, r.SecretParts)
+	require.NotNil(t, r.SecretParts)
+	assert.Equal(t, clientId, r.SecretParts["client_id"])
+	assert.Equal(t, clientSecret, r.SecretParts["client_secret"])
+	assert.Empty(t, r.SecretParts["subject_id"])
 }
