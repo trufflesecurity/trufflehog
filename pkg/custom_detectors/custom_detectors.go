@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"maps"
 	"net/http"
@@ -324,6 +324,10 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 				storeResponseBody(resp, result.ExtraData)
 				break
 			}
+			// Legacy non-200 is a meaningful response (verifier said "no");
+			// mark definitive so a prior ranged verifier with rangesInEffect
+			// does not cause a spurious verification error.
+			definitive = true
 			continue
 		}
 
@@ -360,7 +364,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 
 	if rangesInEffect && !definitive {
-		result.SetVerificationError(fmt.Errorf("verification response status code did not match any configured successRanges or rotatedRanges"))
+		result.SetVerificationError(errors.New("verification response status code did not match any configured successRanges or rotatedRanges"))
 	}
 
 	select {
