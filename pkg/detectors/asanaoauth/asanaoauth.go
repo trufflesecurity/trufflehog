@@ -44,13 +44,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_AsanaOauth,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
 			isVerified, err := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, resMatch)
-			s1.SecretParts = map[string]string{"key": resMatch}
 		}
 
 		results = append(results, s1)
