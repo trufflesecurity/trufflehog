@@ -63,7 +63,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
+			// Merge verifier-supplied extra data into the existing map so the
+			// rotation_guide URL set above is preserved (verifyMatch currently
+			// returns nil for the map, but the merge is correct for future
+			// verifier additions and for the nil case alike).
+			for k, v := range extraData {
+				s1.ExtraData[k] = v
+			}
 			s1.SetVerificationError(verificationErr, match)
 		}
 
