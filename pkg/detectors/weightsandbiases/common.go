@@ -17,7 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-var DefaultClient = common.SaneHttpClient()
+var defaultClient = common.SaneHttpClient()
 
 // WBBaseScanner is a base struct embedded by versioned scanners. It holds the HTTP client and
 // shared detection/verification logic.
@@ -25,22 +25,12 @@ type WBBaseScanner struct {
 	Client *http.Client
 }
 
-type viewerResponse struct {
-	Data struct {
-		Viewer struct {
-			ID       string `json:"id"`
-			Username string `json:"username"`
-			Email    string `json:"email"`
-			Admin    bool   `json:"admin"`
-		} `json:"viewer"`
-	} `json:"data"`
-}
-
 // FromData finds and optionally verifies WeightsAndBiases secrets in data using the provided
 // pattern. version is included in ExtraData of each result.
 func (s WBBaseScanner) FromData(ctx context.Context, verify bool, data []byte, keyPat *regexp.Regexp, version int) ([]detectors.Result, error) {
+	dataStr := string(data)
 	uniqueMatches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(string(data), -1) {
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueMatches[match[1]] = struct{}{}
 	}
 
@@ -53,7 +43,7 @@ func (s WBBaseScanner) FromData(ctx context.Context, verify bool, data []byte, k
 		}
 
 		if verify {
-			isVerified, extraData, verificationErr := s.verify(ctx, match)
+			isVerified, extraData, verificationErr := s.verifyMatch(ctx, match)
 			r.Verified = isVerified
 			r.ExtraData = extraData
 			r.SetVerificationError(verificationErr, match)
@@ -69,14 +59,25 @@ func (s WBBaseScanner) FromData(ctx context.Context, verify bool, data []byte, k
 	return results, nil
 }
 
-// verify checks the credential against the W&B GraphQL /graphql endpoint using the viewer query,
+type viewerResponse struct {
+	Data struct {
+		Viewer struct {
+			ID       string `json:"id"`
+			Username string `json:"username"`
+			Email    string `json:"email"`
+			Admin    bool   `json:"admin"`
+		} `json:"viewer"`
+	} `json:"data"`
+}
+
+// verifyMatch checks the credential against the W&B GraphQL /graphql endpoint using the viewer query,
 // which requires no special permissions. A 200 with a non-empty username means the token is valid;
 // 401 means invalid or revoked.
 // Docs: https://docs.wandb.ai/ref/graphql
-func (s WBBaseScanner) verify(ctx context.Context, token string) (bool, map[string]string, error) {
+func (s WBBaseScanner) verifyMatch(ctx context.Context, token string) (bool, map[string]string, error) {
 	client := s.Client
 	if client == nil {
-		client = DefaultClient
+		client = defaultClient
 	}
 
 	query := `{"query": "query Viewer { viewer { id username email admin } }"}`
@@ -122,4 +123,12 @@ func (s WBBaseScanner) verify(ctx context.Context, token string) (bool, map[stri
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+}
+
+func (s WBBaseScanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_WeightsAndBiases
+}
+
+func (s WBBaseScanner) Description() string {
+	return "Weights & Biases is a Machine Learning Operations (MLOps) platform that helps track experiments, version datasets, evaluate model performance, and collaborate with team members"
 }
