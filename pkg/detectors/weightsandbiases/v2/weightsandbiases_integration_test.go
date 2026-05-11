@@ -53,6 +53,12 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"admin":    "false",
+						"email":    "aman.ullah.jalal@trufflesec.com",
+						"username": "aman-ullah-jalal",
+						"version":  "2",
+					},
 				},
 			},
 			wantErr:             false,
@@ -70,6 +76,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
+					ExtraData:    map[string]string{"version": "2"},
 				},
 			},
 			wantErr:             false,
@@ -99,6 +106,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
+					ExtraData:    map[string]string{"version": "2"},
 				},
 			},
 			wantErr:             false,
@@ -116,6 +124,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
+					ExtraData:    map[string]string{"version": "2"},
 				},
 			},
 			wantErr:             false,
@@ -141,7 +150,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts", "ExtraData")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("WeightsandbiasesV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

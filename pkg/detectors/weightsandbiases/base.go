@@ -17,13 +17,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-var defaultClient = common.SaneHttpClient()
-
 // BaseScanner is a base struct embedded by versioned scanners. It holds the HTTP client and
 // shared detection/verification logic.
 type BaseScanner struct {
 	Client *http.Client
 }
+
+var defaultClient = common.SaneHttpClient()
 
 // FromData finds and optionally verifies WeightsAndBiases secrets in data using the provided
 // pattern. version is included in ExtraData of each result.
