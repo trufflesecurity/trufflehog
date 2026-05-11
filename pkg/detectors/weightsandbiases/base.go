@@ -125,10 +125,10 @@ func (s BaseScanner) verifyMatch(ctx context.Context, token string) (bool, map[s
 	}
 }
 
-func (s BaseScanner) Type() detector_typepb.DetectorType {
-	return detector_typepb.DetectorType_WeightsAndBiases
-}
-
 func (s BaseScanner) Description() string {
 	return "Weights & Biases is a Machine Learning Operations (MLOps) platform that helps track experiments, version datasets, evaluate model performance, and collaborate with team members"
+}
+
+func (s BaseScanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_WeightsAndBiases
 }
