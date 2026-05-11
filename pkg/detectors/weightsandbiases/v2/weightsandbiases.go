@@ -2,7 +2,6 @@ package weightsandbiases
 
 import (
 	"context"
-	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -11,7 +10,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{ client *http.Client }
+type Scanner struct {
+	common.WBBaseScanner
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -26,11 +27,7 @@ func (s Scanner) Version() int { return 2 }
 func (s Scanner) Keywords() []string { return []string{"wandb_v1_"} }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
-	client := s.client
-	if client == nil {
-		client = common.DefaultClient
-	}
-	return common.FromData(ctx, verify, client, data, keyPat)
+	return s.WBBaseScanner.FromData(ctx, verify, data, keyPat, s.Version())
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
