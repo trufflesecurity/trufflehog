@@ -154,7 +154,7 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	if br.tempFile != nil && br.index < br.diskBufferSize {
 		// The temp file holds bytes [0, diskBufferSize) of the virtual stream,
 		// so seek directly to br.index. Subtracting buf.Len() (the prior
-		// behaviour) was only correct when the buffer was empty — after a
+		// behaviour) was only correct when the buffer was empty, after a
 		// flush followed by additional buffered writes, the subtraction
 		// produced a negative offset and a wrong-region read.
 		if _, err := br.tempFile.Seek(br.index, io.SeekStart); err != nil {

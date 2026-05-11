@@ -500,7 +500,7 @@ func TestBufferedReaderSeekerReadAfterFlushBackwardSeek(t *testing.T) {
 	assert.Equal(t, int64(32), brs.diskBufferSize)
 	assert.Equal(t, 16, brs.buf.Len())
 
-	// Seek back to the start and read 8 bytes — these live on disk.
+	// Seek back to the start and read 8 bytes, these live on disk.
 	_, err = brs.Seek(0, io.SeekStart)
 	assert.NoError(t, err)
 
