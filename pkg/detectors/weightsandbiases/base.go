@@ -108,6 +108,7 @@ func (s BaseScanner) verifyMatch(ctx context.Context, token string) (bool, map[s
 			return false, nil, err
 		}
 
+		// Only consider it verified if we got back a username.
 		if viewerResp.Data.Viewer.Username == "" {
 			return false, nil, nil
 		}
