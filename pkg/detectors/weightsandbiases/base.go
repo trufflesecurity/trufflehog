@@ -19,15 +19,15 @@ import (
 
 var defaultClient = common.SaneHttpClient()
 
-// WBBaseScanner is a base struct embedded by versioned scanners. It holds the HTTP client and
+// BaseScanner is a base struct embedded by versioned scanners. It holds the HTTP client and
 // shared detection/verification logic.
-type WBBaseScanner struct {
+type BaseScanner struct {
 	Client *http.Client
 }
 
 // FromData finds and optionally verifies WeightsAndBiases secrets in data using the provided
 // pattern. version is included in ExtraData of each result.
-func (s WBBaseScanner) FromData(ctx context.Context, verify bool, data []byte, keyPat *regexp.Regexp, version int) ([]detectors.Result, error) {
+func (s BaseScanner) FromData(ctx context.Context, verify bool, data []byte, keyPat *regexp.Regexp, version int) ([]detectors.Result, error) {
 	dataStr := string(data)
 	uniqueMatches := make(map[string]struct{})
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
@@ -74,7 +74,7 @@ type viewerResponse struct {
 // which requires no special permissions. A 200 with a non-empty username means the token is valid;
 // 401 means invalid or revoked.
 // Docs: https://docs.wandb.ai/ref/graphql
-func (s WBBaseScanner) verifyMatch(ctx context.Context, token string) (bool, map[string]string, error) {
+func (s BaseScanner) verifyMatch(ctx context.Context, token string) (bool, map[string]string, error) {
 	client := s.Client
 	if client == nil {
 		client = defaultClient
@@ -125,10 +125,10 @@ func (s WBBaseScanner) verifyMatch(ctx context.Context, token string) (bool, map
 	}
 }
 
-func (s WBBaseScanner) Type() detector_typepb.DetectorType {
+func (s BaseScanner) Type() detector_typepb.DetectorType {
 	return detector_typepb.DetectorType_WeightsAndBiases
 }
 
-func (s WBBaseScanner) Description() string {
+func (s BaseScanner) Description() string {
 	return "Weights & Biases is a Machine Learning Operations (MLOps) platform that helps track experiments, version datasets, evaluate model performance, and collaborate with team members"
 }

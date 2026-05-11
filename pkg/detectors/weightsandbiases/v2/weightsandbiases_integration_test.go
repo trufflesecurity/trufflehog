@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	wbcommon "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
+	base "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -89,7 +89,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for timeout",
-			s:    Scanner{WBBaseScanner: wbcommon.WBBaseScanner{Client: common.SaneHttpClientTimeOut(1 * time.Microsecond)}},
+			s:    Scanner{BaseScanner: base.BaseScanner{Client: common.SaneHttpClientTimeOut(1 * time.Microsecond)}},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a weightsandbiases secret %s within", secret)),
@@ -106,7 +106,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but unexpected api surface",
-			s:    Scanner{WBBaseScanner: wbcommon.WBBaseScanner{Client: common.ConstantResponseHttpClient(404, "")}},
+			s:    Scanner{BaseScanner: base.BaseScanner{Client: common.ConstantResponseHttpClient(404, "")}},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a weightsandbiases secret %s within", secret)),
