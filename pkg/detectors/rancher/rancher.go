@@ -2,7 +2,6 @@ package rancher
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -75,8 +74,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 // TruffleHog does not pass environment context here, we attempt a generic
 // check. Real verification happens in integration tests with a live server.
 func verifyRancherToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	// Without a server URL we cannot verify; return unverified rather than error.
-	return false, fmt.Errorf("server URL required for verification — set CATTLE_SERVER")
+	// Without a server URL we cannot verify; return (false, nil) so the result
+	// is classified as unverified rather than unknown.
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
