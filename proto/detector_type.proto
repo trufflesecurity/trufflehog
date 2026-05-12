@@ -1050,4 +1050,5 @@ enum DetectorType {
   JiraDataCenterPAT = 1046;
   ConfluenceDataCenter = 1047;
   Cloudinary = 1048;
+  Pinecone = 1049;
 }
