@@ -116,16 +116,15 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// to buildDetectorList() — discovered by TestAllDetectorTypesAreInDefaultList.
 	// They are not added immediately out of caution for the impact on customers/users.
 	// Remove each entry once its detector has been carefully added.
-	detector_typepb.DetectorType_BitbucketDataCenter: {},
-	detector_typepb.DetectorType_DatadogApikey:       {},
-	detector_typepb.DetectorType_Guru:                {},
-	detector_typepb.DetectorType_IPInfo:              {},
-	detector_typepb.DetectorType_Lob:                 {},
-	detector_typepb.DetectorType_Rev:                 {},
-	detector_typepb.DetectorType_TLy:                 {},
-	detector_typepb.DetectorType_Tru:                 {},
-	detector_typepb.DetectorType_User:                {},
-	detector_typepb.DetectorType_Wit:                 {},
+	detector_typepb.DetectorType_DatadogApikey: {},
+	detector_typepb.DetectorType_Guru:          {},
+	detector_typepb.DetectorType_IPInfo:        {},
+	detector_typepb.DetectorType_Lob:           {},
+	detector_typepb.DetectorType_Rev:           {},
+	detector_typepb.DetectorType_TLy:           {},
+	detector_typepb.DetectorType_Tru:           {},
+	detector_typepb.DetectorType_User:          {},
+	detector_typepb.DetectorType_Wit:           {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
