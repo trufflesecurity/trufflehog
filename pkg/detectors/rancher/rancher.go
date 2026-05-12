@@ -2,39 +2,34 @@ package rancher
 
 import (
 	"context"
-	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct {
-	client *http.Client
-}
+type Scanner struct{}
 
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
-
-	// Match Rancher/Cattle token variable names followed by the token value.
-	// Tokens are 54-64 lowercase alphanumeric chars; (?i:...) scopes
-	// case-insensitivity to the variable name prefix only, keeping the
-	// capture group case-sensitive to avoid false positives on uppercase strings.
+	// Match known Rancher/Cattle variable names followed by the token value.
+	// (?i:...) scopes case-insensitivity to the variable name only; the capture
+	// group stays case-sensitive because Rancher tokens are lowercase alphanumeric.
 	keyPat = regexp.MustCompile(
 		`(?i:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN|RANCHER_SECRET_KEY)` +
-			`[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`)
+			`\s*[=:]\s*["']?([a-z0-9]{54,64}\b)["']?`)
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"cattle_token", "rancher_token", "cattle_bootstrap_password", "rancher_api_token", "rancher_secret_key"}
+	return []string{"cattle_token", "cattle_bootstrap_password", "rancher_token", "rancher_api_token", "rancher_secret_key"}
 }
 
 // FromData finds and optionally verifies Rancher API tokens in a chunk of data.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
+// Verification is not supported without a live CATTLE_SERVER URL; matched tokens
+// are returned as unverified (Verified=false, no VerificationError).
+func (s Scanner) FromData(_ context.Context, _ bool, data []byte) ([]detectors.Result, error) {
 	dataStr := string(data)
 	seen := make(map[string]struct{})
 
@@ -46,38 +41,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 		seen[token] = struct{}{}
 
-		r := detectors.Result{
+		results = append(results, detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Rancher,
 			Raw:          []byte(token),
 			SecretParts:  map[string]string{"token": token},
-		}
-
-		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			// Verification requires a server URL, which we may not have.
-			// We flag the token as unverified rather than skipping it.
-			isVerified, verificationErr := verifyRancherToken(ctx, client, token)
-			r.Verified = isVerified
-			r.SetVerificationError(verificationErr)
-		}
-
-		results = append(results, r)
+		})
 	}
 
 	return results, nil
-}
-
-// verifyRancherToken checks the token against the Rancher management API.
-// It requires CATTLE_SERVER to be present in the same context, but since
-// TruffleHog does not pass environment context here, we attempt a generic
-// check. Real verification happens in integration tests with a live server.
-func verifyRancherToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	// Without a server URL we cannot verify; return (false, nil) so the result
-	// is classified as unverified rather than unknown.
-	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

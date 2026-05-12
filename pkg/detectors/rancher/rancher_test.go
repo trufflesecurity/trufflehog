@@ -58,6 +58,11 @@ RANCHER_API_TOKEN=` + validToken,
 			input: `CATTLE_TOKEN=` + invalidToken,
 			want:  []string{},
 		},
+		{
+			name:  "token too long - should not detect prefix",
+			input: `CATTLE_TOKEN=` + validToken + "zzzzzzzzzzzz",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
