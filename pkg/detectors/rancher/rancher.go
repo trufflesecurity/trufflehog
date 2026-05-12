@@ -21,10 +21,11 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Match Rancher/Cattle token variable names followed by the token value.
-	// Tokens are 54-64 lowercase hex chars; the variable name anchors detection
-	// to avoid false positives on generic random strings.
+	// Tokens are 54-64 lowercase alphanumeric chars; (?i:...) scopes
+	// case-insensitivity to the variable name prefix only, keeping the
+	// capture group case-sensitive to avoid false positives on uppercase strings.
 	keyPat = regexp.MustCompile(
-		`(?i)(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN|RANCHER_SECRET_KEY)` +
+		`(?i:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN|RANCHER_SECRET_KEY)` +
 			`[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`)
 )
 
