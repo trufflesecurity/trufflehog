@@ -67,6 +67,7 @@ scan() {
                     --log-level=3 \
                     --concurrency=8 \
                     --json \
+                    --archive-timeout=2h \
                     "${main_include_flag[@]}" \
                     stdin >> "${OUTPUT_JSONL_MAIN}"
               ) \
@@ -78,6 +79,7 @@ scan() {
                 --concurrency=8 \
                 --json \
                 --print-avg-detector-time \
+                --archive-timeout=2h \
                 "${INCLUDE_FLAG[@]}" \
                 stdin >> "$OUTPUT_JSONL"
         rc=$?
@@ -93,6 +95,7 @@ scan() {
                 --concurrency=8 \
                 --json \
                 --print-avg-detector-time \
+                --archive-timeout=2h \
                 "${INCLUDE_FLAG[@]}" \
                 stdin >> "$OUTPUT_JSONL"
         rc=$?
