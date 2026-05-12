@@ -2,6 +2,7 @@ package rancher
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -41,6 +42,11 @@ RANCHER_API_TOKEN=` + validToken,
 			name: "quoted value",
 			input: `CATTLE_BOOTSTRAP_PASSWORD="` + validToken + `"`,
 			want:  []string{validToken},
+		},
+		{
+			name:  "uppercase token - should not detect",
+			input: `CATTLE_TOKEN=` + strings.ToUpper(validToken),
+			want:  []string{},
 		},
 		{
 			name:  "no context - should not detect",
