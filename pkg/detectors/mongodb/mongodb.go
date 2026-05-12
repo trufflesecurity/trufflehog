@@ -25,6 +25,11 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var _ detectors.TokenizerFalsePositiveChecker = (*Scanner)(nil)
+
+func (s Scanner) IsTokenizerFpDisabled() bool {
+	return true
+}
 
 var (
 	defaultTimeout = 5 * time.Second

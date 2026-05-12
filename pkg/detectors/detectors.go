@@ -203,6 +203,8 @@ func unwrapToLast(err error) error {
 type ResultWithMetadata struct {
 	// IsWordlistFalsePositive indicates whether this secret was flagged as a false positive based on a wordlist check
 	IsWordlistFalsePositive bool
+	// IsTokenizerFalsePositive indicates whether this secret was flagged as a false positive based on a tokenizer check
+	IsTokenizerFalsePositive bool
 	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceID is the ID of the source that the API uses to map secrets to specific sources.
@@ -353,4 +355,12 @@ func withDedupKey(ctx context.Context, detType detector_typepb.DetectorType, cre
 // with NewClientWithDedup or WithDedup — it is the only way to activate deduplication.
 func DoWithDedup(client *http.Client, detType detector_typepb.DetectorType, credential string, req *http.Request) (*http.Response, error) {
 	return client.Do(req.WithContext(withDedupKey(req.Context(), detType, credential)))
+}
+
+// The detectors that don't want to run tokenizer false postive check should implement this interface and return true for IsTokenizerFpDisabled.
+// This is used to skip tokenizer false positive when --filter-tokenize flag is specified.
+// This should usually be used for detectors whose secret can be normal words.
+// For example, the PostgreSQL connection string can contain a username that is a normal word, which can lead to false positives in the tokenizer check.
+type TokenizerFalsePositiveChecker interface {
+	IsTokenizerFpDisabled() bool
 }

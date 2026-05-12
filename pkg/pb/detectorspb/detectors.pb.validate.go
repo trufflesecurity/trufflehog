@@ -233,6 +233,8 @@ func (m *FalsePositiveInfo) validate(all bool) error {
 
 	// no validation rules for LowEntropy
 
+	// no validation rules for LowTokenCharRatio
+
 	if len(errors) > 0 {
 		return FalsePositiveInfoMultiError(errors)
 	}

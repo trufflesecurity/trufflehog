@@ -33,6 +33,7 @@ message Result {
 message FalsePositiveInfo {
   bool word_match = 1;
   bool low_entropy = 2;
+  bool low_token_char_ratio = 3;
 }
 
 message StructuredData {

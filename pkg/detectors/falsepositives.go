@@ -9,6 +9,9 @@ import (
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
 
+	"fmt"
+
+	"github.com/pkoukk/tiktoken-go"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -75,6 +78,40 @@ func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {
 	return func(res Result) (bool, string) {
 		return IsKnownFalsePositive(string(res.Raw), DefaultFalsePositives, true)
 	}
+}
+
+func GetTokenizerFalsePositiveCheck(detector Detector) func(ctx context.Context, res Result) bool {
+	checker, ok := detector.(TokenizerFalsePositiveChecker)
+	if ok {
+		return func(ctx context.Context, res Result) bool {
+			return checker.IsTokenizerFpDisabled()
+		}
+	}
+
+	return IsTokenizerFalsePositive
+}
+
+func IsTokenizerFalsePositive(ctx context.Context, res Result) bool {
+	if !res.Verified {
+		if res.Raw != nil {
+			// We are using cl100k_base because it is the most commonly used encoding
+			// and has a good balance of granularity for false positive detection.
+			tokens := getTokens(string(res.Raw), "cl100k_base")
+			if len(tokens) > 0 {
+				ratio := float64(len(tokens)) / float64(len(res.Raw))
+				// Ratio of less than 0.39 is good to avoid normal words and similar digits like 111111111111
+				if ratio > 0.39 {
+					return true
+				} else {
+					ctx.Logger().Info("Filtered out result with low token-to-character ratio", "detector", res.DetectorType.String(), "ratio", ratio, "result", string(res.Raw))
+					return false
+				}
+			} else {
+				ctx.Logger().Info("Filtered out result with no tokens", "result", res)
+			}
+		}
+	}
+	return false
 }
 
 // IsKnownFalsePositive returns whether a finding is (likely) a known false positive, and the reason for the detection.
@@ -170,4 +207,16 @@ func FilterResultsWithEntropy(ctx context.Context, results []Result, entropy flo
 		}
 	}
 	return filteredResults
+}
+
+func getTokens(text, encoding string) []int {
+	tke, err := tiktoken.GetEncoding(encoding)
+	if err != nil {
+		err = fmt.Errorf("getEncoding: %v", err)
+		return nil
+	}
+
+	token := tke.Encode(text, nil, nil)
+
+	return token
 }

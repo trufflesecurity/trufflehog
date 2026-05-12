@@ -86,6 +86,11 @@ func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var _ detectors.TokenizerFalsePositiveChecker = (*Scanner)(nil)
+
+func (s Scanner) IsTokenizerFpDisabled() bool {
+	return true
+}
 
 func (s Scanner) Keywords() []string {
 	return []string{"postgres"}
