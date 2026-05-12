@@ -17,10 +17,6 @@ else
 fi
 > "$OUTPUT_JSONL"
 
-# Captures trufflehog stderr (incl. --print-avg-detector-time output) for postmortem inspection.
-STDERR_FILE="${STDERR_FILE:-/tmp/corpora-stderr.txt}"
-> "$STDERR_FILE"
-
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-${REPO_ROOT}/trufflehog}"
 
@@ -51,9 +47,6 @@ fi
 # only downloaded once.
 scan() {
     local input="$1"
-    # jq stderr is folded into STDERR_FILE so benign "Broken pipe" notices
-    # (trufflehog exits before jq finishes draining the corpus) don't pollute
-    # CI logs. Real jq parse errors land in the same file for postmortem.
     set +e
 
     local main_include_flag=()
@@ -64,8 +57,8 @@ scan() {
     local rc=0
     if [[ -n "${TRUFFLEHOG_BIN_MAIN:-}" ]]; then
         # Single S3 download teed to both binaries simultaneously.
-        unzstd -c "$input" 2>> "$STDERR_FILE" \
-            | jq -r .content 2>> "$STDERR_FILE" \
+        unzstd -c "$input" \
+            | jq -r .content \
             | tee >(
                 "${TRUFFLEHOG_BIN_MAIN}" \
                     --no-update \
@@ -75,7 +68,7 @@ scan() {
                     --concurrency=8 \
                     --json \
                     "${main_include_flag[@]}" \
-                    stdin >> "${OUTPUT_JSONL_MAIN}" 2>> "$STDERR_FILE"
+                    stdin >> "${OUTPUT_JSONL_MAIN}"
               ) \
             | "$TRUFFLEHOG_BIN" \
                 --no-update \
@@ -86,12 +79,12 @@ scan() {
                 --json \
                 --print-avg-detector-time \
                 "${INCLUDE_FLAG[@]}" \
-                stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+                stdin >> "$OUTPUT_JSONL"
         rc=$?
         wait
     else
-        unzstd -c "$input" 2>> "$STDERR_FILE" \
-            | jq -r .content 2>> "$STDERR_FILE" \
+        unzstd -c "$input" \
+            | jq -r .content \
             | "$TRUFFLEHOG_BIN" \
                 --no-update \
                 --no-verification \
@@ -101,7 +94,7 @@ scan() {
                 --json \
                 --print-avg-detector-time \
                 "${INCLUDE_FLAG[@]}" \
-                stdin >> "$OUTPUT_JSONL" 2>> "$STDERR_FILE"
+                stdin >> "$OUTPUT_JSONL"
         rc=$?
     fi
     set -e

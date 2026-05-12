@@ -182,7 +182,6 @@ jobs:
 
           export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
           export OUTPUT_JSONL=/tmp/results-pr.jsonl
-          export STDERR_FILE=/tmp/corpora-stderr-pr.txt
           export INCLUDE_DETECTORS="$PR_CSV"
 
           if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
