@@ -525,6 +525,11 @@ func run(state overseer.State, logSync func() error) {
 	// OSS Default using github graphql api for issues, pr's and comments
 	feature.UseGithubGraphQLAPI.Store(false)
 
+	// New detector flags
+	feature.PineconeDetectorEnabled.Store(false)
+	feature.CloudinaryDetectorEnabled.Store(false)
+	feature.GitLabOAuthDetectorEnabled.Store(false)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
