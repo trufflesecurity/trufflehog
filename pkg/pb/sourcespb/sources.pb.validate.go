@@ -4154,6 +4154,8 @@ func (m *S3) validate(all bool) error {
 
 	// no validation rules for EnableResumption
 
+	// no validation rules for Profile
+
 	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
 		if v == nil {

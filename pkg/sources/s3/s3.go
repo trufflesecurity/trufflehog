@@ -3,6 +3,7 @@ package s3
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -51,9 +52,11 @@ type Source struct {
 	sources.Progress
 	metricsCollector metricsCollector
 
-	errorCount    *sync.Map
-	jobPool       *errgroup.Group
-	maxObjectSize int64
+	errorCount        *sync.Map
+	jobPool           *errgroup.Group
+	maxObjectSize     int64
+	includeExtensions map[string]struct{}
+	excludeExtensions map[string]struct{}
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -102,7 +105,58 @@ func (s *Source) Init(
 		return errors.New("either a bucket include list or a bucket ignore list can be specified, but not both")
 	}
 
+	if len(conn.GetIncludeExtensions()) > 0 && len(conn.GetExcludeExtensions()) > 0 {
+		return errors.New("either an include extensions list or an exclude extensions list can be specified, but not both")
+	}
+
+	s.includeExtensions = normalizeExtensions(conn.GetIncludeExtensions())
+	s.excludeExtensions = normalizeExtensions(conn.GetExcludeExtensions())
+
 	return nil
+}
+
+// normalizeExtensions converts a slice of extensions into a set with consistent formatting.
+// Extensions are lowercased and prefixed with a dot if missing.
+func normalizeExtensions(exts []string) map[string]struct{} {
+	if len(exts) == 0 {
+		return nil
+	}
+	m := make(map[string]struct{})
+	for _, raw := range exts {
+		// Support both repeated flags and comma-separated values.
+		for _, ext := range strings.Split(raw, ",") {
+			ext = strings.ToLower(strings.TrimSpace(ext))
+			if ext == "" {
+				continue
+			}
+			if !strings.HasPrefix(ext, ".") {
+				ext = "." + ext
+			}
+			m[ext] = struct{}{}
+		}
+	}
+	if len(m) == 0 {
+		return nil
+	}
+	return m
+}
+
+// shouldSkipExtension returns true if the object key should be skipped based on extension filters.
+func (s *Source) shouldSkipExtension(key string) bool {
+	ext := strings.ToLower(path.Ext(key))
+	if ext == "" {
+		// No extension: skip if we have an include list (file can't match), keep otherwise.
+		return len(s.includeExtensions) > 0
+	}
+	if len(s.includeExtensions) > 0 {
+		_, ok := s.includeExtensions[ext]
+		return !ok
+	}
+	if len(s.excludeExtensions) > 0 {
+		_, ok := s.excludeExtensions[ext]
+		return ok
+	}
+	return false
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
@@ -134,6 +188,14 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 }
 
 func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Client, error) {
+	var configOpts []func(*config.LoadOptions) error
+	configOpts = append(configOpts, config.WithRegion(region))
+
+	// If a named profile is specified, use it to resolve credentials from ~/.aws/credentials and ~/.aws/config.
+	if profile := s.conn.GetProfile(); profile != "" {
+		configOpts = append(configOpts, config.WithSharedConfigProfile(profile))
+	}
+
 	var credsProvider aws.CredentialsProvider
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.S3_SessionToken:
@@ -154,9 +216,15 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		// come from the environment or the credentials file or whatever else AWS gets up to).
 	}
 
+	// Only set an explicit credentials provider when we have one (static creds or anonymous).
+	// When using a named profile, let the SDK resolve credentials from the profile config.
+	if credsProvider != nil {
+		configOpts = append(configOpts, config.WithCredentialsProvider(credsProvider))
+	}
+
 	if roleArn != "" {
 		// The config loaded here will be used to retrieve and refresh temporary credentials from AssumeRole
-		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region), config.WithCredentialsProvider(credsProvider))
+		cfg, err := config.LoadDefaultConfig(ctx, configOpts...)
 		if err != nil {
 			return nil, err
 		}
@@ -169,13 +237,14 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		//   "If you explicitly configure a provider on aws.Config directly,
 		//    you must also explicitly wrap the provider with this type using NewCredentialsCache"
 		credsProvider = aws.NewCredentialsCache(provider)
+		// Rebuild options with only the role-based credentials for the final config.
+		configOpts = []func(*config.LoadOptions) error{
+			config.WithRegion(region),
+			config.WithCredentialsProvider(credsProvider),
+		}
 	}
 
-	cfg, err := config.LoadDefaultConfig(
-		ctx,
-		config.WithRegion(region),
-		config.WithCredentialsProvider(credsProvider),
-	)
+	cfg, err := config.LoadDefaultConfig(ctx, configOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -504,6 +573,16 @@ func (s *Source) pageChunker(
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "incompatible_extension", float64(*obj.Size))
 			if err := checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for incompatible file")
+			}
+			continue
+		}
+
+		// Skip based on user-specified extension include/exclude lists.
+		if s.shouldSkipExtension(*obj.Key) {
+			ctx.Logger().V(5).Info("Skipping file due to extension filter", "key", *obj.Key)
+			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "extension_filter", float64(*obj.Size))
+			if err := checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for extension-filtered file")
 			}
 			continue
 		}
