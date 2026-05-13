@@ -310,6 +310,7 @@ func createResult(refreshToken, clientId, tenantId string, verified bool, extraD
 	r := &detectors.Result{
 		DetectorType: detector_typepb.DetectorType_AzureRefreshToken,
 		Raw:          []byte(refreshToken),
+		SecretParts:  map[string]string{"key": refreshToken},
 		ExtraData:    extraData,
 		Verified:     verified,
 	}

@@ -41,6 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		result := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_PivotalTracker,
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {

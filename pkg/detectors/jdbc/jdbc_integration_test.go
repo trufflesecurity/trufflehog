@@ -125,7 +125,7 @@ func TestJdbcVerified(t *testing.T) {
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
 						postgresHost, postgresPort.Port(), postgresDB, strings.Repeat("*", len(postgresPass)), postgresUser),
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"connection_string": fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
 							postgresHost, postgresPort.Port(), postgresDB, postgresPass, postgresUser),
 					},
@@ -147,7 +147,7 @@ func TestJdbcVerified(t *testing.T) {
 					Verified:     true,
 					Redacted: fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
 						mysqlUser, strings.Repeat("*", len(mysqlPass)), mysqlHost, mysqlPort.Port(), mysqlDatabase),
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"connection_string": fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
 							mysqlUser, mysqlPass, mysqlHost, mysqlPort.Port(), mysqlDatabase),
 					},
@@ -169,7 +169,7 @@ func TestJdbcVerified(t *testing.T) {
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
 						sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, strings.Repeat("*", len(sqlServerPass))),
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"connection_string": fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
 							sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, sqlServerPass),
 					},
@@ -322,7 +322,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

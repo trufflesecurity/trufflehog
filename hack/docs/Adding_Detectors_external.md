@@ -17,7 +17,9 @@ The purpose of Secret Detectors is to discover secrets with exceptionally high s
     + [Development Dependencies](#development-dependencies)
     + [Creating a new Secret Detector](#creating-a-new-secret-detector)
     + [Testing the Detector](#testing-the-detector)
+  * [Populating SecretParts](#populating-secretparts)
   * [Addendum](#addendum)
+    + [Verification indeterminacy](#verification-indeterminacy)
     + [Adding Protos in Windows](#adding-protos-in-windows)
 
 ## Getting Started
@@ -82,9 +84,10 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
    1. Update the pattern regex and keywords. Try iterating with [regex101.com](http://regex101.com/).
    2. Update the verifier code to use a non-destructive API call that can determine whether the secret is valid or not.
       * Make sure you understand [verification indeterminacy](#verification-indeterminacy).
-   3. Create a [test for the detector](#testing-the-detector).
-   4. Add your new detector to DefaultDetectors in `/pkg/engine/defaults/defaults.go`.
-   5. Create a pull request for review.
+   3. Populate `SecretParts` on every `Result` your detector emits. See [Populating SecretParts](#populating-secretparts).
+   4. Create a [test for the detector](#testing-the-detector).
+   5. Add your new detector to DefaultDetectors in `/pkg/engine/defaults/defaults.go`.
+   6. Create a pull request for review.
 
 ### Testing the Detector
 To ensure the quality of your PR, make sure your tests are passing with verified credentials.
@@ -128,6 +131,46 @@ To ensure the quality of your PR, make sure your tests are passing with verified
 If the tests are passing, feel free to open a PR!
 
 
+## Populating SecretParts
+
+`SecretParts` is the structured source of truth for the credential components a detector found. It is a `map[string]string` on [`detectors.Result`](/pkg/detectors/detectors.go) that stores each part of the credential under a descriptive key. Downstream consumers (analyzers, Secret Storage, and — in future work — the `Raw`/`RawV2` mapping layer and dedup hashing) rely on it.
+
+**Every `Result` your detector emits must populate `SecretParts`.** Populate it whether or not the secret is verified.
+
+### Single-part credentials
+
+Most detectors find a single opaque token. Use one entry keyed by `"key"` — this is the established convention in the codebase:
+
+```go
+s1 := detectors.Result{
+    DetectorType: detector_typepb.DetectorType_Example,
+    Raw:          []byte(match),
+    SecretParts:  map[string]string{"key": match},
+}
+```
+
+### Multi-part credentials
+
+When the credential has more than one component (e.g. AWS access-key + secret-access-key, OAuth client-id + client-secret, or a token bound to an endpoint/host), use one entry per part with descriptive keys:
+
+```go
+s1 := detectors.Result{
+    DetectorType: detector_typepb.DetectorType_Example,
+    Raw:          []byte(accessKeyID),
+    RawV2:        []byte(accessKeyID + secretAccessKey),
+    SecretParts: map[string]string{
+        "access_key_id":     accessKeyID,
+        "secret_access_key": secretAccessKey,
+    },
+}
+```
+
+### Key-naming guidance
+
+- Single-part: use `"key"`. This matches the bulk of existing detectors in `pkg/detectors/`.
+- Multi-part: pick descriptive, lowercase, `snake_case` keys that name each part (e.g. `client_id`, `client_secret`, `access_key_id`, `secret_access_key`, `username`, `password`, `domain`, `host`, `endpoint`). If the detector also has a corresponding analyzer in `pkg/analyzer/analyzers/`, the keys must match what the analyzer expects, since analyzers read directly from this map.
+- Only secret parts that uniquely identify the credential belong in `SecretParts`. Unrelated metadata belongs in `ExtraData`.
+- This field is the source of truth for uniquely identifying a credential.
 
 
 ## Addendum

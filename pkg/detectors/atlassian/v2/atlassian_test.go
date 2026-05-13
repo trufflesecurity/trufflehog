@@ -85,9 +85,9 @@ func TestAtlassian_Pattern(t *testing.T) {
 	}
 }
 
-// TestAtlassian_AnalysisInfo_KeyAndOrgId tests if both the key and organization id are populated into AnalysisInfo
+// TestAtlassian_SecretParts_KeyAndOrgId tests if both the key and organization id are populated into SecretParts
 // given that they are present in the input data chunk
-func TestAtlassian_AnalysisInfo_KeyAndOrgId(t *testing.T) {
+func TestAtlassian_SecretParts_KeyAndOrgId(t *testing.T) {
 	client := common.SaneHttpClient()
 	d := Scanner{client: client}
 
@@ -118,16 +118,16 @@ func TestAtlassian_AnalysisInfo_KeyAndOrgId(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 1, "mismatch in result count: expected %d, got %d", 1, len(results))
 		result := results[0]
-		require.NotNil(t, result.AnalysisInfo, "AnalysisInfo is nil")
+		require.NotNil(t, result.SecretParts, "SecretParts is nil")
 
-		assert.Equal(t, key, result.AnalysisInfo["key"], "mismatch in key")
-		assert.Equal(t, orgId, result.AnalysisInfo["organization_id"], "mismatch in organization_id")
+		assert.Equal(t, key, result.SecretParts["key"], "mismatch in key")
+		assert.Equal(t, orgId, result.SecretParts["organization_id"], "mismatch in organization_id")
 	})
 }
 
-// TestAtlassian_AnalysisInfo_KeyOnly tests if only key is populated into AnalysisInfo
+// TestAtlassian_SecretParts_KeyOnly tests if only key is populated into SecretParts
 // given that only the key and no organization_id is present in the input data chunk
-func TestAtlassian_AnalysisInfo_KeyOnly(t *testing.T) {
+func TestAtlassian_SecretParts_KeyOnly(t *testing.T) {
 	client := common.SaneHttpClient()
 	d := Scanner{client: client}
 
@@ -156,8 +156,8 @@ func TestAtlassian_AnalysisInfo_KeyOnly(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 1, "mismatch in result count: expected %d, got %d", 1, len(results))
 		result := results[0]
-		require.NotNil(t, result.AnalysisInfo, "AnalysisInfo is nil")
+		require.NotNil(t, result.SecretParts, "SecretParts is nil")
 
-		assert.Equal(t, key, result.AnalysisInfo["key"], "mismatch in key")
+		assert.Equal(t, key, result.SecretParts["key"], "mismatch in key")
 	})
 }

@@ -44,7 +44,7 @@ import (
 )
 
 var (
-	cli = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cli = kingpin.New("trufflehog", "TruffleHog is a tool for finding credentials. Run without a command for interactive mode.")
 	cmd string
 	// https://github.com/trufflesecurity/trufflehog/blob/main/CONTRIBUTING.md#logging-in-trufflehog
 	logLevel            = cli.Flag("log-level", `Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".`).Default("0").Int()
@@ -55,7 +55,7 @@ var (
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").PlaceHolder("N").Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
@@ -319,6 +319,8 @@ func init() {
 	cli.HelpFlag.Short('h')
 	cli.UsageWriter(os.Stdout)
 
+	registerManPageFlag(cli)
+
 	// Check if the TUI environment variable is set.
 	if ok, err := strconv.ParseBool(os.Getenv("TUI_PARENT")); err == nil {
 		usingTUI = ok
@@ -464,6 +466,10 @@ func run(state overseer.State, logSync func() error) {
 		// NOTE: this kludge is here to do an authenticated shallow commit
 		// TODO: refactor to better pass credentials
 		os.Setenv("GITHUB_TOKEN", *githubScanToken)
+	}
+
+	if *concurrency <= 0 {
+		*concurrency = runtime.NumCPU()
 	}
 
 	// When setting a base commit, chunks must be scanned in order.

@@ -14,10 +14,10 @@ jobs:
       contents: "read"
       id-token: "write"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
       - name: Install gotestsum
-        uses: jaxxstorm/action-install-gh-release@v1.14.0
+        uses: jaxxstorm/action-install-gh-release@v3.0.0  # immutable release; no rolling @v3 tag
         with:
           repo: gotestyourself/gotestsum
       - uses: rwx-research/setup-captain@v1

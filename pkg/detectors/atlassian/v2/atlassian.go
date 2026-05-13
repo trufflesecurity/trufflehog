@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueOrgIdMatches[match[1]] = struct{}{}
 	}
 	if len(uniqueOrgIdMatches) == 0 {
-		// we only need an org ID to pass into AnalysisInfo
+		// we only need an org ID to pass into SecretParts
 		// if we don't find one, we can still verify the key
 		// we can add a dummy entry here just to make sure a result is returned
 		uniqueOrgIdMatches[""] = struct{}{}
@@ -75,6 +75,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		for orgId := range uniqueOrgIdMatches {
+			secretParts := map[string]string{"key": match}
+			if orgId != "" {
+				secretParts["organization_id"] = orgId
+			}
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Atlassian,
 				Raw:          []byte(match),
@@ -82,6 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 					"version":        fmt.Sprintf("%d", s.Version()),
 				},
+				SecretParts: secretParts,
 			}
 
 			if verify {
@@ -96,14 +101,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.ExtraData["Organization"] = orgResponse.Data[0].Attributes.Name
 				}
 				s1.SetVerificationError(verificationErr, match)
-				if s1.Verified {
-					s1.AnalysisInfo = map[string]string{
-						"key": match,
-					}
-					if orgId != "" {
-						s1.AnalysisInfo["organization_id"] = orgId
-					}
-				}
 			}
 
 			results = append(results, s1)
