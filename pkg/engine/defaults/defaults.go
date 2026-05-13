@@ -1761,15 +1761,15 @@ func buildDetectorList() []detectors.Detector {
 		&zulipchat.Scanner{},
 	}
 
-	if feature.PineconeDetector.Load() {
+	if feature.PineconeDetectorEnabled.Load() {
 		dets = append(dets, &pinecone.Scanner{})
 	}
 
-	if feature.CloudinaryDetector.Load() {
+	if feature.CloudinaryDetectorEnabled.Load() {
 		dets = append(dets, &cloudinary.Scanner{})
 	}
 
-	if feature.GitLabOAuthDetector.Load() {
+	if feature.GitLabOAuthDetectorEnabled.Load() {
 		dets = append(dets, &gitlaboauth2.Scanner{})
 	}
 
