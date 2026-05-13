@@ -95,6 +95,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/bitbucketdatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
@@ -186,7 +187,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commodities"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/companyhub"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluencedatacenter"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/confluencedatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/contentfulpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/conversiontools"
@@ -334,6 +335,7 @@ import (
 	gitlabv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v1"
 	gitlabv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
 	gitlabv3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v3"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlaboauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
@@ -399,7 +401,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jdbc"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiradatacenterpat"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/jiradatacenterpat"
 	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
@@ -968,6 +970,7 @@ func buildDetectorList() []detectors.Detector {
 		&billomat.Scanner{},
 		&bingsubscriptionkey.Scanner{},
 		&bitbar.Scanner{},
+		&bitbucketdatacenter.Scanner{},
 		&bitbucketapppassword.Scanner{},
 		&bitcoinaverage.Scanner{},
 		&bitfinex.Scanner{},
@@ -1213,6 +1216,7 @@ func buildDetectorList() []detectors.Detector {
 		&gitlabv1.Scanner{},
 		&gitlabv2.Scanner{},
 		&gitlabv3.Scanner{},
+		&gitlaboauth2.Scanner{},
 		&gitter.Scanner{},
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},

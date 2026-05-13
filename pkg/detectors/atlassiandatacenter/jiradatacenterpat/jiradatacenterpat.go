@@ -1,17 +1,11 @@
 package jiradatacenterpat
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -31,12 +25,14 @@ var (
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
+	keywords = []string{"jira", "atlassian"}
+
 	// PATs are base64-encoded strings of the form <12-digit-id>:<20-random-bytes> (33 bytes, 44 chars, no padding).
 	// Since the first byte is always an ASCII digit (0x30–0x39), the first base64 character is always M, N, or O.
 	// This is also verified by generating 25+ tokens.
 	// The trailing boundary (?:[^A-Za-z0-9+/=]|\z) is used instead of \b to correctly handle tokens ending in + or /.
-	patPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira", "atlassian"}) + `\b([MNO][A-Za-z0-9+/]{43})(?:[^A-Za-z0-9+/=]|\z)`)
-	urlPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira", "atlassian"}) + `(https?://[A-Za-z0-9][A-Za-z0-9.\-]*(?::\d{1,5})?)`)
+	patPat  = atlassiandatacenter.GetDCTokenPat(keywords)
+	urlPat  = atlassiandatacenter.GetURLPat(keywords)
 )
 
 func (s Scanner) getClient() *http.Client {
@@ -48,7 +44,7 @@ func (s Scanner) getClient() *http.Client {
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
-	return []string{"jira", "atlassian"}
+	return keywords
 }
 
 // FromData will find and optionally verify Jira Data Center PAT secrets in a given set of bytes.
@@ -57,23 +53,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	tokens := make(map[string]struct{})
 	for _, match := range patPat.FindAllStringSubmatch(dataStr, -1) {
-		if isStructuralPAT(match[1]) {
+		if atlassiandatacenter.IsStructuralPAT(match[1]) {
 			tokens[match[1]] = struct{}{}
 		}
 	}
 
-	uniqueURLs := make(map[string]struct{})
-	for _, match := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueURLs[match[1]] = struct{}{}
-	}
-	foundURLs := make([]string, 0, len(uniqueURLs))
-	for url := range uniqueURLs {
-		foundURLs = append(foundURLs, url)
-	}
-	endpoints := make(map[string]struct{})
-	for _, endpoint := range s.Endpoints(foundURLs...) {
-		endpoints[endpoint] = struct{}{}
-	}
+	endpoints := atlassiandatacenter.FindEndpoints(dataStr, urlPat, s.Endpoints)
 
 	for token := range tokens {
 		if len(endpoints) == 0 {
@@ -87,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		for endpoint := range endpoints {
+		for _, endpoint := range endpoints {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_JiraDataCenterPAT,
 				Raw:          []byte(token),
@@ -127,65 +112,19 @@ func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) 
 	}
 	u.Path = "/rest/api/2/myself"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
-	if err != nil {
-		return false, nil, err
+	isVerified, body, err := atlassiandatacenter.MakeVerifyRequest(ctx, client, u.String(), token)
+	if err != nil || !isVerified {
+		return isVerified, nil, err
 	}
 
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return false, nil, err
+	extraData := map[string]string{"endpoint": baseURL}
+	if name, ok := body["displayName"].(string); ok {
+		extraData["display_name"] = name
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var result map[string]any
-		extraData := map[string]string{
-			"endpoint": baseURL,
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			// 200 confirms the token is valid; failing to decode only means we can't extract extra data.
-			return true, extraData, nil
-		}
-		if name, ok := result["displayName"].(string); ok {
-			extraData["display_name"] = name
-		}
-		if email, ok := result["emailAddress"].(string); ok {
-			extraData["email_address"] = email
-		}
-		return true, extraData, nil
-	case http.StatusUnauthorized:
-		return false, nil, nil
-	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
+	if email, ok := body["emailAddress"].(string); ok {
+		extraData["email_address"] = email
 	}
-}
-
-// isStructuralPAT decodes a candidate base64 string and checks that it matches
-// the "<numeric id>:<random bytes>" structure used by Jira DC PATs:
-// one or more ASCII digits, a colon, then at least one more byte.
-func isStructuralPAT(candidate string) bool {
-	raw, err := base64.StdEncoding.DecodeString(candidate)
-	if err != nil {
-		return false
-	}
-	colon := bytes.IndexByte(raw, ':')
-	if colon <= 0 || colon == len(raw)-1 {
-		return false
-	}
-	for _, b := range raw[:colon] {
-		if b < '0' || b > '9' {
-			return false
-		}
-	}
-	return true
+	return true, extraData, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

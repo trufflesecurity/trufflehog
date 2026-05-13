@@ -517,6 +517,14 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 				return repo, fmt.Errorf("failed to fetch repository: %w", err)
 			}
 			s.cacheRepoInfo(ghRepo)
+			// Handle repository redirects: the API returns the canonical CloneURL
+			// which may differ from the original URL (e.g. org rename). Cache info
+			// under the original URL too so scanRepo can look it up.
+			if cloneURL := ghRepo.GetCloneURL(); cloneURL != repo {
+				if info, ok := s.repoInfoCache.get(cloneURL); ok {
+					s.repoInfoCache.put(repo, info)
+				}
+			}
 			break
 		}
 	}
