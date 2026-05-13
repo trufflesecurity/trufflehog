@@ -1049,5 +1049,8 @@ enum DetectorType {
   BitbucketDataCenter = 1045;
   JiraDataCenterPAT = 1046;
   ConfluenceDataCenter = 1047;
-  SpectralOps = 1048;
+  Cloudinary = 1048;
+  Pinecone = 1049;
+  GitLabOauth2 = 1050;
+  SpectralOps = 1051;
 }

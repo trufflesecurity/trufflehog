@@ -54,6 +54,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_DatabricksToken,
 				Raw:          []byte(token),
 				RawV2:        []byte(token + domain),
+				SecretParts: map[string]string{
+					"token":  token,
+					"domain": domain,
+				},
 			}
 
 			if verify {
@@ -65,13 +69,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyDatabricksToken(client, domain, token)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr)
-
-				if s1.Verified {
-					s1.SecretParts = map[string]string{
-						"token":  token,
-						"domain": domain,
-					}
-				}
 			}
 
 			results = append(results, s1)
