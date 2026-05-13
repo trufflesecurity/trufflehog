@@ -25,7 +25,10 @@ const maxSecretSize = 4096
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*)\b`)
+	// Use negative lookahead instead of trailing \b to avoid truncating JWTs ending with -
+	// Leading \b prevents matching in the middle of words. Trailing \b is omitted because - is not a word character,
+	// causing \b to fail for JWTs ending with -, truncating the raw secret. Strong JWT structure validation ensures accuracy.
+	keyPat = regexp.MustCompile(`\b(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*)`)
 )
 
 // The default max secret size value for this detector must be overridden or JWTs with lots of claims will get missed.
@@ -98,16 +101,8 @@ func decodeJWT(token string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("invalid JWT format: expected 3 parts, got %d", len(parts))
 	}
 
-	// Decode the header (first part)
-	header := parts[0]
-
-	// Add padding if necessary for base64 decoding
-	if padding := len(header) % 4; padding != 0 {
-		header += strings.Repeat("=", 4-padding)
-	}
-
-	// Decode from base64
-	decoded, err := base64.URLEncoding.DecodeString(header)
+	// Decode the header (first part) using RawURLEncoding which handles unpadded base64url
+	decoded, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode base64 header: %w", err)
 	}
