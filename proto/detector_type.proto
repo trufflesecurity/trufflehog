@@ -1051,4 +1051,5 @@ enum DetectorType {
   ConfluenceDataCenter = 1047;
   Cloudinary = 1048;
   Pinecone = 1049;
+  GitLabOauth2 = 1050;
 }
