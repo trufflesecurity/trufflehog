@@ -56,6 +56,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atera"
 	atlassianv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v1"
 	atlassianv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/bitbucketdatacenter"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/confluencedatacenter"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/jiradatacenterpat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0oauth"
@@ -95,7 +98,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/bitbucketdatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
@@ -187,7 +189,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commodities"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/companyhub"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/confluencedatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/contentfulpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/conversiontools"
@@ -401,7 +402,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jdbc"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/jiradatacenterpat"
 	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
@@ -864,11 +864,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func buildDetectorList() []detectors.Detector {
-	return []detectors.Detector{
+	dets := []detectors.Detector{
 		&abyssale.Scanner{},
 		// &abstract.Scanner{},
 		&abuseipdb.Scanner{},
@@ -1042,7 +1043,6 @@ func buildDetectorList() []detectors.Detector {
 		&cloudflarecakey.Scanner{},
 		&cloudflareglobalapikey.Scanner{},
 		&cloudimage.Scanner{},
-		&cloudinary.Scanner{},
 		&cloudmersive.Scanner{},
 		&cloudplan.Scanner{},
 		&cloudsmith.Scanner{},
@@ -1216,7 +1216,6 @@ func buildDetectorList() []detectors.Detector {
 		&gitlabv1.Scanner{},
 		&gitlabv2.Scanner{},
 		&gitlabv3.Scanner{},
-		&gitlaboauth2.Scanner{},
 		&gitter.Scanner{},
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},
@@ -1450,7 +1449,6 @@ func buildDetectorList() []detectors.Detector {
 		&photoroom.Scanner{},
 		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
-		&pinecone.Scanner{},
 		&pipedream.Scanner{},
 		&pipedrive.Scanner{},
 		&pivotaltracker.Scanner{},
@@ -1762,6 +1760,20 @@ func buildDetectorList() []detectors.Detector {
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 	}
+
+	if feature.PineconeDetector.Load() {
+		dets = append(dets, &pinecone.Scanner{})
+	}
+
+	if feature.CloudinaryDetector.Load() {
+		dets = append(dets, &cloudinary.Scanner{})
+	}
+
+	if feature.GitLabOAuthDetector.Load() {
+		dets = append(dets, &gitlaboauth2.Scanner{})
+	}
+
+	return dets
 }
 
 func DefaultDetectors() []detectors.Detector {
