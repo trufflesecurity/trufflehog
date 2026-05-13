@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for match := range uniqueMatches {
-		// Always check if this is a Telerik license key (local validation, not remote)
+		// Always check if this is a Telerik license key to reduce false positives.
 		isTelerik, _ := isTelerikLicenseKey(match)
 		if !isTelerik {
 			continue
@@ -61,6 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_TelerikLicenseKey,
 			Raw:          []byte(match),
+		}
+		if verify {
+			s1.Verified = true
 		}
 
 		results = append(results, s1)

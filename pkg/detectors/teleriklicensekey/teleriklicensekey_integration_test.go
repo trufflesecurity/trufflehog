@@ -34,12 +34,29 @@ func TestTeleriklicensekey_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, not verified",
+			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within", secret)),
 				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_TelerikLicenseKey,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, not verified when verify disabled",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a teleriklicensekey secret %s within", secret)),
+				verify: false,
 			},
 			want: []detectors.Result{
 				{
