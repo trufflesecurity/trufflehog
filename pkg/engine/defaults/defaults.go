@@ -477,6 +477,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/miro"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mistral"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mixmax"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mockaroo"
@@ -1363,6 +1364,7 @@ func buildDetectorList() []detectors.Detector {
 		&microsoftteamswebhook.Scanner{},
 		&mindmeister.Scanner{},
 		&miro.Scanner{},
+		&mistral.Scanner{},
 		&mite.Scanner{},
 		&mixmax.Scanner{},
 		// &mixpanel.Scanner{},
