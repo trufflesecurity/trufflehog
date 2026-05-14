@@ -1,19 +1,15 @@
 package confluencedatacenter
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -35,12 +31,9 @@ var (
 
 	keywords = []string{"confluence", "atlassian", "wiki"}
 
-	// 44-char base64 PAT; decoded form must match the structural check below.
-	tokenPat = regexp.MustCompile(detectors.PrefixRegex(keywords) + `\b([MNO][A-Za-z0-9+/]{43})(?:[^A-Za-z0-9+/=]|\z)`)
-
-	// Self-hosted instance URL: scheme + host + optional port. Keyword-scoped
-	// so unrelated URLs in the same chunk don't get paired with tokens.
-	urlPat = regexp.MustCompile(detectors.PrefixRegex(keywords) + `\b(https?://[a-zA-Z0-9.\-]+(?::\d+)?)\b`)
+	// 44-char base64 PAT; decoded form must match the structural check in atlassiandatacenter.IsStructuralPAT.
+	tokenPat = atlassiandatacenter.GetDCTokenPat(keywords)
+	urlPat   = atlassiandatacenter.GetURLPat(keywords)
 
 	invalidHosts = simple.NewCache[struct{}]()
 	errNoHost    = errors.New("no such host")
@@ -65,26 +58,6 @@ func (s Scanner) getClient() *http.Client {
 	return defaultClient
 }
 
-// isStructuralPAT decodes a candidate base64 string and checks that it matches
-// the "<numeric id>:<random bytes>" structure used by Confluence DC PATs:
-// one or more ASCII digits, a colon, then at least one more byte.
-func isStructuralPAT(candidate string) bool {
-	raw, err := base64.StdEncoding.DecodeString(candidate)
-	if err != nil {
-		return false
-	}
-	colon := bytes.IndexByte(raw, ':')
-	if colon <= 0 || colon == len(raw)-1 {
-		return false
-	}
-	for _, b := range raw[:colon] {
-		if b < '0' || b > '9' {
-			return false
-		}
-	}
-	return true
-}
-
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -93,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if _, seen := uniqueTokens[m[1]]; seen {
 			continue
 		}
-		if isStructuralPAT(m[1]) {
+		if atlassiandatacenter.IsStructuralPAT(m[1]) {
 			uniqueTokens[m[1]] = struct{}{}
 		}
 	}
@@ -101,20 +74,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		return nil, nil
 	}
 
-	foundURLs := make([]string, 0)
-	for _, m := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		foundURLs = append(foundURLs, m[1])
-	}
-	uniqueURLs := make(map[string]struct{})
-	for _, endpoint := range s.Endpoints(foundURLs...) {
-		uniqueURLs[strings.TrimRight(endpoint, "/")] = struct{}{}
-	}
+	allURLs := atlassiandatacenter.FindEndpoints(dataStr, urlPat, s.Endpoints)
 
 	// Filter hosts cached as unreachable from prior calls once up front.
 	// invalidHosts may also grow during this call (see the verify branch
 	// below); those are skipped lazily inside the inner loop.
-	liveURLs := make([]string, 0, len(uniqueURLs))
-	for u := range uniqueURLs {
+	liveURLs := make([]string, 0, len(allURLs))
+	for _, u := range allURLs {
 		if !invalidHosts.Exists(u) {
 			liveURLs = append(liveURLs, u)
 		}
@@ -175,35 +141,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyPAT(ctx context.Context, client *http.Client, baseURL, token string) (bool, error) {
 	endpoint := strings.TrimRight(baseURL, "/") + "/rest/api/user/current"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
-	if err != nil {
-		return false, err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := client.Do(req)
+	isVerified, _, err := atlassiandatacenter.MakeVerifyRequest(ctx, client, endpoint, token)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such host") {
 			return false, errNoHost
 		}
 		return false, err
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusUnauthorized:
-		// Auth header outright rejected — unambiguously an invalid credential.
-		return false, nil
-	default:
-		// 403 included: /rest/api/user/current should always be readable by a
-		// valid PAT, so a Forbidden here signals something unexpected rather
-		// than a definitively invalid token.
-		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
-	}
+	return isVerified, nil
 }

@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},
+			SecretParts: map[string]string{"token": resMatch},
 		}
 
 		if verify {
@@ -78,9 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			} else {
 				s1.SetVerificationError(err, resMatch)
-			}
-			if s1.Verified {
-				s1.SecretParts = map[string]string{"token": resMatch}
 			}
 		}
 
