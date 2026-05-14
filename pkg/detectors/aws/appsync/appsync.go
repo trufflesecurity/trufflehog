@@ -30,7 +30,7 @@ var (
 	)
 
 	endpointPat = regexp.MustCompile(
-		`(https:\/\/[a-z0-9]{26}\.appsync-api\.[a-z0-9-]+\.amazonaws\.com)`,
+		`\b(https:\/\/[a-z0-9]{26}\.appsync-api\.[a-z0-9-]+\.amazonaws\.com)\b`,
 	)
 )
 
