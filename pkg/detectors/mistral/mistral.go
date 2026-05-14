@@ -61,15 +61,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+			isVerified, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			// Merge verifier-supplied extra data into the existing map so the
-			// rotation_guide URL set above is preserved (verifyMatch currently
-			// returns nil for the map, but the merge is correct for future
-			// verifier additions and for the nil case alike).
-			for k, v := range extraData {
-				s1.ExtraData[k] = v
-			}
 			s1.SetVerificationError(verificationErr, match)
 		}
 
@@ -79,19 +72,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	// https://docs.mistral.ai/api/#tag/models
 	// Hitting the models endpoint with a Bearer token returns 200 on a valid
 	// key and 401 on an invalid one, with no side effects.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.mistral.ai/v1/models", nil)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -100,12 +93,12 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, nil, nil
+		return true, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
-		return false, nil, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
