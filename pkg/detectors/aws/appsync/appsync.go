@@ -132,11 +132,6 @@ func verifyAppSyncKey(
 		_ = res.Body.Close()
 	}()
 
-	bodyBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		return false, err
-	}
-
 	// https://docs.aws.amazon.com/appsync/latest/APIReference/CommonErrors.html
 	switch res.StatusCode {
 
@@ -144,6 +139,10 @@ func verifyAppSyncKey(
 		return true, nil
 
 	case http.StatusBadGateway:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
 		// Appsync returns 502 with a specific error message in the body when the key is valid but has no schema defined,
 		// so we treat that as a valid key
 		if bytes.Contains(bodyBytes, []byte("No schema definition exists")) {
