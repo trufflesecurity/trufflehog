@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_Mistral,
+			DetectorType: detector_typepb.DetectorType_MistralAI,
 			Raw:          []byte(match),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://docs.mistral.ai/admin/security-access/api-keys/",
@@ -103,7 +103,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
-	return detector_typepb.DetectorType_Mistral
+	return detector_typepb.DetectorType_MistralAI
 }
 
 func (s Scanner) Description() string {
