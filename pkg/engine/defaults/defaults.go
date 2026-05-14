@@ -1,6 +1,8 @@
 package defaults
 
 import (
+	"slices"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abyssale"
@@ -1046,6 +1048,7 @@ func buildDetectorList() []detectors.Detector {
 		&cloudflarecakey.Scanner{},
 		&cloudflareglobalapikey.Scanner{},
 		&cloudimage.Scanner{},
+		&cloudinary.Scanner{},
 		&cloudmersive.Scanner{},
 		&cloudplan.Scanner{},
 		&cloudsmith.Scanner{},
@@ -1216,6 +1219,7 @@ func buildDetectorList() []detectors.Detector {
 		&githubapp.Scanner{},
 		&githubv1.Scanner{},
 		&githubv2.Scanner{},
+		&gitlaboauth2.Scanner{},
 		&gitlabv1.Scanner{},
 		&gitlabv2.Scanner{},
 		&gitlabv3.Scanner{},
@@ -1452,6 +1456,7 @@ func buildDetectorList() []detectors.Detector {
 		&photoroom.Scanner{},
 		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
+		&pinecone.Scanner{},
 		&pipedream.Scanner{},
 		&pipedrive.Scanner{},
 		&pivotaltracker.Scanner{},
@@ -1765,17 +1770,18 @@ func buildDetectorList() []detectors.Detector {
 		&zulipchat.Scanner{},
 	}
 
-	if feature.PineconeDetectorEnabled.Load() {
-		dets = append(dets, &pinecone.Scanner{})
-	}
-
-	if feature.CloudinaryDetectorEnabled.Load() {
-		dets = append(dets, &cloudinary.Scanner{})
-	}
-
-	if feature.GitLabOAuthDetectorEnabled.Load() {
-		dets = append(dets, &gitlaboauth2.Scanner{})
-	}
+	dets = slices.DeleteFunc(dets, func(d detectors.Detector) bool {
+		switch d.(type) {
+		case *pinecone.Scanner:
+			return feature.PineconeDetectorEnabled.Load()
+		case *cloudinary.Scanner:
+			return feature.CloudinaryDetectorEnabled.Load()
+		case *gitlaboauth2.Scanner:
+			return feature.GitLabOAuthDetectorEnabled.Load()
+		default:
+			return false
+		}
+	})
 
 	return dets
 }
