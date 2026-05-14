@@ -1052,4 +1052,6 @@ enum DetectorType {
   Cloudinary = 1048;
   Pinecone = 1049;
   GitLabOauth2 = 1050;
+  SpectralOps = 1051;
+  AWSAppSync = 1052;
 }

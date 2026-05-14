@@ -68,6 +68,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
 	aws_access_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/access_keys"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/appsync"
 	aws_session_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/session_keys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
@@ -706,6 +707,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spectralops"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/speechtextai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/splunkobservabilitytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spoonacular"
@@ -918,6 +920,7 @@ func buildDetectorList() []detectors.Detector {
 		&appfollow.Scanner{},
 		&appointedd.Scanner{},
 		&appoptics.Scanner{},
+		&appsync.Scanner{},
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
 		&artifactory.Scanner{},
@@ -1597,6 +1600,7 @@ func buildDetectorList() []detectors.Detector {
 		&sourcegraph.Scanner{},
 		&sourcegraphcody.Scanner{},
 		// &sparkpost.Scanner{},
+		&spectralops.Scanner{},
 		&speechtextai.Scanner{},
 		&splunkobservabilitytoken.Scanner{},
 		&spoonacular.Scanner{},
