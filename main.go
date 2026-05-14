@@ -526,9 +526,9 @@ func run(state overseer.State, logSync func() error) {
 	feature.UseGithubGraphQLAPI.Store(false)
 
 	// New detector flags
-	feature.PineconeDetectorEnabled.Store(false)
-	feature.CloudinaryDetectorEnabled.Store(false)
-	feature.GitLabOAuthDetectorEnabled.Store(false)
+	feature.PineconeDetectorEnabled.Store(true)
+	feature.CloudinaryDetectorEnabled.Store(true)
+	feature.GitLabOAuthDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
