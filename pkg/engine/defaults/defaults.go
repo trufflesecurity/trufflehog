@@ -65,6 +65,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
 	aws_access_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/access_keys"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/appsync"
 	aws_session_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/session_keys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
@@ -918,6 +919,7 @@ func buildDetectorList() []detectors.Detector {
 		&appfollow.Scanner{},
 		&appointedd.Scanner{},
 		&appoptics.Scanner{},
+		&appsync.Scanner{},
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
 		&artifactory.Scanner{},
