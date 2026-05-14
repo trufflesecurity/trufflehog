@@ -57,16 +57,13 @@ func (s Scanner) FromData(
 	endpoints := make(map[string]struct{})
 
 	for _, m := range apiKeyPat.FindAllStringSubmatch(dataStr, -1) {
-		fmt.Println("Found potential AppSync API key:", m[1])
 		keys[m[1]] = struct{}{}
 	}
 
 	for _, m := range endpointPat.FindAllStringSubmatch(dataStr, -1) {
-		fmt.Println("Found potential AppSync endpoint:", m[1])
 		normalizedEndpoint := m[1] + "/graphql"
 		endpoints[normalizedEndpoint] = struct{}{}
 	}
-	fmt.Println(endpoints)
 
 	for key := range keys {
 		for endpoint := range endpoints {
