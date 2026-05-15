@@ -1773,11 +1773,11 @@ func buildDetectorList() []detectors.Detector {
 	dets = slices.DeleteFunc(dets, func(d detectors.Detector) bool {
 		switch d.(type) {
 		case *pinecone.Scanner:
-			return feature.PineconeDetectorEnabled.Load()
+			return !feature.PineconeDetectorEnabled.Load()
 		case *cloudinary.Scanner:
-			return feature.CloudinaryDetectorEnabled.Load()
+			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
-			return feature.GitLabOAuthDetectorEnabled.Load()
+			return !feature.GitLabOAuthDetectorEnabled.Load()
 		default:
 			return false
 		}
