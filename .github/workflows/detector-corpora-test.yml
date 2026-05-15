@@ -1,0 +1,266 @@
+name: Corpora Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened]
+    paths:
+      - 'pkg/detectors/**'
+      - 'pkg/engine/defaults/defaults.go'
+      - '.github/workflows/detector-corpora-test.yml'
+      - 'scripts/test/detector_corpora_test.sh'
+      - 'scripts/test/diff_corpora_results.py'
+      - 'scripts/test/detect_changed_detectors.sh'
+
+env:
+  DATASETS: |
+    s3://trufflehog-corpora-datasets/contents.2025-11-04.jsonl.zstd
+
+jobs:
+  corpora-test:
+    if: ${{ github.repository == 'trufflesecurity/trufflehog' && !github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version: "1.25"
+
+      - name: Install dependencies
+        run: sudo apt-get install -y zstd jq
+
+      - name: Resolve merge-base
+        id: merge_base
+        shell: bash
+        run: |
+          set -o pipefail
+          git fetch --no-tags --prune origin main
+          MERGE_BASE=$(git merge-base origin/main HEAD)
+          echo "Merge base: $MERGE_BASE"
+          echo "sha=$MERGE_BASE" >> "$GITHUB_OUTPUT"
+
+      # Determine which detectors changed in this PR. The PR build scopes its
+      # scan to the full set; the main build excludes detectors that don't
+      # exist there yet (new detectors). If the set is empty, the workflow
+      # short-circuits with a skip comment — scoping is the entire point of
+      # Phase 2, falling back to scan-all defeats it.
+      - name: Detect changed detectors
+        id: detect
+        shell: bash
+        env:
+          BASE_REF: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          set -o pipefail
+          chmod +x scripts/test/detect_changed_detectors.sh
+          PR_CSV=$(./scripts/test/detect_changed_detectors.sh --pr-csv || true)
+          MAIN_CSV=$(./scripts/test/detect_changed_detectors.sh --main-csv || true)
+          NEW_LIST=$(./scripts/test/detect_changed_detectors.sh --new-only || true)
+          NEW_CSV=$(echo "$NEW_LIST" | paste -sd, -)
+          echo "PR detectors:   $PR_CSV"
+          echo "Main detectors: $MAIN_CSV"
+          echo "New detectors:  $NEW_CSV"
+          echo "pr_csv=$PR_CSV" >> "$GITHUB_OUTPUT"
+          echo "main_csv=$MAIN_CSV" >> "$GITHUB_OUTPUT"
+          echo "new_csv=$NEW_CSV" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PR_CSV" ]]; then
+            echo "any_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Sticky comment: find any prior detector-bench comment on the PR by
+      # the marker substring and update it in place. The marker — kept in
+      # sync with STICKY_COMMENT_MARKER in scripts/test/diff_corpora_results.py —
+      # has to appear in BOTH the skip body and the diff body so the same
+      # comment flips between them as iterative pushes change which path
+      # fires. Skip body is only posted on pull_request events; workflow_dispatch
+      # runs with no changed detectors silently finish without posting.
+      - name: Find existing skip comment
+        if: steps.detect.outputs.any_changed != 'true' && github.event_name == 'pull_request'
+        id: find_skip_comment
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '<!-- detector-bench -->'
+
+      - name: Post or update skip comment
+        if: steps.detect.outputs.any_changed != 'true' && github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
+        with:
+          comment-id: ${{ steps.find_skip_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            <!-- detector-bench -->
+            ## Corpora Test Results
+
+            No detector regex or keyword changes in this PR. Bench skipped.
+
+      - name: Configure AWS credentials
+        if: steps.detect.outputs.any_changed == 'true'
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Cache the main scan results by merge-base + scoped detector set.
+      # On subsequent pushes to the same PR without a rebase, both are
+      # identical, so the main scan (35 GB of S3 streaming + trufflehog) is
+      # skipped entirely.
+      - name: Restore main scan cache
+        id: main_scan_cache
+        if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != ''
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: /tmp/results-main.jsonl
+          key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
+
+      # Two independent builds run in parallel:
+      #   A) prepare main worktree → build main binary (git I/O then CPU)
+      #      Skipped on main scan cache hit or when main_csv is empty
+      #      (all changed detectors are new — no baseline needed).
+      #   B) build PR binary (CPU, no dependencies)
+      - name: Build binaries
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+          MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
+          MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
+        run: |
+          set -o pipefail
+
+          # Chain A: prepare worktree, then build main binary.
+          # Skipped when main scan results are already cached, or when all
+          # changed detectors are new (main_csv empty — no baseline needed).
+          if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
+            (
+              git worktree add /tmp/trufflehog-main-src "$MERGE_BASE"
+              cd /tmp/trufflehog-main-src
+              CGO_ENABLED=0 go build -o /tmp/trufflehog-main .
+            ) &
+            PID_MAIN_BUILD=$!
+          fi
+
+          # Chain B: build PR binary (no dependencies).
+          CGO_ENABLED=0 go build -o /tmp/trufflehog-pr . &
+          PID_PR_BUILD=$!
+
+          [[ -n "${PID_MAIN_BUILD:-}" ]] && { wait $PID_MAIN_BUILD || { echo "Main binary build failed" >&2; exit 1; }; }
+          wait $PID_PR_BUILD || { echo "PR binary build failed" >&2; exit 1; }
+
+      # PR and main scans share a single S3 stream per dataset file, teed to
+      # both binaries simultaneously. The main side is skipped on a cache hit
+      # (results already in /tmp/results-main.jsonl) or when main_csv is empty
+      # (PR adds only new detectors — no overlap with main).
+      - name: Run corpora tests
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          PR_CSV: ${{ steps.detect.outputs.pr_csv }}
+          MAIN_CSV: ${{ steps.detect.outputs.main_csv }}
+          MAIN_SCAN_CACHE_HIT: ${{ steps.main_scan_cache.outputs.cache-hit }}
+        run: |
+          set -o pipefail
+          files=()
+          while IFS= read -r dataset; do
+            [[ -z "$dataset" ]] && continue
+            files+=("$dataset")
+          done <<< "$DATASETS"
+
+          export TRUFFLEHOG_BIN=/tmp/trufflehog-pr
+          export OUTPUT_JSONL=/tmp/results-pr.jsonl
+          export INCLUDE_DETECTORS="$PR_CSV"
+
+          if [[ -n "$MAIN_CSV" && "$MAIN_SCAN_CACHE_HIT" != 'true' ]]; then
+            # Dual-binary: single S3 download teed to both PR and main binaries.
+            export TRUFFLEHOG_BIN_MAIN=/tmp/trufflehog-main
+            export OUTPUT_JSONL_MAIN=/tmp/results-main.jsonl
+            export INCLUDE_DETECTORS_MAIN="$MAIN_CSV"
+          elif [[ -z "$MAIN_CSV" ]]; then
+            echo "No overlapping detectors in main; skipping main scan."
+            : > /tmp/results-main.jsonl
+          else
+            echo "Main scan cache hit; skipping main scan."
+          fi
+
+          ./scripts/test/detector_corpora_test.sh "${files[@]}" \
+            || { echo "Corpora scan failed" >&2; exit 1; }
+
+      - name: Save main scan cache
+        if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != '' && steps.main_scan_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: /tmp/results-main.jsonl
+          key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
+
+      - name: Diff results
+        if: steps.detect.outputs.any_changed == 'true'
+        shell: bash
+        env:
+          CHANGED: ${{ steps.detect.outputs.pr_csv }}
+          NEW_DETECTORS: ${{ steps.detect.outputs.new_csv }}
+        run: |
+          set -o pipefail
+          python3 scripts/test/diff_corpora_results.py \
+            /tmp/results-main.jsonl /tmp/results-pr.jsonl \
+            --changed-detectors="$CHANGED" \
+            --new-detectors="$NEW_DETECTORS" \
+            > /tmp/diff-report.md
+          cat /tmp/diff-report.md
+
+      # workflow_dispatch runs don't carry an issue context, so resolve the
+      # PR number by branch lookup. pull_request events fall through to the
+      # event's issue number. Output feeds the find/update pair below.
+      - name: Resolve PR number
+        if: steps.detect.outputs.any_changed == 'true'
+        id: resolve_pr
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            let issue_number;
+            if (context.eventName === 'workflow_dispatch') {
+              const pulls = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`,
+                state: 'open',
+              });
+              if (pulls.data.length === 0) {
+                core.setFailed(`No open PR found for branch ${context.ref}`);
+                return;
+              }
+              issue_number = pulls.data[0].number;
+            } else {
+              issue_number = context.issue.number;
+            }
+            core.setOutput('issue_number', issue_number);
+
+      - name: Find existing diff comment
+        if: steps.detect.outputs.any_changed == 'true'
+        id: find_diff_comment
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
+        with:
+          issue-number: ${{ steps.resolve_pr.outputs.issue_number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '<!-- detector-bench -->'
+
+      - name: Post or update diff comment
+        if: steps.detect.outputs.any_changed == 'true'
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
+        with:
+          comment-id: ${{ steps.find_diff_comment.outputs.comment-id }}
+          issue-number: ${{ steps.resolve_pr.outputs.issue_number }}
+          edit-mode: replace
+          body-path: /tmp/diff-report.md
