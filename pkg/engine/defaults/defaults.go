@@ -151,6 +151,7 @@ import (
 	circleciV1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci/v1"
 	circleciV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clarifai"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clay"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clearbit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clickhelp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clicksendsms"
@@ -1029,6 +1030,7 @@ func buildDetectorList() []detectors.Detector {
 		&circleciV1.Scanner{},
 		&circleciV2.Scanner{},
 		&clarifai.Scanner{},
+		&clay.Scanner{},
 		&clearbit.Scanner{},
 		&clickhelp.Scanner{},
 		&clicksendsms.Scanner{},
