@@ -34,7 +34,7 @@ func TestAPKHandler(t *testing.T) {
 			resp, err := http.Get(testCase.archiveURL)
 			assert.NoError(t, err)
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			handler := newAPKHandler()
 
@@ -42,7 +42,7 @@ func TestAPKHandler(t *testing.T) {
 			if err != nil {
 				t.Errorf("error creating reusable reader: %s", err)
 			}
-			defer newReader.Close()
+			defer func() { _ = newReader.Close() }()
 
 			archiveChan := handler.HandleFile(context.Background(), newReader)
 
@@ -76,7 +76,7 @@ func TestOpenInvalidAPK(t *testing.T) {
 
 	rdr, err := newFileReader(ctx, io.NopCloser(reader))
 	assert.NoError(t, err)
-	defer rdr.Close()
+	defer func() { _ = rdr.Close() }()
 
 	archiveChan := make(chan DataOrErr)
 
@@ -91,7 +91,7 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 	resp, err := http.Get(validZipURL)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	handler := newAPKHandler()
 
@@ -100,7 +100,7 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 		t.Errorf("error creating reusable reader: %s", err)
 	}
 	assert.NoError(t, err)
-	defer newReader.Close()
+	defer func() { _ = newReader.Close() }()
 
 	archiveChan := make(chan DataOrErr)
 	ctx := context.AddLogger(context.Background())

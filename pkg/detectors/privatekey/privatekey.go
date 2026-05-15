@@ -222,7 +222,7 @@ func LookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string) (*
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	results := DriftwoodResult{}
 	err = json.NewDecoder(res.Body).Decode(&results)

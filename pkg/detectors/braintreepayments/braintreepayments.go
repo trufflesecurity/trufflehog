@@ -113,7 +113,7 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 	}()
 
 	bodyString := string(bodyBytes)
-	if !(res.StatusCode == http.StatusOK) {
+	if res.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 

@@ -3,10 +3,11 @@ package onelogin
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
@@ -65,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("Content-Type", "application/json; charset=utf-8")
 					res, err := client.Do(req)
 					if err == nil {
-						res.Body.Close() // The request body is unused.
+						_ = res.Body.Close() // The request body is unused.
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							result.Verified = true

@@ -80,7 +80,7 @@ func verifyPostman(ctx context.Context, client *http.Client, token string) (bool
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:

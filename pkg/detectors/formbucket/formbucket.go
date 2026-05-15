@@ -56,14 +56,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				body, errBody := io.ReadAll(res.Body)
 				if errBody != nil {
 					continue
 				}
 				bodyString := string(body)
 				validResponse := strings.Contains(bodyString, `created_on`)
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if errBody == nil {
 					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 						s1.Verified = true

@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
-				res.Body.Close() // The request body is unused.
+				_ = res.Body.Close() // The request body is unused.
 
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
 					result.Verified = true

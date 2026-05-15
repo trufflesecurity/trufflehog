@@ -81,7 +81,7 @@ func verifyWebhook(ctx context.Context, client *http.Client, webhookURL string) 
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
