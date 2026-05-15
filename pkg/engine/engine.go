@@ -504,6 +504,10 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
 	// TODO (ahrav): Determine the optimal cache size.
+	// KNOWN ISSUE: 512 entries is far too small for large scans. Under concurrent notifier
+	// workers a single burst of unique findings easily evicts previously seen keys, allowing
+	// the same secret to be re-emitted on every subsequent pass. Raise to at least 10000
+	// (or make configurable via Config).
 	const cacheSize = 512 // number of entries in the LRU cache
 
 	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
@@ -1287,6 +1291,14 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// Duplicate results with the same decoder type SHOULD have their own entry in the
 		// results list, this would happen if the same secret is found multiple times.
 		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
+		//
+		// KNOWN ISSUE: The condition below only suppresses duplicates when the decoder type
+		// differs (cross-decoder dedup). For the same decoder type the condition evaluates to
+		// false and EVERY occurrence passes through, even when key is already in the cache.
+		// The LRU cache size of 512 entries further compounds this under concurrent notifier
+		// workers: entries are evicted quickly, re-admitting the same finding on every pass.
+		// Proposed fix: change the condition to `if _, ok := e.dedupeCache.Get(key); ok`
+		// and raise the cache size (see cacheSize const in initialize()).
 		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
 		if val, ok := e.dedupeCache.Get(key); ok && (val != result.DecoderType ||
 			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
