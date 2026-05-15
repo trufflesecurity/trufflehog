@@ -278,7 +278,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	err = db.Ping()
 	switch {

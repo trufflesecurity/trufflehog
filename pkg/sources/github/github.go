@@ -769,7 +769,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 	if !s.conn.GetPrintLegacyJson() {
 		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
-			defer os.RemoveAll(path)
+			defer func() { _ = os.RemoveAll(path) }()
 		}
 	}
 
@@ -1363,7 +1363,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter 
 			return err
 		}
 
-		bodyTextsOpts.ListOptions.Page++
+		bodyTextsOpts.Page++
 
 		if len(issues) < defaultPagination {
 			break
@@ -1431,7 +1431,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 			return err
 		}
 
-		issueOpts.ListOptions.Page++
+		issueOpts.Page++
 		if len(issueComments) < defaultPagination {
 			break
 		}
@@ -1499,7 +1499,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sou
 			return err
 		}
 
-		prOpts.ListOptions.Page++
+		prOpts.Page++
 
 		if len(prs) < defaultPagination {
 			break
@@ -1531,7 +1531,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, repor
 			return err
 		}
 
-		prOpts.ListOptions.Page++
+		prOpts.Page++
 
 		if len(prComments) < defaultPagination {
 			break
@@ -1667,7 +1667,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	// As of this writing, if the returned readCloser is not nil, it's just the Body of the returned github.Response, so
 	// there's no need to independently close it.
 	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
 		return fmt.Errorf("could not download file for scan: %w", err)
@@ -1684,7 +1684,7 @@ func (s *Source) scanCommitMetadata(ctx context.Context, owner, repo string, met
 	// fetch the commit
 	commit, resp, err := s.connector.APIClient().Repositories.GetCommit(ctx, owner, repo, meta.GetCommit(), nil)
 	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
 		return fmt.Errorf("could not fetch commit for metadata scan: %w", err)

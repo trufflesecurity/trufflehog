@@ -241,10 +241,10 @@ func (h *apkHandler) processFile(
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", file.Name, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	rdr := iobuf.NewBufferedReaderSeeker(f)
-	defer rdr.Close()
+	defer func() { _ = rdr.Close() }()
 
 	var contentReader io.Reader
 	// Decode the file based on its extension
@@ -306,7 +306,7 @@ func parseResTable(zipReader *zip.Reader) (*apkparser.ResourceTable, error) {
 			}
 
 			resTable, err := apkparser.ParseResourceTable(rdr)
-			rdr.Close()
+			_ = rdr.Close()
 			if err != nil {
 				return nil, err
 			}
