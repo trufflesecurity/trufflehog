@@ -1,8 +1,7 @@
-package cloudflareglobalapikey
+package cloudflareapitoken
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,12 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012 / testuser1005@example.com"
-	invalidPattern = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012/testing@go"
-)
-
-func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
+func TestCloudFlareAPITokenV2_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -26,18 +20,18 @@ func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("cloudflare: %s", validPattern),
-			want:  []string{"abcD123efg456HIJklmn789OPQ_rstUVWxYZ-testuser1005@example.com"},
+			name:  "valid v2 user token - no keyword proximity needed",
+			input: "token: cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe",
+			want:  []string{"cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe"},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("cloudflare keyword is not close to the real key and id = %s", validPattern),
-			want:  nil,
+			name:  "valid v2 account token - no keyword proximity needed",
+			input: "token: cfat_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe",
+			want:  []string{"cfat_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("cloudflare: %s", invalidPattern),
+			name:  "no match for legacy format",
+			input: "cfut_: kOjD1yceduu2jxL2uuwT9dkOIudU3_54sLCEud6j",
 			want:  nil,
 		},
 	}
@@ -57,7 +51,11 @@ func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				t.Errorf("expected %d results, got %d", len(test.want), len(results))
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
 				return
 			}
 
