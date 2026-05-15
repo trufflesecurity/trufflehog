@@ -1422,6 +1422,18 @@ def test_something():
 			expectedFindings: 0,
 		},
 		{
+			name: "ignore postgres url without explicit port",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # The detector normalizes this URL to include :5432, but the ignore tag should still be honored.
+    assert connection_string == "postgres://master_user:master_password@hostname/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
 			name: "ignore not on secret line",
 			content: `
 # tests/example_false_positive.py
