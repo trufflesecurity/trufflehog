@@ -444,6 +444,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/liveagent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/livestorm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loadmill"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lob"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/locationiq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loggly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loginradius"
@@ -1332,6 +1333,7 @@ func buildDetectorList() []detectors.Detector {
 		&liveagent.Scanner{},
 		&livestorm.Scanner{},
 		&loadmill.Scanner{},
+		&lob.Scanner{},
 		&locationiq.Scanner{},
 		&loggly.Scanner{},
 		&loginradius.Scanner{},
