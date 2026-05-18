@@ -5887,6 +5887,8 @@ func (m *Sharepoint) validate(all bool) error {
 
 	// no validation rules for SiteUrl
 
+	// no validation rules for ScanVersions
+
 	switch v := m.Credential.(type) {
 	case *Sharepoint_Oauth:
 		if v == nil {
