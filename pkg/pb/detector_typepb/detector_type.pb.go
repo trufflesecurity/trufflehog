@@ -1080,7 +1080,8 @@ const (
 	DetectorType_AzureDirectManagementKey                DetectorType = 1024
 	DetectorType_AzureAppConfigConnectionString          DetectorType = 1025
 	DetectorType_DeepSeek                                DetectorType = 1026
-	DetectorType_StripePaymentIntent                     DetectorType = 1027
+	DetectorType_StripePaymentIntent DetectorType = 1027
+	DetectorType_StripeWebhook          DetectorType = 1053
 	DetectorType_LangSmith                               DetectorType = 1028
 	DetectorType_BitbucketAppPassword                    DetectorType = 1029
 	DetectorType_Hasura                                  DetectorType = 1030
@@ -2135,6 +2136,7 @@ var (
 		1025: "AzureAppConfigConnectionString",
 		1026: "DeepSeek",
 		1027: "StripePaymentIntent",
+		1053: "StripeWebhook",
 		1028: "LangSmith",
 		1029: "BitbucketAppPassword",
 		1030: "Hasura",
@@ -3186,6 +3188,7 @@ var (
 		"AzureAppConfigConnectionString":    1025,
 		"DeepSeek":                          1026,
 		"StripePaymentIntent":               1027,
+		"StripeWebhook":                    1053,
 		"LangSmith":                         1028,
 		"BitbucketAppPassword":              1029,
 		"Hasura":                            1030,
