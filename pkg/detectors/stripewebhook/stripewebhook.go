@@ -19,7 +19,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// whsec_ followed by 32 or 64 base64-style characters
-	keyPat = regexp.MustCompile(`\b(whsec_[A-Za-z0-9+/]{32}(?:[A-Za-z0-9+/]{32})?)\b`)
+	keyPat = regexp.MustCompile(`\b(whsec_[A-Za-z0-9]{32}(?:[A-Za-z0-9]{32})?)\b`)
 )
 
 func (s Scanner) Keywords() []string {
