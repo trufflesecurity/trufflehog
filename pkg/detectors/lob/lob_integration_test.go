@@ -50,6 +50,9 @@ func TestLob_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Lob,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"environment": "live",
+					},
 				},
 			},
 			wantErr: false,
@@ -66,6 +69,9 @@ func TestLob_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Lob,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"environment": "live",
+					},
 				},
 			},
 			wantErr: false,

@@ -56,6 +56,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_Lob,
 			Raw:          []byte(resMatch),
 			SecretParts:  map[string]string{"key": resMatch},
+			ExtraData: map[string]string{
+				"environment": resMatch[:4], // live or test
+			},
 		}
 
 		if verify {
