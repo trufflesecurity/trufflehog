@@ -116,10 +116,13 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// to buildDetectorList() — discovered by TestAllDetectorTypesAreInDefaultList.
 	// They are not added immediately out of caution for the impact on customers/users.
 	// Remove each entry once its detector has been carefully added.
+	detector_typepb.DetectorType_Cloudinary:    {},
 	detector_typepb.DetectorType_DatadogApikey: {},
+	detector_typepb.DetectorType_GitLabOauth2:  {},
 	detector_typepb.DetectorType_Guru:          {},
 	detector_typepb.DetectorType_IPInfo:        {},
 	detector_typepb.DetectorType_Lob:           {},
+	detector_typepb.DetectorType_Pinecone:      {},
 	detector_typepb.DetectorType_Rev:           {},
 	detector_typepb.DetectorType_TLy:           {},
 	detector_typepb.DetectorType_Tru:           {},
