@@ -732,6 +732,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/streak"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripepaymentintent"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripewebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stytch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sugester"
@@ -1628,6 +1629,7 @@ func buildDetectorList() []detectors.Detector {
 		&streak.Scanner{},
 		&stripe.Scanner{},
 		&stripepaymentintent.Scanner{},
+		&stripewebhook.Scanner{},
 		&stripo.Scanner{},
 		&stytch.Scanner{},
 		&sugester.Scanner{},

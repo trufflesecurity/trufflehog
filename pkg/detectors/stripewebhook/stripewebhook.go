@@ -2,23 +2,19 @@ package stripewebhook
 
 import (
 	"context"
-	"net/http"
 	"regexp"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	detector_typepb "github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct {
-	Client *http.Client
-}
+type Scanner struct{}
 
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
-	// whsec_ followed by 32 or 64 base64-style characters
+	// Stripe webhook secrets are purely alphanumeric (no +/ chars).
+	// Using \b boundaries is safe because the charset is all word characters.
 	keyPat = regexp.MustCompile(`\b(whsec_[A-Za-z0-9]{32}(?:[A-Za-z0-9]{32})?)\b`)
 )
 
@@ -42,22 +38,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := match[1]
 
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_StripeWebhook,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(match[1]),
 		}
 
-		if verify {
-			client := s.Client
-			if client == nil {
-				client = defaultClient
-			}
-			_ = client
-			// Stripe webhook secrets cannot be verified via API directly.
-			// They are used client-side to validate HMAC signatures on webhooks.
-		}
+		// Stripe webhook secrets cannot be verified via API directly.
+		// They are used client-side to validate HMAC signatures on webhook payloads.
 
 		results = append(results, s1)
 	}
