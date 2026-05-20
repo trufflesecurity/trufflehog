@@ -40,7 +40,7 @@ func TestBorgBase_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"FoHclCFSi_aV09jowJQ4RUF_MiqW6ioqq6_OcyB0PFlV-mQ1yoFjk5JLlxbzRUzKTA6vsfR8wq6TNc83rtNKlkD092Sj1c9CbPVBXlHksy.sT2I/so6bMGdPcqxzbjrxYgAUiORgqJDeTet4gKOQlZpt"},
@@ -79,7 +79,7 @@ func TestBorgBase_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

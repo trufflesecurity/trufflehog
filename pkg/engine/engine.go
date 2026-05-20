@@ -39,8 +39,8 @@ import (
 var detectionTimeout = detectors.DefaultResponseTimeout
 
 var errOverlap = errors.New(
-	"More than one detector has found this result. For your safety, verification has been disabled." +
-		"You can override this behavior by using the --allow-verification-overlap flag.",
+	"more than one detector has found this result; for your safety, verification has been disabled. " +
+		"You can override this behavior by using the --allow-verification-overlap flag",
 )
 
 // Metrics for the scan engine for external consumption.
@@ -833,11 +833,11 @@ func iterativeDecode(chunk *sources.Chunk, allDecoders []decoders.Decoder, maxDe
 
 				if depth+1 < maxDepth &&
 					decoder.Type() != detectorspb.DecoderType_PLAIN &&
-					!bytes.Equal(decoded.Chunk.Data, data) &&
-					!slices.ContainsFunc(seen, func(s []byte) bool { return bytes.Equal(s, decoded.Chunk.Data) }) {
+					!bytes.Equal(decoded.Data, data) &&
+					!slices.ContainsFunc(seen, func(s []byte) bool { return bytes.Equal(s, decoded.Data) }) {
 
-					seen = append(seen, decoded.Chunk.Data)
-					nextInputs = append(nextInputs, decoded.Chunk.Data)
+					seen = append(seen, decoded.Data)
+					nextInputs = append(nextInputs, decoded.Data)
 				}
 			}
 		}
@@ -863,7 +863,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
 		for _, d := range decoded {
-			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Chunk.Data)
+			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -1060,7 +1060,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 							res,
 							chunk.chunk,
 							chunk.decoder,
-							detector.Detector.Description(),
+							detector.Description(),
 							isFalsePositive,
 						)
 
@@ -1187,7 +1187,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		}
 
 		for _, res := range results {
-			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
+			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Description(), isFalsePositive)
 		}
 	}
 

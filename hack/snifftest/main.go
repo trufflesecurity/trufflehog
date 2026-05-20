@@ -219,7 +219,7 @@ func main() {
 					logFatal(err, "error scanning repo")
 				}
 				logger.Info("scanned repo", "repo", r)
-				defer os.RemoveAll(path)
+				defer func() { _ = os.RemoveAll(path) }()
 			}(repo)
 		}
 

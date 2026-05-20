@@ -26,13 +26,11 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePos
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", fmt.Errorf("missing key in credInfo"),
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", fmt.Errorf("missing key in credInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -148,7 +146,7 @@ func getUserInfo(cfg *config.Config, key string) (UserInfoJSON, error) {
 	}
 
 	// read response
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// if status code is 200, decode response
 	if resp.StatusCode == 200 {
@@ -175,7 +173,7 @@ func getWorkspaces(cfg *config.Config, key string) (WorkspaceJSON, error) {
 	}
 
 	// read response
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// if status code is 200, decode response
 	if resp.StatusCode == 200 {
@@ -224,7 +222,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	if me.User.Username == "" {
-		return nil, fmt.Errorf("Invalid Postman API Key")
+		return nil, fmt.Errorf("invalid Postman API Key")
 	}
 
 	// get workspaces, if there is error user with empty workspaces will be returned

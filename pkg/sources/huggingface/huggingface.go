@@ -599,7 +599,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	if err != nil {
 		return 0, err
 	}
-	defer os.RemoveAll(path)
+	defer func() { _ = os.RemoveAll(path) }()
 
 	var logger logr.Logger
 	logger.V(2).Info("scanning %s", repoInfo.resourceType)

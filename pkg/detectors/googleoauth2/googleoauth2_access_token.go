@@ -88,7 +88,8 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 		_, _ = io.Copy(io.Discard, res.Body)
 	}()
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		var token tokenInfo
 		if err := json.NewDecoder(res.Body).Decode(&token); err != nil {
 			return false, nil, fmt.Errorf("failed to decode response: %w", err)
@@ -106,7 +107,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 			extraData["expires_at"] = time.Unix(exp, 0).String()
 		}
 		return true, extraData, nil
-	} else if res.StatusCode == http.StatusBadRequest {
+	case http.StatusBadRequest:
 		var errInfo errorInfo
 		if err := json.NewDecoder(res.Body).Decode(&errInfo); err != nil {
 			return false, nil, fmt.Errorf("failed to decode response: %w", err)
@@ -118,7 +119,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 		} else {
 			return false, nil, fmt.Errorf("unexpected error description '%s' for %s", errInfo.Error, req.URL)
 		}
-	} else {
+	default:
 		return false, nil, fmt.Errorf("unexpected response %d for %s", res.StatusCode, req.URL)
 	}
 }
