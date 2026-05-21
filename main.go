@@ -9,11 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/fatih/color"
@@ -102,7 +104,7 @@ var (
 	gitScanBranch          = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth        = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	gitScanBare            = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
-	gitScanSinceDate       = gitScan.Flag("since", "Scan commits more recent than a specific date (e.g. 2024-01-01).").String()
+	gitScanSinceDate       = gitScan.Flag("since", "Scan commits more recent than a specific date. Accepts YYYY-MM-DD, RFC 3339, or a git-style relative date (e.g. 2024-01-01 or \"2 weeks ago\").").String()
 	gitClonePath           = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	gitNoCleanup           = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	gitTrustLocalGitConfig = gitScan.Flag("trust-local-git-config", "Trust local git config.").Bool()
@@ -130,7 +132,7 @@ var (
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
-	githubScanSinceDate         = githubScan.Flag("since", "Scan commits more recent than a specific date (e.g. 2024-01-01).").String()
+	githubScanSinceDate         = githubScan.Flag("since", "Scan commits more recent than a specific date. Accepts YYYY-MM-DD, RFC 3339, or a git-style relative date (e.g. 2024-01-01 or \"2 weeks ago\").").String()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -797,6 +799,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, err
 		}
 
+		if err := validateSinceDate(*gitScanSinceDate); err != nil {
+			return scanMetrics, err
+		}
+
 		gitCfg := sources.GitConfig{
 			URI:                 *gitScanURI,
 			IncludePathsFile:    *gitScanIncludePaths,
@@ -849,6 +855,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 
 		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {
+			return scanMetrics, err
+		}
+
+		if err := validateSinceDate(*githubScanSinceDate); err != nil {
 			return scanMetrics, err
 		}
 
@@ -1283,6 +1293,41 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	}
 
 	return nil
+}
+
+// sinceDateRelativePattern matches the subset of git's approxidate-style
+// relative inputs we want to allow through validation (e.g. "yesterday",
+// "2 weeks ago"). Anything that does not match this and does not parse as
+// one of the fixed layouts is treated as a likely typo.
+var sinceDateRelativePattern = regexp.MustCompile(`(?i)^(now|today|yesterday|noon|midnight|tea|breakfast|lunch|\d+\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago)$`)
+
+// validateSinceDate ensures that --since, if provided, is a date string
+// git log will accept. We reject obvious typos up front so they cannot be
+// silently interpreted by git's permissive date parser as "the beginning
+// of time" — which would scan the full history instead of the intended slice.
+func validateSinceDate(sinceDate string) error {
+	if sinceDate == "" {
+		return nil
+	}
+
+	layouts := []string{
+		"2006-01-02",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		time.RFC3339,
+		time.RFC3339Nano,
+	}
+	for _, layout := range layouts {
+		if _, err := time.Parse(layout, sinceDate); err == nil {
+			return nil
+		}
+	}
+
+	if sinceDateRelativePattern.MatchString(strings.TrimSpace(sinceDate)) {
+		return nil
+	}
+
+	return fmt.Errorf("invalid --since value %q: expected YYYY-MM-DD, RFC 3339, or a git-style relative date (e.g. \"2 weeks ago\")", sinceDate)
 }
 
 // isPreCommitHook detects if trufflehog is running as a pre-commit hook
