@@ -415,7 +415,7 @@ even more`,
 
 			tmpFile, err := os.CreateTemp("", "test_aws_credentials")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -463,10 +463,10 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
-	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
+	_, err = fmt.Fprintf(tmpFile, "test data using keyword %s", fakeDetectorKeyword)
 	assert.NoError(t, err)
 
 	const defaultOutputBufferSize = 64
@@ -507,8 +507,8 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	_, err = tmpFile.WriteString("test stuff")
 	assert.Nil(t, err)
@@ -1445,7 +1445,7 @@ def test_something():
 
 			tmpFile, err := os.CreateTemp("", "test_creds")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -1558,7 +1558,7 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 			// Assert: Confirm that a result was generated and that it has the expected verify flag.
 			select {
 			case result := <-e.results:
-				assert.Equal(t, tc.verify, result.Result.Verified)
+				assert.Equal(t, tc.verify, result.Verified)
 			default:
 				t.Errorf("expected a result but did not get one")
 			}
@@ -1680,7 +1680,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it).
 		for result := range e.results {
-			assert.False(t, result.Result.Verified)
+			assert.False(t, result.Verified)
 		}
 
 		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its

@@ -70,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						} else {
 							s1.SetVerificationError(err, password[0])
 						}
-						db.Close()
+						_ = db.Close()
 					}
 				}
 

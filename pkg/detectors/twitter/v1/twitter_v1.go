@@ -94,7 +94,7 @@ func (s Scanner) VerifyTwitterToken(ctx context.Context, client *http.Client, to
 		return false, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil

@@ -326,7 +326,7 @@ func (s *Source) scanBuckets(
 			bucketIdx,
 			len(bucketsToScan),
 			fmt.Sprintf("Bucket: %s", bucket),
-			s.Progress.EncodedResumeInfo,
+			s.EncodedResumeInfo,
 		)
 
 		var startAfter *string
@@ -554,7 +554,7 @@ func (s *Source) pageChunker(
 				// It's uncertain if the body will be nil in such cases,
 				// but we'll close it if it's not.
 				if res != nil && res.Body != nil {
-					res.Body.Close()
+					_ = res.Body.Close()
 				}
 
 				nErr, ok := state.errorCount.Load(prefix)
@@ -573,7 +573,7 @@ func (s *Source) pageChunker(
 				}
 				return nil
 			}
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			email := "Unknown"
 			if obj.Owner != nil {
@@ -748,7 +748,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	checkpointer := NewCheckpointer(ctx, &s.Progress, true)
 
 	var startAfterPtr *string
-	startAfter := s.Progress.GetEncodedResumeInfoFor(unitID)
+	startAfter := s.GetEncodedResumeInfoFor(unitID)
 	if startAfter != "" {
 		ctx.Logger().V(3).Info(
 			"Resuming unit scan",
@@ -757,7 +757,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		)
 		startAfterPtr = &startAfter
 	}
-	defer s.Progress.ClearEncodedResumeInfoFor(unitID)
+	defer s.ClearEncodedResumeInfoFor(unitID)
 	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer)
 	return nil
 }

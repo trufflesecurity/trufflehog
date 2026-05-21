@@ -153,7 +153,7 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, endpoint,
 	if err != nil {
 		return false, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check the response status
 	switch resp.StatusCode {

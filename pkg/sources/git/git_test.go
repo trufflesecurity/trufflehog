@@ -986,7 +986,7 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 			}
 
 			if path != repoPath && path != "" {
-				os.RemoveAll(path)
+				_ = os.RemoveAll(path)
 			}
 		})
 	}
@@ -1028,7 +1028,7 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 			}
 
 			if path != repoPath && path != "" {
-				os.RemoveAll(path)
+				_ = os.RemoveAll(path)
 			}
 		})
 	}
@@ -1104,7 +1104,7 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 			}
 
 			if path != bareRepoPath && path != "" {
-				os.RemoveAll(path)
+				_ = os.RemoveAll(path)
 			}
 		})
 	}
@@ -1158,7 +1158,7 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 			}
 
 			if path != bareRepoPath && path != "" {
-				os.RemoveAll(path)
+				_ = os.RemoveAll(path)
 			}
 		})
 	}

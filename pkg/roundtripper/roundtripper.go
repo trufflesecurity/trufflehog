@@ -73,7 +73,7 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		)
 
 		if r.BasicAuthRoundTripper != nil {
-			req.SetBasicAuth(r.BasicAuthRoundTripper.username, r.BasicAuthRoundTripper.password)
+			req.SetBasicAuth(r.username, r.password)
 		}
 
 		authMethod := determineAuth(req)
@@ -94,9 +94,9 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			)
 		}
 
-		reason, shouldRetry, duration := r.RetryableRoundtripper.shouldRetryRequest(response, err)
+		reason, shouldRetry, duration := r.shouldRetryRequest(response, err)
 		if shouldRetry {
-			if retries >= int(r.RetryableRoundtripper.maxRetries) {
+			if retries >= int(r.maxRetries) {
 				r.logger.V(2).Info("max retries reached",
 					"host", req.Host,
 					"reason", reason,

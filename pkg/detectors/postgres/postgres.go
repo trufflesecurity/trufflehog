@@ -175,6 +175,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		result.ExtraData = map[string]string{
 			pgSslmode: sslmode,
 		}
+		if host != "" {
+			if port != "" {
+				result.ExtraData["host"] = host + ":" + port
+			} else {
+				result.ExtraData["host"] = host
+			}
+		}
+		if user != "" {
+			result.ExtraData["username"] = user
+		}
+		if dbname := params[pgDbname]; dbname != "" {
+			result.ExtraData["database"] = dbname
+		}
 
 		results = append(results, result)
 	}
@@ -278,7 +291,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	err = db.Ping()
 	switch {

@@ -362,7 +362,7 @@ func (s *Source) scanFile(ctx trContext.Context, chunksChan chan *sources.Chunk,
 	if err != nil {
 		return fmt.Errorf("unable to open file: %w", err)
 	}
-	defer inputFile.Close()
+	defer func() { _ = inputFile.Close() }()
 
 	fileCtx.Logger().V(3).Info("scanning file")
 
