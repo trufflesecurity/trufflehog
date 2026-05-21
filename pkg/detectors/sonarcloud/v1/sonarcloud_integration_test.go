@@ -19,7 +19,7 @@ import (
 func TestSonarCloud_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -53,6 +53,9 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"version": "1",
 					},
+					SecretParts: map[string]string{
+						"key": secret,
+					},
 				},
 			},
 			wantErr: false,
@@ -71,6 +74,9 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"version": "1",
+					},
+					SecretParts: map[string]string{
+						"key": inactiveSecret,
 					},
 				},
 			},
