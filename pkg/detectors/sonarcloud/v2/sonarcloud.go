@@ -99,8 +99,13 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, token str
 	}()
 
 	switch res.StatusCode {
-	case http.StatusNotFound:
+	case http.StatusNotFound, http.StatusForbidden:
 		return true, nil
+		// The official Sonar API docs don't document the response codes for this
+		// endpoint, but community evidence indicates 403 is returned when the
+		// token is valid but lacks org-admin permissions on the queried org:
+		// https://community.sonarsource.com/t/api-access-issue-for-read-only-user-despite-ui-access/140025
+		// https://community.sonarsource.com/t/http-403-when-accessing-api-projects-search-but-other-endpoint-works-like-components/20668
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
