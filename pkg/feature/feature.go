@@ -20,6 +20,7 @@ var (
 	CloudinaryDetectorEnabled      atomic.Bool
 	GitLabOAuthDetectorEnabled     atomic.Bool
 	DatadogApiKeyDetectorEnabled   atomic.Bool
+	LobDetectorEnabled             atomic.Bool
 )
 
 type AtomicString struct {
