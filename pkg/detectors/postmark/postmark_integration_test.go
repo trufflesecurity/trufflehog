@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPostmark_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestPostmark_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postmark,
+					DetectorType: detector_typepb.DetectorType_Postmark,
 					Verified:     true,
 					ExtraData:    map[string]string{"type": "server"},
 				},
@@ -66,7 +66,7 @@ func TestPostmark_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postmark,
+					DetectorType: detector_typepb.DetectorType_Postmark,
 					Verified:     true,
 					ExtraData:    map[string]string{"type": "account"},
 				},
@@ -83,7 +83,7 @@ func TestPostmark_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Postmark,
+					DetectorType: detector_typepb.DetectorType_Postmark,
 					Verified:     false,
 				},
 			},

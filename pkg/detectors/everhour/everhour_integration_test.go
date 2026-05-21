@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestEverhour_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestEverhour_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Everhour,
+					DetectorType: detector_typepb.DetectorType_Everhour,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestEverhour_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Everhour,
+					DetectorType: detector_typepb.DetectorType_Everhour,
 					Verified:     false,
 				},
 			},

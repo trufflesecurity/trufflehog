@@ -63,11 +63,11 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeBit
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentialInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -146,7 +146,7 @@ func getScopesAndType(cfg *config.Config, key string) (string, []string, error) 
 	if err != nil {
 		return "", nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// parse response headers
 	credentialType := resp.Header.Get("x-credential-type")
@@ -198,7 +198,7 @@ func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, err
 	if err != nil {
 		return repos, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// parse response body
 	err = json.NewDecoder(resp.Body).Decode(&repos)

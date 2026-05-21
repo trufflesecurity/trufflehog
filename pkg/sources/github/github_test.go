@@ -1228,6 +1228,104 @@ func TestExplicitRepositoryBypass(t *testing.T) {
 	assert.Contains(t, source.repos, "https://github.com/org/another-explicit.git")
 }
 
+// TestEnsureRepoInfoCache_RepoRedirect verifies that when the GitHub API returns
+// a canonical CloneURL that differs from the requested URL (i.e. a repository
+// has been renamed/moved), ensureRepoInfoCache stores info under BOTH the
+// original URL and the canonical URL so that scanRepo and visibilityOf can
+// look up metadata using either.
+func TestEnsureRepoInfoCache_RepoRedirect(t *testing.T) {
+	defer gock.Off()
+
+	const (
+		originalURL  = "https://github.com/old-org/myrepo.git"
+		canonicalURL = "https://github.com/new-org/myrepo.git"
+	)
+
+	gock.New("https://api.github.com").
+		Get("/repos/old-org/myrepo").
+		Reply(200).
+		JSON(map[string]any{
+			"name":      "myrepo",
+			"full_name": "new-org/myrepo",
+			"clone_url": canonicalURL,
+			"private":   false,
+			"has_wiki":  false,
+			"size":      100,
+			"owner":     map[string]string{"login": "new-org"},
+		})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{Token: "token"},
+	})
+
+	returnedURL, err := s.ensureRepoInfoCache(context.Background(), originalURL, &unitErrorReporter{noopReporter()})
+	require.NoError(t, err)
+
+	// Original URL returned so callers can continue using it.
+	assert.Equal(t, originalURL, returnedURL)
+
+	// Both URLs must be in the cache so scanRepo / visibilityOf don't miss.
+	_, okOriginal := s.repoInfoCache.get(originalURL)
+	assert.True(t, okOriginal, "original (pre-redirect) URL must be cached")
+
+	_, okCanonical := s.repoInfoCache.get(canonicalURL)
+	assert.True(t, okCanonical, "canonical (post-redirect) URL must be cached")
+
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+// TestEnumerate_ExplicitRepoRedirect verifies the end-to-end Enumerate flow
+// when a user provides an explicit repo URL that GitHub redirects to a new
+// location (e.g. org rename). scanRepo must be able to look up cache metadata
+// using the original URL that ends up in s.repos.
+func TestEnumerate_ExplicitRepoRedirect(t *testing.T) {
+	defer gock.Off()
+
+	const (
+		originalURL  = "https://github.com/old-org/myrepo.git"
+		canonicalURL = "https://github.com/new-org/myrepo.git"
+	)
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "test-user"})
+
+	gock.New("https://api.github.com").
+		Get("/repos/old-org/myrepo").
+		Reply(200).
+		JSON(map[string]any{
+			"name":      "myrepo",
+			"full_name": "new-org/myrepo",
+			"clone_url": canonicalURL,
+			"private":   true,
+			"has_wiki":  false,
+			"size":      50,
+			"owner":     map[string]string{"login": "new-org"},
+		})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential:   &sourcespb.GitHub_Token{Token: "token"},
+		Repositories: []string{originalURL},
+	})
+
+	err := s.Enumerate(context.Background(), noopReporter())
+	require.NoError(t, err)
+
+	// s.repos must use the original URL (what was configured).
+	assert.Contains(t, s.repos, originalURL)
+
+	// scanRepo looks up repoInfoCache by the URL in s.repos.
+	// Without the redirect fix this lookup fails with "no repoInfo for URL".
+	info, ok := s.repoInfoCache.get(originalURL)
+	assert.True(t, ok, "scanRepo must be able to look up metadata by original URL")
+	assert.Equal(t, "new-org", info.owner)
+
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func noopReporter() sources.UnitReporter {
 	return sources.VisitorReporter{
 		VisitUnit: func(context.Context, sources.SourceUnit) error {

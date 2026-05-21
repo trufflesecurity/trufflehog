@@ -1,0 +1,680 @@
+.TH TRUFFLEHOG 1 "" "trufflehog dev" "Truffle Security"
+.SH NAME
+trufflehog \- find credentials in various sources
+.SH SYNOPSIS
+.TP
+\fBtrufflehog [<flags>] <command> [<args> ...]\fR
+
+.SH DESCRIPTION
+TruffleHog is a tool for finding credentials. Run without a command for interactive mode.
+.PP
+TruffleHog scans various data sources for verified and
+unverified secrets such as API keys, passwords, and other
+credentials. It supports scanning git repositories, GitHub
+and GitLab organizations, filesystems, S3 buckets, GCS
+buckets, Docker images, CI/CD systems, and more.
+.PP
+When run without a command in an interactive terminal,
+\fBtrufflehog\fR launches a TUI (text user interface) that
+guides you through selecting a scan source and configuring
+options.
+.SH OPTIONS
+.TP
+\fB-h, --help\fR
+Show context-sensitive help (also try --help-long and --help-man).
+.TP
+\fB--log-level=0\fR
+Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
+.TP
+\fB--profile\fR
+Enables profiling and sets a pprof and fgprof server on :18066.
+.TP
+\fB-j, --json\fR
+Output in JSON format.
+.TP
+\fB--json-legacy\fR
+Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
+.TP
+\fB--github-actions\fR
+Output in GitHub Actions format.
+.TP
+\fB--concurrency=N\fR
+Number of concurrent workers.
+.TP
+\fB--no-verification\fR
+Don't verify the results.
+.TP
+\fB--results=RESULTS\fR
+Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.
+.TP
+\fB--no-color\fR
+Disable colorized output
+.TP
+\fB--allow-verification-overlap\fR
+Allow verification of similar credentials across detectors
+.TP
+\fB--filter-unverified\fR
+Only output first unverified result per chunk per detector if there are more than one results.
+.TP
+\fB--filter-entropy=FILTER-ENTROPY\fR
+Filter unverified results with Shannon entropy. Start with 3.0.
+.TP
+\fB--max-decode-depth=5\fR
+Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).
+.TP
+\fB--config=CONFIG\fR
+Path to configuration file.
+.TP
+\fB--print-avg-detector-time\fR
+Print the average time spent on each detector.
+.TP
+\fB--no-update\fR
+Don't check for updates.
+.TP
+\fB--fail\fR
+Exit with code 183 if results are found.
+.TP
+\fB--fail-on-scan-errors\fR
+Exit with non-zero error code if an error occurs during the scan.
+.TP
+\fB--verifier=VERIFIER\fR
+Set custom verification endpoints.
+.TP
+\fB--custom-verifiers-only\fR
+Only use custom verification endpoints.
+.TP
+\fB--detector-timeout=DETECTOR-TIMEOUT\fR
+Maximum time to spend scanning chunks per detector (e.g., 30s).
+.TP
+\fB--archive-max-size=ARCHIVE-MAX-SIZE\fR
+Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
+.TP
+\fB--archive-max-depth=ARCHIVE-MAX-DEPTH\fR
+Maximum depth of archive to scan.
+.TP
+\fB--archive-timeout=ARCHIVE-TIMEOUT\fR
+Maximum time to spend extracting an archive.
+.TP
+\fB--include-detectors="all"\fR
+Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.
+.TP
+\fB--exclude-detectors=EXCLUDE-DETECTORS\fR
+Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.
+.TP
+\fB--no-verification-cache\fR
+Disable verification caching
+.TP
+\fB--force-skip-binaries\fR
+Force skipping binaries.
+.TP
+\fB--force-skip-archives\fR
+Force skipping archives.
+.TP
+\fB--skip-additional-refs\fR
+Skip additional references.
+.TP
+\fB--user-agent-suffix=USER-AGENT-SUFFIX\fR
+Suffix to add to User-Agent.
+.TP
+\fB--version\fR
+Show application version.
+.SH COMMANDS
+.SS
+\fBhelp [<command>...]\fR
+Show help.
+.SS
+\fBgit [<flags>] <uri>\fR
+Find credentials in git repositories.
+.TP
+\fB-i, --include-paths=INCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to include in scan.
+.TP
+\fB-x, --exclude-paths=EXCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to exclude in scan.
+.TP
+\fB--exclude-globs=EXCLUDE-GLOBS\fR
+Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.
+.TP
+\fB--since-commit=SINCE-COMMIT\fR
+Commit to start scan from.
+.TP
+\fB--branch=BRANCH\fR
+Branch to scan.
+.TP
+\fB--max-depth=MAX-DEPTH\fR
+Maximum depth of commits to scan.
+.TP
+\fB--bare\fR
+Scan bare repository (e.g. useful while using in pre-receive hooks)
+.TP
+\fB--clone-path=CLONE-PATH\fR
+Custom path where the repository should be cloned (default: temp dir).
+.TP
+\fB--no-cleanup\fR
+Do not delete cloned repositories after scanning (can only be used with --clone-path).
+.TP
+\fB--trust-local-git-config\fR
+Trust local git config.
+.TP
+\fB--allow\fR
+No-op flag for backwards compat.
+.TP
+\fB--entropy\fR
+No-op flag for backwards compat.
+.TP
+\fB--regex\fR
+No-op flag for backwards compat.
+.SS
+\fBgithub [<flags>]\fR
+Find credentials in GitHub repositories.
+.TP
+\fB--endpoint="https://api.github.com"\fR
+GitHub endpoint.
+.TP
+\fB--repo=REPO\fR
+GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"
+.TP
+\fB--org=ORG\fR
+GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"
+.TP
+\fB--token=TOKEN\fR
+GitHub token. Can be provided with environment variable GITHUB_TOKEN.
+.TP
+\fB--include-forks\fR
+Include forks in scan.
+.TP
+\fB--include-members\fR
+Include organization member repositories in scan.
+.TP
+\fB--include-repos=INCLUDE-REPOS\fR
+Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"
+.TP
+\fB--include-wikis\fR
+Include repository wikisin scan.
+.TP
+\fB--exclude-repos=EXCLUDE-REPOS\fR
+Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"
+.TP
+\fB-i, --include-paths=INCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to include in scan.
+.TP
+\fB-x, --exclude-paths=EXCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to exclude in scan.
+.TP
+\fB--issue-comments\fR
+Include issue descriptions and comments in scan.
+.TP
+\fB--pr-comments\fR
+Include pull request descriptions and comments in scan.
+.TP
+\fB--gist-comments\fR
+Include gist comments in scan.
+.TP
+\fB--comments-timeframe=COMMENTS-TIMEFRAME\fR
+Number of days in the past to review when scanning issue, PR, and gist comments.
+.TP
+\fB--auth-in-url\fR
+Embed authentication credentials in repository URLs instead of using secure HTTP headers
+.TP
+\fB--clone-path=CLONE-PATH\fR
+Custom path where the repository should be cloned (default: temp dir).
+.TP
+\fB--no-cleanup\fR
+Do not delete cloned repositories after scanning (can only be used with --clone-path).
+.TP
+\fB--ignore-gists\fR
+Ignore all gists in scan.
+.SS
+\fBgithub-experimental --repo=REPO [<flags>]\fR
+Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.
+.TP
+\fB--object-discovery\fR
+Discover hidden data objects in GitHub repositories.
+.TP
+\fB--token=TOKEN\fR
+GitHub token. Can be provided with environment variable GITHUB_TOKEN.
+.TP
+\fB--repo=REPO\fR
+GitHub repository to scan. Example: https://github.com/<user>/<repo>.git
+.TP
+\fB--collision-threshold=1\fR
+Threshold for short-sha collisions in object-discovery submodule. Default is 1.
+.TP
+\fB--delete-cached-data\fR
+Delete cached data after object-discovery secret scanning.
+.SS
+\fBgitlab --token=TOKEN [<flags>]\fR
+Find credentials in GitLab repositories.
+.TP
+\fB--endpoint="https://gitlab.com"\fR
+GitLab endpoint.
+.TP
+\fB--repo=REPO\fR
+GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git
+.TP
+\fB--token=TOKEN\fR
+GitLab token. Can be provided with environment variable GITLAB_TOKEN.
+.TP
+\fB--group-id=GROUP-ID\fR
+GitLab group ID. If provided, it will scan the group and its subgroups. You can repeat this flag.
+.TP
+\fB-i, --include-paths=INCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to include in scan.
+.TP
+\fB-x, --exclude-paths=EXCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to exclude in scan.
+.TP
+\fB--include-repos=INCLUDE-REPOS\fR
+Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"
+.TP
+\fB--exclude-repos=EXCLUDE-REPOS\fR
+Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"
+.TP
+\fB--auth-in-url\fR
+Embed authentication credentials in repository URLs instead of using secure HTTP headers
+.TP
+\fB--clone-path=CLONE-PATH\fR
+Custom path where the repository should be cloned (default: temp dir)
+.TP
+\fB--no-cleanup\fR
+Do not delete cloned repositories after scanning (can only be used with --clone-path).
+.SS
+\fBfilesystem [<flags>] [<path>...]\fR
+Find credentials in a filesystem.
+.TP
+\fB--directory=DIRECTORY\fR
+Path to directory to scan. You can repeat this flag.
+.TP
+\fB-i, --include-paths=INCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to include in scan.
+.TP
+\fB-x, --exclude-paths=EXCLUDE-PATHS\fR
+Path to file with newline separated regexes for files to exclude in scan.
+.TP
+\fB-s, --max-symlink-depth=MAX-SYMLINK-DEPTH\fR
+Maximum depth to follow symlinks during filesystem scan.
+.SS
+\fBs3 [<flags>]\fR
+Find credentials in S3 buckets.
+.TP
+\fB--key=KEY\fR
+S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.
+.TP
+\fB--role-arn=ROLE-ARN\fR
+Specify the ARN of an IAM role to assume for scanning. You can repeat this flag.
+.TP
+\fB--secret=SECRET\fR
+S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.
+.TP
+\fB--session-token=SESSION-TOKEN\fR
+S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.
+.TP
+\fB--cloud-environment\fR
+Use IAM credentials in cloud environment.
+.TP
+\fB--bucket=BUCKET\fR
+Name of S3 bucket to scan. You can repeat this flag. Incompatible with --ignore-bucket.
+.TP
+\fB--ignore-bucket=IGNORE-BUCKET\fR
+Name of S3 bucket to ignore. You can repeat this flag. Incompatible with --bucket.
+.TP
+\fB--max-object-size=250MB\fR
+Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)
+.SS
+\fBgcs [<flags>]\fR
+Find credentials in GCS buckets.
+.TP
+\fB--project-id=PROJECT-ID\fR
+GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.
+.TP
+\fB--cloud-environment\fR
+Use Application Default Credentials, IAM credentials to authenticate.
+.TP
+\fB--service-account=SERVICE-ACCOUNT\fR
+Path to GCS service account JSON file.
+.TP
+\fB--without-auth\fR
+Scan GCS buckets without authentication. This will only work for public buckets
+.TP
+\fB--api-key=API-KEY\fR
+GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.
+.TP
+\fB-I, --include-buckets=INCLUDE-BUCKETS\fR
+Buckets to scan. Comma separated list of buckets. You can repeat this flag. Globs are supported
+.TP
+\fB-X, --exclude-buckets=EXCLUDE-BUCKETS\fR
+Buckets to exclude from scan. Comma separated list of buckets. Globs are supported
+.TP
+\fB-i, --include-objects=INCLUDE-OBJECTS\fR
+Objects to scan. Comma separated list of objects. you can repeat this flag. Globs are supported
+.TP
+\fB-x, --exclude-objects=EXCLUDE-OBJECTS\fR
+Objects to exclude from scan. Comma separated list of objects. You can repeat this flag. Globs are supported
+.TP
+\fB--max-object-size=10MB\fR
+Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)
+.SS
+\fBsyslog --format=FORMAT [<flags>]\fR
+Scan syslog
+.TP
+\fB--address=ADDRESS\fR
+Address and port to listen on for syslog. Example: 127.0.0.1:514
+.TP
+\fB--protocol=PROTOCOL\fR
+Protocol to listen on. udp or tcp
+.TP
+\fB--cert=CERT\fR
+Path to TLS cert.
+.TP
+\fB--key=KEY\fR
+Path to TLS key.
+.TP
+\fB--format=FORMAT\fR
+Log format. Can be rfc3164 or rfc5424
+.SS
+\fBcircleci --token=TOKEN\fR
+Scan CircleCI
+.TP
+\fB--token=TOKEN\fR
+CircleCI token. Can also be provided with environment variable
+.SS
+\fBdocker [<flags>]\fR
+Scan Docker Image
+.TP
+\fB--image=IMAGE\fR
+Docker image to scan. Use the file:// prefix to point to a local tarball, the docker:// prefix to point to the docker daemon, otherwise an image registry is assumed.
+.TP
+\fB--token=TOKEN\fR
+Docker bearer token. Can also be provided with environment variable
+.TP
+\fB--exclude-paths=EXCLUDE-PATHS\fR
+Comma separated list of paths to exclude from scan
+.TP
+\fB--namespace=NAMESPACE\fR
+Docker namespace (organization or user). For non-Docker Hub registries, include the registry address as well (e.g., ghcr.io/namespace or quay.io/namespace).
+.TP
+\fB--registry-token=REGISTRY-TOKEN\fR
+Optional Docker registry access token. Provide this if you want to include private images within the specified namespace.
+.SS
+\fBtravisci --token=TOKEN\fR
+Scan TravisCI
+.TP
+\fB--token=TOKEN\fR
+TravisCI token. Can also be provided with environment variable
+.SS
+\fBpostman [<flags>]\fR
+Scan Postman
+.TP
+\fB--token=TOKEN\fR
+Postman token. Can also be provided with environment variable
+.TP
+\fB--workspace-id=WORKSPACE-ID\fR
+Postman workspace ID to scan. You can repeat this flag.
+.TP
+\fB--collection-id=COLLECTION-ID\fR
+Postman collection ID to scan. You can repeat this flag.
+.TP
+\fB--environment=ENVIRONMENT\fR
+Postman environment to scan. You can repeat this flag.
+.TP
+\fB--include-collection-id=INCLUDE-COLLECTION-ID\fR
+Collection ID to include in scan. You can repeat this flag.
+.TP
+\fB--include-environments=INCLUDE-ENVIRONMENTS\fR
+Environments to include in scan. You can repeat this flag.
+.TP
+\fB--exclude-collection-id=EXCLUDE-COLLECTION-ID\fR
+Collection ID to exclude from scan. You can repeat this flag.
+.TP
+\fB--exclude-environments=EXCLUDE-ENVIRONMENTS\fR
+Environments to exclude from scan. You can repeat this flag.
+.TP
+\fB--workspace-paths=WORKSPACE-PATHS\fR
+Path to Postman workspaces.
+.TP
+\fB--collection-paths=COLLECTION-PATHS\fR
+Path to Postman collections.
+.TP
+\fB--environment-paths=ENVIRONMENT-PATHS\fR
+Path to Postman environments.
+.SS
+\fBelasticsearch [<flags>]\fR
+Scan Elasticsearch
+.TP
+\fB--nodes=NODES\fR
+Elasticsearch nodes
+.TP
+\fB--username=USERNAME\fR
+Elasticsearch username
+.TP
+\fB--password=PASSWORD\fR
+Elasticsearch password
+.TP
+\fB--service-token=SERVICE-TOKEN\fR
+Elasticsearch service token
+.TP
+\fB--cloud-id=CLOUD-ID\fR
+Elasticsearch cloud ID. Can also be provided with environment variable
+.TP
+\fB--api-key=API-KEY\fR
+Elasticsearch API key. Can also be provided with environment variable
+.TP
+\fB--index-pattern="*"\fR
+Filters the indices to search
+.TP
+\fB--query-json=QUERY-JSON\fR
+Filters the documents to search
+.TP
+\fB--since-timestamp=SINCE-TIMESTAMP\fR
+Filters the documents to search to those created since this timestamp; overrides any timestamp from --query-json
+.TP
+\fB--best-effort-scan\fR
+Attempts to continuously scan a cluster
+.SS
+\fBjenkins --url=URL [<flags>]\fR
+Scan Jenkins
+.TP
+\fB--url=URL\fR
+Jenkins URL
+.TP
+\fB--username=USERNAME\fR
+Jenkins username
+.TP
+\fB--password=PASSWORD\fR
+Jenkins password
+.TP
+\fB--insecure-skip-verify-tls\fR
+Skip TLS verification
+.SS
+\fBhuggingface [<flags>]\fR
+Find credentials in HuggingFace datasets, models and spaces.
+.TP
+\fB--endpoint="https://huggingface.co"\fR
+HuggingFace endpoint.
+.TP
+\fB--model=MODEL\fR
+HuggingFace model to scan. You can repeat this flag. Example: 'username/model'
+.TP
+\fB--space=SPACE\fR
+HuggingFace space to scan. You can repeat this flag. Example: 'username/space'
+.TP
+\fB--dataset=DATASET\fR
+HuggingFace dataset to scan. You can repeat this flag. Example: 'username/dataset'
+.TP
+\fB--org=ORG\fR
+HuggingFace organization to scan. You can repeat this flag. Example: "trufflesecurity"
+.TP
+\fB--user=USER\fR
+HuggingFace user to scan. You can repeat this flag. Example: "trufflesecurity"
+.TP
+\fB--token=TOKEN\fR
+HuggingFace token. Can be provided with environment variable HUGGINGFACE_TOKEN.
+.TP
+\fB--include-models=INCLUDE-MODELS\fR
+Models to include in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)
+.TP
+\fB--include-spaces=INCLUDE-SPACES\fR
+Spaces to include in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)
+.TP
+\fB--include-datasets=INCLUDE-DATASETS\fR
+Datasets to include in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)
+.TP
+\fB--ignore-models=IGNORE-MODELS\fR
+Models to ignore in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)
+.TP
+\fB--ignore-spaces=IGNORE-SPACES\fR
+Spaces to ignore in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)
+.TP
+\fB--ignore-datasets=IGNORE-DATASETS\fR
+Datasets to ignore in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)
+.TP
+\fB--skip-all-models\fR
+Skip all model scans. (Only used with --user or --org)
+.TP
+\fB--skip-all-spaces\fR
+Skip all space scans. (Only used with --user or --org)
+.TP
+\fB--skip-all-datasets\fR
+Skip all dataset scans. (Only used with --user or --org)
+.TP
+\fB--include-discussions\fR
+Include discussions in scan.
+.TP
+\fB--include-prs\fR
+Include pull requests in scan.
+.SS
+\fBstdin\fR
+Find credentials from stdin.
+.SS
+\fBmulti-scan\fR
+Find credentials in multiple sources defined in configuration.
+.SS
+\fBjson-enumerator [<path>...]\fR
+Find credentials from a JSON enumerator input.
+.SS
+\fBanalyze\fR
+Analyze API keys for fine-grained permissions information.
+.SH "EXIT STATUS"
+.TP
+.B 0
+Successful execution.
+.TP
+.B 183
+Credentials were found and \fB\-\-fail\fR was specified.
+.TP
+.B 1
+An error occurred during scanning.
+.SH EXAMPLES
+.TP
+.B Launch the interactive TUI
+.EX
+trufflehog
+.EE
+.TP
+.B Scan a git repository
+.EX
+trufflehog git https://github.com/example/repo.git
+.EE
+.TP
+.B Scan a GitHub organization
+.EX
+trufflehog github \-\-org=trufflesecurity \-\-token=$GITHUB_TOKEN
+.EE
+.TP
+.B Scan a local filesystem
+.EX
+trufflehog filesystem /path/to/directory
+.EE
+.TP
+.B Scan an S3 bucket
+.EX
+trufflehog s3 \-\-bucket=my\-bucket \-\-cloud\-environment
+.EE
+.TP
+.B Scan a Docker image
+.EX
+trufflehog docker \-\-image=myregistry/myimage:latest
+.EE
+.TP
+.B Read from stdin
+.EX
+cat secrets.txt | trufflehog stdin
+.EE
+.TP
+.B Output JSON and filter with jq
+.EX
+trufflehog git https://github.com/example/repo.git \-\-json \e
+  | jq 'select(.Verified == true)'
+.EE
+.TP
+.B Fail in CI if secrets are found
+.EX
+trufflehog git file://. \-\-fail \-\-results=verified,unknown
+.EE
+.TP
+.B Use a configuration file
+.EX
+trufflehog git https://github.com/example/repo.git \e
+  \-\-config=trufflehog\-config.yaml
+.EE
+.SH ENVIRONMENT
+.TP
+.B GITHUB_TOKEN
+Authentication token for GitHub scanning.
+.TP
+.B GITLAB_TOKEN
+Authentication token for GitLab scanning.
+.TP
+.B AWS_ACCESS_KEY_ID
+AWS access key for S3 scanning.
+.TP
+.B AWS_SECRET_ACCESS_KEY
+AWS secret key for S3 scanning.
+.TP
+.B AWS_SESSION_TOKEN
+AWS session token for temporary credentials.
+.TP
+.B GOOGLE_CLOUD_PROJECT
+GCP project ID for GCS scanning.
+.TP
+.B GOOGLE_API_KEY
+GCP API key for GCS scanning.
+.TP
+.B CIRCLECI_TOKEN
+Authentication token for CircleCI scanning.
+.TP
+.B DOCKER_TOKEN
+Authentication token for Docker scanning.
+.TP
+.B TRAVISCI_TOKEN
+Authentication token for TravisCI scanning.
+.TP
+.B POSTMAN_TOKEN
+Authentication token for Postman scanning.
+.TP
+.B HUGGINGFACE_TOKEN
+Authentication token for HuggingFace scanning.
+.TP
+.B ELASTICSEARCH_NODES
+Comma-separated list of Elasticsearch nodes.
+.TP
+.B JENKINS_URL
+URL of the Jenkins server.
+.SH FILES
+.TP
+.I trufflehog\-config.yaml
+Optional configuration file specified via \fB\-\-config\fR.
+See the project documentation for the configuration
+file format.
+.SH BUGS
+Report bugs at
+.UR https://github.com/trufflesecurity/trufflehog/issues
+the TruffleHog issue tracker
+.UE .
+.SH "SEE ALSO"
+.UR https://github.com/trufflesecurity/trufflehog
+TruffleHog on GitHub
+.UE ,
+.UR https://trufflesecurity.com
+Truffle Security website
+.UE .

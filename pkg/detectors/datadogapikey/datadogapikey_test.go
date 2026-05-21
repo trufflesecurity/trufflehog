@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDataDogApiKey_Pattern_WithValidAPIKey(t *testing.T) {
@@ -25,8 +25,9 @@ func TestDataDogApiKey_Pattern_WithValidAPIKey(t *testing.T) {
 	apiKey := "FKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
 	wantedResult := []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType_DatadogApikey,
+			DetectorType: detector_typepb.DetectorType_DatadogApikey,
 			Raw:          []byte(apiKey),
+			SecretParts:  map[string]string{"api_key": apiKey},
 		},
 	}
 	matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(input))

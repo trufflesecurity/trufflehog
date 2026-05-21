@@ -9,11 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestMesibo_FromChunk(t *testing.T) {
@@ -32,11 +33,12 @@ func TestMesibo_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
@@ -48,7 +50,7 @@ func TestMesibo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mesibo,
+					DetectorType: detector_typepb.DetectorType_Mesibo,
 					Verified:     true,
 				},
 			},
@@ -64,7 +66,7 @@ func TestMesibo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mesibo,
+					DetectorType: detector_typepb.DetectorType_Mesibo,
 					Verified:     false,
 				},
 			},
@@ -81,11 +83,27 @@ func TestMesibo_FromChunk(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
+		{
+			name: "found, verification error on 502",
+			s:    Scanner{client: common.ConstantResponseHttpClient(502, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a mesibo secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_Mesibo,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Mesibo.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -95,9 +113,12 @@ func TestMesibo_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationErr=%v, got verificationError=%v", tt.wantVerificationErr, got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Mesibo.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			if diff := cmp.Diff(tt.want, got, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
+				t.Errorf("Mesibo.FromData() %s diff: (-want +got)\n%s", tt.name, diff)
 			}
 		})
 	}

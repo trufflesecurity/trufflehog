@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestBitfinex_FromChunk(t *testing.T) {
@@ -50,11 +50,11 @@ func TestBitfinex_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				// will try to scan (apiKey, apiSecret) which will verify then (apiSecret, apiKey) which will not since both parameters have equal length
 				{
-					DetectorType: detectorspb.DetectorType_Bitfinex,
+					DetectorType: detector_typepb.DetectorType_Bitfinex,
 					Verified:     true,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Bitfinex,
+					DetectorType: detector_typepb.DetectorType_Bitfinex,
 					Verified:     false,
 				},
 			},
@@ -70,11 +70,11 @@ func TestBitfinex_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Bitfinex,
+					DetectorType: detector_typepb.DetectorType_Bitfinex,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Bitfinex,
+					DetectorType: detector_typepb.DetectorType_Bitfinex,
 					Verified:     false,
 				},
 			},

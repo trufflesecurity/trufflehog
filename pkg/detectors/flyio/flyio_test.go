@@ -8,7 +8,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFlyio_Pattern(t *testing.T) {
@@ -131,7 +131,7 @@ func TestFlyio_IsFalsePositive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_FlyIO,
+				DetectorType: detector_typepb.DetectorType_FlyIO,
 				Raw:          []byte(tt.token),
 			}
 

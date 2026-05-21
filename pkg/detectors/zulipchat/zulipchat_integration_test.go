@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestZulipChat_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detector_typepb.DetectorType_ZulipChat,
 					Verified:     true,
 					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},
@@ -70,7 +70,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detector_typepb.DetectorType_ZulipChat,
 					Verified:     false,
 					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},
@@ -100,7 +100,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detector_typepb.DetectorType_ZulipChat,
 					Verified:     false,
 					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},
@@ -118,7 +118,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detector_typepb.DetectorType_ZulipChat,
 					Verified:     false,
 					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},

@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestRabbitMQ_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestRabbitMQ_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_RabbitMQ,
+					DetectorType: detector_typepb.DetectorType_RabbitMQ,
 					Verified:     true,
 					Redacted:     "amqp://rabbit123:*******************@127.0.0.1",
 				},
@@ -65,7 +65,7 @@ func TestRabbitMQ_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_RabbitMQ,
+					DetectorType: detector_typepb.DetectorType_RabbitMQ,
 					Verified:     false,
 					Redacted:     "amqp://rabbituser:*******************@127.0.0.1",
 				},

@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestCloudflareCaKey_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestCloudflareCaKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CloudflareCaKey,
+					DetectorType: detector_typepb.DetectorType_CloudflareCaKey,
 					Verified:     true,
 				},
 			},
@@ -65,7 +65,7 @@ func TestCloudflareCaKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_CloudflareCaKey,
+					DetectorType: detector_typepb.DetectorType_CloudflareCaKey,
 					Verified:     false,
 				},
 			},

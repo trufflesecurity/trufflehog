@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -49,10 +49,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		for emailMatch := range uniqueEmailMatches {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_CloudflareGlobalApiKey,
+				DetectorType: detector_typepb.DetectorType_CloudflareGlobalApiKey,
 				Redacted:     emailMatch,
 				Raw:          []byte(apiKeyRes),
-				RawV2:        []byte(apiKeyRes + emailMatch),
+				SecretParts: map[string]string{
+					"key":   apiKeyRes,
+					"email": emailMatch,
+				},
+				RawV2: []byte(apiKeyRes + emailMatch),
 			}
 
 			if verify {
@@ -66,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					}
@@ -80,8 +84,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_CloudflareGlobalApiKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_CloudflareGlobalApiKey
 }
 
 func (s Scanner) Description() string {

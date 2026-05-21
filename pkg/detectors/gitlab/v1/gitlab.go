@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -53,8 +53,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"gitlab"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Gitlab
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Gitlab
 }
 
 func (s Scanner) Description() string {
@@ -81,12 +81,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		for _, endpoint := range s.Endpoints() {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Gitlab,
+				DetectorType: detector_typepb.DetectorType_Gitlab,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + endpoint),
 				ExtraData: map[string]string{
 					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
 					"version":        fmt.Sprintf("%d", s.Version()),
+				},
+				SecretParts: map[string]string{
+					"key":  resMatch,
+					"host": endpoint,
 				},
 			}
 
@@ -97,14 +101,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				s1.SetVerificationError(verificationErr)
 
-				// for verified keys set the analysis info
+				// for verified keys break out of the endpoint loop to continue to next secret
 				if s1.Verified {
-					s1.AnalysisInfo = map[string]string{
-						"key":  resMatch,
-						"host": endpoint,
-					}
-
-					// if secret is verified with one endpoint, break the loop to continue to next secret
 					results = append(results, s1)
 					break
 				}
@@ -134,7 +132,7 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 		return false, nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
