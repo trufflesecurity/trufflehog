@@ -1784,6 +1784,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.GitLabOAuthDetectorEnabled.Load()
 		case *datadogapikey.Scanner:
 			return !feature.DatadogApiKeyDetectorEnabled.Load()
+		case *ipinfo.Scanner:
+			return !feature.IPInfoDetectorEnabled.Load()
 		default:
 			return false
 		}

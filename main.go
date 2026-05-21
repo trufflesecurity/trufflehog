@@ -530,6 +530,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.CloudinaryDetectorEnabled.Store(true)
 	feature.GitLabOAuthDetectorEnabled.Store(true)
 	feature.DatadogApiKeyDetectorEnabled.Store(true)
+	feature.IPInfoDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
