@@ -118,17 +118,21 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// to buildDetectorList() — discovered by TestAllDetectorTypesAreInDefaultList.
 	// They are not added immediately out of caution for the impact on customers/users.
 	// Remove each entry once its detector has been carefully added.
-	detector_typepb.DetectorType_Cloudinary:   {},
-	detector_typepb.DetectorType_GitLabOauth2: {},
-	detector_typepb.DetectorType_Guru:         {},
-	detector_typepb.DetectorType_IPInfo:       {},
-	detector_typepb.DetectorType_Lob:          {},
-	detector_typepb.DetectorType_Pinecone:     {},
-	detector_typepb.DetectorType_Rev:          {},
-	detector_typepb.DetectorType_TLy:          {},
-	detector_typepb.DetectorType_Tru:          {},
-	detector_typepb.DetectorType_User:         {},
-	detector_typepb.DetectorType_Wit:          {},
+	detector_typepb.DetectorType_Guru:   {},
+	detector_typepb.DetectorType_IPInfo: {},
+	detector_typepb.DetectorType_Lob:    {},
+	detector_typepb.DetectorType_Rev:    {},
+	detector_typepb.DetectorType_TLy:    {},
+	detector_typepb.DetectorType_Tru:    {},
+	detector_typepb.DetectorType_User:   {},
+	detector_typepb.DetectorType_Wit:    {},
+
+	// Feature flag gated detectors
+	// These should be removed from this list when we remove the feature flag
+	detector_typepb.DetectorType_Cloudinary:    {},
+	detector_typepb.DetectorType_GitLabOauth2:  {},
+	detector_typepb.DetectorType_Pinecone:      {},
+	detector_typepb.DetectorType_DatadogApikey: {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
