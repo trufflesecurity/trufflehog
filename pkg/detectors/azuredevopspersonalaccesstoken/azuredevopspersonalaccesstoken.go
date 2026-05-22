@@ -49,7 +49,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureDevopsPersonalAccessToken,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resOrgMatch),
+				SecretParts: map[string]string{
+					"key":          resMatch,
+					"organization": resOrgMatch,
+				},
+				RawV2: []byte(resMatch + resOrgMatch),
 			}
 
 			if verify {
@@ -64,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.SetBasicAuth("", resMatch)
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					hasVerifiedRes, _ := common.ResponseContainsSubstring(res.Body, "lastUpdateTime")
 					if res.StatusCode >= 200 && res.StatusCode < 300 && hasVerifiedRes {
 						s1.Verified = true

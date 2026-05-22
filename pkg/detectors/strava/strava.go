@@ -2,16 +2,17 @@ package strava
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -53,7 +54,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_Strava,
 					Raw:          []byte(resId),
-					RawV2:        []byte(resId + resSecret),
+					SecretParts: map[string]string{
+						"id":     resId,
+						"secret": resSecret,
+					},
+					RawV2: []byte(resId + resSecret),
 				}
 
 				if verify {
@@ -66,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 					res, err := client.Do(req)
 					if err == nil {
-						defer res.Body.Close()
+						defer func() { _ = res.Body.Close() }()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						}

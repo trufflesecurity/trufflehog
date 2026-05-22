@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bing"}) + `\b([a-fA-F0-9]{32})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"bing"}) + `\b([a-fA-F0-9]{32})\b`)
 )
 
 func (s Scanner) Keywords() []string {
@@ -40,6 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_BingSubscriptionKey,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 		}
 
 		if verify {

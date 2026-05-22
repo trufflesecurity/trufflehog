@@ -173,7 +173,7 @@ func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 		return permissions, nil
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&permissions)
 	if err != nil {
@@ -210,7 +210,7 @@ func getUsers(cfg *config.Config, key string) (TeamJSON, error) {
 		return team, nil
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&team)
 	if err != nil {

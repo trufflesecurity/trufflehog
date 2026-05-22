@@ -154,7 +154,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				ExtraData: map[string]string{
 					"resource_type": aws.ResourceTypes[idMatch[:4]],
 				},
-				AnalysisInfo: map[string]string{
+				SecretParts: map[string]string{
 					"access_key_id":     idMatch,
 					"secret_access_key": secretMatch,
 				},

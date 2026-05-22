@@ -45,6 +45,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_PlanetScale,
 				Raw:          []byte(credentials),
+				SecretParts: map[string]string{
+					"id":    username,
+					"token": password,
+				},
 			}
 
 			if verify {
@@ -64,13 +68,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// Send HTTP request
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-						s1.AnalysisInfo = map[string]string{
-							"id":    username,
-							"token": password,
-						}
 					} else if res.StatusCode == 401 {
 						// The secret is determinately not verified
 						s1.Verified = false

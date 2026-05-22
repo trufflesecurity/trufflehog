@@ -37,7 +37,7 @@ var (
 
 	invalidStorageAccounts = simple.NewCache[struct{}]()
 
-	noSuchHostErr = errors.New("no such host")
+	errNoSuchHost = errors.New("no such host")
 )
 
 func (s Scanner) Keywords() []string {
@@ -79,7 +79,11 @@ UrlLoop:
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureSasToken,
 				Raw:          []byte(url),
-				RawV2:        []byte(url + key),
+				SecretParts: map[string]string{
+					"url": url,
+					"key": key,
+				},
+				RawV2: []byte(url + key),
 			}
 
 			if verify {
@@ -97,7 +101,7 @@ UrlLoop:
 				s1.Verified = isVerified
 
 				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
+					if errors.Is(verificationErr, errNoSuchHost) {
 						invalidStorageAccounts.Set(storageAccount, struct{}{})
 						continue UrlLoop
 					}
@@ -127,11 +131,11 @@ func verifyMatch(ctx context.Context, client *http.Client, url, key string, retr
 	res, err := client.Do(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such host") {
-			return false, noSuchHostErr
+			return false, errNoSuchHost
 		}
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {

@@ -82,7 +82,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_SQLServer,
 			Raw:          []byte(paramsUnsafe.Password),
 			RawV2:        []byte(paramsUnsafe.URL().String()),
-			Redacted:     detectors.RedactURL(*paramsUnsafe.URL()),
+			SecretParts: map[string]string{
+				"host":     paramsUnsafe.Host,
+				"database": paramsUnsafe.Database,
+				"user":     paramsUnsafe.User,
+				"password": paramsUnsafe.Password,
+			},
+			Redacted: detectors.RedactURL(*paramsUnsafe.URL()),
 		}
 
 		if verify {
@@ -132,7 +138,7 @@ var ping = func(ctx context.Context, config msdsn.Config) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer tcpConn.Close()
+	defer func() { _ = tcpConn.Close() }()
 
 	cleanConfig := msdsn.Config{}
 	cleanConfig.Host = config.Host

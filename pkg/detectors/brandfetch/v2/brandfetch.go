@@ -65,6 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Brandfetch,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 			ExtraData:    map[string]string{"version": strconv.Itoa(s.Version())},
 		}
 
@@ -94,7 +95,7 @@ func VerifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

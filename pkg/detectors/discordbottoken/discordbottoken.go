@@ -48,7 +48,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_DiscordBotToken,
 				Redacted:     resId,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resId),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"id":  resId,
+				},
+				RawV2: []byte(resMatch + resId),
 			}
 
 			if verify {
@@ -59,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("Bot %s", resMatch))
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					}

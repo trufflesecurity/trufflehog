@@ -61,6 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Slack,
 				Raw:          []byte(token),
+				SecretParts:  map[string]string{"key": token},
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
@@ -82,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					var authResponse authRes
 					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
 						err = fmt.Errorf("failed to decode auth response: %w", err)
@@ -112,9 +113,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				} else {
 					s1.SetVerificationError(err, token)
-				}
-				s1.AnalysisInfo = map[string]string{
-					"key": token,
 				}
 			}
 

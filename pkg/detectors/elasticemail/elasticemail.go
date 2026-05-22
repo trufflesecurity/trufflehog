@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_ElasticEmail,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -53,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				data, readErr := io.ReadAll(res.Body)
-				res.Body.Close()
+				_ = res.Body.Close()
 				if readErr == nil {
 					var ResVar struct {
 						Success bool `json:"success"`

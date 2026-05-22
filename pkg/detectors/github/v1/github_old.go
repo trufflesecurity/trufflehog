@@ -123,7 +123,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
-			AnalysisInfo: map[string]string{"key": token},
+			SecretParts: map[string]string{"key": token},
 		}
 
 		if verify {
@@ -170,7 +170,7 @@ func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token st
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
 			var userResponse UserRes
 			err = json.NewDecoder(res.Body).Decode(&userResponse)
-			res.Body.Close()
+			_ = res.Body.Close()
 			if err == nil {
 				// GitHub does not seem to consistently return this header.
 				scopes := res.Header.Get("X-OAuth-Scopes")

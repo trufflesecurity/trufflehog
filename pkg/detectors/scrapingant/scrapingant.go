@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_ScrapingAnt,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -88,11 +89,12 @@ func verifyScrapingAnt(ctx context.Context, client *http.Client, apiKey string) 
 		_ = resp.Body.Close()
 	}()
 
-	if resp.StatusCode == http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
-	} else {
+	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }

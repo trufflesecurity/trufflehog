@@ -53,7 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Okta,
 				Raw:          []byte(token),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, token)),
+				SecretParts: map[string]string{
+					"domain": domain,
+					"token":  token,
+				},
+				RawV2: []byte(fmt.Sprintf("%s:%s", domain, token)),
 			}
 
 			if verify {
@@ -94,7 +98,7 @@ func verifyOktaToken(ctx context.Context, client *http.Client, domain, token str
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

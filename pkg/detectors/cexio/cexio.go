@@ -62,7 +62,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_CexIO,
 					Raw:          []byte(resKeyMatch),
-					RawV2:        []byte(resUserIdMatch + resSecretMatch),
+					SecretParts: map[string]string{
+						"user_id": resUserIdMatch,
+						"secret":  resSecretMatch,
+						"key":     resKeyMatch,
+					},
+					RawV2: []byte(resUserIdMatch + resSecretMatch),
 				}
 
 				if verify {
@@ -83,7 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 					res, err := client.Do(req)
 					if err == nil {
-						defer res.Body.Close()
+						defer func() { _ = res.Body.Close() }()
 
 						body, err := io.ReadAll(res.Body)
 						if err != nil {
