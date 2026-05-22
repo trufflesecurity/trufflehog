@@ -123,6 +123,10 @@ func TestNewRelicInsightsInsertKey_FromChunk(t *testing.T) {
 					t.Fatalf("no redacted secret present: \n %+v", got[i])
 				}
 				got[i].Redacted = ""
+				if len(got[i].SecretParts) == 0 {
+					t.Fatalf("no secret parts present: \n %+v", got[i])
+				}
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("NewRelicInsightsInsertKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
