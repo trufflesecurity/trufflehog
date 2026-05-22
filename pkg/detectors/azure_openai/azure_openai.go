@@ -31,7 +31,7 @@ var (
 	// TODO: Investigate custom `azure-api.net` endpoints.
 	// https://github.com/openai/openai-python#microsoft-azure-openai
 	azureUrlPat = regexp.MustCompile(`(?i)([a-z0-9-]+\.openai\.azure\.com)`)
-	azureKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"api[_.-]?key", "openai[_.-]?key"}) + `\b(?-i:([a-zA-Z0-9]{32}|[a-zA-Z0-9]{84}))\b`)
+	azureKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"api[_.-]?key", "openai[_.-]?key"}) + `\b(?-i:([a-f0-9]{32}|[a-zA-Z0-9]{84}))\b`)
 
 	invalidServices = simple.NewCache[struct{}]()
 )

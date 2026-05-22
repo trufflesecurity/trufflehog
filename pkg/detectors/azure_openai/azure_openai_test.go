@@ -82,24 +82,24 @@ func TestAzureOpenAI_Pattern(t *testing.T) {
 		{
 			name: "84-character key - environment variable",
 			input: `export OPENAI_API_BASE=https://myservice-east.openai.azure.com/
-					export OPENAI_API_KEY=uQ9XsjB7aM2eVt5rL1pZcW6yGk4nF8oHd3RzXaYbT7vUjKmQeP5fNwL9oS2tH1rJ3pZxDkMvYeWq0bAs`,
-			want: []string{"uQ9XsjB7aM2eVt5rL1pZcW6yGk4nF8oHd3RzXaYbT7vUjKmQeP5fNwL9oS2tH1rJ3pZxDkMvYeWq0bAs"},
+					export OPENAI_API_KEY=NbrnTP3fAbnFbmOHnKYaXRvj7uff0LYTH8xIZM1JRcoreogrNwwmq6OLkTkx9NIQ0Wobtqn62tOy4CqpIqK3`,
+			want: []string{"NbrnTP3fAbnFbmOHnKYaXRvj7uff0LYTH8xIZM1JRcoreogrNwwmq6OLkTkx9NIQ0Wobtqn62tOy4CqpIqK3"},
 		},
 		{
 			name: "84-character key - curl command",
 			input: `curl -X POST "https://prod-openai.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview" \
 					-H "Content-Type: application/json" \
-					-H "api-key: Rk7mTz3nWx9pLq2vBs5yJd8cFg1hNa6oUi4eXwYrKbQjVm0tPl5sDf3gHn7kMz9aRcWx2bYu4eL"`,
-			want: []string{"Rk7mTz3nWx9pLq2vBs5yJd8cFg1hNa6oUi4eXwYrKbQjVm0tPl5sDf3gHn7kMz9aRcWx2bYu4eL"},
+					-H "api-key: yn9FfcgMXAdx9G81aSQHqNgAC72qFl41sNLjVHWGaub52Ztd26fEeVVhDIq2AnHTmt9OBGhnuKoneNo41eoP"`,
+			want: []string{"yn9FfcgMXAdx9G81aSQHqNgAC72qFl41sNLjVHWGaub52Ztd26fEeVVhDIq2AnHTmt9OBGhnuKoneNo41eoP"},
 		},
 		{
 			name: "84-character key - Python SDK",
 			input: `from openai import AzureOpenAI
 					client = AzureOpenAI(
 						azure_endpoint="https://team-ai.openai.azure.com/",
-						api_key="Ht5mNr9wXz3pLq7vBs2yJd6cFg8hKa1oUi4eTxYrQbMjVn0kPl5sDf3gRn7wMz9aXcWx2bYu4eLk0q",
+						api_key="ni6JDWYlgAACTP9gyv1plBArp5B1Id9Z850kEnydx9qWCA79ISjs8JHUdKF0j7elKPoh3pKMzKG5mSoyPstU",
 					)`,
-			want: []string{"Ht5mNr9wXz3pLq7vBs2yJd6cFg8hKa1oUi4eTxYrQbMjVn0kPl5sDf3gRn7wMz9aXcWx2bYu4eLk0q"},
+			want: []string{"ni6JDWYlgAACTP9gyv1plBArp5B1Id9Z850kEnydx9qWCA79ISjs8JHUdKF0j7elKPoh3pKMzKG5mSoyPstU"},
 		},
 		{
 			name: "invalid - 50 character key (wrong length)",
