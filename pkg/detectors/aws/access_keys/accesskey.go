@@ -20,6 +20,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -269,7 +270,7 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	}
 	// Create STS client
 	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
-		o.APIOptions = append(o.APIOptions, replaceUserAgentMiddleware)
+		o.APIOptions = append(o.APIOptions, replaceUserAgentMiddleware, applyCustomHeadersMiddleware)
 	})
 
 	// Make the GetCallerIdentity API call
@@ -331,6 +332,45 @@ func replaceUserAgentMiddleware(stack *middleware.Stack) error {
 					return next.HandleBuild(ctx, in)
 				}
 				req.Header.Set("User-Agent", common.UserAgent())
+				return next.HandleBuild(ctx, in)
+			},
+		),
+		middleware.After,
+	)
+}
+
+// applyCustomHeadersMiddleware adds any --header values configured via
+// feature.CustomHeaders to the outbound AWS SDK request. The AWS SDK builds
+// its own complete HTTP transport stack and does not honor the
+// http.DefaultTransport wrap that catches stdlib-default detectors, so this
+// SDK-level injection is required for AWS verification traffic to carry the
+// custom headers users configure for SOC identification. Runs as a Build
+// middleware so the headers are present before SigV4 finalizes the request,
+// matching the placement of replaceUserAgentMiddleware. Mirrors the
+// Set-then-Add semantics of common.ApplyCustomHeaders so user-supplied
+// values fully override defaults rather than stacking.
+func applyCustomHeadersMiddleware(stack *middleware.Stack) error {
+	return stack.Build.Add(
+		middleware.BuildMiddlewareFunc(
+			"ApplyCustomHeaders",
+			func(ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler) (
+				out middleware.BuildOutput, metadata middleware.Metadata, err error,
+			) {
+				req, ok := in.Request.(*smithyhttp.Request)
+				if !ok {
+					return next.HandleBuild(ctx, in)
+				}
+				if hdr := feature.CustomHeaders.Load(); hdr != nil {
+					for k, vals := range hdr {
+						for i, v := range vals {
+							if i == 0 {
+								req.Header.Set(k, v)
+							} else {
+								req.Header.Add(k, v)
+							}
+						}
+					}
+				}
 				return next.HandleBuild(ctx, in)
 			},
 		),

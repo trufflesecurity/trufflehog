@@ -50,6 +50,9 @@ Specifies which type(s) of results to output: verified (confirmed valid by API),
 \fB--no-color\fR
 Disable colorized output
 .TP
+\fB--header=HEADER\fR
+Custom HTTP header to add to detector verification requests; repeatable. Format 'Name: value'. WARNING: headers are sent to every verification endpoint; do not use this for credentials scoped to a specific target.
+.TP
 \fB--allow-verification-overlap\fR
 Allow verification of similar credentials across detectors
 .TP

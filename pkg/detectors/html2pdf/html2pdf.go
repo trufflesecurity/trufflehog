@@ -9,6 +9,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -50,14 +51,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req := html2pdfRequest{
+			reqBody := html2pdfRequest{
 				HTML:   "Helloworld",
 				ApiKey: resMatch,
 			}
-			reqJson, _ := json.Marshal(&req)
-			reqBuf := bytes.NewReader(reqJson)
-			res, err := http.Post("https://api.html2pdf.app/v1/generate", "application/json", reqBuf)
-
+			reqJSON, _ := json.Marshal(&reqBody)
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.html2pdf.app/v1/generate", bytes.NewReader(reqJSON))
+			if err != nil {
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+			res, err := common.SaneHttpClient().Do(req)
 			if err == nil {
 				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

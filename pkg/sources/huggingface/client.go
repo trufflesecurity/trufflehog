@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 // Maps for API and HTML paths
@@ -125,7 +126,8 @@ func NewHFClient(baseURL, apiKey string, timeout time.Duration) *HFClient {
 		BaseURL: baseURL,
 		APIKey:  apiKey,
 		HTTPClient: &http.Client{
-			Timeout: timeout,
+			Timeout:   timeout,
+			Transport: common.NewInstrumentedTransport(common.NewCustomTransport(nil)),
 		},
 	}
 }

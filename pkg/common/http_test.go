@@ -14,7 +14,116 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
+
+// resetCustomHeaders clears the global CustomHeaders state and registers a
+// cleanup that restores it. Tests that mutate feature.CustomHeaders must use
+// this helper and must not run in parallel with each other since they share
+// global state.
+func resetCustomHeaders(t *testing.T) {
+	t.Helper()
+	feature.CustomHeaders.Store(http.Header{})
+	t.Cleanup(func() { feature.CustomHeaders.Store(http.Header{}) })
+}
+
+func TestApplyCustomHeaders(t *testing.T) {
+	t.Run("no headers configured leaves request untouched", func(t *testing.T) {
+		resetCustomHeaders(t)
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		req.Header.Set("User-Agent", "OriginalUA")
+
+		ApplyCustomHeaders(req)
+
+		assert.Equal(t, "OriginalUA", req.Header.Get("User-Agent"))
+		assert.Len(t, req.Header.Values("User-Agent"), 1)
+	})
+
+	t.Run("single user value replaces existing default", func(t *testing.T) {
+		resetCustomHeaders(t)
+		feature.CustomHeaders.Store(http.Header{
+			"User-Agent": []string{"MyScanner"},
+		})
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		req.Header.Set("User-Agent", "TruffleHog")
+
+		ApplyCustomHeaders(req)
+
+		assert.Equal(t, []string{"MyScanner"}, req.Header.Values("User-Agent"),
+			"first user-supplied value should Set, not Add, so the default is replaced")
+	})
+
+	t.Run("multiple values: first sets, rest add", func(t *testing.T) {
+		resetCustomHeaders(t)
+		feature.CustomHeaders.Store(http.Header{
+			"X-Foo": []string{"a", "b", "c"},
+		})
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Foo", "preexisting")
+
+		ApplyCustomHeaders(req)
+
+		assert.Equal(t, []string{"a", "b", "c"}, req.Header.Values("X-Foo"),
+			"preexisting value should be replaced by first user value, then b and c appended")
+	})
+
+	t.Run("Load returns a clone: caller mutation does not race", func(t *testing.T) {
+		resetCustomHeaders(t)
+		feature.CustomHeaders.Store(http.Header{
+			"X-Foo": []string{"original"},
+		})
+
+		loaded := feature.CustomHeaders.Load()
+		loaded.Set("X-Foo", "mutated-by-caller")
+
+		// The next Load must not see the caller's mutation.
+		fresh := feature.CustomHeaders.Load()
+		assert.Equal(t, "original", fresh.Get("X-Foo"),
+			"AtomicHeader.Load must return a defensive copy")
+	})
+}
+
+// TestCustomTransportSendsCustomHeaders is an end-to-end test that sets
+// CustomHeaders, dispatches a request through CustomTransport, and asserts
+// the headers arrive at the server. This guards against future changes that
+// might bypass ApplyCustomHeaders in the transport chain.
+func TestCustomTransportSendsCustomHeaders(t *testing.T) {
+	resetCustomHeaders(t)
+
+	feature.CustomHeaders.Store(http.Header{
+		"X-Scanner-Id":      []string{"test-scanner"},
+		"X-Multi":           []string{"one", "two"},
+		"User-Agent":        []string{"OverrideUA"},
+		"X-Empty-Value":     []string{""},
+	})
+
+	var captured http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := &http.Client{
+		Transport: NewCustomTransport(nil),
+		Timeout:   5 * time.Second,
+	}
+	resp, err := client.Get(server.URL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, "test-scanner", captured.Get("X-Scanner-Id"))
+	assert.Equal(t, []string{"one", "two"}, captured.Values("X-Multi"))
+	assert.Equal(t, []string{"OverrideUA"}, captured.Values("User-Agent"),
+		"user-supplied User-Agent should fully replace the default, not stack")
+	require.Contains(t, captured, "X-Empty-Value")
+	assert.Equal(t, []string{""}, captured.Values("X-Empty-Value"),
+		"empty values are valid per RFC 7230 and must reach the wire")
+}
 
 func TestRetryableHTTPClientCheckRetry(t *testing.T) {
 	testCases := []struct {
