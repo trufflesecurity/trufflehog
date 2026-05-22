@@ -31,10 +31,10 @@ func TestJumpCloudV2_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - config file",
 			input: `
-				api_key: jca_r7m2Xk9pL4nQ8vB3wF6yH1jD5sA0tC2eG4iK7oU
+				api_key: jca_r7m2Xk9pL4nQ8vB3wF6yH1jD5sA0tC2eG4iK
 				server: https://console.jumpcloud.com
 			`,
-			want: []string{"jca_r7m2Xk9pL4nQ8vB3wF6yH1jD5sA0tC2eG4iK7oU"},
+			want: []string{"jca_r7m2Xk9pL4nQ8vB3wF6yH1jD5sA0tC2eG4iK"},
 		},
 		{
 			name: "valid pattern - code usage",
