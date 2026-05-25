@@ -3,6 +3,7 @@ package github
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
@@ -48,13 +49,15 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 
 	// For GHE.com, the BaseURL for ghinstallation must be the API subdomain
 	// WITHOUT /api/v3/ appended. ghinstallation uses this to construct the
-	// token exchange URL: {BaseURL}/app/installations/{id}/access_tokens
+	// token exchange URL: {BaseURL}/app/installations/{id}/access_tokens.
+	// normalizeGHECloudAPIEndpoint adds a trailing slash (required by go-github's
+	// BaseURL), but ghinstallation expects no trailing slash, so trim it here.
 	if isGHECloud(apiEndpoint) {
 		normalizedURL, err := normalizeGHECloudAPIEndpoint(apiEndpoint)
 		if err != nil {
 			return nil, fmt.Errorf("could not normalize GHE.com endpoint: %w", err)
 		}
-		installationTransport.BaseURL = normalizedURL
+		installationTransport.BaseURL = strings.TrimRight(normalizedURL, "/")
 	} else {
 		installationTransport.BaseURL = apiEndpoint
 	}
