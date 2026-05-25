@@ -23,18 +23,30 @@ func (d *HTML) Type() detectorspb.DecoderType {
 	return detectorspb.DecoderType_HTML
 }
 
-var htmlTagPattern = regexp.MustCompile(`<[a-zA-Z][a-zA-Z0-9]*[\s>/]`)
+// htmlTagPattern matches standard HTML/XML opening tags. The optional namespace
+// group (?::[a-zA-Z][a-zA-Z0-9]*)? also matches ASPX/XML namespace-prefixed
+// tags such as <asp:Content and <mso:CanvasContent1.
+var htmlTagPattern = regexp.MustCompile(`<[a-zA-Z][a-zA-Z0-9]*(?::[a-zA-Z][a-zA-Z0-9]*)?[\s>/]`)
+
+// htmlEntityPattern matches entity-encoded HTML tags (e.g. &lt;div , &lt;p&gt;,
+// &lt;br/>). The terminator (?:[\s>/]|&gt;) covers both literal > and its
+// entity form, so bare-tag forms like &lt;p&gt; are detected. Requiring a
+// terminator after the tag name prevents matching comparison operators in
+// entity-encoded text (x &lt; threshold has a space before the word, not
+// after) and template placeholders (&lt;YOUR_KEY&gt; where _ breaks the
+// alphanumeric run before &gt; can match).
+var htmlEntityPattern = regexp.MustCompile(`&lt;[a-zA-Z][a-zA-Z0-9]*(?::[a-zA-Z][a-zA-Z0-9]*)?(?:[\s>/]|&gt;)`)
 
 // highSignalAttrs are attribute names whose values are extracted into the
 // decoded output because they commonly contain URLs, tokens, or other secrets.
 var highSignalAttrs = map[string]bool{
-	"href":       true,
-	"src":        true,
-	"action":     true,
-	"value":      true,
-	"content":    true,
-	"alt":   true,
-	"title": true,
+	"href":    true,
+	"src":     true,
+	"action":  true,
+	"value":   true,
+	"content": true,
+	"alt":     true,
+	"title":   true,
 }
 
 // syntaxHighlightPrefixes lists CSS class prefixes used by syntax highlighting
@@ -116,7 +128,7 @@ func (d *HTML) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 }
 
 func looksLikeHTML(data []byte) bool {
-	return htmlTagPattern.Match(data)
+	return htmlTagPattern.Match(data) || htmlEntityPattern.Match(data)
 }
 
 func extractHTML(data []byte) []byte {
@@ -196,9 +208,17 @@ func hasSyntaxHighlightClass(n *html.Node) bool {
 }
 
 func emitAttributes(buf *bytes.Buffer, n *html.Node) {
+	// Namespace-prefixed elements (e.g. asp:textbox, mso:canvascontent1) are
+	// ASP.NET server controls or XML metadata nodes. All their attributes are
+	// data payloads that may carry secrets (ConnectionString, Text, SelectCommand,
+	// etc.), so we emit every attribute rather than filtering by highSignalAttrs.
+	// After html.Parse the colon is preserved in n.Data even though the name is
+	// lowercased, making strings.Contains a reliable namespace check.
+	isNamespaced := strings.Contains(n.Data, ":")
+
 	for _, attr := range n.Attr {
 		isDataAttr := strings.HasPrefix(attr.Key, "data-")
-		if !highSignalAttrs[attr.Key] && !isDataAttr {
+		if !isNamespaced && !highSignalAttrs[attr.Key] && !isDataAttr {
 			continue
 		}
 		val := strings.TrimSpace(attr.Val)

@@ -525,6 +525,9 @@ func run(state overseer.State, logSync func() error) {
 	// OSS Default using github graphql api for issues, pr's and comments
 	feature.UseGithubGraphQLAPI.Store(false)
 
+	// OSS Default Use HTML Decoder on
+	feature.HTMLDecoderEnabled.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
