@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type fakeDetector struct{}
@@ -21,8 +21,8 @@ func (d fakeDetector) Keywords() []string {
 	return nil
 }
 
-func (d fakeDetector) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType(0)
+func (d fakeDetector) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType(0)
 }
 
 func (f fakeDetector) Description() string { return "" }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -41,8 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueTokens {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_DigitalOceanToken,
+			DetectorType: detector_typepb.DetectorType_DigitalOceanToken,
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -53,11 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyDigitalOceanToken(ctx, client, token)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
-			if s1.Verified {
-				s1.AnalysisInfo = map[string]string{
-					"key": token,
-				}
-			}
 		}
 
 		results = append(results, s1)
@@ -79,7 +75,7 @@ func verifyDigitalOceanToken(ctx context.Context, client *http.Client, token str
 	if err != nil {
 		return false, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -91,8 +87,8 @@ func verifyDigitalOceanToken(ctx context.Context, client *http.Client, token str
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_DigitalOceanToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_DigitalOceanToken
 }
 
 func (s Scanner) Description() string {

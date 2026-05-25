@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFullstory_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestFullstory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Fullstory,
+					DetectorType: detector_typepb.DetectorType_Fullstory,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"version": "2",
@@ -67,7 +67,7 @@ func TestFullstory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Fullstory,
+					DetectorType: detector_typepb.DetectorType_Fullstory,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"version": "2",

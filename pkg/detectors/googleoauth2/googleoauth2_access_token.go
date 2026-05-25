@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -87,7 +88,8 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 		_, _ = io.Copy(io.Discard, res.Body)
 	}()
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		var token tokenInfo
 		if err := json.NewDecoder(res.Body).Decode(&token); err != nil {
 			return false, nil, fmt.Errorf("failed to decode response: %w", err)
@@ -105,7 +107,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 			extraData["expires_at"] = time.Unix(exp, 0).String()
 		}
 		return true, extraData, nil
-	} else if res.StatusCode == http.StatusBadRequest {
+	case http.StatusBadRequest:
 		var errInfo errorInfo
 		if err := json.NewDecoder(res.Body).Decode(&errInfo); err != nil {
 			return false, nil, fmt.Errorf("failed to decode response: %w", err)
@@ -117,7 +119,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 		} else {
 			return false, nil, fmt.Errorf("unexpected error description '%s' for %s", errInfo.Error, req.URL)
 		}
-	} else {
+	default:
 		return false, nil, fmt.Errorf("unexpected response %d for %s", res.StatusCode, req.URL)
 	}
 }
@@ -135,8 +137,8 @@ type errorInfo struct {
 	Error string `json:"error_description"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GoogleOauth2
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GoogleOauth2
 }
 
 func (s Scanner) Description() string {

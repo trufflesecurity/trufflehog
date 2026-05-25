@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -49,8 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			userPatMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Fmfw,
+				DetectorType: detector_typepb.DetectorType_Fmfw,
 				Raw:          []byte(tokenPatMatch),
+				SecretParts:  map[string]string{"key": tokenPatMatch},
 			}
 
 			if verify {
@@ -63,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					}
@@ -77,8 +78,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Fmfw
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Fmfw
 }
 
 func (s Scanner) Description() string {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"runtime"
-	"strings"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -21,14 +20,13 @@ type (
 )
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.
-//
-// **Important:** The order of the fields in this struct is specifically designed to optimize
-// struct alignment and minimize memory usage. Do not change the field order without carefully considering
-// the potential impact on memory consumption.
-// Ex: https://go.dev/play/p/Azf4a7O-DhC
 type Chunk struct {
 	// Data is the data to decode and scan.
 	Data []byte
+	// OriginalData holds the pre-decode source data, preserved for secret
+	// storage. Set before iterative decoding so it retains the original
+	// content even after Data is replaced with decoded forms.
+	OriginalData []byte
 
 	// SourceName is the name of the Source that produced the chunk.
 	SourceName string
@@ -593,22 +591,6 @@ func (p *Progress) ClearEncodedResumeInfoFor(id string) {
 	defer p.mut.Unlock()
 	p.ensureEncodedResumeInfoByID()
 	delete(p.encodedResumeInfoByID, id)
-	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
-}
-
-// ClearEncodedResumeContainingId removes the encoded resume information
-// entries that contain the id
-func (p *Progress) ClearEncodedResumeContainingId(id string) {
-	p.mut.Lock()
-	defer p.mut.Unlock()
-	p.ensureEncodedResumeInfoByID()
-
-	for key := range p.encodedResumeInfoByID {
-		if strings.Contains(key, id) {
-			delete(p.encodedResumeInfoByID, key)
-		}
-	}
-
 	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
 }
 

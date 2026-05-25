@@ -145,7 +145,7 @@ func makeElasticSearchRequest(
 		return nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	rawData, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -216,17 +216,17 @@ func fetchIndexDocumentCount(
 
 	hits, ok := data["hits"].(map[string]any)
 	if !ok {
-		return 0, errors.New("No hits in response")
+		return 0, errors.New("no hits in response")
 	}
 
 	total, ok := hits["total"].(map[string]any)
 	if !ok {
-		return 0, errors.New("No total in hits")
+		return 0, errors.New("no total in hits")
 	}
 
 	count, ok := total["value"].(float64)
 	if !ok {
-		return 0, errors.New("No value in total")
+		return 0, errors.New("no value in total")
 	}
 
 	return int(count), nil
@@ -249,7 +249,7 @@ func createPITForSearch(
 
 	pitID, ok := data["id"].(string)
 	if !ok {
-		return "", errors.New("No id in response")
+		return "", errors.New("no id in response")
 	}
 
 	return pitID, nil
@@ -321,7 +321,7 @@ func processSearchedDocuments(
 		if !ok {
 			apiErr, ok := searchResults["error"].(map[string]any)
 			if ok {
-				return 0, fmt.Errorf("Error fetching search results: %v\n", apiErr)
+				return 0, fmt.Errorf("error fetching search results: %v", apiErr)
 			}
 			continue
 		}

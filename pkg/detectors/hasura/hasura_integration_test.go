@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestHasura_FromData(t *testing.T) {
@@ -52,7 +52,7 @@ func TestHasura_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Hasura,
+					DetectorType: detector_typepb.DetectorType_Hasura,
 					Verified:     true,
 					Raw:          []byte(secret),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, secret)),
@@ -72,7 +72,7 @@ func TestHasura_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Hasura,
+					DetectorType: detector_typepb.DetectorType_Hasura,
 					Verified:     false,
 					Raw:          []byte(inactiveSecret),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, inactiveSecret)),
@@ -104,7 +104,7 @@ func TestHasura_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Hasura,
+					DetectorType: detector_typepb.DetectorType_Hasura,
 					Verified:     false,
 					Raw:          []byte(secret),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, secret)),
@@ -124,7 +124,7 @@ func TestHasura_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Hasura,
+					DetectorType: detector_typepb.DetectorType_Hasura,
 					Verified:     false,
 					Raw:          []byte(secret),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, secret)),

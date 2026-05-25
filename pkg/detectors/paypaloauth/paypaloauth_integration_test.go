@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPaypalOauth_FromChunk(t *testing.T) {
@@ -52,11 +52,11 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					DetectorType: detector_typepb.DetectorType_PaypalOauth,
 					Verified:     true,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					DetectorType: detector_typepb.DetectorType_PaypalOauth,
 					Verified:     false,
 				},
 			},
@@ -72,11 +72,11 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					DetectorType: detector_typepb.DetectorType_PaypalOauth,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					DetectorType: detector_typepb.DetectorType_PaypalOauth,
 					Verified:     false,
 				},
 			},
@@ -92,11 +92,11 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					DetectorType: detector_typepb.DetectorType_PaypalOauth,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					DetectorType: detector_typepb.DetectorType_PaypalOauth,
 					Verified:     false,
 				},
 			},

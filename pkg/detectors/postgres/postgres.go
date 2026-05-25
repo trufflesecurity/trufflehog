@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const (
@@ -136,9 +136,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		raw := []byte(fmt.Sprintf("%s://%s:%s@%s:%s", dbType, user, password, host, port))
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Postgres,
+			DetectorType: detector_typepb.DetectorType_Postgres,
 			Raw:          raw,
 			RawV2:        raw,
+			SecretParts:  map[string]string{"connection_string": string(raw)},
 		}
 
 		// We don't need to normalize the (deprecated) requiressl option into the (up-to-date) sslmode option - pq can
@@ -164,9 +165,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
-			result.AnalysisInfo = map[string]string{
-				"connection_string": string(raw),
-			}
 		}
 
 		// We gather SSL information into ExtraData in case it's useful for later reporting.
@@ -176,6 +174,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 		result.ExtraData = map[string]string{
 			pgSslmode: sslmode,
+		}
+		if host != "" {
+			if port != "" {
+				result.ExtraData["host"] = host + ":" + port
+			} else {
+				result.ExtraData["host"] = host
+			}
+		}
+		if user != "" {
+			result.ExtraData["username"] = user
+		}
+		if dbname := params[pgDbname]; dbname != "" {
+			result.ExtraData["database"] = dbname
 		}
 
 		results = append(results, result)
@@ -280,7 +291,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	err = db.Ping()
 	switch {
@@ -302,8 +313,8 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Postgres
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Postgres
 }
 
 func (s Scanner) Description() string {

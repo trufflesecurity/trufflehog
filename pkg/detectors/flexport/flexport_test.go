@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFlexport_Pattern(t *testing.T) {
@@ -110,7 +110,7 @@ func TestFlexport_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Flexport,
+					DetectorType: detector_typepb.DetectorType_Flexport,
 					Verified:     true,
 				},
 			},
@@ -127,7 +127,7 @@ func TestFlexport_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Flexport,
+					DetectorType: detector_typepb.DetectorType_Flexport,
 					Verified:     true,
 				},
 			},
@@ -144,7 +144,7 @@ func TestFlexport_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Flexport,
+					DetectorType: detector_typepb.DetectorType_Flexport,
 					Verified:     false,
 				},
 			},
@@ -173,7 +173,7 @@ func TestFlexport_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Flexport,
+					DetectorType: detector_typepb.DetectorType_Flexport,
 					Verified:     false,
 				},
 			},
@@ -190,7 +190,7 @@ func TestFlexport_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Flexport,
+					DetectorType: detector_typepb.DetectorType_Flexport,
 					Verified:     false,
 				},
 			},

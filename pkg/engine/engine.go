@@ -28,6 +28,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -38,8 +39,8 @@ import (
 var detectionTimeout = detectors.DefaultResponseTimeout
 
 var errOverlap = errors.New(
-	"More than one detector has found this result. For your safety, verification has been disabled." +
-		"You can override this behavior by using the --allow-verification-overlap flag.",
+	"more than one detector has found this result; for your safety, verification has been disabled. " +
+		"You can override this behavior by using the --allow-verification-overlap flag",
 )
 
 // Metrics for the scan engine for external consumption.
@@ -503,6 +504,10 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
 	// TODO (ahrav): Determine the optimal cache size.
+	// KNOWN ISSUE: 512 entries is far too small for large scans. Under concurrent notifier
+	// workers a single burst of unique findings easily evicts previously seen keys, allowing
+	// the same secret to be re-emitted on every subsequent pass. Raise to at least 10000
+	// (or make configurable via Config).
 	const cacheSize = 512 // number of entries in the LRU cache
 
 	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
@@ -648,7 +653,7 @@ func (e *Engine) sanityChecks(ctx context.Context) {
 	seenDetectors := make(map[config.DetectorID]struct{}, len(e.detectors))
 	for _, det := range e.detectors {
 		id := config.GetDetectorID(det)
-		if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
+		if _, ok := seenDetectors[id]; ok && id.ID != detector_typepb.DetectorType_CustomRegex {
 			ctx.Logger().Info("possible duplicate detector configured", "detector", id)
 		}
 		seenDetectors[id] = struct{}{}
@@ -828,11 +833,11 @@ func iterativeDecode(chunk *sources.Chunk, allDecoders []decoders.Decoder, maxDe
 
 				if depth+1 < maxDepth &&
 					decoder.Type() != detectorspb.DecoderType_PLAIN &&
-					!bytes.Equal(decoded.Chunk.Data, data) &&
-					!slices.ContainsFunc(seen, func(s []byte) bool { return bytes.Equal(s, decoded.Chunk.Data) }) {
+					!bytes.Equal(decoded.Data, data) &&
+					!slices.ContainsFunc(seen, func(s []byte) bool { return bytes.Equal(s, decoded.Data) }) {
 
-					seen = append(seen, decoded.Chunk.Data)
-					nextInputs = append(nextInputs, decoded.Chunk.Data)
+					seen = append(seen, decoded.Data)
+					nextInputs = append(nextInputs, decoded.Data)
 				}
 			}
 		}
@@ -854,10 +859,11 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		startTime := time.Now()
 		sourceVerify := chunk.SourceVerify
 
+		chunk.OriginalData = chunk.Data
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
 		for _, d := range decoded {
-			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Chunk.Data)
+			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -1054,7 +1060,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 							res,
 							chunk.chunk,
 							chunk.decoder,
-							detector.Detector.Description(),
+							detector.Description(),
 							isFalsePositive,
 						)
 
@@ -1180,8 +1186,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			results = e.filterResults(ctx, data.detector, results)
 		}
 
+		AssignDuplicateLineOffsets(&data.chunk, results)
+
 		for _, res := range results {
-			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Detector.Description(), isFalsePositive)
+			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Description(), isFalsePositive)
 		}
 	}
 
@@ -1285,6 +1293,14 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// Duplicate results with the same decoder type SHOULD have their own entry in the
 		// results list, this would happen if the same secret is found multiple times.
 		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
+		//
+		// KNOWN ISSUE: The condition below only suppresses duplicates when the decoder type
+		// differs (cross-decoder dedup). For the same decoder type the condition evaluates to
+		// false and EVERY occurrence passes through, even when key is already in the cache.
+		// The LRU cache size of 512 entries further compounds this under concurrent notifier
+		// workers: entries are evicted quickly, re-admitting the same finding on every pass.
+		// Proposed fix: change the condition to `if _, ok := e.dedupeCache.Get(key); ok`
+		// and raise the cache size (see cacheSize const in initialize()).
 		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
 		if val, ok := e.dedupeCache.Get(key); ok && (val != result.DecoderType ||
 			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
@@ -1325,21 +1341,39 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	}
 }
 
+// effectiveSecret returns the canonical secret string for a result, preferring
+// the primary secret value and falling back to Raw. Callers that compute or
+// consume chunk offsets must go through this helper so the two stay in sync.
+func effectiveSecret(r *detectors.Result) string {
+	secret := r.GetPrimarySecretValue()
+	if secret == "" {
+		secret = string(r.Raw)
+	}
+	return secret
+}
+
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	// get the primary secret value from the result if set
-	secret := result.GetPrimarySecretValue()
-	if secret == "" {
-		secret = string(result.Raw)
+	secretBytes := []byte(effectiveSecret(result))
+
+	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
+	// pre-assigned (for duplicate secrets), use it directly to find the correct
+	// occurrence instead of always matching the first one.
+	var offset int
+	if result.HasChunkOffset() {
+		offset = int(result.ChunkOffset())
+	} else {
+		offset = bytes.Index(chunk.Data, secretBytes)
+		if offset == -1 {
+			return 0, false
+		}
 	}
 
-	before, after, found := bytes.Cut(chunk.Data, []byte(secret))
-	if !found {
-		return 0, false
-	}
-	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
 	result.SetPrimarySecretLine(lineNumber)
-	// If the line contains the ignore tag, we should ignore the result.
+
+	// If the line containing the secret has the ignore tag, we should ignore the result.
+	after := chunk.Data[offset+len(secretBytes):]
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
 		endLine = len(after)
@@ -1348,6 +1382,46 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		return lineNumber, true
 	}
 	return lineNumber, false
+}
+
+// AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same
+// secret value within a chunk. This allows FragmentLineOffset to locate the correct
+// occurrence instead of always finding the first one.
+func AssignDuplicateLineOffsets(chunk *sources.Chunk, results []detectors.Result) {
+	// Group result indices by their secret value.
+	type group struct {
+		secret  string
+		indices []int
+	}
+	seen := make(map[string]int) // secret -> index into groups slice
+	var groups []group
+
+	for i := range results {
+		secret := effectiveSecret(&results[i])
+		if idx, ok := seen[secret]; ok {
+			groups[idx].indices = append(groups[idx].indices, i)
+		} else {
+			seen[secret] = len(groups)
+			groups = append(groups, group{secret: secret, indices: []int{i}})
+		}
+	}
+
+	for _, g := range groups {
+		if len(g.indices) <= 1 {
+			continue
+		}
+		secretBytes := []byte(g.secret)
+		searchStart := 0
+		for _, ri := range g.indices {
+			pos := bytes.Index(chunk.Data[searchStart:], secretBytes)
+			if pos == -1 {
+				break
+			}
+			absPos := searchStart + pos
+			results[ri].SetChunkOffset(int64(absPos))
+			searchStart = absPos + len(secretBytes)
+		}
+	}
 }
 
 // FragmentFirstLineAndLink extracts the first line number and the link from the chunk metadata.
