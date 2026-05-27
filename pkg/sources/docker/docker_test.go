@@ -6,8 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	image "github.com/docker/docker/api/types/image"
-	dockerClient "github.com/docker/docker/client"
+	dockerClient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -261,7 +260,7 @@ func TestDockerImageScanFromLocalDaemon(t *testing.T) {
 		return
 	}
 
-	resp, err := client.ImagePull(context.TODO(), img, image.PullOptions{})
+	resp, err := client.ImagePull(context.TODO(), img, dockerClient.ImagePullOptions{})
 	if err != nil {
 		t.Errorf("Failed to load image %s: %v", img, err)
 		return
