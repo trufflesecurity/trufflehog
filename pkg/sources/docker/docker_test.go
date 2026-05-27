@@ -254,7 +254,7 @@ func TestDockerImageScanFromLocalDaemon(t *testing.T) {
 	// pull the image here to ensure it exists locally
 	img := "docker.io/trufflesecurity/secrets:latest"
 
-	client, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv, dockerClient.WithAPIVersionNegotiation())
+	client, err := dockerClient.New(dockerClient.FromEnv)
 	if err != nil {
 		t.Errorf("Failed to create Docker client: %v", err)
 		return
