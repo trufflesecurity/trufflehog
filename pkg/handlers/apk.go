@@ -374,14 +374,23 @@ func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt, dex
 	var classErrors int
 	ci := dexReader.ClassIter()
 	for ci.HasNext() {
-		node, err := ci.Next()
-		if err != nil {
-			// There can be a _lot_ of errors with obfuscated APKs, so it is worth tracking a total and continuing
-			// rather than logging each.
-			classErrors++
-			continue
-		}
-		h.processDexClass(ctx, dexReader, node, &dexOutput)
+		// The IIFE gives the deferred recovery a per-iteration scope so that panics from ci.Next(), specifically
+		// dextk's unchecked slice operations on corrupted class metadata, are caught per-class instead of aborting
+		// the entire APK.
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					classErrors++
+				}
+			}()
+
+			node, err := ci.Next()
+			if err != nil {
+				classErrors++
+				return
+			}
+			h.processDexClass(ctx, dexReader, node, &dexOutput)
+		}()
 	}
 	if classErrors > 0 {
 		ctx.Logger().V(2).Info("skipped malformed dex classes", "dex_file", dexFile, "skipped_classes", classErrors)
