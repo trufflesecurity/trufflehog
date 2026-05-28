@@ -347,7 +347,7 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, e
 			inStrings = true
 			val, err := entry.GetValue().String()
 			if err != nil {
-				return nil, err
+				continue
 			}
 			// Write directly to the buffer
 			resourceStrings.WriteString(entry.Key)
