@@ -78,7 +78,7 @@ func (s Scanner) verifyResult(ctx context.Context, apiKey string) (bool, map[str
 		return false, nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		whoamiRes := whoamiResponse{}
 		err := json.NewDecoder(res.Body).Decode(&whoamiRes)

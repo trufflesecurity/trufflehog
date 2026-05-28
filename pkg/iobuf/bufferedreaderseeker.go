@@ -390,7 +390,7 @@ func (br *BufferedReadSeeker) Close() error {
 	}
 
 	if br.tempFile != nil {
-		br.tempFile.Close()
+		_ = br.tempFile.Close()
 		return os.Remove(br.tempFileName)
 	}
 	return nil

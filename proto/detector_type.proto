@@ -1051,5 +1051,8 @@ enum DetectorType {
   ConfluenceDataCenter = 1047;
   Cloudinary = 1048;
   Pinecone = 1049;
-  Rancher = 1050;
+  GitLabOauth2 = 1050;
+  SpectralOps = 1051;
+  AWSAppSync = 1052;
+  Rancher = 1053;
 }
