@@ -130,6 +130,18 @@ func TestPostgres_ExtraData(t *testing.T) {
 	}
 }
 
+func TestPostgres_PrimarySecretUsesMatchedURI(t *testing.T) {
+	const uri = "postgresql://admin:secret@10.0.0.1/production"
+
+	s := Scanner{detectLoopback: true}
+	results, err := s.FromData(context.Background(), false, []byte(uri))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "postgresql://admin:secret@10.0.0.1:5432", string(results[0].Raw))
+	assert.Equal(t, uri, results[0].GetPrimarySecretValue())
+}
+
 func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
 	s := New(
 		WithIgnorePattern([]string{
