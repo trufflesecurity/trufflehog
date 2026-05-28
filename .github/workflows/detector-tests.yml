@@ -14,13 +14,13 @@ jobs:
       contents: "read"
       id-token: "write"
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
       - name: Install gotestsum
-        uses: jaxxstorm/action-install-gh-release@v3.0.0  # immutable release; no rolling @v3 tag
+        uses: jaxxstorm/action-install-gh-release@25e24d2d23ae098373794ef1d6faecb48ee52da8 # v3.0.0
         with:
           repo: gotestyourself/gotestsum
-      - uses: rwx-research/setup-captain@v1
+      - uses: rwx-research/setup-captain@f761ee3671e4c027299f8a5842a53fba8ddd8e37 # v1
       - name: Test Go
         run: |
           export CGO_ENABLED=1
