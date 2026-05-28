@@ -372,11 +372,10 @@ func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt, dex
 
 	var dexOutput bytes.Buffer
 	var classErrors int
-	ci := dexReader.ClassIter()
-	for ci.HasNext() {
-		// The IIFE gives the deferred recovery a per-iteration scope so that panics from ci.Next(), specifically
-		// dextk's unchecked slice operations on corrupted class metadata, are caught per-class instead of aborting
-		// the entire APK.
+	// Use an index-based loop instead of ClassIter to guarantee progress.
+	// The iterator's pos field only advances after a successful `ReadClassAndParse`, so a panic would leave it stuck
+	// on the same class and the HasNext loop would spin forever.
+	for id := uint32(0); id < dexReader.ClassDefCount; id++ {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -384,7 +383,7 @@ func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt, dex
 				}
 			}()
 
-			node, err := ci.Next()
+			node, err := dexReader.ReadClassAndParse(id)
 			if err != nil {
 				classErrors++
 				return
@@ -408,7 +407,7 @@ func (h *apkHandler) processDexClass(
 ) {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger().V(2).Info("panic processing dex class", "class", node.Name.String(), "error", fmt.Sprintf("%v", r))
+			ctx.Logger().V(2).Info("panic processing dex class", "class", node.Name.Parsed, "error", fmt.Sprintf("%v", r))
 		}
 	}()
 
@@ -553,7 +552,13 @@ func decodeXML(rdr io.ReadSeeker, resTable *apkparser.ResourceTable) (io.Reader,
 // Returns an empty string if the manifest is missing or the package attribute cannot be parsed.
 // This is only for logging the package name, however it can be extremely difficult to debug trufflehog when running
 // against gigabytes of APKs. You will want this metadata in the error messages.
-func extractPackageName(zipReader *zip.Reader, resTable *apkparser.ResourceTable) string {
+func extractPackageName(zipReader *zip.Reader, resTable *apkparser.ResourceTable) (pkgName string) {
+	defer func() {
+		if r := recover(); r != nil {
+			pkgName = ""
+		}
+	}()
+
 	for _, file := range zipReader.File {
 		if file.Name != "AndroidManifest.xml" {
 			continue
