@@ -72,15 +72,14 @@ func TestOpenInvalidAPK(t *testing.T) {
 	reader := strings.NewReader("invalid apk")
 
 	ctx := context.AddLogger(context.Background())
-	handler := apkHandler{}
 
 	rdr, err := newFileReader(ctx, io.NopCloser(reader))
 	assert.NoError(t, err)
 	defer func() { _ = rdr.Close() }()
 
-	archiveChan := make(chan DataOrErr)
-
-	err = handler.processAPK(ctx, rdr, archiveChan)
+	_, err = createZipReader(rdr)
+	// Since processAPK no longer creates the zip reader, this now calls createZipReader directly to test the same
+	// error path.
 	assert.Contains(t, err.Error(), "zip: not a valid zip file")
 }
 
@@ -93,8 +92,6 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	defer func() { _ = resp.Body.Close() }()
 
-	handler := newAPKHandler()
-
 	newReader, err := newFileReader(context.Background(), resp.Body)
 	if err != nil {
 		t.Errorf("error creating reusable reader: %s", err)
@@ -102,9 +99,9 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = newReader.Close() }()
 
-	archiveChan := make(chan DataOrErr)
-	ctx := context.AddLogger(context.Background())
+	zipReader, err := createZipReader(newReader)
+	assert.NoError(t, err)
 
-	err = handler.processAPK(ctx, newReader, archiveChan)
+	_, err = parseResTable(zipReader)
 	assert.Contains(t, err.Error(), "resources.arsc file not found")
 }
