@@ -59,7 +59,7 @@ func (s Scanner) FromData(
 			DetectorType: detector_typepb.DetectorType_RedHatPyxis,
 			Raw:          []byte(token),
 			SecretParts: map[string]string{
-				"api_key": token,
+				"key": token,
 			},
 		}
 
