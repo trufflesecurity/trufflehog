@@ -1,6 +1,8 @@
 package defaults
 
 import (
+	"slices"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abyssale"
@@ -56,6 +58,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atera"
 	atlassianv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v1"
 	atlassianv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/bitbucketdatacenter"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/confluencedatacenter"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/jiradatacenterpat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0oauth"
@@ -96,7 +101,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/bitbucketdatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
@@ -188,7 +192,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commodities"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/companyhub"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/confluencedatacenter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/contentfulpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/conversiontools"
@@ -402,7 +405,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jdbc"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassiandatacenter/jiradatacenterpat"
 	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
@@ -866,11 +868,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func buildDetectorList() []detectors.Detector {
-	return []detectors.Detector{
+	dets := []detectors.Detector{
 		&abyssale.Scanner{},
 		// &abstract.Scanner{},
 		&abuseipdb.Scanner{},
@@ -1216,10 +1219,10 @@ func buildDetectorList() []detectors.Detector {
 		&githubapp.Scanner{},
 		&githubv1.Scanner{},
 		&githubv2.Scanner{},
+		&gitlaboauth2.Scanner{},
 		&gitlabv1.Scanner{},
 		&gitlabv2.Scanner{},
 		&gitlabv3.Scanner{},
-		&gitlaboauth2.Scanner{},
 		&gitter.Scanner{},
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},
@@ -1766,6 +1769,21 @@ func buildDetectorList() []detectors.Detector {
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 	}
+
+	dets = slices.DeleteFunc(dets, func(d detectors.Detector) bool {
+		switch d.(type) {
+		case *pinecone.Scanner:
+			return !feature.PineconeDetectorEnabled.Load()
+		case *cloudinary.Scanner:
+			return !feature.CloudinaryDetectorEnabled.Load()
+		case *gitlaboauth2.Scanner:
+			return !feature.GitLabOAuthDetectorEnabled.Load()
+		default:
+			return false
+		}
+	})
+
+	return dets
 }
 
 func DefaultDetectors() []detectors.Detector {
