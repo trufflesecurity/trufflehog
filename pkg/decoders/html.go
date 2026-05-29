@@ -217,8 +217,9 @@ func emitAttributes(buf *bytes.Buffer, n *html.Node) {
 	isNamespaced := strings.Contains(n.Data, ":")
 
 	for _, attr := range n.Attr {
-		isDataAttr := strings.HasPrefix(attr.Key, "data-")
-		if !isNamespaced && !highSignalAttrs[attr.Key] && !isDataAttr {
+		if !isNamespaced &&
+			!highSignalAttrs[attr.Key] &&
+			!strings.HasPrefix(attr.Key, "data-") {
 			continue
 		}
 		val := strings.TrimSpace(attr.Val)
