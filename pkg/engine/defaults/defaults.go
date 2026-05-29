@@ -561,6 +561,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pganalyzereadkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/photoroom"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
@@ -1453,6 +1454,7 @@ func buildDetectorList() []detectors.Detector {
 		&peopledatalabs.Scanner{},
 		&pepipost.Scanner{},
 		&percy.Scanner{},
+		&pganalyzereadkey.Scanner{},
 		&photoroom.Scanner{},
 		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
@@ -1778,6 +1780,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *pganalyzereadkey.Scanner:
+			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
 		default:
 			return false
 		}

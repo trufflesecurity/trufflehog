@@ -5,20 +5,21 @@ import (
 )
 
 var (
-	ForceSkipBinaries              atomic.Bool
-	ForceSkipArchives              atomic.Bool
-	GitCloneTimeoutDuration        atomic.Int64
-	SkipAdditionalRefs             atomic.Bool
-	EnableAPKHandler               atomic.Bool
-	UserAgentSuffix                AtomicString
-	UseSimplifiedGitlabEnumeration atomic.Bool
-	UseGitMirror                   atomic.Bool
-	GitlabProjectsPerPage          atomic.Int64
-	UseGithubGraphQLAPI            atomic.Bool // use github graphql api to fetch issues, pr's and comments
-	HTMLDecoderEnabled             atomic.Bool
-	PineconeDetectorEnabled        atomic.Bool
-	CloudinaryDetectorEnabled      atomic.Bool
-	GitLabOAuthDetectorEnabled     atomic.Bool
+	ForceSkipBinaries               atomic.Bool
+	ForceSkipArchives               atomic.Bool
+	GitCloneTimeoutDuration         atomic.Int64
+	SkipAdditionalRefs              atomic.Bool
+	EnableAPKHandler                atomic.Bool
+	UserAgentSuffix                 AtomicString
+	UseSimplifiedGitlabEnumeration  atomic.Bool
+	UseGitMirror                    atomic.Bool
+	GitlabProjectsPerPage           atomic.Int64
+	UseGithubGraphQLAPI             atomic.Bool // use github graphql api to fetch issues, pr's and comments
+	HTMLDecoderEnabled              atomic.Bool
+	PineconeDetectorEnabled         atomic.Bool
+	CloudinaryDetectorEnabled       atomic.Bool
+	GitLabOAuthDetectorEnabled      atomic.Bool
+	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
 )
 
 type AtomicString struct {

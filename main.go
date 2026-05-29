@@ -529,6 +529,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.PineconeDetectorEnabled.Store(true)
 	feature.CloudinaryDetectorEnabled.Store(true)
 	feature.GitLabOAuthDetectorEnabled.Store(true)
+	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

@@ -111,6 +111,7 @@ func TestAllDetectorTypesAreInDefaultList(t *testing.T) {
 //
 // TODO: audit this list periodically — entries in the "mistakenly missed" group
 // should be removed once the corresponding detector is added to defaults.go.
+//
 //nolint:staticcheck // SA1019: intentionally references deprecated DetectorType values to keep them excluded.
 var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// TODO: these detectors have implementations but were mistakenly never added
@@ -341,4 +342,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_AzureMLWebServiceClassicIdentifiableKey: {},
 	detector_typepb.DetectorType_AzureSQL:                                {},
 	detector_typepb.DetectorType_BuiltWith:                               {},
+	detector_typepb.DetectorType_PgAnalyzeReadKey:                        {},
 }
