@@ -7,7 +7,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -19,7 +18,8 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	// Use the SSRF-safe client that blocks requests to local/private IP ranges.
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Rancher API tokens: 54–64 lowercase alphanumeric chars, named with cattle/rancher prefixes.
 	keyPat = regexp.MustCompile(`(?i)(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN)[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`)
@@ -30,6 +30,21 @@ var (
 
 func (s Scanner) Keywords() []string {
 	return []string{"CATTLE_TOKEN", "RANCHER_TOKEN", "CATTLE_BOOTSTRAP_PASSWORD", "RANCHER_API_TOKEN"}
+}
+
+func verifyToken(ctx context.Context, serverURL, token string) bool {
+	req, err := http.NewRequestWithContext(ctx, "GET", serverURL+"/v3", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = res.Body.Close() }()
+	return res.StatusCode == http.StatusOK
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -48,22 +63,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify && len(serverMatches) > 0 {
-			serverURL := strings.TrimSpace(serverMatches[0][1])
-			serverURL = strings.TrimRight(serverURL, "/")
-
-			req, err := http.NewRequestWithContext(ctx, "GET", serverURL+"/v3", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Set("Authorization", "Bearer "+token)
-
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode == http.StatusOK {
-					s1.Verified = true
-				}
-			}
+			serverURL := strings.TrimRight(strings.TrimSpace(serverMatches[0][1]), "/")
+			s1.Verified = verifyToken(ctx, serverURL, token)
 		}
 
 		results = append(results, s1)
