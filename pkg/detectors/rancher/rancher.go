@@ -33,19 +33,19 @@ func (s Scanner) Keywords() []string {
 	return []string{"CATTLE_TOKEN", "RANCHER_TOKEN", "CATTLE_BOOTSTRAP_PASSWORD", "RANCHER_API_TOKEN"}
 }
 
-func verifyToken(ctx context.Context, serverURL, token string) bool {
+func verifyToken(ctx context.Context, serverURL, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", serverURL+"/v3", nil)
 	if err != nil {
-		return false
+		return false, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false
+		return false, err
 	}
 	defer func() { _ = res.Body.Close() }()
-	return res.StatusCode == http.StatusOK
+	return res.StatusCode == http.StatusOK, nil
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -65,7 +65,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify && len(serverMatches) > 0 {
 			serverURL := strings.TrimRight(strings.TrimSpace(serverMatches[0][1]), "/")
-			s1.Verified = verifyToken(ctx, serverURL, token)
+			verified, verifyErr := verifyToken(ctx, serverURL, token)
+			if verifyErr != nil {
+				s1.SetVerificationError(verifyErr, token)
+			} else {
+				s1.Verified = verified
+			}
 		}
 
 		results = append(results, s1)
