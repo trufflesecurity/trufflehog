@@ -21,11 +21,12 @@ var (
 	// Use the SSRF-safe client that blocks requests to local/private IP ranges.
 	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
-	// Rancher API tokens: 54–64 lowercase alphanumeric chars, named with cattle/rancher prefixes.
-	keyPat = regexp.MustCompile(`(?i)(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN)[\w]*\s*[=:]\s*["']?([a-z0-9]{54,64})["']?`)
+	// Match variable name case-insensitively via (?i:...) scope, then require strictly
+	// lowercase alphanumeric token to avoid false positives from the broad character set.
+	keyPat = regexp.MustCompile(`(?i:(?:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN)[\w]*\s*[=:]\s*["']?)([a-z0-9]{54,64})["']?`)
 
 	// Server URL used for validation; must appear nearby in the same chunk.
-	serverPat = regexp.MustCompile(`(?i)(?:CATTLE_SERVER|RANCHER_URL|RANCHER_SERVER)\s*[=:]\s*["']?(https?://[^\s"']+)["']?`)
+	serverPat = regexp.MustCompile(`(?i:(?:CATTLE_SERVER|RANCHER_URL|RANCHER_SERVER)\s*[=:]\s*["']?)(https?://[^\s"']+)["']?`)
 )
 
 func (s Scanner) Keywords() []string {

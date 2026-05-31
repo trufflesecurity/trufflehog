@@ -609,6 +609,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rabbitmq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/railwayapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rancher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rawg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/razorpay"
@@ -709,7 +710,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rancher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spectralops"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/speechtextai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/splunkobservabilitytoken"
@@ -1502,6 +1502,7 @@ func buildDetectorList() []detectors.Detector {
 		&rabbitmq.Scanner{},
 		&railwayapp.Scanner{},
 		&ramp.Scanner{},
+		&rancher.Scanner{},
 		&rapidapi.Scanner{},
 		// &raven.Scanner{},
 		&rawg.Scanner{},
@@ -1606,7 +1607,6 @@ func buildDetectorList() []detectors.Detector {
 		&sourcegraph.Scanner{},
 		&sourcegraphcody.Scanner{},
 		// &sparkpost.Scanner{},
-		&rancher.Scanner{},
 		&spectralops.Scanner{},
 		&speechtextai.Scanner{},
 		&splunkobservabilitytoken.Scanner{},
