@@ -336,12 +336,12 @@ type resourceEntryData struct {
 	Value        string
 }
 
-// resourceEntryProvider abstracts resource table lookups for testability.
-type resourceEntryProvider interface {
+// GetEntryer abstracts resource table lookups for testability.
+type GetEntryer interface {
 	GetEntry(id uint32) (*resourceEntryData, error)
 }
 
-// apkResourceTable adapts *apkparser.ResourceTable to the resourceEntryProvider interface.
+// apkResourceTable adapts *apkparser.ResourceTable to the GetEntryer interface.
 type apkResourceTable struct {
 	table *apkparser.ResourceTable
 }
@@ -361,10 +361,10 @@ func (t *apkResourceTable) GetEntry(id uint32) (*resourceEntryData, error) {
 }
 
 // extractStringsFromResTable extracts the strings from the resources table, which is provided by the
-// `resourceEntryProvider` interface (a thin wrapper around `apkparser.ResourceTable` for testability).
+// `GetEntryer` interface (a thin wrapper around `apkparser.ResourceTable` for testability).
 // APK strings are typically stored in the 0x7f000000-0x7fffffff range.
 // https://chromium.googlesource.com/chromium/src/+/master/build/android/docs/life_of_a_resource.md
-func extractStringsFromResTable(provider resourceEntryProvider) io.Reader {
+func extractStringsFromResTable(provider GetEntryer) io.Reader {
 	var resourceStrings bytes.Buffer
 	inStrings := false
 	for i := 0x7f000000; i <= 0x7fffffff; i++ {
