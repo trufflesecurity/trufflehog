@@ -222,10 +222,8 @@ func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparse
 	if resTable == nil {
 		return errors.New("ResourceTable is nil")
 	}
-	rscStrRdr, err := extractStringsFromResTable(resTable)
-	if err != nil {
-		return fmt.Errorf("failed to parse strings from resources.arsc: %w", err)
-	}
+	provider := &apkResourceTable{table: resTable}
+	rscStrRdr := extractStringsFromResTable(provider)
 	return h.handleAPKFileContent(ctx, rscStrRdr, "resources.arsc", apkChan)
 }
 
@@ -331,41 +329,66 @@ func openFile(file *zip.File) (io.ReadCloser, error) {
 	return rc, nil
 }
 
-// extractStringsFromResTable extracts the strings from the resources table
-// Note: This is a hacky way to get the strings from the resources table
-// APK strings are typically (always?) stored in the 0x7f000000-0x7fffffff range
+// resourceEntryData holds the extracted fields from a single resource table entry.
+type resourceEntryData struct {
+	Key          string
+	ResourceType string
+	Value        string
+}
+
+// resourceEntryProvider abstracts resource table lookups for testability.
+type resourceEntryProvider interface {
+	GetEntry(id uint32) (*resourceEntryData, error)
+}
+
+// apkResourceTable adapts *apkparser.ResourceTable to the resourceEntryProvider interface.
+type apkResourceTable struct {
+	table *apkparser.ResourceTable
+}
+
+// GetEntry retrieves a resource entry by ID, returning nil if the entry does not exist.
+func (t *apkResourceTable) GetEntry(id uint32) (*resourceEntryData, error) {
+	entry, _ := t.table.GetResourceEntry(id)
+	if entry == nil {
+		return nil, nil
+	}
+	val, err := entry.GetValue().String()
+	return &resourceEntryData{
+		Key:          entry.Key,
+		ResourceType: entry.ResourceType,
+		Value:        val,
+	}, err
+}
+
+// extractStringsFromResTable extracts the strings from the resources table, which is provided by the
+// `resourceEntryProvider` interface (a thin wrapper around `apkparser.ResourceTable` for testability).
+// APK strings are typically stored in the 0x7f000000-0x7fffffff range.
 // https://chromium.googlesource.com/chromium/src/+/master/build/android/docs/life_of_a_resource.md
-func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, error) {
+func extractStringsFromResTable(provider resourceEntryProvider) io.Reader {
 	var resourceStrings bytes.Buffer
 	inStrings := false
 	for i := 0x7f000000; i <= 0x7fffffff; i++ {
-		entry, _ := resTable.GetResourceEntry(uint32(i))
+		entry, err := provider.GetEntry(uint32(i))
 		if entry == nil {
 			continue
 		}
 		if entry.ResourceType == "string" {
-			inStrings = true
-			val, err := entry.GetValue().String()
-			// The errors that can return result from String() which has a switch statement default case that calls
-			// Data(), and that has a string table lookup error if it's a AttrTypeString, or an unknown resource
-			// type that has its own switch return default ErrUnknownResourceDataType.
-			//
-			// In either case, neither error implies that the rest of the resource table shouldn't be processed.
 			if err != nil {
 				continue
 			}
-			// Write directly to the buffer
+			inStrings = true
 			resourceStrings.WriteString(entry.Key)
 			resourceStrings.WriteString(": ")
-			resourceStrings.WriteString(val)
+			resourceStrings.WriteString(entry.Value)
 			resourceStrings.WriteString("\n")
 		}
-		// Exit the loop if we've finished processing the strings
+		// The contiguity assumption is valid for standard AAPT output, but we might want to revisit this if there's
+		// shared libs or multiple packages in a group.
 		if inStrings && entry.ResourceType != "string" {
 			break
 		}
 	}
-	return &resourceStrings, nil
+	return &resourceStrings
 }
 
 // processDexFile decodes the dex file and returns the relevant instructions

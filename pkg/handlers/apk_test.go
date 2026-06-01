@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/avast/apkparser"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -104,4 +105,41 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 
 	_, err = parseResTable(zipReader)
 	assert.Contains(t, err.Error(), "resources.arsc file not found")
+}
+
+type mockResourceEntry struct {
+	data *resourceEntryData
+	err  error
+}
+
+type mockResourceProvider struct {
+	entries map[uint32]mockResourceEntry
+}
+
+func (m *mockResourceProvider) GetEntry(id uint32) (*resourceEntryData, error) {
+	e, ok := m.entries[id]
+	if !ok {
+		return nil, nil
+	}
+	return e.data, e.err
+}
+
+func TestExtractStringsFromResTable_SkipsBadEntries(t *testing.T) {
+	provider := &mockResourceProvider{
+		entries: map[uint32]mockResourceEntry{
+			0x7f040000: {data: &resourceEntryData{Key: "app_name", ResourceType: "string", Value: "MyApp"}},
+			0x7f040001: {data: &resourceEntryData{Key: "bad_entry", ResourceType: "string"}, err: apkparser.ErrUnknownResourceDataType},
+			0x7f040002: {data: &resourceEntryData{Key: "api_key", ResourceType: "string", Value: "secret123"}},
+			0x7f040003: {data: &resourceEntryData{Key: "icon", ResourceType: "drawable"}},
+		},
+	}
+
+	rdr := extractStringsFromResTable(provider)
+	data, err := io.ReadAll(rdr)
+	assert.NoError(t, err)
+
+	output := string(data)
+	assert.Contains(t, output, "app_name: MyApp")
+	assert.Contains(t, output, "api_key: secret123")
+	assert.NotContains(t, output, "bad_entry")
 }
