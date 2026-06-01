@@ -346,6 +346,11 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, e
 		if entry.ResourceType == "string" {
 			inStrings = true
 			val, err := entry.GetValue().String()
+			// The errors that can return result from String() which has a switch statement default case that calls
+			// Data(), and that has a string table lookup error if it's a AttrTypeString, or an unknown resource
+			// type that has its own switch return default ErrUnknownResourceDataType.
+			//
+			// In either case, neither error implies that the rest of the resource table shouldn't be processed.
 			if err != nil {
 				continue
 			}
