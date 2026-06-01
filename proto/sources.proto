@@ -467,9 +467,9 @@ message Sharepoint {
     credentials.Oauth2 oauth = 1;
   }
   string site_url = 2;
-  bool scan_versions = 3;
-  bool scan_comments = 4;
-  bool scan_attachments = 5;
+  bool include_versions = 3;
+  bool include_comments = 4;
+  bool include_attachments = 5;
 }
 
 message AzureRepos {

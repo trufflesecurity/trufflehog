@@ -5887,11 +5887,11 @@ func (m *Sharepoint) validate(all bool) error {
 
 	// no validation rules for SiteUrl
 
-	// no validation rules for ScanVersions
+	// no validation rules for IncludeVersions
 
-	// no validation rules for ScanComments
+	// no validation rules for IncludeComments
 
-	// no validation rules for ScanAttachments
+	// no validation rules for IncludeAttachments
 
 	switch v := m.Credential.(type) {
 	case *Sharepoint_Oauth:
