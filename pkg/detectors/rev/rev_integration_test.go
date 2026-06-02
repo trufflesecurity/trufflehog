@@ -109,7 +109,7 @@ func TestRev_FromChunk(t *testing.T) {
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("SpectralOps.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Rev.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
