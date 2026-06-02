@@ -843,6 +843,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wiz"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worksnaps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/workstack"
@@ -1743,6 +1744,7 @@ func buildDetectorList() []detectors.Detector {
 		&weightsandbiases.Scanner{},
 		// &wepay.Scanner{},
 		&whoxy.Scanner{},
+		&wit.Scanner{},
 		&wistia.Scanner{},
 		&wiz.Scanner{},
 		&worksnaps.Scanner{},
@@ -1788,6 +1790,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.DatadogApiKeyDetectorEnabled.Load()
 		case *tly.Scanner:
 			return !feature.TlyDetectorEnabled.Load()
+		case *wit.Scanner:
+			return !feature.WitDetectorEnabled.Load()
 		default:
 			return false
 		}
