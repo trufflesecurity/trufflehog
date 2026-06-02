@@ -1,4 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>trufflesecurity/.github:renovate-config#v1.0.1"]
+  "extends": ["github>trufflesecurity/.github:renovate-config#v1.0.2"]
 }
