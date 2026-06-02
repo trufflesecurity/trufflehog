@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	validPattern   = "OmFxWjhZvCpOeMsgTJdZMas+dlUpr=fa7+.QOKKYvi7RKWyBeHtaLa7_rzMhLrRd"
+	validPattern   = "9UgOsRfud4RTyBQpJQFOQiwNQcfeLGHH1DDoxhgzCvBmccmVQ7MYB0ai3LXGZNMf"
 	invalidPattern = "OmFxWjhZvCpOeMsgTJdZMas+dlUpr=fa?+.QOKKYvi7RKWyBeHtaLa7_rzMhLrRd"
 	keyword        = "user"
 )
