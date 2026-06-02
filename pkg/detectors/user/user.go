@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://secretscanner.user.com/api/public/users/", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://detectors.user.com/api/public/users/", nil)
 			if err != nil {
 				continue
 			}
