@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"user"}) + `\b([a-zA-Z0-9-._+=]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"user"}) + `\b([A-Za-z0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
