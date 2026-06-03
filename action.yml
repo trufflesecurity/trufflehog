@@ -99,7 +99,7 @@ runs:
         ##          Run TruffleHog              ##
         ##########################################
         docker run --rm -v .:/tmp -w /tmp \
-        ${IMAGE}:${VERSION} \
+        "${IMAGE}:${VERSION}" \
         git file:///tmp/ \
         --since-commit \
         ${BASE:-''} \
