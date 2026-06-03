@@ -2,8 +2,11 @@ package facebookoauth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -59,18 +62,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				// thanks https://stackoverflow.com/questions/15621471/validate-a-facebook-app-id-and-app-secret
-				// https://stackoverflow.com/questions/24401241/how-to-get-a-facebook-access-token-using-appid-and-app-secret-without-any-login
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://graph.facebook.com/me?access_token=%s|%s", apiIdRes, apiSecretRes), nil)
-				if err != nil {
-					continue
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					defer func() { _ = res.Body.Close() }()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
+				isVerified, extraData, verificationErr := verifyFacebookOAuth(ctx, apiIdRes, apiSecretRes)
+				s1.Verified = isVerified
+				s1.ExtraData = extraData
+				if verificationErr != nil {
+					s1.SetVerificationError(verificationErr, apiSecretRes)
 				}
 			}
 
@@ -79,6 +75,74 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+
+// We query /{app-id}?fields=roles, the documented way to validate an app ID/secret
+// pair (https://stackoverflow.com/questions/15621471/validate-a-facebook-app-id-and-app-secret):
+// valid credentials return 200 with the app's roles, while an invalid pair returns a
+// 400 OAuthException (code 190, "Invalid OAuth access token signature.").
+
+func verifyFacebookOAuth(ctx context.Context, appID, appSecret string) (bool, map[string]string, error) {
+	url := fmt.Sprintf("https://graph.facebook.com/%s?fields=roles&access_token=%s|%s", appID, appID, appSecret)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, nil, err
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		var r rolesResponse
+		if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+			// The credentials are valid (200), so report verified even if we can't
+			// parse the optional roles context.
+			return true, nil, nil
+		}
+		return true, r.extraData(), nil
+	case http.StatusBadRequest, http.StatusUnauthorized:
+		// Invalid app ID/secret pair (e.g. OAuthException code 190).
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+}
+
+// rolesResponse models the /{app-id}?fields=roles payload.
+type rolesResponse struct {
+	Roles struct {
+		Data []struct {
+			User string `json:"user"`
+			Role string `json:"role"`
+		} `json:"data"`
+	} `json:"roles"`
+}
+
+// extraData flattens the app roles into result ExtraData: a count plus a
+// comma-separated list of "user:role" pairs identifying who has access to the app.
+func (r rolesResponse) extraData() map[string]string {
+	data := r.Roles.Data
+	if len(data) == 0 {
+		return nil
+	}
+
+	pairs := make([]string, 0, len(data))
+	for _, role := range data {
+		pairs = append(pairs, role.User+":"+role.Role)
+	}
+
+	return map[string]string{
+		"app_roles_count": strconv.Itoa(len(data)),
+		"app_roles":       strings.Join(pairs, ", "),
+	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
