@@ -74,7 +74,7 @@ enum DetectorType {
   FastlyPersonalToken = 68;
   GoogleOauth2 = 69;
   ReCAPTCHA = 70; // Not yet implemented
-  GoogleApiKey = 71 [deprecated = true];
+  GoogleApiKey = 71;
   Hunter = 72;
   IbmCloudUserKey = 73;
   Netlify = 74;
