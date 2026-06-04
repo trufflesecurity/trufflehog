@@ -32,8 +32,8 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Bounds have been removed because there are some cases that tokens have trailing frontslash(/) or plus sign (+)
-	keyPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{56}[ "'\r\n]{1})`)
-	privKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{86,88}[ "'\r\n]{1})`)
+	keyPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{56})[ "'\r\n]`)
+	privKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{86,88})[ "'\r\n]`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -51,9 +51,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
+		if !isValidBase64(resMatch) {
+			continue
+		}
 
 		for _, privKeyMatch := range privKeyMatches {
 			resPrivKeyMatch := strings.TrimSpace(privKeyMatch[1])
+			if !isValidBase64(resPrivKeyMatch) {
+				continue
+			}
 
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Kraken,
@@ -100,6 +106,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func isValidBase64(candidate string) bool {
+	_, err := base64.StdEncoding.DecodeString(candidate)
+	return err == nil
 }
 
 // Code from https://docs.kraken.com/rest/#section/Authentication/Headers-and-Signature
