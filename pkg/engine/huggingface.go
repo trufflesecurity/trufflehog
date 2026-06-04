@@ -24,9 +24,13 @@ type HuggingfaceConfig struct {
 	IgnoreSpaces       []string
 	IncludeDatasets    []string
 	IgnoreDatasets     []string
+	Buckets            []string
+	IncludeBuckets     []string
+	IgnoreBuckets      []string
 	SkipAllModels      bool
 	SkipAllSpaces      bool
 	SkipAllDatasets    bool
+	SkipAllBuckets     bool
 	IncludeDiscussions bool
 	IncludePrs         bool
 	Token              string
@@ -48,9 +52,13 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sour
 		IgnoreSpaces:       c.IgnoreSpaces,
 		IncludeDatasets:    c.IncludeDatasets,
 		IgnoreDatasets:     c.IgnoreDatasets,
+		Buckets:            c.Buckets,
+		IncludeBuckets:     c.IncludeBuckets,
+		IgnoreBuckets:      c.IgnoreBuckets,
 		SkipAllModels:      c.SkipAllModels,
 		SkipAllSpaces:      c.SkipAllSpaces,
 		SkipAllDatasets:    c.SkipAllDatasets,
+		SkipAllBuckets:     c.SkipAllBuckets,
 		IncludeDiscussions: c.IncludeDiscussions,
 		IncludePrs:         c.IncludePrs,
 	}
