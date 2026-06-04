@@ -147,6 +147,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			RawV2:        raw,
 			SecretParts:  map[string]string{"connection_string": string(raw)},
 		}
+		// Set the un-normalized raw match as the primary secret value. This
+		// ensures that the engine's line-offset and ignore-tag matching logic
+		// can locate the match even though Raw/RawV2 are stored normalized.
 		result.SetPrimarySecretValue(candidate.uri)
 
 		// We don't need to normalize the (deprecated) requiressl option into the (up-to-date) sslmode option - pq can
