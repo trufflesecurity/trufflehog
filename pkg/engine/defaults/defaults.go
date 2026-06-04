@@ -1780,6 +1780,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *sonarcloudv2.Scanner:
+			return !feature.SonarCloudV2DetectorEnabled.Load()
 		default:
 			return false
 		}
