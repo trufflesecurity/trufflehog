@@ -3,20 +3,23 @@ package youtubeapikey
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
 var (
-    validKey   = "8SN8OtkzJ6z2tcFtv93Gl63o97LGGBvYAyJviDg"
-    invalidKey = "8SN8OtkzJ6z2tcFtv93?l63o97LGGBvYAyJviDg"
-    validId    = "0ifNmkGT6biPToj9TDGYqyFP"
-    invalidId  = "0ifNmkG?6biPToj9TDGYqyFP"
-    keyword    = "youtubeapikey"
+	validKey   = "8SN8OtkzJ6z2tcFtv93Gl63o97LGGBvYAyJviDg"
+	invalidKey = "8SN8OtkzJ6z2tcFtv93?l63o97LGGBvYAyJviDg"
+	validId    = "0ifNmkGT6biPToj9TDGYqyFP"
+	invalidId  = "0ifNmkG?6biPToj9TDGYqyFP"
+	keyword    = "youtubeapikey"
 )
 
 func TestYoutubeApiKey_Pattern(t *testing.T) {
@@ -77,6 +80,48 @@ func TestYoutubeApiKey_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestYoutubeApiKey_Verification(t *testing.T) {
+	tests := []struct {
+		name                string
+		statusCode          int
+		wantVerified        bool
+		wantVerificationErr string
+	}{
+		{
+			name:         "verified",
+			statusCode:   http.StatusOK,
+			wantVerified: true,
+		},
+		{
+			name:       "unverified",
+			statusCode: http.StatusBadRequest,
+		},
+		{
+			name:                "verification error",
+			statusCode:          http.StatusInternalServerError,
+			wantVerificationErr: "unexpected HTTP response status 500",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			d := Scanner{client: common.ConstantResponseHttpClient(test.statusCode, "{}")}
+			input := fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId)
+
+			results, err := d.FromData(context.Background(), true, []byte(input))
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Equal(t, test.wantVerified, results[0].Verified)
+
+			if test.wantVerificationErr == "" {
+				require.NoError(t, results[0].VerificationError())
+			} else {
+				require.EqualError(t, results[0].VerificationError(), test.wantVerificationErr)
 			}
 		})
 	}
