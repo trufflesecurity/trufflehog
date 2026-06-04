@@ -40,6 +40,10 @@ const (
 	SPACE             = "space"
 	BUCKET            = "bucket"
 	defaultPagination = 100
+
+	// bucketsPagination is the page size for bucket listing endpoints,
+	// which default to 100 items per page (5000 max).
+	bucketsPagination = 5000
 )
 
 type resourceType string

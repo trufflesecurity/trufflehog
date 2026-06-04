@@ -235,7 +235,7 @@ func (c *HFClient) GetBucket(ctx context.Context, bucketID string) (Bucket, erro
 // ListBucketsByAuthor retrieves buckets from the Hugging Face API by author (user or org).
 func (c *HFClient) ListBucketsByAuthor(ctx context.Context, author string) ([]Bucket, error) {
 	var buckets []Bucket
-	url := fmt.Sprintf("%s/%s/%s/%s", c.BaseURL, APIRoute, BucketsRoute, author)
+	url := fmt.Sprintf("%s/%s/%s/%s?limit=%d", c.BaseURL, APIRoute, BucketsRoute, author, bucketsPagination)
 	for url != "" {
 		var page []Bucket
 		next, err := c.getPage(ctx, url, &page)
@@ -252,7 +252,7 @@ func (c *HFClient) ListBucketsByAuthor(ctx context.Context, author string) ([]Bu
 // header pagination.
 func (c *HFClient) ListBucketFiles(ctx context.Context, bucketID string) ([]BucketFile, error) {
 	var files []BucketFile
-	url := fmt.Sprintf("%s/%s/%s/%s/tree?recursive=true", c.BaseURL, APIRoute, BucketsRoute, bucketID)
+	url := fmt.Sprintf("%s/%s/%s/%s/tree?recursive=true&limit=%d", c.BaseURL, APIRoute, BucketsRoute, bucketID, bucketsPagination)
 	for url != "" {
 		var page []BucketFile
 		next, err := c.getPage(ctx, url, &page)
