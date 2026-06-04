@@ -10,7 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/huggingface"
 )
 
-// HuggingFaceConfig represents the configuration for HuggingFace.
+// HuggingfaceConfig represents the configuration for HuggingFace.
 type HuggingfaceConfig struct {
 	Endpoint           string
 	Models             []string
@@ -33,7 +33,7 @@ type HuggingfaceConfig struct {
 	Concurrency        int
 }
 
-// ScanGitHub scans HuggingFace with the provided options.
+// ScanHuggingface scans HuggingFace with the provided options.
 func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sources.JobProgressRef, error) {
 	connection := sourcespb.Huggingface{
 		Endpoint:           c.Endpoint,
