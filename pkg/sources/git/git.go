@@ -1471,6 +1471,9 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 // GetSafeRemoteURL is a helper function that will attempt to get a safe URL first
 // from the preferred remote name, falling back to the first remote name
 // available, or an empty string if there are no remotes.
+// If the resolved remote URL points to a local path (e.g. file:// scheme),
+// it will attempt to open that repository and resolve its remote URL instead,
+// so that clones of local repos report the upstream remote rather than the local path.
 func GetSafeRemoteURL(repo *git.Repository, preferred string) string {
 	remote, err := repo.Remote(preferred)
 	if err != nil {
@@ -1488,7 +1491,62 @@ func GetSafeRemoteURL(repo *git.Repository, preferred string) string {
 	if err != nil {
 		return ""
 	}
+
+	// If the remote URL is a local path, try to resolve the real upstream remote
+	// from the original repository. This handles the case where TruffleHog clones
+	// a local repo to a temp directory — the clone's origin points to the local
+	// path, but we want the original repo's actual remote URL.
+	if localPath := localRepoPath(safeURL); localPath != "" {
+		if resolved := resolveUpstreamRemote(localPath, preferred); resolved != "" {
+			return resolved
+		}
+	}
+
 	return safeURL
+}
+
+// localRepoPath returns the filesystem path if the URL refers to a local
+// repository (file:// scheme or an absolute path), or empty string otherwise.
+func localRepoPath(rawURL string) string {
+	if strings.HasPrefix(rawURL, "file://") {
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return ""
+		}
+		return u.Path
+	}
+	if filepath.IsAbs(rawURL) {
+		if _, err := os.Stat(rawURL); err == nil {
+			return rawURL
+		}
+	}
+	return ""
+}
+
+// resolveUpstreamRemote opens the repo at localPath and returns its remote URL,
+// but only if that remote is not itself a local path (to avoid infinite recursion).
+func resolveUpstreamRemote(localPath, preferred string) string {
+	origRepo, err := RepoFromPath(localPath)
+	if err != nil {
+		return ""
+	}
+	origRemote, err := origRepo.Remote(preferred)
+	if err != nil {
+		remotes, err := origRepo.Remotes()
+		if err != nil || len(remotes) == 0 {
+			return ""
+		}
+		origRemote = remotes[0]
+	}
+	resolved, _, err := stripPassword(origRemote.Config().URLs[0])
+	if err != nil {
+		return ""
+	}
+	// Only return if the resolved URL is not itself a local path.
+	if localRepoPath(resolved) != "" {
+		return ""
+	}
+	return resolved
 }
 
 func HandleBinary(

@@ -1163,3 +1163,139 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 		})
 	}
 }
+
+func TestGetSafeRemoteURL_ResolvesUpstreamFromLocalClone(t *testing.T) {
+	t.Parallel()
+
+	const expectedRemote = "https://dev.azure.com/org/project/_git/repo"
+
+	// Create the "original" repo with a real remote configured.
+	origPath := setupTestRepo(t, "original-repo")
+	addTestFileAndCommit(t, origPath, "file.txt", "content")
+	assert.NoError(t, exec.Command("git", "-C", origPath, "remote", "add", "origin", expectedRemote).Run())
+
+	// Clone the original repo locally (simulates what TruffleHog does).
+	cloneDir := t.TempDir()
+	clonePath := filepath.Join(cloneDir, "clone")
+	assert.NoError(t, exec.Command("git", "clone", origPath, clonePath).Run())
+
+	// The clone's origin points to the local origPath, NOT the real remote.
+	cloneRepo, err := RepoFromPath(clonePath)
+	assert.NoError(t, err)
+
+	got := GetSafeRemoteURL(cloneRepo, "origin")
+	assert.Equal(t, expectedRemote, got, "should resolve through the local clone to the original repo's upstream remote")
+}
+
+func TestGetSafeRemoteURL_FileSchemeResolvesUpstream(t *testing.T) {
+	t.Parallel()
+
+	const expectedRemote = "https://github.com/example/repo.git"
+
+	// Create the "original" repo with a real remote.
+	origPath := setupTestRepo(t, "original-repo")
+	addTestFileAndCommit(t, origPath, "file.txt", "content")
+	assert.NoError(t, exec.Command("git", "-C", origPath, "remote", "add", "origin", expectedRemote).Run())
+
+	// Clone using a file:// URI (this is how the user triggers the bug).
+	cloneDir := t.TempDir()
+	clonePath := filepath.Join(cloneDir, "clone")
+	assert.NoError(t, exec.Command("git", "clone", "file://"+origPath, clonePath).Run())
+
+	cloneRepo, err := RepoFromPath(clonePath)
+	assert.NoError(t, err)
+
+	got := GetSafeRemoteURL(cloneRepo, "origin")
+	assert.Equal(t, expectedRemote, got, "should resolve file:// origin to the upstream remote")
+}
+
+func TestGetSafeRemoteURL_NoRemote(t *testing.T) {
+	t.Parallel()
+
+	// Create a repo with no remotes at all.
+	repoPath := setupTestRepo(t, "no-remote-repo")
+	addTestFileAndCommit(t, repoPath, "file.txt", "content")
+
+	repo, err := RepoFromPath(repoPath)
+	assert.NoError(t, err)
+
+	got := GetSafeRemoteURL(repo, "origin")
+	assert.Empty(t, got, "should return empty string when no remotes are configured")
+}
+
+func TestGetSafeRemoteURL_LocalOriginNoUpstream(t *testing.T) {
+	t.Parallel()
+
+	// Create the "original" repo with NO remotes.
+	origPath := setupTestRepo(t, "original-no-upstream")
+	addTestFileAndCommit(t, origPath, "file.txt", "content")
+
+	// Clone it locally — clone's origin points to origPath, which itself has no remote.
+	cloneDir := t.TempDir()
+	clonePath := filepath.Join(cloneDir, "clone")
+	assert.NoError(t, exec.Command("git", "clone", origPath, clonePath).Run())
+
+	cloneRepo, err := RepoFromPath(clonePath)
+	assert.NoError(t, err)
+
+	got := GetSafeRemoteURL(cloneRepo, "origin")
+	// The original repo has no upstream, so we fall back to the local path.
+	assert.Equal(t, origPath, got, "should fall back to local path when original repo has no upstream remote")
+}
+
+func TestGetSafeRemoteURL_RealRemote(t *testing.T) {
+	t.Parallel()
+
+	const expectedRemote = "https://github.com/example/repo.git"
+
+	// A repo whose origin is already a real remote URL (the normal case).
+	repoPath := setupTestRepo(t, "real-remote-repo")
+	addTestFileAndCommit(t, repoPath, "file.txt", "content")
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "remote", "add", "origin", expectedRemote).Run())
+
+	repo, err := RepoFromPath(repoPath)
+	assert.NoError(t, err)
+
+	got := GetSafeRemoteURL(repo, "origin")
+	assert.Equal(t, expectedRemote, got, "should return the remote URL directly when it's not a local path")
+}
+
+func TestGetSafeRemoteURL_FallsBackToFirstRemote(t *testing.T) {
+	t.Parallel()
+
+	const expectedRemote = "https://github.com/example/repo.git"
+
+	repoPath := setupTestRepo(t, "fallback-remote-repo")
+	addTestFileAndCommit(t, repoPath, "file.txt", "content")
+	// Add a remote named "upstream" (not "origin").
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "remote", "add", "upstream", expectedRemote).Run())
+
+	repo, err := RepoFromPath(repoPath)
+	assert.NoError(t, err)
+
+	// Ask for "origin" which doesn't exist — should fall back to "upstream".
+	got := GetSafeRemoteURL(repo, "origin")
+	assert.Equal(t, expectedRemote, got, "should fall back to first available remote when preferred remote doesn't exist")
+}
+
+func TestGetSafeRemoteURL_BareCloneResolvesUpstream(t *testing.T) {
+	t.Parallel()
+
+	const expectedRemote = "https://dev.azure.com/org/project/_git/repo"
+
+	// Create original repo with a real remote.
+	origPath := setupTestRepo(t, "original-for-bare")
+	addTestFileAndCommit(t, origPath, "file.txt", "content")
+	assert.NoError(t, exec.Command("git", "-C", origPath, "remote", "add", "origin", expectedRemote).Run())
+
+	// Create a bare clone (simulates --mirror).
+	cloneDir := t.TempDir()
+	barePath := filepath.Join(cloneDir, "bare-clone")
+	assert.NoError(t, exec.Command("git", "clone", "--bare", origPath, barePath).Run())
+
+	bareRepo, err := RepoFromPath(barePath)
+	assert.NoError(t, err)
+
+	got := GetSafeRemoteURL(bareRepo, "origin")
+	assert.Equal(t, expectedRemote, got, "should resolve bare clone's local origin to the upstream remote")
+}
