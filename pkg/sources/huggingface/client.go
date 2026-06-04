@@ -18,12 +18,14 @@ var apiPaths = map[string]string{
 	DATASET: DatasetsRoute,
 	MODEL:   ModelsAPIRoute,
 	SPACE:   SpacesRoute,
+	BUCKET:  BucketsRoute,
 }
 
 var htmlPaths = map[string]string{
 	DATASET: DatasetsRoute,
 	MODEL:   "",
 	SPACE:   SpacesRoute,
+	BUCKET:  BucketsRoute,
 }
 
 type Author struct {
@@ -222,11 +224,11 @@ func (c *HFClient) ListReposByAuthor(ctx context.Context, resourceType string, a
 // GetBucket retrieves bucket metadata from the Hugging Face API.
 func (c *HFClient) GetBucket(ctx context.Context, bucketID string) (Bucket, error) {
 	var bucket Bucket
-	if c.BaseURL == "" || bucketID == "" {
-		return bucket, errors.New("endpoint and bucketID must not be empty")
+	url, err := buildAPIURL(c.BaseURL, BUCKET, bucketID)
+	if err != nil {
+		return bucket, err
 	}
-	url := fmt.Sprintf("%s/%s/%s/%s", c.BaseURL, APIRoute, BucketsRoute, bucketID)
-	err := c.get(ctx, url, &bucket)
+	err = c.get(ctx, url, &bucket)
 	return bucket, err
 }
 
