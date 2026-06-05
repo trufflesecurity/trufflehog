@@ -1206,5 +1206,5 @@ func TestGitChunk_LongLine(t *testing.T) {
 	wg.Wait()
 	// ensure the goroutine has finished writing to count before we read it
 	// one chunk for the commit/file metadata, and at least one chunk for the file content
-	assert.Equal(t, 2, count, "expected at least two chunk from a file with a 100 KB line")
+	assert.Equal(t, 2, count, "expected two chunks from a file with a 100 KB line")
 }
