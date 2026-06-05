@@ -35,11 +35,13 @@ type Page struct {
 // fall back to a single-secret form.
 func New(styles *theme.Styles, keymap *theme.KeyMap, data any) *Page {
 	d, _ := data.(Data)
+	f := form.New(specsFor(d.KeyType))
+	f.SetSubmitMsg("Run TruffleHog Analyze")
 	return &Page{
 		styles:  styles,
 		keymap:  keymap,
 		keyType: d.KeyType,
-		form:    form.New(specsFor(d.KeyType)),
+		form:    f,
 	}
 }
 

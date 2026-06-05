@@ -65,10 +65,9 @@ type Page struct {
 // New constructs the source picker.
 func New(styles *theme.Styles, keymap *theme.KeyMap, _ any) *Page {
 	items := buildItems()
-	delegate := list.NewDefaultDelegate()
-	l := list.New(items, delegate, 0, 0)
+	l := list.New(items, theme.ListDelegate(), 0, 0)
 	l.Title = "Sources"
-	l.Styles.Title = styles.Title
+	theme.ApplyListStyles(&l, styles)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 	return &Page{list: l, styles: styles, keymap: keymap}

@@ -31,6 +31,12 @@ type Styles struct {
 	TabActive    lipgloss.Style
 	TabInactive  lipgloss.Style
 	TabSeparator lipgloss.Style
+
+	// Buttons. ButtonFocused is the brand-colored CTA used when a form's
+	// submit stop is focused and for the "[ Run TruffleHog ]" affordance on
+	// the source-config run tab. Button is the dim resting state.
+	ButtonFocused lipgloss.Style
+	Button        lipgloss.Style
 }
 
 // DefaultStyles returns the default Styles. The same pointer is returned on
@@ -71,8 +77,8 @@ func buildDefaultStyles() *Styles {
 	s.SelectedItem = lipgloss.NewStyle().
 		PaddingLeft(1).
 		Border(lipgloss.Border{Left: "┃"}, false, false, false, true).
-		BorderForeground(ColorAccent).
-		Foreground(ColorAccent).
+		BorderForeground(ColorSelectBG).
+		Foreground(ColorSelectBG).
 		Bold(true).
 		Height(3)
 
@@ -86,6 +92,16 @@ func buildDefaultStyles() *Styles {
 		SetString("│").
 		Padding(0, 1).
 		Foreground(Smoke)
+
+	s.ButtonFocused = lipgloss.NewStyle().
+		Background(ColorSelectBG).
+		Foreground(ColorSelectFG).
+		Bold(true).
+		Padding(0, 2)
+
+	s.Button = lipgloss.NewStyle().
+		Foreground(ColorMuted).
+		Padding(0, 2)
 
 	return s
 }

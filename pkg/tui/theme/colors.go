@@ -36,7 +36,7 @@ var (
 	ColorLink      = Violet
 	ColorCodeBG    = Bronze
 	ColorCodeFG    = Offwhite
-	ColorSelectBG  = Bronze
+	ColorSelectBG  = Sprout
 	ColorSelectFG  = Offwhite
 	ColorTabActive = Fern
 )

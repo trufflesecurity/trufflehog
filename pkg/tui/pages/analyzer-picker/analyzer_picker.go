@@ -35,12 +35,12 @@ func New(styles *theme.Styles, keymap *theme.KeyMap, _ any) *Page {
 	for i, a := range all {
 		items[i] = item(a)
 	}
-	delegate := list.NewDefaultDelegate()
+	delegate := theme.ListDelegate()
 	delegate.ShowDescription = false
 	delegate.SetSpacing(0)
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Select an analyzer type"
-	l.Styles.Title = styles.Title
+	theme.ApplyListStyles(&l, styles)
 	l.SetShowStatusBar(false)
 	return &Page{list: l, styles: styles, keymap: keymap}
 }

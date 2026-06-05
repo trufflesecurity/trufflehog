@@ -234,7 +234,7 @@ func (p *Page) runView() string {
 	b.WriteString("\nGenerated command:\n")
 	b.WriteString(p.styles.Code.Render(renderCommand(p.sourceAdapter.Cmd(), p.truffleCmd())))
 	b.WriteString("\n\n")
-	b.WriteString(p.styles.Primary.Render("[ press enter to run ]"))
+	b.WriteString(p.styles.ButtonFocused.Render("[ Run TruffleHog ]"))
 	return b.String()
 }
 

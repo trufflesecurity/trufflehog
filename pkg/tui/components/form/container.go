@@ -22,6 +22,11 @@ type SubmitMsg struct {
 // Form is a container that wires a slice of FieldSpecs into working widgets,
 // handles focus / submit, runs validators and constraints, and produces an
 // arg vector via Args.
+//
+// Focus model: f.focused ranges over [0, len(fields)]. Indices 0..len-1 are
+// the field widgets; len(fields) is the submit button stop. Pressing enter on
+// a field advances focus; pressing enter on the submit button validates and
+// emits SubmitMsg.
 type Form struct {
 	fields      []Field
 	constraints []Constraint
@@ -29,16 +34,20 @@ type Form struct {
 	topError    string
 	width       int
 	height      int
+	submitMsg   string
 	submitKeys  key.Binding
 	nextKeys    key.Binding
 	prevKeys    key.Binding
 }
 
 // New constructs a Form from the given field specs and optional cross-field
-// constraints.
+// constraints. The default submit-button label is "Next"; callers should
+// override via SetSubmitMsg when the action is more specific (e.g. "Run
+// TruffleHog Analyze").
 func New(specs []FieldSpec, constraints ...Constraint) *Form {
 	f := &Form{
 		constraints: constraints,
+		submitMsg:   "Next",
 		submitKeys:  key.NewBinding(key.WithKeys("ctrl+s")),
 		nextKeys:    key.NewBinding(key.WithKeys("down")),
 		prevKeys:    key.NewBinding(key.WithKeys("up")),
@@ -50,6 +59,24 @@ func New(specs []FieldSpec, constraints ...Constraint) *Form {
 	f.focused = -1
 	f.focusNext()
 	return f
+}
+
+// SetSubmitMsg sets the label rendered on the submit button. Empty defaults
+// to "Next".
+func (f *Form) SetSubmitMsg(msg string) {
+	if msg == "" {
+		msg = "Next"
+	}
+	f.submitMsg = msg
+}
+
+// submitFocused reports whether focus is currently on the submit button.
+func (f *Form) submitFocused() bool { return f.focused == len(f.fields) }
+
+func (f *Form) submitCmd() tea.Cmd {
+	values := f.Values()
+	args := f.Args()
+	return func() tea.Msg { return SubmitMsg{Values: values, Args: args} }
 }
 
 // Fields returns the underlying field widgets. The slice shares the form's
@@ -123,22 +150,34 @@ func (f *Form) focusNext() {
 	if len(f.fields) == 0 {
 		return
 	}
-	if f.focused >= 0 && f.focused < len(f.fields) {
-		f.fields[f.focused].Blur()
+	f.blurCurrent()
+	f.focused++
+	if f.focused > len(f.fields) {
+		f.focused = 0
 	}
-	f.focused = (f.focused + 1) % len(f.fields)
-	f.fields[f.focused].Focus()
+	if f.focused < len(f.fields) {
+		f.fields[f.focused].Focus()
+	}
 }
 
 func (f *Form) focusPrev() {
 	if len(f.fields) == 0 {
 		return
 	}
+	f.blurCurrent()
+	f.focused--
+	if f.focused < 0 {
+		f.focused = len(f.fields)
+	}
+	if f.focused < len(f.fields) {
+		f.fields[f.focused].Focus()
+	}
+}
+
+func (f *Form) blurCurrent() {
 	if f.focused >= 0 && f.focused < len(f.fields) {
 		f.fields[f.focused].Blur()
 	}
-	f.focused = (f.focused - 1 + len(f.fields)) % len(f.fields)
-	f.fields[f.focused].Focus()
 }
 
 // Update forwards keyboard events to the focused field, handling focus
@@ -153,23 +192,19 @@ func (f *Form) Update(msg tea.Msg) (*Form, tea.Cmd) {
 			f.focusPrev()
 			return f, nil
 		case km.String() == "enter":
-			if f.focused < len(f.fields)-1 {
-				f.focusNext()
-				return f, nil
+			if f.submitFocused() {
+				if !f.Valid() {
+					return f, nil
+				}
+				return f, f.submitCmd()
 			}
-			if !f.Valid() {
-				return f, nil
-			}
-			return f, func() tea.Msg {
-				return SubmitMsg{Values: f.Values(), Args: f.Args()}
-			}
+			f.focusNext()
+			return f, nil
 		case key.Matches(km, f.submitKeys):
 			if !f.Valid() {
 				return f, nil
 			}
-			return f, func() tea.Msg {
-				return SubmitMsg{Values: f.Values(), Args: f.Args()}
-			}
+			return f, f.submitCmd()
 		}
 	}
 	if f.focused >= 0 && f.focused < len(f.fields) {
@@ -193,7 +228,10 @@ func (f *Form) Resize(w, h int) {
 }
 
 // View renders the form. Each field renders its own label/help/error; the
-// form renders the top-level constraint error above all fields.
+// form renders the top-level constraint error above all fields and the
+// submit button below them. The button's brand styling makes the action
+// discoverable — pressing enter on the last field advances to it, not
+// straight to submit.
 func (f *Form) View() string {
 	styles := theme.DefaultStyles()
 	var b strings.Builder
@@ -204,5 +242,12 @@ func (f *Form) View() string {
 	for _, fd := range f.fields {
 		b.WriteString(fd.View())
 	}
+	label := "[ " + f.submitMsg + " ]"
+	if f.submitFocused() {
+		b.WriteString(styles.ButtonFocused.Render(label))
+	} else {
+		b.WriteString(styles.Button.Render(label))
+	}
+	b.WriteString("\n")
 	return lipgloss.NewStyle().Render(b.String())
 }
