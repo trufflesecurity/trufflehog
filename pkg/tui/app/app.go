@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -259,5 +260,43 @@ func (m *Model) View() string {
 	if p == nil {
 		return ""
 	}
-	return m.zone.Scan(m.styles.App.Render(p.View()))
+	body := p.View()
+	if footer := m.renderHelp(p); footer != "" {
+		body = body + "\n" + footer
+	}
+	return m.zone.Scan(m.styles.App.Render(body))
+}
+
+// renderHelp builds the one-line key hint shown below every page. Pages own
+// their per-page bindings via Help(); the router adds quit/back so users
+// always know how to leave.
+func (m *Model) renderHelp(p Page) string {
+	parts := make([]string, 0, 8)
+	for _, b := range p.Help() {
+		if s := formatBinding(b); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	if len(m.stack) > 1 {
+		parts = append(parts, formatBinding(m.keymap.Back))
+	}
+	parts = append(parts, formatBinding(m.keymap.Quit))
+	if len(parts) == 0 {
+		return ""
+	}
+	return m.styles.Hint.Render(strings.Join(parts, "  •  "))
+}
+
+func formatBinding(b key.Binding) string {
+	h := b.Help()
+	if h.Key == "" && h.Desc == "" {
+		return ""
+	}
+	if h.Desc == "" {
+		return h.Key
+	}
+	if h.Key == "" {
+		return h.Desc
+	}
+	return h.Key + " " + h.Desc
 }
