@@ -147,6 +147,8 @@ func TestRedisIntegration_FromChunk(t *testing.T) {
 			}
 			for i := range got {
 				got[i].Raw = nil
+				got[i].SecretParts = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
@@ -206,6 +208,8 @@ func TestURI_FromChunk(t *testing.T) {
 			}
 			for i := range got {
 				got[i].Raw = nil
+				got[i].SecretParts = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

@@ -116,7 +116,7 @@ func verifyCredentials(ctx context.Context, client *http.Client, appId, appSecre
 			if bodyResponse.Code == 0 {
 				return true, nil
 			} else {
-				return false, fmt.Errorf("Verification failed code %d, message %s", bodyResponse.Code, bodyResponse.Message)
+				return false, fmt.Errorf("verification failed code %d, message %s", bodyResponse.Code, bodyResponse.Message)
 			}
 		}
 	default:

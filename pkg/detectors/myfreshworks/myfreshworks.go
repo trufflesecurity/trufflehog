@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -86,7 +87,7 @@ func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resI
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode == http.StatusOK {
 		body, err := io.ReadAll(res.Body)
@@ -95,7 +96,7 @@ func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resI
 		}
 
 		return json.Valid(body), nil
-	} else if !(res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden) {
+	} else if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusForbidden {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 
