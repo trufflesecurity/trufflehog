@@ -53,12 +53,12 @@ KRAKEN_PRIVATE_KEY="%s"
 		},
 		{
 			name:  "invalid pattern - malformed api key base64 padding",
-			input: fmt.Sprintf("%s key = '%s' secret = '%s'", keyword, invalidKeyPattern, validPrivKeyPattern),
+			input: fmt.Sprintf("%s key = '%s' %s secret = '%s'", keyword, invalidKeyPattern, keyword, validPrivKeyPattern),
 			want:  []string{},
 		},
 		{
 			name:  "invalid pattern - malformed private key base64 padding",
-			input: fmt.Sprintf("%s key = '%s' secret = '%s'", keyword, validKeyPattern, invalidPrivKeyPattern),
+			input: fmt.Sprintf("%s key = '%s' %s secret = '%s'", keyword, validKeyPattern, keyword, invalidPrivKeyPattern),
 			want:  []string{},
 		},
 	}
