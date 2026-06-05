@@ -1782,6 +1782,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.GitLabOAuthDetectorEnabled.Load()
 		case *sonarcloudv2.Scanner:
 			return !feature.SonarCloudV2DetectorEnabled.Load()
+		case *enigma.Scanner:
+			return !feature.EnigmaDetectorEnabled.Load()
 		default:
 			return false
 		}

@@ -20,6 +20,7 @@ var (
 	CloudinaryDetectorEnabled      atomic.Bool
 	GitLabOAuthDetectorEnabled     atomic.Bool
 	SonarCloudV2DetectorEnabled    atomic.Bool
+	EnigmaDetectorEnabled          atomic.Bool
 )
 
 type AtomicString struct {
