@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1191,7 +1192,10 @@ func TestGitChunk_LongLine(t *testing.T) {
 
 	chunksCh := make(chan *sources.Chunk, 64)
 	var count int
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for range chunksCh {
 			count++
 		}
@@ -1199,6 +1203,8 @@ func TestGitChunk_LongLine(t *testing.T) {
 
 	assert.NoError(t, s.Chunks(ctx, chunksCh))
 	close(chunksCh)
+	wg.Wait()
+	// ensure the goroutine has finished writing to count before we read it
 	// one chunk for the commit/file metadata, and at least one chunk for the file content
 	assert.Equal(t, 2, count, "expected at least two chunk from a file with a 100 KB line")
 }
