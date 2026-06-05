@@ -1517,9 +1517,20 @@ def test_something():
     connection_string = "who-cares"
 
     # Ignoring this does not work
-	assert some_other_stuff == "blah" # trufflehog:ignore
+    assert some_other_stuff == "blah" # trufflehog:ignore
     assert connection_string == "postgres://master_user:master_password@hostname:1234/main"`,
 			expectedFindings: 1,
+		},
+		{
+			name: "ignore postgres URI without explicit port",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    assert connection_string == "postgres://master_user:master_password@hostname/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
 		},
 	}
 

@@ -130,6 +130,18 @@ func TestPostgres_ExtraData(t *testing.T) {
 	}
 }
 
+func TestPostgres_PreservesMatchedURIForLineOffsets(t *testing.T) {
+	s := Scanner{}
+	uri := "postgres://sN19x:d7N8bs@1.2.3.4/mydb"
+
+	results, err := s.FromData(context.Background(), false, []byte(uri))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, []byte("postgres://sN19x:d7N8bs@1.2.3.4:5432"), results[0].Raw)
+	assert.Equal(t, uri, results[0].GetPrimarySecretValue())
+}
+
 func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
 	s := New(
 		WithIgnorePattern([]string{

@@ -52,6 +52,11 @@ var (
 	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 )
 
+type uriMatch struct {
+	params map[string]string
+	uri    string
+}
+
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
@@ -95,10 +100,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	var results []detectors.Result
 	candidateParamSets := findUriMatches(data, s.ignorePatterns)
 
-	for _, params := range candidateParamSets {
+	for _, candidate := range candidateParamSets {
 		if common.IsDone(ctx) {
 			break
 		}
+		params := candidate.params
 		user, ok := params[pgUser]
 		if !ok {
 			continue
@@ -141,6 +147,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			RawV2:        raw,
 			SecretParts:  map[string]string{"connection_string": string(raw)},
 		}
+		result.SetPrimarySecretValue(candidate.uri)
 
 		// We don't need to normalize the (deprecated) requiressl option into the (up-to-date) sslmode option - pq can
 		// do it for us - but we will do it anyway here so that when we later capture sslmode into ExtraData we will
@@ -199,8 +206,8 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
-func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []map[string]string {
-	var matches []map[string]string
+func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []uriMatch {
+	var matches []uriMatch
 	for _, uri := range uriPattern.FindAll(data, -1) {
 		if shouldIgnore(uri, ignorePatterns) {
 			continue
@@ -224,7 +231,10 @@ func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []map[string]s
 		}
 
 		params[pgDbType] = dbType
-		matches = append(matches, params)
+		matches = append(matches, uriMatch{
+			params: params,
+			uri:    string(uri),
+		})
 	}
 	return matches
 }
