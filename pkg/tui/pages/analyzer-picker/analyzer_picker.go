@@ -86,3 +86,13 @@ func (p *Page) Help() []key.Binding {
 }
 
 func (p *Page) AllowQKey() bool { return false }
+
+// ClaimsBack lets the page consume esc when a filter is open or applied,
+// matching the bubbles/list contract where esc clears the filter.
+func (p *Page) ClaimsBack() bool {
+	switch p.list.FilterState() {
+	case list.Filtering, list.FilterApplied:
+		return true
+	}
+	return false
+}

@@ -207,6 +207,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// BackClaimer is implemented by pages that need first dibs on the Back key —
+// e.g. bubbles/list with filtering enabled uses esc to cancel an active
+// filter, and would otherwise lose that affordance to the router.
+type BackClaimer interface {
+	// ClaimsBack reports whether the page wants to handle the Back key
+	// itself on this tick. When true, the router forwards the key instead
+	// of popping the page.
+	ClaimsBack() bool
+}
+
 // handleGlobalKey inspects the key against the router-level bindings and
 // returns (cmd, handled). When handled is true the caller MUST NOT forward the
 // key to the active page, even if cmd is nil: bubbles/list (and other
@@ -225,6 +235,9 @@ func (m *Model) handleGlobalKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		}
 		return nil, false
 	case key.Matches(msg, m.keymap.Back):
+		if p, ok := m.active().(BackClaimer); ok && p.ClaimsBack() {
+			return nil, false
+		}
 		if len(m.stack) <= 1 {
 			m.args = nil
 			return tea.Quit, true

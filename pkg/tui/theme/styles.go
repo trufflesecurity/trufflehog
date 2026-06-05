@@ -1,6 +1,10 @@
 package theme
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"sync"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Styles is the style sheet the TUI renders with. Only fields actually
 // rendered somewhere live here; if you find yourself adding a field that
@@ -29,8 +33,12 @@ type Styles struct {
 	TabSeparator lipgloss.Style
 }
 
-// DefaultStyles returns the default Styles.
-func DefaultStyles() *Styles {
+// DefaultStyles returns the default Styles. The same pointer is returned on
+// every call — Styles is immutable after construction, so widgets can call
+// this on every render without paying for repeated allocations.
+var DefaultStyles = sync.OnceValue(buildDefaultStyles)
+
+func buildDefaultStyles() *Styles {
 	s := new(Styles)
 
 	s.App = lipgloss.NewStyle().Margin(1, 2)

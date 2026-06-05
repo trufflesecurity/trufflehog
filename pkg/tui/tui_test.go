@@ -22,7 +22,6 @@ func TestInitialPage(t *testing.T) {
 		{name: "analyze GitHub casefold → form", args: []string{"analyze", "GitHub"}, wantID: app.PageAnalyzerForm, wantKey: "github"},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			id, data := initialPage(tc.args)
 			if id != tc.wantID {

@@ -11,18 +11,18 @@ import "strings"
 func BuildArgs(specs []FieldSpec, values map[string]string) []string {
 	var out []string
 	for _, s := range specs {
-		v := values[s.Key]
+		v := strings.TrimSpace(values[s.Key])
 		if s.Transform != nil {
-			v = s.Transform(strings.TrimSpace(v))
+			v = strings.TrimSpace(s.Transform(v))
 		}
 		switch s.Emit {
 		case EmitLongFlag:
-			if strings.TrimSpace(v) == "" {
+			if v == "" {
 				continue
 			}
 			out = append(out, "--"+s.Key, v)
 		case EmitLongFlagEq:
-			if strings.TrimSpace(v) == "" {
+			if v == "" {
 				continue
 			}
 			out = append(out, "--"+s.Key+"="+v)
@@ -39,7 +39,7 @@ func BuildArgs(specs []FieldSpec, values map[string]string) []string {
 				out = append(out, s.Constant...)
 			}
 		case EmitPositional:
-			if strings.TrimSpace(v) == "" {
+			if v == "" {
 				continue
 			}
 			out = append(out, v)

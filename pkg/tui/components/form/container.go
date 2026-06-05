@@ -145,11 +145,22 @@ func (f *Form) focusPrev() {
 // cycling and submission at the container level.
 func (f *Form) Update(msg tea.Msg) (*Form, tea.Cmd) {
 	if km, ok := msg.(tea.KeyMsg); ok {
+		// Text-entry widgets need first dibs on up/down so the cursor /
+		// history affordances bubbles/textinput owns aren't stolen by
+		// focus cycling. Checkbox and select fields don't use arrows for
+		// anything, so we keep them as focus shortcuts there.
+		focusKeysSafe := true
+		if f.focused >= 0 && f.focused < len(f.fields) {
+			switch f.fields[f.focused].Spec().Kind {
+			case KindText, KindSecret:
+				focusKeysSafe = false
+			}
+		}
 		switch {
-		case key.Matches(km, f.nextKeys):
+		case focusKeysSafe && key.Matches(km, f.nextKeys):
 			f.focusNext()
 			return f, nil
-		case key.Matches(km, f.prevKeys):
+		case focusKeysSafe && key.Matches(km, f.prevKeys):
 			f.focusPrev()
 			return f, nil
 		case km.String() == "enter":
