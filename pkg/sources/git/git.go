@@ -750,7 +750,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
 		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
@@ -901,6 +900,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 	defer func() { _ = reader.Close() }()
 
 	originalChunk := bufio.NewScanner(reader)
+	// Default bufio max token size (64 KB) is too small for files with long lines
+	// (e.g. minified JS, base64 blobs). Raise the cap to 10 MB so those lines
+	// are still scanned; the oversize-line path below will chunk them correctly.
+	// The initial buffer starts at 4 KB (same as bufio's default) and grows only
+	// when a line actually exceeds the current size, keeping allocations cheap for
+	// the common case of small diffs.
+	const maxScanTokenSize = 10 * 1024 * 1024
+	originalChunk.Buffer(make([]byte, 4096), maxScanTokenSize)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
@@ -966,6 +973,9 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		if _, err := newChunkBuffer.Write(line); err != nil {
 			ctx.Logger().Error(err, "error writing to chunk buffer", "filename", fileName, "commit", hash, "file", diff.PathB)
 		}
+	}
+	if err := originalChunk.Err(); err != nil {
+		ctx.Logger().Error(err, "error scanning chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
 	}
 	// Send anything still in the new chunk buffer
 	if newChunkBuffer.Len() > 0 {
