@@ -1782,6 +1782,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.GitLabOAuthDetectorEnabled.Load()
 		case *figmapersonalaccesstokenv3.Scanner:
 			return !feature.FigmaV3DetectorEnabled.Load()
+		case *enigma.Scanner:
+			return !feature.EnigmaDetectorEnabled.Load()
 		default:
 			return false
 		}
