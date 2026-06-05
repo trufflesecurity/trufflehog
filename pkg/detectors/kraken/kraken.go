@@ -51,13 +51,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
-		if !isValidBase64(resMatch) {
+		if _, ok := decodeBase64(resMatch); !ok {
 			continue
 		}
 
 		for _, privKeyMatch := range privKeyMatches {
 			resPrivKeyMatch := strings.TrimSpace(privKeyMatch[1])
-			if !isValidBase64(resPrivKeyMatch) {
+			b64DecodedSecret, ok := decodeBase64(resPrivKeyMatch)
+			if !ok {
 				continue
 			}
 
@@ -79,7 +80,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				payload := url.Values{}
 				payload.Add("nonce", apiNonce)
 
-				b64DecodedSecret, _ := base64.StdEncoding.DecodeString(resPrivKeyMatch)
 				signature := getKrakenSignature("/0/private/Balance", payload, b64DecodedSecret)
 
 				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.kraken.com/0/private/Balance", strings.NewReader(payload.Encode()))
@@ -108,9 +108,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func isValidBase64(candidate string) bool {
-	_, err := base64.StdEncoding.DecodeString(candidate)
-	return err == nil
+func decodeBase64(candidate string) ([]byte, bool) {
+	decoded, err := base64.StdEncoding.DecodeString(candidate)
+	if err == nil {
+		return decoded, true
+	}
+
+	decoded, err = base64.RawStdEncoding.DecodeString(candidate)
+	if err == nil {
+		return decoded, true
+	}
+
+	return nil, false
 }
 
 // Code from https://docs.kraken.com/rest/#section/Authentication/Headers-and-Signature

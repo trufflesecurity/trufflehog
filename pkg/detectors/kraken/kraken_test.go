@@ -12,11 +12,12 @@ import (
 )
 
 var (
-	validKeyPattern       = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkq"
-	invalidKeyPattern     = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCk="
-	validPrivKeyPattern   = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpag=="
-	invalidPrivKeyPattern = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZG=mhpag=="
-	keyword               = "kraken"
+	validKeyPattern             = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkq"
+	invalidKeyPattern           = "AQIDBAUGBwgJCgsMDQ4PEBESExQV=hcYGRobHB0eHyAhIiMkJSYnKCkq"
+	validPrivKeyPattern         = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpag=="
+	validUnpaddedPrivKeyPattern = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpag"
+	invalidPrivKeyPattern       = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZG=mhpag=="
+	keyword                     = "kraken"
 )
 
 func TestKraken_Pattern(t *testing.T) {
@@ -33,6 +34,11 @@ func TestKraken_Pattern(t *testing.T) {
 			want:  []string{validKeyPattern + validPrivKeyPattern},
 		},
 		{
+			name:  "valid pattern - private key without base64 padding",
+			input: fmt.Sprintf("%s '%s' %s '%s'", keyword, validKeyPattern, keyword, validUnpaddedPrivKeyPattern),
+			want:  []string{validKeyPattern + validUnpaddedPrivKeyPattern},
+		},
+		{
 			name: "valid pattern - quoted env vars",
 			input: fmt.Sprintf(`
 KRAKEN_API_KEY="%s"
@@ -46,8 +52,13 @@ KRAKEN_PRIVATE_KEY="%s"
 			want:  []string{},
 		},
 		{
-			name:  "invalid pattern - malformed base64 padding",
-			input: fmt.Sprintf("%s key = '%s' secret = '%s'", keyword, invalidKeyPattern, invalidPrivKeyPattern),
+			name:  "invalid pattern - malformed api key base64 padding",
+			input: fmt.Sprintf("%s key = '%s' secret = '%s'", keyword, invalidKeyPattern, validPrivKeyPattern),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - malformed private key base64 padding",
+			input: fmt.Sprintf("%s key = '%s' secret = '%s'", keyword, validKeyPattern, invalidPrivKeyPattern),
 			want:  []string{},
 		},
 	}
