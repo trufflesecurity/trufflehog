@@ -19,7 +19,7 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{
 		`influx(?:db)?[_-]?(?:api[_-]?)?token`,
 		`datasource[_-][a-z0-9_-]{0,32}[_-]token`,
-	}) + `\b([A-Za-z0-9_-]{40,}={0,2})(?:[^A-Za-z0-9_\-=]|$)`)
+	}) + `\b([A-Za-z0-9][A-Za-z0-9_-]{39,}={0,2})(?:[^A-Za-z0-9_=]|$)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
