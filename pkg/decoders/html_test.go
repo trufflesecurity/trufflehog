@@ -371,6 +371,73 @@ func TestHTML_FromChunk(t *testing.T) {
 			want:  "5 > 3 & 2 < 4",
 		},
 
+		// --- ASPX / namespace-prefixed tag support ---
+		{
+			// Fragment ASPX pages (master-page-based) have no <html> wrapper;
+			// they start with an <%@ Page %> directive and use <asp:Content>
+			// as their root. The updated htmlTagPattern must match the
+			// namespace-prefixed tag so the decoder doesn't return nil.
+			// The <%@ ... %> directive is emitted as text by the HTML5 parser
+			// (< followed by % is not a valid tag start, so < is treated literally).
+			// Namespace element attributes (PlaceHolderMain, server) are also
+			// emitted because <asp:Content> is a namespace-prefixed element.
+			name: "aspx fragment with namespace tags and no html wrapper",
+			chunk: &sources.Chunk{Data: []byte(
+				"<%@ Page MasterPageFile=\"~masterurl/default.master\" %>\n" +
+					`<asp:Content ContentPlaceHolderId="PlaceHolderMain" runat="server">` +
+					"<div>api_key=abc123</div>" +
+					"</asp:Content>",
+			)},
+			want: "<%@ Page MasterPageFile=\"~masterurl/default.master\" %>\nPlaceHolderMain\nserver\napi_key=abc123",
+		},
+		{
+			// ASP.NET server controls carry secrets in PascalCase attributes
+			// (ConnectionString, Text, SelectCommand, etc.) that are not in
+			// highSignalAttrs and do not use the data- prefix. Namespace-prefixed
+			// elements must have all their attributes emitted.
+			name:  "aspx server control attribute extraction - ConnectionString",
+			chunk: &sources.Chunk{Data: []byte(`<html><body><asp:SqlDataSource ConnectionString="Server=.;Password=hunter2" runat="server" /></body></html>`)},
+			want:  "Server=.;Password=hunter2\nserver",
+		},
+		{
+			// A plain Text attribute on a server control (common for labels,
+			// textboxes, buttons that carry pre-filled values).
+			name:  "aspx server control attribute extraction - Text",
+			chunk: &sources.Chunk{Data: []byte(`<html><body><asp:TextBox Text="api_key=secret123" runat="server" /></body></html>`)},
+			want:  "api_key=secret123\nserver",
+		},
+		{
+			// Entity-encoded HTML chunk with no literal tags. This simulates a
+			// chunk that falls entirely within a large entity-encoded field (e.g.
+			// SharePoint mso:CanvasContent1). The htmlEntityPattern must fire so
+			// the decoder does not return nil. html.Parse decodes the entities to
+			// literal HTML markup — the engine's iterativeDecode then re-applies
+			// the HTML decoder at depth 2 to fully extract the secret. At depth 1
+			// the output is the decoded markup string.
+			name:  "entity-encoded html chunk with no literal tags",
+			chunk: &sources.Chunk{Data: []byte(`&lt;div data-sp-rte=&quot;&quot;&gt;&lt;p&gt;api_key=secret123&lt;/p&gt;&lt;/div&gt;`)},
+			want:  `<div data-sp-rte=""><p>api_key=secret123</p></div>`,
+		},
+		{
+			// SharePoint stores page content entity-encoded inside mso:CanvasContent1.
+			// The first html.Parse pass decodes the entities to a text string containing
+			// literal HTML markup. The engine's iterativeDecode then re-applies the HTML
+			// decoder at depth 2 to extract content from that inner markup.
+			// At depth 1 (this test), the entity-encoded text is emitted as plain text
+			// after residualEntityReplacer runs. The msdt:dt="string" attribute is also
+			// emitted because mso:CanvasContent1 is a namespace-prefixed element.
+			name: "sharepoint aspx mso:CanvasContent1 secret in nested html",
+			chunk: &sources.Chunk{Data: []byte(
+				`<html xmlns:mso="urn:schemas-microsoft-com:office:office">` +
+					`<head><mso:CustomDocumentProperties>` +
+					`<mso:CanvasContent1 msdt:dt="string">` +
+					`&lt;div&gt;&lt;p&gt;-----BEGIN OPENSSH PRIVATE KEY-----&lt;/p&gt;&lt;/div&gt;` +
+					`</mso:CanvasContent1>` +
+					`</mso:CustomDocumentProperties></head></html>`,
+			)},
+			want: "string\n<div><p>-----BEGIN OPENSSH PRIVATE KEY-----</p></div>",
+		},
+
 		// --- Integration: all extraction types in one chunk ---
 		{
 			// Combines text nodes (split across spans), URL-decoded attribute
@@ -462,6 +529,25 @@ func TestLooksLikeHTML(t *testing.T) {
 		{"XML-like", "<root>content</root>", true},
 		{"just less-than", "a < b", false},
 		{"html entity only", "&amp; &lt;", false},
+
+		// ASPX / namespace-prefixed tags (literal form)
+		{"aspx namespace tag with space", `<asp:Content runat="server">`, true},
+		{"mso namespace tag with space", `<mso:WikiField msdt:dt="string">`, true},
+		{"multi-segment namespace tag", `<WebPartPages:WebPartZone runat="server">`, true},
+
+		// Entity-encoded HTML tags (positive)
+		{"entity-encoded div with space", `&lt;div class="foo"&gt;`, true},
+		{"entity-encoded p with gt terminator", `&lt;p&gt;hello&lt;/p&gt;`, true},
+		{"entity-encoded self-closing br", `&lt;br/&gt;`, true},
+		{"entity-encoded namespace tag", `&lt;asp:Content runat="server"&gt;`, true},
+
+		// Entity-encoded false positives that must NOT match
+		{"comparison operator entity-encoded", `x &lt; maxRetries exceeded`, false},
+		{"comparison operator single word", `result &lt; threshold`, false},
+		{"template placeholder entity-encoded", `&lt;YOUR_API_KEY&gt;`, false},
+		{"double-encoded entity not matched", `&amp;lt;div&gt;`, false},
+		{"json with digit after lt", `{"lt": "<3"}`, false},
+		{"sql comparison bare lt", `SELECT * FROM t WHERE a < b`, false},
 	}
 
 	for _, tt := range tests {

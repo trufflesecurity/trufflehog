@@ -131,6 +131,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// These should be removed from this list when we remove the feature flag
 	detector_typepb.DetectorType_Cloudinary:    {},
 	detector_typepb.DetectorType_DatadogApikey: {},
+	detector_typepb.DetectorType_Enigma:        {},
 	detector_typepb.DetectorType_GitLabOauth2:  {},
 	detector_typepb.DetectorType_Pinecone:      {},
 

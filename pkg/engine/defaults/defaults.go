@@ -1780,6 +1780,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *enigma.Scanner:
+			return !feature.EnigmaDetectorEnabled.Load()
 		case *datadogapikey.Scanner:
 			return !feature.DatadogApiKeyDetectorEnabled.Load()
 		default:
