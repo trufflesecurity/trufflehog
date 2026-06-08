@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -32,39 +33,83 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify User secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(
+	ctx context.Context,
+	verify bool,
+	data []byte,
+) (results []detectors.Result, err error) {
+
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueTokens := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueTokens[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
-		s1 := detectors.Result{
+	for token := range uniqueTokens {
+		result := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_User,
-			Raw:          []byte(resMatch),
-			SecretParts:  map[string]string{"key": resMatch},
+			Raw:          []byte(token),
+			SecretParts: map[string]string{
+				"key": token,
+			},
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://detectors.user.com/api/public/users/", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Token %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			verified, verificationErr := verifyUserToken(
+				ctx,
+				client,
+				token,
+			)
+			result.SetVerificationError(verificationErr, token)
+			result.Verified = verified
 		}
 
-		results = append(results, s1)
+		results = append(results, result)
 	}
 
-	return results, nil
+	return
+}
+
+func verifyUserToken(
+	ctx context.Context,
+	client *http.Client,
+	token string,
+) (bool, error) {
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		"https://detectors.user.com/api/public/users/",
+		http.NoBody,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Token %s", token))
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusGone:
+		// Token is invalid, revoked, or endpoint no longer valid.
+		return false, nil
+	default:
+		return false, fmt.Errorf(
+			"unexpected HTTP response status %d",
+			res.StatusCode,
+		)
+	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
