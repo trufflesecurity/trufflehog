@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	validPattern   = "pk_1234567890abcdefghijklmnopqrstuvwx"
+	validPattern   = "pk_a1b2c3d4e5f60718293a4b5c6d7e8f9012"
 	invalidPattern = "pk_1234567890abcdefghijklmnopqrstu-_="
 	keyword        = "klaviyo"
 )
