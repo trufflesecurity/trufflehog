@@ -53,7 +53,7 @@ func TestHandleFile(t *testing.T) {
 
 // Fetched over HTTP; the ~5 MB upstream fixture would notably grow pkg/handlers/testdata/ if embedded.
 func TestHandleHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm_random_data.json")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/sm_random_data.json")
 	assert.NoError(t, err)
 	defer func() {
 		if resp != nil && resp.Body != nil {
@@ -408,7 +408,7 @@ func BenchmarkHandleTar(b *testing.B) {
 
 // Fetched over HTTP; the ~18 MB upstream fixture would substantially grow pkg/handlers/testdata/ if embedded.
 func TestHandleLargeHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/md_random_data.json.zip")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/md_random_data.json.zip")
 	if !assert.NoError(t, err) {
 		return
 	}
