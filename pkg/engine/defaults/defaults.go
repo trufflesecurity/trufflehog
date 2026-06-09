@@ -218,6 +218,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dareboost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databrickstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
@@ -1097,6 +1098,7 @@ func buildDetectorList() []detectors.Detector {
 		&dareboost.Scanner{},
 		&databox.Scanner{},
 		&databrickstoken.Scanner{},
+		&datadogapikey.Scanner{},
 		&datadogtoken.Scanner{},
 		&datagov.Scanner{},
 		// &debounce.Scanner{},
@@ -1780,6 +1782,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.GitLabOAuthDetectorEnabled.Load()
 		case *enigma.Scanner:
 			return !feature.EnigmaDetectorEnabled.Load()
+		case *datadogapikey.Scanner:
+			return !feature.DatadogApiKeyDetectorEnabled.Load()
 		default:
 			return false
 		}
