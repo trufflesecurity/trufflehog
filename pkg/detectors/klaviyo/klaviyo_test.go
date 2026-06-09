@@ -1,3 +1,4 @@
+// Pattern tests for the Klaviyo detector.
 package klaviyo
 
 import (
@@ -5,83 +6,80 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern    = "pk_a1b2c3d4e5f60718293a4b5c6d7e8f9012"
-	validPatternNew = "pk_AbCdEf_f0e1d2c3b4a5968778695a4b3c2d1e0f00"
-	invalidPattern  = "pk_1234567890abcdefghijklmnopqrstu-_="
-	keyword         = "klaviyo"
-)
+// KlaviyoPatternSuite drives keyPat through the engine's real path (keyword
+// prefilter, then FromData). One method per case, so a failure names it.
+type KlaviyoPatternSuite struct {
+	suite.Suite
+	d    Scanner
+	core *ahocorasick.Core
+}
 
-func TestKlaviyo_Pattern(t *testing.T) {
-	d := Scanner{}
-	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-	tests := []struct {
-		name  string
-		input string
-		want  []string
-	}{
-		{
-			name:  "valid pattern - with keyword klaviyo",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "valid pattern (new format) - with keyword klaviyo",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPatternNew),
-			want:  []string{validPatternNew},
-		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
-		},
-	}
+func TestKlaviyoPatternSuite(t *testing.T) {
+	suite.Run(t, new(KlaviyoPatternSuite))
+}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
-				return
-			}
+// Fresh scanner and prefilter per method, so state can't leak between cases.
+func (s *KlaviyoPatternSuite) SetupTest() {
+	s.d = Scanner{}
+	s.core = ahocorasick.NewAhoCorasickCore([]detectors.Detector{s.d})
+}
 
-			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+// Legacy keys must keep matching despite the tighter lowercase-hex rule.
+func (s *KlaviyoPatternSuite) TestLegacyHexFormat() {
+	key := "pk_a1b2c3d4e5f60718293a4b5c6d7e8f9012" // pk_ + 34 lowercase hex
+	input := fmt.Sprintf("klaviyo token = '%s'", key)
+	s.Require().NotEmpty(s.core.FindDetectorMatches([]byte(input)), "keyword prefilter should fire")
 
-			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
-				return
-			}
+	results, err := s.d.FromData(context.Background(), false, []byte(input))
+	s.Require().NoError(err)
+	s.Require().Len(results, 1)
+	s.Equal(key, string(results[0].Raw))
+}
 
-			actual := make(map[string]struct{}, len(results))
-			for _, r := range results {
-				if len(r.RawV2) > 0 {
-					actual[string(r.RawV2)] = struct{}{}
-				} else {
-					actual[string(r.Raw)] = struct{}{}
-				}
-			}
-			expected := make(map[string]struct{}, len(test.want))
-			for _, v := range test.want {
-				expected[v] = struct{}{}
-			}
+// The newer prefixed format. Mixed-case company_id is the bit a hex-only
+// guess would miss.
+func (s *KlaviyoPatternSuite) TestNewPrefixedFormat() {
+	key := "pk_AbCdEf_f0e1d2c3b4a5968778695a4b3c2d1e0f00" // pk_ + 6 alnum company_id + _ + 34 hex
+	input := fmt.Sprintf("klaviyo token = '%s'", key)
+	s.Require().NotEmpty(s.core.FindDetectorMatches([]byte(input)), "keyword prefilter should fire")
 
-			if diff := cmp.Diff(expected, actual); diff != "" {
-				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
-			}
-		})
-	}
+	results, err := s.d.FromData(context.Background(), false, []byte(input))
+	s.Require().NoError(err)
+	s.Require().Len(results, 1)
+	s.Equal(key, string(results[0].Raw))
+}
+
+// Punctuation in the body should never read as a key.
+func (s *KlaviyoPatternSuite) TestPunctuationBodyRejected() {
+	results, err := s.d.FromData(context.Background(), false, []byte("klaviyo = 'pk_1234567890abcdefghijklmnopqrstu-_='"))
+	s.Require().NoError(err)
+	s.Empty(results)
+}
+
+// Legacy bodies are lowercase hex (vendor-confirmed), so uppercase is a false
+// positive.
+func (s *KlaviyoPatternSuite) TestUppercaseHexRejected() {
+	results, err := s.d.FromData(context.Background(), false, []byte("klaviyo = 'pk_A1B2C3D4E5F60718293A4B5C6D7E8F9012'"))
+	s.Require().NoError(err)
+	s.Empty(results)
+}
+
+// Guards the legacy {34} length.
+func (s *KlaviyoPatternSuite) TestLegacyTooShortRejected() {
+	results, err := s.d.FromData(context.Background(), false, []byte("klaviyo = 'pk_a1b2c3d4e5f60718293a4b5c6d7e8f901'")) // 33 hex
+	s.Require().NoError(err)
+	s.Empty(results)
+}
+
+// Guards the new-format {34} tail and trailing \b.
+func (s *KlaviyoPatternSuite) TestNewFormatTailTooLongRejected() {
+	results, err := s.d.FromData(context.Background(), false, []byte("klaviyo = 'pk_AbCdEf_f0e1d2c3b4a5968778695a4b3c2d1e0f001'")) // 35 hex tail
+	s.Require().NoError(err)
+	s.Empty(results)
 }
