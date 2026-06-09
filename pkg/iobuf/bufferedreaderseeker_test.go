@@ -578,6 +578,42 @@ func TestBufferedReaderSeekerReadSpansDiskAndBuffer(t *testing.T) {
 	assert.Equal(t, payload[40:48], tail, "buffered tail orphaned by spanning read")
 }
 
+// TestBufferedReaderSeekerReadRewindAfterFlush is the issue #4569 shape
+// (slice bounds panic during APK/DEX scans): flush the buffer to disk, pull a
+// few more bytes into the refilled buffer, seek back to the start, then issue
+// a Read that the old code split across both branches. The cumulative-count
+// reslice (`out = out[totalBytesRead:]`) then walked past the already
+// shortened tail of `out` and panicked.
+func TestBufferedReaderSeekerReadRewindAfterFlush(t *testing.T) {
+	payload := make([]byte, 4096)
+	for i := range payload {
+		payload[i] = byte(i % 251)
+	}
+
+	brs := NewBufferedReaderSeeker(bytes.NewBuffer(payload))
+	defer brs.Close()
+	brs.threshold = 32
+
+	// Flush 32 bytes to disk, then leave 8 more sitting in the buffer.
+	if _, err := io.ReadFull(brs, make([]byte, 32)); err != nil {
+		t.Fatalf("priming disk read: %v", err)
+	}
+	if _, err := io.ReadFull(brs, make([]byte, 8)); err != nil {
+		t.Fatalf("priming buffer read: %v", err)
+	}
+
+	if _, err := brs.Seek(0, io.SeekStart); err != nil {
+		t.Fatalf("seek: %v", err)
+	}
+
+	// 20 bytes from position 0; the pre-fix code panicked here.
+	got := make([]byte, 20)
+	n, err := brs.Read(got)
+	assert.NoError(t, err)
+	assert.Equal(t, 20, n)
+	assert.Equal(t, payload[:20], got, "rewound read returned wrong bytes")
+}
+
 // errorReader is an io.Reader that returns an error after reading a specified number of bytes.
 // It's used to simulate non-EOF errors during read operations.
 type errorReader struct {
