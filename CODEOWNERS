@@ -1,56 +1,13 @@
-# catch-all
-* @trufflesecurity/product-eng
+# Default -- Integrations owns OSS, community, detectors, sources, analyzers
+* @trufflesecurity/integrations
 
-# Shared
-pkg/decoders/ @trufflesecurity/Scanning @trufflesecurity/OSS
-pkg/engine/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-pkg/gitparse/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-pkg/giturl/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-pkg/handlers/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-pkg/iobuf/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-pkg/sanitizer/ @trufflesecurity/Scanning  @trufflesecurity/OSS
-proto/ @trufflesecurity/Scanning  @trufflesecurity/Integrations
+# Scan engine and pipeline
+pkg/decoders/ @trufflesecurity/scanning
+pkg/engine/ @trufflesecurity/scanning
+pkg/handlers/ @trufflesecurity/scanning
+pkg/iobuf/ @trufflesecurity/scanning
+pkg/sanitizer/ @trufflesecurity/scanning
+pkg/writers/ @trufflesecurity/scanning
 
-# Scanning
-pkg/sources/ @trufflesecurity/Scanning
-pkg/writers/ @trufflesecurity/Scanning
-
-# Integrations
-pkg/sources/circleci/ @trufflesecurity/Integrations
-pkg/sources/docker/ @trufflesecurity/Integrations
-pkg/sources/elasticsearch/ @trufflesecurity/Integrations
-pkg/sources/filesystem/ @trufflesecurity/Integrations
-pkg/sources/gcs/ @trufflesecurity/Integrations
-pkg/sources/git/ @trufflesecurity/Integrations
-pkg/sources/github/ @trufflesecurity/Integrations
-pkg/sources/gitlab/ @trufflesecurity/Integrations
-pkg/sources/jenkins/ @trufflesecurity/Integrations
-pkg/sources/postman/ @trufflesecurity/Integrations
-pkg/sources/s3/ @trufflesecurity/Integrations
-pkg/sources/travisci/ @trufflesecurity/Integrations
-proto/detector_type.proto @trufflesecurity/Integrations
-
-# OSS
-pkg/detectors/ @trufflesecurity/OSS
-pkg/common/ @trufflesecurity/OSS
-pkg/custom_detectors/ @trufflesecurity/OSS
-pkg/analyzer/ @trufflesecurity/OSS
-pkg/engine/defaults/defaults.go @trufflesecurity/OSS
-pkg/engine/defaults/defaults_test.go @trufflesecurity/OSS
-
-# critical detectors
-pkg/detectors/aws/ @trufflesecurity/backend
-pkg/detectors/gcp/ @trufflesecurity/backend
-pkg/detectors/azure/ @trufflesecurity/backend
-pkg/detectors/okta/ @trufflesecurity/backend
-pkg/detectors/privatekey/ @trufflesecurity/backend
-pkg/detectors/slack/ @trufflesecurity/backend
-pkg/detectors/slackwebhook/ @trufflesecurity/backend
-pkg/detectors/microsoftteamswebhook/ @trufflesecurity/backend
-pkg/detectors/twilio/ @trufflesecurity/backend
-pkg/detectors/sendgrid/ @trufflesecurity/backend
-pkg/detectors/gitlab/ @trufflesecurity/backend
-pkg/detectors/gitlabv2/ @trufflesecurity/backend
-pkg/detectors/github/ @trufflesecurity/backend
-pkg/detectors/github_old/ @trufflesecurity/backend
-pkg/detectors/githubapp/ @trufflesecurity/backend
+# Contracts -- co-owned, changes affect both teams
+proto/ @trufflesecurity/integrations @trufflesecurity/scanning
