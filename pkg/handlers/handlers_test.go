@@ -54,7 +54,7 @@ func TestHandleFile(t *testing.T) {
 }
 
 func TestHandleHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm_random_data.json")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/sm_random_data.json")
 	assert.NoError(t, err)
 	defer func() {
 		if resp != nil && resp.Body != nil {
@@ -425,7 +425,7 @@ func BenchmarkHandleTar(b *testing.B) {
 }
 
 func TestHandleLargeHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/md_random_data.json.zip")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/md_random_data.json.zip")
 	if !assert.NoError(t, err) {
 		return
 	}

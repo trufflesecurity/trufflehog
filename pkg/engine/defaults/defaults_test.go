@@ -130,9 +130,10 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// These should be removed from this list when we remove the feature flag
 	detector_typepb.DetectorType_Cloudinary:    {},
 	detector_typepb.DetectorType_DatadogApikey: {},
+	detector_typepb.DetectorType_Enigma:        {},
 	detector_typepb.DetectorType_GitLabOauth2:  {},
-	detector_typepb.DetectorType_Lob:           {},
 	detector_typepb.DetectorType_Pinecone:      {},
+	detector_typepb.DetectorType_Lob:           {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
