@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	validPattern   = "pk_1234567890abcdefghijklmnopqrstuvwx"
-	invalidPattern = "pk_1234567890abcdefghijklmnopqrstu-_="
-	keyword        = "klaviyo"
+	validPattern    = "pk_a1b2c3d4e5f60718293a4b5c6d7e8f9012"
+	validPatternNew = "pk_AbCdEf_f0e1d2c3b4a5968778695a4b3c2d1e0f00"
+	invalidPattern  = "pk_1234567890abcdefghijklmnopqrstu-_="
+	keyword         = "klaviyo"
 )
 
 func TestKlaviyo_Pattern(t *testing.T) {
@@ -29,6 +30,11 @@ func TestKlaviyo_Pattern(t *testing.T) {
 			name:  "valid pattern - with keyword klaviyo",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
 			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern (new format) - with keyword klaviyo",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPatternNew),
+			want:  []string{validPatternNew},
 		},
 		{
 			name:  "invalid pattern",
