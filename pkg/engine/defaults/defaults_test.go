@@ -122,7 +122,6 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_IPInfo: {},
 	detector_typepb.DetectorType_Lob:    {},
 	detector_typepb.DetectorType_Rev:    {},
-	detector_typepb.DetectorType_TLy:    {},
 	detector_typepb.DetectorType_Tru:    {},
 	detector_typepb.DetectorType_User:   {},
 	detector_typepb.DetectorType_Wit:    {},
@@ -134,6 +133,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Enigma:        {},
 	detector_typepb.DetectorType_GitLabOauth2:  {},
 	detector_typepb.DetectorType_Pinecone:      {},
+	detector_typepb.DetectorType_TLy:           {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()

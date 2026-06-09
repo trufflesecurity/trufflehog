@@ -21,6 +21,7 @@ var (
 	GitLabOAuthDetectorEnabled     atomic.Bool
 	EnigmaDetectorEnabled          atomic.Bool
 	DatadogApiKeyDetectorEnabled   atomic.Bool
+	TlyDetectorEnabled             atomic.Bool
 )
 
 type AtomicString struct {
