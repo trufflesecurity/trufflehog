@@ -5,6 +5,7 @@ package engine
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"runtime"
@@ -503,10 +504,9 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
-	// The cache size is set to 10000 entries, which is a balance between memory usage and the need for effective deduplication.
-	// On average a cache entry would be between 500-1000 bytes, so this would use around 5-10 MB of memory.
-	// This should be sufficient for most scans while keeping memory usage reasonable.
-	const cacheSize = 10000
+	// The cache size is set to 5000 entries, which is a balance between memory usage and the need for effective deduplication.
+	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
+	const cacheSize = 5000
 
 	cache, err := lru.New[string, struct{}](cacheSize)
 	if err != nil {
@@ -1292,7 +1292,10 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// filtered, which handles peek-overlap re-scans and cross-decoder duplicates alike.
 		// The key also include the DetectorName to prevent deduping the results for
 		// custom detectors which have the same type.
-		key := fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
+		// MD5 hash of the key is used to reduce memory usage of the dedupe cache,
+		// since the raw result and source metadata can be large.
+		h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
+		key := string(h[:])
 		if _, ok := e.dedupeCache.Get(key); ok {
 			continue
 		}
