@@ -1291,7 +1291,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// suppressed. Only exact duplicates — same credential at the same location — are
 		// filtered, which handles peek-overlap re-scans and cross-decoder duplicates alike.
 		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
-		if _, ok := e.dedupeCache.Get(key); ok || result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN {
+		if _, ok := e.dedupeCache.Get(key); ok && result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN {
 			continue
 		}
 		e.dedupeCache.Add(key, struct{}{})
