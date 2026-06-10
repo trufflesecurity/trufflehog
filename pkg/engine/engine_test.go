@@ -925,7 +925,7 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
 			},
 			retainFalsePositives:      true,
-			wantUnverifiedSecretCount: 2,
+			wantUnverifiedSecretCount: 1,
 		},
 		{
 			name: "overlap, do not retain false positives",

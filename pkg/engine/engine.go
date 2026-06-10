@@ -1290,7 +1290,9 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// different occurrences of the same credential at different locations are not
 		// suppressed. Only exact duplicates — same credential at the same location — are
 		// filtered, which handles peek-overlap re-scans and cross-decoder duplicates alike.
-		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
+		// The key also include the DetectorName to prevent deduping the results for
+		// custom detectors which have the same type.
+		key := fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
 		if _, ok := e.dedupeCache.Get(key); ok {
 			continue
 		}
