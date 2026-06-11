@@ -536,7 +536,12 @@ func run(state overseer.State, logSync func() error) {
 	feature.DatadogApiKeyDetectorEnabled.Store(true)
 	feature.TlyDetectorEnabled.Store(true)
 	feature.WitDetectorEnabled.Store(true)
+<<<<<<< user-detector
 	feature.UserDetectorEnabled.Store(true)
+=======
+	feature.RevDetectorEnabled.Store(true)
+
+>>>>>>> main
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
