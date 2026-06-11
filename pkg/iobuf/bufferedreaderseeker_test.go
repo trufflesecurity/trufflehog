@@ -478,7 +478,7 @@ func TestBufferedReaderSeekerReadAfterFlushBackwardSeek(t *testing.T) {
 
 	// bytes.NewBuffer is non-seekable, so the BufferedReadSeeker must buffer.
 	brs := NewBufferedReaderSeeker(bytes.NewBuffer(payload))
-	defer brs.Close()
+	defer func() { assert.NoError(t, brs.Close()) }()
 	// Use a small threshold so the prime read flushes to disk.
 	brs.threshold = 32
 
@@ -537,7 +537,7 @@ func TestBufferedReaderSeekerReadSpansDiskAndBuffer(t *testing.T) {
 	}
 
 	brs := NewBufferedReaderSeeker(bytes.NewBuffer(payload))
-	defer brs.Close()
+	defer func() { assert.NoError(t, brs.Close()) }()
 	brs.threshold = 32
 
 	// Fill exactly to the threshold to trigger a flush on writeData.
@@ -591,7 +591,7 @@ func TestBufferedReaderSeekerReadRewindAfterFlush(t *testing.T) {
 	}
 
 	brs := NewBufferedReaderSeeker(bytes.NewBuffer(payload))
-	defer brs.Close()
+	defer func() { assert.NoError(t, brs.Close()) }()
 	brs.threshold = 32
 
 	// Flush 32 bytes to disk, then leave 8 more sitting in the buffer.
