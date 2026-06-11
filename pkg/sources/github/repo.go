@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -380,8 +379,7 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 func (s *Source) normalizeRepo(repo string) (string, error) {
 
 	// If it's a full URL (has protocol), normalize it
-	if regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
-
+	if hasURLScheme.MatchString(repo) {
 		return giturl.NormalizeGithubRepo(repo)
 	}
 	if strings.Contains(repo, "@") && strings.Contains(repo, ":") {
@@ -396,7 +394,7 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 		}
 	}
 	// If it's a repository name (contains / but not http), convert to full URL first
-	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
+	if strings.Contains(repo, "/") && !hasURLScheme.MatchString(repo) {
 		fullURL := "https://github.com/" + repo
 		// If using GitHub Enterprise, adjust the URL accordingly
 		if s.conn != nil && s.conn.Endpoint != "" && !endsWithGithub.MatchString(s.conn.Endpoint) {

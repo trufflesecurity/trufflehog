@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v67/github"
+	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -240,6 +241,45 @@ func TestAPIClientForRepoUsesRepoInstallationMap(t *testing.T) {
 	defer mu.Unlock()
 	require.Len(t, tokenRequestPaths, 1)
 	assert.Contains(t, tokenRequestPaths[0], "/app/installations/999/access_tokens")
+}
+
+func TestGraphQLClientForRepoCachesClients(t *testing.T) {
+	privKey := generateTestPrivateKey(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+	}))
+	defer server.Close()
+
+	defaultGraphQLClient := &githubv4.Client{}
+	connector := &appConnector{
+		installationID:      100,
+		appID:               12345,
+		appPrivateKey:       privKey,
+		apiEndpoint:         server.URL,
+		graphqlClient:       defaultGraphQLClient,
+		repoInstallationMap: make(map[string]int64),
+	}
+	connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
+
+	ctx := trContext.Background()
+
+	t.Run("returns default client for default installation repos", func(t *testing.T) {
+		got, err := connector.GraphQLClientForRepo(ctx, "https://github.com/default-org/repo.git")
+		require.NoError(t, err)
+		assert.Same(t, defaultGraphQLClient, got)
+	})
+
+	t.Run("caches clients for non-default installations", func(t *testing.T) {
+		client1, err := connector.GraphQLClientForRepo(ctx, "https://github.com/other-org/repo.git")
+		require.NoError(t, err)
+		assert.NotSame(t, defaultGraphQLClient, client1)
+
+		client2, err := connector.GraphQLClientForRepo(ctx, "https://github.com/other-org/repo.git")
+		require.NoError(t, err)
+		assert.Same(t, client1, client2)
+	})
 }
 
 func TestAddMembersByOrgWithClient(t *testing.T) {

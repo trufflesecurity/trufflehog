@@ -30,6 +30,9 @@ type appConnector struct {
 	// bounded by the installations touched while scanning.
 	apiClientsByInstallationID map[int64]*github.Client
 
+	graphqlClientsMu               sync.Mutex
+	graphqlClientsByInstallationID map[int64]*githubv4.Client
+
 	// repoInstallationMap maps repo clone URLs to their owning installation
 	// ID for repos discovered from non-default installations. Clone checks
 	// this map to use the correct installation token.
@@ -70,13 +73,14 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 	}
 
 	connector := &appConnector{
-		installationClient:         installationClient,
-		installationID:             installationID,
-		appID:                      appID,
-		appPrivateKey:              []byte(app.PrivateKey),
-		apiEndpoint:                apiEndpoint,
-		apiClientsByInstallationID: make(map[int64]*github.Client),
-		repoInstallationMap:        make(map[string]int64),
+		installationClient:             installationClient,
+		installationID:                 installationID,
+		appID:                          appID,
+		appPrivateKey:                  []byte(app.PrivateKey),
+		apiEndpoint:                    apiEndpoint,
+		apiClientsByInstallationID:     make(map[int64]*github.Client),
+		graphqlClientsByInstallationID: make(map[int64]*githubv4.Client),
+		repoInstallationMap:            make(map[string]int64),
 	}
 
 	apiClient, err := connector.APIClientForInstallation(installationID)
@@ -112,12 +116,27 @@ func (c *appConnector) GraphQLClientForRepo(ctx context.Context, repoURL string)
 		return c.graphqlClient, nil
 	}
 
+	c.graphqlClientsMu.Lock()
+	defer c.graphqlClientsMu.Unlock()
+
+	if client, ok := c.graphqlClientsByInstallationID[installID]; ok {
+		return client, nil
+	}
+
 	apiClient, err := c.APIClientForInstallation(installID)
 	if err != nil {
 		return nil, err
 	}
 
-	return createGraphqlClient(ctx, apiClient.Client(), c.apiEndpoint)
+	client, err := createGraphqlClient(ctx, apiClient.Client(), c.apiEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	if c.graphqlClientsByInstallationID == nil {
+		c.graphqlClientsByInstallationID = make(map[int64]*githubv4.Client)
+	}
+	c.graphqlClientsByInstallationID[installID] = client
+	return client, nil
 }
 
 func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {

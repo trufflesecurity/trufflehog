@@ -130,6 +130,9 @@ var _ sources.SourceUnitEnumChunker = (*Source)(nil)
 
 var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 
+// hasURLScheme matches strings that start with a URL scheme (e.g. "https://").
+var hasURLScheme = regexp.MustCompile(`^[a-z]+://`)
+
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
@@ -994,7 +997,7 @@ func (s *Source) repoURLFromTargetMetadata(meta *source_metadatapb.Github) (stri
 	}
 
 	if repo := meta.GetRepository(); repo != "" {
-		if !strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) && !strings.Contains(repo, ":") {
+		if !strings.Contains(repo, "/") && !hasURLScheme.MatchString(repo) && !strings.Contains(repo, ":") {
 			return linkRepo, nil
 		}
 		normalized, err := s.normalizeRepo(repo)
