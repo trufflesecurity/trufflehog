@@ -709,13 +709,14 @@ func (s *Source) listAppInstallations(ctx context.Context, connector *appConnect
 // enumerateAllInstallationRepos discovers repos from every installation of the
 // GitHub App. For each installation, it creates a per-installation API client
 // and records the installation ID for each repo so Clone uses the correct token.
+// Per-installation failures are reported through the unit reporter and don't
+// abort enumeration of the remaining installations.
 func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *appConnector, reporter sources.UnitReporter) error {
 	installs, err := s.listAppInstallations(ctx, connector, defaultPagination)
 	if err != nil {
 		return err
 	}
 
-	var errs []error
 	for _, install := range installs {
 		installID := install.GetID()
 		account := install.Account.GetLogin()
@@ -724,8 +725,10 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 
 		client, err := connector.APIClientForInstallation(installID)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("could not create API client for installation %d: %w", installID, err))
 			installCtx.Logger().Error(err, "could not create API client for installation")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", installID, err)); err != nil {
+				return err
+			}
 			continue
 		}
 
@@ -743,13 +746,15 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 		if err := s.processRepos(installCtx, account, reporter, listRepos, &appListOptions{
 			ListOptions: github.ListOptions{PerPage: defaultPagination},
 		}); err != nil {
-			errs = append(errs, fmt.Errorf("error enumerating repos for installation %d: %w", installID, err))
 			installCtx.Logger().Error(err, "error enumerating repos for installation")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("error enumerating repos for installation %d: %w", installID, err)); err != nil {
+				return err
+			}
 			continue
 		}
 	}
 
-	return errors.Join(errs...)
+	return nil
 }
 
 func (s *Source) mapExplicitReposToInstallations(ctx context.Context, connector *appConnector) error {

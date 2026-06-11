@@ -1494,7 +1494,7 @@ func TestScanAllInstallationsMapsUnitBeforeMetadataFetch(t *testing.T) {
 	assert.Equal(t, int64(2448), connector.installationIDForRepo("https://github.com/other-org/repo.git"))
 }
 
-func TestEnumerateAllInstallationReposReturnsInstallationErrors(t *testing.T) {
+func TestEnumerateAllInstallationReposReportsInstallationErrors(t *testing.T) {
 	privateKey := createPrivateKey()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1506,9 +1506,14 @@ func TestEnumerateAllInstallationReposReturnsInstallationErrors(t *testing.T) {
 			installID := parts[len(parts)-2]
 			_, _ = fmt.Fprintf(w, `{"token":"token-%s","expires_at":"2099-01-01T00:00:00Z"}`, installID)
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/app/installations"):
-			_, _ = w.Write([]byte(`[{"id":1337,"account":{"login":"default-org","type":"Organization"}}]`))
+			_, _ = w.Write([]byte(`[{"id":1337,"account":{"login":"default-org","type":"Organization"}},{"id":2448,"account":{"login":"other-org","type":"Organization"}}]`))
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/installation/repositories"):
-			http.Error(w, "repo list failed", http.StatusInternalServerError)
+			// Fail the first installation's repo listing; succeed for the second.
+			if strings.Contains(r.Header.Get("Authorization"), "token-1337") {
+				http.Error(w, "repo list failed", http.StatusInternalServerError)
+				return
+			}
+			_, _ = w.Write([]byte(`{"total_count":1,"repositories":[{"id":1,"name":"repo-b","full_name":"other-org/repo-b","clone_url":"https://github.com/other-org/repo-b.git","size":1}]}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -1528,9 +1533,29 @@ func TestEnumerateAllInstallationReposReturnsInstallationErrors(t *testing.T) {
 	})
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
-	err := s.enumerateAllInstallationRepos(context.Background(), s.connector.(*appConnector), noopReporter())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "error enumerating repos for installation")
+	var reportedErrs []error
+	var reportedUnits []sources.SourceUnit
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(_ context.Context, unit sources.SourceUnit) error {
+			reportedUnits = append(reportedUnits, unit)
+			return nil
+		},
+		VisitErr: func(_ context.Context, err error) error {
+			reportedErrs = append(reportedErrs, err)
+			return nil
+		},
+	}
+
+	err := s.enumerateAllInstallationRepos(context.Background(), s.connector.(*appConnector), reporter)
+
+	// A single installation failure is reported but doesn't abort the scan;
+	// the other installation's repos are still enumerated.
+	require.NoError(t, err)
+	require.Len(t, reportedErrs, 1)
+	assert.Contains(t, reportedErrs[0].Error(), "error enumerating repos for installation 1337")
+	require.Len(t, reportedUnits, 1)
+	unitID, _ := reportedUnits[0].SourceUnitID()
+	assert.Equal(t, "https://github.com/other-org/repo-b.git", unitID)
 }
 
 // This only tests the resume info slice portion of setProgressCompleteWithRepo.

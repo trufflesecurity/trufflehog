@@ -117,20 +117,28 @@ func (c *appConnector) GraphQLClientForRepo(ctx context.Context, repoURL string)
 	}
 
 	c.graphqlClientsMu.Lock()
-	defer c.graphqlClientsMu.Unlock()
-
-	if client, ok := c.graphqlClientsByInstallationID[installID]; ok {
+	client, ok := c.graphqlClientsByInstallationID[installID]
+	c.graphqlClientsMu.Unlock()
+	if ok {
 		return client, nil
 	}
 
+	// Create the client outside the lock to avoid nesting graphqlClientsMu
+	// with apiClientsMu (taken by APIClientForInstallation).
 	apiClient, err := c.APIClientForInstallation(installID)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := createGraphqlClient(ctx, apiClient.Client(), c.apiEndpoint)
+	client, err = createGraphqlClient(ctx, apiClient.Client(), c.apiEndpoint)
 	if err != nil {
 		return nil, err
+	}
+
+	c.graphqlClientsMu.Lock()
+	defer c.graphqlClientsMu.Unlock()
+	if existing, ok := c.graphqlClientsByInstallationID[installID]; ok {
+		return existing, nil
 	}
 	if c.graphqlClientsByInstallationID == nil {
 		c.graphqlClientsByInstallationID = make(map[int64]*githubv4.Client)
