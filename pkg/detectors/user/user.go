@@ -94,6 +94,7 @@ func verifyUserToken(ctx context.Context, client *http.Client, token, baseURL st
 		return false, err
 	}
 	u.Path = "/api/public/users/"
+
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
