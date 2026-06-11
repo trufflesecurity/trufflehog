@@ -536,6 +536,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.DatadogApiKeyDetectorEnabled.Store(true)
 	feature.TlyDetectorEnabled.Store(true)
 	feature.WitDetectorEnabled.Store(true)
+	feature.RevDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

@@ -627,6 +627,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rev"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/revampcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ringcentral"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ritekit"
@@ -1524,6 +1525,7 @@ func buildDetectorList() []detectors.Detector {
 		// &restpack.Scanner{},
 		&restpackhtmltopdfapi.Scanner{},
 		&restpackscreenshotapi.Scanner{},
+		&rev.Scanner{},
 		&revampcrm.Scanner{},
 		&ringcentral.Scanner{},
 		&ritekit.Scanner{},
@@ -1792,6 +1794,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.TlyDetectorEnabled.Load()
 		case *wit.Scanner:
 			return !feature.WitDetectorEnabled.Load()
+		case *rev.Scanner:
+			return !feature.RevDetectorEnabled.Load()
 		default:
 			return false
 		}
