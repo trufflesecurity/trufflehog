@@ -719,7 +719,7 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 
 	for _, install := range installs {
 		installID := install.GetID()
-		account := install.Account.GetLogin()
+		account := install.GetAccount().GetLogin()
 		installCtx := context.WithValues(ctx, "org", account, "installation_id", installID)
 		installCtx.Logger().Info("Enumerating repos from GitHub App installation")
 
@@ -1338,10 +1338,10 @@ func (s *Source) addMembersByApp(ctx context.Context, connector *appConnector, r
 	}
 
 	for _, install := range installs {
-		if install.Account.GetType() != "Organization" {
+		if install.GetAccount().GetType() != "Organization" {
 			continue
 		}
-		org := install.Account.GetLogin()
+		org := install.GetAccount().GetLogin()
 		installCtx := context.WithValues(ctx, "org", org, "installation_id", install.GetID())
 
 		// Create a per-installation API client so that the token is scoped to
@@ -1350,11 +1350,17 @@ func (s *Source) addMembersByApp(ctx context.Context, connector *appConnector, r
 		client, err := connector.APIClientForInstallation(install.GetID())
 		if err != nil {
 			installCtx.Logger().Error(err, "could not create API client for installation")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", install.GetID(), err)); err != nil {
+				return err
+			}
 			continue
 		}
 
 		if err := s.addMembersByOrgWithClient(installCtx, client, org, reporter); err != nil {
 			installCtx.Logger().Error(err, "Unable to add members for org")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not add members for org %q (installation %d): %w", org, install.GetID(), err)); err != nil {
+				return err
+			}
 			continue
 		}
 	}
