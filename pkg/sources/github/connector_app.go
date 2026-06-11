@@ -22,8 +22,13 @@ type appConnector struct {
 	graphqlClient      *githubv4.Client
 	installationClient *github.Client
 	installationID     int64
-	appsTransport      *ghinstallation.AppsTransport
+	appID              int64
+	appPrivateKey      []byte
 	apiEndpoint        string
+	apiClientsMu       sync.Mutex
+	// apiClientsByInstallationID is scoped to this connector/source run and is
+	// bounded by the installations touched while scanning.
+	apiClientsByInstallationID map[int64]*github.Client
 
 	// repoInstallationMap maps repo clone URLs to their owning installation
 	// ID for repos discovered from non-default installations. Clone checks
@@ -65,11 +70,13 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 	}
 
 	connector := &appConnector{
-		installationClient:  installationClient,
-		installationID:      installationID,
-		appsTransport:       installationTransport,
-		apiEndpoint:         apiEndpoint,
-		repoInstallationMap: make(map[string]int64),
+		installationClient:         installationClient,
+		installationID:             installationID,
+		appID:                      appID,
+		appPrivateKey:              []byte(app.PrivateKey),
+		apiEndpoint:                apiEndpoint,
+		apiClientsByInstallationID: make(map[int64]*github.Client),
+		repoInstallationMap:        make(map[string]int64),
 	}
 
 	apiClient, err := connector.APIClientForInstallation(installationID)
@@ -175,7 +182,27 @@ func (c *appConnector) InstallationClient() *github.Client {
 // orgs — each org's API calls must use that org's installation token to get
 // proper IP allowlist bypass and permission scoping.
 func (c *appConnector) APIClientForInstallation(installationID int64) (*github.Client, error) {
-	transport := ghinstallation.NewFromAppsTransport(c.appsTransport, installationID)
+	c.apiClientsMu.Lock()
+	defer c.apiClientsMu.Unlock()
+
+	if installationID == c.installationID && c.apiClient != nil {
+		return c.apiClient, nil
+	}
+	if c.apiClientsByInstallationID == nil {
+		c.apiClientsByInstallationID = make(map[int64]*github.Client)
+	}
+	if client, ok := c.apiClientsByInstallationID[installationID]; ok {
+		return client, nil
+	}
+
+	appsTransportHTTPClient := common.RetryableHTTPClientTimeout(60)
+	appsTransport, err := ghinstallation.NewAppsTransport(appsTransportHTTPClient.Transport, c.appID, c.appPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not create app transport for installation %d: %w", installationID, err)
+	}
+	appsTransport.BaseURL = c.apiEndpoint
+
+	transport := ghinstallation.NewFromAppsTransport(appsTransport, installationID)
 	transport.BaseURL = c.apiEndpoint
 
 	httpClient := common.RetryableHTTPClientTimeout(60)
@@ -184,6 +211,10 @@ func (c *appConnector) APIClientForInstallation(installationID int64) (*github.C
 	client, err := github.NewClient(httpClient).WithEnterpriseURLs(c.apiEndpoint, c.apiEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("could not create API client for installation %d: %w", installationID, err)
+	}
+	c.apiClientsByInstallationID[installationID] = client
+	if installationID == c.installationID {
+		c.apiClient = client
 	}
 	return client, nil
 }

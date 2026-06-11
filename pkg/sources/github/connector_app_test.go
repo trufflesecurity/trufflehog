@@ -12,7 +12,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,16 +55,9 @@ func TestAPIClientForInstallation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	appsTransport, err := ghinstallation.NewAppsTransport(
-		http.DefaultTransport,
-		12345,
-		privKey,
-	)
-	require.NoError(t, err)
-	appsTransport.BaseURL = server.URL
-
 	connector := &appConnector{
-		appsTransport: appsTransport,
+		appID:         12345,
+		appPrivateKey: privKey,
 		apiEndpoint:   server.URL,
 	}
 
@@ -79,6 +71,15 @@ func TestAPIClientForInstallation(t *testing.T) {
 		assert.NotNil(t, client2)
 
 		assert.NotSame(t, client1, client2, "should be different client instances")
+	})
+
+	t.Run("reuses clients for the same installation", func(t *testing.T) {
+		client1, err := connector.APIClientForInstallation(333)
+		require.NoError(t, err)
+		client2, err := connector.APIClientForInstallation(333)
+		require.NoError(t, err)
+
+		assert.Same(t, client1, client2)
 	})
 
 	t.Run("returned client uses the correct installation ID", func(t *testing.T) {
@@ -161,6 +162,18 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 	assert.Contains(t, tokenRequestPaths[0], "/app/installations/4242/access_tokens")
 }
 
+func TestAPIClientForInstallationUsesConfiguredClient(t *testing.T) {
+	defaultClient := github.NewClient(nil)
+	connector := &appConnector{
+		apiClient:      defaultClient,
+		installationID: 100,
+	}
+
+	got, err := connector.APIClientForInstallation(100)
+	require.NoError(t, err)
+	assert.Same(t, defaultClient, got)
+}
+
 func TestCloneUsesRepoInstallationMap(t *testing.T) {
 	connector := &appConnector{
 		installationID:      100,
@@ -206,13 +219,10 @@ func TestAPIClientForRepoUsesRepoInstallationMap(t *testing.T) {
 	}))
 	defer server.Close()
 
-	appsTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, 12345, privKey)
-	require.NoError(t, err)
-	appsTransport.BaseURL = server.URL
-
 	connector := &appConnector{
 		installationID:      100,
-		appsTransport:       appsTransport,
+		appID:               12345,
+		appPrivateKey:       privKey,
 		apiEndpoint:         server.URL,
 		repoInstallationMap: make(map[string]int64),
 	}
@@ -220,6 +230,9 @@ func TestAPIClientForRepoUsesRepoInstallationMap(t *testing.T) {
 
 	client, err := connector.APIClientForRepo("https://github.com/other-org/repo.git")
 	require.NoError(t, err)
+	cachedClient, err := connector.APIClientForRepo("https://github.com/other-org/repo.git")
+	require.NoError(t, err)
+	assert.Same(t, client, cachedClient)
 
 	_, _, _ = client.Organizations.ListMembers(trContext.Background(), "test-org", nil)
 
