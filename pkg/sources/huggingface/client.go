@@ -133,15 +133,36 @@ type HFClient struct {
 	BaseURL    string
 	APIKey     string
 	HTTPClient *http.Client
+	// downloadClient streams file bodies. Unlike HTTPClient it has no overall
+	// Timeout, because http.Client.Timeout also interrupts Response.Body reads —
+	// which would kill large/slow downloads handed to handlers.HandleFile.
+	downloadClient *http.Client
 }
 
 // NewHFClient creates a new HF client
 func NewHFClient(baseURL, apiKey string, timeout time.Duration) *HFClient {
+	// Bound the connect + response-header phase (including redirect hops to the
+	// CDN) without capping the body read; overall cancellation comes from the
+	// request context. Built explicitly (rather than cloning DefaultTransport)
+	// so it stays a *http.Transport even when tests swap the default transport.
+	downloadTransport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: timeout,
+	}
+
 	return &HFClient{
 		BaseURL: baseURL,
 		APIKey:  apiKey,
 		HTTPClient: &http.Client{
 			Timeout: timeout,
+		},
+		downloadClient: &http.Client{
+			Transport: downloadTransport,
 		},
 	}
 }
@@ -278,7 +299,7 @@ func (c *HFClient) DownloadBucketFile(ctx context.Context, bucketID string, path
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
-	resp, err := c.HTTPClient.Do(req)
+	resp, err := c.downloadClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download bucket file %s: %w", path, err)
 	}

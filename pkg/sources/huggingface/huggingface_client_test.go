@@ -2,6 +2,7 @@ package huggingface
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"testing"
 	"time"
@@ -648,6 +649,22 @@ func TestGetGitPath_SpaceResource(t *testing.T) {
 
 	path := discussion.GetGitPath()
 	assert.Equal(t, expectedPath, path)
+}
+
+func TestNewHFClient_DownloadClientHasNoOverallTimeout(t *testing.T) {
+	client := NewHFClient("https://huggingface.co", TEST_TOKEN, 10*time.Second)
+
+	// The API client keeps an overall timeout (its body is consumed in-call).
+	assert.Equal(t, 10*time.Second, client.HTTPClient.Timeout)
+
+	// The download client must NOT have an overall timeout, since that would
+	// also interrupt streaming Response.Body reads in handlers.HandleFile.
+	assert.Equal(t, time.Duration(0), client.downloadClient.Timeout)
+
+	// The header phase is still bounded at the transport level.
+	transport, ok := client.downloadClient.Transport.(*http.Transport)
+	assert.True(t, ok)
+	assert.Equal(t, 10*time.Second, transport.ResponseHeaderTimeout)
 }
 
 func TestEscapePathSegments(t *testing.T) {
