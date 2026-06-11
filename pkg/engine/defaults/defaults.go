@@ -347,6 +347,7 @@ import (
 	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
 	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleclientsecret"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googlegemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
@@ -1230,6 +1231,7 @@ func buildDetectorList() []detectors.Detector {
 		&godaddyv1.Scanner{},
 		&godaddyv2.Scanner{},
 		&goodday.Scanner{},
+		&googleclientsecret.Scanner{},
 		&googlegemini.Scanner{},
 		&googleoauth2.Scanner{},
 		&grafana.Scanner{},
