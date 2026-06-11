@@ -161,6 +161,74 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 	assert.Contains(t, tokenRequestPaths[0], "/app/installations/4242/access_tokens")
 }
 
+func TestCloneUsesRepoInstallationMap(t *testing.T) {
+	connector := &appConnector{
+		installationID:      100,
+		repoInstallationMap: make(map[string]int64),
+	}
+
+	t.Run("uses default installation when no mapping exists", func(t *testing.T) {
+		assert.Equal(t, int64(100), connector.installationIDForRepo("https://github.com/default-org/repo.git"))
+	})
+
+	t.Run("uses mapped installation for cross-org repos", func(t *testing.T) {
+		connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
+		assert.Equal(t, int64(999), connector.installationIDForRepo("https://github.com/other-org/repo.git"))
+	})
+
+	t.Run("uses mapped installation for derived wiki URLs", func(t *testing.T) {
+		connector.setRepoInstallation("https://github.com/wiki-org/repo.git", 888)
+		assert.Equal(t, int64(888), connector.installationIDForRepo("https://github.com/wiki-org/repo.wiki.git"))
+	})
+}
+
+func TestAPIClientForRepoUsesRepoInstallationMap(t *testing.T) {
+	privKey := generateTestPrivateKey(t)
+
+	var mu sync.Mutex
+	var tokenRequestPaths []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "access_tokens") {
+			mu.Lock()
+			tokenRequestPaths = append(tokenRequestPaths, r.URL.Path)
+			mu.Unlock()
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":      "test-token",
+				"expires_at": "2099-01-01T00:00:00Z",
+			})
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode([]map[string]string{{"login": "alice"}})
+	}))
+	defer server.Close()
+
+	appsTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, 12345, privKey)
+	require.NoError(t, err)
+	appsTransport.BaseURL = server.URL
+
+	connector := &appConnector{
+		installationID:      100,
+		appsTransport:       appsTransport,
+		apiEndpoint:         server.URL,
+		repoInstallationMap: make(map[string]int64),
+	}
+	connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
+
+	client, err := connector.APIClientForRepo("https://github.com/other-org/repo.git")
+	require.NoError(t, err)
+
+	_, _, _ = client.Organizations.ListMembers(trContext.Background(), "test-org", nil)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, tokenRequestPaths, 1)
+	assert.Contains(t, tokenRequestPaths[0], "/app/installations/999/access_tokens")
+}
+
 func TestAddMembersByOrgWithClient(t *testing.T) {
 	strPtr := func(s string) *string { return &s }
 	memberPage := []*github.User{

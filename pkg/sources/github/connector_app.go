@@ -3,6 +3,8 @@ package github
 import (
 	"fmt"
 	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
@@ -22,6 +24,12 @@ type appConnector struct {
 	installationID     int64
 	appsTransport      *ghinstallation.AppsTransport
 	apiEndpoint        string
+
+	// repoInstallationMap maps repo clone URLs to their owning installation
+	// ID for repos discovered from non-default installations. Clone checks
+	// this map to use the correct installation token.
+	repoInstallationMu  sync.RWMutex
+	repoInstallationMap map[string]int64
 }
 
 var _ Connector = (*appConnector)(nil)
@@ -57,10 +65,11 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 	}
 
 	connector := &appConnector{
-		installationClient: installationClient,
-		installationID:     installationID,
-		appsTransport:      installationTransport,
-		apiEndpoint:        apiEndpoint,
+		installationClient:  installationClient,
+		installationID:      installationID,
+		appsTransport:       installationTransport,
+		apiEndpoint:         apiEndpoint,
+		repoInstallationMap: make(map[string]int64),
 	}
 
 	apiClient, err := connector.APIClientForInstallation(installationID)
@@ -82,17 +91,75 @@ func (c *appConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
+func (c *appConnector) APIClientForRepo(repoURL string) (*github.Client, error) {
+	installID := c.installationIDForRepo(repoURL)
+	if installID == c.installationID {
+		return c.apiClient, nil
+	}
+	return c.APIClientForInstallation(installID)
+}
+
+func (c *appConnector) GraphQLClientForRepo(ctx context.Context, repoURL string) (*githubv4.Client, error) {
+	installID := c.installationIDForRepo(repoURL)
+	if installID == c.installationID {
+		return c.graphqlClient, nil
+	}
+
+	apiClient, err := c.APIClientForInstallation(installID)
+	if err != nil {
+		return nil, err
+	}
+
+	return createGraphqlClient(ctx, apiClient.Client(), c.apiEndpoint)
+}
+
 func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
+	installID := c.installationIDForRepo(repoURL)
+
 	// TODO: Check rate limit for this call.
 	token, _, err := c.installationClient.Apps.CreateInstallationToken(
 		ctx,
-		c.installationID,
+		installID,
 		&github.InstallationTokenOptions{})
 	if err != nil {
-		return "", nil, fmt.Errorf("could not create installation token: %w", err)
+		return "", nil, fmt.Errorf("could not create installation token for installation %d: %w", installID, err)
 	}
 
 	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "", "x-access-token", true, args...)
+}
+
+func (c *appConnector) installationIDForRepo(repoURL string) int64 {
+	c.repoInstallationMu.RLock()
+	defer c.repoInstallationMu.RUnlock()
+
+	if id, ok := c.repoInstallationMap[repoURL]; ok {
+		return id
+	}
+	return c.installationID
+}
+
+func (c *appConnector) hasRepoInstallation(repoURL string) bool {
+	c.repoInstallationMu.RLock()
+	defer c.repoInstallationMu.RUnlock()
+
+	_, ok := c.repoInstallationMap[repoURL]
+	return ok
+}
+
+// setRepoInstallation records which installation owns a repo and its derived
+// wiki URL so Clone uses the correct installation token for cross-org repos.
+func (c *appConnector) setRepoInstallation(repoURL string, installationID int64) {
+	c.repoInstallationMu.Lock()
+	defer c.repoInstallationMu.Unlock()
+
+	if c.repoInstallationMap == nil {
+		c.repoInstallationMap = make(map[string]int64)
+	}
+	c.repoInstallationMap[repoURL] = installationID
+	if strings.HasSuffix(repoURL, ".git") {
+		wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
+		c.repoInstallationMap[wikiURL] = installationID
+	}
 }
 
 func (c *appConnector) GraphQLClient() *githubv4.Client {

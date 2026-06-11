@@ -17,6 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	sourcegit "github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 // repoInfoCache is a thread-safe cache to store information about repositories.
@@ -62,6 +63,13 @@ type repoInfo struct {
 // cloneRepo clones a repository given its URL, returns the path and the repository object.
 func (s *Source) cloneRepo(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
 	return s.connector.Clone(ctx, repoURL)
+}
+
+func (s *Source) apiClientForRepo(repoURL string) (*github.Client, error) {
+	if connector, ok := s.connector.(*appConnector); ok {
+		return connector.APIClientForRepo(repoURL)
+	}
+	return s.connector.APIClient(), nil
 }
 
 // repoListOptions is an interface for types that provide options for listing repositories.
@@ -338,13 +346,26 @@ func (s *Source) cacheGistInfo(g *github.Gist) {
 // Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
 // but still don't have a cloneable wiki.
 func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
-	wikiURL := strings.TrimSuffix(repoURL, ".git") + "/wiki"
+	wikiBaseURL := repoURL
+	if repoInfo, ok := s.repoInfoCache.get(repoURL); ok {
+		wikiBaseURL = (&url.URL{
+			Scheme: "https",
+			Host:   githubWebHost(s.conn.GetEndpoint()),
+			Path:   fmt.Sprintf("/%s/%s", repoInfo.owner, repoInfo.name),
+		}).String() + ".git"
+	}
+	wikiURL := strings.TrimSuffix(wikiBaseURL, ".git") + "/wiki"
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
 	if err != nil {
 		return false
 	}
 
-	res, err := s.connector.APIClient().Client().Do(req)
+	apiClient, err := s.apiClientForRepo(repoURL)
+	if err != nil {
+		return false
+	}
+
+	res, err := apiClient.Client().Do(req)
 	if err != nil {
 		return false
 	}
@@ -362,6 +383,17 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 	if regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
 
 		return giturl.NormalizeGithubRepo(repo)
+	}
+	if strings.Contains(repo, "@") && strings.Contains(repo, ":") {
+		repoURL, err := sourcegit.GitURLParse(repo)
+		if err == nil && repoURL.Host != "" && repoURL.Path != "" {
+			u := &url.URL{
+				Scheme: "https",
+				Host:   repoURL.Host,
+				Path:   repoURL.Path,
+			}
+			return giturl.NormalizeGithubRepo(u.String())
+		}
 	}
 	// If it's a repository name (contains / but not http), convert to full URL first
 	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {

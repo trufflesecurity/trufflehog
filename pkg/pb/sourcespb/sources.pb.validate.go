@@ -2590,6 +2590,8 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for PrintLegacyJson
 
+	// no validation rules for ScanAllInstallations
+
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
 		if v == nil {
