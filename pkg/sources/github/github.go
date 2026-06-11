@@ -825,6 +825,7 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 				}
 				s.recordInstallationRepoMatches(connector, installID, result.Repositories, wantedRepos)
 				if len(wantedRepos) == 0 {
+					logInstallationMappingErrors(ctx, errs)
 					return nil
 				}
 			}
@@ -839,6 +840,7 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 	if len(wantedRepos) > 0 {
 		errs = append(errs, s.mapRemainingReposByMetadata(ctx, connector, installs, clients, installedRepoKeys, wantedRepos)...)
 		if len(wantedRepos) == 0 {
+			logInstallationMappingErrors(ctx, errs)
 			return nil
 		}
 	}
@@ -853,6 +855,15 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 	}
 
 	return errors.Join(errs...)
+}
+
+// logInstallationMappingErrors surfaces per-installation failures that didn't
+// prevent all requested repos from being mapped, so they aren't silently lost
+// when mapping succeeds overall.
+func logInstallationMappingErrors(ctx context.Context, errs []error) {
+	if err := errors.Join(errs...); err != nil {
+		ctx.Logger().Error(err, "some installations could not be fully enumerated while mapping repos")
+	}
 }
 
 func (s *Source) recordInstallationRepoMatches(connector *appConnector, installationID int64, repos []*github.Repository, wantedRepos map[string]repoMappingRequest) {
