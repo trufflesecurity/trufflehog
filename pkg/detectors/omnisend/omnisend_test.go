@@ -2,7 +2,11 @@ package omnisend
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -10,6 +14,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 var (
 	validPattern   = "XoKBwjiMvYw7bhB0kX8c4O02YYsy5rrwDFszYLlJsTT08jZqFH4byZsqdHrlHrid-m5zeIaQlGZ"
@@ -85,6 +95,143 @@ func TestOmnisend_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestOmnisend_VerificationEndpoint(t *testing.T) {
+	input := fmt.Sprintf("%s token = '%s'", keyword, validPattern)
+
+	called := false
+	d := Scanner{
+		client: &http.Client{
+			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				called = true
+				if req.URL.String() != "https://api.omnisend.com/v3/contacts?limit=100&offset=0" {
+					t.Fatalf("unexpected verification URL: %s", req.URL.String())
+				}
+				if req.Header.Get("X-API-KEY") != validPattern {
+					t.Fatalf("unexpected X-API-KEY header: %q", req.Header.Get("X-API-KEY"))
+				}
+
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("{}")),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	results, err := d.FromData(context.Background(), true, []byte(input))
+	if err != nil {
+		t.Fatalf("FromData returned error: %v", err)
+	}
+	if !called {
+		t.Fatal("verification HTTP request was not made")
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if !results[0].Verified {
+		t.Fatal("expected result to be verified")
+	}
+	if results[0].VerificationError() != nil {
+		t.Fatalf("unexpected verification error: %v", results[0].VerificationError())
+	}
+}
+
+func TestOmnisend_VerificationResponses(t *testing.T) {
+	input := fmt.Sprintf("%s token = '%s'", keyword, validPattern)
+
+	tests := []struct {
+		name                string
+		response            *http.Response
+		responseErr         error
+		wantVerified        bool
+		wantVerificationErr bool
+	}{
+		{
+			name: "valid token",
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+			wantVerified: true,
+		},
+		{
+			name: "valid token with nil body",
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+			},
+			wantVerified: true,
+		},
+		{
+			name: "unexpected success status",
+			response: &http.Response{
+				StatusCode: http.StatusCreated,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+			wantVerificationErr: true,
+		},
+		{
+			name: "unauthorized token",
+			response: &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+		},
+		{
+			name: "forbidden token",
+			response: &http.Response{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+		},
+		{
+			name:                "client error",
+			responseErr:         errors.New("network failure"),
+			wantVerificationErr: true,
+		},
+		{
+			name: "unexpected status",
+			response: &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+			wantVerificationErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := Scanner{
+				client: &http.Client{
+					Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+						return tt.response, tt.responseErr
+					}),
+				},
+			}
+
+			results, err := d.FromData(context.Background(), true, []byte(input))
+			if err != nil {
+				t.Fatalf("FromData returned error: %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+			if results[0].Verified != tt.wantVerified {
+				t.Fatalf("Verified = %v, want %v", results[0].Verified, tt.wantVerified)
+			}
+			if (results[0].VerificationError() != nil) != tt.wantVerificationErr {
+				t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, results[0].VerificationError())
 			}
 		})
 	}
