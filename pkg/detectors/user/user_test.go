@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	validPattern   = "9UgOsRfud4RTyBQpJQFOQiwNQcfeLGHH1DDoxhgzCvBmccmVQ7MYB0ai3LXGZNMf"
-	invalidPattern = "OmFxWjhZvCpOeMsgTJdZMas+dlUpr=fa?+.QOKKYvi7RKWyBeHtaLa7_rzMhLrRd"
-	keyword        = "user"
+	validKey     = "9UgOsRfud4RTyBQpJQFOQiwNQcfeLGHH1DDoxhgzCvBmccmVQ7MYB0ai3LXGZNMf"
+	validURL     = "testdetector.user.com"
+	invalidKey   = "OmFxWjhZvCpOeMsgTJdZMas+dlUpr=fa?+.QOKKYvi7RKWyBeHtaLa7_rzMhLrRd"
+	keyword      = "user"
 )
 
 func TestUser_Pattern(t *testing.T) {
@@ -26,23 +27,33 @@ func TestUser_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword user",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			name:  "valid pattern - key and url present",
+			input: fmt.Sprintf("%s token = '%s'\nurl = https://%s", keyword, validKey, validURL),
+			want:  []string{validKey + ":https://" + validURL},
 		},
 		{
-			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
-			want:  []string{validPattern},
+			name:  "valid pattern - ignore duplicate keys",
+			input: fmt.Sprintf("%s token = '%s' | '%s'\nurl = https://%s", keyword, validKey, validKey, validURL),
+			want:  []string{validKey + ":https://" + validURL},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			name:  "no result - key without url",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validKey),
 			want:  []string{},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			name:  "no result - url without key",
+			input: fmt.Sprintf("%s url = https://%s", keyword, validURL),
+			want:  []string{},
+		},
+		{
+			name:  "no result - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'\nurl = https://%s", keyword, validKey, validURL),
+			want:  []string{},
+		},
+		{
+			name:  "no result - invalid key format",
+			input: fmt.Sprintf("%s = '%s'\nurl = https://%s", keyword, invalidKey, validURL),
 			want:  []string{},
 		},
 	}
@@ -50,7 +61,7 @@ func TestUser_Pattern(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
+			if len(matchedDetectors) == 0 && len(test.want) > 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}

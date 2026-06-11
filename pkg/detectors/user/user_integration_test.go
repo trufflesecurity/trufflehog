@@ -26,6 +26,7 @@ func TestUser_FromChunk(t *testing.T) {
 	}
 	secret := testSecrets.MustGetField("USER")
 	inactiveSecret := testSecrets.MustGetField("USER_INACTIVE")
+	endpoint := testSecrets.MustGetField("USER_ENDPOINT")
 
 	type args struct {
 		ctx    context.Context
@@ -44,13 +45,19 @@ func TestUser_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a user secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("user token = %s\nurl = %s", secret, endpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_User,
 					Verified:     true,
+					Raw:          []byte(secret),
+					RawV2:        []byte(secret + ":" + endpoint),
+					SecretParts: map[string]string{
+						"key":      secret,
+						"endpoint": endpoint,
+					},
 				},
 			},
 			wantErr: false,
@@ -60,13 +67,19 @@ func TestUser_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a user secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("user token = %s\nurl = %s", inactiveSecret, endpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_User,
 					Verified:     false,
+					Raw:          []byte(inactiveSecret),
+					RawV2:        []byte(inactiveSecret + ":" + endpoint),
+					SecretParts: map[string]string{
+						"key":      inactiveSecret,
+						"endpoint": endpoint,
+					},
 				},
 			},
 			wantErr: false,
@@ -91,24 +104,16 @@ func TestUser_FromChunk(t *testing.T) {
 				t.Errorf("User.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
 			ignoreOpts := cmpopts.IgnoreFields(
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
 				"primarySecret",
-				"SecretParts",
 				"chunkOffset",
 				"chunkOffsetSet",
 			)
-
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("User.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+				t.Errorf("User.FromData() %s diff: (-want +got)\n%s", tt.name, diff)
 			}
 		})
 	}
