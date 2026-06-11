@@ -649,3 +649,24 @@ func TestGetGitPath_SpaceResource(t *testing.T) {
 	path := discussion.GetGitPath()
 	assert.Equal(t, expectedPath, path)
 }
+
+func TestEscapePathSegments(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{"simple", "file.jsonl", "file.jsonl"},
+		{"nested preserves slashes", "synthtraces/abf-123.jsonl", "synthtraces/abf-123.jsonl"},
+		{"space", "my dir/my file.jsonl", "my%20dir/my%20file.jsonl"},
+		{"question mark", "data?.jsonl", "data%3F.jsonl"},
+		{"hash", "v#1/data.jsonl", "v%231/data.jsonl"},
+		{"percent", "100%/data.jsonl", "100%25/data.jsonl"},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, escapePathSegments(tt.path))
+		})
+	}
+}

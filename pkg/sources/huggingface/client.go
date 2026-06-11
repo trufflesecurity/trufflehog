@@ -268,9 +268,9 @@ func (c *HFClient) ListBucketFiles(ctx context.Context, bucketID string) ([]Buck
 // DownloadBucketFile streams a file's content from a bucket via the resolve
 // endpoint. The caller is responsible for closing the returned reader.
 func (c *HFClient) DownloadBucketFile(ctx context.Context, bucketID string, path string) (io.ReadCloser, error) {
-	// The resolve endpoint expects the file path fully URL-encoded as a
-	// single segment (including slashes).
-	downloadURL := fmt.Sprintf("%s/%s/%s/resolve/%s", c.BaseURL, BucketsRoute, bucketID, url.PathEscape(path))
+	// Escape each path segment individually so special characters (spaces,
+	// '?', '#', etc.) are encoded while slashes are preserved as separators.
+	downloadURL := fmt.Sprintf("%s/%s/%s/resolve/%s", c.BaseURL, BucketsRoute, bucketID, escapePathSegments(path))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
 	if err != nil {
@@ -321,6 +321,16 @@ func (c *HFClient) getPage(ctx context.Context, url string, target interface{}) 
 		return "", err
 	}
 	return parseNextLink(resp.Header.Get("Link")), nil
+}
+
+// escapePathSegments URL-encodes each slash-separated segment of a path while
+// keeping the slashes as separators, e.g. "a b/c?d" -> "a%20b/c%3Fd".
+func escapePathSegments(path string) string {
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		segments[i] = url.PathEscape(segment)
+	}
+	return strings.Join(segments, "/")
 }
 
 // parseNextLink extracts the URL with rel="next" from a Link header value.
