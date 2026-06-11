@@ -136,7 +136,7 @@ func (s *Source) scanBucketFile(ctx context.Context, bucketID string, bucketInfo
 			Data: &source_metadatapb.MetaData_Huggingface{
 				Huggingface: &source_metadatapb.Huggingface{
 					File:         sanitizer.UTF8(file.Path),
-					Link:         sanitizer.UTF8(fmt.Sprintf("%s/%s/%s/resolve/%s", s.conn.Endpoint, BucketsRoute, bucketID, file.Path)),
+					Link:         sanitizer.UTF8(fmt.Sprintf("%s/%s/%s/resolve/%s", s.conn.Endpoint, BucketsRoute, bucketID, escapePathSegments(file.Path))),
 					Repository:   sanitizer.UTF8(fmt.Sprintf("%s/%s/%s", s.conn.Endpoint, BucketsRoute, bucketID)),
 					Visibility:   bucketInfo.visibility,
 					ResourceType: BUCKET,
