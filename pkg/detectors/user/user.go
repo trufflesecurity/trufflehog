@@ -3,14 +3,12 @@ package user
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -24,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.NewClientWithDedup(detectors.DetectorHttpClientWithNoLocalAddresses)
 
 	keyPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"user"}) + `\b([A-Za-z0-9]{64})\b`)
 	userURLPat = regexp.MustCompile(`\b([a-z0-9-]+\.user\.com)\b`)
@@ -107,14 +105,11 @@ func verifyUserToken(ctx context.Context, client *http.Client, token, baseURL st
 
 	req.Header.Set("Authorization", fmt.Sprintf("Token %s", token))
 
-	res, err := client.Do(req)
+	res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_User, token+":"+baseURL, req)
 	if err != nil {
 		return false, err
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:
