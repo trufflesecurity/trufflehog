@@ -856,6 +856,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youneedabudget"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yousign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youtubeapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zendeskapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zenkitapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zenrows"
@@ -1758,6 +1759,7 @@ func buildDetectorList() []detectors.Detector {
 		&youneedabudget.Scanner{},
 		&yousign.Scanner{},
 		&youtubeapikey.Scanner{},
+		&zai.Scanner{},
 		// &zapierwebhook.Scanner{},
 		&zendeskapi.Scanner{},
 		&zenkitapi.Scanner{},
@@ -1792,6 +1794,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.TlyDetectorEnabled.Load()
 		case *wit.Scanner:
 			return !feature.WitDetectorEnabled.Load()
+		case *zai.Scanner:
+			return !feature.ZaiDetectorEnabled.Load()
 		default:
 			return false
 		}

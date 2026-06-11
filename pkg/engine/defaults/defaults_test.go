@@ -134,6 +134,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Pinecone:      {},
 	detector_typepb.DetectorType_TLy:           {},
 	detector_typepb.DetectorType_Wit:           {},
+	detector_typepb.DetectorType_ZAI:           {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
