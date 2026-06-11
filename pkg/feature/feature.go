@@ -23,11 +23,8 @@ var (
 	DatadogApiKeyDetectorEnabled   atomic.Bool
 	TlyDetectorEnabled             atomic.Bool
 	WitDetectorEnabled             atomic.Bool
-<<<<<<< user-detector
-	UserDetectorEnabled            atomic.Bool
-=======
 	RevDetectorEnabled             atomic.Bool
->>>>>>> main
+	UserDetectorEnabled            atomic.Bool
 )
 
 type AtomicString struct {

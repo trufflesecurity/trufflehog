@@ -1796,13 +1796,10 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.TlyDetectorEnabled.Load()
 		case *wit.Scanner:
 			return !feature.WitDetectorEnabled.Load()
-<<<<<<< user-detector
-		case *user.Scanner:
-			return !feature.UserDetectorEnabled.Load()
-=======
 		case *rev.Scanner:
 			return !feature.RevDetectorEnabled.Load()
->>>>>>> main
+		case *user.Scanner:
+			return !feature.UserDetectorEnabled.Load()
 		default:
 			return false
 		}
