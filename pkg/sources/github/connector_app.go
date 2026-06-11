@@ -56,35 +56,26 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 		return nil, fmt.Errorf("could not create installation client: %w", err)
 	}
 
-	apiTransport, err := ghinstallation.New(
-		httpClient.Transport,
-		appID,
-		installationID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, fmt.Errorf("could not create API client transport: %w", err)
-	}
-	apiTransport.BaseURL = apiEndpoint
-
-	httpClient.Transport = apiTransport
-	apiClient, err := github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("could not create API client: %w", err)
-	}
-
-	graphqlClient, err := createGraphqlClient(ctx, httpClient, apiEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
-	}
-
-	return &appConnector{
-		apiClient:          apiClient,
-		graphqlClient:      graphqlClient,
+	connector := &appConnector{
 		installationClient: installationClient,
 		installationID:     installationID,
 		appsTransport:      installationTransport,
 		apiEndpoint:        apiEndpoint,
-	}, nil
+	}
+
+	apiClient, err := connector.APIClientForInstallation(installationID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create API client for configured installation: %w", err)
+	}
+	connector.apiClient = apiClient
+
+	graphqlClient, err := createGraphqlClient(ctx, apiClient.Client(), apiEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
+	}
+	connector.graphqlClient = graphqlClient
+
+	return connector, nil
 }
 
 func (c *appConnector) APIClient() *github.Client {

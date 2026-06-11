@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 )
 
 func generateTestPrivateKey(t *testing.T) []byte {
@@ -118,6 +119,46 @@ func TestAPIClientForInstallation(t *testing.T) {
 		assert.Contains(t, tokenRequestPaths[0], "/installations/100/")
 		assert.Contains(t, tokenRequestPaths[1], "/installations/200/")
 	})
+}
+
+func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T) {
+	privKey := generateTestPrivateKey(t)
+
+	var mu sync.Mutex
+	var tokenRequestPaths []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method == "POST" && strings.Contains(r.URL.Path, "access_tokens") {
+			mu.Lock()
+			tokenRequestPaths = append(tokenRequestPaths, r.URL.Path)
+			mu.Unlock()
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":      "configured-installation-token",
+				"expires_at": "2099-01-01T00:00:00Z",
+			})
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode([]map[string]string{{"login": "alice"}})
+	}))
+	defer server.Close()
+
+	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+		PrivateKey:     string(privKey),
+		InstallationId: "4242",
+		AppId:          "12345",
+	})
+	require.NoError(t, err)
+
+	_, _, err = connector.APIClient().Organizations.ListMembers(trContext.Background(), "test-org", nil)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, tokenRequestPaths, 1)
+	assert.Contains(t, tokenRequestPaths[0], "/app/installations/4242/access_tokens")
 }
 
 func TestAddMembersByOrgWithClient(t *testing.T) {
