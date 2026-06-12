@@ -285,17 +285,21 @@ func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets
 	}
 }
 
+// scanBuckets scans the given buckets using the given role and adds the number
+// of objects it scanned to totalObjectCount. The counter is owned by Chunks and
+// shared across role passes so that the completion message reflects the whole
+// scan, not just the last role's pass.
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.Client,
 	role string,
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
+	totalObjectCount *uint64,
 ) {
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
-	var totalObjectCount uint64
 
 	checkpointer := NewCheckpointer(ctx, &s.Progress, false)
 	pos := determineResumePosition(ctx, checkpointer, bucketsToScan)
@@ -340,13 +344,13 @@ func (s *Source) scanBuckets(
 		}
 
 		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
-		totalObjectCount += objectCount
+		*totalObjectCount += objectCount
 	}
 
 	s.SetProgressComplete(
 		len(bucketsToScan),
 		len(bucketsToScan),
-		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, totalObjectCount),
+		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, *totalObjectCount),
 		"",
 	)
 }
@@ -435,8 +439,9 @@ func (s *Source) listErrorsAreExpected(role string) bool {
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	var totalObjectCount uint64
 	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
-		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
+		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan, &totalObjectCount)
 		return nil
 	}
 

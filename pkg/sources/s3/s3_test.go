@@ -89,6 +89,25 @@ func TestSource_ListErrorsAreExpected(t *testing.T) {
 	}
 }
 
+func TestSource_ScanBucketsReportsCumulativeObjectCount(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	// Simulate a later role pass after an earlier pass already scanned three
+	// objects. The pass below scans no buckets, so the completion message must
+	// still report the cumulative total rather than resetting to zero.
+	totalObjectCount := uint64(3)
+	s.scanBuckets(context.Background(), nil, "", nil, make(chan *sources.Chunk, 1), &totalObjectCount)
+
+	assert.Equal(t, uint64(3), totalObjectCount)
+	assert.Contains(t, s.Message, "3 objects scanned")
+}
+
 func TestSource_Chunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
