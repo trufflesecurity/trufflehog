@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1162,4 +1163,48 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGitChunk_LongLine verifies that files containing lines longer than
+// bufio's default 64 KB token limit are still scanned. Before the fix,
+// bufio.Scanner would silently stop on the first oversized line and produce
+// zero chunks for that file.
+func TestGitChunk_LongLine(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	repoPath := setupTestRepo(t, "long-line-repo")
+
+	// Build a single line that is 100 KB — well above the old 64 KB cap.
+	longLine := strings.Repeat("a", 100*1024)
+	addTestFileAndCommit(t, repoPath, "long_line.txt", longLine)
+
+	conn, err := anypb.New(&sourcespb.Git{
+		Credential: &sourcespb.Git_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Repositories: []string{"file://" + repoPath},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	assert.NoError(t, s.Init(ctx, "test long line", 0, 0, false, conn, 1))
+
+	chunksCh := make(chan *sources.Chunk, 64)
+	var count int
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range chunksCh {
+			count++
+		}
+	}()
+
+	assert.NoError(t, s.Chunks(ctx, chunksCh))
+	close(chunksCh)
+	wg.Wait()
+	// ensure the goroutine has finished writing to count before we read it
+	// one chunk for the commit/file metadata, and at least one chunk for the file content
+	assert.Equal(t, 2, count, "expected two chunks from a file with a 100 KB line")
 }
