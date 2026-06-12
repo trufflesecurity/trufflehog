@@ -390,15 +390,19 @@ func (s *Source) scanBucket(
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
-			if role == "" {
-				ctx.Logger().Error(err, "could not list objects in bucket")
-			} else {
+			if s.listErrorsAreExpected(role) {
 				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
 				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
 				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
 				// and therefore not an error.
 				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
+			} else {
+				// This can also be a failure to assume the role itself: role credentials
+				// are resolved lazily, so the first request that needs them surfaces the
+				// STS error here rather than at client construction.
+				ctx.Logger().Error(err, "could not list objects in bucket")
 			}
+			s.metricsCollector.RecordBucketListError(bucket, role)
 			break
 		}
 		pageMetadata := pageMetadata{
@@ -417,6 +421,16 @@ func (s *Source) scanBucket(
 		pageNumber++
 	}
 	return objectCount
+}
+
+// listErrorsAreExpected reports whether a failure to list a bucket's objects
+// should be suppressed rather than logged as an error. When a role is assumed
+// without an explicit bucket list, the scanner attempts every bucket in the
+// account and is expected to be denied on some of them. When buckets are
+// explicitly configured, a listing failure means a configured target is being
+// silently skipped, so it is always an error, even under an assumed role.
+func (s *Source) listErrorsAreExpected(role string) bool {
+	return role != "" && len(s.conn.GetBuckets()) == 0
 }
 
 // Chunks emits chunks of bytes over a channel.
