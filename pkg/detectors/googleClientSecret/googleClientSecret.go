@@ -27,7 +27,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// GOCSPX- prefix followed by exactly 28 base64url-safe characters.
-	clientSecretPat = regexp.MustCompile(`\bGOCSPX-([0-9A-Za-z_\-]{28})\b`)
+	// Avoid trailing \b because a valid suffix can end with "-" (non-word char).
+	clientSecretPat = regexp.MustCompile(`\bGOCSPX-([0-9A-Za-z_-]{28})(?:['"|\n\r\s\x60]|$)`)
 
 	// Google OAuth client IDs are typically numeric project ID + token + apps domain.
 	// Allow mixed-case letters, digits, underscore, and hyphen in the token segment.
