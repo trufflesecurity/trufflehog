@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -98,11 +99,28 @@ func TestUser_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			tt.s.UseFoundEndpoints(true)
+
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("User.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(
 				detectors.Result{},
@@ -116,6 +134,35 @@ func TestUser_FromChunk(t *testing.T) {
 				t.Errorf("User.FromData() %s diff: (-want +got)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestUser_FromChunk_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("USER")
+	endpoint := testSecrets.MustGetField("USER_ENDPOINT")
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	if err := s.SetConfiguredEndpoints(endpoint); err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+
+	data := []byte(fmt.Sprintf("user token = %s", secret))
+
+	got, err := s.FromData(ctx, true, data)
+
+	require.NoError(t, err, "unexpected error from FromData")
+	require.Greater(t, len(got), 0, "expected at least 1 result")
+
+	expectedRawV2 := []byte(secret + ":" + endpoint)
+	if string(got[0].RawV2) != string(expectedRawV2) {
+		t.Errorf("User.FromData() rawV2 mismatch: got %s, want %s", string(got[0].RawV2), string(expectedRawV2))
 	}
 }
 
