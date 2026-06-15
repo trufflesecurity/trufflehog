@@ -537,6 +537,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.TlyDetectorEnabled.Store(true)
 	feature.WitDetectorEnabled.Store(true)
 	feature.RevDetectorEnabled.Store(true)
+	feature.UserDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

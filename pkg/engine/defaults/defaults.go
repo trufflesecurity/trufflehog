@@ -811,6 +811,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/upwave"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uri"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/urlscan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/user"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
@@ -1713,6 +1714,7 @@ func buildDetectorList() []detectors.Detector {
 		&upwave.Scanner{},
 		&uri.Scanner{},
 		&urlscan.Scanner{},
+		&user.Scanner{},
 		&userflow.Scanner{},
 		&userstack.Scanner{},
 		&vagrantcloudpersonaltoken.Scanner{},
@@ -1796,6 +1798,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.WitDetectorEnabled.Load()
 		case *rev.Scanner:
 			return !feature.RevDetectorEnabled.Load()
+		case *user.Scanner:
+			return !feature.UserDetectorEnabled.Load()
 		default:
 			return false
 		}
