@@ -525,10 +525,19 @@ func run(state overseer.State, logSync func() error) {
 	// OSS Default using github graphql api for issues, pr's and comments
 	feature.UseGithubGraphQLAPI.Store(false)
 
+	// OSS Default Use HTML Decoder on
+	feature.HTMLDecoderEnabled.Store(true)
+
 	// New detector flags
 	feature.PineconeDetectorEnabled.Store(true)
 	feature.CloudinaryDetectorEnabled.Store(true)
 	feature.GitLabOAuthDetectorEnabled.Store(true)
+	feature.EnigmaDetectorEnabled.Store(true)
+	feature.DatadogApiKeyDetectorEnabled.Store(true)
+	feature.TlyDetectorEnabled.Store(true)
+	feature.WitDetectorEnabled.Store(true)
+	feature.RevDetectorEnabled.Store(true)
+	feature.UserDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
