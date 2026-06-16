@@ -58,7 +58,7 @@ var (
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").PlaceHolder("N").Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
-	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").HintOptions("verified", "unverified", "unknown", "filtered_unverified").String()
 	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
 	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
@@ -188,10 +188,10 @@ var (
 
 	syslogScan     = cli.Command("syslog", "Scan syslog")
 	syslogAddress  = syslogScan.Flag("address", "Address and port to listen on for syslog. Example: 127.0.0.1:514").String()
-	syslogProtocol = syslogScan.Flag("protocol", "Protocol to listen on. udp or tcp").String()
+	syslogProtocol = syslogScan.Flag("protocol", "Protocol to listen on. udp or tcp").HintOptions("udp", "tcp").String()
 	syslogTLSCert  = syslogScan.Flag("cert", "Path to TLS cert.").String()
 	syslogTLSKey   = syslogScan.Flag("key", "Path to TLS key.").String()
-	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").Required().String()
+	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").HintOptions("rfc3164", "rfc5424").Required().String()
 
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
