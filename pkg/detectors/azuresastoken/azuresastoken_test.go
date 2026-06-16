@@ -61,6 +61,23 @@ func TestAzureSASToken_Pattern(t *testing.T) {
 			want: []string{"https://trufflesecurity.blob.core.windows.net/trufflesecurity/test_blob.txtsp=r&st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c&sig=WSdF9YeZhvrbs%2B%2B1f8ZdDBzEe7fBJ%2BenuaXQ%2BJ9WOw0%3D"},
 		},
 		{
+			// Storage Explorer emits the parameters in a different order (sv first,
+			// sp last) and URL-encodes the ':' in the timestamps as %3A. See #4732.
+			name: "valid pattern, alternate order with url-encoded timestamps",
+			input: `
+	https://accountname.blob.core.windows.net/sorted?sv=2023-01-03&st=2025-06-18T08%3A45%3A11Z&se=2025-06-19T08%3A45%3A11Z&sr=c&sp=r&sig=ow2a1XbXmD4%2BEv9LBUkek8R%2FrAjvrQFpenUbzztILn8%3D
+	`,
+			want: []string{"https://accountname.blob.core.windows.net/sortedsv=2023-01-03&st=2025-06-18T08%3A45%3A11Z&se=2025-06-19T08%3A45%3A11Z&sr=c&sp=r&sig=ow2a1XbXmD4%2BEv9LBUkek8R%2FrAjvrQFpenUbzztILn8%3D"},
+		},
+		{
+			name: "non-sas query string is ignored",
+			input: `
+	AZURE_BLOB_QUERY=comp=list&restype=container&maxresults=100
+	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/trufflesecurity
+	`,
+			want: nil,
+		},
+		{
 			name: "invalid pattern",
 			input: `
 	AZURE_BLOB_SAS_TOKEN=st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c
