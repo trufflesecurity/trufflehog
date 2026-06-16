@@ -67,7 +67,7 @@ func TestDiscordBotToken_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_DiscordBotToken,
-					Redacted:     idSecret,
+					Redacted:     decodeBotID(inactiveSecret),
 					Verified:     false,
 				},
 			},
@@ -98,6 +98,8 @@ func TestDiscordBotToken_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].ExtraData = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("DiscordBotToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
