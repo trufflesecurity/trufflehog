@@ -65,9 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, extraData, verificationErr := verifyFacebookOAuth(ctx, apiIdRes, apiSecretRes)
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
-				if verificationErr != nil {
-					s1.SetVerificationError(verificationErr, apiSecretRes)
-				}
+				s1.SetVerificationError(verificationErr, apiSecretRes)
 			}
 
 			results = append(results, s1)
