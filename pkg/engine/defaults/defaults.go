@@ -181,6 +181,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clustdoc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coda"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codacy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codeberg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codeclimate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codemagic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codequiry"
@@ -1064,6 +1065,7 @@ func buildDetectorList() []detectors.Detector {
 		&clustdoc.Scanner{},
 		&coda.Scanner{},
 		&codacy.Scanner{},
+		&codeberg.Scanner{},
 		&codeclimate.Scanner{},
 		&codemagic.Scanner{},
 		&codequiry.Scanner{},
