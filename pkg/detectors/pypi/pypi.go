@@ -77,6 +77,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	_ = writer.WriteField(":action", "file_upload")
 	_ = writer.WriteField("name", "dummy-package")
 	_ = writer.WriteField("version", "0.0.1")
+	_ = writer.WriteField("filetype", "sdist")
 	_ = writer.WriteField("content", "dummy-content")
 
 	// Close the writer to finalize the form
