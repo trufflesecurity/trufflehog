@@ -72,6 +72,9 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_DatadogApikey,
 					Verified:     false,
 					Raw:          []byte(invalidApiKey),
+					SecretParts: map[string]string{
+						"api_key": invalidApiKey,
+					},
 				},
 			},
 			wantErr: false,
