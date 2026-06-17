@@ -494,6 +494,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moosend"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moralis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mrticktock"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/msg91"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mux"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myfreshworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
@@ -1391,6 +1392,7 @@ func buildDetectorList() []detectors.Detector {
 		&moosend.Scanner{},
 		&moralis.Scanner{},
 		&mrticktock.Scanner{},
+		&msg91.Scanner{},
 		&mux.Scanner{},
 		&myfreshworks.Scanner{},
 		&myintervals.Scanner{},
