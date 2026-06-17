@@ -155,7 +155,7 @@ func getPersonalAccessToken(cfg *config.Config, key, host string) (AccessTokenJS
 		return tokens, resp.StatusCode, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
 		return tokens, resp.StatusCode, err
 	}
@@ -183,7 +183,7 @@ func getAccessibleProjects(cfg *config.Config, key, host string) ([]ProjectsJSON
 		return projects, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -197,7 +197,7 @@ func getAccessibleProjects(cfg *config.Config, key, host string) ([]ProjectsJSON
 	if err := json.NewDecoder(newBody()).Decode(&projects); err != nil {
 		var e ErrorJSON
 		if err := json.NewDecoder(newBody()).Decode(&e); err == nil {
-			return projects, fmt.Errorf("Insufficient Scope to query for projects. We need api or read_api permissions.")
+			return projects, errors.New("insufficient scope to query for projects: we need api or read_api permissions")
 		}
 		return projects, err
 	}
@@ -219,7 +219,7 @@ func getMetadata(cfg *config.Config, key, host string) (MetadataJSON, error) {
 		return metadata, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -239,7 +239,7 @@ func getMetadata(cfg *config.Config, key, host string) (MetadataJSON, error) {
 		if err := json.NewDecoder(newBody()).Decode(&e); err != nil {
 			return metadata, err
 		}
-		return metadata, fmt.Errorf("Insufficient Scope to query for metadata. We need read_user, ai_features, api or read_api permissions.")
+		return metadata, errors.New("insufficient scope to query for metadata: we need read_user, ai_features, api or read_api permissions")
 	}
 
 	return metadata, nil
@@ -258,7 +258,7 @@ func AnalyzePermissions(cfg *config.Config, key string, host string) (*SecretInf
 		return nil, err
 	}
 	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("Invalid GitLab Access Token")
+		return nil, errors.New("invalid GitLab access token")
 	}
 
 	meta, err := getMetadata(cfg, key, host)

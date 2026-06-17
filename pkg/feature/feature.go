@@ -16,6 +16,15 @@ var (
 	GitlabProjectsPerPage          atomic.Int64
 	UseGithubGraphQLAPI            atomic.Bool // use github graphql api to fetch issues, pr's and comments
 	HTMLDecoderEnabled             atomic.Bool
+	PineconeDetectorEnabled        atomic.Bool
+	CloudinaryDetectorEnabled      atomic.Bool
+	GitLabOAuthDetectorEnabled     atomic.Bool
+	EnigmaDetectorEnabled          atomic.Bool
+	DatadogApiKeyDetectorEnabled   atomic.Bool
+	TlyDetectorEnabled             atomic.Bool
+	WitDetectorEnabled             atomic.Bool
+	RevDetectorEnabled             atomic.Bool
+	UserDetectorEnabled            atomic.Bool
 )
 
 type AtomicString struct {
