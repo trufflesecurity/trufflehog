@@ -763,6 +763,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/telegrambottoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teletype"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/telnyx"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tencentcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/terraformcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/testingbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/textmagic"
@@ -1666,6 +1667,7 @@ func buildDetectorList() []detectors.Detector {
 		&telegrambottoken.Scanner{},
 		&teletype.Scanner{},
 		&telnyx.Scanner{},
+		&tencentcloud.Scanner{},
 		&terraformcloudpersonaltoken.Scanner{},
 		&testingbot.Scanner{},
 		&textmagic.Scanner{},
