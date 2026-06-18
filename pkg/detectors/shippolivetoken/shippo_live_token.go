@@ -32,8 +32,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Shippo live tokens are documented with `shippo_live_` prefix and a 40-char hex suffix.
-	// This follows open-source scanner patterns while staying strict on token shape.
-	tokenPat = regexp.MustCompile(`\b(shippo_live_[a-f0-9]{40})(?:['"|\n\r\s\x60;]|$)`)
+	tokenPat = regexp.MustCompile(`\b(shippo_live_[a-f0-9]{40})\b`)
 )
 
 func (s Scanner) Keywords() []string {
