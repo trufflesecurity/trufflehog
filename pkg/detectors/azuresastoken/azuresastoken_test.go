@@ -70,6 +70,15 @@ func TestAzureSASToken_Pattern(t *testing.T) {
 			want: []string{"https://accountname.blob.core.windows.net/sortedsv=2023-01-03&st=2025-06-18T08%3A45%3A11Z&se=2025-06-19T08%3A45%3A11Z&sr=c&sp=r&sig=ow2a1XbXmD4%2BEv9LBUkek8R%2FrAjvrQFpenUbzztILn8%3D"},
 		},
 		{
+			// Percent-encoding hex digits are case-insensitive (RFC 3986), so a
+			// timestamp encoded with lowercase %3a must match just like %3A.
+			name: "valid pattern, url-encoded timestamps with lowercase hex",
+			input: `
+	https://accountname.blob.core.windows.net/sorted?sv=2023-01-03&st=2025-06-18T08%3a45%3a11Z&se=2025-06-19T08%3a45%3a11Z&sr=c&sp=r&sig=ow2a1XbXmD4%2BEv9LBUkek8R%2FrAjvrQFpenUbzztILn8%3D
+	`,
+			want: []string{"https://accountname.blob.core.windows.net/sortedsv=2023-01-03&st=2025-06-18T08%3a45%3a11Z&se=2025-06-19T08%3a45%3a11Z&sr=c&sp=r&sig=ow2a1XbXmD4%2BEv9LBUkek8R%2FrAjvrQFpenUbzztILn8%3D"},
+		},
+		{
 			name: "non-sas query string is ignored",
 			input: `
 	AZURE_BLOB_QUERY=comp=list&restype=container&maxresults=100

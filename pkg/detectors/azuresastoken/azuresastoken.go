@@ -41,10 +41,12 @@ var (
 
 	// Validators for the individual SAS parameters. The `sp` permission set and `sr`
 	// resource set match the formats the previous, order-locked regex accepted.
-	spValuePat   = regexp.MustCompile(`^[racwdli]+$`)
-	svValuePat   = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-	srValuePat   = regexp.MustCompile(`^[bcfso]$`)
-	timeValuePat = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}(?::|%3A)\d{2}(?::|%3A)\d{2}Z$`)
+	spValuePat = regexp.MustCompile(`^[racwdli]+$`)
+	svValuePat = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	srValuePat = regexp.MustCompile(`^[bcfso]$`)
+	// The `:` separators may be URL-encoded; percent-encoding hex digits are
+	// case-insensitive per RFC 3986, so accept both %3A and %3a.
+	timeValuePat = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}(?::|%3[Aa])\d{2}(?::|%3[Aa])\d{2}Z$`)
 	sigValuePat  = regexp.MustCompile(`^[a-zA-Z0-9%+/=]{10,}$`)
 	sipValuePat  = regexp.MustCompile(`^\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3})?$`)
 
