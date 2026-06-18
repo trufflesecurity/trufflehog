@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-errors/errors"
@@ -239,25 +240,13 @@ func (s *Source) scanSymlink(
 // component matches os.ReadDir's ordering, where "blue-team" sorts before
 // "blue-team-deprecated". Returns -1, 0, or 1.
 func comparePathsForResume(a, b string) int {
-	aParts := strings.Split(a, string(filepath.Separator))
-	bParts := strings.Split(b, string(filepath.Separator))
-	for i := 0; i < len(aParts) && i < len(bParts); i++ {
-		if aParts[i] != bParts[i] {
-			if aParts[i] < bParts[i] {
-				return -1
-			}
-			return 1
-		}
-	}
-	// All shared components are equal; the shorter path (the ancestor) comes first.
-	switch {
-	case len(aParts) < len(bParts):
-		return -1
-	case len(aParts) > len(bParts):
-		return 1
-	default:
-		return 0
-	}
+	// slices.Compare walks the components lexicographically and, when one path is
+	// a prefix of the other, orders the shorter (ancestor) path first — matching
+	// the depth-first walk order described above.
+	return slices.Compare(
+		strings.Split(a, string(filepath.Separator)),
+		strings.Split(b, string(filepath.Separator)),
+	)
 }
 
 func (s *Source) scanDir(
