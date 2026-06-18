@@ -120,7 +120,7 @@ Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
 
 ```bash
 git clone https://github.com/trufflesecurity/trufflehog.git
-cd trufflehog;
+cd trufflehog
 go install
 ```
 
