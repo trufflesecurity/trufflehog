@@ -609,7 +609,13 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
 			orgCtx := context.WithValue(ctx, "account", org)
-			userType, err := s.getReposByOrgOrUser(ctx, org, true, reporter)
+			// The authenticated /user/repos endpoint ignores the requested account
+			// and returns the token owner's repos, so only use it when org is the
+			// token owner. For any other user passed via --org, fall back to the
+			// public listing instead of silently scanning the token owner's repos.
+			// https://github.com/trufflesecurity/trufflehog/issues/4517
+			authenticated := strings.EqualFold(org, ghUser.GetLogin())
+			userType, err := s.getReposByOrgOrUser(ctx, org, authenticated, reporter)
 			if err != nil {
 				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
 				continue

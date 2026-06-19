@@ -624,6 +624,90 @@ func TestEnumerateWithToken(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+// Passing a username via --org that isn't the token owner should list that
+// user's public repos via /users/{user}/repos, not the token owner's repos
+// via /user/repos. Regression test for issue #4517.
+func TestEnumerateWithToken_DifferentUserListsPublicRepos(t *testing.T) {
+	defer gock.Off()
+
+	// The token owner is "token-owner", but we scan "super-secret-user".
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "token-owner"})
+
+	// The requested account is not an org.
+	gock.New("https://api.github.com").
+		Get("/orgs/super-secret-user/repos").
+		Reply(404).
+		JSON(map[string]string{"message": "Not Found"})
+
+	// It must be resolved as a user and listed via the public endpoint.
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/repos").
+		Reply(200).
+		JSON([]map[string]string{{"full_name": "super-secret-user/super-secret-repo", "clone_url": "https://github.com/super-secret-user/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"id": "super-secret-gist", "git_pull_url": "https://gist.github.com/super-secret-gist.git"}})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint:      "https://api.github.com",
+		Organizations: []string{"super-secret-user"},
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
+	assert.Nil(t, err)
+	assert.True(t, s.filteredRepoCache.Exists("super-secret-user/super-secret-repo"))
+	// /user/repos must not be hit for a different user; all mocks consumed once.
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+// When the account is the token owner, keep using the authenticated
+// /user/repos listing so private repos are still scanned (see #4426).
+func TestEnumerateWithToken_OwnerListsAuthenticatedRepos(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	gock.New("https://api.github.com").
+		Get("/orgs/super-secret-user/repos").
+		Reply(404).
+		JSON(map[string]string{"message": "Not Found"})
+
+	// Token owner: private + public repositories via the authenticated endpoint.
+	gock.New("https://api.github.com").
+		Get("/user/repos").
+		Reply(200).
+		JSON([]map[string]string{{"full_name": "super-secret-user/private-repo", "clone_url": "https://github.com/super-secret-user/private-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"id": "super-secret-gist", "git_pull_url": "https://gist.github.com/super-secret-gist.git"}})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint:      "https://api.github.com",
+		Organizations: []string{"super-secret-user"},
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
+	assert.Nil(t, err)
+	assert.True(t, s.filteredRepoCache.Exists("super-secret-user/private-repo"))
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
 func BenchmarkEnumerateWithToken(b *testing.B) {
 	defer gock.Off()
 
