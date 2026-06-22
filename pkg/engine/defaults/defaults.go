@@ -21,6 +21,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ranchertoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aletheiaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/algoliaadminkey"
@@ -899,6 +900,7 @@ func buildDetectorList() []detectors.Detector {
 		&airvisual.Scanner{},
 		&aiven.Scanner{},
 		&alchemy.Scanner{},
+		&ranchertoken.Scanner{},
 		// The service currently has blocked requests with a "TruffleHog" UserAgent.
 		// &alconost.Scanner{},
 		&alegra.Scanner{},
