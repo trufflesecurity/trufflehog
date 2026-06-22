@@ -31,7 +31,7 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
-	return []string{"cattle_token", "rancher_token", "cattle_bootstrap_password", "rancher_api_token", "rancher_secret_key"}
+	return []string{"cattle", "rancher"}
 }
 
 // FromData will find and optionally verify RancherToken secrets in a given set of bytes.
