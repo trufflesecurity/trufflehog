@@ -1488,6 +1488,24 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 				if err := os.WriteFile(clonedIndexPath, indexData, 0644); err != nil {
 					return path, remote, fmt.Errorf("failed to write index file: %w", err)
 				}
+
+				// Add the source object store as an alternate so staged blobs are accessible.
+				// git clone with file:// only transfers reachable objects; staged blobs must
+				// be reached via the original object store.
+				// For worktrees, the commondir file points to the main repo's git dir
+				// which holds the actual shared object store.
+				sourceObjectsPath := filepath.Join(originalGitDir, "objects")
+				if commondirData, err := os.ReadFile(filepath.Join(originalGitDir, "commondir")); err == nil {
+					commondir := strings.TrimSpace(string(commondirData))
+					if !filepath.IsAbs(commondir) {
+						commondir = filepath.Join(originalGitDir, commondir)
+					}
+					sourceObjectsPath = filepath.Join(filepath.Clean(commondir), "objects")
+				}
+				alternatesPath := filepath.Join(path, gitDirName, "objects", "info", "alternates")
+				if err := os.MkdirAll(filepath.Dir(alternatesPath), 0755); err == nil {
+					_ = os.WriteFile(alternatesPath, []byte(sourceObjectsPath+"\n"), 0644)
+				}
 			}
 		}
 	case "http", "https":

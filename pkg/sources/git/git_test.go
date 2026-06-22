@@ -651,6 +651,7 @@ func setupTestRepo(t *testing.T, repoName string) string {
 	assert.NoError(t, exec.Command("git", "init", repoPath).Run())
 	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.name", "Test User").Run())
 	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.email", "test@example.com").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "commit.gpgsign", "false").Run())
 
 	return repoPath
 }
@@ -949,15 +950,13 @@ func TestPrepareRepoWithWorktree(t *testing.T) {
 		assert.False(t, isRemote)
 		assert.NotEmpty(t, preparedPath)
 
+		defer func() { _ = os.RemoveAll(preparedPath) }()
+
 		// Verify the cloned repo has the staged changes preserved
-		if preparedPath != "" {
-			defer func() { _ = os.RemoveAll(preparedPath) }()
-			stagedOutput, err := exec.Command("git", "-C", preparedPath, "diff", "--cached").Output()
-			if err == nil && len(stagedOutput) > 0 {
-				assert.Contains(t, string(stagedOutput), "modified content in worktree",
-					"Staged changes should be preserved when cloning from worktree")
-			}
-		}
+		stagedOutput, err := exec.Command("git", "-C", preparedPath, "diff", "--cached").Output()
+		assert.NoError(t, err, "git diff --cached should succeed in prepared repo")
+		assert.Contains(t, string(stagedOutput), "modified content in worktree",
+			"Staged changes should be preserved when cloning from worktree")
 	})
 }
 
