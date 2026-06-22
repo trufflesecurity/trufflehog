@@ -1055,4 +1055,5 @@ enum DetectorType {
   SpectralOps = 1051;
   AWSAppSync = 1052;
   BasicAuth = 1057;
+  StreamIO = 1058;
 }
