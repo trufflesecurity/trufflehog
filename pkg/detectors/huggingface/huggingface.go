@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_HuggingFace,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -52,7 +53,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, resMatch)
-			s1.AnalysisInfo = map[string]string{"key": resMatch}
 		}
 
 		results = append(results, s1)
@@ -78,7 +78,7 @@ func (s Scanner) verifyResult(ctx context.Context, apiKey string) (bool, map[str
 		return false, nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		whoamiRes := whoamiResponse{}
 		err := json.NewDecoder(res.Body).Decode(&whoamiRes)

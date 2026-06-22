@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_BraintreePayments,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 
 			if verify {
@@ -112,7 +113,7 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 	}()
 
 	bodyString := string(bodyBytes)
-	if !(res.StatusCode == http.StatusOK) {
+	if res.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 

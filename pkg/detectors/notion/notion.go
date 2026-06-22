@@ -42,6 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Notion,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -53,14 +54,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 || res.StatusCode == 403 {
 					// if >= 200 and < 300, the secret is valid and has privileges for the /v1/users endpoint
 					// If 403, the secret is valid, but does not have privileges for the /v1/users endpoint,
 					// Notion returns 401 for all non-valid keys, thus 403 indicates it has fine-tuned permissions,
 					// /v1/search, /v1/databases/*, etc. may work.
 					s1.Verified = true
-					s1.AnalysisInfo = map[string]string{"key": resMatch}
 
 				}
 			} else {

@@ -65,7 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_BrowserStack,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resUserMatch),
+				SecretParts: map[string]string{
+					"key":      resMatch,
+					"username": resUserMatch,
+				},
+				RawV2: []byte(resMatch + resUserMatch),
 			}
 
 			if verify {
@@ -102,7 +106,7 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode == http.StatusOK {
 		return true, nil

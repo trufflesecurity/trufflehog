@@ -77,6 +77,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detector_typepb.DetectorType_SalesforceRefreshToken,
 					Raw:          []byte(refreshToken),
 					RawV2:        fmt.Appendf([]byte{}, "%s:%s:%s", refreshToken, key, secret),
+					SecretParts: map[string]string{
+						"refresh_token":   refreshToken,
+						"consumer_key":    key,
+						"consumer_secret": secret,
+					},
 				}
 
 				if verify {

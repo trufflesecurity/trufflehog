@@ -63,7 +63,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Twitch,
 				Raw:          []byte(id),
-				RawV2:        []byte(id + ":" + secret),
+				SecretParts: map[string]string{
+					"id":     id,
+					"secret": secret,
+				},
+				RawV2: []byte(id + ":" + secret),
 			}
 
 			if verify {
@@ -104,7 +108,7 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:

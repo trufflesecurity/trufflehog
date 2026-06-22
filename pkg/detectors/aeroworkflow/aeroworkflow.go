@@ -60,7 +60,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Aeroworkflow,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"id":  resIdMatch,
+				},
+				RawV2: []byte(resMatch + resIdMatch),
 			}
 
 			if verify {
@@ -89,7 +93,7 @@ func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resI
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// https://api.aeroworkflow.com/swagger/index.html
 	switch res.StatusCode {

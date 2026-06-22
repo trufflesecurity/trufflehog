@@ -133,7 +133,7 @@ func TestGCP_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "SecretParts")
 			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
 			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("GCP.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

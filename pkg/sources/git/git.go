@@ -30,7 +30,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/gitcmd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -215,7 +214,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		concurrency = runtime.NumCPU()
 	}
 
-	if err = gitcmd.CheckVersion(); err != nil {
+	if err = CmdCheck(); err != nil {
 		return err
 	}
 
@@ -320,7 +319,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURI string, reporter sources.
 		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 		if !s.conn.GetPrintLegacyJson() {
 			if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-				defer os.RemoveAll(path)
+				defer func() { _ = os.RemoveAll(path) }()
 			}
 		}
 
@@ -374,7 +373,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 		if !s.conn.GetPrintLegacyJson() {
 			if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-				defer os.RemoveAll(gitDir)
+				defer func() { _ = os.RemoveAll(gitDir) }()
 			}
 		}
 
@@ -405,7 +404,7 @@ func RepoFromPath(path string) (*git.Repository, error) {
 
 func CleanOnError(err *error, path string) {
 	if *err != nil {
-		os.RemoveAll(path)
+		_ = os.RemoveAll(path)
 	}
 }
 
@@ -615,7 +614,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 //
 // Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
 func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
-	if err := gitcmd.CheckVersion(); err != nil {
+	if err := CmdCheck(); err != nil {
 		return err
 	}
 	lsUrl, err := GitURLParse(gitUrl)
@@ -795,7 +794,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
 		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
@@ -908,7 +906,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				)
 				return nil
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			data := make([]byte, d.Len())
 			if _, err := io.ReadFull(reader, data); err != nil {
@@ -943,9 +941,17 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		ctx.Logger().Error(err, "error creating reader for chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	originalChunk := bufio.NewScanner(reader)
+	// Default bufio max token size (64 KB) is too small for files with long lines
+	// (e.g. minified JS, base64 blobs). Raise the cap to 10 MB so those lines
+	// are still scanned; the oversize-line path below will chunk them correctly.
+	// The initial buffer starts at 4 KB (same as bufio's default) and grows only
+	// when a line actually exceeds the current size, keeping allocations cheap for
+	// the common case of small diffs.
+	const maxScanTokenSize = 10 * 1024 * 1024
+	originalChunk.Buffer(make([]byte, 4096), maxScanTokenSize)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
@@ -1011,6 +1017,9 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		if _, err := newChunkBuffer.Write(line); err != nil {
 			ctx.Logger().Error(err, "error writing to chunk buffer", "filename", fileName, "commit", hash, "file", diff.PathB)
 		}
+	}
+	if err := originalChunk.Err(); err != nil {
+		ctx.Logger().Error(err, "error scanning chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
 	}
 	// Send anything still in the new chunk buffer
 	if newChunkBuffer.Len() > 0 {
@@ -1160,7 +1169,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				logger.Error(err, "error creating reader for staged")
 				return nil
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			data := make([]byte, d.Len())
 			if _, err := reader.Read(data); err != nil {

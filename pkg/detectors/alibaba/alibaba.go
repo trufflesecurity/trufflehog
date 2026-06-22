@@ -75,9 +75,9 @@ func GetSignature(input, key string) string {
 }
 
 func buildStringToSign(method, input string) string {
-	filter := strings.Replace(input, "+", "%20", -1)
-	filter = strings.Replace(filter, "%7E", "~", -1)
-	filter = strings.Replace(filter, "*", "%2A", -1)
+	filter := strings.ReplaceAll(input, "+", "%20")
+	filter = strings.ReplaceAll(filter, "%7E", "~")
+	filter = strings.ReplaceAll(filter, "*", "%2A")
 	filter = method + "&%2F&" + url.QueryEscape(filter)
 	return filter
 }
@@ -105,7 +105,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Alibaba,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"id":  resIdMatch,
+				},
+				RawV2: []byte(resMatch + resIdMatch),
 			}
 
 			if verify {
@@ -151,7 +155,7 @@ func verifyAlibaba(ctx context.Context, client *http.Client, resIdMatch, resMatc
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	var alibabaResp alibabaResp
 	if err = json.NewDecoder(res.Body).Decode(&alibabaResp); err != nil {

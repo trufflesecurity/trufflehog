@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_LiveAgent,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 				ExtraData: map[string]string{
 					"domain": domainRes,
 				},
@@ -66,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("apikey", resMatch)
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else if res.StatusCode == 403 {

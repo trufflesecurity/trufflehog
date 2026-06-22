@@ -68,7 +68,7 @@ func isValidECPrivateKey(pemKey []byte) bool {
 
 	// Check the key type
 	_, ok := key.Public().(*ecdsa.PublicKey)
-        return ok
+	return ok
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -106,6 +106,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_Coinbase,
 				Raw:          []byte(resPrivateKey),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", resKeyName, resPrivateKey)),
+				SecretParts: map[string]string{
+					"key_name": resKeyName,
+					"key":      resPrivateKey,
+				},
 			}
 
 			if verify {

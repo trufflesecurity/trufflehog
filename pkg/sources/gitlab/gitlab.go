@@ -13,7 +13,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/gitcmd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -167,7 +166,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	if err := gitcmd.CheckVersion(); err != nil {
+	if err := git.CmdCheck(); err != nil {
 		return err
 	}
 
@@ -978,7 +977,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 			if !s.printLegacyJSON {
 				if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-					defer os.RemoveAll(path)
+					defer func() { _ = os.RemoveAll(path) }()
 				}
 			}
 
@@ -1181,7 +1180,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 	if !s.printLegacyJSON {
 		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-			defer os.RemoveAll(path)
+			defer func() { _ = os.RemoveAll(path) }()
 		}
 	}
 

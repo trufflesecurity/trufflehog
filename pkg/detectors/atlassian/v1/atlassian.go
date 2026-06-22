@@ -35,7 +35,7 @@ var _ detectors.Versioner = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian"}) + `\b([a-zA-Z-0-9]{24})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian"}) + `\b([a-zA-Z0-9]{24})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -66,6 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
+			SecretParts: map[string]string{"key": match},
 		}
 
 		if verify {
@@ -80,12 +81,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.ExtraData["Organization"] = orgResponse.Data[0].Attributes.Name
 			}
 			s1.SetVerificationError(verificationErr, match)
-
-			if isVerified {
-				s1.AnalysisInfo = map[string]string{
-					"key": match,
-				}
-			}
 		}
 
 		results = append(results, s1)

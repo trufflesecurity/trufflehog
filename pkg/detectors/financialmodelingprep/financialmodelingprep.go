@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_FinancialModelingPrep,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -60,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// error response is in json
 					validResponse := strings.Contains(bodyString, `[ "`)
 
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if validResponse {
 							s1.Verified = true
