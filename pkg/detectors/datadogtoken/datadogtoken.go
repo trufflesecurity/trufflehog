@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.EndpointSetter
 	detectors.DefaultMultiPartCredentialProvider
 }
@@ -24,6 +25,13 @@ var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return client
+}
 
 var (
 	client = common.SaneHttpClient()
@@ -130,6 +138,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
+				client := s.getClient()
+				var verificationErr error
 				for _, baseURL := range s.Endpoints(endpoints...) {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
 					if err != nil {
@@ -139,26 +149,34 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("DD-API-KEY", resApiMatch)
 					req.Header.Add("DD-APPLICATION-KEY", resAppMatch)
 					res, err := client.Do(req)
-					if err == nil {
-						defer func() { _ = res.Body.Close() }()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							s1.SecretParts["endpoint"] = baseURL
-							var serviceResponse userServiceResponse
-							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
-								// setup emails
-								if len(serviceResponse.Data) > 0 {
-									setUserEmails(serviceResponse.Data, &s1)
-								}
-								// setup organizations
-								if len(serviceResponse.Included) > 0 {
-									setOrganizationInfo(serviceResponse.Included, &s1)
-								}
-							}
-							// break the loop once we've successfully validated the token against a baseURL
-							break
-						}
+					if err != nil {
+						// An unreachable endpoint is a verification issue, not an
+						// invalid credential. Remember the error and surface it
+						// below if no endpoint ends up verifying the token.
+						verificationErr = err
+						continue
 					}
+					defer func() { _ = res.Body.Close() }()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+						s1.SecretParts["endpoint"] = baseURL
+						var serviceResponse userServiceResponse
+						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
+							// setup emails
+							if len(serviceResponse.Data) > 0 {
+								setUserEmails(serviceResponse.Data, &s1)
+							}
+							// setup organizations
+							if len(serviceResponse.Included) > 0 {
+								setOrganizationInfo(serviceResponse.Included, &s1)
+							}
+						}
+						// break the loop once we've successfully validated the token against a baseURL
+						break
+					}
+				}
+				if !s1.Verified && verificationErr != nil {
+					s1.SetVerificationError(verificationErr, resApiMatch)
 				}
 			}
 			results = append(results, s1)
