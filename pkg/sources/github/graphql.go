@@ -15,13 +15,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-func (s *Source) graphQLClientForRepo(ctx context.Context, repoURL string) (*githubv4.Client, error) {
-	if connector, ok := s.connector.(*appConnector); ok {
-		return connector.GraphQLClientForRepo(ctx, repoURL)
-	}
-	return s.connector.GraphQLClient(), nil
-}
-
 // processIssuesWithComments process github repo issues with comments using graphql API
 func (s *Source) processIssuesWithComments(
 	ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo,

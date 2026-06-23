@@ -24,8 +24,12 @@ const (
 type Connector interface {
 	// APIClient returns a configured GitHub client that can be used for GitHub API operations.
 	APIClient() *github.Client
+	// APIClientForRepo returns a GitHub API client scoped to the repository URL when needed.
+	APIClientForRepo(repoURL string) (*github.Client, error)
 	// GraphQLClient returns a client that can be used for GraphQL operations.
 	GraphQLClient() *githubv4.Client
+	// GraphQLClientForRepo returns a GitHub GraphQL client scoped to the repository URL when needed.
+	GraphQLClientForRepo(ctx context.Context, repoURL string) (*githubv4.Client, error)
 	// Clone clones a repository using the configured authentication information.
 	Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error)
 }

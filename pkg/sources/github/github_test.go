@@ -1058,12 +1058,42 @@ func TestMapExplicitReposToInstallationsErrorsForUnmatchedRepos(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
-
-	err := s.mapExplicitReposToInstallations(context.Background(), s.connector.(*appConnector))
+	err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "configured repos were not found in any GitHub App installation")
 	assert.Contains(t, err.Error(), "https://github.com/other-org/missing.git")
+}
+
+func TestScanAllInstallationsInitErrorsWhenInstallationsCannotBeListed(t *testing.T) {
+	privateKey := createPrivateKey()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/app/installations"):
+			http.Error(w, "installation list failed", http.StatusInternalServerError)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:             server.URL,
+		ScanAllInstallations: true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+
+	err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not list installations")
 }
 
 func TestMapExplicitReposToInstallationsStopsAfterReposFound(t *testing.T) {
@@ -1129,6 +1159,60 @@ func TestMapExplicitReposToInstallationsStopsAfterReposFound(t *testing.T) {
 	assert.Equal(t, 0, unrelatedRepoListCalls)
 }
 
+func TestScanAllInstallationsReusesInstallationsLoadedDuringInit(t *testing.T) {
+	privateKey := createPrivateKey()
+	var listInstallationsCalls int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/app/installations/") && strings.HasSuffix(r.URL.Path, "/access_tokens"):
+			parts := strings.Split(r.URL.Path, "/")
+			installID := parts[len(parts)-2]
+			_, _ = fmt.Fprintf(w, `{"token":"token-%s","expires_at":"2099-01-01T00:00:00Z"}`, installID)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/app/installations"):
+			listInstallationsCalls++
+			_, _ = w.Write([]byte(`[
+				{"id":1337,"account":{"login":"default-org","type":"Organization"}},
+				{"id":2448,"account":{"login":"other-org","type":"Organization"}}
+			]`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/installation/repositories"):
+			if strings.Contains(r.Header.Get("Authorization"), "token-2448") {
+				_, _ = w.Write([]byte(`{"total_count":1,"repositories":[
+					{"name":"repo","full_name":"other-org/repo","clone_url":"https://github.com/other-org/repo.git","owner":{"login":"other-org","type":"Organization"},"size":1}
+				]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"total_count":0,"repositories":[]}`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/orgs/") && strings.HasSuffix(r.URL.Path, "/members"):
+			_, _ = w.Write([]byte(`[]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:             server.URL,
+		Repositories:         []string{"https://github.com/other-org/repo.git"},
+		ScanAllInstallations: true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
+
+	connector := s.connector.(*appConnector)
+	require.NoError(t, s.enumerateAllInstallationRepos(context.Background(), connector, noopReporter()))
+	require.NoError(t, s.addMembersByApp(context.Background(), connector, noopReporter()))
+	assert.Equal(t, 1, listInstallationsCalls)
+}
+
 func TestMapExplicitReposToInstallationsMatchesSSHRepoURL(t *testing.T) {
 	privateKey := createPrivateKey()
 	const sshRepoURL = "ssh://git@github.com/other-org/repo.git"
@@ -1166,7 +1250,6 @@ func TestMapExplicitReposToInstallationsMatchesSSHRepoURL(t *testing.T) {
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
 	connector := s.connector.(*appConnector)
-	require.NoError(t, s.mapExplicitReposToInstallations(context.Background(), connector))
 	assert.Equal(t, int64(2448), connector.installationIDForRepo(sshRepoURL))
 }
 
@@ -1207,7 +1290,6 @@ func TestMapExplicitReposToInstallationsMatchesSCPStyleSSHRepoURL(t *testing.T) 
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
 	connector := s.connector.(*appConnector)
-	require.NoError(t, s.mapExplicitReposToInstallations(context.Background(), connector))
 	assert.Equal(t, int64(2448), connector.installationIDForRepo(sshRepoURL))
 }
 
@@ -1247,9 +1329,7 @@ func TestMapExplicitReposToInstallationsRejectsHostMismatch(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
-
-	err := s.mapExplicitReposToInstallations(context.Background(), s.connector.(*appConnector))
+	err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "configured repos were not found")
 }
@@ -1288,9 +1368,7 @@ func TestMapExplicitReposToInstallationsRejectsRepoMissingFromInstallationList(t
 			},
 		},
 	})
-	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
-
-	err := s.mapExplicitReposToInstallations(context.Background(), s.connector.(*appConnector))
+	err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "configured repos were not found")
 }
@@ -1332,7 +1410,6 @@ func TestMapExplicitReposToInstallationsMapsWikiRepoURL(t *testing.T) {
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
 	connector := s.connector.(*appConnector)
-	require.NoError(t, s.mapExplicitReposToInstallations(context.Background(), connector))
 	assert.Equal(t, int64(2448), connector.installationIDForRepo("https://github.com/other-org/repo.git"))
 	assert.Equal(t, int64(2448), connector.installationIDForRepo(wikiRepoURL))
 }
@@ -1381,7 +1458,6 @@ func TestMapExplicitReposToInstallationsMapsRedirectedRepoFromMetadata(t *testin
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
 	connector := s.connector.(*appConnector)
-	require.NoError(t, s.mapExplicitReposToInstallations(context.Background(), connector))
 
 	assert.Equal(t, int64(2448), connector.installationIDForRepo(oldRepoURL))
 	assert.Equal(t, int64(2448), connector.installationIDForRepo(canonicalRepoURL))
@@ -1768,6 +1844,41 @@ func TestGetRepoURLPartsWithTrailingHyphen(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			assert.Equal(t, tc.expected, parts)
+		})
+	}
+}
+
+func TestGithubWebHost(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{
+			name:     "empty endpoint defaults to github",
+			endpoint: "",
+			want:     "github.com",
+		},
+		{
+			name:     "cloud api endpoint",
+			endpoint: "https://api.github.com",
+			want:     "github.com",
+		},
+		{
+			name:     "enterprise endpoint",
+			endpoint: "https://github.example.com/api/v3",
+			want:     "github.example.com",
+		},
+		{
+			name:     "host ending with github.com substring is enterprise",
+			endpoint: "https://legithub.com/api/v3",
+			want:     "legithub.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, githubWebHost(tt.endpoint))
 		})
 	}
 }

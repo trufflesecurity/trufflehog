@@ -64,13 +64,6 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string) (string, *gogit.
 	return s.connector.Clone(ctx, repoURL)
 }
 
-func (s *Source) apiClientForRepo(repoURL string) (*github.Client, error) {
-	if connector, ok := s.connector.(*appConnector); ok {
-		return connector.APIClientForRepo(repoURL)
-	}
-	return s.connector.APIClient(), nil
-}
-
 // repoListOptions is an interface for types that provide options for listing repositories.
 type repoListOptions interface {
 	getListOptions() *github.ListOptions
@@ -350,16 +343,16 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 		wikiBaseURL = (&url.URL{
 			Scheme: "https",
 			Host:   githubWebHost(s.conn.GetEndpoint()),
-			Path:   fmt.Sprintf("/%s/%s", repoInfo.owner, repoInfo.name),
-		}).String() + ".git"
+		}).JoinPath(repoInfo.owner, repoInfo.name+".git").String()
 	}
+	// Convert the clone URL to the corresponding web wiki URL.
 	wikiURL := strings.TrimSuffix(wikiBaseURL, ".git") + "/wiki"
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
 	if err != nil {
 		return false
 	}
 
-	apiClient, err := s.apiClientForRepo(repoURL)
+	apiClient, err := s.connector.APIClientForRepo(repoURL)
 	if err != nil {
 		return false
 	}

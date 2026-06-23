@@ -190,10 +190,16 @@ func (c *appConnector) setRepoInstallation(repoURL string, installationID int64)
 		c.repoInstallationMap = make(map[string]int64)
 	}
 	c.repoInstallationMap[repoURL] = installationID
-	if strings.HasSuffix(repoURL, ".git") {
-		wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
+	if wikiURL, ok := wikiCloneURLForRepo(repoURL); ok {
 		c.repoInstallationMap[wikiURL] = installationID
 	}
+}
+
+func wikiCloneURLForRepo(repoURL string) (string, bool) {
+	if !strings.HasSuffix(repoURL, ".git") {
+		return "", false
+	}
+	return strings.TrimSuffix(repoURL, ".git") + ".wiki.git", true
 }
 
 func (c *appConnector) GraphQLClient() *githubv4.Client {

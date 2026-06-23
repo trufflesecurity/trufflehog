@@ -282,6 +282,28 @@ func TestGraphQLClientForRepoCachesClients(t *testing.T) {
 	})
 }
 
+func TestDefaultConnectorsReturnDefaultClientsForRepo(t *testing.T) {
+	ctx := trContext.Background()
+	apiClient := github.NewClient(nil)
+	graphqlClient := &githubv4.Client{}
+
+	connectors := []Connector{
+		&basicAuthConnector{apiClient: apiClient, graphqlClient: graphqlClient},
+		&tokenConnector{apiClient: apiClient, graphqlClient: graphqlClient},
+		&unauthenticatedConnector{apiClient: apiClient, graphqlClient: graphqlClient},
+	}
+
+	for _, connector := range connectors {
+		gotAPIClient, err := connector.APIClientForRepo("https://github.com/trufflesecurity/trufflehog.git")
+		require.NoError(t, err)
+		assert.Same(t, apiClient, gotAPIClient)
+
+		gotGraphQLClient, err := connector.GraphQLClientForRepo(ctx, "https://github.com/trufflesecurity/trufflehog.git")
+		require.NoError(t, err)
+		assert.Same(t, graphqlClient, gotGraphQLClient)
+	}
+}
+
 func TestAddMembersByOrgWithClient(t *testing.T) {
 	strPtr := func(s string) *string { return &s }
 	memberPage := []*github.User{
