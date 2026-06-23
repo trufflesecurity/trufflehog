@@ -25,6 +25,8 @@ func TestDuoapisecretkey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("DUOAPISECRETKEY")
+	integrationKey := testSecrets.MustGetField("DUOAPISECRETKEY_INTEGRATION")
+	apiHost := testSecrets.MustGetField("DUOAPISECRETKEY_HOST")
 	inactiveSecret := testSecrets.MustGetField("DUOAPISECRETKEY_INACTIVE")
 
 	type args struct {
@@ -44,8 +46,12 @@ func TestDuoapisecretkey_FromChunk(t *testing.T) {
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a duoapisecretkey secret %s within", secret)),
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`
+					duo_integration_key = %s
+					duo_secret_key = %s
+					duo_api_host = %s
+				`, integrationKey, secret, apiHost)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -61,8 +67,12 @@ func TestDuoapisecretkey_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a duoapisecretkey secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`
+					duo_integration_key = %s
+					duo_secret_key = %s
+					duo_api_host = %s
+				`, integrationKey, inactiveSecret, apiHost)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -90,8 +100,12 @@ func TestDuoapisecretkey_FromChunk(t *testing.T) {
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a duoapisecretkey secret %s within", secret)),
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`
+					duo_integration_key = %s
+					duo_secret_key = %s
+					duo_api_host = %s
+				`, integrationKey, secret, apiHost)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -107,8 +121,12 @@ func TestDuoapisecretkey_FromChunk(t *testing.T) {
 			name: "found, verified but unexpected api surface",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a duoapisecretkey secret %s within", secret)),
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`
+					duo_integration_key = %s
+					duo_secret_key = %s
+					duo_api_host = %s
+				`, integrationKey, secret, apiHost)),
 				verify: true,
 			},
 			want: []detectors.Result{

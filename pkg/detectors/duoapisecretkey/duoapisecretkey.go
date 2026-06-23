@@ -2,8 +2,6 @@ package duoapisecretkey
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -22,12 +20,12 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	// Duo API Secret Key is a 40-character hex string
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"duo", "secret"}) + `\b([a-fA-F0-9]{40})\b`)
-	// Duo Integration Key is a 20-character alphanumeric string
+	// Duo API Secret Key is a 40-character alphanumeric string
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"duo", "secret"}) + `\b([a-zA-Z0-9]{40})\b`)
+	// Duo Integration Key is a 20-character alphanumeric string starting with DI
 	integrationPat = regexp.MustCompile(detectors.PrefixRegex([]string{"duo", "integration"}) + `\b(DI[A-Z0-9]{18})\b`)
 	// Duo API hostname pattern
-	hostPat = regexp.MustCompile(`\b(api-[a-f0-9]{8}\.duosecurity\.com)\b`)
+	hostPat = regexp.MustCompile(`\b(api-[a-z0-9]{8}\.duosecurity\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -105,37 +103,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, secret, integration, host string) (bool, map[string]string, error) {
-	// Duo Admin API check endpoint
-	url := fmt.Sprintf("https://%s/admin/v1/info/summary", host)
+	// Note: Duo API requires HMAC-SHA1 signature-based authentication, not simple HTTP Basic Auth
+	// The verification would require implementing their signature algorithm as documented here:
+	// https://duo.com/docs/authapi#authentication
+	// For now, we detect the secret pattern but don't verify it via API call
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return false, nil, err
-	}
-
-	// Duo uses HTTP Basic Auth with integration key as username and secret key as password
-	req.SetBasicAuth(integration, secret)
-
-	res, err := client.Do(req)
-	if err != nil {
-		return false, nil, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
-
-	switch res.StatusCode {
-	case http.StatusOK:
-		return true, map[string]string{
-			"rotation_guide": "https://howtorotate.com/docs/tutorials/duo/",
-		}, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
-		// The secret is determinately not verified
-		return false, nil, nil
-	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-	}
+	// Return unverified with rotation guide
+	return false, map[string]string{
+		"rotation_guide": "https://duo.com/docs/administration-applications#rotating-keys",
+	}, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
