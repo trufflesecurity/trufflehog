@@ -1106,6 +1106,8 @@ const (
 	DetectorType_GitLabOauth2                            DetectorType = 1050
 	DetectorType_SpectralOps                             DetectorType = 1051
 	DetectorType_AWSAppSync                              DetectorType = 1052
+	DetectorType_BasicAuth                               DetectorType = 1057
+	DetectorType_StreamIO                                DetectorType = 1058
 )
 
 // Enum value maps for DetectorType.
@@ -2160,6 +2162,8 @@ var (
 		1050: "GitLabOauth2",
 		1051: "SpectralOps",
 		1052: "AWSAppSync",
+		1057: "BasicAuth",
+		1058: "StreamIO",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3211,6 +3215,8 @@ var (
 		"GitLabOauth2":                      1050,
 		"SpectralOps":                       1051,
 		"AWSAppSync":                        1052,
+		"BasicAuth":                         1057,
+		"StreamIO":                          1058,
 	}
 )
 
