@@ -19,7 +19,13 @@ var (
 	PineconeDetectorEnabled         atomic.Bool
 	CloudinaryDetectorEnabled       atomic.Bool
 	GitLabOAuthDetectorEnabled      atomic.Bool
-	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
+	EnigmaDetectorEnabled           atomic.Bool
+	DatadogApiKeyDetectorEnabled    atomic.Bool
+	TlyDetectorEnabled              atomic.Bool
+	WitDetectorEnabled              atomic.Bool
+	RevDetectorEnabled              atomic.Bool
+	UserDetectorEnabled             atomic.Bool
+  PgAnalyzeReadKeyDetectorEnabled atomic.Bool
 )
 
 type AtomicString struct {

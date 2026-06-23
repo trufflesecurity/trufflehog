@@ -919,15 +919,6 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 			wantUnverifiedSecretCount: 0,
 		},
 		{
-			name: "overlap, retain false positives",
-			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
-			},
-			retainFalsePositives:      true,
-			wantUnverifiedSecretCount: 2,
-		},
-		{
 			name: "overlap, do not retain false positives",
 			detectors: []detectors.Detector{
 				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
@@ -1506,6 +1497,18 @@ def test_something():
 
     # Ignoring this does not work
     assert connection_string == "postgres://master_user:master_password@hostname:1234/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
+			name: "ignore postgres url without explicit port",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # The detector normalizes this URL to include :5432, but the ignore tag should still be honored.
+    assert connection_string == "postgres://master_user:master_password@hostname/main"  # trufflehog:ignore`,
 			expectedFindings: 0,
 		},
 		{

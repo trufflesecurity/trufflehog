@@ -1,8 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:base"
-  ],
-  "prConcurrentLimit": 3,
-  "prHourlyLimit": 2
+  "extends": ["github>trufflesecurity/.github:renovate-config#v1.0.2"]
 }

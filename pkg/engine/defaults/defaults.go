@@ -218,6 +218,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dareboost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databrickstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
@@ -627,6 +628,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rev"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/revampcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ringcentral"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ritekit"
@@ -773,6 +775,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timecamp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timezoneapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tineswebhook"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tmetric"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/todoist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tokeet"
@@ -809,6 +812,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/upwave"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uri"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/urlscan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/user"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
@@ -842,6 +846,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wiz"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worksnaps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/workstack"
@@ -1098,6 +1103,7 @@ func buildDetectorList() []detectors.Detector {
 		&dareboost.Scanner{},
 		&databox.Scanner{},
 		&databrickstoken.Scanner{},
+		&datadogapikey.Scanner{},
 		&datadogtoken.Scanner{},
 		&datagov.Scanner{},
 		// &debounce.Scanner{},
@@ -1522,6 +1528,7 @@ func buildDetectorList() []detectors.Detector {
 		// &restpack.Scanner{},
 		&restpackhtmltopdfapi.Scanner{},
 		&restpackscreenshotapi.Scanner{},
+		&rev.Scanner{},
 		&revampcrm.Scanner{},
 		&ringcentral.Scanner{},
 		&ritekit.Scanner{},
@@ -1671,6 +1678,7 @@ func buildDetectorList() []detectors.Detector {
 		&timecamp.Scanner{},
 		&timezoneapi.Scanner{},
 		&tineswebhook.Scanner{},
+		&tly.Scanner{},
 		&tmetric.Scanner{},
 		&todoist.Scanner{},
 		// &toggltrack.Scanner{},
@@ -1708,6 +1716,7 @@ func buildDetectorList() []detectors.Detector {
 		&upwave.Scanner{},
 		&uri.Scanner{},
 		&urlscan.Scanner{},
+		&user.Scanner{},
 		&userflow.Scanner{},
 		&userstack.Scanner{},
 		&vagrantcloudpersonaltoken.Scanner{},
@@ -1742,6 +1751,7 @@ func buildDetectorList() []detectors.Detector {
 		// &wepay.Scanner{},
 		&whoxy.Scanner{},
 		&wistia.Scanner{},
+		&wit.Scanner{},
 		&wiz.Scanner{},
 		&worksnaps.Scanner{},
 		&workstack.Scanner{},
@@ -1780,7 +1790,19 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
-		case *pganalyzereadkey.Scanner:
+		case *enigma.Scanner:
+			return !feature.EnigmaDetectorEnabled.Load()
+		case *datadogapikey.Scanner:
+			return !feature.DatadogApiKeyDetectorEnabled.Load()
+		case *tly.Scanner:
+			return !feature.TlyDetectorEnabled.Load()
+		case *wit.Scanner:
+			return !feature.WitDetectorEnabled.Load()
+		case *rev.Scanner:
+			return !feature.RevDetectorEnabled.Load()
+		case *user.Scanner:
+			return !feature.UserDetectorEnabled.Load()
+    case *pganalyzereadkey.Scanner:
 			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
 		default:
 			return false

@@ -38,6 +38,76 @@ func TestSource_Init_IncludeAndIgnoreBucketsError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestSource_ListErrorsAreExpected(t *testing.T) {
+	tests := []struct {
+		name    string
+		role    string
+		buckets []string
+		want    bool
+	}{
+		{
+			name: "no role, no explicit buckets",
+			want: false,
+		},
+		{
+			name:    "no role, explicit buckets",
+			buckets: []string{"bucket-a"},
+			want:    false,
+		},
+		{
+			name: "role without explicit buckets, denials are expected",
+			role: "arn:aws:iam::123456789012:role/some-role",
+			want: true,
+		},
+		{
+			name:    "role with explicit buckets, denials are errors",
+			role:    "arn:aws:iam::123456789012:role/some-role",
+			buckets: []string{"bucket-a"},
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn, err := anypb.New(&sourcespb.S3{
+				Credential: &sourcespb.S3_AccessKey{
+					AccessKey: &credentialspb.KeySecret{
+						Key:    "ignored for test",
+						Secret: "ignored for test",
+					},
+				},
+				Buckets: tt.buckets,
+				Roles:   []string{tt.role},
+			})
+			require.NoError(t, err)
+
+			s := Source{}
+			require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+			assert.Equal(t, tt.want, s.listErrorsAreExpected(tt.role))
+		})
+	}
+}
+
+func TestSource_ScanBucketsReportsCumulativeObjectCount(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	// Simulate a later role pass after an earlier pass already scanned three
+	// objects. The pass below scans no buckets, so the completion message must
+	// still report the cumulative total rather than resetting to zero.
+	totalObjectCount := uint64(3)
+	s.scanBuckets(context.Background(), nil, "", nil, make(chan *sources.Chunk, 1), &totalObjectCount)
+
+	assert.Equal(t, uint64(3), totalObjectCount)
+	assert.Contains(t, s.Message, "3 objects scanned")
+}
+
 func TestSource_Chunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
