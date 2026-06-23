@@ -243,6 +243,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docker"
 	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
 	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerswarmjointoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -1128,6 +1129,7 @@ func buildDetectorList() []detectors.Detector {
 		&docker.Scanner{},
 		&dockerhubv1.Scanner{},
 		&dockerhubv2.Scanner{},
+		&dockerswarmjointoken.Scanner{},
 		&docparser.Scanner{},
 		&documo.Scanner{},
 		&docusign.Scanner{},
