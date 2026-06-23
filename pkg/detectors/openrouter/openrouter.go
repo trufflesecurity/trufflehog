@@ -122,9 +122,9 @@ type keyResponse struct {
 }
 
 type key struct {
-	Label          string `json:"label"`
-	Limit          int32  `json:"limit"`
-	Usage          int32  `json:"usage"`
-	IsFreeTier     bool   `json:"is_free_tier"`
-	LimitRemaining int32  `json:"limit_remaining"`
+	Label          string   `json:"label"`
+	Limit          *float64 `json:"limit"`
+	Usage          float64  `json:"usage"`
+	IsFreeTier     bool     `json:"is_free_tier"`
+	LimitRemaining *float64 `json:"limit_remaining"`
 }
