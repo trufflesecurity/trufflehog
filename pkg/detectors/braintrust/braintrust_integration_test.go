@@ -152,6 +152,8 @@ func TestBraintrust_FromData(t *testing.T) {
 				"verificationError",
 				"primarySecret",
 				"SecretParts",
+				"chunkOffset",
+				"chunkOffsetSet",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
