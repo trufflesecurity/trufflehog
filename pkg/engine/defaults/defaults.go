@@ -458,6 +458,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailerlite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailgun"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailgunwebhooktoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailjetbasicauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailjetsms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailmodo"
@@ -1352,6 +1353,7 @@ func buildDetectorList() []detectors.Detector {
 		&mailchimp.Scanner{},
 		&mailerlite.Scanner{},
 		&mailgun.Scanner{},
+		&mailgunwebhooktoken.Scanner{},
 		&mailjetbasicauth.Scanner{},
 		&mailjetsms.Scanner{},
 		&mailmodo.Scanner{},
