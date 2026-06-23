@@ -12,6 +12,7 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -338,26 +339,25 @@ func (s *Source) cacheGistInfo(g *github.Gist) {
 // Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
 // but still don't have a cloneable wiki.
 func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
-	wikiBaseURL := repoURL
+	var wikiURL string
 	if repoInfo, ok := s.repoInfoCache.get(repoURL); ok {
-		wikiBaseURL = (&url.URL{
-			Scheme: "https",
-			Host:   githubWebHost(s.conn.GetEndpoint()),
-		}).JoinPath(repoInfo.owner, repoInfo.name+".git").String()
+		if repoInfo.visibility == source_metadatapb.Visibility_private {
+			return true
+		}
+		wikiURL = wikiWebURLForRepoInfo(s.conn.GetEndpoint(), repoInfo)
+	} else {
+		var err error
+		wikiURL, err = wikiWebURLForRepoCloneURL(repoURL)
+		if err != nil {
+			return false
+		}
 	}
-	// Convert the clone URL to the corresponding web wiki URL.
-	wikiURL := strings.TrimSuffix(wikiBaseURL, ".git") + "/wiki"
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
 	if err != nil {
 		return false
 	}
 
-	apiClient, err := s.connector.APIClientForRepo(repoURL)
-	if err != nil {
-		return false
-	}
-
-	res, err := apiClient.Client().Do(req)
+	res, err := common.RetryableHTTPClientTimeout(githubHTTPTimeoutSeconds).Do(req)
 	if err != nil {
 		return false
 	}
@@ -372,10 +372,10 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 func (s *Source) normalizeRepo(repo string) (string, error) {
 
 	// If it's a full URL (has protocol), normalize it
-	if hasURLScheme.MatchString(repo) {
+	if hasURLScheme(repo) {
 		return giturl.NormalizeGithubRepo(repo)
 	}
-	if strings.Contains(repo, "@") && strings.Contains(repo, ":") {
+	if isSCPStyleRepoURL(repo) {
 		repoURL, err := sourcegit.GitURLParse(repo)
 		if err == nil && repoURL.Host != "" && repoURL.Path != "" {
 			u := &url.URL{
@@ -387,17 +387,15 @@ func (s *Source) normalizeRepo(repo string) (string, error) {
 		}
 	}
 	// If it's a repository name (contains / but not http), convert to full URL first
-	if strings.Contains(repo, "/") && !hasURLScheme.MatchString(repo) {
+	if strings.Contains(repo, "/") && !hasURLScheme(repo) {
 		fullURL := "https://github.com/" + repo
 		// If using GitHub Enterprise, adjust the URL accordingly
-		if s.conn != nil && s.conn.Endpoint != "" && !endsWithGithub.MatchString(s.conn.Endpoint) {
-			u, err := url.Parse(s.conn.Endpoint)
+		if s.conn != nil && s.conn.Endpoint != "" && !isGitHubCloudEndpoint(s.conn.Endpoint) {
+			u, err := endpointBaseURL(s.conn.Endpoint)
 			if err != nil {
 				return "", fmt.Errorf("invalid enterprise endpoint: %w", err)
 			}
-			// we want to remove any path components from the endpoint and just use the host
-			u.Path = "/" + repo
-			fullURL = u.String()
+			fullURL = u.JoinPath(strings.Split(repo, "/")...).String()
 		}
 		return giturl.NormalizeGithubRepo(fullURL)
 	}

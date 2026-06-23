@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -130,11 +129,6 @@ func (s *Source) setScanOptions(base, head string) {
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 var _ sources.SourceUnitEnumChunker = (*Source)(nil)
-
-var endsWithGithub = regexp.MustCompile(`(^|[/.])github\.com/?$`)
-
-// hasURLScheme matches strings that start with a URL scheme (e.g. "https://").
-var hasURLScheme = regexp.MustCompile(`^[a-z]+://`)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -350,9 +344,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metadatapb.Visibility {
 	// It isn't possible to get the visibility of a wiki.
 	// We must use the visibility of the corresponding repository.
-	if strings.HasSuffix(repoURL, ".wiki.git") {
-		repoURL = strings.TrimSuffix(repoURL, ".wiki.git") + ".git"
-	}
+	repoURL = repoCloneURLForWikiCloneURL(repoURL)
 
 	repoInfo, ok := s.repoInfoCache.get(repoURL)
 	if !ok {
@@ -745,6 +737,27 @@ func (s *Source) listAppInstallations(
 	return allInstalls, nil
 }
 
+func (s *Source) listAppInstallationRepoPage(
+	ctx context.Context,
+	client *github.Client,
+	opts *github.ListOptions,
+	handleRateLimit func(error) bool,
+) ([]*github.Repository, *github.Response, error) {
+	for {
+		result, res, err := client.Apps.ListRepos(ctx, opts)
+		if handleRateLimit(err) {
+			continue
+		}
+		if result == nil {
+			return nil, res, err
+		}
+		if result.Repositories == nil {
+			return []*github.Repository{}, res, err
+		}
+		return result.Repositories, res, err
+	}
+}
+
 // enumerateAllInstallationRepos discovers repos from every installation of the
 // GitHub App. For each installation, it creates a per-installation API client
 // and records the installation ID for each repo so Clone uses the correct token.
@@ -772,14 +785,13 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 		}
 
 		listRepos := func(ctx context.Context, _ string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-			result, resp, err := client.Apps.ListRepos(ctx, opts.getListOptions())
-			if result != nil {
-				for _, r := range result.Repositories {
-					connector.setRepoInstallation(r.GetCloneURL(), installID)
-				}
-				return result.Repositories, resp, err
+			repos, resp, err := s.listAppInstallationRepoPage(ctx, client, opts.getListOptions(), func(err error) bool {
+				return s.handleRateLimitWithUnitReporter(ctx, reporter, err)
+			})
+			for _, r := range repos {
+				connector.setRepoInstallation(r.GetCloneURL(), installID)
 			}
-			return nil, resp, err
+			return repos, resp, err
 		}
 
 		if err := s.processRepos(installCtx, account, reporter, listRepos, &appListOptions{
@@ -848,26 +860,25 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 
 		opts := &github.ListOptions{PerPage: defaultPagination}
 		for {
-			result, res, err := client.Apps.ListRepos(ctx, opts)
-			if s.handleRateLimit(ctx, err) {
-				continue
-			}
+			repos, res, err := s.listAppInstallationRepoPage(ctx, client, opts, func(err error) bool {
+				return s.handleRateLimit(ctx, err)
+			})
 			if err != nil {
 				errs = errors.Join(errs, fmt.Errorf("could not list repos for installation %d: %w", installID, err))
 				break
 			}
 
-			if result != nil {
+			if repos != nil {
 				if installedRepoKeys[installID] == nil {
-					installedRepoKeys[installID] = make(map[string]struct{}, len(result.Repositories))
+					installedRepoKeys[installID] = make(map[string]struct{}, len(repos))
 				}
-				for _, repo := range result.Repositories {
+				for _, repo := range repos {
 					key, err := repoHostOwnerNameKey(repo.GetCloneURL())
 					if err == nil {
 						installedRepoKeys[installID][key] = struct{}{}
 					}
 				}
-				s.recordInstallationRepoMatches(connector, installID, result.Repositories, wantedRepos)
+				s.recordInstallationRepoMatches(connector, installID, repos, wantedRepos)
 				if len(wantedRepos) == 0 {
 					if errs != nil {
 						ctx.Logger().Error(errs, "some installations could not be fully enumerated while mapping repos")
@@ -1018,12 +1029,7 @@ func repoHostOwnerNameKey(repoURL string) (string, error) {
 }
 
 func repoURLForInstallationLookup(repoURL string) string {
-	// Installation APIs return repository clone URLs, so map wiki clone URLs
-	// back to their owning repository before comparing installation ownership.
-	if strings.HasSuffix(repoURL, ".wiki.git") {
-		return strings.TrimSuffix(repoURL, ".wiki.git") + ".git"
-	}
-	return repoURL
+	return repoCloneURLForWikiCloneURL(repoURL)
 }
 
 func sameRepoHost(repoURL, otherRepoURL string) bool {
@@ -1036,17 +1042,6 @@ func sameRepoHost(repoURL, otherRepoURL string) bool {
 		return false
 	}
 	return strings.EqualFold(parts[0], otherParts[0])
-}
-
-func githubWebHost(endpoint string) string {
-	if endpoint == "" || endsWithGithub.MatchString(endpoint) {
-		return "github.com"
-	}
-	u, err := url.Parse(endpoint)
-	if err != nil || u.Host == "" {
-		return "github.com"
-	}
-	return u.Host
 }
 
 func (s *Source) repoURLFromTargetMetadata(meta *source_metadatapb.Github) (string, error) {
@@ -1161,20 +1156,22 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 
 	// Scan the wiki, if enabled, and the repo has one.
 	if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
-		wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
-		wikiCtx := context.WithValue(ctx, "repo", wikiURL)
+		wikiURL, ok := wikiCloneURLForRepo(repoURL)
+		if ok {
+			wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
-		_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
-		if err != nil {
-			// Ignore "Repository not found" errors.
-			// It's common for GitHub's API to say a repo has a wiki when it doesn't.
-			if !strings.Contains(err.Error(), "not found") {
-				if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
-					return err
+			_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
+			if err != nil {
+				// Ignore "Repository not found" errors.
+				// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+				if !strings.Contains(err.Error(), "not found") {
+					if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
+						return err
+					}
 				}
-			}
 
-			// Don't return, it still might be possible to scan comments.
+				// Don't return, it still might be possible to scan comments.
+			}
 		}
 	}
 

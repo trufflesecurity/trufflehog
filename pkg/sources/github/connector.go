@@ -35,10 +35,7 @@ type Connector interface {
 }
 
 func newConnector(ctx context.Context, source *Source) (Connector, error) {
-	apiEndpoint := source.conn.Endpoint
-	if apiEndpoint == "" || endsWithGithub.MatchString(apiEndpoint) {
-		apiEndpoint = cloudV3Endpoint
-	}
+	apiEndpoint := canonicalAPIEndpoint(source.conn.Endpoint)
 
 	switch cred := source.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:

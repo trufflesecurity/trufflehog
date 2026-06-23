@@ -57,9 +57,10 @@ func TestAPIClientForInstallation(t *testing.T) {
 	defer server.Close()
 
 	connector := &appConnector{
-		appID:         12345,
-		appPrivateKey: privKey,
-		apiEndpoint:   server.URL,
+		appID:                   12345,
+		appPrivateKey:           privKey,
+		apiEndpoint:             server.URL,
+		clientsByInstallationID: make(map[int64]*appInstallationClients),
 	}
 
 	t.Run("creates distinct clients for different installations", func(t *testing.T) {
@@ -153,6 +154,16 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 		AppId:          "12345",
 	})
 	require.NoError(t, err)
+	require.NotNil(t, connector.APIClient())
+	require.NotNil(t, connector.GraphQLClient())
+
+	gotAPIClient, err := connector.APIClientForRepo("https://github.com/default-org/repo.git")
+	require.NoError(t, err)
+	assert.Same(t, connector.APIClient(), gotAPIClient)
+
+	gotGraphQLClient, err := connector.GraphQLClientForRepo(trContext.Background(), "https://github.com/default-org/repo.git")
+	require.NoError(t, err)
+	assert.Same(t, connector.GraphQLClient(), gotGraphQLClient)
 
 	_, _, err = connector.APIClient().Organizations.ListMembers(trContext.Background(), "test-org", nil)
 	require.NoError(t, err)
@@ -166,8 +177,10 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 func TestAPIClientForInstallationUsesConfiguredClient(t *testing.T) {
 	defaultClient := github.NewClient(nil)
 	connector := &appConnector{
-		apiClient:      defaultClient,
 		installationID: 100,
+		clientsByInstallationID: map[int64]*appInstallationClients{
+			100: {apiClient: defaultClient},
+		},
 	}
 
 	got, err := connector.APIClientForInstallation(100)
@@ -182,17 +195,23 @@ func TestCloneUsesRepoInstallationMap(t *testing.T) {
 	}
 
 	t.Run("uses default installation when no mapping exists", func(t *testing.T) {
-		assert.Equal(t, int64(100), connector.installationIDForRepo("https://github.com/default-org/repo.git"))
+		installationID, mapped := connector.installationIDForRepo("https://github.com/default-org/repo.git")
+		assert.False(t, mapped)
+		assert.Equal(t, int64(100), installationID)
 	})
 
 	t.Run("uses mapped installation for cross-org repos", func(t *testing.T) {
 		connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
-		assert.Equal(t, int64(999), connector.installationIDForRepo("https://github.com/other-org/repo.git"))
+		installationID, mapped := connector.installationIDForRepo("https://github.com/other-org/repo.git")
+		assert.True(t, mapped)
+		assert.Equal(t, int64(999), installationID)
 	})
 
 	t.Run("uses mapped installation for derived wiki URLs", func(t *testing.T) {
 		connector.setRepoInstallation("https://github.com/wiki-org/repo.git", 888)
-		assert.Equal(t, int64(888), connector.installationIDForRepo("https://github.com/wiki-org/repo.wiki.git"))
+		installationID, mapped := connector.installationIDForRepo("https://github.com/wiki-org/repo.wiki.git")
+		assert.True(t, mapped)
+		assert.Equal(t, int64(888), installationID)
 	})
 }
 
@@ -221,11 +240,12 @@ func TestAPIClientForRepoUsesRepoInstallationMap(t *testing.T) {
 	defer server.Close()
 
 	connector := &appConnector{
-		installationID:      100,
-		appID:               12345,
-		appPrivateKey:       privKey,
-		apiEndpoint:         server.URL,
-		repoInstallationMap: make(map[string]int64),
+		installationID:          100,
+		appID:                   12345,
+		appPrivateKey:           privKey,
+		apiEndpoint:             server.URL,
+		clientsByInstallationID: make(map[int64]*appInstallationClients),
+		repoInstallationMap:     make(map[string]int64),
 	}
 	connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
 
@@ -254,11 +274,13 @@ func TestGraphQLClientForRepoCachesClients(t *testing.T) {
 
 	defaultGraphQLClient := &githubv4.Client{}
 	connector := &appConnector{
-		installationID:      100,
-		appID:               12345,
-		appPrivateKey:       privKey,
-		apiEndpoint:         server.URL,
-		graphqlClient:       defaultGraphQLClient,
+		installationID: 100,
+		appID:          12345,
+		appPrivateKey:  privKey,
+		apiEndpoint:    server.URL,
+		clientsByInstallationID: map[int64]*appInstallationClients{
+			100: {graphqlClient: defaultGraphQLClient},
+		},
 		repoInstallationMap: make(map[string]int64),
 	}
 	connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
@@ -279,6 +301,16 @@ func TestGraphQLClientForRepoCachesClients(t *testing.T) {
 		client2, err := connector.GraphQLClientForRepo(ctx, "https://github.com/other-org/repo.git")
 		require.NoError(t, err)
 		assert.Same(t, client1, client2)
+
+		apiClient, err := connector.APIClientForRepo("https://github.com/other-org/repo.git")
+		require.NoError(t, err)
+
+		connector.mu.RLock()
+		cachedClients := connector.clientsByInstallationID[999]
+		connector.mu.RUnlock()
+		require.NotNil(t, cachedClients)
+		assert.Same(t, apiClient, cachedClients.apiClient)
+		assert.Same(t, client1, cachedClients.graphqlClient)
 	})
 }
 

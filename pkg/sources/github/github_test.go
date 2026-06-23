@@ -512,6 +512,11 @@ func TestNormalizeRepo_Enterprise(t *testing.T) {
 			endpoint:   "https://example.com/api/v3",
 			wantResult: "https://example.com/org/repo.git",
 		},
+		{
+			name:       "host with path without scheme",
+			endpoint:   "example.com/api/v3",
+			wantResult: "https://example.com/org/repo.git",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1154,7 +1159,9 @@ func TestMapExplicitReposToInstallationsStopsAfterReposFound(t *testing.T) {
 	require.NoError(t, s.mapExplicitReposToInstallations(context.Background(), connector))
 	require.NoError(t, s.mapExplicitReposToInstallations(context.Background(), connector))
 
-	assert.Equal(t, int64(2448), connector.installationIDForRepo("https://github.com/other-org/repo.git"))
+	installationID, mapped := connector.installationIDForRepo("https://github.com/other-org/repo.git")
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
 	assert.Equal(t, 1, listInstallationsCalls)
 	assert.Equal(t, 0, unrelatedRepoListCalls)
 }
@@ -1250,7 +1257,9 @@ func TestMapExplicitReposToInstallationsMatchesSSHRepoURL(t *testing.T) {
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
 	connector := s.connector.(*appConnector)
-	assert.Equal(t, int64(2448), connector.installationIDForRepo(sshRepoURL))
+	installationID, mapped := connector.installationIDForRepo(sshRepoURL)
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
 }
 
 func TestMapExplicitReposToInstallationsMatchesSCPStyleSSHRepoURL(t *testing.T) {
@@ -1290,7 +1299,9 @@ func TestMapExplicitReposToInstallationsMatchesSCPStyleSSHRepoURL(t *testing.T) 
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
 	connector := s.connector.(*appConnector)
-	assert.Equal(t, int64(2448), connector.installationIDForRepo(sshRepoURL))
+	installationID, mapped := connector.installationIDForRepo(sshRepoURL)
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
 }
 
 func TestMapExplicitReposToInstallationsRejectsHostMismatch(t *testing.T) {
@@ -1410,8 +1421,12 @@ func TestMapExplicitReposToInstallationsMapsWikiRepoURL(t *testing.T) {
 	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
 
 	connector := s.connector.(*appConnector)
-	assert.Equal(t, int64(2448), connector.installationIDForRepo("https://github.com/other-org/repo.git"))
-	assert.Equal(t, int64(2448), connector.installationIDForRepo(wikiRepoURL))
+	installationID, mapped := connector.installationIDForRepo("https://github.com/other-org/repo.git")
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
+	installationID, mapped = connector.installationIDForRepo(wikiRepoURL)
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
 }
 
 func TestMapExplicitReposToInstallationsMapsRedirectedRepoFromMetadata(t *testing.T) {
@@ -1459,8 +1474,12 @@ func TestMapExplicitReposToInstallationsMapsRedirectedRepoFromMetadata(t *testin
 
 	connector := s.connector.(*appConnector)
 
-	assert.Equal(t, int64(2448), connector.installationIDForRepo(oldRepoURL))
-	assert.Equal(t, int64(2448), connector.installationIDForRepo(canonicalRepoURL))
+	installationID, mapped := connector.installationIDForRepo(oldRepoURL)
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
+	installationID, mapped = connector.installationIDForRepo(canonicalRepoURL)
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
 	info, ok := s.repoInfoCache.get(oldRepoURL)
 	require.True(t, ok)
 	assert.Equal(t, "new-org/repo", info.fullName)
@@ -1567,7 +1586,9 @@ func TestScanAllInstallationsMapsUnitBeforeMetadataFetch(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "https://github.com/other-org/repo.git", repoURL)
 
-	assert.Equal(t, int64(2448), connector.installationIDForRepo("https://github.com/other-org/repo.git"))
+	installationID, mapped := connector.installationIDForRepo("https://github.com/other-org/repo.git")
+	assert.True(t, mapped)
+	assert.Equal(t, int64(2448), installationID)
 }
 
 func TestEnumerateAllInstallationReposReportsInstallationErrors(t *testing.T) {
@@ -1865,8 +1886,18 @@ func TestGithubWebHost(t *testing.T) {
 			want:     "github.com",
 		},
 		{
+			name:     "cloud api endpoint without scheme",
+			endpoint: "api.github.com",
+			want:     "github.com",
+		},
+		{
 			name:     "enterprise endpoint",
 			endpoint: "https://github.example.com/api/v3",
+			want:     "github.example.com",
+		},
+		{
+			name:     "enterprise endpoint without scheme",
+			endpoint: "github.example.com/api/v3",
 			want:     "github.example.com",
 		},
 		{
@@ -1881,6 +1912,29 @@ func TestGithubWebHost(t *testing.T) {
 			assert.Equal(t, tt.want, githubWebHost(tt.endpoint))
 		})
 	}
+}
+
+func TestWikiIsReachableSkipsHeadForPrivateRepos(t *testing.T) {
+	var called bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}))
+	defer server.Close()
+
+	repoURL := "https://github.example.com/owner/repo.git"
+	s := &Source{
+		conn:          &sourcespb.GitHub{Endpoint: server.URL},
+		repoInfoCache: newRepoInfoCache(),
+	}
+	s.repoInfoCache.put(repoURL, repoInfo{
+		owner:      "owner",
+		name:       "repo",
+		visibility: source_metadatapb.Visibility_private,
+	})
+
+	assert.True(t, s.wikiIsReachable(context.Background(), repoURL))
+	assert.False(t, called)
 }
 
 func TestGetGistID(t *testing.T) {
@@ -1928,7 +1982,8 @@ func TestScanAllInstallationsTargetMappingErrorIsTargetedScanError(t *testing.T)
 	s := &Source{
 		conn: &sourcespb.GitHub{ScanAllInstallations: true},
 		connector: &appConnector{
-			repoInstallationMap: make(map[string]int64),
+			clientsByInstallationID: make(map[int64]*appInstallationClients),
+			repoInstallationMap:     make(map[string]int64),
 		},
 	}
 	ctx := context.Background()
