@@ -522,6 +522,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nvapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oanda"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/octopusapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/okta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/omnisend"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onedesk"
@@ -1419,6 +1420,7 @@ func buildDetectorList() []detectors.Detector {
 		&nvapi.Scanner{},
 		&nylas.Scanner{},
 		&oanda.Scanner{},
+		&octopusapikey.Scanner{},
 		&okta.Scanner{},
 		&omnisend.Scanner{},
 		&onedesk.Scanner{},
