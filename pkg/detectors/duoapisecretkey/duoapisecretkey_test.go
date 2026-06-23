@@ -131,7 +131,7 @@ func TestDuoapisecretkey_FromData_WithVerification(t *testing.T) {
 		wantDetections int
 	}{
 		{
-			name: "valid credentials - detected but not verified (Duo requires signature auth)",
+			name: "valid credentials - should verify successfully",
 			data: fmt.Sprintf(`
 				[duo]
 				integration_key = %s
@@ -139,7 +139,7 @@ func TestDuoapisecretkey_FromData_WithVerification(t *testing.T) {
 				api_hostname = %s
 			`, testIntegrationKey, testSecretKey, testAPIHost),
 			verify:         true,
-			wantVerified:   false, // Duo API requires HMAC-SHA1 signature, not implemented yet
+			wantVerified:   true,
 			wantDetections: 1,
 		},
 		{
@@ -155,14 +155,14 @@ func TestDuoapisecretkey_FromData_WithVerification(t *testing.T) {
 			wantDetections: 1,
 		},
 		{
-			name: "valid credentials in different format - detected but not verified",
+			name: "valid credentials in different format - should verify",
 			data: fmt.Sprintf(`
 				DUO_INTEGRATION_KEY=%s
 				DUO_SECRET_KEY=%s
 				DUO_API_HOST=%s
 			`, testIntegrationKey, testSecretKey, testAPIHost),
 			verify:         true,
-			wantVerified:   false, // Duo API requires HMAC-SHA1 signature, not implemented yet
+			wantVerified:   true,
 			wantDetections: 1,
 		},
 		{

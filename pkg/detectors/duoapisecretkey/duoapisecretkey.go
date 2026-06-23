@@ -2,7 +2,15 @@ package duoapisecretkey
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
+	"encoding/hex"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -103,15 +111,69 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, secret, integration, host string) (bool, map[string]string, error) {
-	// Note: Duo API requires HMAC-SHA1 signature-based authentication, not simple HTTP Basic Auth
-	// The verification would require implementing their signature algorithm as documented here:
-	// https://duo.com/docs/authapi#authentication
-	// For now, we detect the secret pattern but don't verify it via API call
+	// Use Duo Auth API check endpoint with signed request
+	method := "GET"
+	path := "/auth/v2/check"
+	params := ""
 
-	// Return unverified with rotation guide
-	return false, map[string]string{
-		"rotation_guide": "https://duo.com/docs/administration-applications#rotating-keys",
-	}, nil
+	date := time.Now().UTC().Format(time.RFC1123)
+	url := fmt.Sprintf("https://%s%s", host, path)
+
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		return false, nil, err
+	}
+
+	// Add Duo signature authentication headers
+	auth := signDuoRequest(integration, secret, method, host, path, params, date)
+	req.Header.Set("Authorization", auth)
+	req.Header.Set("Date", date)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, map[string]string{
+			"rotation_guide": "https://duo.com/docs/administration-applications#rotating-keys",
+		}, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		// The secret is determinately not verified
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+}
+
+// signDuoRequest creates the Authorization header for Duo API requests using HMAC-SHA1
+// Reference: https://duo.com/docs/authapi#authentication
+func signDuoRequest(integration, secret, method, host, path, params, date string) string {
+	// Build canonical string
+	canon := []string{
+		date,
+		strings.ToUpper(method),
+		strings.ToLower(host),
+		path,
+		params,
+	}
+	canonical := strings.Join(canon, "\n")
+
+	// Compute HMAC-SHA1 signature (hex-encoded, not base64)
+	mac := hmac.New(sha1.New, []byte(secret))
+	mac.Write([]byte(canonical))
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	// Create Basic Auth: base64(integration_key:hex_signature)
+	auth := integration + ":" + signature
+	basicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+
+	return basicAuth
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
