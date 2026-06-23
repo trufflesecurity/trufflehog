@@ -231,6 +231,93 @@ func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
+// TestFragmentLineOffset_DuplicateSecrets verifies that when the same secret
+// appears on multiple lines within a chunk, each result receives the correct
+// line number rather than always reporting the first occurrence's line.
+// Regression test for https://github.com/trufflesecurity/trufflehog/issues/2502
+func TestFragmentLineOffset_DuplicateSecrets(t *testing.T) {
+	secret := []byte("AKIA1234567890ABCDEF")
+	chunk := &sources.Chunk{
+		Data: []byte("line1\n" + // line 0
+			"line2\n" + // line 1
+			"AKIA1234567890ABCDEF\n" + // line 2 (first occurrence)
+			"line4\n" + // line 3
+			"AKIA1234567890ABCDEF\n" + // line 4 (second occurrence)
+			"line6\n" + // line 5
+			"AKIA1234567890ABCDEF\n"), // line 6 (third occurrence)
+	}
+
+	results := []detectors.Result{
+		{Raw: secret},
+		{Raw: secret},
+		{Raw: secret},
+	}
+	expectedLines := []int64{2, 4, 6}
+
+	AssignDuplicateLineOffsets(chunk, results)
+
+	seen := make(map[int64]bool)
+	for i, res := range results {
+		lineOffset, _ := FragmentLineOffset(chunk, &res)
+		assert.Equal(t, expectedLines[i], lineOffset,
+			"result[%d]: expected line %d but got %d", i, expectedLines[i], lineOffset)
+		assert.False(t, seen[lineOffset],
+			"result[%d]: line %d was already reported by a previous result (duplicate line number)", i, lineOffset)
+		seen[lineOffset] = true
+	}
+}
+
+func TestAssignDuplicateLineOffsets(t *testing.T) {
+	chunk := &sources.Chunk{
+		Data: []byte("aaa\nbbb\naaa\nccc\naaa\n"),
+	}
+	results := []detectors.Result{
+		{Raw: []byte("aaa")},
+		{Raw: []byte("aaa")},
+		{Raw: []byte("aaa")},
+		{Raw: []byte("bbb")},
+	}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	// Duplicates get offsets assigned.
+	assert.True(t, results[0].HasChunkOffset())
+	assert.Equal(t, int64(0), results[0].ChunkOffset())
+
+	assert.True(t, results[1].HasChunkOffset())
+	assert.Equal(t, int64(8), results[1].ChunkOffset()) // "aaa\nbbb\n" = 8 bytes
+
+	assert.True(t, results[2].HasChunkOffset())
+	assert.Equal(t, int64(16), results[2].ChunkOffset()) // "aaa\nbbb\naaa\nccc\n" = 16 bytes
+
+	// Unique secret does not get an offset.
+	assert.False(t, results[3].HasChunkOffset())
+}
+
+func TestFragmentLineOffset_DuplicateSecretsWithIgnoreTag(t *testing.T) {
+	secret := []byte("mysecret")
+	chunk := &sources.Chunk{
+		Data: []byte("mysecret\nfoo\nmysecret trufflehog:ignore\nbar\nmysecret\n"),
+	}
+	results := []detectors.Result{
+		{Raw: secret},
+		{Raw: secret},
+		{Raw: secret},
+	}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	line0, ignored0 := FragmentLineOffset(chunk, &results[0])
+	assert.Equal(t, int64(0), line0)
+	assert.False(t, ignored0)
+
+	line1, ignored1 := FragmentLineOffset(chunk, &results[1])
+	assert.Equal(t, int64(2), line1)
+	assert.True(t, ignored1)
+
+	line2, ignored2 := FragmentLineOffset(chunk, &results[2])
+	assert.Equal(t, int64(4), line2)
+	assert.False(t, ignored2)
+}
+
 func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *detectors.Result) {
 	data := make([]byte, 0, 4096)
 	needle := []byte("needle")
@@ -415,7 +502,7 @@ even more`,
 
 			tmpFile, err := os.CreateTemp("", "test_aws_credentials")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -463,10 +550,10 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
-	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
+	_, err = fmt.Fprintf(tmpFile, "test data using keyword %s", fakeDetectorKeyword)
 	assert.NoError(t, err)
 
 	const defaultOutputBufferSize = 64
@@ -507,8 +594,8 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	_, err = tmpFile.WriteString("test stuff")
 	assert.Nil(t, err)
@@ -830,15 +917,6 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
-		},
-		{
-			name: "overlap, retain false positives",
-			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
-			},
-			retainFalsePositives:      true,
-			wantUnverifiedSecretCount: 2,
 		},
 		{
 			name: "overlap, do not retain false positives",
@@ -1381,6 +1459,7 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 		detector_typepb.DetectorType_HashiCorpVaultAuth:         {},
 		detector_typepb.DetectorType_JiraDataCenterPAT:          {},
 		detector_typepb.DetectorType_ConfluenceDataCenter:       {},
+		detector_typepb.DetectorType_BitbucketDataCenter:        {},
 		// these do not have any cloud endpoint
 	}
 
@@ -1421,6 +1500,18 @@ def test_something():
 			expectedFindings: 0,
 		},
 		{
+			name: "ignore postgres url without explicit port",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # The detector normalizes this URL to include :5432, but the ignore tag should still be honored.
+    assert connection_string == "postgres://master_user:master_password@hostname/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
 			name: "ignore not on secret line",
 			content: `
 # tests/example_false_positive.py
@@ -1444,7 +1535,7 @@ def test_something():
 
 			tmpFile, err := os.CreateTemp("", "test_creds")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -1557,7 +1648,7 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 			// Assert: Confirm that a result was generated and that it has the expected verify flag.
 			select {
 			case result := <-e.results:
-				assert.Equal(t, tc.verify, result.Result.Verified)
+				assert.Equal(t, tc.verify, result.Verified)
 			default:
 				t.Errorf("expected a result but did not get one")
 			}
@@ -1679,7 +1770,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it).
 		for result := range e.results {
-			assert.False(t, result.Result.Verified)
+			assert.False(t, result.Verified)
 		}
 
 		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its

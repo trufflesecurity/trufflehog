@@ -33,9 +33,9 @@ func main() {
 	flag.BoolVar(&failOnFindings, "fail", false, "exit 1 if any findings are reported (default: warning-only)")
 	flag.BoolVar(&quiet, "quiet", false, "suppress the summary line when no findings are reported")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] [dir ...]\n", os.Args[0])
-		fmt.Fprintln(flag.CommandLine.Output(), "\nFinds detector packages that construct detectors.Result without setting SecretParts.")
-		fmt.Fprintln(flag.CommandLine.Output(), "\nFlags:")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] [dir ...]\n", os.Args[0])
+		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "\nFinds detector packages that construct detectors.Result without setting SecretParts.")
+		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "\nFlags:")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -62,7 +62,7 @@ func main() {
 	}
 
 	for _, f := range findings {
-		fmt.Printf("%s: warning: detectors.Result constructed without SecretParts (no reference to SecretParts anywhere in package)\n", f.Position)
+		fmt.Printf("%s: warning: detectors.Result constructed without SecretParts\n", f.Position)
 	}
 
 	if len(findings) > 0 {

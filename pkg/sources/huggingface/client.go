@@ -157,7 +157,7 @@ func (c *HFClient) get(ctx context.Context, url string, target interface{}) erro
 		return errors.New("access to this repo is restricted and you are not in the authorized list. Visit the repository to ask for access")
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return json.NewDecoder(resp.Body).Decode(target)
 }
