@@ -25,6 +25,7 @@ var (
 	WitDetectorEnabled             atomic.Bool
 	RevDetectorEnabled             atomic.Bool
 	UserDetectorEnabled            atomic.Bool
+	BraintrustDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {

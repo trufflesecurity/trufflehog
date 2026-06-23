@@ -1802,6 +1802,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.RevDetectorEnabled.Load()
 		case *user.Scanner:
 			return !feature.UserDetectorEnabled.Load()
+		case *braintrust.Scanner:
+			return !feature.BraintrustDetectorEnabled.Load()
 		default:
 			return false
 		}

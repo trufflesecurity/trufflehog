@@ -538,6 +538,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.WitDetectorEnabled.Store(true)
 	feature.RevDetectorEnabled.Store(true)
 	feature.UserDetectorEnabled.Store(true)
+	feature.BraintrustDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
