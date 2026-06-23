@@ -105,7 +105,7 @@ enum DetectorType {
   RapidApi = 99;
   CloudflareApiToken = 100;
   Webex = 101;
-  FirebaseCloudMessaging = 102; // Not yet implemented
+  FirebaseCloudMessaging = 102;
   ContentfulPersonalAccessToken = 103;
   MapBox = 104;
   MailJetBasicAuth = 105;
@@ -1054,4 +1054,5 @@ enum DetectorType {
   GitLabOauth2 = 1050;
   SpectralOps = 1051;
   AWSAppSync = 1052;
+  FernetKey = 1062;
 }

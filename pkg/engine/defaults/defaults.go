@@ -283,11 +283,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fastforex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fastlypersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/feedier"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fernetkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fetchrss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
 	figmapersonalaccesstokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
 	figmapersonalaccesstokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/firebasecloudmessaging"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/findl"
@@ -1168,11 +1170,13 @@ func buildDetectorList() []detectors.Detector {
 		&fastforex.Scanner{},
 		&fastlypersonaltoken.Scanner{},
 		&feedier.Scanner{},
+		&fernetkey.Scanner{},
 		&fetchrss.Scanner{},
 		&fibery.Scanner{},
 		&figmapersonalaccesstokenv1.Scanner{},
 		&figmapersonalaccesstokenv2.Scanner{},
 		&fileio.Scanner{},
+		&firebasecloudmessaging.Scanner{},
 		&finage.Scanner{},
 		&financialmodelingprep.Scanner{},
 		&findl.Scanner{},
