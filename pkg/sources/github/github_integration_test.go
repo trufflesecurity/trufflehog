@@ -65,7 +65,7 @@ func TestSource_Token(t *testing.T) {
 	s.Init(ctx, "github integration test source", 0, 0, false, conn, 1)
 	s.filteredRepoCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
 
-	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient(), noopReporter())
+	err = s.enumerateWithApp(ctx, s.connector.(*appConnector), noopReporter())
 	assert.NoError(t, err)
 
 	_, _, err = s.cloneRepo(ctx, "https://github.com/truffle-test-integration-org/another-test-repo.git")
