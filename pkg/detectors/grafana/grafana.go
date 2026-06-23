@@ -96,16 +96,16 @@ func verifyGrafanaKey(ctx context.Context, client *http.Client, token string) (b
 	}()
 
 	switch resp.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusForbidden:
+		// 200: token is valid and has permission to list tokens.
+		// 403: token is valid (authenticated) but lacks permission for this
+		// resource. Either way the credentials are genuine, so it's verified.
 		return true, nil
 	case http.StatusUnauthorized:
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return false, err
-		}
-
-		// token is valid but has restricted permissions
-		return strings.Contains(string(bodyBytes), "Unauthorized"), nil
+		// 401: the token is missing, expired, or revoked. Grafana returns this
+		// for invalid credentials (including a body containing "Unauthorized"),
+		// so it is determinately not verified.
+		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
