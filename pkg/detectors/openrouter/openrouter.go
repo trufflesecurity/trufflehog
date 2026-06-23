@@ -95,10 +95,10 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 		key := keyResponse.Data
 		extraData := map[string]string{
 			"label":           key.Label,
-			"limit":           fmt.Sprintf("%d", key.Limit),
-			"usage":           fmt.Sprintf("%d", key.Usage),
+			"limit":           fmtFloatPtr(key.Limit),
+			"usage":           fmt.Sprintf("%f", key.Usage),
 			"is_free_tier":    strconv.FormatBool(key.IsFreeTier),
-			"limit_remaining": fmt.Sprintf("%d", key.LimitRemaining),
+			"limit_remaining": fmtFloatPtr(key.LimitRemaining),
 		}
 		return true, extraData, nil
 	case http.StatusUnauthorized:
@@ -115,6 +115,13 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "OpenRouter provides a unified API that gives you access to hundreds of AI models through a single endpoint, while automatically handling fallbacks and selecting the most cost-effective options."
+}
+
+func fmtFloatPtr(f *float64) string {
+	if f == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%f", *f)
 }
 
 type keyResponse struct {
