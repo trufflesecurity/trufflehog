@@ -1054,4 +1054,5 @@ enum DetectorType {
   GitLabOauth2 = 1050;
   SpectralOps = 1051;
   AWSAppSync = 1052;
+  AdobeIMS = 1053;
 }
