@@ -348,8 +348,8 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 	// if resume time is not empty and is after current time, than put the request to sleep till that.
 	if !resumeTime.IsZero() && time.Now().Before(resumeTime) {
 		retryAfter := time.Until(resumeTime)
-		time.Sleep(retryAfter)
-		return true
+		_, canceled := sleepWithContext(ctx, retryAfter)
+		return !canceled
 	}
 
 	var retryAfter time.Duration
@@ -393,10 +393,10 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-	time.Sleep(retryAfter)
-	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
+	slept, canceled := sleepWithContext(ctx, retryAfter)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(slept.Seconds())
 
-	return true
+	return !canceled
 }
 
 func (s *Source) chunkGraphqlIssues(ctx context.Context, repoInfo repoInfo, issues []issue, reporter sources.ChunkReporter) error {

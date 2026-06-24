@@ -12,24 +12,43 @@ func TestWikiCloneURLForRepo(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "https://github.com/owner/repo.wiki.git", got)
 
-	_, ok = wikiCloneURLForRepo("https://github.com/owner/repo.wiki.git")
-	assert.False(t, ok)
+	got, ok = wikiCloneURLForRepo("https://github.com/owner/repo.wiki.git")
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/owner/repo.wiki.wiki.git", got)
 
 	_, ok = wikiCloneURLForRepo("https://github.com/owner/repo")
 	assert.False(t, ok)
 }
 
 func TestRepoCloneURLForWikiCloneURL(t *testing.T) {
+	got, ok := repoCloneURLForWikiCloneURL("https://github.com/owner/repo.wiki.git")
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/owner/repo.git", got)
+
+	_, ok = repoCloneURLForWikiCloneURL("https://github.com/owner/repo.git")
+	assert.False(t, ok)
+}
+
+func TestRepoURLsForInstallationLookup(t *testing.T) {
 	assert.Equal(
 		t,
-		"https://github.com/owner/repo.git",
-		repoCloneURLForWikiCloneURL("https://github.com/owner/repo.wiki.git"),
+		[]string{"https://github.com/owner/repo.git"},
+		repoURLsForInstallationLookup("https://github.com/owner/repo.git"),
 	)
 	assert.Equal(
 		t,
-		"https://github.com/owner/repo.git",
-		repoCloneURLForWikiCloneURL("https://github.com/owner/repo.git"),
+		[]string{"https://github.com/owner/repo.wiki.git", "https://github.com/owner/repo.git"},
+		repoURLsForInstallationLookup("https://github.com/owner/repo.wiki.git"),
 	)
+}
+
+func TestWikiCloneURLForRepoInfo(t *testing.T) {
+	got, ok := wikiCloneURLForRepoInfo("https://github.com/owner/repo.wiki.git", repoInfo{name: "repo.wiki"})
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/owner/repo.wiki.wiki.git", got)
+
+	_, ok = wikiCloneURLForRepoInfo("https://github.com/owner/repo.wiki.git", repoInfo{name: "repo"})
+	assert.False(t, ok)
 }
 
 func TestWikiWebURLForRepoInfo(t *testing.T) {
@@ -96,9 +115,11 @@ func TestIsGitHubCloudEndpoint(t *testing.T) {
 	assert.True(t, isGitHubCloudEndpoint("github.com"))
 	assert.True(t, isGitHubCloudEndpoint("https://api.github.com"))
 	assert.True(t, isGitHubCloudEndpoint("api.github.com"))
+	assert.True(t, isGitHubCloudEndpoint("https://github.com:443"))
 	assert.False(t, isGitHubCloudEndpoint("https://legithub.com/api/v3"))
 	assert.False(t, isGitHubCloudEndpoint("https://github.example.com/api/v3"))
 	assert.False(t, isGitHubCloudEndpoint("https://enterprise.example.com/api/github.com"))
+	assert.False(t, isGitHubCloudEndpoint("https://github.com:8443/api/v3"))
 }
 
 func TestEndpointBaseURL(t *testing.T) {
@@ -109,6 +130,10 @@ func TestEndpointBaseURL(t *testing.T) {
 	got, err = endpointBaseURL("github.example.com/api/v3")
 	require.NoError(t, err)
 	assert.Equal(t, "https://github.example.com", got.String())
+
+	got, err = endpointBaseURL("ghe.example:8443/api/v3")
+	require.NoError(t, err)
+	assert.Equal(t, "https://ghe.example:8443", got.String())
 }
 
 func TestCanonicalAPIEndpoint(t *testing.T) {
@@ -117,4 +142,33 @@ func TestCanonicalAPIEndpoint(t *testing.T) {
 	assert.Equal(t, cloudV3Endpoint, canonicalAPIEndpoint("https://api.github.com"))
 	assert.Equal(t, "https://github.example.com/api/v3", canonicalAPIEndpoint("github.example.com/api/v3"))
 	assert.Equal(t, "https://github.example.com/api/v3", canonicalAPIEndpoint("https://github.example.com/api/v3"))
+	assert.Equal(t, "https://github.com:8443/api/v3", canonicalAPIEndpoint("github.com:8443/api/v3"))
+}
+
+func TestRepoCloneURLForTargetEndpoint(t *testing.T) {
+	got, err := repoCloneURLForTargetEndpoint("", "http://github.com/owner/repo.git")
+	require.NoError(t, err)
+	assert.Equal(t, "https://github.com/owner/repo.git", got)
+
+	got, err = repoCloneURLForTargetEndpoint(cloudV3Endpoint, "https://github.com:443/owner/repo.git")
+	require.NoError(t, err)
+	assert.Equal(t, "https://github.com:443/owner/repo.git", got)
+
+	got, err = repoCloneURLForTargetEndpoint("http://github.company/api/v3", "https://github.company/owner/repo.git")
+	require.NoError(t, err)
+	assert.Equal(t, "http://github.company/owner/repo.git", got)
+
+	_, err = repoCloneURLForTargetEndpoint(cloudV3Endpoint, "https://attacker.example/owner/repo.git")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match GitHub endpoint host")
+
+	_, err = repoCloneURLForTargetEndpoint(cloudV3Endpoint, "ssh://git@github.com/owner/repo.git")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported scheme")
+}
+
+func TestIsWikiLink(t *testing.T) {
+	assert.True(t, isWikiLink("https://github.com/owner/repo/wiki/path/to/file"))
+	assert.False(t, isWikiLink("https://github.com/owner/repo/blob/main/path/to/file"))
+	assert.False(t, isWikiLink("not a url"))
 }

@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v67/github"
 	"github.com/shurcooL/githubv4"
@@ -344,7 +345,11 @@ func (s *Source) Validate(ctx context.Context) []error {
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metadatapb.Visibility {
 	// It isn't possible to get the visibility of a wiki.
 	// We must use the visibility of the corresponding repository.
-	repoURL = repoCloneURLForWikiCloneURL(repoURL)
+	if _, ok := s.repoInfoCache.get(repoURL); !ok {
+		if parentRepoURL, isWiki := repoCloneURLForWikiCloneURL(repoURL); isWiki {
+			repoURL = parentRepoURL
+		}
+	}
 
 	repoInfo, ok := s.repoInfoCache.get(repoURL)
 	if !ok {
@@ -375,17 +380,22 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	// We don't care about handling enumerated values as they happen during
 	// the normal Chunks flow because we enumerate and scan in two steps.
+	var enumerationErrs []error
 	noopReporter := sources.VisitorReporter{
 		VisitUnit: func(context.Context, sources.SourceUnit) error {
 			return nil
 		},
+		VisitErr: func(ctx context.Context, err error) error {
+			enumerationErrs = append(enumerationErrs, err)
+			return ctx.Err()
+		},
 	}
 	err := s.Enumerate(ctx, noopReporter)
 	if err != nil {
-		return fmt.Errorf("error enumerating: %w", err)
+		return errors.Join(fmt.Errorf("error enumerating: %w", err), errors.Join(enumerationErrs...))
 	}
 
-	return s.scan(ctx, chunksReporter)
+	return errors.Join(append(enumerationErrs, s.scan(ctx, chunksReporter))...)
 }
 
 // Enumerate enumerates the GitHub source based on authentication method and
@@ -815,6 +825,8 @@ func (s *Source) mapExplicitReposToInstallations(ctx context.Context, connector 
 type repoMappingRequest struct {
 	original   string
 	normalized string
+	lookupURLs []string
+	lookupKeys []string
 }
 
 func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConnector, repos []string) error {
@@ -831,11 +843,22 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 		if connector.hasRepoInstallation(repo) || connector.hasRepoInstallation(normalized) {
 			continue
 		}
-		key, err := repoHostOwnerNameKey(repoURLForInstallationLookup(normalized))
-		if err != nil {
-			return fmt.Errorf("could not parse configured repo %q: %w", repo, err)
+		request := repoMappingRequest{
+			original:   repo,
+			normalized: normalized,
+			lookupURLs: repoURLsForInstallationLookup(normalized),
 		}
-		wantedRepos[key] = repoMappingRequest{original: repo, normalized: normalized}
+		for _, lookupURL := range request.lookupURLs {
+			key, err := repoHostOwnerNameKey(lookupURL)
+			if err != nil {
+				return fmt.Errorf("could not parse configured repo %q: %w", repo, err)
+			}
+			request.lookupKeys = append(request.lookupKeys, key)
+		}
+		// During installation repo listing, only allow exact matches. If no
+		// exact repo exists, mapRemainingReposByMetadata tries wiki-parent
+		// fallbacks afterward.
+		wantedRepos[request.lookupKeys[0]] = request
 	}
 	if len(wantedRepos) == 0 {
 		return nil
@@ -927,8 +950,14 @@ func (s *Source) recordInstallationRepoMatches(connector *appConnector, installa
 		if !ok {
 			continue
 		}
-		delete(wantedRepos, key)
+		deleteRepoMappingRequest(wantedRepos, requested)
 		s.recordRepoInstallation(connector, installationID, repo, requested)
+	}
+}
+
+func deleteRepoMappingRequest(wantedRepos map[string]repoMappingRequest, requested repoMappingRequest) {
+	if len(requested.lookupKeys) > 0 {
+		delete(wantedRepos, requested.lookupKeys[0])
 	}
 }
 
@@ -952,44 +981,50 @@ func (s *Source) mapRemainingReposByMetadata(
 			continue
 		}
 
-		for key, requested := range wantedRepos {
-			_, parts, err := getRepoURLParts(repoURLForInstallationLookup(requested.normalized))
-			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("could not parse configured repo %q: %w", requested.original, err))
-				continue
-			}
+		for _, requested := range wantedRepos {
+			for i, lookupURL := range requested.lookupURLs {
+				_, parts, err := getRepoURLParts(lookupURL)
+				if err != nil {
+					errs = errors.Join(errs, fmt.Errorf("could not parse configured repo %q: %w", requested.original, err))
+					break
+				}
 
-			var repo *github.Repository
-			for {
-				repo, _, err = client.Repositories.Get(ctx, parts[1], parts[2])
-				if s.handleRateLimit(ctx, err) {
+				var repo *github.Repository
+				for {
+					repo, _, err = client.Repositories.Get(ctx, parts[1], parts[2])
+					if s.handleRateLimit(ctx, err) {
+						continue
+					}
+					break
+				}
+				if err != nil {
+					if isGitHub404Error(err) {
+						continue
+					}
+					errs = errors.Join(errs, fmt.Errorf("could not fetch repo %q for installation %d: %w", requested.original, installID, err))
+					break
+				}
+				canonicalKey, err := repoHostOwnerNameKey(repo.GetCloneURL())
+				if err != nil {
+					errs = errors.Join(errs, fmt.Errorf("could not parse fetched repo %q for installation %d: %w", repo.GetCloneURL(), installID, err))
 					continue
+				}
+				if _, ok := installedRepoKeys[installID][canonicalKey]; !ok {
+					continue
+				}
+				if !sameRepoHost(requested.normalized, repo.GetCloneURL()) {
+					if i == 0 {
+						break
+					}
+					continue
+				}
+
+				deleteRepoMappingRequest(wantedRepos, requested)
+				s.recordRepoInstallation(connector, installID, repo, requested)
+				if len(wantedRepos) == 0 {
+					return errs
 				}
 				break
-			}
-			if err != nil {
-				if isGitHub404Error(err) {
-					continue
-				}
-				errs = errors.Join(errs, fmt.Errorf("could not fetch repo %q for installation %d: %w", requested.original, installID, err))
-				continue
-			}
-			canonicalKey, err := repoHostOwnerNameKey(repo.GetCloneURL())
-			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("could not parse fetched repo %q for installation %d: %w", repo.GetCloneURL(), installID, err))
-				continue
-			}
-			if _, ok := installedRepoKeys[installID][canonicalKey]; !ok {
-				continue
-			}
-			if !sameRepoHost(requested.normalized, repo.GetCloneURL()) {
-				continue
-			}
-
-			delete(wantedRepos, key)
-			s.recordRepoInstallation(connector, installID, repo, requested)
-			if len(wantedRepos) == 0 {
-				return errs
 			}
 		}
 	}
@@ -1028,16 +1063,12 @@ func repoHostOwnerNameKey(repoURL string) (string, error) {
 	return strings.ToLower(parts[0] + "/" + parts[1] + "/" + parts[2]), nil
 }
 
-func repoURLForInstallationLookup(repoURL string) string {
-	return repoCloneURLForWikiCloneURL(repoURL)
-}
-
 func sameRepoHost(repoURL, otherRepoURL string) bool {
-	_, parts, err := getRepoURLParts(repoURLForInstallationLookup(repoURL))
+	_, parts, err := getRepoURLParts(repoURL)
 	if err != nil {
 		return false
 	}
-	_, otherParts, err := getRepoURLParts(repoURLForInstallationLookup(otherRepoURL))
+	_, otherParts, err := getRepoURLParts(otherRepoURL)
 	if err != nil {
 		return false
 	}
@@ -1060,13 +1091,21 @@ func (s *Source) repoURLFromTargetMetadata(meta *source_metadatapb.Github) (stri
 		if err != nil {
 			return "", fmt.Errorf("could not normalize target repository %q: %w", repo, err)
 		}
-		linkKey, err := repoHostOwnerNameKey(repoURLForInstallationLookup(linkRepo))
+		linkKey, err := repoHostOwnerNameKey(linkRepo)
 		if err != nil {
 			return "", err
 		}
-		repoKey, err := repoHostOwnerNameKey(repoURLForInstallationLookup(normalized))
+		repoKey, err := repoHostOwnerNameKey(normalized)
 		if err != nil {
 			return "", fmt.Errorf("could not parse target repository %q: %w", repo, err)
+		}
+		if repoKey != linkKey && isWikiLink(meta.GetLink()) {
+			if parentRepoURL, isWiki := repoCloneURLForWikiCloneURL(normalized); isWiki {
+				repoKey, err = repoHostOwnerNameKey(parentRepoURL)
+				if err != nil {
+					return "", fmt.Errorf("could not parse target repository %q: %w", repo, err)
+				}
+			}
 		}
 		if repoKey != linkKey {
 			return "", fmt.Errorf("target repository %q does not match link repository %q", normalized, linkRepo)
@@ -1156,7 +1195,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 
 	// Scan the wiki, if enabled, and the repo has one.
 	if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
-		wikiURL, ok := wikiCloneURLForRepo(repoURL)
+		wikiURL, ok := wikiCloneURLForRepoInfo(repoURL, repoInfo)
 		if ok {
 			wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
@@ -1308,9 +1347,25 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-	time.Sleep(retryAfter)
-	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
-	return true
+	slept, canceled := sleepWithContext(ctx, retryAfter)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(slept.Seconds())
+	return !canceled
+}
+
+func sleepWithContext(ctx context.Context, duration time.Duration) (time.Duration, bool) {
+	start := time.Now()
+	if duration <= 0 {
+		return time.Since(start), false
+	}
+
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return time.Since(start), false
+	case <-ctx.Done():
+		return time.Since(start), true
+	}
 }
 
 // handleRateLimitWithUnitReporter is a wrapper around handleRateLimit that includes unit reporting
@@ -2115,10 +2170,24 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	if err != nil {
 		return err
 	}
+	targetIsWiki := isWikiLink(meta.GetLink())
+	if targetIsWiki {
+		repoURL, err = repoCloneURLForTargetEndpoint(s.conn.GetEndpoint(), repoURL)
+		if err != nil {
+			return err
+		}
+	}
 	if connector, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations {
 		if err := s.mapReposToInstallations(ctx, connector, []string{repoURL}); err != nil {
 			return err
 		}
+	}
+	if targetIsWiki {
+		wikiURL, ok := wikiCloneURLForRepo(repoURL)
+		if !ok {
+			return fmt.Errorf("could not derive wiki clone URL from target repository %q", repoURL)
+		}
+		return s.scanWikiTarget(ctx, wikiURL, meta, &chunkSkel, reporter)
 	}
 	apiClient, err := s.connector.APIClientForRepo(repoURL)
 	if err != nil {
@@ -2153,6 +2222,50 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 
 	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
 	return handlers.HandleFile(fileCtx, readCloser, &chunkSkel, reporter)
+}
+
+func (s *Source) scanWikiTarget(ctx context.Context, wikiURL string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
+	if meta.GetCommit() == "" {
+		return fmt.Errorf("wiki target has no commit")
+	}
+
+	path, repo, err := s.cloneRepo(ctx, wikiURL)
+	if err != nil {
+		return fmt.Errorf("could not clone wiki for targeted scan: %w", err)
+	}
+	if !s.conn.GetPrintLegacyJson() {
+		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
+			defer func() { _ = os.RemoveAll(path) }()
+		}
+	}
+
+	commit, err := repo.CommitObject(plumbing.NewHash(meta.GetCommit()))
+	if err != nil {
+		return fmt.Errorf("could not fetch wiki commit for targeted scan: %w", err)
+	}
+
+	if meta.GetFile() == "" {
+		var sb strings.Builder
+		sb.WriteString(commit.Author.Email)
+		sb.WriteString("\n")
+		sb.WriteString(commit.Committer.Email)
+		sb.WriteString("\n")
+		sb.WriteString(commit.Message)
+		return handlers.HandleFile(ctx, io.NopCloser(strings.NewReader(sb.String())), chunkSkel, reporter)
+	}
+
+	file, err := commit.File(meta.GetFile())
+	if err != nil {
+		return fmt.Errorf("could not find wiki file for targeted scan: %w", err)
+	}
+	readCloser, err := file.Reader()
+	if err != nil {
+		return fmt.Errorf("could not read wiki file for targeted scan: %w", err)
+	}
+	defer func() { _ = readCloser.Close() }()
+
+	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
+	return handlers.HandleFile(fileCtx, readCloser, chunkSkel, reporter)
 }
 
 func (s *Source) scanCommitMetadata(ctx context.Context, apiClient *github.Client, owner, repo string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
