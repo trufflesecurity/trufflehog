@@ -3446,6 +3446,8 @@ func (m *Huggingface) validate(all bool) error {
 
 	// no validation rules for IncludePrs
 
+	// no validation rules for SkipAllBuckets
+
 	switch v := m.Credential.(type) {
 	case *Huggingface_Token:
 		if v == nil {

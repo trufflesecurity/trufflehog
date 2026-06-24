@@ -2,6 +2,7 @@ package huggingface
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"testing"
 	"time"
@@ -648,4 +649,41 @@ func TestGetGitPath_SpaceResource(t *testing.T) {
 
 	path := discussion.GetGitPath()
 	assert.Equal(t, expectedPath, path)
+}
+
+func TestNewHFClient_DownloadClientHasNoOverallTimeout(t *testing.T) {
+	client := NewHFClient("https://huggingface.co", TEST_TOKEN, 10*time.Second)
+
+	// The API client keeps an overall timeout (its body is consumed in-call).
+	assert.Equal(t, 10*time.Second, client.HTTPClient.Timeout)
+
+	// The download client must NOT have an overall timeout, since that would
+	// also interrupt streaming Response.Body reads in handlers.HandleFile.
+	assert.Equal(t, time.Duration(0), client.downloadClient.Timeout)
+
+	// The header phase is still bounded at the transport level.
+	transport, ok := client.downloadClient.Transport.(*http.Transport)
+	assert.True(t, ok)
+	assert.Equal(t, 10*time.Second, transport.ResponseHeaderTimeout)
+}
+
+func TestEscapePathSegments(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{"simple", "file.jsonl", "file.jsonl"},
+		{"nested preserves slashes", "synthtraces/abf-123.jsonl", "synthtraces/abf-123.jsonl"},
+		{"space", "my dir/my file.jsonl", "my%20dir/my%20file.jsonl"},
+		{"question mark", "data?.jsonl", "data%3F.jsonl"},
+		{"hash", "v#1/data.jsonl", "v%231/data.jsonl"},
+		{"percent", "100%/data.jsonl", "100%25/data.jsonl"},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, escapePathSegments(tt.path))
+		})
+	}
 }
