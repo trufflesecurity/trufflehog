@@ -516,6 +516,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/visiblenpmregistryauthdata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nugetapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
@@ -1413,6 +1414,7 @@ func buildDetectorList() []detectors.Detector {
 		&nozbeteams.Scanner{},
 		&npmtoken.Scanner{},
 		&npmtokenv2.Scanner{},
+		&visiblenpmregistryauthdata.Scanner{},
 		&nugetapikey.Scanner{},
 		&numverify.Scanner{},
 		&nutritionix.Scanner{},
