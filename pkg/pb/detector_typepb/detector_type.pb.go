@@ -126,7 +126,7 @@ const (
 	DetectorType_RapidApi                      DetectorType = 99
 	DetectorType_CloudflareApiToken            DetectorType = 100
 	DetectorType_Webex                         DetectorType = 101
-	DetectorType_FirebaseCloudMessaging        DetectorType = 102 // Not yet implemented
+	DetectorType_FirebaseCloudMessaging        DetectorType = 102
 	DetectorType_ContentfulPersonalAccessToken DetectorType = 103
 	DetectorType_MapBox                        DetectorType = 104
 	DetectorType_MailJetBasicAuth              DetectorType = 105
@@ -1106,6 +1106,7 @@ const (
 	DetectorType_GitLabOauth2                            DetectorType = 1050
 	DetectorType_SpectralOps                             DetectorType = 1051
 	DetectorType_AWSAppSync                              DetectorType = 1052
+	DetectorType_FernetKey                               DetectorType = 1062
 )
 
 // Enum value maps for DetectorType.
@@ -2160,6 +2161,7 @@ var (
 		1050: "GitLabOauth2",
 		1051: "SpectralOps",
 		1052: "AWSAppSync",
+		1062: "FernetKey",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3211,6 +3213,7 @@ var (
 		"GitLabOauth2":                      1050,
 		"SpectralOps":                       1051,
 		"AWSAppSync":                        1052,
+		"FernetKey":                         1062,
 	}
 )
 
