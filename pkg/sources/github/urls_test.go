@@ -12,9 +12,8 @@ func TestWikiCloneURLForRepo(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "https://github.com/owner/repo.wiki.git", got)
 
-	got, ok = wikiCloneURLForRepo("https://github.com/owner/repo.wiki.git")
-	require.True(t, ok)
-	assert.Equal(t, "https://github.com/owner/repo.wiki.wiki.git", got)
+	_, ok = wikiCloneURLForRepo("https://github.com/owner/repo.wiki.git")
+	assert.False(t, ok)
 
 	_, ok = wikiCloneURLForRepo("https://github.com/owner/repo")
 	assert.False(t, ok)

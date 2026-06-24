@@ -799,7 +799,7 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 				return s.handleRateLimitWithUnitReporter(ctx, reporter, err)
 			})
 			for _, r := range repos {
-				connector.setRepoInstallation(r.GetCloneURL(), installID)
+				connector.setRepoInstallationForRepoName(r.GetCloneURL(), r.GetName(), installID)
 			}
 			return repos, resp, err
 		}
@@ -1033,7 +1033,7 @@ func (s *Source) mapRemainingReposByMetadata(
 
 func (s *Source) recordRepoInstallation(connector *appConnector, installationID int64, repo *github.Repository, requested repoMappingRequest) {
 	cloneURL := repo.GetCloneURL()
-	connector.setRepoInstallation(cloneURL, installationID)
+	connector.setRepoInstallationForRepoName(cloneURL, repo.GetName(), installationID)
 	if requested.normalized != cloneURL && sameRepoHost(requested.normalized, cloneURL) {
 		connector.setRepoInstallation(requested.normalized, installationID)
 	}

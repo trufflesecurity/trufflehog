@@ -7,18 +7,22 @@ import (
 )
 
 func wikiCloneURLForRepo(repoURL string) (string, bool) {
-	if !strings.HasSuffix(repoURL, ".git") {
+	if !strings.HasSuffix(repoURL, ".git") || strings.HasSuffix(repoURL, ".wiki.git") {
 		return "", false
 	}
 	return strings.TrimSuffix(repoURL, ".git") + ".wiki.git", true
 }
 
 func wikiCloneURLForRepoInfo(repoURL string, info repoInfo) (string, bool) {
+	return wikiCloneURLForRepoName(repoURL, info.name)
+}
+
+func wikiCloneURLForRepoName(repoURL, name string) (string, bool) {
 	_, parts, err := getRepoURLParts(repoURL)
-	if err != nil || len(parts) != 3 || !strings.EqualFold(parts[2], info.name) {
+	if err != nil || len(parts) != 3 || !strings.EqualFold(parts[2], name) || !strings.HasSuffix(repoURL, ".git") {
 		return "", false
 	}
-	return wikiCloneURLForRepo(repoURL)
+	return strings.TrimSuffix(repoURL, ".git") + ".wiki.git", true
 }
 
 func repoCloneURLForWikiCloneURL(repoURL string) (string, bool) {

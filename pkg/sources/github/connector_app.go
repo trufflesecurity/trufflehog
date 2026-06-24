@@ -175,11 +175,21 @@ func (c *appConnector) hasRepoInstallation(repoURL string) bool {
 // setRepoInstallation records which installation owns a repo and its derived
 // wiki URL so Clone uses the correct installation token for cross-org repos.
 func (c *appConnector) setRepoInstallation(repoURL string, installationID int64) {
+	c.setRepoInstallationForWiki(repoURL, installationID, wikiCloneURLForRepo)
+}
+
+func (c *appConnector) setRepoInstallationForRepoName(repoURL, repoName string, installationID int64) {
+	c.setRepoInstallationForWiki(repoURL, installationID, func(repoURL string) (string, bool) {
+		return wikiCloneURLForRepoName(repoURL, repoName)
+	})
+}
+
+func (c *appConnector) setRepoInstallationForWiki(repoURL string, installationID int64, wikiURLForRepo func(string) (string, bool)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.repoInstallationMap[repoURL] = installationID
-	if wikiURL, ok := wikiCloneURLForRepo(repoURL); ok {
+	if wikiURL, ok := wikiURLForRepo(repoURL); ok {
 		c.repoInstallationMap[wikiURL] = installationID
 	}
 }
