@@ -1054,4 +1054,6 @@ enum DetectorType {
   GitLabOauth2 = 1050;
   SpectralOps = 1051;
   AWSAppSync = 1052;
+  BasicAuth = 1057;
+  RailsMasterKey = 1063;
 }

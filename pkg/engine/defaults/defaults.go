@@ -91,6 +91,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/basicauth"
 	bannerbearv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v1"
 	bannerbearv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
@@ -608,6 +609,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qualaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qubole"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rabbitmq"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/railsmasterkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/railwayapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
@@ -969,6 +971,7 @@ func buildDetectorList() []detectors.Detector {
 		&azuresearchquerykey.Scanner{},
 		&azure_storage.Scanner{},
 		&azurerepositorykey.Scanner{},
+		&basicauth.Scanner{},
 		&bannerbearv1.Scanner{},
 		&bannerbearv2.Scanner{},
 		&baremetrics.Scanner{},
@@ -1505,6 +1508,7 @@ func buildDetectorList() []detectors.Detector {
 		&qualaroo.Scanner{},
 		&qubole.Scanner{},
 		&rabbitmq.Scanner{},
+		&railsmasterkey.Scanner{},
 		&railwayapp.Scanner{},
 		&ramp.Scanner{},
 		&rapidapi.Scanner{},
