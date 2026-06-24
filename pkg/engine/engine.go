@@ -1294,12 +1294,18 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// custom detectors which have the same type.
 		// MD5 hash of the key is used to reduce memory usage of the dedupe cache,
 		// since the raw result and source metadata can be large.
-		h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
-		key := string(h[:])
-		if _, ok := e.dedupeCache.Get(key); ok {
-			continue
+		//
+		// This deduplication only applies to results that are *not*
+		// from reverification, since we are expected to see the same
+		// result from reverification and want to Dispatch it below.
+		if result.SecretID == 0 {
+			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
+			key := string(h[:])
+			if _, ok := e.dedupeCache.Get(key); ok {
+				continue
+			}
+			e.dedupeCache.Add(key, struct{}{})
 		}
-		e.dedupeCache.Add(key, struct{}{})
 
 		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)

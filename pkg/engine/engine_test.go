@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -1987,6 +1988,80 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 			} else {
 				assert.False(t, found, "unexpected detector match")
 			}
+		})
+	}
+}
+
+// captureDispatcher records every dispatched result for assertion in tests.
+type captureDispatcher struct {
+	results []detectors.ResultWithMetadata
+}
+
+func (d *captureDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	d.results = append(d.results, result)
+	return nil
+}
+
+// TestNotifierWorker_ReverifiedResultsBypassDedupe verifies that the notifier's
+// dedupe cache is skipped when a result carries a non-zero SecretID — i.e., when
+// it originated from reverification — so that the dispatcher sees every
+// reverification result even when the underlying secret has not changed.
+func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
+	tests := []struct {
+		name         string
+		secretID     int64
+		wantDispatch int
+	}{
+		{
+			name:         "non-reverified duplicates are deduplicated",
+			secretID:     0,
+			wantDispatch: 1,
+		},
+		{
+			name:         "reverified duplicates bypass the dedupe cache",
+			secretID:     42,
+			wantDispatch: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache, err := lru.New[string, struct{}](16)
+			require.NoError(t, err)
+
+			disp := &captureDispatcher{}
+			e := &Engine{
+				results:                 make(chan detectors.ResultWithMetadata, 4),
+				dedupeCache:             cache,
+				dispatcher:              disp,
+				notifyVerifiedResults:   true,
+				notifyUnverifiedResults: true,
+				notifyUnknownResults:    true,
+			}
+
+			result := detectors.ResultWithMetadata{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Git{
+						Git: &source_metadatapb.Git{Line: 1},
+					},
+				},
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+				SecretID:   tt.secretID,
+				Result: detectors.Result{
+					DetectorType: detector_typepb.DetectorType(-1),
+					Raw:          []byte("a-secret"),
+					Verified:     true,
+				},
+			}
+
+			// Push the same result twice — identical hash inputs.
+			e.results <- result
+			e.results <- result
+			close(e.results)
+
+			e.notifierWorker(context.Background())
+
+			assert.Equal(t, tt.wantDispatch, len(disp.results))
 		})
 	}
 }
