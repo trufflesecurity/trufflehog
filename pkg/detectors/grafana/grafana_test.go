@@ -110,9 +110,24 @@ func TestGrafana_Verification(t *testing.T) {
 			wantVerified: true,
 		},
 		{
-			// Regression: a revoked/invalid token returns 401 with a body that
-			// contains "Unauthorized". It must NOT be treated as verified.
-			name:         "401 Unauthorized (revoked token) is unverified",
+			// Valid token that authenticated but lacks accesspolicies:read scope.
+			// Grafana returns 401 with a permission/scope error -> verified.
+			name:         "401 with permission/scope error (valid token) is verified",
+			statusCode:   401,
+			body:         `{"code":"Unauthorized","message":"invalid permission: access policy missing required scope [accesspolicies:read], received [accesspolicies:write]","requestId":"fc800c18-fb65-4013-bb8b-2e047a698974"}`,
+			wantVerified: true,
+		},
+		{
+			// Invalid/revoked token that failed authentication -> unverified.
+			name:         "401 InvalidCredentials (revoked token) is unverified",
+			statusCode:   401,
+			body:         `{"code":"InvalidCredentials","message":"Token could not be parsed","requestId":"538c7b37-2882-4727-9fae-6fc87321aa5c"}`,
+			wantVerified: false,
+		},
+		{
+			// Regression: a revoked token whose body merely contains
+			// "Unauthorized" (but no permission/scope error) must NOT be verified.
+			name:         "401 generic Unauthorized (revoked token) is unverified",
 			statusCode:   401,
 			body:         `{"code":"Unauthorized","message":"Unauthorized"}`,
 			wantVerified: false,
