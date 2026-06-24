@@ -1107,6 +1107,7 @@ const (
 	DetectorType_SpectralOps                             DetectorType = 1051
 	DetectorType_AWSAppSync                              DetectorType = 1052
 	DetectorType_BasicAuth                               DetectorType = 1057
+	DetectorType_RailsMasterKey                          DetectorType = 1063
 )
 
 // Enum value maps for DetectorType.
@@ -2162,6 +2163,7 @@ var (
 		1051: "SpectralOps",
 		1052: "AWSAppSync",
 		1057: "BasicAuth",
+		1063: "RailsMasterKey",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3214,6 +3216,7 @@ var (
 		"SpectralOps":                       1051,
 		"AWSAppSync":                        1052,
 		"BasicAuth":                         1057,
+		"RailsMasterKey":                    1063,
 	}
 )
 

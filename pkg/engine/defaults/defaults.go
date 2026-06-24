@@ -609,6 +609,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qualaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qubole"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rabbitmq"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/railsmasterkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/railwayapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
@@ -1507,6 +1508,7 @@ func buildDetectorList() []detectors.Detector {
 		&qualaroo.Scanner{},
 		&qubole.Scanner{},
 		&rabbitmq.Scanner{},
+		&railsmasterkey.Scanner{},
 		&railwayapp.Scanner{},
 		&ramp.Scanner{},
 		&rapidapi.Scanner{},
