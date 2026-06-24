@@ -38,7 +38,7 @@ var (
 	authLinePat = regexp.MustCompile(`(?im)(?:^|[\n\r])\s*(?:@[^:\s]+:)?(?:\/\/[^\s]+\/:)?_auth\s*=\s*([A-Za-z0-9+/=_-]{16,})`)
 
 	// NPM token shapes we can actively verify via whoami endpoint.
-	verifyableTokenPat = regexp.MustCompile(`^(?:npm_[A-Za-z0-9]{36}|[0-9A-Fa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
+	verifyableTokenPat = regexp.MustCompile(`^(?:npm_[A-Za-z0-9]{36}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$`)
 )
 
 func (s Scanner) Keywords() []string {
