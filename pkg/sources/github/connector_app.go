@@ -52,7 +52,7 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 
 	appID, err := strconv.ParseInt(app.AppId, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse app ID %q: %w", appID, err)
+		return nil, fmt.Errorf("could not parse app ID %q: %w", app.AppId, err)
 	}
 
 	installationTransport, err := newAppsTransport(apiEndpoint, appID, []byte(app.PrivateKey))
