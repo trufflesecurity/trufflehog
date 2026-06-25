@@ -72,6 +72,86 @@ func TestSource_Token(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSource_ExcludeArchived(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
+	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
+	if err != nil {
+		t.Fatal(err)
+	}
+	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
+	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
+	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
+
+	srcWithExclude := &sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     githubPrivateKeyNew,
+				InstallationId: githubInstallationIDNew,
+				AppId:          githubAppIDNew,
+			},
+		},
+		ExcludeArchived: true,
+	}
+	connWithExclude, err := anypb.New(srcWithExclude)
+	if err != nil {
+		panic(err)
+	}
+
+	sWithExclude := Source{
+		conn:          srcWithExclude,
+		memberCache:   map[string]struct{}{},
+		repoInfoCache: newRepoInfoCache(),
+	}
+	sWithExclude.Init(ctx, "github integration test source with exclude", 0, 0, false, connWithExclude, 1)
+	sWithExclude.filteredRepoCache = sWithExclude.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
+
+	err = sWithExclude.enumerateWithApp(ctx, sWithExclude.connector.(*appConnector).InstallationClient(), noopReporter())
+	assert.NoError(t, err)
+
+	srcWithoutExclude := &sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     githubPrivateKeyNew,
+				InstallationId: githubInstallationIDNew,
+				AppId:          githubAppIDNew,
+			},
+		},
+		ExcludeArchived: false,
+	}
+	connWithoutExclude, err := anypb.New(srcWithoutExclude)
+	if err != nil {
+		panic(err)
+	}
+
+	sWithoutExclude := Source{
+		conn:          srcWithoutExclude,
+		memberCache:   map[string]struct{}{},
+		repoInfoCache: newRepoInfoCache(),
+	}
+	sWithoutExclude.Init(ctx, "github integration test source without exclude", 0, 0, false, connWithoutExclude, 1)
+	sWithoutExclude.filteredRepoCache = sWithoutExclude.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
+
+	err = sWithoutExclude.enumerateWithApp(ctx, sWithoutExclude.connector.(*appConnector).InstallationClient(), noopReporter())
+	assert.NoError(t, err)
+
+	assert.Less(t, sWithExclude.filteredRepoCache.Count(), sWithoutExclude.filteredRepoCache.Count(),
+		"ExcludeArchived should result in strictly fewer repos (test org must have at least one archived repo). WithExclude: %d, WithoutExclude: %d",
+		sWithExclude.filteredRepoCache.Count(), sWithoutExclude.filteredRepoCache.Count())
+
+	t.Logf("Repos with ExcludeArchived=true: %d", sWithExclude.filteredRepoCache.Count())
+	t.Logf("Repos with ExcludeArchived=false: %d", sWithoutExclude.filteredRepoCache.Count())
+}
+
 func TestSource_ScanComments(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()

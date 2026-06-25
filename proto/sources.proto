@@ -283,6 +283,7 @@ message GitHub {
   bool print_legacy_json = 25;
   // When using GitHub App credentials, enumerate repositories from every app installation.
   bool scan_all_installations = 26;
+  bool exclude_archived = 27;
 }
 
 message GitHubExperimental {

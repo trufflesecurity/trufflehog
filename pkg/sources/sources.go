@@ -334,6 +334,8 @@ type GithubConfig struct {
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup   bool
 	IgnoreGists bool
+	// ExcludeArchived indicates whether to exclude archived repositories from the scan.
+	ExcludeArchived bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
 }
