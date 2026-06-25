@@ -16,6 +16,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -78,6 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	client := detectors.DetectorHttpClientWithNoLocalAddresses
 
 	seenMatches := make(map[string]struct{})
+	skipUnverified := feature.DropUnverifiedJWTResults.Load()
 
 	for _, matchGroups := range keyPat.FindAllStringSubmatch(string(data), -1) {
 		match := matchGroups[1]
@@ -144,6 +146,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.SetVerificationError(verificationErr, match)
 		}
 
+		// Remove unverified results from jwt detector output when the "drop-unverified-jwt-results" feature flag is enabled.
+		if skipUnverified && verify && !s1.Verified && s1.VerificationError() == nil {
+			continue
+		}
 		results = append(results, s1)
 	}
 

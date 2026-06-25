@@ -26,6 +26,7 @@ var (
 	RevDetectorEnabled             atomic.Bool
 	UserDetectorEnabled            atomic.Bool
 	BraintrustDetectorEnabled      atomic.Bool
+	DropUnverifiedJWTResults       atomic.Bool
 )
 
 type AtomicString struct {
