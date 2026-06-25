@@ -281,6 +281,8 @@ message GitHub {
   bool no_cleanup = 23;
   bool ignore_gists = 24;
   bool print_legacy_json = 25;
+  // When using GitHub App credentials, enumerate repositories from every app installation.
+  bool scan_all_installations = 26;
 }
 
 message GitHubExperimental {
