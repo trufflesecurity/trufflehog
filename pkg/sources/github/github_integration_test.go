@@ -114,7 +114,7 @@ func TestSource_ExcludeArchived(t *testing.T) {
 	sWithExclude.Init(ctx, "github integration test source with exclude", 0, 0, false, connWithExclude, 1)
 	sWithExclude.filteredRepoCache = sWithExclude.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
 
-	err = sWithExclude.enumerateWithApp(ctx, sWithExclude.connector.(*appConnector).InstallationClient(), noopReporter())
+	err = sWithExclude.enumerateWithApp(ctx, sWithExclude.connector.(*appConnector), noopReporter())
 	assert.NoError(t, err)
 
 	srcWithoutExclude := &sourcespb.GitHub{
@@ -141,7 +141,7 @@ func TestSource_ExcludeArchived(t *testing.T) {
 	sWithoutExclude.Init(ctx, "github integration test source without exclude", 0, 0, false, connWithoutExclude, 1)
 	sWithoutExclude.filteredRepoCache = sWithoutExclude.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
 
-	err = sWithoutExclude.enumerateWithApp(ctx, sWithoutExclude.connector.(*appConnector).InstallationClient(), noopReporter())
+	err = sWithoutExclude.enumerateWithApp(ctx, sWithoutExclude.connector.(*appConnector), noopReporter())
 	assert.NoError(t, err)
 
 	assert.Less(t, sWithExclude.filteredRepoCache.Count(), sWithoutExclude.filteredRepoCache.Count(),
