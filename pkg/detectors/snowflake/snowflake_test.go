@@ -17,8 +17,11 @@ func TestSnowflake_Pattern(t *testing.T) {
 	validAccount := "tuacoip-zt74995"
 	validPrivateLinkAccount := "tuacoip-zt74995.privatelink"
 	validSingleCharacterAccount := "tuacoip-z"
+	validDigitOrgAccount := "ABC1234-EXAMPLE"               // org segment contains digits; missed by the old [a-zA-Z]{7} pattern
+	validRegionQualifiedAccount := "xy12345-prod.us-east-1" // region/cloud suffix contains dots; truncated by the old account body
 	validUsername := gofakeit.Username()
-	invalidUsername := "Spencer@5091.com" // special characters not allowed
+	specialCharUsername := "super!user@corp" // '!' and '@' are valid Snowflake login-name characters
+	invalidUsername := "Spencer@5091.com"    // special characters not allowed
 
 	validPassword := common.GenerateRandomPassword(true, true, true, false, 10)
 	invalidPassword := "!12" // invalid length
@@ -49,6 +52,27 @@ func TestSnowflake_Pattern(t *testing.T) {
 			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validSingleCharacterAccount, validUsername, validPassword),
 			want: [][]string{
 				{validSingleCharacterAccount, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Snowflake Credentials - Account with digits in org segment",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validDigitOrgAccount, validUsername, validPassword),
+			want: [][]string{
+				{validDigitOrgAccount, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Snowflake Credentials - Region-qualified account",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validRegionQualifiedAccount, validUsername, validPassword),
+			want: [][]string{
+				{validRegionQualifiedAccount, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Snowflake Credentials - Username with ! and @",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, specialCharUsername, validPassword),
+			want: [][]string{
+				{validAccount, specialCharUsername, validPassword},
 			},
 		},
 		{
