@@ -334,6 +334,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getgist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getresponse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getsandbox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitea"
 	githubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
 	githubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_oauth2"
@@ -1223,6 +1224,7 @@ func buildDetectorList() []detectors.Detector {
 		&getgist.Scanner{},
 		&getresponse.Scanner{},
 		&getsandbox.Scanner{},
+		&gitea.Scanner{},
 		&github_oauth2.Scanner{},
 		&githubapp.Scanner{},
 		&githubv1.Scanner{},

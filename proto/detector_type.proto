@@ -1055,4 +1055,5 @@ enum DetectorType {
   SpectralOps = 1051;
   AWSAppSync = 1052;
   BrainTrustApiKey = 1053;
+  Gitea = 1057;
 }
