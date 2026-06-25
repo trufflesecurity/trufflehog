@@ -24,7 +24,7 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-const browserStackAPIURL = "https://www.browserstack.com/automate/plan.json"
+const browserStackAPIURL = "https://api.browserstack.com/automate/plan.json"
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -122,8 +122,6 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 	} else if res.StatusCode != http.StatusUnauthorized {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
