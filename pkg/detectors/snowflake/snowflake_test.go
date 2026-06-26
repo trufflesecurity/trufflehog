@@ -17,8 +17,10 @@ func TestSnowflake_Pattern(t *testing.T) {
 	validAccount := "tuacoip-zt74995"
 	validPrivateLinkAccount := "tuacoip-zt74995.privatelink"
 	validSingleCharacterAccount := "tuacoip-z"
-	validDigitOrgAccount := "ABC1234-EXAMPLE"               // org segment contains digits; missed by the old [a-zA-Z]{7} pattern
-	validRegionQualifiedAccount := "xy12345-prod.us-east-1" // region/cloud suffix contains dots; truncated by the old account body
+	validDigitOrgAccount := "ABC1234-EXAMPLE"                   // org segment contains digits; missed by the old [a-zA-Z]{7} pattern
+	validRegionQualifiedAccount := "xy12345-prod.us-east-1"     // region/cloud suffix contains dots; truncated by the old account body
+	fullHostAccount := "tuacoip-zt74995.snowflakecomputing.com" // account stored as the full login host
+	fullHostAccountIdentifier := "tuacoip-zt74995"              // verifyMatch re-appends the suffix, so it must be reported stripped
 	validUsername := gofakeit.Username()
 	specialCharUsername := "super!user@corp" // '!' and '@' are valid Snowflake login-name characters
 	invalidUsername := "Spencer@5091.com"    // special characters not allowed
@@ -66,6 +68,13 @@ func TestSnowflake_Pattern(t *testing.T) {
 			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validRegionQualifiedAccount, validUsername, validPassword),
 			want: [][]string{
 				{validRegionQualifiedAccount, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Snowflake Credentials - Account stored as full host",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", fullHostAccount, validUsername, validPassword),
+			want: [][]string{
+				{fullHostAccountIdentifier, validUsername, validPassword},
 			},
 		},
 		{
