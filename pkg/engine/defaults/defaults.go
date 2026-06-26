@@ -753,6 +753,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tallyfy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tatumio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tavily"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/taxjar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teamgate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teamworkcrm"
@@ -1656,6 +1657,7 @@ func buildDetectorList() []detectors.Detector {
 		&tailscale.Scanner{},
 		&tallyfy.Scanner{},
 		&tatumio.Scanner{},
+		&tavily.Scanner{},
 		&taxjar.Scanner{},
 		&teamgate.Scanner{},
 		&teamworkcrm.Scanner{},
