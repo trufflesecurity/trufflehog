@@ -122,7 +122,7 @@ enum DetectorType {
   VultrApiKey = 116;
   Pepipost = 117;
   Postman = 118;
-  CloudsightKey = 119; // Not yet implemented
+  CloudsightKey = 119;
   JiraToken = 120;
   NexmoApiKey = 121;
   SegmentApiKey = 122;
