@@ -1065,4 +1065,6 @@ enum DetectorType {
   HashiCorpVaultBatchToken = 1061;
   HashiCorpVaultToken = 1062;
   Duo = 1063;
+  Waveapps = 1064;
+  MercadoPago = 1065;
 }

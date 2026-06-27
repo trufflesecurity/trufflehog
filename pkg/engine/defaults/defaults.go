@@ -483,6 +483,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meraki"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mercadopago"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mesibo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/messagebird"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
@@ -1394,6 +1395,7 @@ func buildDetectorList() []detectors.Detector {
 		&mediastack.Scanner{},
 		&meistertask.Scanner{},
 		&meraki.Scanner{},
+		&mercadopago.Scanner{},
 		&mesibo.Scanner{},
 		&messagebird.Scanner{},
 		&metaapi.Scanner{},
