@@ -845,6 +845,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraping"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/websitepulse"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/waveapps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
@@ -1749,6 +1750,7 @@ func buildDetectorList() []detectors.Detector {
 		&webexbot.Scanner{},
 		&webflow.Scanner{},
 		&webscraper.Scanner{},
+		&waveapps.Scanner{},
 		&webscraping.Scanner{},
 		&websitepulse.Scanner{},
 		&weightsandbiases.Scanner{},
