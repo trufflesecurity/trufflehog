@@ -9,7 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -24,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cattle", "rancher"}) + `\b([a-z0-9]{54,64})\b`)
 )

@@ -21,7 +21,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ranchertoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aletheiaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/algoliaadminkey"
@@ -612,6 +611,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rabbitmq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/railwayapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ranchertoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rawg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/razorpay"
@@ -900,7 +900,6 @@ func buildDetectorList() []detectors.Detector {
 		&airvisual.Scanner{},
 		&aiven.Scanner{},
 		&alchemy.Scanner{},
-		&ranchertoken.Scanner{},
 		// The service currently has blocked requests with a "TruffleHog" UserAgent.
 		// &alconost.Scanner{},
 		&alegra.Scanner{},
@@ -1511,6 +1510,7 @@ func buildDetectorList() []detectors.Detector {
 		&rabbitmq.Scanner{},
 		&railwayapp.Scanner{},
 		&ramp.Scanner{},
+		&ranchertoken.Scanner{},
 		&rapidapi.Scanner{},
 		// &raven.Scanner{},
 		&rawg.Scanner{},
