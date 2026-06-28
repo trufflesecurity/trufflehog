@@ -246,7 +246,6 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Duda:                                    {},
 	detector_typepb.DetectorType_Duffel:                                  {},
 	detector_typepb.DetectorType_Dynadot:                                 {},
-	detector_typepb.DetectorType_Dynatrace:                               {},
 	detector_typepb.DetectorType_Edusign:                                 {},
 	detector_typepb.DetectorType_ElasticPath:                             {},
 	detector_typepb.DetectorType_Emailoctopus:                            {},
