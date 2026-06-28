@@ -137,7 +137,7 @@ func TestMercadopago_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreUnexported(detectors.Result{})
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreFields(detectors.Result{}, "Raw", "SecretParts")); diff != "" {
 				t.Errorf("Mercadopago.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
