@@ -836,6 +836,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vultrapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vyte"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/walkscore"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/waveapps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weatherbit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weatherstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/web3storage"
@@ -845,7 +846,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraping"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/websitepulse"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/waveapps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
@@ -1743,6 +1743,7 @@ func buildDetectorList() []detectors.Detector {
 		&vultrapikey.Scanner{},
 		&vyte.Scanner{},
 		&walkscore.Scanner{},
+		&waveapps.Scanner{},
 		&weatherbit.Scanner{},
 		&weatherstack.Scanner{},
 		&web3storage.Scanner{},
@@ -1750,7 +1751,6 @@ func buildDetectorList() []detectors.Detector {
 		&webexbot.Scanner{},
 		&webflow.Scanner{},
 		&webscraper.Scanner{},
-		&waveapps.Scanner{},
 		&webscraping.Scanner{},
 		&websitepulse.Scanner{},
 		&weightsandbiases.Scanner{},
