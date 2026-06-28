@@ -19,6 +19,9 @@ type MysqlJDBC struct {
 var _ JDBC = (*MysqlJDBC)(nil)
 
 func (s *MysqlJDBC) ping(ctx context.Context) pingResult {
+	if hostIsLocal(s.Host) {
+		return pingResult{errNoLocalIP, true}
+	}
 	return ping(ctx, "mysql", isMySQLErrorDeterminate,
 		buildMySQLConnectionString(s.Host, "", s.User, s.Password, s.Params))
 }
