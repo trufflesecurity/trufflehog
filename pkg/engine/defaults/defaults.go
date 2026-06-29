@@ -1806,7 +1806,7 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.UserDetectorEnabled.Load()
 		case *braintrust.Scanner:
 			return !feature.BraintrustDetectorEnabled.Load()
-    case *pganalyzereadkey.Scanner:
+		case *pganalyzereadkey.Scanner:
 			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
 		default:
 			return false

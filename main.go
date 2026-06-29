@@ -543,7 +543,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.RevDetectorEnabled.Store(true)
 	feature.UserDetectorEnabled.Store(true)
 	feature.BraintrustDetectorEnabled.Store(true)
-  feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
+	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

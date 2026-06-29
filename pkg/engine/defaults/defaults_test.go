@@ -135,6 +135,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Rev:              {},
 	detector_typepb.DetectorType_User:             {},
 	detector_typepb.DetectorType_BrainTrustApiKey: {},
+	detector_typepb.DetectorType_PgAnalyzeReadKey: {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
@@ -347,5 +348,4 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_AzureMLWebServiceClassicIdentifiableKey: {},
 	detector_typepb.DetectorType_AzureSQL:                                {},
 	detector_typepb.DetectorType_BuiltWith:                               {},
-	detector_typepb.DetectorType_PgAnalyzeReadKey:                        {},
 }
