@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/airbrake/",
 			},
+			SecretParts: map[string]string{"key": key},
 		}
 
 		if verify {
@@ -61,9 +62,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyAirbrakeUserKey(ctx, client, key)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
-			if isVerified {
-				s1.SecretParts = map[string]string{"key": key}
-			}
 		}
 
 		results = append(results, s1)

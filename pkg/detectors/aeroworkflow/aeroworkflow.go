@@ -93,7 +93,7 @@ func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resI
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// https://api.aeroworkflow.com/swagger/index.html
 	switch res.StatusCode {
