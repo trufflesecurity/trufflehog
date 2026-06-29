@@ -70,6 +70,11 @@ func (s Scanner) FromData(
 				DetectorType: detector_typepb.DetectorType_OctopusDeploy,
 				Raw:          []byte(token),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", url, token)),
+				Redacted:     token[:4] + "...",
+				SecretParts: map[string]string{
+					"key": token,
+					"url": url,
+				},
 			}
 
 			if verify {

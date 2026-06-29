@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestOctopusDeploy_FromData(t *testing.T) {
@@ -63,7 +63,7 @@ func TestOctopusDeploy_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OctopusDeploy,
+					DetectorType: detector_typepb.DetectorType_OctopusDeploy,
 					Verified:     true,
 					Raw:          []byte(activeToken),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", baseURL, activeToken)),
@@ -85,7 +85,7 @@ func TestOctopusDeploy_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OctopusDeploy,
+					DetectorType: detector_typepb.DetectorType_OctopusDeploy,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", baseURL, activeToken)),
@@ -108,7 +108,7 @@ func TestOctopusDeploy_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OctopusDeploy,
+					DetectorType: detector_typepb.DetectorType_OctopusDeploy,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", baseURL, activeToken)),
@@ -131,7 +131,7 @@ func TestOctopusDeploy_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OctopusDeploy,
+					DetectorType: detector_typepb.DetectorType_OctopusDeploy,
 					Verified:     false,
 					Raw:          []byte(inactiveToken),
 					RawV2:        []byte(fmt.Sprintf("%s:%s", baseURL, inactiveToken)),
@@ -175,6 +175,10 @@ func TestOctopusDeploy_FromData(t *testing.T) {
 				"ExtraData",
 				"verificationError",
 				"primarySecret",
+				"Redacted",
+				"chunkOffset",
+				"chunkOffsetSet",
+				"SecretParts",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
