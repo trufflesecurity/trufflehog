@@ -23,13 +23,14 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = detectors.NewClientWithDedup(common.SaneHttpClient())
 
-	pyxisAPIKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"redhat"}) + `\b([a-z0-9]{32})\b`)
+	pyxisAPIKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"redhat", "pyxis"}) + `\b([a-z0-9]{32})\b`)
 )
 
 // Keywords used for fast pre-filtering
 func (s Scanner) Keywords() []string {
 	return []string{
 		"redhat",
+		"pyxis",
 	}
 }
 
