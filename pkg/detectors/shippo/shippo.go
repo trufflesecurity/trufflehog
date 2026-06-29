@@ -60,9 +60,9 @@ func (s Scanner) FromData(
 		result := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Shippo,
 			Raw:          []byte(token),
-			Redacted:     token[:10] + "...",
+			Redacted:     token[:5] + "...",
 			SecretParts: map[string]string{
-				"token": token,
+				"key": token,
 			},
 		}
 
@@ -128,5 +128,5 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Shippo is a shipping API platform. This detector identifies Shippo live API tokens."
+	return "Shippo is a shipping API platform. Shippo live API tokens can be used to authenticate API requests and manage shipping operations."
 }
