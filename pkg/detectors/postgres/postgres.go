@@ -58,6 +58,11 @@ type Scanner struct {
 	ignorePatterns []*regexp.Regexp
 }
 
+type uriMatch struct {
+	params map[string]string
+	rawURI string
+}
+
 func New(opts ...func(*Scanner)) *Scanner {
 	scanner := &Scanner{
 		ignorePatterns: []*regexp.Regexp{},
@@ -93,12 +98,13 @@ func (s Scanner) Keywords() []string {
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	var results []detectors.Result
-	candidateParamSets := findUriMatches(data, s.ignorePatterns)
+	candidateURIs := findUriMatches(data, s.ignorePatterns)
 
-	for _, params := range candidateParamSets {
+	for _, candidateURI := range candidateURIs {
 		if common.IsDone(ctx) {
 			break
 		}
+		params := candidateURI.params
 		user, ok := params[pgUser]
 		if !ok {
 			continue
@@ -141,6 +147,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			RawV2:        raw,
 			SecretParts:  map[string]string{"connection_string": string(raw)},
 		}
+		// Set the un-normalized raw match as the primary secret value.
+		// This ensures that the engine's line-offset and ignore-tag matching logic
+		// (which searches the source document for the exact string) can locate the match,
+		// even though Raw/RawV2 are stored in a normalized form.
+		result.SetPrimarySecretValue(candidateURI.rawURI)
 
 		// We don't need to normalize the (deprecated) requiressl option into the (up-to-date) sslmode option - pq can
 		// do it for us - but we will do it anyway here so that when we later capture sslmode into ExtraData we will
@@ -199,8 +210,8 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
-func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []map[string]string {
-	var matches []map[string]string
+func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []uriMatch {
+	var matches []uriMatch
 	for _, uri := range uriPattern.FindAll(data, -1) {
 		if shouldIgnore(uri, ignorePatterns) {
 			continue
@@ -224,7 +235,10 @@ func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []map[string]s
 		}
 
 		params[pgDbType] = dbType
-		matches = append(matches, params)
+		matches = append(matches, uriMatch{
+			params: params,
+			rawURI: string(uri),
+		})
 	}
 	return matches
 }
