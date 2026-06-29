@@ -79,7 +79,6 @@ func (s Scanner) FromData(
 	}
 
 	for token := range uniqueTokens {
-		emitted := false
 		for _, endpoint := range s.Endpoints(endpoints...) {
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_HashiCorpVaultToken,
@@ -87,8 +86,8 @@ func (s Scanner) FromData(
 				RawV2:        []byte(token + ":" + endpoint),
 				Redacted:     token[:8] + "...",
 				SecretParts: map[string]string{
-					"token": token,
-					"url":   endpoint,
+					"key": token,
+					"url": endpoint,
 				},
 			}
 
@@ -113,23 +112,6 @@ func (s Scanner) FromData(
 			}
 
 			results = append(results, result)
-			emitted = true
-		}
-		if !emitted {
-			// No reachable URL in context — emit an unverified token-only
-			// result and annotate why we couldn't verify.
-			results = append(results, detectors.Result{
-				DetectorType: detector_typepb.DetectorType_HashiCorpVaultToken,
-				Raw:          []byte(token),
-				RawV2:        []byte(token),
-				Redacted:     token[:8] + "...",
-				ExtraData: map[string]string{
-					"verification_note": "no reachable Vault URL found in context; tokens reported unverified",
-				},
-				SecretParts: map[string]string{
-					"token": token,
-				},
-			})
 		}
 	}
 

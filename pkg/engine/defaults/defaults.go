@@ -1814,6 +1814,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
 		case *redhatpyxis.Scanner:
 			return !feature.RedHatPyxisDetectorEnabled.Load()
+		case *hashicorpvaulttoken.Scanner:
+			return !feature.HashiCorpVaultTokenDetectorEnabled.Load()
 		default:
 			return false
 		}
