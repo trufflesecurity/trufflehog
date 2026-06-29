@@ -1815,7 +1815,7 @@ func buildDetectorList() []detectors.Detector {
 		case *redhatpyxis.Scanner:
 			return !feature.RedHatPyxisDetectorEnabled.Load()
 		case *hashicorpbatchtoken.Scanner:
-			return !feature.HashiCorpVaultBatchTokenDetector.Load()
+			return !feature.HashiCorpVaultBatchTokenDetectorEnabled.Load()
 		default:
 			return false
 		}
