@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestWeightsandbiases_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestWeightsandbiases_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WeightsAndBiases,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"admin":    "false",
@@ -72,7 +72,7 @@ func TestWeightsandbiases_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WeightsAndBiases,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
 				},
 			},
@@ -101,7 +101,7 @@ func TestWeightsandbiases_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WeightsAndBiases,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
 				},
 			},
@@ -118,7 +118,7 @@ func TestWeightsandbiases_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WeightsAndBiases,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
 				},
 			},

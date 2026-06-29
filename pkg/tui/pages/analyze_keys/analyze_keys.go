@@ -62,9 +62,9 @@ func (ui *AnalyzeKeyPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ui.list.SetSize(msg.Width-h, msg.Height-v)
 		case tea.KeyMsg:
 			switch {
-			case key.Matches(msg, ui.Common.KeyMap.Back):
+			case key.Matches(msg, ui.KeyMap.Back):
 				return nil, tea.Quit
-			case key.Matches(msg, ui.Common.KeyMap.Select):
+			case key.Matches(msg, ui.KeyMap.Select):
 				chosenAnalyzer := ui.list.SelectedItem().(KeyTypeItem)
 
 				return ui, func() tea.Msg {

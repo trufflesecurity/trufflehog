@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	regexp "github.com/wasilibs/go-re2"
 )
 
@@ -64,8 +64,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_DatadogApikey,
+			DetectorType: detector_typepb.DetectorType_DatadogApikey,
 			Raw:          []byte(resApiMatch),
+			SecretParts:  map[string]string{"api_key": resApiMatch},
 		}
 
 		if verify {
@@ -74,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, baseURL)
 				if isVerified {
 					s1.Verified = isVerified
-					s1.AnalysisInfo = map[string]string{"api_key": resApiMatch, "endpoint": baseURL}
+					s1.SecretParts["endpoint"] = baseURL
 					// break the loop once we've successfully validated the token against a baseURL
 					break
 				}
@@ -117,8 +118,8 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, baseUrl strin
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_DatadogApikey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_DatadogApikey
 }
 
 func (s Scanner) Description() string {

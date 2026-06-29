@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -30,8 +33,8 @@ type Detector interface {
 	// That is, if any of the keywords are found in a chunk, the chunk will be run through the detector.
 	Keywords() []string
 
-	// Type returns the DetectorType number from detectors.proto for the given detector.
-	Type() detectorspb.DetectorType
+	// Type returns the DetectorType number from detector_type.proto for the given detector.
+	Type() detector_typepb.DetectorType
 
 	// Description returns a description for the result being detected
 	Description() string
@@ -46,7 +49,7 @@ type Detector interface {
 type CustomResultsCleaner interface {
 	// CleanResults removes "superfluous" results from a result set (where the definition of "superfluous" is detector-
 	// specific).
-	CleanResults(results []Result) []Result
+	CleanResults(results []Result, verificationEnabled bool) []Result
 	// ShouldCleanResultsIrrespectiveOfConfiguration allows a custom cleaner to instruct the engine to ignore
 	// user-provided configuration that controls whether results are cleaned. (User-provided configuration is not the
 	// only factor that determines whether the engine runs cleaning logic.)
@@ -95,7 +98,7 @@ type CloudProvider interface {
 
 type Result struct {
 	// DetectorType is the type of Detector.
-	DetectorType detectorspb.DetectorType
+	DetectorType detector_typepb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
 	// Verified indicates whether the result was verified or not.
@@ -118,10 +121,11 @@ type Result struct {
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
 
-	// AnalysisInfo should be set with information required for credential
-	// analysis to run. The keys of the map are analyzer specific and
-	// should match what is expected in the corresponding analyzer.
-	AnalysisInfo map[string]string
+	// SecretParts holds the individual components of a (potentially multi-part)
+	// credential, keyed by a component name. It is used by analyzers where
+	// the keys are analyzer specific and should match what the
+	// corresponding analyzer expects.
+	SecretParts map[string]string
 
 	// primarySecret is used when a detector has multiple secret patterns.
 	// This secret is designated to determine the line number.
@@ -130,6 +134,11 @@ type Result struct {
 		Value string
 		Line  int64
 	}
+
+	// chunkOffset stores the byte position of this result's secret within chunk data.
+	// Used to disambiguate line numbers when the same secret appears multiple times.
+	chunkOffset    int64
+	chunkOffsetSet bool
 }
 
 // CopyVerificationInfo clones verification info (status and error) from another Result struct. This is used when
@@ -170,6 +179,22 @@ func (r *Result) SetPrimarySecretLine(line int64) {
 // GetPrimarySecretValue return primary secret match value
 func (r *Result) GetPrimarySecretValue() string {
 	return r.primarySecret.Value
+}
+
+// SetChunkOffset records the byte position of this result's secret within the chunk data.
+func (r *Result) SetChunkOffset(offset int64) {
+	r.chunkOffset = offset
+	r.chunkOffsetSet = true
+}
+
+// ChunkOffset returns the byte position of this result's secret within the chunk data.
+func (r *Result) ChunkOffset() int64 {
+	return r.chunkOffset
+}
+
+// HasChunkOffset reports whether a chunk offset has been explicitly set on this result.
+func (r *Result) HasChunkOffset() bool {
+	return r.chunkOffsetSet
 }
 
 // redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.
@@ -244,7 +269,7 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 
 // CleanResults returns all verified secrets, and if there are no verified secrets,
 // just one unverified secret if there are any.
-func CleanResults(results []Result) []Result {
+func CleanResults(results []Result, _ bool) []Result {
 	if len(results) == 0 {
 		return results
 	}
@@ -332,4 +357,21 @@ func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
 	parsedURL.Path = ""
 	parsedURL.RawQuery = ""
 	return parsedURL, nil
+}
+
+type dedupKeyContextKey struct{}
+
+func withDedupKey(ctx context.Context, detType detector_typepb.DetectorType, credential string) context.Context {
+	key := fmt.Sprintf("%d:%s", int32(detType), credential)
+	return context.WithValue(ctx, dedupKeyContextKey{}, key)
+}
+
+// DoWithDedup executes req through client, coalescing concurrent requests that share
+// the same detector type and credential into a single network call via singleflight.
+// The response body is fully buffered and replayed to every waiting caller.
+//
+// Use this instead of client.Do for all verification requests on a client created
+// with NewClientWithDedup or WithDedup — it is the only way to activate deduplication.
+func DoWithDedup(client *http.Client, detType detector_typepb.DetectorType, credential string, req *http.Request) (*http.Response, error) {
+	return client.Do(req.WithContext(withDedupKey(req.Context(), detType, credential)))
 }

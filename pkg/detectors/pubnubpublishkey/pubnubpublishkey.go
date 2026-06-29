@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -49,9 +49,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ressubMatch := strings.TrimSpace(subMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+				DetectorType: detector_typepb.DetectorType_PubNubPublishKey,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + "/" + ressubMatch),
+				SecretParts: map[string]string{
+					"key":           resMatch,
+					"subscribe_key": ressubMatch,
+				},
+				RawV2: []byte(resMatch + "/" + ressubMatch),
 			}
 
 			if verify {
@@ -87,10 +91,10 @@ func verifyPubNub(ctx context.Context, client *http.Client, resMatch, ressubMatc
 		return false, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
-	} else if !(res.StatusCode == 400 || res.StatusCode == 403) {
+	} else if res.StatusCode != 400 && res.StatusCode != 403 {
 		// 403 is suggested by the API docs (https://www.pubnub.com/docs/sdks/rest-api/send-signal-to-channel)
 		// 400 is what actually seems to be coming back for invalid credentials
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
@@ -99,8 +103,8 @@ func verifyPubNub(ctx context.Context, client *http.Client, resMatch, ressubMatc
 	return false, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PubNubPublishKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PubNubPublishKey
 }
 
 func (s Scanner) Description() string {

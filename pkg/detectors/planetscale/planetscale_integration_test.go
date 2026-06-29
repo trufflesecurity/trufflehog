@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPlanetscale_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     true,
 				},
 			},
@@ -70,7 +70,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},
@@ -99,7 +99,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},
@@ -116,7 +116,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlanetScale,
+					DetectorType: detector_typepb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},
@@ -139,7 +139,7 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "AnalysisInfo", "ExtraData")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "SecretParts", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Planetscale.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

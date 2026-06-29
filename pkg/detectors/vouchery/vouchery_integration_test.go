@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestVouchery_FromChunk(t *testing.T) {
@@ -49,12 +49,12 @@ func TestVouchery_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Vouchery,
+					DetectorType: detector_typepb.DetectorType_Vouchery,
 					Verified:     false,
 					RawV2:        []byte(secret + "secret"),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Vouchery,
+					DetectorType: detector_typepb.DetectorType_Vouchery,
 					Verified:     true,
 					RawV2:        []byte(secret + subdomain),
 				},
@@ -71,12 +71,12 @@ func TestVouchery_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Vouchery,
+					DetectorType: detector_typepb.DetectorType_Vouchery,
 					Verified:     false,
 					RawV2:        []byte(inactiveSecret + "secret"),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Vouchery,
+					DetectorType: detector_typepb.DetectorType_Vouchery,
 					Verified:     false,
 					RawV2:        []byte(inactiveSecret + subdomain),
 				},

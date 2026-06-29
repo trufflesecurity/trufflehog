@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestIpquality_FromChunk(t *testing.T) {
@@ -27,7 +27,7 @@ func TestIpquality_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("IPQUALITY")
 	inactiveSecret := testSecrets.MustGetField("IPQUALITY_INACTIVE")
 
-	invalidResult := detectors.Result{DetectorType: detectorspb.DetectorType_IPQuality, Verified: false}
+	invalidResult := detectors.Result{DetectorType: detector_typepb.DetectorType_IPQuality, Verified: false}
 	invalidResult.SetVerificationError(errors.New("couldn't verify; API Key has " + insufficientCreditMessage))
 
 	type args struct {
@@ -52,7 +52,7 @@ func TestIpquality_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IPQuality,
+					DetectorType: detector_typepb.DetectorType_IPQuality,
 					Verified:     true,
 				},
 			},
