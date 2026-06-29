@@ -44,5 +44,9 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobP
 		return sources.JobProgressRef{}, err
 	}
 
+	if c.SinceDate != "" {
+		gitSource.ApplyScanOption(git.ScanOptionSinceDate(c.SinceDate))
+	}
+
 	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitSource)
 }

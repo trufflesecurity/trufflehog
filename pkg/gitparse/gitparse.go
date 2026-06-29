@@ -326,17 +326,32 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 		return diffChan, err
 	}
 
+	// Capture stderr in parallel: stream at V(2) for live debug output, and
+	// retain the full text so we can surface it at Error level if the command
+	// exits non-zero. Without this, mistakes like an unparseable `--after`
+	// date are swallowed and the scan looks like a clean (but empty) success.
+	var stderrBuf strings.Builder
+	stderrDone := make(chan struct{})
 	go func() {
+		defer close(stderrDone)
 		scanner := bufio.NewScanner(stdErr)
 		for scanner.Scan() {
-			ctx.Logger().V(2).Info(scanner.Text())
+			line := scanner.Text()
+			ctx.Logger().V(2).Info(line)
+			stderrBuf.WriteString(line)
+			stderrBuf.WriteByte('\n')
 		}
 	}()
 
 	go func() {
 		defer func() {
+			<-stderrDone
 			if err := cmd.Wait(); err != nil {
-				ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
+				if ctx.Err() != nil {
+					ctx.Logger().V(2).Info("git command interrupted", "error", err)
+					return
+				}
+				ctx.Logger().Error(err, "git command failed", "stderr", strings.TrimSpace(stderrBuf.String()))
 			}
 		}()
 		c.FromReader(ctx, stdOut, diffChan, isStaged)

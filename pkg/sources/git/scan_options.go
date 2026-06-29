@@ -13,6 +13,7 @@ type ScanOptions struct {
 	Bare         bool
 	ExcludeGlobs []string
 	LogOptions   *git.LogOptions
+	SinceDate    string
 }
 
 type ScanOption func(*ScanOptions)
@@ -56,6 +57,12 @@ func ScanOptionLogOptions(logOptions *git.LogOptions) ScanOption {
 func ScanOptionBare(bare bool) ScanOption {
 	return func(scanOptions *ScanOptions) {
 		scanOptions.Bare = bare
+	}
+}
+
+func ScanOptionSinceDate(sinceDate string) ScanOption {
+	return func(scanOptions *ScanOptions) {
+		scanOptions.SinceDate = sinceDate
 	}
 }
 
