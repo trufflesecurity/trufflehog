@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTableau_FromChunk(t *testing.T) {
@@ -56,7 +56,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+					DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"token_name":            tokenName,
@@ -69,10 +69,10 @@ func TestTableau_FromChunk(t *testing.T) {
 						"verification_status":   "valid",
 						"auth_token_received":   "true",
 					},
-					AnalysisInfo: map[string]string{
-						"endpoint":  tableauURL,
-						"patSecret": tokenSecret,
-						"tokenName": tokenName,
+					SecretParts: map[string]string{
+						"endpoint":   tableauURL,
+						"pat_secret": tokenSecret,
+						"token_name": tokenName,
 					},
 				},
 			},
@@ -88,7 +88,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+					DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"token_name":            tokenName,
@@ -115,7 +115,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+					DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"token_name":            tokenName,
@@ -141,7 +141,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+					DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"token_name":            inactiveTokenName,
@@ -249,35 +249,35 @@ func TestTableau_FromChunk_MultipleMixedVerificationResults(t *testing.T) {
 
 	want := []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     true, // tokenName + tokenSecret + valid URL
 		},
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     false, // tokenName + tokenSecret + invalid URL
 		},
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     false, // tokenName + inactiveTokenSecret + valid URL
 		},
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     false, // tokenName + inactiveTokenSecret + invalid URL
 		},
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     false, // inactiveTokenName + tokenSecret + valid URL
 		},
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     false, // inactiveTokenName + tokenSecret + invalid URL
 		},
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     false, // inactiveTokenName + inactiveTokenSecret + valid URL
 		},
 		{
-			DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+			DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 			Verified:     false, // inactiveTokenName + inactiveTokenSecret + invalid URL
 		},
 	}
@@ -299,7 +299,7 @@ func TestTableau_FromChunk_MultipleMixedVerificationResults(t *testing.T) {
 		}
 	}
 	ignoreOpts := []cmp.Option{
-		cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "AnalysisInfo"),
+		cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "SecretParts"),
 		cmpopts.IgnoreUnexported(detectors.Result{}),
 	}
 

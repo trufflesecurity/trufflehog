@@ -41,11 +41,11 @@ const (
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, ok := credInfo["token"]
 	if !ok {
-		return nil, errors.New("token not found in credInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("token not found in credInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, token)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return MapToAnalyzerResult(info), nil
 }
@@ -83,7 +83,7 @@ func AnalyzePermissions(cfg *config.Config, token string) (*secretInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err

@@ -9,7 +9,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const TestDetectorType = -1
@@ -23,7 +23,7 @@ func (testDetectorV1) FromData(ctx context.Context, verify bool, data []byte) ([
 
 func (testDetectorV1) Keywords() []string { return []string{"a", "b"} }
 
-func (testDetectorV1) Type() detectorspb.DetectorType {
+func (testDetectorV1) Type() detector_typepb.DetectorType {
 	return TestDetectorType
 }
 
@@ -42,7 +42,7 @@ func (testDetectorV2) Keywords() []string {
 	return []string{"a"}
 }
 
-func (testDetectorV2) Type() detectorspb.DetectorType {
+func (testDetectorV2) Type() detector_typepb.DetectorType {
 	return TestDetectorType
 }
 
@@ -61,7 +61,7 @@ func (testDetectorV3) Keywords() []string {
 	return []string{"truffle"}
 }
 
-func (testDetectorV3) Type() detectorspb.DetectorType {
+func (testDetectorV3) Type() detector_typepb.DetectorType {
 	return TestDetectorType
 }
 
@@ -81,7 +81,7 @@ func (testDetectorV4) FromData(context.Context, bool, []byte) ([]detectors.Resul
 
 func (testDetectorV4) Keywords() []string { return []string{"password"} }
 
-func (testDetectorV4) Type() detectorspb.DetectorType { return TestDetectorType }
+func (testDetectorV4) Type() detector_typepb.DetectorType { return TestDetectorType }
 
 func (testDetectorV4) Version() int { return 1 }
 
@@ -103,7 +103,7 @@ func (testDetectorV5) FromData(context.Context, bool, []byte) ([]detectors.Resul
 
 func (testDetectorV5) Keywords() []string { return []string{"password"} }
 
-func (testDetectorV5) Type() detectorspb.DetectorType { return TestDetectorType }
+func (testDetectorV5) Type() detector_typepb.DetectorType { return TestDetectorType }
 
 func (testDetectorV5) Version() int { return 1 }
 
@@ -125,7 +125,7 @@ func (testDetectorV6) FromData(context.Context, bool, []byte) ([]detectors.Resul
 
 func (testDetectorV6) Keywords() []string { return []string{"password"} }
 
-func (testDetectorV6) Type() detectorspb.DetectorType { return TestDetectorType }
+func (testDetectorV6) Type() detector_typepb.DetectorType { return TestDetectorType }
 
 func (testDetectorV6) Version() int { return 1 }
 

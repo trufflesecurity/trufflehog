@@ -9,7 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -38,8 +38,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Stripe,
+			DetectorType: detector_typepb.DetectorType_Stripe,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 		}
 		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/stripe/",
@@ -60,13 +61,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
-				res.Body.Close() // The request body is unused.
+				_ = res.Body.Close() // The request body is unused.
 
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
 					result.Verified = true
 				}
 			}
-			result.AnalysisInfo = map[string]string{"key": match}
 		}
 
 		results = append(results, result)
@@ -75,8 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Stripe
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Stripe
 }
 
 func (s Scanner) Description() string {

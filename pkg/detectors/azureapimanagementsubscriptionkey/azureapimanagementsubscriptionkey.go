@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -31,7 +31,7 @@ var (
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", ".azure-api.net", "subscription", "key"}) + `([a-zA-Z-0-9]{32})`) // pattern for both Primary and secondary key
 
 	invalidHosts  = simple.NewCache[struct{}]()
-	noSuchHostErr = errors.New("no such host")
+	errNoSuchHost = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -58,9 +58,13 @@ EndpointLoop:
 	for baseUrl := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureAPIManagementSubscriptionKey,
+				DetectorType: detector_typepb.DetectorType_AzureAPIManagementSubscriptionKey,
 				Raw:          []byte(baseUrl),
-				RawV2:        []byte(baseUrl + ":" + key),
+				SecretParts: map[string]string{
+					"url": baseUrl,
+					"key": key,
+				},
+				RawV2: []byte(baseUrl + ":" + key),
 			}
 
 			if verify {
@@ -77,7 +81,7 @@ EndpointLoop:
 				isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, key)
 				s1.Verified = isVerified
 				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
+					if errors.Is(verificationErr, errNoSuchHost) {
 						invalidHosts.Set(baseUrl, struct{}{})
 						continue EndpointLoop
 					}
@@ -92,8 +96,8 @@ EndpointLoop:
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureAPIManagementSubscriptionKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureAPIManagementSubscriptionKey
 }
 
 func (s Scanner) Description() string {
@@ -116,7 +120,7 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, baseUrl, 
 	if err != nil {
 		return false, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

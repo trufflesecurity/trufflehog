@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestNetlify_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Netlify,
+					DetectorType: detector_typepb.DetectorType_Netlify,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
@@ -68,7 +68,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Netlify,
+					DetectorType: detector_typepb.DetectorType_Netlify,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
@@ -103,7 +103,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Netlify.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

@@ -45,10 +45,18 @@ func (c *unauthenticatedConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
+func (c *unauthenticatedConnector) APIClientForRepo(_ string) (*github.Client, error) {
+	return c.apiClient, nil
+}
+
 func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
 	return git.CloneRepoUsingUnauthenticated(ctx, repoURL, c.clonePath, args...)
 }
 
 func (c *unauthenticatedConnector) GraphQLClient() *githubv4.Client {
 	return c.graphqlClient
+}
+
+func (c *unauthenticatedConnector) GraphQLClientForRepo(_ context.Context, _ string) (*githubv4.Client, error) {
+	return c.graphqlClient, nil
 }

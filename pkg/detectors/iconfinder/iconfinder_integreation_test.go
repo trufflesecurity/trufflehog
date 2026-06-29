@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestIconFinder_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestIconFinder_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IconFinder,
+					DetectorType: detector_typepb.DetectorType_IconFinder,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestIconFinder_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IconFinder,
+					DetectorType: detector_typepb.DetectorType_IconFinder,
 					Verified:     false,
 				},
 			},

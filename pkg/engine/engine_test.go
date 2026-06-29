@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -26,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -46,32 +48,32 @@ var _ detectors.Versioner = (*fakeDetectorV2)(nil)
 func (f fakeDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType(-1),
+			DetectorType: detector_typepb.DetectorType(-1),
 			Verified:     true,
 			Raw:          []byte("fake secret v1"),
 		},
 	}, nil
 }
 
-func (f fakeDetectorV1) Keywords() []string             { return []string{fakeDetectorKeyword} }
-func (f fakeDetectorV1) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
-func (f fakeDetectorV1) Version() int                   { return 1 }
+func (f fakeDetectorV1) Keywords() []string                 { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV1) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
+func (f fakeDetectorV1) Version() int                       { return 1 }
 
 func (f fakeDetectorV1) Description() string { return "fake detector v1" }
 
 func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType(-1),
+			DetectorType: detector_typepb.DetectorType(-1),
 			Verified:     true,
 			Raw:          []byte("fake secret v2"),
 		},
 	}, nil
 }
 
-func (f fakeDetectorV2) Keywords() []string             { return []string{fakeDetectorKeyword} }
-func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
-func (f fakeDetectorV2) Version() int                   { return 2 }
+func (f fakeDetectorV2) Keywords() []string                 { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV2) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
+func (f fakeDetectorV2) Version() int                       { return 2 }
 
 func (f fakeDetectorV2) Description() string { return "fake detector v2" }
 
@@ -228,6 +230,93 @@ func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
 	assert.False(t, isIgnored)
 	// offset 2 means line 3
 	assert.Equal(t, int64(2), lineOffset)
+}
+
+// TestFragmentLineOffset_DuplicateSecrets verifies that when the same secret
+// appears on multiple lines within a chunk, each result receives the correct
+// line number rather than always reporting the first occurrence's line.
+// Regression test for https://github.com/trufflesecurity/trufflehog/issues/2502
+func TestFragmentLineOffset_DuplicateSecrets(t *testing.T) {
+	secret := []byte("AKIA1234567890ABCDEF")
+	chunk := &sources.Chunk{
+		Data: []byte("line1\n" + // line 0
+			"line2\n" + // line 1
+			"AKIA1234567890ABCDEF\n" + // line 2 (first occurrence)
+			"line4\n" + // line 3
+			"AKIA1234567890ABCDEF\n" + // line 4 (second occurrence)
+			"line6\n" + // line 5
+			"AKIA1234567890ABCDEF\n"), // line 6 (third occurrence)
+	}
+
+	results := []detectors.Result{
+		{Raw: secret},
+		{Raw: secret},
+		{Raw: secret},
+	}
+	expectedLines := []int64{2, 4, 6}
+
+	AssignDuplicateLineOffsets(chunk, results)
+
+	seen := make(map[int64]bool)
+	for i, res := range results {
+		lineOffset, _ := FragmentLineOffset(chunk, &res)
+		assert.Equal(t, expectedLines[i], lineOffset,
+			"result[%d]: expected line %d but got %d", i, expectedLines[i], lineOffset)
+		assert.False(t, seen[lineOffset],
+			"result[%d]: line %d was already reported by a previous result (duplicate line number)", i, lineOffset)
+		seen[lineOffset] = true
+	}
+}
+
+func TestAssignDuplicateLineOffsets(t *testing.T) {
+	chunk := &sources.Chunk{
+		Data: []byte("aaa\nbbb\naaa\nccc\naaa\n"),
+	}
+	results := []detectors.Result{
+		{Raw: []byte("aaa")},
+		{Raw: []byte("aaa")},
+		{Raw: []byte("aaa")},
+		{Raw: []byte("bbb")},
+	}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	// Duplicates get offsets assigned.
+	assert.True(t, results[0].HasChunkOffset())
+	assert.Equal(t, int64(0), results[0].ChunkOffset())
+
+	assert.True(t, results[1].HasChunkOffset())
+	assert.Equal(t, int64(8), results[1].ChunkOffset()) // "aaa\nbbb\n" = 8 bytes
+
+	assert.True(t, results[2].HasChunkOffset())
+	assert.Equal(t, int64(16), results[2].ChunkOffset()) // "aaa\nbbb\naaa\nccc\n" = 16 bytes
+
+	// Unique secret does not get an offset.
+	assert.False(t, results[3].HasChunkOffset())
+}
+
+func TestFragmentLineOffset_DuplicateSecretsWithIgnoreTag(t *testing.T) {
+	secret := []byte("mysecret")
+	chunk := &sources.Chunk{
+		Data: []byte("mysecret\nfoo\nmysecret trufflehog:ignore\nbar\nmysecret\n"),
+	}
+	results := []detectors.Result{
+		{Raw: secret},
+		{Raw: secret},
+		{Raw: secret},
+	}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	line0, ignored0 := FragmentLineOffset(chunk, &results[0])
+	assert.Equal(t, int64(0), line0)
+	assert.False(t, ignored0)
+
+	line1, ignored1 := FragmentLineOffset(chunk, &results[1])
+	assert.Equal(t, int64(2), line1)
+	assert.True(t, ignored1)
+
+	line2, ignored2 := FragmentLineOffset(chunk, &results[2])
+	assert.Equal(t, int64(4), line2)
+	assert.False(t, ignored2)
 }
 
 func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *detectors.Result) {
@@ -414,7 +503,7 @@ even more`,
 
 			tmpFile, err := os.CreateTemp("", "test_aws_credentials")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -462,10 +551,10 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
-	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
+	_, err = fmt.Fprintf(tmpFile, "test data using keyword %s", fakeDetectorKeyword)
 	assert.NoError(t, err)
 
 	const defaultOutputBufferSize = 64
@@ -506,8 +595,8 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	_, err = tmpFile.WriteString("test stuff")
 	assert.Nil(t, err)
@@ -659,7 +748,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 
 	// Arrange: Create a Result
 	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType(-1),
+		DetectorType: detector_typepb.DetectorType(-1),
 		ExtraData:    map[string]string{"key": "value"},
 		Raw:          []byte("something"),
 		RawV2:        []byte("something:else"),
@@ -681,7 +770,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	assert.Equal(t, []byte("something:else"), r.RawV2)
 	assert.Equal(t, "someth***", r.Redacted)
 	assert.True(t, r.Verified)
-	assert.Equal(t, detectorspb.DetectorType(-1), r.DetectorType)
+	assert.Equal(t, detector_typepb.DetectorType(-1), r.DetectorType)
 	assert.Equal(t, sources.SourceID(1), r.SourceID)
 	assert.Equal(t, sources.JobID(2), r.JobID)
 	assert.Equal(t, int64(3), r.SecretID)
@@ -817,7 +906,7 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "no overlap, retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
 			},
 			retainFalsePositives:      true,
 			wantUnverifiedSecretCount: 1,
@@ -825,25 +914,16 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "no overlap, do not retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
 			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
 		},
 		{
-			name: "overlap, retain false positives",
-			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
-			},
-			retainFalsePositives:      true,
-			wantUnverifiedSecretCount: 2,
-		},
-		{
 			name: "overlap, do not retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
 			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
@@ -1175,8 +1255,8 @@ func (c customCleaner) FromData(aCtx.Context, bool, []byte) ([]detectors.Result,
 	return []detectors.Result{}, nil
 }
 
-func (c customCleaner) Keywords() []string             { return []string{} }
-func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+func (c customCleaner) Keywords() []string                 { return []string{} }
+func (c customCleaner) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
 
 func (customCleaner) Description() string { return "" }
 
@@ -1312,25 +1392,25 @@ func TestEngine_ShouldVerifyChunk(t *testing.T) {
 		{
 			name:        "detector override by exact version",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 2},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 2},
 			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
 		},
 		{
 			name:        "detector override by versionless config",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 0},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 0},
 			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
 		},
 		{
 			name:        "no detector override because of detector type mismatch",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_NpmToken, Version: 2},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_NpmToken, Version: 2},
 			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
 		},
 		{
 			name:        "no detector override because of detector version mismatch",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 1},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 1},
 			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
 		},
 	}
@@ -1373,12 +1453,26 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	assert.NoError(t, err)
 
 	var count int
+	noCloudEndpointDetectors := map[detector_typepb.DetectorType]struct{}{
+		detector_typepb.DetectorType_ArtifactoryAccessToken:     {},
+		detector_typepb.DetectorType_ArtifactoryReferenceToken:  {},
+		detector_typepb.DetectorType_TableauPersonalAccessToken: {},
+		detector_typepb.DetectorType_HashiCorpVaultAuth:         {},
+		detector_typepb.DetectorType_JiraDataCenterPAT:          {},
+		detector_typepb.DetectorType_ConfluenceDataCenter:       {},
+		detector_typepb.DetectorType_BitbucketDataCenter:        {},
+		// these do not have any cloud endpoint
+	}
+
 	for _, det := range e.detectors {
 		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
 			id := config.GetDetectorID(det)
-			if len(endpoints.Endpoints()) == 0 && det.Type() != detectorspb.DetectorType_ArtifactoryAccessToken && det.Type() != detectorspb.DetectorType_TableauPersonalAccessToken { // artifactory and tableau does not have any cloud endpoint
-				t.Fatalf("detector %q Endpoints() is empty", id.String())
+			if len(endpoints.Endpoints()) == 0 {
+				if _, ok := noCloudEndpointDetectors[det.Type()]; !ok {
+					t.Fatalf("detector %q Endpoints() is empty", id.String())
+				}
 			}
+
 			count++
 		}
 	}
@@ -1407,6 +1501,18 @@ def test_something():
 			expectedFindings: 0,
 		},
 		{
+			name: "ignore postgres url without explicit port",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # The detector normalizes this URL to include :5432, but the ignore tag should still be honored.
+    assert connection_string == "postgres://master_user:master_password@hostname/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
 			name: "ignore not on secret line",
 			content: `
 # tests/example_false_positive.py
@@ -1430,7 +1536,7 @@ def test_something():
 
 			tmpFile, err := os.CreateTemp("", "test_creds")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -1468,7 +1574,7 @@ def test_something():
 }
 
 type passthroughDetector struct {
-	detectorType detectorspb.DetectorType
+	detectorType detector_typepb.DetectorType
 	keywords     []string
 	secret       string
 }
@@ -1486,9 +1592,9 @@ func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) 
 	}, nil
 }
 
-func (p passthroughDetector) Keywords() []string             { return p.keywords }
-func (p passthroughDetector) Type() detectorspb.DetectorType { return p.detectorType }
-func (p passthroughDetector) Description() string            { return "fake detector for testing" }
+func (p passthroughDetector) Keywords() []string                 { return p.keywords }
+func (p passthroughDetector) Type() detector_typepb.DetectorType { return p.detectorType }
+func (p passthroughDetector) Description() string                { return "fake detector for testing" }
 
 type passthroughDecoder struct{}
 
@@ -1499,7 +1605,9 @@ func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableC
 	}
 }
 
-func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
+func (p passthroughDecoder) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType(-1)
+}
 
 // TestEngine_DetectChunk_UsesVerifyFlag validates that detectChunk correctly forwards detectableChunk.verify to
 // detectors.
@@ -1541,7 +1649,7 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 			// Assert: Confirm that a result was generated and that it has the expected verify flag.
 			select {
 			case result := <-e.results:
-				assert.Equal(t, tc.verify, result.Result.Verified)
+				assert.Equal(t, tc.verify, result.Verified)
 			default:
 				t.Errorf("expected a result but did not get one")
 			}
@@ -1642,8 +1750,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		// Arrange: Create overlapping detector matches. We can't create them directly, so we have to use a minimal A-H
 		// core.
 		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
-			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}},
-			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"keyw"}},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"keyword"}},
 		})
 		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
 		require.Len(t, detectorMatches, 2)
@@ -1663,7 +1771,7 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it).
 		for result := range e.results {
-			assert.False(t, result.Result.Verified)
+			assert.False(t, result.Verified)
 		}
 
 		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its
@@ -1703,8 +1811,8 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		// Arrange: Create non-overlapping detector matches. We can't create them directly, so we have to use a minimal
 		// A-H core.
 		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
-			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}, secret: "oahpow"},
-			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}, secret: "blaisd"},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"keyw"}, secret: "oahpow"},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"keyword"}, secret: "blaisd"},
 		})
 		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
 		require.Len(t, detectorMatches, 2)
@@ -1732,10 +1840,22 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 func TestEngine_IterativeDecoding(t *testing.T) {
 	t.Parallel()
 
-	// base64(base64("my-secret-key-test-value"))
 	const (
+		// base64(base64("my-secret-key-test-value"))
 		doubleEncoded   = "YlhrdGMyVmpjbVYwTFd0bGVTMTBaWE4wTFhaaGJIVmw="
 		detectorKeyword = "my-secret"
+
+		// escapedUnicode("my-secret-key-test-value")
+		escapedUnicode = `\u006d\u0079\u002d\u0073\u0065\u0063\u0072\u0065\u0074\u002d\u006b\u0065\u0079\u002d\u0074\u0065\u0073\u0074\u002d\u0076\u0061\u006c\u0075\u0065`
+
+		// escapedUnicode(escapedUnicode("my-secret-key-test-value"))
+		doubleEscapedUnicode = `\u005c\u0075\u0030\u0030\u0036\u0064\u005c\u0075\u0030\u0030\u0037\u0039\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0033\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0036\u0033\u005c\u0075\u0030\u0030\u0037\u0032\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0036\u0062\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0039\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0033\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0036\u005c\u0075\u0030\u0030\u0036\u0031\u005c\u0075\u0030\u0030\u0036\u0063\u005c\u0075\u0030\u0030\u0037\u0035\u005c\u0075\u0030\u0030\u0036\u0035`
+
+		// base64(escapedUnicode("my-secret-key-test-value"))
+		b64EscapedUnicode = "XHUwMDZkXHUwMDc5XHUwMDJkXHUwMDczXHUwMDY1XHUwMDYzXHUwMDcyXHUwMDY1XHUwMDc0XHUwMDJkXHUwMDZiXHUwMDY1XHUwMDc5XHUwMDJkXHUwMDc0XHUwMDY1XHUwMDczXHUwMDc0XHUwMDJkXHUwMDc2XHUwMDYxXHUwMDZjXHUwMDc1XHUwMDY1"
+
+		// escapedUnicode(base64("my-secret-key-test-value"))
+		escapedUnicodeB64 = `\u0062\u0058\u006b\u0074\u0063\u0032\u0056\u006a\u0063\u006d\u0056\u0030\u004c\u0057\u0074\u006c\u0065\u0053\u0031\u0030\u005a\u0058\u004e\u0030\u004c\u0058\u005a\u0068\u0062\u0048\u0056\u006c`
 	)
 
 	// "token: bXktc2VjcmV0LWtleS10ZXN0LXZhbHVl end" as UTF-16LE
@@ -1778,6 +1898,48 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 			depth:       2,
 			wantKeyword: true,
 		},
+		{
+			name:        "escaped unicode, depth=1, found",
+			input:       []byte("token: " + escapedUnicode),
+			depth:       1,
+			wantKeyword: true,
+		},
+		{
+			name:        "double escaped unicode, depth=1, miss",
+			input:       []byte("token: " + doubleEscapedUnicode),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "double escaped unicode, depth=2, found",
+			input:       []byte("token: " + doubleEscapedUnicode),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "base64+escaped unicode, depth=1, miss",
+			input:       []byte("token: " + b64EscapedUnicode),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "base64+escaped unicode, depth=2, found",
+			input:       []byte("token: " + b64EscapedUnicode),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "escaped unicode+base64, depth=1, miss",
+			input:       []byte("token: " + escapedUnicodeB64),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "escaped unicode+base64, depth=2, found",
+			input:       []byte("token: " + escapedUnicodeB64),
+			depth:       2,
+			wantKeyword: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1787,7 +1949,7 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 
 			detector := &passthroughDetector{
 				keywords:     []string{detectorKeyword},
-				detectorType: detectorspb.DetectorType(9999),
+				detectorType: detector_typepb.DetectorType(9999),
 			}
 			e := &Engine{
 				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
@@ -1826,6 +1988,80 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 			} else {
 				assert.False(t, found, "unexpected detector match")
 			}
+		})
+	}
+}
+
+// captureDispatcher records every dispatched result for assertion in tests.
+type captureDispatcher struct {
+	results []detectors.ResultWithMetadata
+}
+
+func (d *captureDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	d.results = append(d.results, result)
+	return nil
+}
+
+// TestNotifierWorker_ReverifiedResultsBypassDedupe verifies that the notifier's
+// dedupe cache is skipped when a result carries a non-zero SecretID — i.e., when
+// it originated from reverification — so that the dispatcher sees every
+// reverification result even when the underlying secret has not changed.
+func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
+	tests := []struct {
+		name         string
+		secretID     int64
+		wantDispatch int
+	}{
+		{
+			name:         "non-reverified duplicates are deduplicated",
+			secretID:     0,
+			wantDispatch: 1,
+		},
+		{
+			name:         "reverified duplicates bypass the dedupe cache",
+			secretID:     42,
+			wantDispatch: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache, err := lru.New[string, struct{}](16)
+			require.NoError(t, err)
+
+			disp := &captureDispatcher{}
+			e := &Engine{
+				results:                 make(chan detectors.ResultWithMetadata, 4),
+				dedupeCache:             cache,
+				dispatcher:              disp,
+				notifyVerifiedResults:   true,
+				notifyUnverifiedResults: true,
+				notifyUnknownResults:    true,
+			}
+
+			result := detectors.ResultWithMetadata{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Git{
+						Git: &source_metadatapb.Git{Line: 1},
+					},
+				},
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+				SecretID:   tt.secretID,
+				Result: detectors.Result{
+					DetectorType: detector_typepb.DetectorType(-1),
+					Raw:          []byte("a-secret"),
+					Verified:     true,
+				},
+			}
+
+			// Push the same result twice — identical hash inputs.
+			e.results <- result
+			e.results <- result
+			close(e.results)
+
+			e.notifierWorker(context.Background())
+
+			assert.Equal(t, tt.wantDispatch, len(disp.results))
 		})
 	}
 }

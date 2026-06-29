@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPagerDutyApiKey_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     true,
 				},
 			},
@@ -65,7 +65,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     false,
 				},
 			},
@@ -82,7 +82,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     false,
 				},
 			},
@@ -99,7 +99,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     false,
 				},
 			},

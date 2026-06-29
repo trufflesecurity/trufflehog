@@ -30,12 +30,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePos
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	uri, ok := credInfo["connection_string"]
 	if !ok {
-		return nil, errors.New("connection string not found in credInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("connection string not found in credInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, uri)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceDatabase, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -278,7 +278,7 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	role, privs, err := getUserPrivs(db)
 	if err != nil {
@@ -372,7 +372,7 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roleName string
 	var isSuperuser, canInherit, canCreateRole, canCreateDB, canLogin, isReplicationRole, bypassesRLS bool
@@ -389,7 +389,7 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 	}
 
 	// Map roles to privileges
-	var mapRoles map[string]bool = map[string]bool{
+	var mapRoles = map[string]bool{
 		"Superuser":            isSuperuser,
 		"Inheritance of Privs": canInherit,
 		"Create Role":          canCreateRole,
@@ -404,20 +404,20 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 
 func getDBPrivs(db *sql.DB) (string, []DB, error) {
 	query := `
-        SELECT 
+        SELECT
             d.datname AS database_name,
             u.usename AS owner,
             current_user AS current_user,
             has_database_privilege(current_user, d.datname, 'CONNECT') AS can_connect,
             has_database_privilege(current_user, d.datname, 'CREATE') AS can_create,
             has_database_privilege(current_user, d.datname, 'TEMP') AS can_create_temporary_tables
-        FROM 
+        FROM
             pg_database d
-        JOIN 
+        JOIN
             pg_user u ON d.datdba = u.usesysid
-        WHERE 
+        WHERE
             NOT d.datistemplate
-        ORDER BY 
+        ORDER BY
             d.datname;
     `
 	// Originally had WHERE NOT d.datistemplate  AND d.datallowconn
@@ -427,7 +427,7 @@ func getDBPrivs(db *sql.DB) (string, []DB, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	dbs := make([]DB, 0)
 
@@ -501,7 +501,7 @@ func getDBWriter(db DB, current_user string) func(a ...interface{}) string {
 func buildSliceDBNames(dbs []DB) []string {
 	var dbNames []string
 	for _, db := range dbs {
-		if db.DBPrivs.Connect {
+		if db.Connect {
 			dbNames = append(dbNames, db.DatabaseName)
 		}
 	}
@@ -519,7 +519,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 			// color.Red("[x] Failed to connect to Postgres database: %s", dbase)
 			continue
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		// Get table privs
 		query := `
@@ -543,7 +543,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		// Iterate through the result set
 		for rows.Next() {
@@ -589,7 +589,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 		if err = rows.Err(); err != nil {
 			return nil, err
 		}
-		db.Close()
+		_ = db.Close()
 	}
 
 	return tablePrivileges, nil

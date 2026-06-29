@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -37,7 +37,7 @@ var (
 
 	invalidStorageAccounts = simple.NewCache[struct{}]()
 
-	noSuchHostErr = errors.New("no such host")
+	errNoSuchHost = errors.New("no such host")
 )
 
 func (s Scanner) Keywords() []string {
@@ -47,8 +47,8 @@ func (s Scanner) Keywords() []string {
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureSasToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureSasToken
 }
 
 func (s Scanner) Description() string {
@@ -77,9 +77,13 @@ UrlLoop:
 	for url, storageAccount := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureSasToken,
+				DetectorType: detector_typepb.DetectorType_AzureSasToken,
 				Raw:          []byte(url),
-				RawV2:        []byte(url + key),
+				SecretParts: map[string]string{
+					"url": url,
+					"key": key,
+				},
+				RawV2: []byte(url + key),
 			}
 
 			if verify {
@@ -97,7 +101,7 @@ UrlLoop:
 				s1.Verified = isVerified
 
 				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
+					if errors.Is(verificationErr, errNoSuchHost) {
 						invalidStorageAccounts.Set(storageAccount, struct{}{})
 						continue UrlLoop
 					}
@@ -127,11 +131,11 @@ func verifyMatch(ctx context.Context, client *http.Client, url, key string, retr
 	res, err := client.Do(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such host") {
-			return false, noSuchHostErr
+			return false, errNoSuchHost
 		}
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
