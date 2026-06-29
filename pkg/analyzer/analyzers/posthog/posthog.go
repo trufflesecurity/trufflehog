@@ -37,13 +37,11 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePos
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("missing key in credInfo"),
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("missing key in credInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -166,7 +164,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, client *http.Client, domain
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status code
 	switch {
@@ -302,7 +300,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// we need to determine if the key is for US or EU domain
 	domain, user, err := resolveDomainAndUser(cfg, client, key)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid API Key: %w", err)
+		return nil, fmt.Errorf("invalid API key: %w", err)
 	}
 
 	info.user = user
@@ -439,7 +437,7 @@ func resolveDomainAndUser(cfg *config.Config, client *http.Client, key string) (
 		if err != nil {
 			return "", nil, err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		switch resp.StatusCode {
 		case http.StatusOK:
@@ -476,7 +474,7 @@ func getOrganization(cfg *config.Config, client *http.Client, domain string, key
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

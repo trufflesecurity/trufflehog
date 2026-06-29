@@ -107,7 +107,7 @@ func (r LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 	if err != nil {
 		return resp, fmt.Errorf("failed to open log file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Write log entry to file.
 	if _, err := file.WriteString(logEntry); err != nil {

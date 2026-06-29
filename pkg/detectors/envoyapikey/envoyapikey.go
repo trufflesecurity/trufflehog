@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("X-Api-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				body, _ := io.ReadAll(res.Body)
 
 				// Invalid API keys can also return status code 200, so check for presence of 'status 401' in response body.

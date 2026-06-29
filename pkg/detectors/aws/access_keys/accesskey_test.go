@@ -46,6 +46,20 @@ func TestAWS_Pattern(t *testing.T) {
 			want: []string{"AKIAWGXZ9OPDOWUJMZGI:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63"},
 		},
 		{
+			name: "valid pattern - multiple secrets",
+			input: `
+				aws credentials{
+					id: ABIAS9L8MS5IPHTZPPUQ
+					secret: v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63
+				},
+				aws credentials{
+					id: ABIAS9L8MS5IPHTZPXUR
+					secret: v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondDD21
+				}
+			`,
+			want: []string{"ABIAS9L8MS5IPHTZPPUQ:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63", "ABIAS9L8MS5IPHTZPPUQ:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondDD21", "ABIAS9L8MS5IPHTZPXUR:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63", "ABIAS9L8MS5IPHTZPXUR:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondDD21"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				aws credentials{

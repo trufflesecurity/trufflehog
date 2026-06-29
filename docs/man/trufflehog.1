@@ -487,7 +487,7 @@ Jenkins password
 Skip TLS verification
 .SS
 \fBhuggingface [<flags>]\fR
-Find credentials in HuggingFace datasets, models and spaces.
+Find credentials in HuggingFace datasets, models, spaces and buckets.
 .TP
 \fB--endpoint="https://huggingface.co"\fR
 HuggingFace endpoint.
@@ -500,6 +500,9 @@ HuggingFace space to scan. You can repeat this flag. Example: 'username/space'
 .TP
 \fB--dataset=DATASET\fR
 HuggingFace dataset to scan. You can repeat this flag. Example: 'username/dataset'
+.TP
+\fB--bucket=BUCKET\fR
+HuggingFace bucket to scan. You can repeat this flag. Example: 'username/bucket'
 .TP
 \fB--org=ORG\fR
 HuggingFace organization to scan. You can repeat this flag. Example: "trufflesecurity"
@@ -528,6 +531,12 @@ Spaces to ignore in scan. You can repeat this flag. Must use HuggingFace space f
 \fB--ignore-datasets=IGNORE-DATASETS\fR
 Datasets to ignore in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)
 .TP
+\fB--include-buckets=INCLUDE-BUCKETS\fR
+Buckets to include in scan. You can repeat this flag. Must use HuggingFace bucket full name. Example: 'username/bucket' (Only used with --user or --org)
+.TP
+\fB--ignore-buckets=IGNORE-BUCKETS\fR
+Buckets to ignore in scan. You can repeat this flag. Must use HuggingFace bucket full name. Example: 'username/bucket' (Only used with --user or --org)
+.TP
 \fB--skip-all-models\fR
 Skip all model scans. (Only used with --user or --org)
 .TP
@@ -536,6 +545,9 @@ Skip all space scans. (Only used with --user or --org)
 .TP
 \fB--skip-all-datasets\fR
 Skip all dataset scans. (Only used with --user or --org)
+.TP
+\fB--skip-all-buckets\fR
+Skip all bucket scans. (Only used with --user or --org)
 .TP
 \fB--include-discussions\fR
 Include discussions in scan.
