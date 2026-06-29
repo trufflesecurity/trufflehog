@@ -115,6 +115,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintrust"
 	brandfetchv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v1"
 	brandfetchv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
@@ -998,6 +999,7 @@ func buildDetectorList() []detectors.Detector {
 		&box.Scanner{},
 		&boxoauth.Scanner{},
 		&braintreepayments.Scanner{},
+		&braintrust.Scanner{},
 		&brandfetchv1.Scanner{},
 		&brandfetchv2.Scanner{},
 		&browserstack.Scanner{},
@@ -1802,6 +1804,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.RevDetectorEnabled.Load()
 		case *user.Scanner:
 			return !feature.UserDetectorEnabled.Load()
+		case *braintrust.Scanner:
+			return !feature.BraintrustDetectorEnabled.Load()
     case *pganalyzereadkey.Scanner:
 			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
 		default:

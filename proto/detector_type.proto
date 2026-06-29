@@ -1054,5 +1054,6 @@ enum DetectorType {
   GitLabOauth2 = 1050;
   SpectralOps = 1051;
   AWSAppSync = 1052;
-  PgAnalyzeReadKey = 1053;
+  BrainTrustApiKey = 1053;
+  PgAnalyzeReadKey = 1054;
 }

@@ -281,6 +281,8 @@ message GitHub {
   bool no_cleanup = 23;
   bool ignore_gists = 24;
   bool print_legacy_json = 25;
+  // When using GitHub App credentials, enumerate repositories from every app installation.
+  bool scan_all_installations = 26;
 }
 
 message GitHubExperimental {
@@ -336,6 +338,10 @@ message Huggingface {
   bool  skip_all_datasets = 18;
   bool include_discussions = 11;
   bool include_prs = 19;
+  repeated string buckets = 20;
+  repeated string ignore_buckets = 21;
+  repeated string include_buckets = 22;
+  bool skip_all_buckets = 23;
 }
 
 enum JiraInstallationType {
