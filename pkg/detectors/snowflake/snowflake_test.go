@@ -23,7 +23,6 @@ func TestSnowflake_Pattern(t *testing.T) {
 	fullHostAccountIdentifier := "tuacoip-zt74995"              // verifyMatch re-appends the suffix, so it must be reported stripped
 	validUsername := gofakeit.Username()
 	specialCharUsername := "super!user@corp" // '!' and '@' are valid Snowflake login-name characters
-	invalidUsername := "Spencer@5091.com"    // special characters not allowed
 
 	validPassword := common.GenerateRandomPassword(true, true, true, false, 10)
 	invalidPassword := "!12" // invalid length
@@ -85,8 +84,13 @@ func TestSnowflake_Pattern(t *testing.T) {
 			},
 		},
 		{
-			name:  "Snowflake Credentials - Invalid Username & Password",
-			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, invalidUsername, invalidPassword),
+			// The password `!12` is below the minimum capture length, so no
+			// credential is emitted. `UsernameRegexCheck` is a deliberately broad
+			// pre-filter (it can cross-match neighbouring fields), so rejection
+			// here is driven by the password, not the username; the name reflects
+			// that rather than claiming username validation.
+			name:  "Snowflake Credentials - Password too short is rejected",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, validUsername, invalidPassword),
 			want:  [][]string{},
 		},
 	}
