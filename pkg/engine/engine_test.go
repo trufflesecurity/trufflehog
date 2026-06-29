@@ -1260,7 +1260,10 @@ func (c customCleaner) Type() detector_typepb.DetectorType { return detector_typ
 
 func (customCleaner) Description() string { return "" }
 
-func (c customCleaner) CleanResults([]detectors.Result) []detectors.Result {
+func (c customCleaner) CleanResults(result []detectors.Result, verficationEnabled bool) []detectors.Result {
+	if !verficationEnabled {
+		return []detectors.Result{{}}
+	}
 	return []detectors.Result{}
 }
 func (c customCleaner) ShouldCleanResultsIrrespectiveOfConfiguration() bool { return c.ignoreConfig }
@@ -1270,6 +1273,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 		name               string
 		cleaningConfigured bool
 		ignoreConfig       bool
+		verify             bool
 		resultsToClean     []detectors.Result
 		wantResults        []detectors.Result
 	}{
@@ -1277,6 +1281,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to clean",
 			cleaningConfigured: true,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
 		},
@@ -1284,6 +1289,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to not clean",
 			cleaningConfigured: false,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{{}},
 		},
@@ -1291,8 +1297,17 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "clean irrespective of config",
 			cleaningConfigured: false,
 			ignoreConfig:       true,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
+		},
+		{
+			name:               "clean irrespective of config with verification disabled",
+			cleaningConfigured: false,
+			ignoreConfig:       true,
+			verify:             false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{{}},
 		},
 	}
 
@@ -1306,6 +1321,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			engine := Engine{
 				filterUnverified:     tt.cleaningConfigured,
 				retainFalsePositives: true,
+				verify:               tt.verify,
 			}
 
 			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
