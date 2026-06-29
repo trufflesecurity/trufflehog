@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestWebexbot_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestWebexbot_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WebexBot,
+					DetectorType: detector_typepb.DetectorType_WebexBot,
 					Verified:     true,
 					Redacted:     redacted,
 				},
@@ -71,7 +71,7 @@ func TestWebexbot_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WebexBot,
+					DetectorType: detector_typepb.DetectorType_WebexBot,
 					Verified:     false,
 					Redacted:     inactiveRedacted,
 				},
@@ -101,7 +101,7 @@ func TestWebexbot_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WebexBot,
+					DetectorType: detector_typepb.DetectorType_WebexBot,
 					Verified:     false,
 					Redacted:     redacted,
 				},
@@ -119,7 +119,7 @@ func TestWebexbot_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_WebexBot,
+					DetectorType: detector_typepb.DetectorType_WebexBot,
 					Verified:     false,
 					Redacted:     redacted,
 				},

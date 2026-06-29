@@ -43,12 +43,12 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, exist := credInfo["token"]
 	if !exist {
-		return nil, errors.New("token not found in credentials info")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("token not found in credentials info"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, token)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 
 	return secretInfoToAnalyzerResult(info), nil

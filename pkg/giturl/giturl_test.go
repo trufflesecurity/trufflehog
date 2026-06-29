@@ -172,6 +172,33 @@ func TestGenerateLink(t *testing.T) {
 			want: "https://dev.azure.com/org/project/_git/repo?version=GCabcdef",
 		},
 		{
+			name: "bitbucket cloud link gen",
+			args: args{
+				repo:   "https://bitbucket.org/org/repo.git",
+				commit: "abc123",
+				file:   "main.go",
+			},
+			want: "https://bitbucket.org/org/repo/src/abc123/main.go",
+		},
+		{
+			name: "bitbucket cloud link gen with line",
+			args: args{
+				repo:   "https://bitbucket.org/org/repo.git",
+				commit: "abc123",
+				file:   "main.go",
+				line:   int64(19),
+			},
+			want: "https://bitbucket.org/org/repo/src/abc123/main.go#lines-19",
+		},
+		{
+			name: "bitbucket cloud link gen - no file",
+			args: args{
+				repo:   "https://bitbucket.org/org/repo.git",
+				commit: "abc123",
+			},
+			want: "https://bitbucket.org/org/repo/src/abc123/",
+		},
+		{
 			name: "Unknown provider on-prem instance",
 			args: args{
 				repo:   "https://onprem.customdomain.com/org/repo.git",
@@ -270,12 +297,36 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Update bitbucket, no line number supported",
+			name: "Update Bitbucket Cloud link with line",
 			args: args{
-				link:    "https://bitbucket.org/org/repo/blob/xyz123/main.go",
+				link:    "https://bitbucket.org/org/repo/src/xyz123/main.go",
 				newLine: int64(10),
 			},
-			want: "https://bitbucket.org/org/repo/blob/xyz123/main.go",
+			want: "https://bitbucket.org/org/repo/src/xyz123/main.go#lines-10",
+		},
+		{
+			name: "Update Bitbucket Cloud link - replace existing line",
+			args: args{
+				link:    "https://bitbucket.org/org/repo/src/xyz123/main.go#lines-5",
+				newLine: int64(10),
+			},
+			want: "https://bitbucket.org/org/repo/src/xyz123/main.go#lines-10",
+		},
+		{
+			name: "Update Bitbucket Server link with line",
+			args: args{
+				link:    "https://enterprise.example.com/projects/PROJ/repos/repo/browse/main.go?at=xyz123",
+				newLine: int64(10),
+			},
+			want: "https://enterprise.example.com/projects/PROJ/repos/repo/browse/main.go?at=xyz123#10",
+		},
+		{
+			name: "Update Bitbucket Server link - replace existing line",
+			args: args{
+				link:    "https://enterprise.example.com/projects/PROJ/repos/repo/browse/main.go?at=xyz123#5",
+				newLine: int64(20),
+			},
+			want: "https://enterprise.example.com/projects/PROJ/repos/repo/browse/main.go?at=xyz123#20",
 		},
 		{
 			name: "Update github link with line",

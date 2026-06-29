@@ -34,7 +34,7 @@ func TestBlogger_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 
 					// Check response status
 					if resp.StatusCode == http.StatusOK {
@@ -74,7 +74,7 @@ func TestBlogger_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 
 					// Check response status
 					if resp.StatusCode == http.StatusOK {

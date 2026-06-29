@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const canaryAccessKeyID = "AKIASP2TPHJSQH3FJRUX"
@@ -49,7 +49,7 @@ func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
 	if assert.NoError(t, err) {
 		want := []detectors.Result{
 			{
-				DetectorType: detectorspb.DetectorType_AWS,
+				DetectorType: detector_typepb.DetectorType_AWS,
 				Verified:     false,
 				Redacted:     "AKIAZAVB57H55F3T4BKH",
 				ExtraData: map[string]string{
@@ -67,7 +67,7 @@ func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
 	if assert.NoError(t, err) {
 		want := []detectors.Result{
 			{
-				DetectorType: detectorspb.DetectorType_AWS,
+				DetectorType: detector_typepb.DetectorType_AWS,
 				Verified:     true,
 				Redacted:     "AKIAZAVB57H55F3T4BKH",
 				ExtraData: map[string]string{
@@ -122,7 +122,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     true,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -146,7 +146,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -178,7 +178,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIAZAVB57H55F3T4XYZ",
 					ExtraData: map[string]string{
@@ -187,7 +187,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					},
 				},
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     true,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -222,7 +222,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     true,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -248,7 +248,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -285,7 +285,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -309,7 +309,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -331,7 +331,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     canaryAccessKeyID,
 					ExtraData: map[string]string{
@@ -355,7 +355,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     canaryAccessKeyID,
 					ExtraData: map[string]string{
@@ -379,7 +379,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
@@ -388,7 +388,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					},
 				},
 				{
-					DetectorType: detectorspb.DetectorType_AWS,
+					DetectorType: detector_typepb.DetectorType_AWS,
 					Verified:     true,
 					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{

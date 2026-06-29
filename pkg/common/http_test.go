@@ -395,7 +395,7 @@ func TestSaneHttpClientMetrics(t *testing.T) {
 			resp, err := client.Get(requestURL)
 
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expectedStatusCode, resp.StatusCode)
 
 			// Check that request counter was incremented
@@ -462,7 +462,7 @@ func TestRetryableHttpClientMetrics(t *testing.T) {
 			resp, err := client.Get(requestURL)
 
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expectedStatusCode, resp.StatusCode)
 
 			// Check that request counter was incremented
@@ -494,7 +494,7 @@ func TestInstrumentedTransport(t *testing.T) {
 	// Make a request
 	resp, err := client.Get(server.URL)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Verify the request was successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

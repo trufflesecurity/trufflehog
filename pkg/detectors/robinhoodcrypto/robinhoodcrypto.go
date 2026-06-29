@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -59,9 +59,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for apiKey := range apiKeyMatches {
 		for base64PrivateKey := range base64PrivateKeyMatches {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_RobinhoodCrypto,
+				DetectorType: detector_typepb.DetectorType_RobinhoodCrypto,
 				Raw:          []byte(apiKey),
-				RawV2:        []byte(apiKey + base64PrivateKey),
+				SecretParts: map[string]string{
+					"key":         apiKey,
+					"private_key": base64PrivateKey,
+				},
+				RawV2: []byte(apiKey + base64PrivateKey),
 			}
 
 			if verify {
@@ -190,8 +194,8 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, base64Private
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_RobinhoodCrypto
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_RobinhoodCrypto
 }
 
 func (s Scanner) Description() string {
