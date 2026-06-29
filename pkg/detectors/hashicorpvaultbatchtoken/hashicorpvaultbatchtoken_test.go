@@ -27,7 +27,7 @@ func TestBatchToken_PatternWithURL(t *testing.T) {
 				https://vault-cluster-abc123.hashicorp.cloud:8200
 			`,
 			want: []string{
-				"hvb.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahttps://vault-cluster-abc123.hashicorp.cloud:8200",
+				"hvb.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:https://vault-cluster-abc123.hashicorp.cloud:8200",
 			},
 		},
 		{
@@ -37,7 +37,7 @@ func TestBatchToken_PatternWithURL(t *testing.T) {
 				https://vault-cluster-xyz.hashicorp.cloud
 			`,
 			want: []string{
-				"hvb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbhttps://vault-cluster-xyz.hashicorp.cloud",
+				"hvb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:https://vault-cluster-xyz.hashicorp.cloud",
 			},
 		},
 		{

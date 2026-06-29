@@ -12,7 +12,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -79,10 +79,14 @@ func (s Scanner) FromData(
 	for _, endpoint := range s.Endpoints(endpoints...) {
 		for token := range uniqueTokens {
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_HashiCorpVaultBatchToken,
+				DetectorType: detector_typepb.DetectorType_HashiCorpVaultBatchToken,
 				Raw:          []byte(token),
-				RawV2:        []byte(token + endpoint),
+				RawV2:        []byte(token + ":" + endpoint),
 				Redacted:     token[:8] + "...",
+				SecretParts: map[string]string{
+					"key": token,
+					"url": endpoint,
+				},
 			}
 
 			if verify {
@@ -176,6 +180,6 @@ func verifyVaultToken(
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_HashiCorpVaultBatchToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_HashiCorpVaultBatchToken
 }

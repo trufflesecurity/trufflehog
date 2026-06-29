@@ -48,7 +48,7 @@ func TestBatchToken_FromData(t *testing.T) {
 			input:  fmt.Sprintf("%s\n%s", batchToken, vaultURL),
 			verify: true,
 			wantTokens: []string{
-				batchToken + vaultURL,
+				batchToken + ":" + vaultURL,
 			},
 			wantVerified:        true,
 			wantVerificationErr: false,
@@ -58,7 +58,7 @@ func TestBatchToken_FromData(t *testing.T) {
 			input:  fmt.Sprintf("%s\n%s", fakeToken, vaultURL),
 			verify: true,
 			wantTokens: []string{
-				fakeToken + vaultURL,
+				fakeToken + ":" + vaultURL,
 			},
 			wantVerified:        false,
 			wantVerificationErr: false,
@@ -68,7 +68,7 @@ func TestBatchToken_FromData(t *testing.T) {
 			input:  fmt.Sprintf("%s\n%s", batchToken, vaultURL),
 			verify: false,
 			wantTokens: []string{
-				batchToken + vaultURL,
+				batchToken + ":" + vaultURL,
 			},
 			wantVerified:        false,
 			wantVerificationErr: false,
