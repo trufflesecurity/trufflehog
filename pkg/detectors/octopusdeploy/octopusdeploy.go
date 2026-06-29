@@ -10,7 +10,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -67,7 +67,7 @@ func (s Scanner) FromData(
 	for url := range uniqueUrls {
 		for token := range uniqueTokens {
 			result := detectors.Result{
-				DetectorType: detectorspb.DetectorType_OctopusDeploy,
+				DetectorType: detector_typepb.DetectorType_OctopusDeploy,
 				Raw:          []byte(token),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", url, token)),
 			}
@@ -140,8 +140,8 @@ func verifyOctopusToken(
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OctopusDeploy
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OctopusDeploy
 }
 
 func (s Scanner) Description() string {
