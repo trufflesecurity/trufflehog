@@ -49,7 +49,8 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 	}
 
 	var permissions []Permission
-	if info.AccountStatusCode == 200 {
+	switch info.AccountStatusCode {
+	case 200:
 		permissions = []Permission{
 			AccountManagementRead,
 			AccountManagementWrite,
@@ -68,7 +69,7 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 			CallManagementRead,
 			CallManagementWrite,
 		}
-	} else if info.AccountStatusCode == 401 {
+	case 401:
 		permissions = []Permission{
 			ServiceVerificationRead,
 			ServiceVerificationWrite,
@@ -159,7 +160,7 @@ func getAccountsStatusCode(cfg *config.Config, sid string, secret string) (int, 
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode, nil
 }
 
@@ -196,7 +197,7 @@ func getVerifyServicesStatusCode(cfg *config.Config, sid string, secret string) 
 	if err != nil {
 		return serviceRes, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// read response
 	if err := json.NewDecoder(resp.Body).Decode(&serviceRes); err != nil {
@@ -224,7 +225,7 @@ func listTwilioAccounts(cfg *config.Config, sid, secret string) ([]service, erro
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result struct {
 		Accounts []service `json:"accounts"`
@@ -287,11 +288,12 @@ func printPermissions(statusCode int) {
 	color.Green("[!] Valid Twilio API Key\n")
 	color.Green("[i] Expires: Never")
 
-	if statusCode == 401 {
+	switch statusCode {
+	case 401:
 		color.Yellow("[i] Key type: Standard")
 		color.Yellow("[i] Permissions: All EXCEPT key management and account/subaccount configuration.")
 
-	} else if statusCode == 200 {
+	case 200:
 		color.Green("[i] Key type: Main (aka Admin)")
 		color.Green("[i] Permissions: All")
 	}

@@ -2,6 +2,7 @@ package dropbox
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -90,5 +91,40 @@ func TestDropBox_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+// TestDropBox_LongTokenThroughEngineWindow guards the MaxSecretSize override. The scanning
+// engine only passes a keyword-centered window of the chunk to FromData (512 bytes by
+// default). Newer scoped Dropbox tokens (sl.u.…) can be ~1.5KB, so without MaxSecretSize the
+// token is truncated before the regex sees it and verification fails. This exercises the full
+// Aho-Corasick windowing path rather than calling FromData on the whole input directly.
+func TestDropBox_LongTokenThroughEngineWindow(t *testing.T) {
+	token := "sl.u." + strings.Repeat("aB3-_", 300) // 5 + 1500 = 1505 chars, single base64url run
+	chunk := []byte("DROPBOX_TOKEN=" + token + "\n")
+
+	d := Scanner{}
+	core := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	matches := core.FindDetectorMatches(chunk)
+	if len(matches) == 0 {
+		t.Fatal("no detector matches for long token")
+	}
+
+	var found bool
+	for _, m := range matches {
+		for _, data := range m.Matches() {
+			results, err := d.FromData(context.Background(), false, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, r := range results {
+				if string(r.Raw) == token {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Errorf("full %d-char token was not captured through the engine window (MaxSecretSize regression?)", len(token))
 	}
 }

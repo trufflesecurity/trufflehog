@@ -67,11 +67,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			res, err := client.Do(req)
 			if err == nil {
-				if res.StatusCode == http.StatusOK {
+				switch res.StatusCode {
+				case http.StatusOK:
 					s1.Verified = true
-				} else if res.StatusCode == http.StatusUnauthorized {
+				case http.StatusUnauthorized:
 					// The secret is determinately not verified (nothing to do)
-				} else {
+				default:
 					var buf bytes.Buffer
 					var bodyString string
 					_, err = io.Copy(&buf, res.Body)

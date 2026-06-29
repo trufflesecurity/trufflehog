@@ -330,13 +330,13 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	}
 }
 
-func (s scanner) CleanResults(results []detectors.Result) []detectors.Result {
-	return aws.CleanResults(results)
+func (s scanner) CleanResults(results []detectors.Result, verificationEnabled bool) []detectors.Result {
+	return aws.CleanResults(results, verificationEnabled)
 }
 
 // Reference: https://nitter.poast.org/TalBeerySec/status/1816449053841838223#m
 func checkSessionToken(sessionToken string, secret string) bool {
-	if !(strings.Contains(sessionToken, "YXdz") || strings.Contains(sessionToken, "Jb3JpZ2luX2Vj")) ||
+	if (!strings.Contains(sessionToken, "YXdz") && !strings.Contains(sessionToken, "Jb3JpZ2luX2Vj")) ||
 		strings.Contains(sessionToken, secret) {
 		// Handle error if the sessionToken is not a valid base64 string
 		return false

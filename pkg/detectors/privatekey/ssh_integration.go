@@ -64,13 +64,13 @@ func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport
 		}
 		return "", err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	session, err := client.NewSession()
 	if err != nil {
 		return "", err
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	var output bytes.Buffer
 	session.Stderr = &output
@@ -93,7 +93,7 @@ func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.C
 
 	ncc, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("error creating SSH connection to %s: %w", addr, err)
 	}
 

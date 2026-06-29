@@ -54,6 +54,10 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 					Verified:     true,
 					Raw:          []byte(id),
 					RawV2:        []byte(id + secret),
+					SecretParts: map[string]string{
+						"client_id":     id,
+						"client_secret": secret,
+					},
 				},
 			},
 			wantErr: false,
@@ -72,6 +76,10 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 					Verified:     false,
 					Raw:          []byte(id),
 					RawV2:        []byte(id + invalidSecret),
+					SecretParts: map[string]string{
+						"client_id":     id,
+						"client_secret": invalidSecret,
+					},
 				},
 			},
 			wantErr: false,
