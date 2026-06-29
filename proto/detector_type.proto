@@ -1057,5 +1057,5 @@ enum DetectorType {
   BrainTrustApiKey = 1053;
   PgAnalyzeReadKey = 1054;
   RedHatPyxis = 1055;
-  DuffelTestToken = 1056;
+  DuffelToken = 1056;
 }

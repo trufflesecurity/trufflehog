@@ -1,4 +1,4 @@
-package duffeltesttoken
+package duffeltoken
 
 import (
 	"context"
@@ -24,15 +24,15 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Duffel test token pattern
-	// Format: duffel_test_ + 43 alphanumeric / dash / underscore characters
+	// Format: (duffel_test_ or duffel_live_)  + 43 alphanumeric / dash / underscore characters
 	duffelTestTokenPat = regexp.MustCompile(
-		`\b(duffel_test_[A-Za-z0-9_-]{43})(?:$|[^A-Za-z0-9_-])`,
+		`\b(duffel_(test|live)_[A-Za-z0-9_-]{43})(?:$|[^A-Za-z0-9_-])`,
 	)
 )
 
 // Keywords used for fast pre-filtering
 func (s Scanner) Keywords() []string {
-	return []string{"duffel_test_"}
+	return []string{"duffel_test_", "duffel_live_"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -58,7 +58,7 @@ func (s Scanner) FromData(
 
 	for token := range uniqueTokens {
 		result := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_DuffelTestToken,
+			DetectorType: detector_typepb.DetectorType_DuffelToken,
 			Raw:          []byte(token),
 			Redacted:     token[:15] + "...",
 			SecretParts: map[string]string{
@@ -135,9 +135,9 @@ func verifyDuffelToken(
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
-	return detector_typepb.DetectorType_DuffelTestToken
+	return detector_typepb.DetectorType_DuffelToken
 }
 
 func (s Scanner) Description() string {
-	return "Duffel is a flight search and booking API service. Duffel test API tokens can be used to access and interact with flight search and booking APIs in test environments."
+	return "Duffel is a flight search and booking API service. Duffel API tokens can be used to access and interact with flight search and booking APIs in test environments."
 }

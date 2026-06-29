@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package duffeltesttoken
+package duffeltoken
 
 import (
 	"context"
@@ -54,7 +54,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelToken,
 					Verified:     true,
 					Raw:          []byte(activeToken),
 				},
@@ -70,7 +70,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelToken,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 				},
@@ -87,7 +87,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelToken,
 					Verified:     false,
 					Raw:          []byte(activeToken),
 				},
@@ -104,7 +104,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_DuffelTestToken,
+					DetectorType: detector_typepb.DetectorType_DuffelToken,
 					Verified:     false,
 					Raw:          []byte(inactiveToken),
 				},
@@ -150,6 +150,8 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 				"primarySecret",
 				"Redacted",
 				"SecretParts",
+				"chunkOffset",
+				"chunkOffsetSet",
 			)
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {

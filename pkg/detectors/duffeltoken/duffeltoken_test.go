@@ -1,4 +1,4 @@
-package duffeltesttoken
+package duffeltoken
 
 import (
 	"context"
