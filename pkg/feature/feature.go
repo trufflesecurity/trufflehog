@@ -27,6 +27,7 @@ var (
 	UserDetectorEnabled             atomic.Bool
 	BraintrustDetectorEnabled       atomic.Bool
 	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
+	RedHatPyxisDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {

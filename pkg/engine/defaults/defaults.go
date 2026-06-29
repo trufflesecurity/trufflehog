@@ -620,6 +620,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/reallysimplesystems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rebrandly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rechargepayments"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/redhatpyxis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/redis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
@@ -1520,6 +1521,7 @@ func buildDetectorList() []detectors.Detector {
 		&reallysimplesystems.Scanner{},
 		&rebrandly.Scanner{},
 		&rechargepayments.Scanner{},
+		&redhatpyxis.Scanner{},
 		&redis.Scanner{},
 		&refiner.Scanner{},
 		&rentman.Scanner{},
@@ -1808,6 +1810,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.BraintrustDetectorEnabled.Load()
 		case *pganalyzereadkey.Scanner:
 			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
+		case *redhatpyxis.Scanner:
+			return !feature.RedHatPyxisDetectorEnabled.Load()
 		default:
 			return false
 		}

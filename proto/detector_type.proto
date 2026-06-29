@@ -1056,4 +1056,5 @@ enum DetectorType {
   AWSAppSync = 1052;
   BrainTrustApiKey = 1053;
   PgAnalyzeReadKey = 1054;
+  RedHatPyxis = 1055;
 }
