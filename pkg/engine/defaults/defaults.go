@@ -1815,7 +1815,7 @@ func buildDetectorList() []detectors.Detector {
 		case *redhatpyxis.Scanner:
 			return !feature.RedHatPyxisDetectorEnabled.Load()
 		case *duffeltoken.Scanner:
-			return !feature.RedHatPyxisDetectorEnabled.Load()
+			return !feature.DuffelTokenDetectorEnabled.Load()
 		default:
 			return false
 		}
