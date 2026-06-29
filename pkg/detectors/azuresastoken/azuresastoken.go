@@ -37,7 +37,12 @@ var (
 	// signature as %2B, %2F, %3D). Rather than enumerate every permutation in one
 	// regex, match a contiguous run of query parameters and validate the SAS-specific
 	// parameters in keyMatchIsSASToken below. This keeps detection order-independent.
-	sasQueryPat = regexp.MustCompile(`[a-z]{2,4}=[^&\s"'<>]+(?:&[a-z]{2,4}=[^&\s"'<>]+)+`)
+	// The value class excludes `=` so a SAS token preceded by a short lowercase
+	// `key=` (e.g. `sas=sp=r&...`) is not absorbed from that preceding key, which
+	// would bury the real `sp` parameter inside the first value and fail
+	// validation. Azure URL-encodes any `=` inside a value (the signature padding
+	// becomes %3D), so excluding the literal does not drop a legitimate value.
+	sasQueryPat = regexp.MustCompile(`[a-z]{2,4}=[^&=\s"'<>]+(?:&[a-z]{2,4}=[^&=\s"'<>]+)+`)
 
 	// Validators for the individual SAS parameters. The `sp` permission set and `sr`
 	// resource set match the formats the previous, order-locked regex accepted.
