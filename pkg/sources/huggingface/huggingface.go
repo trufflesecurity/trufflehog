@@ -32,12 +32,18 @@ const (
 	DatasetsRoute     = "datasets"
 	SpacesRoute       = "spaces"
 	ModelsAPIRoute    = "models"
+	BucketsRoute      = "buckets"
 	DiscussionsRoute  = "discussions"
 	APIRoute          = "api"
 	DATASET           = "dataset"
 	MODEL             = "model"
 	SPACE             = "space"
+	BUCKET            = "bucket"
 	defaultPagination = 100
+
+	// bucketsPagination is the page size for bucket listing endpoints,
+	// which default to 100 items per page (5000 max).
+	bucketsPagination = 5000
 )
 
 type resourceType string
@@ -56,10 +62,12 @@ type Source struct {
 	models   []string
 	spaces   []string
 	datasets []string
+	buckets  []string
 
 	filteredModelsCache   *filteredRepoCache
 	filteredSpacesCache   *filteredRepoCache
 	filteredDatasetsCache *filteredRepoCache
+	filteredBucketsCache  *filteredRepoCache
 
 	repoInfoCache repoInfoCache
 
@@ -76,6 +84,7 @@ type Source struct {
 	skipAllModels      bool
 	skipAllSpaces      bool
 	skipAllDatasets    bool
+	skipAllBuckets     bool
 	includeDiscussions bool
 	includePrs         bool
 
@@ -220,9 +229,16 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 		s.conn.GetIgnoreDatasets(),
 	)
 
+	s.filteredBucketsCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](),
+		append(s.conn.GetBuckets(), s.conn.GetIncludeBuckets()...),
+		s.conn.GetIgnoreBuckets(),
+	)
+
 	s.models = initializeRepos(s.filteredModelsCache, s.conn.Models, fmt.Sprintf("%s/%s.git", s.conn.Endpoint, "%s"))
 	s.spaces = initializeRepos(s.filteredSpacesCache, s.conn.Spaces, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, SpacesRoute, "%s"))
 	s.datasets = initializeRepos(s.filteredDatasetsCache, s.conn.Datasets, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, DatasetsRoute, "%s"))
+	// Buckets are not git repos; they are keyed by their plain "namespace/name" ID.
+	s.buckets = initializeRepos(s.filteredBucketsCache, s.conn.Buckets, "%s")
 	s.repoInfoCache = newRepoInfoCache()
 
 	s.includeDiscussions = s.conn.IncludeDiscussions
@@ -262,6 +278,7 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 	s.skipAllModels = s.conn.SkipAllModels
 	s.skipAllSpaces = s.conn.SkipAllSpaces
 	s.skipAllDatasets = s.conn.SkipAllDatasets
+	s.skipAllBuckets = s.conn.SkipAllBuckets
 
 	return nil
 }
@@ -283,6 +300,12 @@ func (s *Source) validateIgnoreIncludeRepos() error {
 		return err
 	}
 	if err := verifySlashSeparatedStrings(s.conn.IncludeDatasets); err != nil {
+		return err
+	}
+	if err := verifySlashSeparatedStrings(s.conn.IgnoreBuckets); err != nil {
+		return err
+	}
+	if err := verifySlashSeparatedStrings(s.conn.IncludeBuckets); err != nil {
 		return err
 	}
 	return nil
@@ -366,12 +389,20 @@ func (s *Source) enumerate(ctx context.Context) error {
 		}
 	}
 
-	ctx.Logger().Info("Completed enumeration", "num_models", len(s.models), "num_spaces", len(s.spaces), "num_datasets", len(s.datasets))
+	s.buckets = make([]string, 0, s.filteredBucketsCache.Count())
+	for _, bucket := range s.filteredBucketsCache.Keys() {
+		if err := s.cacheBucketInfo(ctx, bucket); err != nil {
+			continue
+		}
+	}
+
+	ctx.Logger().Info("Completed enumeration", "num_models", len(s.models), "num_spaces", len(s.spaces), "num_datasets", len(s.datasets), "num_buckets", len(s.buckets))
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.models)
 	sort.Strings(s.datasets)
 	sort.Strings(s.spaces)
+	sort.Strings(s.buckets)
 	return nil
 }
 
@@ -475,6 +506,12 @@ func (s *Source) enumerateAuthors(ctx context.Context) {
 				continue
 			}
 		}
+		if !s.skipAllBuckets {
+			if err := s.fetchAndCacheBuckets(orgCtx, org); err != nil {
+				orgCtx.Logger().Error(err, "Failed to fetch buckets for organization")
+				continue
+			}
+		}
 	}
 	for _, user := range s.usersCache.Keys() {
 		userCtx := context.WithValue(ctx, "user", user)
@@ -493,6 +530,12 @@ func (s *Source) enumerateAuthors(ctx context.Context) {
 		if !s.skipAllDatasets {
 			if err := s.fetchAndCacheRepos(userCtx, DATASET, user); err != nil {
 				userCtx.Logger().Error(err, "Failed to fetch datasets for user")
+				continue
+			}
+		}
+		if !s.skipAllBuckets {
+			if err := s.fetchAndCacheBuckets(userCtx, user); err != nil {
+				userCtx.Logger().Error(err, "Failed to fetch buckets for user")
 				continue
 			}
 		}
@@ -588,6 +631,9 @@ func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk) error
 		return err
 	}
 	if err := s.scanRepos(ctx, chunksChan, DATASET); err != nil {
+		return err
+	}
+	if err := s.scanBuckets(ctx, chunksChan); err != nil {
 		return err
 	}
 	return nil

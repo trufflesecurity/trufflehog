@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -650,6 +651,7 @@ func setupTestRepo(t *testing.T, repoName string) string {
 	assert.NoError(t, exec.Command("git", "init", repoPath).Run())
 	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.name", "Test User").Run())
 	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.email", "test@example.com").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "commit.gpgsign", "false").Run())
 
 	return repoPath
 }
@@ -850,6 +852,111 @@ func TestPrepareRepoErrorPaths(t *testing.T) {
 		assert.Error(t, err)
 		assert.False(t, isRemote)
 		assert.Equal(t, "", preparedPath)
+	})
+}
+
+func TestResolveGitDir(t *testing.T) {
+	t.Parallel()
+
+	t.Run("regular repository with .git directory", func(t *testing.T) {
+		repoPath := setupTestRepo(t, "regular-repo")
+		addTestFileAndCommit(t, repoPath, "test.txt", "test content")
+
+		gitDir, err := resolveGitDir(repoPath)
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(repoPath, ".git"), gitDir)
+
+		// Verify it's actually a directory
+		info, err := os.Stat(gitDir)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("git worktree with .git file", func(t *testing.T) {
+		// Create main repository
+		mainRepoPath := setupTestRepo(t, "main-repo")
+		addTestFileAndCommit(t, mainRepoPath, "test.txt", "test content")
+
+		// Create a worktree
+		worktreePath := filepath.Join(filepath.Dir(mainRepoPath), "worktree")
+		err := exec.Command("git", "-C", mainRepoPath, "worktree", "add", worktreePath, "-b", "worktree-branch").Run()
+		assert.NoError(t, err)
+
+		// Verify .git is a file in the worktree
+		gitPath := filepath.Join(worktreePath, ".git")
+		info, err := os.Stat(gitPath)
+		assert.NoError(t, err)
+		assert.False(t, info.IsDir(), ".git should be a file in a worktree")
+
+		// Test resolveGitDir
+		gitDir, err := resolveGitDir(worktreePath)
+		assert.NoError(t, err)
+		assert.NotEqual(t, gitPath, gitDir, "resolved git dir should be different from .git file path")
+
+		// Verify the resolved path is a valid git directory (should contain index)
+		indexPath := filepath.Join(gitDir, "index")
+		_, err = os.Stat(indexPath)
+		assert.NoError(t, err, "resolved git dir should contain index file")
+	})
+
+	t.Run("nonexistent repository", func(t *testing.T) {
+		_, err := resolveGitDir("/nonexistent/path")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to stat .git")
+	})
+
+	t.Run("invalid .git file content", func(t *testing.T) {
+		tempDir := t.TempDir()
+		gitPath := filepath.Join(tempDir, ".git")
+
+		// Create an invalid .git file (not starting with "gitdir: ")
+		err := os.WriteFile(gitPath, []byte("invalid content"), 0644)
+		assert.NoError(t, err)
+
+		_, err = resolveGitDir(tempDir)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid .git file format")
+	})
+}
+
+func TestPrepareRepoWithWorktree(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Create main repository with staged changes
+	mainRepoPath := setupTestRepo(t, "main-repo-worktree")
+	addTestFileAndCommit(t, mainRepoPath, "test.txt", "initial content")
+
+	// Create a worktree
+	worktreePath := filepath.Join(filepath.Dir(mainRepoPath), "test-worktree")
+	err := exec.Command("git", "-C", mainRepoPath, "worktree", "add", worktreePath, "-b", "worktree-branch").Run()
+	assert.NoError(t, err)
+
+	// Stage some changes in the worktree
+	testFile := filepath.Join(worktreePath, "test.txt")
+	assert.NoError(t, os.WriteFile(testFile, []byte("modified content in worktree"), 0644))
+	assert.NoError(t, exec.Command("git", "-C", worktreePath, "add", "test.txt").Run())
+
+	// Verify staged changes exist in worktree
+	output, err := exec.Command("git", "-C", worktreePath, "diff", "--cached").Output()
+	assert.NoError(t, err)
+	assert.Contains(t, string(output), "modified content in worktree", "Staged changes should exist in worktree")
+
+	t.Run("PrepareRepo should work with git worktree", func(t *testing.T) {
+		fileURI := "file://" + worktreePath
+		preparedPath, isRemote, err := PrepareRepo(ctx, fileURI, "", false, false)
+
+		assert.NoError(t, err, "PrepareRepo should succeed with git worktree")
+		assert.False(t, isRemote)
+		assert.NotEmpty(t, preparedPath)
+
+		defer func() { _ = os.RemoveAll(preparedPath) }()
+
+		// Verify the cloned repo has the staged changes preserved
+		stagedOutput, err := exec.Command("git", "-C", preparedPath, "diff", "--cached").Output()
+		assert.NoError(t, err, "git diff --cached should succeed in prepared repo")
+		assert.Contains(t, string(stagedOutput), "modified content in worktree",
+			"Staged changes should be preserved when cloning from worktree")
 	})
 }
 
@@ -1162,4 +1269,48 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGitChunk_LongLine verifies that files containing lines longer than
+// bufio's default 64 KB token limit are still scanned. Before the fix,
+// bufio.Scanner would silently stop on the first oversized line and produce
+// zero chunks for that file.
+func TestGitChunk_LongLine(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	repoPath := setupTestRepo(t, "long-line-repo")
+
+	// Build a single line that is 100 KB — well above the old 64 KB cap.
+	longLine := strings.Repeat("a", 100*1024)
+	addTestFileAndCommit(t, repoPath, "long_line.txt", longLine)
+
+	conn, err := anypb.New(&sourcespb.Git{
+		Credential: &sourcespb.Git_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Repositories: []string{"file://" + repoPath},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	assert.NoError(t, s.Init(ctx, "test long line", 0, 0, false, conn, 1))
+
+	chunksCh := make(chan *sources.Chunk, 64)
+	var count int
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range chunksCh {
+			count++
+		}
+	}()
+
+	assert.NoError(t, s.Chunks(ctx, chunksCh))
+	close(chunksCh)
+	wg.Wait()
+	// ensure the goroutine has finished writing to count before we read it
+	// one chunk for the commit/file metadata, and at least one chunk for the file content
+	assert.Equal(t, 2, count, "expected two chunks from a file with a 100 KB line")
 }
