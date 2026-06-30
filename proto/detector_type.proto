@@ -1059,4 +1059,5 @@ enum DetectorType {
   RedHatPyxis = 1055;
   OctopusDeploy = 1056;
   OpenRouter = 1057;
+  RSASecurID = 1059;
 }

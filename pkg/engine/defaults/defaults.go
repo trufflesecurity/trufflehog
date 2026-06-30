@@ -642,6 +642,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rootly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rsasecurid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/runrunit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saladcloudapikey"
@@ -1547,6 +1548,7 @@ func buildDetectorList() []detectors.Detector {
 		&rootly.Scanner{},
 		&route4me.Scanner{},
 		&rownd.Scanner{},
+		&rsasecurid.Scanner{},
 		&rubygems.Scanner{},
 		&runrunit.Scanner{},
 		&saladcloudapikey.Scanner{},

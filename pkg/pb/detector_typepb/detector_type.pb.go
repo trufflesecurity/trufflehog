@@ -1111,6 +1111,7 @@ const (
 	DetectorType_RedHatPyxis                             DetectorType = 1055
 	DetectorType_OctopusDeploy                           DetectorType = 1056
 	DetectorType_OpenRouter                              DetectorType = 1057
+	DetectorType_RSASecurID                              DetectorType = 1059
 )
 
 // Enum value maps for DetectorType.
@@ -2170,6 +2171,7 @@ var (
 		1055: "RedHatPyxis",
 		1056: "OctopusDeploy",
 		1057: "OpenRouter",
+		1059: "RSASecurID",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3226,6 +3228,7 @@ var (
 		"RedHatPyxis":                       1055,
 		"OctopusDeploy":                     1056,
 		"OpenRouter":                        1057,
+		"RSASecurID":                        1059,
 	}
 )
 
