@@ -146,7 +146,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
 					if isVerified {
-						s1.ResetVerificationError() // Reset verification error in case a secret is verified with an endpoint
 						s1.SecretParts["endpoint"] = baseURL
 						if res != nil {
 							if len(res.Data) > 0 {

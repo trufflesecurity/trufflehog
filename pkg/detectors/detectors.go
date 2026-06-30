@@ -156,10 +156,6 @@ func (r *Result) SetVerificationError(err error, secrets ...string) {
 	}
 }
 
-func (r *Result) ResetVerificationError() {
-	r.verificationError = nil
-}
-
 // Public accessors for the fields could also be provided if needed.
 func (r *Result) VerificationError() error {
 	return r.verificationError
