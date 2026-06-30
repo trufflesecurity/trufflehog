@@ -132,7 +132,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 					t.Errorf("PagerDutyApiKey.FromData() verificationError = %v, wantVerificationErr %v", got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("PagerDutyApiKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
