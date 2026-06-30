@@ -27,7 +27,9 @@ var (
 
 	// Match wave_sn_prod_ and wave_ci_prod_ tokens.
 	// These are Wave payment tokens used for API authentication.
-	keyPat = regexp.MustCompile(`\b(wave_(?:sn|ci)_prod_[A-Za-z0-9_-]{30,})\b`)
+	// No trailing \b because '-' is not a word character — \b would silently
+	// truncate tokens that end with a hyphen.
+	keyPat = regexp.MustCompile(`\b(wave_(?:sn|ci)_prod_[A-Za-z0-9_-]{30,})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
