@@ -29,6 +29,7 @@ var (
 		"Slack User Token":              regexp.MustCompile(`xoxp\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
 		"Slack Workspace Access Token":  regexp.MustCompile(`xoxa\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
 		"Slack Workspace Refresh Token": regexp.MustCompile(`xoxr\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack App-Level Token":         regexp.MustCompile(`xapp\-1\-[A-Za-z0-9\-]{48,}`),
 	}
 	verifyURL = "https://slack.com/api/auth.test"
 )
@@ -47,7 +48,7 @@ type authRes struct {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"xoxb-", "xoxp-", "xoxa-", "xoxr-"}
+	return []string{"xoxb-", "xoxp-", "xoxa-", "xoxr-", "xapp-"}
 }
 
 // FromData will find and optionally verify Slack secrets in a given set of bytes.
