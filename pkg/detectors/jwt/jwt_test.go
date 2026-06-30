@@ -148,14 +148,14 @@ func TestJwt_SkipUnverified(t *testing.T) {
 	}{
 		{
 			name:           "expired token - results should be skipped when skipUnverified is true",
-			input:          "eyJhbGciOiJSUzI1NiIsImtpZCI6IjMwMzViYjg2ZDk5ZjIyZTYxMzQ2N2E2NjgwODI1ZWViMGQ4MTM5YTIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJzdWIiOiJ1c2VyMSIsImlhdCI6OTAwMDAwMDAwMCwiZXhwIjo5OTk5OTk5OTk5fQ.dGhpc19pc19hX2Zha2Vfc2lnbmF0dXJlX25vdF92YWxpZA",
+			input:          "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcwNDA2NzIwMCwiZXhwIjoxNzA0MDcwODAwfQ.9z15Ku3lWBC8rFPlvxkX3wx6wRalhoN7PlBRtE7fUXyoHqVLiZG2l5eMo6KwBlAu1L2hFtkvQwiJ79G5o3a4Bw",
 			want:           []string{},
 			skipUnverified: true,
 		},
 		{
 			name:           "expired token - results should not be skipped when skipUnverified is false",
-			input:          "eyJhbGciOiJSUzI1NiIsImtpZCI6IjMwMzViYjg2ZDk5ZjIyZTYxMzQ2N2E2NjgwODI1ZWViMGQ4MTM5YTIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJzdWIiOiJ1c2VyMSIsImlhdCI6OTAwMDAwMDAwMCwiZXhwIjo5OTk5OTk5OTk5fQ.dGhpc19pc19hX2Zha2Vfc2lnbmF0dXJlX25vdF92YWxpZA",
-			want:           []string{"eyJhbGciOiJSUzI1NiIsImtpZCI6IjMwMzViYjg2ZDk5ZjIyZTYxMzQ2N2E2NjgwODI1ZWViMGQ4MTM5YTIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJzdWIiOiJ1c2VyMSIsImlhdCI6OTAwMDAwMDAwMCwiZXhwIjo5OTk5OTk5OTk5fQ.dGhpc19pc19hX2Zha2Vfc2lnbmF0dXJlX25vdF92YWxpZA"},
+			input:          "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcwNDA2NzIwMCwiZXhwIjoxNzA0MDcwODAwfQ.9z15Ku3lWBC8rFPlvxkX3wx6wRalhoN7PlBRtE7fUXyoHqVLiZG2l5eMo6KwBlAu1L2hFtkvQwiJ79G5o3a4Bw",
+			want:           []string{"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcwNDA2NzIwMCwiZXhwIjoxNzA0MDcwODAwfQ.9z15Ku3lWBC8rFPlvxkX3wx6wRalhoN7PlBRtE7fUXyoHqVLiZG2l5eMo6KwBlAu1L2hFtkvQwiJ79G5o3a4Bw"},
 			skipUnverified: false,
 		},
 	}
