@@ -50,6 +50,11 @@ func TestSonarCloud_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s token = '@%s'", keyword, validPattern),
 			want:  []string{},
 		},
+		{
+			name:  "no false positive from sonarqube dependabot commit URLs",
+			input: "https://github.com/sonarsource/sonarqube-scan-action/commit/e050aa9e699112ca0664dd2a5c694ddab05dc555",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
