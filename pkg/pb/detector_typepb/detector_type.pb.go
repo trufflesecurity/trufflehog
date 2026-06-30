@@ -143,7 +143,7 @@ const (
 	DetectorType_VultrApiKey                   DetectorType = 116
 	DetectorType_Pepipost                      DetectorType = 117
 	DetectorType_Postman                       DetectorType = 118
-	DetectorType_CloudsightKey                 DetectorType = 119 // Not yet implemented
+	DetectorType_CloudsightKey                 DetectorType = 119
 	DetectorType_JiraToken                     DetectorType = 120
 	DetectorType_NexmoApiKey                   DetectorType = 121
 	DetectorType_SegmentApiKey                 DetectorType = 122

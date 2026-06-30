@@ -175,6 +175,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudinary"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudmersive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudplan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudsightkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudsmith"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloverly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloze"
@@ -1060,6 +1061,7 @@ func buildDetectorList() []detectors.Detector {
 		&cloudinary.Scanner{},
 		&cloudmersive.Scanner{},
 		&cloudplan.Scanner{},
+		&cloudsightkey.Scanner{},
 		&cloudsmith.Scanner{},
 		&cloverly.Scanner{},
 		&cloze.Scanner{},
