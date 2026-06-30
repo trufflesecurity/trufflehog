@@ -128,8 +128,11 @@ type Config struct {
 
 	Dispatcher ResultsDispatcher
 
-	// SourceManager is used to manage the sources and units.
-	// TODO (ahrav): Update this comment, i'm dumb and don't really know what else it does.
+	// SourceManager orchestrates source enumeration and concurrent chunk production.
+	// The engine consumes chunks from its output channel via ChunksChan, and during
+	// Finish it calls SourceManager.Wait() to drain in-flight work before closing the
+	// downstream channels. Callers construct and own the SourceManager; the engine
+	// neither creates nor closes it.
 	SourceManager *sources.SourceManager
 
 	// PrintAvgDetectorTime sets the printAvgDetectorTime flag on the engine. If set to
