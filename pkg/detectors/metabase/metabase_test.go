@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	validKeyPattern       = "Y49ftoUer6aYZOzdkRzlENnW8PHnD9zf9dP9"
+	validKeyPattern       = "38f4939c-ad7f-4cbe-ae54-30946daf8593"
 	invalidKeyPattern     = "=49ftoUer6aYZOzdkRzlENnW8PHnD9zf9dP9"
 	validBaseUrlPattern   = "https://tiwRdoa.metabase.com"
 	invalidBaseUrlPattern = "https://tiwRdo^.metabase.com"
@@ -40,6 +40,11 @@ func TestMetabase_Pattern(t *testing.T) {
 		{
 			name:  "invalid pattern",
 			input: fmt.Sprintf("%s key = '%s' url = '%s'", keyword, invalidKeyPattern, invalidBaseUrlPattern),
+			want:  []string{},
+		},
+		{
+			name:  "false positive - 36-char url slug is not a session token",
+			input: fmt.Sprintf("%s '%s' %s '%s'", keyword, "prod-analytics-dashboard-public-link", keyword, validBaseUrlPattern),
 			want:  []string{},
 		},
 	}
