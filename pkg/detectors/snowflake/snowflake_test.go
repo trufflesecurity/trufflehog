@@ -17,8 +17,11 @@ func TestSnowflake_Pattern(t *testing.T) {
 	validAccount := "tuacoip-zt74995"
 	validPrivateLinkAccount := "tuacoip-zt74995.privatelink"
 	validSingleCharacterAccount := "tuacoip-z"
+	validDottedAccount := "myorgname.myaccount01.privatelink"
+
 	validUsername := gofakeit.Username()
-	invalidUsername := "Spencer@5091.com" // special characters not allowed
+	invalidUsername := "Spencer?5091.com" // special characters not allowed
+	usernameWithAt := "user@!domain"
 
 	validPassword := common.GenerateRandomPassword(true, true, true, false, 10)
 	invalidPassword := "!12" // invalid length
@@ -55,6 +58,20 @@ func TestSnowflake_Pattern(t *testing.T) {
 			name:  "Snowflake Credentials - Invalid Username & Password",
 			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, invalidUsername, invalidPassword),
 			want:  [][]string{},
+		},
+		{
+			name:  "Dotted Account - org.account.privatelink format",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validDottedAccount, validUsername, validPassword),
+			want: [][]string{
+				{validDottedAccount, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Username with !@ characters",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, usernameWithAt, validPassword),
+			want: [][]string{
+				{validAccount, usernameWithAt, validPassword},
+			},
 		},
 	}
 
