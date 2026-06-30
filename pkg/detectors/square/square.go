@@ -9,7 +9,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
@@ -44,8 +44,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(secMatch[1])
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Square,
+			DetectorType: detector_typepb.DetectorType_Square,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/square/",
@@ -69,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// req.Header.Add("Square-Version", "2020-08-12")
 			res, err := client.Do(req)
 			if err == nil {
-				res.Body.Close() // The request body is unused.
+				_ = res.Body.Close() // The request body is unused.
 
 				// 200 means good key and has `merchants` scope - default allowed by square
 				// 401 is bad key
@@ -77,7 +78,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					result.Verified = true
 				}
 			}
-			result.AnalysisInfo = map[string]string{"key": resMatch}
 		}
 
 		results = append(results, result)
@@ -86,8 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Square
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Square
 }
 
 func (s Scanner) Description() string {

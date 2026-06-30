@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSendgrid_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestSendgrid_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SendGrid,
+					DetectorType: detector_typepb.DetectorType_SendGrid,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestSendgrid_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SendGrid,
+					DetectorType: detector_typepb.DetectorType_SendGrid,
 					Verified:     false,
 				},
 			},
@@ -95,7 +95,7 @@ func TestSendgrid_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SendGrid,
+					DetectorType: detector_typepb.DetectorType_SendGrid,
 					Verified:     false,
 				},
 			},
@@ -112,7 +112,7 @@ func TestSendgrid_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SendGrid,
+					DetectorType: detector_typepb.DetectorType_SendGrid,
 					Verified:     false,
 				},
 			},
@@ -127,7 +127,7 @@ func TestSendgrid_FromChunk(t *testing.T) {
 				t.Errorf("Sendgrid.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo", "ExtraData")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Sendgrid.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -34,17 +34,17 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSho
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentialInfo"))
 	}
 
 	storeUrl, ok := credInfo["store_url"]
 	if !ok {
-		return nil, errors.New("store_url not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("store_url not found in credentialInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key, storeUrl)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -213,7 +213,7 @@ func getShopInfo(cfg *config.Config, key string, store string) (ShopInfoJSON, er
 		return shopInfo, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&shopInfo)
 	if err != nil {
@@ -252,7 +252,7 @@ func getAccessScopes(cfg *config.Config, key string, store string) (AccessScopes
 		return accessScopes, resp.StatusCode, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&accessScopes)
 	if err != nil {

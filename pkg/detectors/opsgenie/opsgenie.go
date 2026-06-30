@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -28,8 +28,8 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"opsgenie"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Opsgenie
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Opsgenie
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -62,8 +62,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range keyMatches {
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Opsgenie,
+			DetectorType: detector_typepb.DetectorType_Opsgenie,
 			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
 		}
 
 		if verify {
@@ -76,9 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if isVerified {
 				r.Verified = isVerified
 				r.ExtraData = extraData
-				r.AnalysisInfo = map[string]string{
-					"key": key,
-				}
 			}
 			r.SetVerificationError(vErr, key)
 		}

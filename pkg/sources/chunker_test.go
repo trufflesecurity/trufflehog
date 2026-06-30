@@ -159,7 +159,7 @@ type panicReader struct{}
 
 var _ io.Reader = (*panicReader)(nil)
 
-func (_ panicReader) Read([]byte) (int, error) {
+func (panicReader) Read([]byte) (int, error) {
 	panic("panic for testing")
 }
 

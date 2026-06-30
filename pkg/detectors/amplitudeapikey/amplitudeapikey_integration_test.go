@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAmplitudeApiKey_FromChunk(t *testing.T) {
@@ -51,11 +51,11 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
+					DetectorType: detector_typepb.DetectorType_AmplitudeApiKey,
 					Verified:     true,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
+					DetectorType: detector_typepb.DetectorType_AmplitudeApiKey,
 					Verified:     false,
 				},
 			},
@@ -72,11 +72,11 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
+					DetectorType: detector_typepb.DetectorType_AmplitudeApiKey,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
+					DetectorType: detector_typepb.DetectorType_AmplitudeApiKey,
 					Verified:     false,
 				},
 			},

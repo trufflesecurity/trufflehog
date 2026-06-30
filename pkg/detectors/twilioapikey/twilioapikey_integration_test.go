@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTwilioAPIKey_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestTwilioAPIKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_Twilio,
 					Verified:     true,
 					Redacted:     secret,
 					RawV2:        []byte(apiKey + secret),
@@ -74,7 +74,7 @@ func TestTwilioAPIKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_Twilio,
 					Verified:     false,
 					Redacted:     secretInactive,
 					RawV2:        []byte(apiKey + secretInactive),
@@ -110,7 +110,7 @@ func TestTwilioAPIKey_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Twilio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	dpb "github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 var (
@@ -16,15 +16,15 @@ var (
 		"all": allDetectors(),
 	}
 
-	detectorTypeValue = make(map[string]dpb.DetectorType, len(dpb.DetectorType_value))
-	validDetectors    = make(map[dpb.DetectorType]struct{}, len(dpb.DetectorType_value))
-	maxDetectorType   dpb.DetectorType
+	detectorTypeValue = make(map[string]detector_typepb.DetectorType, len(detector_typepb.DetectorType_value))
+	validDetectors    = make(map[detector_typepb.DetectorType]struct{}, len(detector_typepb.DetectorType_value))
+	maxDetectorType   detector_typepb.DetectorType
 )
 
 // Setup package local global variables.
 func init() {
-	for k, v := range dpb.DetectorType_value {
-		dt := dpb.DetectorType(v)
+	for k, v := range detector_typepb.DetectorType_value {
+		dt := detector_typepb.DetectorType(v)
 		detectorTypeValue[strings.ToLower(k)] = dt
 		validDetectors[dt] = struct{}{}
 		if dt > maxDetectorType {
@@ -37,7 +37,7 @@ func init() {
 // way for users to identify detectors, whether unique or not. A DetectorID
 // with Version = 0 indicates all possible versions of a detector.
 type DetectorID struct {
-	ID      dpb.DetectorType
+	ID      detector_typepb.DetectorType
 	Version int
 }
 
@@ -117,7 +117,7 @@ func ParseVerifierEndpoints(verifierURLs map[string]string) (map[DetectorID][]st
 }
 
 func (id DetectorID) String() string {
-	name := dpb.DetectorType_name[int32(id.ID)]
+	name := detector_typepb.DetectorType_name[int32(id.ID)]
 	if name == "" {
 		name = "<invalid ID>"
 	}
@@ -129,9 +129,9 @@ func (id DetectorID) String() string {
 
 // allDetectors returns an ordered slice of all detector types.
 func allDetectors() []DetectorID {
-	all := make([]DetectorID, 0, len(dpb.DetectorType_name))
-	for id := range dpb.DetectorType_name {
-		all = append(all, DetectorID{ID: dpb.DetectorType(id)})
+	all := make([]DetectorID, 0, len(detector_typepb.DetectorType_name))
+	for id := range detector_typepb.DetectorType_name {
+		all = append(all, DetectorID{ID: detector_typepb.DetectorType(id)})
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	return all
@@ -173,7 +173,7 @@ func asRange(input string) ([]DetectorID, error) {
 		return nil, fmt.Errorf("versions within ranges are not supported: %s", input)
 	}
 
-	step := dpb.DetectorType(1)
+	step := detector_typepb.DetectorType(1)
 	if dtStart.ID > dtEnd.ID {
 		step = -1
 	}
@@ -212,7 +212,7 @@ func asDetectorID(input string) (DetectorID, error) {
 	}
 	// Check if it's a detector ID.
 	if i, err := strconv.ParseInt(input, 10, 32); err == nil {
-		dt := dpb.DetectorType(i)
+		dt := detector_typepb.DetectorType(i)
 		if _, ok := validDetectors[dt]; !ok {
 			return DetectorID{}, fmt.Errorf("invalid detector ID: %s", input)
 		}
