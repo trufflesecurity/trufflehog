@@ -1,8 +1,10 @@
 package docker
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"testing"
 
@@ -99,4 +101,140 @@ func TestGHCRListImages_RateLimitError(t *testing.T) {
 	ghcrImages, err := ghcr.ListImages(context.Background(), "ghcr.io/mongodb")
 	assert.Error(t, err)
 	assert.Nil(t, ghcrImages)
+}
+
+func TestGenericOCIRegistryListImages(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v2/_catalog", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"myapp", "mydb"}})
+	}))
+	defer srv.Close()
+
+	reg := &GenericOCIRegistry{Host: srv.Listener.Addr().String()}
+	reg.WithClient(srv.Client())
+
+	// Override scheme to http for the test server.
+	reg.scheme = "http"
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.NoError(t, err)
+
+	expected := []string{
+		srv.Listener.Addr().String() + "/myapp",
+		srv.Listener.Addr().String() + "/mydb",
+	}
+	slices.Sort(images)
+	slices.Sort(expected)
+	assert.Equal(t, expected, images)
+}
+
+func TestGenericOCIRegistryListImages_Pagination(t *testing.T) {
+	t.Parallel()
+
+	page := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if page == 0 {
+			w.Header().Set("Link", `</v2/_catalog?n=2&last=repo2>; rel="next"`)
+			_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"repo1", "repo2"}})
+			page++
+		} else {
+			_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"repo3"}})
+		}
+	}))
+	defer srv.Close()
+
+	reg := &GenericOCIRegistry{Host: srv.Listener.Addr().String(), scheme: "http"}
+	reg.WithClient(srv.Client())
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.NoError(t, err)
+	assert.Len(t, images, 3)
+}
+
+func TestGenericOCIRegistryListImages_PaginationAbsoluteURL(t *testing.T) {
+	t.Parallel()
+
+	page := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if page == 0 {
+			w.Header().Set("Link", fmt.Sprintf(`<%s/v2/_catalog?n=2&last=repo2>; rel="next"`, "http://"+r.Host))
+			_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"repo1", "repo2"}})
+			page++
+		} else {
+			_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"repo3"}})
+		}
+	}))
+	defer srv.Close()
+
+	reg := &GenericOCIRegistry{Host: srv.Listener.Addr().String(), scheme: "http"}
+	reg.WithClient(srv.Client())
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.NoError(t, err)
+	assert.Len(t, images, 3)
+}
+
+func TestGenericOCIRegistryListImages_AuthHeader(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer mytoken", r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(catalogResp{Repositories: []string{"secured-app"}})
+	}))
+	defer srv.Close()
+
+	reg := &GenericOCIRegistry{Host: srv.Listener.Addr().String(), scheme: "http"}
+	reg.WithClient(srv.Client())
+	reg.WithRegistryToken("mytoken")
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.NoError(t, err)
+	assert.Equal(t, []string{srv.Listener.Addr().String() + "/secured-app"}, images)
+}
+
+func TestGenericOCIRegistryListImages_ErrorStatus(t *testing.T) {
+	t.Parallel()
+
+	reg := &GenericOCIRegistry{Host: "127.0.0.1:9"}
+	reg.WithClient(common.ConstantResponseHttpClient(http.StatusUnauthorized, "{}"))
+	reg.scheme = "http"
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.Error(t, err)
+	assert.Nil(t, images)
+}
+
+func TestGenericOCIRegistryListImages_MalformedLinkHeader(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Link", `<ht!tp://invalid url with spaces>; rel="next"`)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"repositories":["repo1","repo2"]}`))
+	}))
+	defer server.Close()
+
+	reg := &GenericOCIRegistry{Host: server.URL[7:]}
+	reg.scheme = "http"
+
+	images, err := reg.ListImages(context.Background(), "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "pagination failed")
+	assert.Nil(t, images)
+}
+
+func TestMakeRegistryFromHost(t *testing.T) {
+	t.Parallel()
+
+	reg := MakeRegistryFromHost("registry.example.com")
+	assert.Equal(t, "registry.example.com", reg.Name())
+	_, ok := reg.(*GenericOCIRegistry)
+	assert.True(t, ok)
 }

@@ -233,6 +233,8 @@ type DockerConfig struct {
 	Namespace string
 	// RegistryToken is an optional authentication token used to access private images within the namespace.
 	RegistryToken string
+	// Registry is the full registry host to enumerate all images from (e.g., registry.example.com).
+	Registry string
 }
 
 // GCSConfig defines the optional configuration for a GCS source.

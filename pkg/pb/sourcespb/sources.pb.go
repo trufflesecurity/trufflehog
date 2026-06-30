@@ -1182,6 +1182,7 @@ type Docker struct {
 	ExcludePaths  []string            `protobuf:"bytes,6,rep,name=exclude_paths,json=excludePaths,proto3" json:"exclude_paths,omitempty"`
 	Namespace     string              `protobuf:"bytes,7,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	RegistryToken string              `protobuf:"bytes,8,opt,name=registry_token,json=registryToken,proto3" json:"registry_token,omitempty"`
+	Registry      string              `protobuf:"bytes,9,opt,name=registry,proto3" json:"registry,omitempty"`
 }
 
 func (x *Docker) Reset() {
@@ -1275,6 +1276,13 @@ func (x *Docker) GetNamespace() string {
 func (x *Docker) GetRegistryToken() string {
 	if x != nil {
 		return x.RegistryToken
+	}
+	return ""
+}
+
+func (x *Docker) GetRegistry() string {
+	if x != nil {
+		return x.Registry
 	}
 	return ""
 }

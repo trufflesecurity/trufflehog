@@ -395,6 +395,9 @@ Docker namespace (organization or user). For non-Docker Hub registries, include 
 .TP
 \fB--registry-token=REGISTRY-TOKEN\fR
 Optional Docker registry access token. Provide this if you want to include private images within the specified namespace.
+.TP
+\fB--registry=REGISTRY\fR
+Scan all images in a registry host. Supports OCI Distribution Spec compliant registries (Harbor, Nexus, Artifactory, etc.). Use --registry-token for authentication.
 .SS
 \fBtravisci --token=TOKEN\fR
 Scan TravisCI
