@@ -392,6 +392,14 @@ message JSONEnumerator {
   string metadata = 1;
 }
 
+message Web {
+  string url = 1;
+  string page_title = 2;
+  string content_type = 3;
+  int64 depth = 4;
+  string timestamp = 5;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -430,5 +438,6 @@ message MetaData {
     Stdin stdin = 34;
     SlackContinuous slackContinuous = 35;
     JSONEnumerator jsonEnumerator = 36;
+    Web web = 37;
   }
 }
