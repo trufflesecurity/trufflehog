@@ -1109,6 +1109,7 @@ const (
 	DetectorType_BrainTrustApiKey                        DetectorType = 1053
 	DetectorType_DockerSwarmUnlock                       DetectorType = 1062
 	DetectorType_VaultToken                              DetectorType = 1063
+	DetectorType_VaultRootToken                          DetectorType = 1064
 )
 
 // Enum value maps for DetectorType.
@@ -2166,6 +2167,7 @@ var (
 		1053: "BrainTrustApiKey",
 		1062: "DockerSwarmUnlock",
 		1063: "VaultToken",
+		1064: "VaultRootToken",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3220,6 +3222,7 @@ var (
 		"BrainTrustApiKey":                  1053,
 		"DockerSwarmUnlock":                 1062,
 		"VaultToken":                        1063,
+		"VaultRootToken":                    1064,
 	}
 )
 

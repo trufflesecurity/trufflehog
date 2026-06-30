@@ -1057,4 +1057,5 @@ enum DetectorType {
   BrainTrustApiKey = 1053;
   DockerSwarmUnlock = 1062;
   VaultToken = 1063;
+  VaultRootToken = 1064;
 }
