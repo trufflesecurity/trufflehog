@@ -69,6 +69,10 @@ func (c *tokenConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
+func (c *tokenConnector) APIClientForRepo(_ string) (*github.Client, error) {
+	return c.apiClient, nil
+}
+
 func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
 	if err := c.setUserIfUnset(ctx); err != nil {
 		return "", nil, err
@@ -79,6 +83,10 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...stri
 
 func (c *tokenConnector) GraphQLClient() *githubv4.Client {
 	return c.graphqlClient
+}
+
+func (c *tokenConnector) GraphQLClientForRepo(_ context.Context, _ string) (*githubv4.Client, error) {
+	return c.graphqlClient, nil
 }
 
 func (c *tokenConnector) IsGithubEnterprise() bool {

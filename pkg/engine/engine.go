@@ -5,6 +5,7 @@ package engine
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"runtime"
@@ -215,7 +216,7 @@ type Engine struct {
 
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
-	dedupeCache *lru.Cache[string, detectorspb.DecoderType]
+	dedupeCache *lru.Cache[string, struct{}]
 
 	// verify determines whether the scanner will attempt to verify candidate secrets.
 	verify bool
@@ -503,14 +504,11 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
-	// TODO (ahrav): Determine the optimal cache size.
-	// KNOWN ISSUE: 512 entries is far too small for large scans. Under concurrent notifier
-	// workers a single burst of unique findings easily evicts previously seen keys, allowing
-	// the same secret to be re-emitted on every subsequent pass. Raise to at least 10000
-	// (or make configurable via Config).
-	const cacheSize = 512 // number of entries in the LRU cache
+	// The cache size is set to 5000 entries, which is a balance between memory usage and the need for effective deduplication.
+	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
+	const cacheSize = 5000
 
-	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
+	cache, err := lru.New[string, struct{}](cacheSize)
 	if err != nil {
 		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
@@ -1212,7 +1210,7 @@ func (e *Engine) filterResults(
 		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
 	if e.filterUnverified || ignoreConfig {
-		results = clean(results)
+		results = clean(results, e.verify)
 	}
 
 	if e.filterEntropy != 0 {
@@ -1288,25 +1286,26 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		atomic.AddUint32(&e.numFoundResults, 1)
 
 		// Dedupe results by comparing the detector type, raw result, and source metadata.
-		// We want to avoid duplicate results with different decoder types, but we also
-		// want to include duplicate results with the same decoder type.
-		// Duplicate results with the same decoder type SHOULD have their own entry in the
-		// results list, this would happen if the same secret is found multiple times.
-		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
+		// The key includes SourceMetadata (file path, line numbers, etc.) so genuinely
+		// different occurrences of the same credential at different locations are not
+		// suppressed. Only exact duplicates — same credential at the same location — are
+		// filtered, which handles peek-overlap re-scans and cross-decoder duplicates alike.
+		// The key also include the DetectorName to prevent deduping the results for
+		// custom detectors which have the same type.
+		// MD5 hash of the key is used to reduce memory usage of the dedupe cache,
+		// since the raw result and source metadata can be large.
 		//
-		// KNOWN ISSUE: The condition below only suppresses duplicates when the decoder type
-		// differs (cross-decoder dedup). For the same decoder type the condition evaluates to
-		// false and EVERY occurrence passes through, even when key is already in the cache.
-		// The LRU cache size of 512 entries further compounds this under concurrent notifier
-		// workers: entries are evicted quickly, re-admitting the same finding on every pass.
-		// Proposed fix: change the condition to `if _, ok := e.dedupeCache.Get(key); ok`
-		// and raise the cache size (see cacheSize const in initialize()).
-		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
-		if val, ok := e.dedupeCache.Get(key); ok && (val != result.DecoderType ||
-			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
-			continue
+		// This deduplication only applies to results that are *not*
+		// from reverification, since we are expected to see the same
+		// result from reverification and want to Dispatch it below.
+		if result.SecretID == 0 {
+			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
+			key := string(h[:])
+			if _, ok := e.dedupeCache.Get(key); ok {
+				continue
+			}
+			e.dedupeCache.Add(key, struct{}{})
 		}
-		e.dedupeCache.Add(key, result.DecoderType)
 
 		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
