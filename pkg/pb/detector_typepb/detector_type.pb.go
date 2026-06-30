@@ -1109,6 +1109,7 @@ const (
 	DetectorType_BrainTrustApiKey                        DetectorType = 1053
 	DetectorType_PgAnalyzeReadKey                        DetectorType = 1054
 	DetectorType_RedHatPyxis                             DetectorType = 1055
+	DetectorType_AnypointClientSecret                    DetectorType = 1056
 )
 
 // Enum value maps for DetectorType.
@@ -2166,6 +2167,7 @@ var (
 		1053: "BrainTrustApiKey",
 		1054: "PgAnalyzeReadKey",
 		1055: "RedHatPyxis",
+		1056: "AnypointClientSecret",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3220,6 +3222,7 @@ var (
 		"BrainTrustApiKey":                  1053,
 		"PgAnalyzeReadKey":                  1054,
 		"RedHatPyxis":                       1055,
+		"AnypointClientSecret":              1056,
 	}
 )
 

@@ -32,6 +32,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/amplitudeapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypoint"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypointclientsecret"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anypointoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apacta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/api2cart"
@@ -914,6 +915,7 @@ func buildDetectorList() []detectors.Detector {
 		&amplitudeapikey.Scanner{},
 		&anthropic.Scanner{},
 		&anypoint.Scanner{},
+		&anypointclientsecret.Scanner{},
 		&anypointoauth2.Scanner{},
 		&apacta.Scanner{},
 		&api2cart.Scanner{},
