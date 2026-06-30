@@ -2,10 +2,12 @@ package grafana
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -82,6 +84,87 @@ func TestGrafana_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestGrafana_Verification(t *testing.T) {
+	tests := []struct {
+		name         string
+		statusCode   int
+		body         string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "200 OK is verified",
+			statusCode:   200,
+			body:         `[{"id":"abc"}]`,
+			wantVerified: true,
+		},
+		{
+			name:         "403 Forbidden (valid token, restricted permissions) is verified",
+			statusCode:   403,
+			body:         `{"message":"You'll need additional permissions to perform this action."}`,
+			wantVerified: true,
+		},
+		{
+			// Valid token that authenticated but lacks accesspolicies:read scope.
+			// Grafana returns 401 with a permission/scope error -> verified.
+			name:         "401 with permission/scope error (valid token) is verified",
+			statusCode:   401,
+			body:         `{"code":"Unauthorized","message":"invalid permission: access policy missing required scope [accesspolicies:read], received [accesspolicies:write]","requestId":"fc800c18-fb65-4013-bb8b-2e047a698974"}`,
+			wantVerified: true,
+		},
+		{
+			// Invalid/revoked token that failed authentication -> unverified.
+			name:         "401 InvalidCredentials (revoked token) is unverified",
+			statusCode:   401,
+			body:         `{"code":"InvalidCredentials","message":"Token could not be parsed","requestId":"538c7b37-2882-4727-9fae-6fc87321aa5c"}`,
+			wantVerified: false,
+		},
+		{
+			// Regression: a revoked token whose body merely contains
+			// "Unauthorized" (but no permission/scope error) must NOT be verified.
+			name:         "401 generic Unauthorized (revoked token) is unverified",
+			statusCode:   401,
+			body:         `{"code":"Unauthorized","message":"Unauthorized"}`,
+			wantVerified: false,
+		},
+		{
+			name:         "401 with empty body is unverified",
+			statusCode:   401,
+			body:         ``,
+			wantVerified: false,
+		},
+		{
+			name:         "unexpected status code returns verification error",
+			statusCode:   404,
+			body:         ``,
+			wantVerified: false,
+			wantErr:      true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := Scanner{client: common.ConstantResponseHttpClient(test.statusCode, test.body)}
+			data := []byte(fmt.Sprintf("a grafana secret %s here", secret))
+
+			results, err := s.FromData(context.Background(), true, data)
+			if err != nil {
+				t.Fatalf("FromData() unexpected error = %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+
+			if results[0].Verified != test.wantVerified {
+				t.Errorf("Verified = %v, want %v", results[0].Verified, test.wantVerified)
+			}
+			if gotErr := results[0].VerificationError() != nil; gotErr != test.wantErr {
+				t.Errorf("verification error present = %v, want %v (err = %v)", gotErr, test.wantErr, results[0].VerificationError())
 			}
 		})
 	}

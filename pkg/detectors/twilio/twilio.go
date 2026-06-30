@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -23,7 +24,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.RetryableHTTPClient()
+	defaultClient = detectors.NewClientWithDedup(common.RetryableHTTPClient())
 	sidPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "account", "id", "sid"}) + `\b(AC[0-9a-f]{32})\b`)
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "auth", "token", "secret", "key"}) + `\b([0-9a-f]{32})\b`)
 )
@@ -56,13 +57,17 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	sidMatches := sidPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueKeys := make(map[string]struct{})
+	for _, keyMatch := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[keyMatch[1]] = struct{}{}
+	}
+	uniqueSIDs := make(map[string]struct{})
+	for _, sidMatch := range sidPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueSIDs[sidMatch[1]] = struct{}{}
+	}
 
-	for _, sidMatch := range sidMatches {
-		sid := sidMatch[1]
-		for _, keyMatch := range keyMatches {
-			key := keyMatch[1]
+	for sid := range uniqueSIDs {
+		for key := range uniqueKeys {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Twilio,
 				Raw:          []byte(sid),
@@ -80,9 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr)
 
-				for key, value := range extraData {
-					s1.ExtraData[key] = value
-				}
+				maps.Copy(s1.ExtraData, extraData)
 			}
 
 			results = append(results, s1)
@@ -109,7 +112,7 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid string) (ma
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Accept", "*/*")
 	req.SetBasicAuth(sid, key)
-	resp, err := client.Do(req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Twilio, sid+key, req)
 	if err != nil {
 		return nil, false, err
 	}

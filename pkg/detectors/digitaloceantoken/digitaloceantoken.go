@@ -75,7 +75,7 @@ func verifyDigitalOceanToken(ctx context.Context, client *http.Client, token str
 	if err != nil {
 		return false, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

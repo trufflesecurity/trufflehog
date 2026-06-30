@@ -216,7 +216,7 @@ func ValidateApiKey(client *http.Client, baseURL, apiKey string) (bool, error) {
 	case http.StatusForbidden:
 		return false, nil
 	default:
-		return false, fmt.Errorf("Unable to validate api key with status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unable to validate api key with status code: %d", resp.StatusCode)
 	}
 }
 
