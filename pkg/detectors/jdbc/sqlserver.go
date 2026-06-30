@@ -18,6 +18,9 @@ type SqlServerJDBC struct {
 var _ JDBC = (*SqlServerJDBC)(nil)
 
 func (s *SqlServerJDBC) ping(ctx context.Context) pingResult {
+	if hostIsLocal(s.Host) {
+		return pingResult{errNoLocalIP, true}
+	}
 	return ping(ctx, "mssql", isSqlServerErrorDeterminate,
 		buildSQLServerConnectionString(s.Host, s.User, s.Password, "master", map[string]string{"connection+timeout": "5"}))
 }

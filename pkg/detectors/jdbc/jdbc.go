@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -257,6 +259,52 @@ func ping(ctx context.Context, driverName string, isDeterminate func(error) bool
 		indeterminateErrors = append(indeterminateErrors, err)
 	}
 	return pingResult{errors.Join(indeterminateErrors...), false}
+}
+
+// errNoLocalIP mirrors detectors.ErrNoLocalIP used by the URI detector. Returning
+// it from a ping is a determinate result, which stops the candidate-connection
+// waterfall so we never actually dial the local address.
+var errNoLocalIP = errors.New("dialing local IP addresses is not allowed")
+
+// isLocalIP reports whether ip points at the local machine or an internal
+// network. It mirrors the check used by the URI detector in
+// detectors.DetectorHttpClientWithNoLocalAddresses (see pkg/detectors/http.go).
+func isLocalIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsPrivate() ||
+		ip.IsUnspecified()
+}
+
+// hostIsLocal reports whether host resolves to a local/loopback/link-local/
+// private/unspecified address. host is the value stored on a parsed JDBC
+// connection, which may carry the MySQL driver's tcp(...)/unix(...) wrapper and
+// an optional ":port" suffix, so both are stripped before the check. If the host
+// is a name rather than a literal IP it is resolved with net.LookupIP and treated
+// as local when any resolved address is local.
+func hostIsLocal(host string) bool {
+	// Strip the MySQL driver's network wrapper, e.g. tcp(127.0.0.1:3306) or
+	// unix(/var/run/mysqld.sock).
+	if i := strings.IndexByte(host, '('); i >= 0 && strings.HasSuffix(host, ")") {
+		host = host[i+1 : len(host)-1]
+	}
+
+	// Drop an optional port. SplitHostPort fails when there is no port, in which
+	// case host is already bare.
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		return isLocalIP(ip)
+	}
+
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(ips, isLocalIP)
 }
 
 func pingErr(ctx context.Context, driverName, conn string) error {

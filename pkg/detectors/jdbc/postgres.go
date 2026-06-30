@@ -19,6 +19,9 @@ type PostgresJDBC struct {
 var _ JDBC = (*PostgresJDBC)(nil)
 
 func (s *PostgresJDBC) ping(ctx context.Context) pingResult {
+	if hostIsLocal(s.Host) {
+		return pingResult{errNoLocalIP, true}
+	}
 	// It is crucial that we try to build a connection string ourselves before using the one we found. This is because
 	// if the found connection string doesn't include a username, the driver will attempt to connect using the current
 	// user's name, which will fail in a way that looks like a determinate failure, thus terminating the waterfall. In
