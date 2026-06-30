@@ -1108,6 +1108,7 @@ const (
 	DetectorType_AWSAppSync                              DetectorType = 1052
 	DetectorType_BrainTrustApiKey                        DetectorType = 1053
 	DetectorType_DockerSwarmUnlock                       DetectorType = 1062
+	DetectorType_VaultToken                              DetectorType = 1063
 )
 
 // Enum value maps for DetectorType.
@@ -2164,6 +2165,7 @@ var (
 		1052: "AWSAppSync",
 		1053: "BrainTrustApiKey",
 		1062: "DockerSwarmUnlock",
+		1063: "VaultToken",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3217,6 +3219,7 @@ var (
 		"AWSAppSync":                        1052,
 		"BrainTrustApiKey":                  1053,
 		"DockerSwarmUnlock":                 1062,
+		"VaultToken":                        1063,
 	}
 )
 
