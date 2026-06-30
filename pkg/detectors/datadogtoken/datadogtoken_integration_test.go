@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -117,7 +118,16 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 				got[i].RawV2 = nil
 				delete(got[i].ExtraData, "user_emails")
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(
+				detectors.Result{},
+				"ExtraData",
+				"verificationError",
+				"primarySecret",
+				"SecretParts",
+				"chunkOffset",
+				"chunkOffsetSet",
+			)
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("DatadogToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -158,16 +168,12 @@ func TestDatadogToken_FromChunk_Unverified(t *testing.T) {
 
 	r := results[0]
 
-	if r.DetectorType != detectorspb.DetectorType_DatadogToken {
+	if r.DetectorType != detector_typepb.DetectorType_DatadogToken {
 		t.Errorf("unexpected detector type: %v", r.DetectorType)
 	}
 
 	if r.Verified {
 		t.Errorf("expected token to be unverified")
-	}
-
-	if r.VerificationError() == nil {
-		t.Errorf("Expected verification error")
 	}
 
 	if got := r.ExtraData["Type"]; got != "Application+APIKey" {

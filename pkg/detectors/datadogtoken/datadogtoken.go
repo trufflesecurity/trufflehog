@@ -145,15 +145,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
-					if isVerified && res != nil {
+					if isVerified {
 						s1.ResetVerificationError() // Reset verification error in case a secret is verified with an endpoint
-						s1.AnalysisInfo = map[string]string{"apiKey": resApiMatch, "appKey": resAppMatch, "endpoint": baseURL}
-						var serviceResponse userServiceResponse
-						if len(serviceResponse.Data) > 0 {
-							setUserEmails(serviceResponse.Data, &s1)
-						}
-						if len(serviceResponse.Included) > 0 {
-							setOrganizationInfo(serviceResponse.Included, &s1)
+						s1.SecretParts["endpoint"] = baseURL
+						if res != nil {
+							if len(res.Data) > 0 {
+								setUserEmails(res.Data, &s1)
+							}
+							if len(res.Included) > 0 {
+								setOrganizationInfo(res.Included, &s1)
+							}
 						}
 						// break the loop once we've successfully validated the token against a baseURL
 						break
@@ -203,14 +204,8 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, appKey, baseU
 			return nil, false, err
 		}
 		return &serviceResponse, true, nil
-	case http.StatusBadRequest:
-		return nil, false, fmt.Errorf("bad request")
-	case http.StatusUnauthorized:
-		return nil, false, fmt.Errorf("invalid credentials")
-	case http.StatusForbidden:
-		return nil, false, fmt.Errorf("Insufficient permissions")
-	case http.StatusTooManyRequests:
-		return nil, false, fmt.Errorf("too many requests")
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil, false, nil
 	default:
 		return nil, false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
