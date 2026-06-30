@@ -514,7 +514,7 @@ func run(state overseer.State, logSync func() error) {
 	}
 
 	if *dropUnverifiedJWTResults {
-		feature.DropUnverifiedJWTResults.Store(*dropUnverifiedJWTResults)
+		feature.DropUnverifiedJWTResults.Store(true)
 	}
 
 	// OSS Default APK handling on
