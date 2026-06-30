@@ -501,7 +501,7 @@ enum DetectorType {
   VirusTotal = 497;
   AirVisual = 498;
   Currencyfreaks = 499;
-  Duffel = 500; // Not yet implemented
+  Duffel = 500;
   FlatIO = 501;
   M3o = 502;
   Mesibo = 503;
