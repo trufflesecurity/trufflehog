@@ -52,6 +52,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactoryreferencetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artsy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/arweavekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanaoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/assemblyai"
@@ -944,6 +945,7 @@ func buildDetectorList() []detectors.Detector {
 		&artifactory.Scanner{},
 		&artifactoryreferencetoken.Scanner{},
 		&artsy.Scanner{},
+		&arweavekey.Scanner{},
 		&asanaoauth.Scanner{},
 		&asanapersonalaccesstoken.Scanner{},
 		&assemblyai.Scanner{},
