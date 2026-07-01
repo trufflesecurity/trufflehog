@@ -5,29 +5,30 @@ import (
 )
 
 var (
-	ForceSkipBinaries               atomic.Bool
-	ForceSkipArchives               atomic.Bool
-	GitCloneTimeoutDuration         atomic.Int64
-	SkipAdditionalRefs              atomic.Bool
-	EnableAPKHandler                atomic.Bool
-	UserAgentSuffix                 AtomicString
-	UseSimplifiedGitlabEnumeration  atomic.Bool
-	UseGitMirror                    atomic.Bool
-	GitlabProjectsPerPage           atomic.Int64
-	UseGithubGraphQLAPI             atomic.Bool // use github graphql api to fetch issues, pr's and comments
-	HTMLDecoderEnabled              atomic.Bool
-	PineconeDetectorEnabled         atomic.Bool
-	CloudinaryDetectorEnabled       atomic.Bool
-	GitLabOAuthDetectorEnabled      atomic.Bool
-	EnigmaDetectorEnabled           atomic.Bool
-	DatadogApiKeyDetectorEnabled    atomic.Bool
-	TlyDetectorEnabled              atomic.Bool
-	WitDetectorEnabled              atomic.Bool
-	RevDetectorEnabled              atomic.Bool
-	UserDetectorEnabled             atomic.Bool
-	BraintrustDetectorEnabled       atomic.Bool
-	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
-	RedHatPyxisDetectorEnabled      atomic.Bool
+	ForceSkipBinaries                  atomic.Bool
+	ForceSkipArchives                  atomic.Bool
+	GitCloneTimeoutDuration            atomic.Int64
+	SkipAdditionalRefs                 atomic.Bool
+	EnableAPKHandler                   atomic.Bool
+	UserAgentSuffix                    AtomicString
+	UseSimplifiedGitlabEnumeration     atomic.Bool
+	UseGitMirror                       atomic.Bool
+	GitlabProjectsPerPage              atomic.Int64
+	UseGithubGraphQLAPI                atomic.Bool // use github graphql api to fetch issues, pr's and comments
+	HTMLDecoderEnabled                 atomic.Bool
+	PineconeDetectorEnabled            atomic.Bool
+	CloudinaryDetectorEnabled          atomic.Bool
+	GitLabOAuthDetectorEnabled         atomic.Bool
+	EnigmaDetectorEnabled              atomic.Bool
+	DatadogApiKeyDetectorEnabled       atomic.Bool
+	TlyDetectorEnabled                 atomic.Bool
+	WitDetectorEnabled                 atomic.Bool
+	RevDetectorEnabled                 atomic.Bool
+	UserDetectorEnabled                atomic.Bool
+	BraintrustDetectorEnabled          atomic.Bool
+	PgAnalyzeReadKeyDetectorEnabled    atomic.Bool
+	RedHatPyxisDetectorEnabled         atomic.Bool
+	HashiCorpVaultTokenDetectorEnabled atomic.Bool
 )
 
 type AtomicString struct {
