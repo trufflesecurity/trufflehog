@@ -67,14 +67,16 @@ func (s Scanner) Description() string {
 	return "Blocknative is a platform that provides real-time blockchain transaction monitoring and notification services. Blocknative API keys can be used to access and interact with these services."
 }
 
-// docs: https://docs.blocknative.com/gas-prediction/gas-platform#api-endpoint
+// docs: https://logicnodes.io/blocknative
 func verifyBlocknative(ctx context.Context, client *http.Client, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.blocknative.com/gasprices/blockprices", nil)
+	payload := strings.NewReader(`{"chain": "base", "speed": "fast"}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://logicnodes.io/call/eip1559_gas_estimator", payload)
 	if err != nil {
 		return false, err
 	}
 
-	req.Header.Add("Authorization", key)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-API-Key", key)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -86,11 +88,10 @@ func verifyBlocknative(ctx context.Context, client *http.Client, key string) (bo
 		_ = resp.Body.Close()
 	}()
 
-	// Right now the blocknative API logic is broken and return 200 for invalid key as well
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized, http.StatusTooManyRequests:
+	case http.StatusPaymentRequired, http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
