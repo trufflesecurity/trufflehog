@@ -711,6 +711,10 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     head: # optional
     # Extra args to be passed to the trufflehog cli.
     extra_args: --log-level=2 --results=verified,unknown
+    # Scan with a specific TruffleHog version (default: latest).
+    version:
+    # Docker image to pull. Override to use a registry mirror (default: ghcr.io/trufflesecurity/trufflehog).
+    image:
 ```
 
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
