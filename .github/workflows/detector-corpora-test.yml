@@ -25,15 +25,15 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25"
+          go-version: "1.26"
 
       - name: Install dependencies
         run: sudo apt-get install -y zstd jq
@@ -108,7 +108,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: steps.detect.outputs.any_changed == 'true'
-        uses: aws-actions/configure-aws-credentials@acca2b1b2070338fb9fd1ca27ecee81d687e58e5 # v6
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -121,7 +121,7 @@ jobs:
       - name: Restore main scan cache
         id: main_scan_cache
         if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != ''
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: /tmp/results-main.jsonl
           key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
@@ -200,7 +200,7 @@ jobs:
 
       - name: Save main scan cache
         if: steps.detect.outputs.any_changed == 'true' && steps.detect.outputs.main_csv != '' && steps.main_scan_cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: /tmp/results-main.jsonl
           key: main-scan-v1-${{ steps.merge_base.outputs.sha }}-${{ steps.detect.outputs.main_csv }}
