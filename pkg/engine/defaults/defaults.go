@@ -100,6 +100,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bip39seedphrase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
@@ -488,6 +489,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mockaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moderation"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moneroseedphrase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mongodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monkeylearn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerk"
@@ -983,6 +985,7 @@ func buildDetectorList() []detectors.Detector {
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
 		&bingsubscriptionkey.Scanner{},
+		&bip39seedphrase.Scanner{},
 		&bitbar.Scanner{},
 		&bitbucketdatacenter.Scanner{},
 		&bitbucketapppassword.Scanner{},
@@ -1387,6 +1390,7 @@ func buildDetectorList() []detectors.Detector {
 		&mockaroo.Scanner{},
 		&moderation.Scanner{},
 		&monday.Scanner{},
+		&moneroseedphrase.Scanner{},
 		&mongodb.Scanner{},
 		&monkeylearn.Scanner{},
 		&moonclerk.Scanner{},
