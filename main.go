@@ -545,6 +545,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.BraintrustDetectorEnabled.Store(true)
 	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
 	feature.RedHatPyxisDetectorEnabled.Store(true)
+	feature.HashiCorpVaultBatchTokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
