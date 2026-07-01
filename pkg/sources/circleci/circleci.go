@@ -152,7 +152,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 				for _, step := range projBuildJobs.Steps {
 					for _, action := range step.Actions {
-						data, err := s.getOutputUrlResponse(action.OutputUrl)
+						data, err := s.getOutputUrlResponse(ctx, action.OutputUrl)
 						if err != nil {
 							ctx.Logger().Error(err, "error getting action output url response")
 							errors = append(errors, err)
@@ -160,7 +160,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 							continue
 						}
 
-						if err = s.chunk(ctx, project, buildNum, step.Name, data, chunksChan); err != nil {
+						if err = func() error {
+							defer data.Close()
+							return s.chunk(ctx, project, buildNum, step.Name, data, chunksChan)
+						}(); err != nil {
 							ctx.Logger().Error(err, "error chunking action")
 							errors = append(errors, err)
 
@@ -169,7 +172,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 					}
 				}
 
-				if err = s.chunk(ctx, project, buildNum, "", projBuildJobs.CircleYaml.YamlString, chunksChan); err != nil {
+				if err = s.chunk(ctx, project, buildNum, "", strings.NewReader(projBuildJobs.CircleYaml.YamlString), chunksChan); err != nil {
 					ctx.Logger().Error(err, "error chunking build yaml")
 					errors = append(errors, err)
 
@@ -328,34 +331,31 @@ func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, buildNum 
 	}
 }
 
-func (s *Source) getOutputUrlResponse(outputUrl string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, outputUrl, nil)
+func (s *Source) getOutputUrlResponse(ctx context.Context, outputUrl string) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, outputUrl, http.NoBody)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer func() {
+
+	if resp.StatusCode >= http.StatusBadRequest {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
-	}()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("unexpected status code: %d while fetching action output", resp.StatusCode)
 	}
 
-	return string(bodyBytes), nil
+	return resp.Body, nil
 }
 
-func (s *Source) chunk(ctx context.Context, proj project, buildNum BuildNum, stepName, chunkData string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunk(ctx context.Context, proj project, buildNum BuildNum, stepName string, chunkData io.Reader, chunksChan chan *sources.Chunk) error {
 	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.Reponame, buildNum)
 
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, strings.NewReader(chunkData))
+	chunkResChan := chunkReader(ctx, chunkData)
 	for data := range chunkResChan {
 		chunk := &sources.Chunk{
 			SourceType: s.Type(),
