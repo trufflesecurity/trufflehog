@@ -40,6 +40,10 @@ archives:
       - LICENSE
       - README.md
       - docs/man/trufflehog.1
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
 dockers:
   - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
     dockerfile: Dockerfile.goreleaser
