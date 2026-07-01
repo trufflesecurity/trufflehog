@@ -3,6 +3,7 @@ package sentryorgtoken
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -18,6 +19,14 @@ var (
 	`
 	invalidPattern = "sntrys_eyJFAKE-OjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
 	token          = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
+	// Org auth tokens are variable length (the org slug and region URLs differ
+	// per organization/region). Build a shorter- and longer-than-fixture token at
+	// runtime from the `sntrys_eyJ` prefix plus filler, so these fixtures do not
+	// trip push-protection secret scanners; the detector only requires
+	// `sntrys_eyJ` followed by base64 characters. Post-`eyJ` lengths 177 and 225
+	// bracket the fixture's 197 -- both were dropped by the old fixed pattern.
+	shortOrgToken = "sntrys_eyJ" + strings.Repeat("A", 177)
+	longOrgToken  = "sntrys_eyJ" + strings.Repeat("A", 225)
 )
 
 func TestSentryToken_Pattern(t *testing.T) {
@@ -37,6 +46,16 @@ func TestSentryToken_Pattern(t *testing.T) {
 			name:  "valid pattern - ignore duplicate",
 			input: fmt.Sprintf("token = '%s' | '%s'", validPattern, validPattern),
 			want:  []string{token},
+		},
+		{
+			name:  "valid pattern - short org slug",
+			input: fmt.Sprintf("sentry_token := %s", shortOrgToken),
+			want:  []string{shortOrgToken},
+		},
+		{
+			name:  "valid pattern - long org slug",
+			input: fmt.Sprintf("sentry_token := %s", longOrgToken),
+			want:  []string{longOrgToken},
 		},
 		{
 			name:  "invalid pattern",
