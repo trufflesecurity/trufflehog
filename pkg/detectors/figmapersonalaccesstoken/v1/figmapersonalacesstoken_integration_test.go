@@ -55,7 +55,6 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"version": "1",
 					},
-					SecretParts: map[string]string{"token": secret},
 				},
 			},
 			wantErr: false,

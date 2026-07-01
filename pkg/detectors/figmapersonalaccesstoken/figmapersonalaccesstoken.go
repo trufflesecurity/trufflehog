@@ -27,9 +27,9 @@ func VerifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusForbidden:
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
-		// The Figma API returns 403 for invalid, expired, or revoked tokens,
+		// The Figma API returns 401/403 for invalid, expired, or revoked tokens,
 		// as well as valid tokens that lack the required scopes for the requested resource.
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
