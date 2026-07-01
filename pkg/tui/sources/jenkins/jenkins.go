@@ -3,77 +3,60 @@ package jenkins
 import (
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type jenkinsCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetNote() string {
-	return "If no username and password are provided, TruffleHog will attempt an unauthenticated Jenkins scan."
-}
-
-func GetFields() jenkinsCmdModel {
-	return jenkinsCmdModel{textinputs.New([]textinputs.InputConfig{
-		{
-			Label:       "Endpoint URL",
-			Key:         "url",
-			Required:    true,
-			Help:        "URL of the Jenkins server.",
-			Placeholder: "https://jenkins.example.com",
+// Definition returns the jenkins source configuration.
+//
+// Username + password are emitted only when both are set; either alone is
+// dropped so we don't accidentally half-authenticate against a server that
+// would then fall back to anonymous auth silently.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "jenkins",
+		Title:       "Jenkins",
+		Description: "Scan Jenkins, a CI/CD platform. (Recently open-sourced from enterprise!)",
+		Tier:        sources.TierOSS,
+		Note:        "If no username and password are provided, TruffleHog will attempt an unauthenticated Jenkins scan.",
+		Command:     "jenkins",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "url",
+				Label:       "Endpoint URL",
+				Help:        "URL of the Jenkins server.",
+				Kind:        form.KindText,
+				Placeholder: "https://jenkins.example.com",
+				Validators:  []form.Validate{form.Required()},
+			},
+			{
+				Key:   "username",
+				Label: "Username",
+				Help:  "For authenticated scans - pairs with password.",
+				Kind:  form.KindText,
+			},
+			{
+				Key:   "password",
+				Label: "Password",
+				Help:  "For authenticated scans - pairs with username.",
+				Kind:  form.KindSecret,
+			},
 		},
-		{
-			Label:    "Username",
-			Key:      "username",
-			Required: false,
-			Help:     "For authenticated scans - pairs with password.",
+		BuildArgs: func(values map[string]string) []string {
+			url := strings.TrimSpace(values["url"])
+			username := strings.TrimSpace(values["username"])
+			password := strings.TrimSpace(values["password"])
+
+			var out []string
+			if url != "" {
+				out = append(out, "--url="+url)
+			}
+			if username != "" && password != "" {
+				out = append(out, "--username="+username, "--password="+password)
+			}
+			return out
 		},
-		{
-			Label:    "Password",
-			Key:      "password",
-			Required: false,
-			Help:     "For authenticated scans - pairs with username.",
-		}})}
-}
-
-func checkIsAuthenticated(inputs map[string]textinputs.Input) bool {
-	username := inputs["username"].Value
-	password := inputs["password"].Value
-
-	return username != "" && password != ""
-}
-
-func (m jenkinsCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "jenkins")
-	inputs := m.GetInputs()
-
-	keys := []string{"url"}
-	if checkIsAuthenticated(inputs) {
-		keys = append(keys, "username", "password")
 	}
-
-	for _, key := range keys {
-		val, ok := inputs[key]
-		if !ok || val.Value == "" {
-			continue
-		}
-		command = append(command, "--"+key+"="+val.Value)
-	}
-
-	return strings.Join(command, " ")
-}
-
-func (m jenkinsCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-
-	summaryKeys := []string{"url"}
-	if checkIsAuthenticated(inputs) {
-		summaryKeys = append(summaryKeys, "username", "password")
-	}
-
-	return common.SummarizeSource(summaryKeys, inputs, labels)
 }

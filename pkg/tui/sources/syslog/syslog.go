@@ -1,80 +1,74 @@
 package syslog
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type syslogCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-// TODO: review fields
-func GetFields() syslogCmdModel {
-	protocol := textinputs.InputConfig{
-		Label:       "Protocol",
-		Key:         "protocol",
-		Required:    true,
-		Help:        "udp or tcp",
-		Placeholder: "tcp",
+// Definition returns the syslog source configuration.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "syslog",
+		Title:       "Syslog",
+		Description: "Scan syslog, event data logs.",
+		Tier:        sources.TierOSS,
+		Command:     "syslog",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "address",
+				Label:       "Address",
+				Help:        "Address and port to listen on for syslog",
+				Kind:        form.KindText,
+				Placeholder: "127.0.0.1:514",
+				Emit:        form.EmitLongFlagEq,
+				Validators:  []form.Validate{form.Required()},
+			},
+			{
+				Key:         "protocol",
+				Label:       "Protocol",
+				Help:        "udp or tcp",
+				Kind:        form.KindSelect,
+				Emit:        form.EmitLongFlagEq,
+				Default:     "tcp",
+				Options: []form.SelectOption{
+					{Label: "TCP", Value: "tcp"},
+					{Label: "UDP", Value: "udp"},
+				},
+				Validators: []form.Validate{form.Required(), form.OneOf("tcp", "udp")},
+			},
+			{
+				Key:         "cert",
+				Label:       "TLS Certificate",
+				Help:        "Path to TLS certificate",
+				Kind:        form.KindText,
+				Placeholder: "/path/to/cert",
+				Emit:        form.EmitLongFlagEq,
+				Validators:  []form.Validate{form.Required()},
+			},
+			{
+				Key:         "key",
+				Label:       "TLS Key",
+				Help:        "Path to TLS key",
+				Kind:        form.KindText,
+				Placeholder: "/path/to/key",
+				Emit:        form.EmitLongFlagEq,
+				Validators:  []form.Validate{form.Required()},
+			},
+			{
+				Key:         "format",
+				Label:       "Log format",
+				Help:        "Can be rfc3164 or rfc5424",
+				Kind:        form.KindSelect,
+				Emit:        form.EmitLongFlagEq,
+				Default:     "rfc3164",
+				Options: []form.SelectOption{
+					{Label: "rfc3164", Value: "rfc3164"},
+					{Label: "rfc5424", Value: "rfc5424"},
+				},
+				Validators: []form.Validate{form.Required(), form.OneOf("rfc3164", "rfc5424")},
+			},
+		},
 	}
-
-	listenAddress := textinputs.InputConfig{
-		Label:       "Address",
-		Key:         "address",
-		Help:        "Address and port to listen on for syslog",
-		Required:    true,
-		Placeholder: "127.0.0.1:514",
-	}
-
-	tlsCert := textinputs.InputConfig{
-		Label:       "TLS Certificate",
-		Key:         "cert",
-		Required:    true,
-		Help:        "Path to TLS certificate",
-		Placeholder: "/path/to/cert",
-	}
-
-	tlsKey := textinputs.InputConfig{
-		Label:       "TLS Key",
-		Key:         "key",
-		Required:    true,
-		Help:        "Path to TLS key",
-		Placeholder: "/path/to/key",
-	}
-
-	format := textinputs.InputConfig{
-		Label:       "Log format",
-		Key:         "format",
-		Required:    true,
-		Help:        "Can be rfc3164 or rfc5424",
-		Placeholder: "rfc3164",
-	}
-
-	return syslogCmdModel{textinputs.New([]textinputs.InputConfig{listenAddress, protocol, tlsCert, tlsKey, format})}
-}
-
-func (m syslogCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "syslog")
-
-	inputs := m.GetInputs()
-	syslogKeys := [5]string{"address", "protocol", "cert", "key", "format"}
-
-	for _, key := range syslogKeys {
-		flag := "--" + key + "=" + inputs[key].Value
-		command = append(command, flag)
-	}
-
-	return strings.Join(command, " ")
-}
-
-func (m syslogCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-	keys := []string{"address", "protocol", "cert", "key", "format"}
-
-	return common.SummarizeSource(keys, inputs, labels)
 }
