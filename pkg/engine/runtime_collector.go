@@ -168,18 +168,24 @@ func (c *runtimeCollector) Collect(ch chan<- prometheus.Metric) {
 // registerRuntimeMetrics installs the engine's runtime collector into the
 // default Prometheus registry. If a collector with identical descriptors is
 // already registered (e.g. a previous engine in the same process that didn't
-// fully tear down), the registration is skipped and the engine will not
-// attempt to unregister on shutdown.
+// call Finish), the stale collector is evicted and replaced. Without eviction
+// the stale collector would pin a dead engine in memory and permanently block
+// future engines from exposing metrics.
 func (e *Engine) registerRuntimeMetrics(ctx context.Context) {
 	collector := newRuntimeCollector(e)
-	if err := prometheus.DefaultRegisterer.Register(collector); err != nil {
+	err := prometheus.DefaultRegisterer.Register(collector)
+	if err != nil {
 		var already prometheus.AlreadyRegisteredError
-		if errors.As(err, &already) {
-			ctx.Logger().V(2).Info("engine runtime metrics already registered, skipping")
+		if !errors.As(err, &already) {
+			ctx.Logger().Error(err, "failed to register engine runtime metrics")
 			return
 		}
-		ctx.Logger().Error(err, "failed to register engine runtime metrics")
-		return
+		ctx.Logger().V(2).Info("evicting stale engine runtime metrics collector")
+		prometheus.DefaultRegisterer.Unregister(already.ExistingCollector)
+		if err := prometheus.DefaultRegisterer.Register(collector); err != nil {
+			ctx.Logger().Error(err, "failed to register engine runtime metrics after eviction")
+			return
+		}
 	}
 	e.runtimeCollector = collector
 }
