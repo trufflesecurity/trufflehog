@@ -41,7 +41,14 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"algolia", "docsearch"}
+	return []string{
+		"algolia",
+		"docsearch",
+		"ALGOLIA_API_KEY",
+		"ALGOLIA_APPLICATION_ID",
+		"x-algolia-api-key",
+		"x-algolia-application-id",
+	}
 }
 
 // FromData will find and optionally verify AlgoliaAdminKey secrets in a given set of bytes.
