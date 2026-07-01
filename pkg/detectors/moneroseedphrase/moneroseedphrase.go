@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-//go:embed wordlist.txt
+//go:embed wordlist-monero-en.txt
 var wordlistRaw string
 
 var (
@@ -26,6 +26,7 @@ func init() {
 	for i, w := range strings.Split(strings.TrimSpace(wordlistRaw), "\n") {
 		word := strings.TrimSpace(strings.ToLower(w))
 		moneroWords[word] = i
+		moneroKeywords = append(moneroKeywords, word)
 	}
 }
 
@@ -35,6 +36,7 @@ const checksumPrefixLength = 3
 type Scanner struct{}
 
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 func (s Scanner) Keywords() []string {
 	return moneroKeywords
@@ -57,6 +59,10 @@ func (s Scanner) FromData(_ context.Context, _ bool, data []byte) ([]detectors.R
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 // verifyMoneroChecksum validates the 25th word as Monero's Electrum checksum.

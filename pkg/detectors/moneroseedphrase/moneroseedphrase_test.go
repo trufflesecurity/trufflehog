@@ -101,8 +101,8 @@ func TestMonero_Keywords(t *testing.T) {
 
 	t.Run("bare mnemonic triggers through wordlist keyword", func(t *testing.T) {
 		detectorMatches := ahoCorasickCore.FindDetectorMatches([]byte(validMoneroMnemonic))
-		if len(detectorMatches) != 0 {
-			t.Errorf("keywords '%v' unexpectedly matched bare mnemonic", d.Keywords())
+		if len(detectorMatches) == 0 {
+			t.Errorf("keywords '%v' did not match bare mnemonic", d.Keywords())
 		}
 
 		results, err := d.FromData(context.Background(), false, []byte(validMoneroMnemonic))
@@ -115,7 +115,7 @@ func TestMonero_Keywords(t *testing.T) {
 	})
 }
 
-func TestMonero_KeywordsExcludesWordlistTerms(t *testing.T) {
+func TestMonero_KeywordsIncludesWordlistTerms(t *testing.T) {
 	d := Scanner{}
 	keywords := map[string]struct{}{}
 	for _, keyword := range d.Keywords() {
@@ -125,9 +125,18 @@ func TestMonero_KeywordsExcludesWordlistTerms(t *testing.T) {
 	wordlist := moneroWordlist(t)
 	for _, idx := range []int{0, 2, 15, 18} {
 		word := wordlist[idx]
-		if _, ok := keywords[word]; ok {
-			t.Errorf("Keywords() contains wordlist term at index %d", idx)
+		if _, ok := keywords[word]; !ok {
+			t.Errorf("Keywords() missing wordlist term at index %d", idx)
 		}
+	}
+}
+
+func TestMonero_IsFalsePositive(t *testing.T) {
+	isFalsePositive, reason := detectors.GetFalsePositiveCheck(Scanner{})(detectors.Result{
+		Raw: []byte(validMoneroMnemonic),
+	})
+	if isFalsePositive {
+		t.Fatalf("expected seed phrase not to be filtered as false positive: %s", reason)
 	}
 }
 

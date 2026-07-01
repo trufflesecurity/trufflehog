@@ -84,10 +84,10 @@ func TestBIP39_Keywords(t *testing.T) {
 			wantMatch: true,
 		},
 		{
-			name:      "detects bare mnemonic directly without prefilter keyword",
+			name:      "detects bare mnemonic through wordlist keyword",
 			input:     valid12WordMnemonic,
 			want:      1,
-			wantMatch: false,
+			wantMatch: true,
 		},
 		{
 			name:      "detects 24-word mnemonic with keyword",
@@ -151,7 +151,7 @@ func TestBIP39_Keywords(t *testing.T) {
 	}
 }
 
-func TestBIP39_KeywordsExcludesWordlistTerms(t *testing.T) {
+func TestBIP39_KeywordsIncludesWordlistTerms(t *testing.T) {
 	d := Scanner{}
 	keywords := map[string]struct{}{}
 	for _, keyword := range d.Keywords() {
@@ -161,9 +161,18 @@ func TestBIP39_KeywordsExcludesWordlistTerms(t *testing.T) {
 	wordlist := bip39Wordlist(t)
 	for _, idx := range []int{0, 1, 2, 3} {
 		word := wordlist[idx]
-		if _, ok := keywords[word]; ok {
-			t.Errorf("Keywords() contains wordlist term at index %d", idx)
+		if _, ok := keywords[word]; !ok {
+			t.Errorf("Keywords() missing wordlist term at index %d", idx)
 		}
+	}
+}
+
+func TestBIP39_IsFalsePositive(t *testing.T) {
+	isFalsePositive, reason := detectors.GetFalsePositiveCheck(Scanner{})(detectors.Result{
+		Raw: []byte(valid12WordMnemonic),
+	})
+	if isFalsePositive {
+		t.Fatalf("expected seed phrase not to be filtered as false positive: %s", reason)
 	}
 }
 
