@@ -253,6 +253,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dronahq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/droneci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dropbox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duffeltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dwolla"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dynalist"
@@ -1141,6 +1142,7 @@ func buildDetectorList() []detectors.Detector {
 		&dronahq.Scanner{},
 		&droneci.Scanner{},
 		&dropbox.Scanner{},
+		&duffeltoken.Scanner{},
 		&duply.Scanner{},
 		&dwolla.Scanner{},
 		&dynalist.Scanner{},
@@ -1812,6 +1814,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
 		case *redhatpyxis.Scanner:
 			return !feature.RedHatPyxisDetectorEnabled.Load()
+		case *duffeltoken.Scanner:
+			return !feature.DuffelTokenDetectorEnabled.Load()
 		default:
 			return false
 		}
