@@ -128,7 +128,8 @@ func (r AnalyzerRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	}
 	// Check that unsafe methods did NOT return a valid status code.
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return resp, fmt.Errorf("non-safe request returned success")
+		resp.Body.Close()
+		return nil, fmt.Errorf("non-safe request returned success")
 	}
 	return resp, nil
 }
