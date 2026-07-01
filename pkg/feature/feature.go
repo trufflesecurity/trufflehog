@@ -28,6 +28,7 @@ var (
 	BraintrustDetectorEnabled       atomic.Bool
 	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
 	RedHatPyxisDetectorEnabled      atomic.Bool
+  FigmaV3DetectorEnabled          atomic.Bool
 )
 
 type AtomicString struct {

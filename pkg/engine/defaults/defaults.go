@@ -288,6 +288,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
 	figmapersonalaccesstokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
 	figmapersonalaccesstokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
+	figmapersonalaccesstokenv3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
@@ -1176,6 +1177,7 @@ func buildDetectorList() []detectors.Detector {
 		&fibery.Scanner{},
 		&figmapersonalaccesstokenv1.Scanner{},
 		&figmapersonalaccesstokenv2.Scanner{},
+		&figmapersonalaccesstokenv3.Scanner{},
 		&fileio.Scanner{},
 		&finage.Scanner{},
 		&financialmodelingprep.Scanner{},
@@ -1794,6 +1796,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *figmapersonalaccesstokenv3.Scanner:
+			return !feature.FigmaV3DetectorEnabled.Load()
 		case *enigma.Scanner:
 			return !feature.EnigmaDetectorEnabled.Load()
 		case *datadogapikey.Scanner:
