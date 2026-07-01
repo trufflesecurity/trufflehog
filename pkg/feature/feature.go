@@ -19,6 +19,7 @@ var (
 	PineconeDetectorEnabled         atomic.Bool
 	CloudinaryDetectorEnabled       atomic.Bool
 	GitLabOAuthDetectorEnabled      atomic.Bool
+	SonarCloudV2DetectorEnabled     atomic.Bool
 	EnigmaDetectorEnabled           atomic.Bool
 	DatadogApiKeyDetectorEnabled    atomic.Bool
 	TlyDetectorEnabled              atomic.Bool

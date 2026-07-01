@@ -711,7 +711,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snipcart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snykkey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud"
+	sonarcloudv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v1"
+	sonarcloudv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spectralops"
@@ -1614,7 +1615,8 @@ func buildDetectorList() []detectors.Detector {
 		&snipcart.Scanner{},
 		&snowflake.Scanner{},
 		&snykkey.Scanner{},
-		&sonarcloud.Scanner{},
+		&sonarcloudv1.Scanner{},
+		&sonarcloudv2.Scanner{},
 		&sourcegraph.Scanner{},
 		&sourcegraphcody.Scanner{},
 		// &sparkpost.Scanner{},
@@ -1794,6 +1796,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *sonarcloudv2.Scanner:
+			return !feature.SonarCloudV2DetectorEnabled.Load()
 		case *enigma.Scanner:
 			return !feature.EnigmaDetectorEnabled.Load()
 		case *datadogapikey.Scanner:

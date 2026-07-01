@@ -19,12 +19,12 @@ import (
 func TestSonarCloud_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SONARCLOUD")
-	inactiveSecret := testSecrets.MustGetField("SONARCLOUD_INACTIVE")
+	secret := testSecrets.MustGetField("SONARCLOUD_V2")
+	inactiveSecret := testSecrets.MustGetField("SONARCLOUD_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -50,6 +50,12 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_SonarCloud,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"version": "2",
+					},
+					SecretParts: map[string]string{
+						"key": secret,
+					},
 				},
 			},
 			wantErr: false,
@@ -66,6 +72,12 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_SonarCloud,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "2",
+					},
+					SecretParts: map[string]string{
+						"key": inactiveSecret,
+					},
 				},
 			},
 			wantErr: false,
