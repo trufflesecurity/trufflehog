@@ -115,22 +115,6 @@ func TestMonero_Keywords(t *testing.T) {
 	})
 }
 
-func TestMonero_KeywordsIncludesWordlistTerms(t *testing.T) {
-	d := Scanner{}
-	keywords := map[string]struct{}{}
-	for _, keyword := range d.Keywords() {
-		keywords[keyword] = struct{}{}
-	}
-
-	wordlist := moneroWordlist(t)
-	for _, idx := range []int{0, 2, 15, 18} {
-		word := wordlist[idx]
-		if _, ok := keywords[word]; !ok {
-			t.Errorf("Keywords() missing wordlist term at index %d", idx)
-		}
-	}
-}
-
 func TestMonero_IsFalsePositive(t *testing.T) {
 	isFalsePositive, reason := detectors.GetFalsePositiveCheck(Scanner{})(detectors.Result{
 		Raw: []byte(validMoneroMnemonic),
@@ -296,5 +280,27 @@ func TestMonero_Type(t *testing.T) {
 	d := Scanner{}
 	if int(d.Type()) != 1057 {
 		t.Errorf("expected type 1057 (MoneroSeedPhrase), got %d", d.Type())
+	}
+}
+
+func TestMonero_KeywordsDoesNotIncludeCommonWords(t *testing.T) {
+	d := Scanner{}
+	keywords := map[string]struct{}{}
+	for _, keyword := range d.Keywords() {
+		keywords[keyword] = struct{}{}
+	}
+
+	commonWords := []string{"all", "air", "age", "act", "art", "ask", "arm", "add", "any", "aim"}
+	for _, w := range commonWords {
+		if _, ok := keywords[w]; ok {
+			t.Errorf("expected common word %q to be excluded from Keywords()", w)
+		}
+	}
+
+	uncommonMnemonicWords := []string{"arises", "arsenic"}
+	for _, w := range uncommonMnemonicWords {
+		if _, ok := keywords[w]; !ok {
+			t.Errorf("expected uncommon mnemonic word %q to remain in Keywords()", w)
+		}
 	}
 }

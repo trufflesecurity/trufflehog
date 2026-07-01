@@ -2,6 +2,7 @@ package bip39seedphrase
 
 import (
 	"context"
+	"crypto/sha256"
 	"strconv"
 	"strings"
 	"testing"
@@ -62,6 +63,45 @@ func numberedBIP39Mnemonic(seed string) string {
 	return input.String()
 }
 
+func generatedBareBIP39MnemonicWithKeyword(t *testing.T, keywords []string) string {
+	t.Helper()
+
+	keywordSet := make(map[string]struct{}, len(keywords))
+	for _, keyword := range keywords {
+		keywordSet[keyword] = struct{}{}
+	}
+
+	wordlist := bip39Wordlist(t)
+	for counter := 0; counter < 10_000; counter++ {
+		seed := sha256.Sum256([]byte("bip39 bare mnemonic keyword test vector " + strconv.Itoa(counter)))
+		entropy := seed[:16]
+		hash := sha256.Sum256(entropy)
+		bits := bytesToBits(entropy) + bytesToBits(hash[:])[:4]
+
+		words := make([]string, 0, 12)
+		matchesKeyword := false
+		for i := 0; i < len(bits); i += 11 {
+			idx, err := strconv.ParseInt(bits[i:i+11], 2, 64)
+			if err != nil {
+				t.Fatalf("parse generated BIP39 index: %v", err)
+			}
+			word := wordlist[idx]
+			words = append(words, word)
+			if _, ok := keywordSet[word]; ok {
+				matchesKeyword = true
+			}
+		}
+
+		phrase := strings.Join(words, " ")
+		if matchesKeyword && verifyBIP39Checksum(words) {
+			return phrase
+		}
+	}
+
+	t.Fatal("could not generate a bare BIP39 mnemonic containing a keyword")
+	return ""
+}
+
 func TestBIP39_Keywords(t *testing.T) {
 	d := Scanner{}
 	keywords := d.Keywords()
@@ -69,6 +109,7 @@ func TestBIP39_Keywords(t *testing.T) {
 		t.Fatal("expected non-empty keywords")
 	}
 
+	generatedBareMnemonic := generatedBareBIP39MnemonicWithKeyword(t, keywords)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
 	tests := []struct {
@@ -84,8 +125,8 @@ func TestBIP39_Keywords(t *testing.T) {
 			wantMatch: true,
 		},
 		{
-			name:      "detects bare mnemonic through wordlist keyword",
-			input:     valid12WordMnemonic,
+			name:      "detects generated bare mnemonic through wordlist keyword",
+			input:     generatedBareMnemonic,
 			want:      1,
 			wantMatch: true,
 		},
@@ -131,11 +172,11 @@ func TestBIP39_Keywords(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detectorMatches := ahoCorasickCore.FindDetectorMatches([]byte(tt.input))
 			if tt.wantMatch && len(detectorMatches) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), tt.input)
+				t.Errorf("expected keywords to match test input")
 				return
 			}
 			if !tt.wantMatch && len(detectorMatches) != 0 {
-				t.Errorf("keywords '%v' unexpectedly matched: %s", d.Keywords(), tt.input)
+				t.Errorf("expected keywords not to match test input")
 				return
 			}
 
@@ -148,22 +189,6 @@ func TestBIP39_Keywords(t *testing.T) {
 				t.Errorf("expected %d results, got %d", tt.want, len(results))
 			}
 		})
-	}
-}
-
-func TestBIP39_KeywordsIncludesWordlistTerms(t *testing.T) {
-	d := Scanner{}
-	keywords := map[string]struct{}{}
-	for _, keyword := range d.Keywords() {
-		keywords[keyword] = struct{}{}
-	}
-
-	wordlist := bip39Wordlist(t)
-	for _, idx := range []int{0, 1, 2, 3} {
-		word := wordlist[idx]
-		if _, ok := keywords[word]; !ok {
-			t.Errorf("Keywords() missing wordlist term at index %d", idx)
-		}
 	}
 }
 
@@ -312,5 +337,27 @@ func TestBIP39_Type(t *testing.T) {
 	d := Scanner{}
 	if int(d.Type()) != 1056 {
 		t.Errorf("expected type 1056 (BIP39SeedPhrase), got %d", d.Type())
+	}
+}
+
+func TestBIP39_KeywordsDoesNotIncludeCommonWords(t *testing.T) {
+	d := Scanner{}
+	keywords := map[string]struct{}{}
+	for _, keyword := range d.Keywords() {
+		keywords[keyword] = struct{}{}
+	}
+
+	commonWords := []string{"all", "air", "age", "act", "art", "ask", "arm", "add", "any", "aim"}
+	for _, w := range commonWords {
+		if _, ok := keywords[w]; ok {
+			t.Errorf("expected common word %q to be excluded from Keywords()", w)
+		}
+	}
+
+	uncommonMnemonicWords := []string{"dice", "stable"}
+	for _, w := range uncommonMnemonicWords {
+		if _, ok := keywords[w]; !ok {
+			t.Errorf("expected uncommon mnemonic word %q to remain in Keywords()", w)
+		}
 	}
 }
