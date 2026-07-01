@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -17,8 +16,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v67/github"
+	"github.com/shurcooL/githubv4"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -64,11 +65,14 @@ type Source struct {
 	scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
 
-	conn            *sourcespb.GitHub
-	jobPool         *errgroup.Group
-	resumeInfoMutex sync.Mutex
-	resumeInfoSlice []string
-	connector       Connector
+	conn                   *sourcespb.GitHub
+	jobPool                *errgroup.Group
+	resumeInfoMutex        sync.Mutex
+	resumeInfoSlice        []string
+	connector              Connector
+	appInstallationsMu     sync.Mutex
+	appInstallations       []*github.Installation
+	appInstallationsLoaded bool
 
 	includePRComments     bool
 	includeIssueComments  bool
@@ -126,8 +130,6 @@ func (s *Source) setScanOptions(base, head string) {
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 var _ sources.SourceUnitEnumChunker = (*Source)(nil)
-
-var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -239,6 +241,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !s.conn.RemoveAuthInUrl
+	s.resetAppInstallations()
 
 	connector, err := newConnector(aCtx, s)
 	if err != nil {
@@ -277,6 +280,17 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
+	}
+
+	if connector, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations {
+		if _, err := s.getAppInstallations(aCtx, connector); err != nil {
+			return err
+		}
+		if len(s.repos) > 0 {
+			if err := s.mapExplicitReposToInstallations(aCtx, connector); err != nil {
+				return err
+			}
+		}
 	}
 
 	cfg := &git.Config{
@@ -331,8 +345,10 @@ func (s *Source) Validate(ctx context.Context) []error {
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metadatapb.Visibility {
 	// It isn't possible to get the visibility of a wiki.
 	// We must use the visibility of the corresponding repository.
-	if strings.HasSuffix(repoURL, ".wiki.git") {
-		repoURL = strings.TrimSuffix(repoURL, ".wiki.git") + ".git"
+	if _, ok := s.repoInfoCache.get(repoURL); !ok {
+		if parentRepoURL, isWiki := repoCloneURLForWikiCloneURL(repoURL); isWiki {
+			repoURL = parentRepoURL
+		}
 	}
 
 	repoInfo, ok := s.repoInfoCache.get(repoURL)
@@ -364,17 +380,22 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	// We don't care about handling enumerated values as they happen during
 	// the normal Chunks flow because we enumerate and scan in two steps.
+	var enumerationErrs []error
 	noopReporter := sources.VisitorReporter{
 		VisitUnit: func(context.Context, sources.SourceUnit) error {
 			return nil
 		},
+		VisitErr: func(ctx context.Context, err error) error {
+			enumerationErrs = append(enumerationErrs, err)
+			return ctx.Err()
+		},
 	}
 	err := s.Enumerate(ctx, noopReporter)
 	if err != nil {
-		return fmt.Errorf("error enumerating: %w", err)
+		return errors.Join(fmt.Errorf("error enumerating: %w", err), errors.Join(enumerationErrs...))
 	}
 
-	return s.scan(ctx, chunksReporter)
+	return errors.Join(append(enumerationErrs, s.scan(ctx, chunksReporter))...)
 }
 
 // Enumerate enumerates the GitHub source based on authentication method and
@@ -421,7 +442,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
 	switch c := s.connector.(type) {
 	case *appConnector:
-		if err := s.enumerateWithApp(ctx, c.InstallationClient(), dedupeReporter); err != nil {
+		if err := s.enumerateWithApp(ctx, c, dedupeReporter); err != nil {
 			return err
 		}
 	case *basicAuthConnector:
@@ -509,7 +530,12 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 	} else {
 		// Cache repository info.
 		for {
-			ghRepo, _, err := s.connector.APIClient().Repositories.Get(ctx, urlParts[1], urlParts[2])
+			apiClient, err := s.connector.APIClientForRepo(repo)
+			if err != nil {
+				return repo, fmt.Errorf("failed to create API client for repository: %w", err)
+			}
+
+			ghRepo, _, err := apiClient.Repositories.Get(ctx, urlParts[1], urlParts[2])
 			if s.handleRateLimit(ctx, err, reporter) {
 				continue
 			}
@@ -631,16 +657,22 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	return nil
 }
 
-func (s *Source) enumerateWithApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
+func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, reporter sources.UnitReporter) error {
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
-		if err := s.getReposByApp(ctx, reporter); err != nil {
-			return err
+		if s.conn.ScanAllInstallations {
+			if err := s.enumerateAllInstallationRepos(ctx, connector, reporter); err != nil {
+				return err
+			}
+		} else {
+			if err := s.getReposByApp(ctx, reporter); err != nil {
+				return err
+			}
 		}
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, installationClient, reporter)
+			err := s.addMembersByApp(ctx, connector, reporter)
 			if err != nil {
 				return err
 			}
@@ -661,6 +693,444 @@ func (s *Source) enumerateWithApp(ctx context.Context, installationClient *githu
 	}
 
 	return nil
+}
+
+func (s *Source) resetAppInstallations() {
+	s.appInstallationsMu.Lock()
+	defer s.appInstallationsMu.Unlock()
+
+	s.appInstallations = nil
+	s.appInstallationsLoaded = false
+}
+
+func (s *Source) getAppInstallations(ctx context.Context, connector *appConnector) ([]*github.Installation, error) {
+	s.appInstallationsMu.Lock()
+	defer s.appInstallationsMu.Unlock()
+
+	if s.appInstallationsLoaded {
+		return s.appInstallations, nil
+	}
+
+	installs, err := s.listAppInstallations(ctx, connector, defaultPagination)
+	if err != nil {
+		return nil, err
+	}
+	s.appInstallations = installs
+	s.appInstallationsLoaded = true
+	return s.appInstallations, nil
+}
+
+func (s *Source) listAppInstallations(
+	ctx context.Context,
+	connector *appConnector,
+	perPage int,
+) ([]*github.Installation, error) {
+	installationClient := connector.InstallationClient()
+	opts := &github.ListOptions{PerPage: perPage}
+
+	var allInstalls []*github.Installation
+	for {
+		installs, res, err := installationClient.Apps.ListInstallations(ctx, opts)
+		if s.handleRateLimit(ctx, err) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not list installations: %w", err)
+		}
+		allInstalls = append(allInstalls, installs...)
+		if res == nil || res.NextPage == 0 {
+			break
+		}
+		opts.Page = res.NextPage
+	}
+
+	return allInstalls, nil
+}
+
+func (s *Source) listAppInstallationRepoPage(
+	ctx context.Context,
+	client *github.Client,
+	opts *github.ListOptions,
+	handleRateLimit func(error) bool,
+) ([]*github.Repository, *github.Response, error) {
+	for {
+		result, res, err := client.Apps.ListRepos(ctx, opts)
+		if handleRateLimit(err) {
+			continue
+		}
+		if result == nil {
+			return nil, res, err
+		}
+		if result.Repositories == nil {
+			return []*github.Repository{}, res, err
+		}
+		return result.Repositories, res, err
+	}
+}
+
+// enumerateAllInstallationRepos discovers repos from every installation of the
+// GitHub App. For each installation, it creates a per-installation API client
+// and records the installation ID for each repo so Clone uses the correct token.
+// Per-installation failures are reported through the unit reporter and don't
+// abort enumeration of the remaining installations.
+func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *appConnector, reporter sources.UnitReporter) error {
+	installs, err := s.getAppInstallations(ctx, connector)
+	if err != nil {
+		return err
+	}
+
+	for _, install := range installs {
+		installID := install.GetID()
+		account := install.GetAccount().GetLogin()
+		installCtx := context.WithValues(ctx, "org", account, "installation_id", installID)
+		installCtx.Logger().Info("Enumerating repos from GitHub App installation")
+
+		client, err := connector.APIClientForInstallation(installID)
+		if err != nil {
+			installCtx.Logger().Error(err, "could not create API client for installation")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", installID, err)); err != nil {
+				return err
+			}
+			continue
+		}
+
+		listRepos := func(ctx context.Context, _ string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+			repos, resp, err := s.listAppInstallationRepoPage(ctx, client, opts.getListOptions(), func(err error) bool {
+				return s.handleRateLimitWithUnitReporter(ctx, reporter, err)
+			})
+			for _, r := range repos {
+				connector.setRepoInstallationForRepoName(r.GetCloneURL(), r.GetName(), installID)
+			}
+			return repos, resp, err
+		}
+
+		if err := s.processRepos(installCtx, account, reporter, listRepos, &appListOptions{
+			ListOptions: github.ListOptions{PerPage: defaultPagination},
+		}); err != nil {
+			installCtx.Logger().Error(err, "error enumerating repos for installation")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("error enumerating repos for installation %d: %w", installID, err)); err != nil {
+				return err
+			}
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) mapExplicitReposToInstallations(ctx context.Context, connector *appConnector) error {
+	return s.mapReposToInstallations(ctx, connector, s.repos)
+}
+
+type repoMappingRequest struct {
+	original   string
+	normalized string
+	lookupURLs []string
+	lookupKeys []string
+}
+
+func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConnector, repos []string) error {
+	if len(repos) == 0 {
+		return nil
+	}
+
+	wantedRepos := make(map[string]repoMappingRequest, len(repos))
+	for _, repo := range repos {
+		normalized, err := s.normalizeRepo(repo)
+		if err != nil {
+			return fmt.Errorf("could not normalize configured repo %q: %w", repo, err)
+		}
+		if connector.hasRepoInstallation(repo) || connector.hasRepoInstallation(normalized) {
+			continue
+		}
+		request := repoMappingRequest{
+			original:   repo,
+			normalized: normalized,
+			lookupURLs: repoURLsForInstallationLookup(normalized),
+		}
+		for _, lookupURL := range request.lookupURLs {
+			key, err := repoHostOwnerNameKey(lookupURL)
+			if err != nil {
+				return fmt.Errorf("could not parse configured repo %q: %w", repo, err)
+			}
+			request.lookupKeys = append(request.lookupKeys, key)
+		}
+		// During installation repo listing, only allow exact matches. If no
+		// exact repo exists, mapRemainingReposByMetadata tries wiki-parent
+		// fallbacks afterward.
+		wantedRepos[request.lookupKeys[0]] = request
+	}
+	if len(wantedRepos) == 0 {
+		return nil
+	}
+
+	installs, err := s.getAppInstallations(ctx, connector)
+	if err != nil {
+		return err
+	}
+
+	var errs error
+	clients := make(map[int64]*github.Client, len(installs))
+	installedRepoKeys := make(map[int64]map[string]struct{}, len(installs))
+	for _, install := range installs {
+		installID := install.GetID()
+		client, err := connector.APIClientForInstallation(installID)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("could not create API client for installation %d: %w", installID, err))
+			continue
+		}
+		clients[installID] = client
+
+		opts := &github.ListOptions{PerPage: defaultPagination}
+		for {
+			repos, res, err := s.listAppInstallationRepoPage(ctx, client, opts, func(err error) bool {
+				return s.handleRateLimit(ctx, err)
+			})
+			if err != nil {
+				errs = errors.Join(errs, fmt.Errorf("could not list repos for installation %d: %w", installID, err))
+				break
+			}
+
+			if repos != nil {
+				if installedRepoKeys[installID] == nil {
+					installedRepoKeys[installID] = make(map[string]struct{}, len(repos))
+				}
+				for _, repo := range repos {
+					key, err := repoHostOwnerNameKey(repo.GetCloneURL())
+					if err == nil {
+						installedRepoKeys[installID][key] = struct{}{}
+					}
+				}
+				s.recordInstallationRepoMatches(connector, installID, repos, wantedRepos)
+				if len(wantedRepos) == 0 {
+					if errs != nil {
+						ctx.Logger().Error(errs, "some installations could not be fully enumerated while mapping repos")
+					}
+					return nil
+				}
+			}
+
+			if res == nil || res.NextPage == 0 {
+				break
+			}
+			opts.Page = res.NextPage
+		}
+	}
+
+	if len(wantedRepos) > 0 {
+		errs = errors.Join(errs, s.mapRemainingReposByMetadata(ctx, connector, installs, clients, installedRepoKeys, wantedRepos))
+		if len(wantedRepos) == 0 {
+			if errs != nil {
+				ctx.Logger().Error(errs, "some installations could not be fully enumerated while mapping repos")
+			}
+			return nil
+		}
+	}
+
+	if len(wantedRepos) > 0 {
+		unmatched := make([]string, 0, len(wantedRepos))
+		for _, requested := range wantedRepos {
+			unmatched = append(unmatched, requested.original)
+		}
+		sort.Strings(unmatched)
+		errs = errors.Join(errs, fmt.Errorf("configured repos were not found in any GitHub App installation: %s", strings.Join(unmatched, ", ")))
+	}
+
+	return errs
+}
+
+func (s *Source) recordInstallationRepoMatches(connector *appConnector, installationID int64, repos []*github.Repository, wantedRepos map[string]repoMappingRequest) {
+	for _, repo := range repos {
+		cloneURL := repo.GetCloneURL()
+		key, err := repoHostOwnerNameKey(cloneURL)
+		if err != nil {
+			continue
+		}
+		requested, ok := wantedRepos[key]
+		if !ok {
+			continue
+		}
+		deleteRepoMappingRequest(wantedRepos, requested)
+		s.recordRepoInstallation(connector, installationID, repo, requested)
+	}
+}
+
+func deleteRepoMappingRequest(wantedRepos map[string]repoMappingRequest, requested repoMappingRequest) {
+	if len(requested.lookupKeys) > 0 {
+		delete(wantedRepos, requested.lookupKeys[0])
+	}
+}
+
+func (s *Source) mapRemainingReposByMetadata(
+	ctx context.Context,
+	connector *appConnector,
+	installs []*github.Installation,
+	clients map[int64]*github.Client,
+	installedRepoKeys map[int64]map[string]struct{},
+	wantedRepos map[string]repoMappingRequest,
+) error {
+	var errs error
+	for _, install := range installs {
+		if len(wantedRepos) == 0 {
+			return errs
+		}
+
+		installID := install.GetID()
+		client, ok := clients[installID]
+		if !ok {
+			continue
+		}
+
+		for _, requested := range wantedRepos {
+			for i, lookupURL := range requested.lookupURLs {
+				_, parts, err := getRepoURLParts(lookupURL)
+				if err != nil {
+					errs = errors.Join(errs, fmt.Errorf("could not parse configured repo %q: %w", requested.original, err))
+					break
+				}
+
+				var repo *github.Repository
+				for {
+					repo, _, err = client.Repositories.Get(ctx, parts[1], parts[2])
+					if s.handleRateLimit(ctx, err) {
+						continue
+					}
+					break
+				}
+				if err != nil {
+					if isGitHub404Error(err) {
+						continue
+					}
+					errs = errors.Join(errs, fmt.Errorf("could not fetch repo %q for installation %d: %w", requested.original, installID, err))
+					break
+				}
+				canonicalKey, err := repoHostOwnerNameKey(repo.GetCloneURL())
+				if err != nil {
+					errs = errors.Join(errs, fmt.Errorf("could not parse fetched repo %q for installation %d: %w", repo.GetCloneURL(), installID, err))
+					continue
+				}
+				if _, ok := installedRepoKeys[installID][canonicalKey]; !ok {
+					continue
+				}
+				if !sameRepoHost(requested.normalized, repo.GetCloneURL()) {
+					if i == 0 {
+						break
+					}
+					continue
+				}
+
+				deleteRepoMappingRequest(wantedRepos, requested)
+				s.recordRepoInstallation(connector, installID, repo, requested)
+				if len(wantedRepos) == 0 {
+					return errs
+				}
+				break
+			}
+		}
+	}
+	return errs
+}
+
+func (s *Source) recordRepoInstallation(connector *appConnector, installationID int64, repo *github.Repository, requested repoMappingRequest) {
+	cloneURL := repo.GetCloneURL()
+	connector.setRepoInstallationForRepoName(cloneURL, repo.GetName(), installationID)
+	if requested.normalized != cloneURL && sameRepoHost(requested.normalized, cloneURL) {
+		connector.setRepoInstallation(requested.normalized, installationID)
+	}
+	if requested.original != requested.normalized && requested.original != cloneURL && sameRepoHost(requested.original, cloneURL) {
+		connector.setRepoInstallation(requested.original, installationID)
+	}
+
+	s.cacheRepoInfo(repo)
+	if info, ok := s.repoInfoCache.get(cloneURL); ok {
+		if requested.normalized != cloneURL && sameRepoHost(requested.normalized, cloneURL) {
+			s.repoInfoCache.put(requested.normalized, info)
+		}
+		if requested.original != requested.normalized && requested.original != cloneURL && sameRepoHost(requested.original, cloneURL) {
+			s.repoInfoCache.put(requested.original, info)
+		}
+	}
+}
+
+func repoHostOwnerNameKey(repoURL string) (string, error) {
+	_, parts, err := getRepoURLParts(repoURL)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) != 3 {
+		return "", fmt.Errorf("expected repository URL, got %q", repoURL)
+	}
+	return strings.ToLower(parts[0] + "/" + parts[1] + "/" + parts[2]), nil
+}
+
+func sameRepoHost(repoURL, otherRepoURL string) bool {
+	_, parts, err := getRepoURLParts(repoURL)
+	if err != nil {
+		return false
+	}
+	_, otherParts, err := getRepoURLParts(otherRepoURL)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(parts[0], otherParts[0])
+}
+
+func (s *Source) repoURLFromTargetMetadata(meta *source_metadatapb.Github) (string, error) {
+	linkRepo, err := s.repoURLFromTargetLink(meta.GetLink())
+	if err != nil {
+		return "", err
+	}
+
+	if repo := meta.GetRepository(); repo != "" {
+		// Target metadata may only include a bare repo name. In that case the
+		// owner and host from the link are the authoritative repository identity.
+		if !strings.Contains(repo, "/") && !strings.Contains(repo, ":") {
+			return linkRepo, nil
+		}
+		normalized, err := s.normalizeRepo(repo)
+		if err != nil {
+			return "", fmt.Errorf("could not normalize target repository %q: %w", repo, err)
+		}
+		linkKey, err := repoHostOwnerNameKey(linkRepo)
+		if err != nil {
+			return "", err
+		}
+		repoKey, err := repoHostOwnerNameKey(normalized)
+		if err != nil {
+			return "", fmt.Errorf("could not parse target repository %q: %w", repo, err)
+		}
+		if repoKey != linkKey && isWikiLink(meta.GetLink()) {
+			if parentRepoURL, isWiki := repoCloneURLForWikiCloneURL(normalized); isWiki {
+				repoKey, err = repoHostOwnerNameKey(parentRepoURL)
+				if err != nil {
+					return "", fmt.Errorf("could not parse target repository %q: %w", repo, err)
+				}
+			}
+		}
+		if repoKey != linkKey {
+			return "", fmt.Errorf("target repository %q does not match link repository %q", normalized, linkRepo)
+		}
+	}
+
+	return linkRepo, nil
+}
+
+func (s *Source) repoURLFromTargetLink(link string) (string, error) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse GitHub URL: %w", err)
+	}
+
+	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(segments) < 2 {
+		return "", fmt.Errorf("invalid GitHub URL")
+	}
+
+	repoURL := (&url.URL{
+		Scheme: u.Scheme,
+		Host:   u.Host,
+	}).JoinPath(segments[0], segments[1]+".git").String()
+	return s.normalizeRepo(repoURL)
 }
 
 func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error {
@@ -725,20 +1195,22 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 
 	// Scan the wiki, if enabled, and the repo has one.
 	if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
-		wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
-		wikiCtx := context.WithValue(ctx, "repo", wikiURL)
+		wikiURL, ok := wikiCloneURLForRepoInfo(repoURL, repoInfo)
+		if ok {
+			wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
-		_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
-		if err != nil {
-			// Ignore "Repository not found" errors.
-			// It's common for GitHub's API to say a repo has a wiki when it doesn't.
-			if !strings.Contains(err.Error(), "not found") {
-				if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
-					return err
+			_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
+			if err != nil {
+				// Ignore "Repository not found" errors.
+				// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+				if !strings.Contains(err.Error(), "not found") {
+					if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
+						return err
+					}
 				}
-			}
 
-			// Don't return, it still might be possible to scan comments.
+				// Don't return, it still might be possible to scan comments.
+			}
 		}
 	}
 
@@ -875,9 +1347,25 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-	time.Sleep(retryAfter)
-	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
-	return true
+	slept, canceled := sleepWithContext(ctx, retryAfter)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(slept.Seconds())
+	return !canceled
+}
+
+func sleepWithContext(ctx context.Context, duration time.Duration) (time.Duration, bool) {
+	start := time.Now()
+	if duration <= 0 {
+		return time.Since(start), false
+	}
+
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return time.Since(start), false
+	case <-ctx.Done():
+		return time.Since(start), true
+	}
 }
 
 // handleRateLimitWithUnitReporter is a wrapper around handleRateLimit that includes unit reporting
@@ -938,23 +1426,38 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 	return nil
 }
 
-func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
-	opts := &github.ListOptions{
-		PerPage: membersAppPagination,
-	}
-
+func (s *Source) addMembersByApp(ctx context.Context, connector *appConnector, reporter sources.UnitReporter) error {
 	// TODO: Check rate limit for this call.
-	installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
+	installs, err := s.getAppInstallations(ctx, connector)
 	if err != nil {
 		return fmt.Errorf("could not enumerate installed orgs: %w", err)
 	}
 
-	for _, org := range installs {
-		if org.Account.GetType() != "Organization" {
+	for _, install := range installs {
+		if install.GetAccount().GetType() != "Organization" {
 			continue
 		}
-		if err := s.addMembersByOrg(ctx, *org.Account.Login, reporter); err != nil {
-			return err
+		org := install.GetAccount().GetLogin()
+		installCtx := context.WithValues(ctx, "org", org, "installation_id", install.GetID())
+
+		// Create a per-installation API client so that the token is scoped to
+		// this org. GitHub App installation tokens only bypass IP allowlists for
+		// their own org; using a cross-org token causes 403s.
+		client, err := connector.APIClientForInstallation(install.GetID())
+		if err != nil {
+			installCtx.Logger().Error(err, "could not create API client for installation")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", install.GetID(), err)); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := s.addMembersByOrgWithClient(installCtx, client, org, reporter); err != nil {
+			installCtx.Logger().Error(err, "Unable to add members for org")
+			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not add members for org %q (installation %d): %w", org, install.GetID(), err)); err != nil {
+				return err
+			}
+			continue
 		}
 	}
 
@@ -1036,6 +1539,10 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string, reporter source
 }
 
 func (s *Source) addMembersByOrg(ctx context.Context, org string, reporter sources.UnitReporter) error {
+	return s.addMembersByOrgWithClient(ctx, s.connector.APIClient(), org, reporter)
+}
+
+func (s *Source) addMembersByOrgWithClient(ctx context.Context, client *github.Client, org string, reporter sources.UnitReporter) error {
 	opts := &github.ListMembersOptions{
 		PublicOnly: false,
 		ListOptions: github.ListOptions{
@@ -1045,7 +1552,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string, reporter sourc
 
 	logger := ctx.Logger().WithValues("org", org)
 	for {
-		members, res, err := s.connector.APIClient().Organizations.ListMembers(ctx, org, opts)
+		members, res, err := client.Organizations.ListMembers(ctx, org, opts)
 		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
@@ -1103,15 +1610,24 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 		cutoffTime = &t
 	}
 
+	apiClient, err := s.connector.APIClientForRepo(repoPath)
+	if err != nil {
+		return err
+	}
+
 	if s.includeGistComments && isGistUrl(urlParts) && !s.ignoreGists {
-		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter, cutoffTime)
+		return s.processGistComments(ctx, apiClient, urlString, urlParts, repoInfo, reporter, cutoffTime)
 	} else if s.includeIssueComments || s.includePRComments {
 		// if we need to use graphql api for repo issues, prs and comments
 		if feature.UseGithubGraphQLAPI.Load() {
-			return s.processRepoIssueandPRsWithCommentsGraphql(ctx, repoInfo, reporter, cutoffTime)
+			graphqlClient, err := s.connector.GraphQLClientForRepo(ctx, repoPath)
+			if err != nil {
+				return err
+			}
+			return s.processRepoIssueandPRsWithCommentsGraphql(ctx, graphqlClient, repoInfo, reporter, cutoffTime)
 		}
 
-		return s.processIssueandPRsWithCommentsREST(ctx, repoInfo, reporter, cutoffTime)
+		return s.processIssueandPRsWithCommentsREST(ctx, apiClient, repoInfo, reporter, cutoffTime)
 	}
 
 	return nil
@@ -1178,7 +1694,7 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 
 const initialPage = 1 // page to start listing from
 
-func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processGistComments(ctx context.Context, apiClient *github.Client, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	ctx.Logger().V(2).Info("Scanning GitHub Gist comments")
 
 	// GitHub Gist URL.
@@ -1189,7 +1705,7 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 		Page:    initialPage,
 	}
 	for {
-		comments, _, err := s.connector.APIClient().Gists.ListComments(ctx, gistID, options)
+		comments, _, err := apiClient.Gists.ListComments(ctx, gistID, options)
 		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
@@ -1287,25 +1803,25 @@ var (
 )
 
 func (s *Source) processIssueandPRsWithCommentsREST(
-	ctx context.Context, repoInfo repoInfo,
+	ctx context.Context, apiClient *github.Client, repoInfo repoInfo,
 	reporter sources.ChunkReporter, cutoffTime *time.Time,
 ) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
-		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
+		if err := s.processIssues(ctx, apiClient, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processIssueComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+		if err := s.processIssueComments(ctx, apiClient, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
 
 	if s.includePRComments {
 		ctx.Logger().V(2).Info("Scanning pull requests")
-		if err := s.processPRs(ctx, repoInfo, reporter); err != nil {
+		if err := s.processPRs(ctx, apiClient, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processPRComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+		if err := s.processPRComments(ctx, apiClient, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
@@ -1314,23 +1830,23 @@ func (s *Source) processIssueandPRsWithCommentsREST(
 }
 
 func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
-	ctx context.Context, repoInfo repoInfo,
+	ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo,
 	reporter sources.ChunkReporter, cutoffTime *time.Time,
 ) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
-		if err := s.processIssuesWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+		if err := s.processIssuesWithComments(ctx, graphqlClient, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
 
 	if s.includePRComments {
 		ctx.Logger().V(2).Info("Scanning pull requests")
-		if err := s.processPRWithComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
+		if err := s.processPRWithComments(ctx, graphqlClient, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 
-		if err := s.processReviewThreads(ctx, repoInfo, reporter, cutoffTime); err != nil {
+		if err := s.processReviewThreads(ctx, graphqlClient, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
@@ -1338,7 +1854,7 @@ func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
 	return nil
 }
 
-func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processIssues(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	bodyTextsOpts := &github.IssueListByRepoOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1350,7 +1866,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter 
 	}
 
 	for {
-		issues, _, err := s.connector.APIClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
+		issues, _, err := apiClient.Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
 		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
@@ -1408,7 +1924,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 	return nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processIssueComments(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
@@ -1419,7 +1935,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 	}
 
 	for {
-		issueComments, _, err := s.connector.APIClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
+		issueComments, _, err := apiClient.Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
 		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
@@ -1475,7 +1991,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 	return nil
 }
 
-func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processPRs(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	prOpts := &github.PullRequestListOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1487,7 +2003,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sou
 	}
 
 	for {
-		prs, _, err := s.connector.APIClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
+		prs, _, err := apiClient.PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
 		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
@@ -1508,7 +2024,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sou
 	return nil
 }
 
-func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processPRComments(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	prOpts := &github.PullRequestListCommentsOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1519,7 +2035,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, repor
 	}
 
 	for {
-		prComments, _, err := s.connector.APIClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
+		prComments, _, err := apiClient.PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
 		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
@@ -1650,15 +2166,43 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("invalid GitHub URL")
 	}
 
+	repoURL, err := s.repoURLFromTargetMetadata(meta)
+	if err != nil {
+		return err
+	}
+	targetIsWiki := isWikiLink(meta.GetLink())
+	if targetIsWiki {
+		repoURL, err = repoCloneURLForTargetEndpoint(s.conn.GetEndpoint(), repoURL)
+		if err != nil {
+			return err
+		}
+	}
+	if connector, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations {
+		if err := s.mapReposToInstallations(ctx, connector, []string{repoURL}); err != nil {
+			return err
+		}
+	}
+	if targetIsWiki {
+		wikiURL, ok := wikiCloneURLForRepo(repoURL)
+		if !ok {
+			return fmt.Errorf("could not derive wiki clone URL from target repository %q", repoURL)
+		}
+		return s.scanWikiTarget(ctx, wikiURL, meta, &chunkSkel, reporter)
+	}
+	apiClient, err := s.connector.APIClientForRepo(repoURL)
+	if err != nil {
+		return err
+	}
+
 	if meta.GetFile() == "" && meta.GetCommit() != "" {
 		ctx := context.WithValues(ctx, "commit_hash", meta.GetCommit())
 		ctx.Logger().V(2).Info("secret metadata has no file; scanning commit metadata instead")
 
-		return s.scanCommitMetadata(ctx, segments[1], segments[2], meta, &chunkSkel, reporter)
+		return s.scanCommitMetadata(ctx, apiClient, segments[1], segments[2], meta, &chunkSkel, reporter)
 	}
 
 	// else try downloading the file content to scan
-	readCloser, resp, err := s.connector.APIClient().Repositories.DownloadContents(
+	readCloser, resp, err := apiClient.Repositories.DownloadContents(
 		ctx,
 		segments[1],
 		segments[2],
@@ -1680,9 +2224,53 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	return handlers.HandleFile(fileCtx, readCloser, &chunkSkel, reporter)
 }
 
-func (s *Source) scanCommitMetadata(ctx context.Context, owner, repo string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
+func (s *Source) scanWikiTarget(ctx context.Context, wikiURL string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
+	if meta.GetCommit() == "" {
+		return fmt.Errorf("wiki target has no commit")
+	}
+
+	path, repo, err := s.cloneRepo(ctx, wikiURL)
+	if err != nil {
+		return fmt.Errorf("could not clone wiki for targeted scan: %w", err)
+	}
+	if !s.conn.GetPrintLegacyJson() {
+		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
+			defer func() { _ = os.RemoveAll(path) }()
+		}
+	}
+
+	commit, err := repo.CommitObject(plumbing.NewHash(meta.GetCommit()))
+	if err != nil {
+		return fmt.Errorf("could not fetch wiki commit for targeted scan: %w", err)
+	}
+
+	if meta.GetFile() == "" {
+		var sb strings.Builder
+		sb.WriteString(commit.Author.Email)
+		sb.WriteString("\n")
+		sb.WriteString(commit.Committer.Email)
+		sb.WriteString("\n")
+		sb.WriteString(commit.Message)
+		return handlers.HandleFile(ctx, io.NopCloser(strings.NewReader(sb.String())), chunkSkel, reporter)
+	}
+
+	file, err := commit.File(meta.GetFile())
+	if err != nil {
+		return fmt.Errorf("could not find wiki file for targeted scan: %w", err)
+	}
+	readCloser, err := file.Reader()
+	if err != nil {
+		return fmt.Errorf("could not read wiki file for targeted scan: %w", err)
+	}
+	defer func() { _ = readCloser.Close() }()
+
+	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
+	return handlers.HandleFile(fileCtx, readCloser, chunkSkel, reporter)
+}
+
+func (s *Source) scanCommitMetadata(ctx context.Context, apiClient *github.Client, owner, repo string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
 	// fetch the commit
-	commit, resp, err := s.connector.APIClient().Repositories.GetCommit(ctx, owner, repo, meta.GetCommit(), nil)
+	commit, resp, err := apiClient.Repositories.GetCommit(ctx, owner, repo, meta.GetCommit(), nil)
 	if resp != nil && resp.Body != nil {
 		defer func() { _ = resp.Body.Close() }()
 	}
@@ -1709,8 +2297,15 @@ func (s *Source) scanCommitMetadata(ctx context.Context, owner, repo string, met
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	repoURL, _ := unit.SourceUnitID()
+	repoURL, kind := unit.SourceUnitID()
 	ctx = context.WithValue(ctx, "repo", repoURL)
+
+	if connector, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations && kind == "repo" {
+		if err := s.mapReposToInstallations(ctx, connector, []string{repoURL}); err != nil {
+			return err
+		}
+	}
+
 	// ChunkUnit is not guaranteed to be called from Enumerate, so we must
 	// check and fetch the repoInfoCache for this repo.
 	repoURL, err := s.ensureRepoInfoCache(ctx, repoURL, &chunkErrorReporter{reporter: reporter})
