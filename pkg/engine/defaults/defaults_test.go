@@ -137,6 +137,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_BrainTrustApiKey: {},
 	detector_typepb.DetectorType_PgAnalyzeReadKey: {},
 	detector_typepb.DetectorType_RedHatPyxis:      {},
+	detector_typepb.DetectorType_OctopusDeploy:    {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
