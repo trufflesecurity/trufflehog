@@ -1,4 +1,15 @@
-Please report security issues to security@trufflesec.com and include `trufflehog` in the subject line. If your vulnerability involves SSRF or outbound requests, please see our policy for that specific class of vulnerability below.
+Please report security issues to security@trufflesec.com and include `trufflehog` in the subject line.
+
+## Reporting Guidelines
+
+Truffle Security values the work of independent security researchers. To help us triage and remediate issues efficiently, please include the following in your report:
+
+- **Summary** - brief description of the issue.
+- **Proof of Concept** - steps to reproduce, including any relevant code references.
+- **Impact** - the realistic impact this has on TruffleHog users.
+- **Suggested Fix** (optional) - any recommendations on how to fix the issue.
+
+If your vulnerability involves SSRF or outbound requests, please see our policy for that specific class of vulnerability below.
 
 ## Blind SSRF & Outbound Request Policy
 Truffle Security treats blind SSRF (the ability to induce outbound requests without data retrieval) as a hardening opportunity rather than a vulnerability. We do not issue CVEs or formal advisories for reports showing outbound interactions unless they demonstrate a tangible security risk to users.
