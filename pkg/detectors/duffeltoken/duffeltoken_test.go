@@ -21,21 +21,43 @@ func TestDuffelTestToken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern - basic",
+			name: "valid pattern",
 			input: `
-				[INFO] Starting duffel integration
-				[DEBUG] Using token duffel_test_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-				[INFO] Complete
-			`,
+				func setupDuffelClient() (*http.Client, error) {
+					url := "https://api.duffel.com/identity/customer/users?limit=1"
+
+					// Create a new request with the secret as a header
+					req, err := http.NewRequest("GET", url, http.NoBody)
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return nil, err
+					}
+
+					duffelToken := "duffel_test_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+					req.Header.Set("Authorization", "Bearer "+duffelToken)
+					req.Header.Set("Duffel-Version", "v2")
+
+					// Perform the request
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer func() { _ = resp.Body.Close() }()
+
+					return client, nil
+				}
+				`,
 			want: []string{
 				"duffel_test_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			},
 		},
 		{
-			name: "valid pattern - environment variable",
+			name: "valid pattern - env file",
 			input: `
+				# .env.production
+				APP_NAME=flight-booker
+				APP_ENV=production
 				DUFFEL_API_TOKEN=duffel_test_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			`,
+				LOG_LEVEL=info
+				`,
 			want: []string{
 				"duffel_test_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			},
@@ -43,9 +65,14 @@ func TestDuffelTestToken_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - multiple tokens",
 			input: `
-				duffel_test_ccccccccccccccccccccccccccccccccccccccccccc
-				duffel_test_ddddddddddddddddddddddddddddddddddddddddddd
-			`,
+				func loadDuffelTokens() map[string]string {
+					// Tokens for each deployment environment
+					return map[string]string{
+						"staging":    "duffel_test_ccccccccccccccccccccccccccccccccccccccccccc",
+						"production": "duffel_test_ddddddddddddddddddddddddddddddddddddddddddd",
+					}
+				}
+				`,
 			want: []string{
 				"duffel_test_ccccccccccccccccccccccccccccccccccccccccccc",
 				"duffel_test_ddddddddddddddddddddddddddddddddddddddddddd",
@@ -54,22 +81,33 @@ func TestDuffelTestToken_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern - too short",
 			input: `
-				token=duffel_test_abc123
-			`,
+				func setupDuffelClient() {
+					// Truncated token accidentally committed
+					token := "duffel_test_abc123"
+					client.SetAuthToken(token)
+				}
+				`,
 			want: nil,
 		},
 		{
 			name: "invalid pattern - invalid characters",
 			input: `
-				duffel_test_aaaaaaaaaaaaaaaaaaaaaaa!aaaaaaaaaaaaaaaaaaa
-			`,
+				func setupDuffelClient() {
+					// Token contains an invalid special character
+					token := "duffel_test_aaaaaaaaaaaaaaaaaaaaaaa!aaaaaaaaaaaaaaaaaaa"
+					client.SetAuthToken(token)
+				}
+				`,
 			want: nil,
 		},
 		{
 			name: "invalid pattern - keyword only",
 			input: `
-				Testing duffel_test_ token detection
-			`,
+				// TODO: replace hardcoded duffel_test_ prefix check with proper validation
+				func isDuffelTestToken(s string) bool {
+					return strings.HasPrefix(s, "duffel_test_")
+				}
+				`,
 			want: nil,
 		},
 	}
@@ -78,11 +116,7 @@ func TestDuffelTestToken_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf(
-					"test %q failed: expected keywords %v to be found in the input",
-					test.name,
-					d.Keywords(),
-				)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
@@ -90,11 +124,7 @@ func TestDuffelTestToken_Pattern(t *testing.T) {
 			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				t.Errorf(
-					"mismatch in result count: expected %d, got %d",
-					len(test.want),
-					len(results),
-				)
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 

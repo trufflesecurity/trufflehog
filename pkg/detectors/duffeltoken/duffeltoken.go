@@ -21,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Duffel test token pattern
 	// Format: (duffel_test_ or duffel_live_)  + 43 alphanumeric / dash / underscore characters
@@ -103,7 +103,8 @@ func verifyDuffelToken(
 	req.Header.Set("Duffel-Version", "v2")
 	req.Header.Set("Accept", "application/json")
 
-	res, err := client.Do(req)
+	res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_DuffelToken, token, req)
+
 	if err != nil {
 		return false, err
 	}
