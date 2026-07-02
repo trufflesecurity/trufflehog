@@ -1105,9 +1105,15 @@ const (
 	DetectorType_Pinecone                                DetectorType = 1049
 	DetectorType_GitLabOauth2                            DetectorType = 1050
 	DetectorType_SpectralOps                             DetectorType = 1051
-	DetectorType_AWSAppSync                              DetectorType = 1052
-	DetectorType_BrainTrustApiKey                        DetectorType = 1053
-	DetectorType_NewRelicBrowserKey                      DetectorType = 1056
+		DetectorType_AWSAppSync                              DetectorType = 1052
+	DetectorType_ShippoLiveToken                         DetectorType = 1053
+	DetectorType_VisibleNpmRegistryAuthData              DetectorType = 1054
+	DetectorType_BcryptHash                              DetectorType = 1055
+	DetectorType_Base64PrivateKey                        DetectorType = 1056
+	DetectorType_BasicAuth                               DetectorType = 1057
+	DetectorType_DuoAPISecretKey                         DetectorType = 1058
+	DetectorType_DockerSwarmJoinToken                    DetectorType = 1059
+	DetectorType_NewRelicBrowserKey                    DetectorType = 1065
 )
 
 // Enum value maps for DetectorType.
@@ -2161,9 +2167,15 @@ var (
 		1049: "Pinecone",
 		1050: "GitLabOauth2",
 		1051: "SpectralOps",
-		1052: "AWSAppSync",
-		1053: "BrainTrustApiKey",
-		1056: "NewRelicBrowserKey",
+				1052: "AWSAppSync",
+		1053: "ShippoLiveToken",
+		1054: "VisibleNpmRegistryAuthData",
+		1055: "BcryptHash",
+		1056: "Base64PrivateKey",
+		1057: "BasicAuth",
+		1058: "DuoAPISecretKey",
+		1059: "DockerSwarmJoinToken",
+		1065: "NewRelicBrowserKey",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3214,9 +3226,15 @@ var (
 		"Pinecone":                          1049,
 		"GitLabOauth2":                      1050,
 		"SpectralOps":                       1051,
-		"AWSAppSync":                        1052,
-		"BrainTrustApiKey":                  1053,
-		"NewRelicBrowserKey":                1056,
+				"AWSAppSync":                        1052,
+		"ShippoLiveToken":                   1053,
+		"VisibleNpmRegistryAuthData":        1054,
+		"BcryptHash":                        1055,
+		"Base64PrivateKey":                  1056,
+		"BasicAuth":                         1057,
+		"DuoAPISecretKey":                   1058,
+		"DockerSwarmJoinToken":              1059,
+		"NewRelicBrowserKey":                    1065,
 	}
 )
 
