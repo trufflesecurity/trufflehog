@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-errors/errors"
@@ -229,6 +230,25 @@ func (s *Source) scanSymlink(
 	return nil
 }
 
+// comparePathsForResume orders two cleaned paths the way a depth-first walk over
+// os.ReadDir-sorted entries does: component by component. A raw string comparison
+// is wrong here because the separator '/' (0x2F) sorts after characters that are
+// valid in a path component, such as '-' (0x2D) or '.' (0x2E). For example, as raw
+// strings "/root/blue-team-deprecated" < "/root/blue-team/file.txt" (the '-' after
+// "blue-team" sorts before '/'), which would make scanDir wrongly skip the sibling
+// directory "blue-team-deprecated" when resuming inside "blue-team". Comparing per
+// component matches os.ReadDir's ordering, where "blue-team" sorts before
+// "blue-team-deprecated". Returns -1, 0, or 1.
+func comparePathsForResume(a, b string) int {
+	// slices.Compare walks the components lexicographically and, when one path is
+	// a prefix of the other, orders the shorter (ancestor) path first — matching
+	// the depth-first walk order described above.
+	return slices.Compare(
+		strings.Split(a, string(filepath.Separator)),
+		strings.Split(b, string(filepath.Separator)),
+	)
+}
+
 func (s *Source) scanDir(
 	ctx trContext.Context,
 	chunksChan chan *sources.Chunk,
@@ -258,8 +278,8 @@ func (s *Source) scanDir(
 	if resumeAfter != "" && !strings.HasPrefix(resumeAfter, path+string(filepath.Separator)) && resumeAfter != path {
 		// Resume point is not in this subtree. Compare paths to determine if we
 		// should skip this directory (already scanned) or process it (already passed).
-		if path < resumeAfter {
-			// This directory comes before the resume point lexicographically,
+		if comparePathsForResume(path, resumeAfter) < 0 {
+			// This directory comes before the resume point in traversal order,
 			// meaning it was already fully scanned. Skip it entirely.
 			return nil
 		}

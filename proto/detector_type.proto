@@ -1054,5 +1054,9 @@ enum DetectorType {
   GitLabOauth2 = 1050;
   SpectralOps = 1051;
   AWSAppSync = 1052;
-  VisibleNpmRegistryAuthData = 1053;
+  ShippoLiveToken = 1053;
+  VisibleNpmRegistryAuthData = 1054;
+  BcryptHash = 1055;
+  Base64PrivateKey = 1056;
+  BasicAuth = 1057;
 }
