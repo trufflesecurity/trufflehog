@@ -44,6 +44,7 @@ archives:
       - goos: windows
         formats:
           - zip
+          - tar.gz
 dockers:
   - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
     dockerfile: Dockerfile.goreleaser
