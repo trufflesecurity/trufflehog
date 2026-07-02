@@ -55,11 +55,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range base64Pat.FindAllString(dataStr, -1) {
 		match = strings.TrimSpace(match)
 
-		// Try to decode
+		// Try to decode - first with padding, then without (raw)
 		decoded, err := base64.StdEncoding.DecodeString(match)
 		if err != nil {
-			// Try URL encoding
-			decoded, err = base64.URLEncoding.DecodeString(match)
+			// Try without padding for unpadded base64 strings
+			decoded, err = base64.RawStdEncoding.DecodeString(match)
 			if err != nil {
 				continue
 			}
