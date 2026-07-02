@@ -20,7 +20,8 @@ var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 var (
 	// Bcrypt hash format: $2a$, $2b$, or $2y$ followed by cost (2 digits) and 53 base64 chars
 	// Example: $2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW
-	bcryptPat = regexp.MustCompile(`\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}\b`)
+	// Note: No word boundary at end - bcrypt's base64 alphabet includes . and /
+	bcryptPat = regexp.MustCompile(`\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}`)
 )
 
 func (s Scanner) Keywords() []string {
@@ -66,5 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
-	return detectors.IsKnownFalsePositive(string(result.Raw), detectors.DefaultFalsePositives, true)
+	// Bcrypt hashes are 60-character pseudo-random base64 strings that often contain
+	// common English substrings (e.g., "from", "name", "data"). Applying word-based
+	// false positive checks would incorrectly filter legitimate hashes.
+	return false, ""
 }
