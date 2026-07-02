@@ -28,6 +28,8 @@ var (
 	BraintrustDetectorEnabled       atomic.Bool
 	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
 	RedHatPyxisDetectorEnabled      atomic.Bool
+	OctopusDeployDetectorEnabled    atomic.Bool
+	DropUnverifiedJWTResults        atomic.Bool
   FigmaV3DetectorEnabled          atomic.Bool
 )
 

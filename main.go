@@ -87,11 +87,12 @@ var (
 	noVerificationCache = cli.Flag("no-verification-cache", "Disable verification caching").Bool()
 
 	// Add feature flags
-	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
-	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
-	gitCloneTimeout    = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
-	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
-	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
+	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
+	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()
 
 	gitScan                = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -516,6 +517,10 @@ func run(state overseer.State, logSync func() error) {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
 	}
 
+	if *dropUnverifiedJWTResults {
+		feature.DropUnverifiedJWTResults.Store(true)
+	}
+
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
 
@@ -546,6 +551,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.BraintrustDetectorEnabled.Store(true)
 	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
 	feature.RedHatPyxisDetectorEnabled.Store(true)
+	feature.OctopusDeployDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
