@@ -232,6 +232,10 @@ type Engine struct {
 	verificationOverlapWorkerMultiplier int
 
 	maxDecodeDepth int
+
+	// runtimeCollector exposes live channel/worker/scan counters to Prometheus
+	// while the engine is running. Set in Start, cleared in Finish.
+	runtimeCollector *runtimeCollector
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.
@@ -639,6 +643,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) Start(ctx context.Context) {
 	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
 	e.sanityChecks(ctx)
+	e.registerRuntimeMetrics(ctx)
 	e.startWorkers(ctx)
 }
 
@@ -755,6 +760,8 @@ func (e *Engine) Finish(ctx context.Context) error {
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
 
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
+
+	e.unregisterRuntimeMetrics()
 
 	return err
 }
