@@ -22,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
+	defaultClient = detectors.NewClientWithDedup(detectors.DetectorHttpClientWithNoLocalAddresses)
 
 	// Octopus Deploy API keys:
 	// Format: API- followed by 29–34 uppercase letters or digits
@@ -70,7 +70,7 @@ func (s Scanner) FromData(
 				DetectorType: detector_typepb.DetectorType_OctopusDeploy,
 				Raw:          []byte(token),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", url, token)),
-				Redacted:     token[:4] + "...",
+				Redacted:     token[:8] + "...",
 				SecretParts: map[string]string{
 					"key": token,
 					"url": url,
@@ -120,7 +120,7 @@ func verifyOctopusToken(
 
 	req.Header.Set("X-Octopus-ApiKey", token)
 
-	res, err := client.Do(req)
+	res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_OctopusDeploy, fmt.Sprintf("%s:%s", baseUrl, token), req)
 	if err != nil {
 		return false, err
 	}
