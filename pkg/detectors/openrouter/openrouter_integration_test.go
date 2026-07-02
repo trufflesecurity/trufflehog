@@ -18,7 +18,7 @@ import (
 func TestOpenRouter_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -50,7 +50,7 @@ func TestOpenRouter_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_OpenRouter,
-					Redacted:     "sk-or-v1-3dd...aa5",
+					Redacted:     inactiveSecret[:12] + "..." + inactiveSecret[70:],
 					Verified:     false,
 				},
 			},
@@ -68,7 +68,7 @@ func TestOpenRouter_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_OpenRouter,
 					Verified:     true,
-					Redacted:     "sk-or-v1-753...1a5",
+					Redacted:     secret[:12] + "..." + secret[70:],
 				},
 			},
 			wantErr: false,
