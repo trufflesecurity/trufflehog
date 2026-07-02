@@ -28,11 +28,8 @@ var (
 	BraintrustDetectorEnabled       atomic.Bool
 	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
 	RedHatPyxisDetectorEnabled      atomic.Bool
-<<<<<<< oct-deploy-detector
 	OctopusDeployDetectorEnabled    atomic.Bool
-=======
-  DropUnverifiedJWTResults        atomic.Bool
->>>>>>> main
+	DropUnverifiedJWTResults        atomic.Bool
 )
 
 type AtomicString struct {
