@@ -1105,10 +1105,28 @@ const (
 	DetectorType_Pinecone                                DetectorType = 1049
 	DetectorType_GitLabOauth2                            DetectorType = 1050
 	DetectorType_SpectralOps                             DetectorType = 1051
-	DetectorType_AWSAppSync                              DetectorType = 1052
-	DetectorType_BrainTrustApiKey                        DetectorType = 1053
-	DetectorType_DockerSwarmUnlock                       DetectorType = 1062
-	DetectorType_VaultToken                              DetectorType = 1063
+		DetectorType_AWSAppSync                              DetectorType = 1052
+	DetectorType_ShippoLiveToken                         DetectorType = 1053
+	DetectorType_VisibleNpmRegistryAuthData              DetectorType = 1054
+	DetectorType_BcryptHash                              DetectorType = 1055
+	DetectorType_Base64PrivateKey                        DetectorType = 1056
+	DetectorType_BasicAuth                               DetectorType = 1057
+	DetectorType_DuoAPISecretKey                         DetectorType = 1058
+	DetectorType_DockerSwarmJoinToken                    DetectorType = 1059
+	DetectorType_FernetKey                               DetectorType = 1060
+	DetectorType_RailsMasterKey                          DetectorType = 1061
+	DetectorType_CloudSightAPIKey                        DetectorType = 1062
+	DetectorType_NewRelicUserAPIKey                      DetectorType = 1063
+	DetectorType_NewRelicLicenseKey                      DetectorType = 1064
+	DetectorType_NewRelicBrowserKey                      DetectorType = 1065
+	DetectorType_DockerSwarmUnlock                       DetectorType = 1066
+	DetectorType_Duffel                                  DetectorType = 1067
+	DetectorType_VaultToken                              DetectorType = 1068
+	DetectorType_SlackAppToken                           DetectorType = 1069
+	DetectorType_VaultRootToken                          DetectorType = 1070
+	DetectorType_VaultUnsealKey                          DetectorType = 1071
+	DetectorType_YahooOAuth                              DetectorType = 1072
+	DetectorType_BrainTrustApiKey                        DetectorType = 1073
 )
 
 // Enum value maps for DetectorType.
@@ -2162,10 +2180,28 @@ var (
 		1049: "Pinecone",
 		1050: "GitLabOauth2",
 		1051: "SpectralOps",
-		1052: "AWSAppSync",
-		1053: "BrainTrustApiKey",
-		1062: "DockerSwarmUnlock",
-		1063: "VaultToken",
+				1052: "AWSAppSync",
+		1053: "ShippoLiveToken",
+		1054: "VisibleNpmRegistryAuthData",
+		1055: "BcryptHash",
+		1056: "Base64PrivateKey",
+		1057: "BasicAuth",
+		1058: "DuoAPISecretKey",
+		1059: "DockerSwarmJoinToken",
+		1060: "FernetKey",
+		1061: "RailsMasterKey",
+		1062: "CloudSightAPIKey",
+		1063: "NewRelicUserAPIKey",
+		1064: "NewRelicLicenseKey",
+		1065: "NewRelicBrowserKey",
+		1066: "DockerSwarmUnlock",
+		1067: "Duffel",
+		1068: "VaultToken",
+		1069: "SlackAppToken",
+		1070: "VaultRootToken",
+		1071: "VaultUnsealKey",
+		1072: "YahooOAuth",
+		1073: "BrainTrustApiKey",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3216,10 +3252,28 @@ var (
 		"Pinecone":                          1049,
 		"GitLabOauth2":                      1050,
 		"SpectralOps":                       1051,
-		"AWSAppSync":                        1052,
-		"BrainTrustApiKey":                  1053,
-		"DockerSwarmUnlock":                 1062,
-		"VaultToken":                        1063,
+				"AWSAppSync":                        1052,
+		"ShippoLiveToken":                   1053,
+		"VisibleNpmRegistryAuthData":        1054,
+		"BcryptHash":                        1055,
+		"Base64PrivateKey":                  1056,
+		"BasicAuth":                         1057,
+		"DuoAPISecretKey":                   1058,
+		"DockerSwarmJoinToken":              1059,
+		"FernetKey":                         1060,
+		"RailsMasterKey":                    1061,
+		"CloudSightAPIKey":                  1062,
+		"NewRelicUserAPIKey":                1063,
+		"NewRelicLicenseKey":                1064,
+		"NewRelicBrowserKey":                1065,
+		"DockerSwarmUnlock":                 1066,
+		"Duffel":                            1067,
+		"VaultToken":                        1068,
+		"SlackAppToken":                     1069,
+		"VaultRootToken":                    1070,
+		"VaultUnsealKey":                    1071,
+		"YahooOAuth":                        1072,
+		"BrainTrustApiKey":                  1073,
 	}
 )
 
