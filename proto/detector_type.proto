@@ -1055,5 +1055,13 @@ enum DetectorType {
   SpectralOps = 1051;
   AWSAppSync = 1052;
   BasicAuth = 1057;
-  RailsMasterKey = 1063;
+  ShippoLiveToken = 1053;
+  VisibleNpmRegistryAuthData = 1054;
+  BcryptHash = 1055;
+  Base64PrivateKey = 1056;
+  BasicAuth = 1057;
+  DuoAPISecretKey = 1058;
+  DockerSwarmJoinToken = 1059;
+  RailsMasterKey = 1061;
+}
 }
