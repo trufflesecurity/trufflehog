@@ -69,13 +69,13 @@ func TestDuffelTestToken_Pattern(t *testing.T) {
 					// Tokens for each deployment environment
 					return map[string]string{
 						"staging":    "duffel_test_ccccccccccccccccccccccccccccccccccccccccccc",
-						"production": "duffel_test_ddddddddddddddddddddddddddddddddddddddddddd",
+						"production": "duffel_live_ddddddddddddddddddddddddddddddddddddddddddd",
 					}
 				}
 				`,
 			want: []string{
 				"duffel_test_ccccccccccccccccccccccccccccccccccccccccccc",
-				"duffel_test_ddddddddddddddddddddddddddddddddddddddddddd",
+				"duffel_live_ddddddddddddddddddddddddddddddddddddddddddd",
 			},
 		},
 		{
