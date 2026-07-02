@@ -29,6 +29,7 @@ var (
 	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
 	RedHatPyxisDetectorEnabled      atomic.Bool
 	OpenRouterDetectorEnabled       atomic.Bool
+  DropUnverifiedJWTResults        atomic.Bool
 )
 
 type AtomicString struct {
