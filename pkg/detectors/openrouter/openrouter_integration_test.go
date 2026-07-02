@@ -12,7 +12,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestOpenRouter_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestOpenRouter_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenRouter,
+					DetectorType: detector_typepb.DetectorType_OpenRouter,
 					Redacted:     "sk-or-v1-3dd...aa5",
 					Verified:     false,
 				},
@@ -66,7 +66,7 @@ func TestOpenRouter_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_OpenRouter,
+					DetectorType: detector_typepb.DetectorType_OpenRouter,
 					Verified:     true,
 					Redacted:     "sk-or-v1-753...1a5",
 				},
@@ -99,7 +99,7 @@ func TestOpenRouter_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				got[i].ExtraData = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("OpenRouter.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

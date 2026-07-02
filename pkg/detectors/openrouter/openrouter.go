@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -45,10 +45,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_OpenRouter,
+			DetectorType: s.Type(),
 			// NOTE: we redact the same way it is done in the `Label` field
-			Redacted: token[:12] + "..." + token[70:],
-			Raw:      []byte(token),
+			Redacted:    token[:12] + "..." + token[70:],
+			Raw:         []byte(token),
+			SecretParts: map[string]string{"key": token},
 		}
 
 		if verify {
@@ -109,8 +110,8 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OpenRouter
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OpenRouter
 }
 
 func (s Scanner) Description() string {
