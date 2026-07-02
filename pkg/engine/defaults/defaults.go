@@ -600,6 +600,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/protocolsio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/proxycrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubpublishkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubsecretkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pulumi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/purestake"
@@ -1500,6 +1501,7 @@ func buildDetectorList() []detectors.Detector {
 		&protocolsio.Scanner{},
 		&proxycrawl.Scanner{},
 		&pubnubpublishkey.Scanner{},
+		&pubnubsecretkey.Scanner{},
 		&pubnubsubscriptionkey.Scanner{},
 		&pulumi.Scanner{},
 		&purestake.Scanner{},
