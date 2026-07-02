@@ -25,11 +25,11 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
+	defaultClient = detectors.NewClientWithDedup(detectors.DetectorHttpClientWithNoLocalAddresses)
 
 	// Batch tokens: hvb.<50-300 chars>
 	batchTokenPat = regexp.MustCompile(
-		`\b(hvb\.[A-Za-z0-9_.-]{50,300})\b`,
+		`\b(hvb\.[A-Za-z0-9_.-]{50,300})(?:[^A-Za-z0-9_.-]|\z)`,
 	)
 
 	vaultUrlPat = regexp.MustCompile(`(https?:\/\/[^\s\/]*\.hashicorp\.cloud(?::\d+)?)(?:\/[^\s]*)?`)
@@ -101,12 +101,12 @@ func (s Scanner) FromData(
 
 				if verificationResp != nil {
 					result.ExtraData = map[string]string{
-						"policies":  strings.Join(verificationResp.Data.Policies, ", "),
 						"orphan":    fmt.Sprintf("%v", verificationResp.Data.Orphan),
 						"renewable": fmt.Sprintf("%v", verificationResp.Data.Renewable),
 						"type":      verificationResp.Data.Type,
 						"entity_id": verificationResp.Data.EntityId,
 					}
+					result.ExtraData["policies"] = strings.Join(verificationResp.Data.Policies, ", ")
 				}
 			}
 
@@ -151,7 +151,7 @@ func verifyVaultToken(
 
 	req.Header.Set("X-Vault-Token", token)
 
-	res, err := client.Do(req)
+	res, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_HashiCorpVaultBatchToken, fmt.Sprintf("%s:%s", baseUrl, token), req)
 	if err != nil {
 		return false, nil, err
 	}

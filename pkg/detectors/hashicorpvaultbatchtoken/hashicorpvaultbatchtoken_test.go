@@ -23,9 +23,24 @@ func TestBatchToken_PatternWithURL(t *testing.T) {
 		{
 			name: "valid hvb token with vault url",
 			input: `
-				X-Vault-Token=hvb.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-				https://vault-cluster-abc123.hashicorp.cloud:8200
-			`,
+				func setupVaultClient() (*http.Client, error) {
+					vaultAddr := "https://vault-cluster-abc123.hashicorp.cloud:8200"
+					token := "hvb.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+					// Look up the token to confirm it's still valid
+					req, err := http.NewRequest("GET", vaultAddr+"/v1/auth/token/lookup-self", http.NoBody)
+					if err != nil {
+						return nil, err
+					}
+					req.Header.Set("X-Vault-Token", token)
+
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer func() { _ = resp.Body.Close() }()
+
+					return client, nil
+				}
+				`,
 			want: []string{
 				"hvb.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:https://vault-cluster-abc123.hashicorp.cloud:8200",
 			},
@@ -33,9 +48,11 @@ func TestBatchToken_PatternWithURL(t *testing.T) {
 		{
 			name: "valid hvb token with longer length",
 			input: `
-				hvb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-				https://vault-cluster-xyz.hashicorp.cloud
-			`,
+				# vault-config.env
+				VAULT_ADDR=https://vault-cluster-xyz.hashicorp.cloud
+				VAULT_TOKEN=hvb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+				VAULT_NAMESPACE=admin
+				`,
 			want: []string{
 				"hvb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:https://vault-cluster-xyz.hashicorp.cloud",
 			},
@@ -43,23 +60,38 @@ func TestBatchToken_PatternWithURL(t *testing.T) {
 		{
 			name: "token only, no URL",
 			input: `
-				hvb.cccccccccccccccccccccccccccccccccccccccccccccccccc
-			`,
+				func rotateVaultToken() {
+					// Deprecated batch token retained for the audit trail
+					oldToken := "hvb.cccccccccccccccccccccccccccccccccccccccccccccccccc"
+					log.Println("token retired:", oldToken)
+				}
+				`,
 			want: nil,
 		},
 		{
 			name: "URL only, no token",
 			input: `
-				https://vault-cluster-abc123.hashicorp.cloud:8200
-			`,
+				func vaultHealthCheck() error {
+					resp, err := http.Get("https://vault-cluster-abc123.hashicorp.cloud:8200/v1/sys/health")
+					if err != nil {
+						return err
+					}
+					defer func() { _ = resp.Body.Close() }()
+					return nil
+				}
+				`,
 			want: nil,
 		},
 		{
 			name: "invalid token - too short",
 			input: `
-				hvb.shorttoken
-				https://vault-cluster-abc123.hashicorp.cloud
-			`,
+				func setupVaultClient() {
+					vaultAddr := "https://vault-cluster-abc123.hashicorp.cloud"
+					// Truncated token accidentally committed
+					token := "hvb.shorttoken"
+					client.SetToken(vaultAddr, token)
+				}
+				`,
 			want: nil,
 		},
 	}
