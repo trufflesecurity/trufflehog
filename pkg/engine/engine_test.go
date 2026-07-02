@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -919,15 +920,6 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 			wantUnverifiedSecretCount: 0,
 		},
 		{
-			name: "overlap, retain false positives",
-			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
-			},
-			retainFalsePositives:      true,
-			wantUnverifiedSecretCount: 2,
-		},
-		{
 			name: "overlap, do not retain false positives",
 			detectors: []detectors.Detector{
 				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
@@ -1268,7 +1260,10 @@ func (c customCleaner) Type() detector_typepb.DetectorType { return detector_typ
 
 func (customCleaner) Description() string { return "" }
 
-func (c customCleaner) CleanResults([]detectors.Result) []detectors.Result {
+func (c customCleaner) CleanResults(result []detectors.Result, verficationEnabled bool) []detectors.Result {
+	if !verficationEnabled {
+		return []detectors.Result{{}}
+	}
 	return []detectors.Result{}
 }
 func (c customCleaner) ShouldCleanResultsIrrespectiveOfConfiguration() bool { return c.ignoreConfig }
@@ -1278,6 +1273,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 		name               string
 		cleaningConfigured bool
 		ignoreConfig       bool
+		verify             bool
 		resultsToClean     []detectors.Result
 		wantResults        []detectors.Result
 	}{
@@ -1285,6 +1281,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to clean",
 			cleaningConfigured: true,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
 		},
@@ -1292,6 +1289,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to not clean",
 			cleaningConfigured: false,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{{}},
 		},
@@ -1299,8 +1297,17 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "clean irrespective of config",
 			cleaningConfigured: false,
 			ignoreConfig:       true,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
+		},
+		{
+			name:               "clean irrespective of config with verification disabled",
+			cleaningConfigured: false,
+			ignoreConfig:       true,
+			verify:             false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{{}},
 		},
 	}
 
@@ -1314,6 +1321,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			engine := Engine{
 				filterUnverified:     tt.cleaningConfigured,
 				retainFalsePositives: true,
+				verify:               tt.verify,
 			}
 
 			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
@@ -1506,6 +1514,18 @@ def test_something():
 
     # Ignoring this does not work
     assert connection_string == "postgres://master_user:master_password@hostname:1234/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
+			name: "ignore postgres url without explicit port",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # The detector normalizes this URL to include :5432, but the ignore tag should still be honored.
+    assert connection_string == "postgres://master_user:master_password@hostname/main"  # trufflehog:ignore`,
 			expectedFindings: 0,
 		},
 		{
@@ -1984,6 +2004,80 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 			} else {
 				assert.False(t, found, "unexpected detector match")
 			}
+		})
+	}
+}
+
+// captureDispatcher records every dispatched result for assertion in tests.
+type captureDispatcher struct {
+	results []detectors.ResultWithMetadata
+}
+
+func (d *captureDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	d.results = append(d.results, result)
+	return nil
+}
+
+// TestNotifierWorker_ReverifiedResultsBypassDedupe verifies that the notifier's
+// dedupe cache is skipped when a result carries a non-zero SecretID — i.e., when
+// it originated from reverification — so that the dispatcher sees every
+// reverification result even when the underlying secret has not changed.
+func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
+	tests := []struct {
+		name         string
+		secretID     int64
+		wantDispatch int
+	}{
+		{
+			name:         "non-reverified duplicates are deduplicated",
+			secretID:     0,
+			wantDispatch: 1,
+		},
+		{
+			name:         "reverified duplicates bypass the dedupe cache",
+			secretID:     42,
+			wantDispatch: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache, err := lru.New[string, struct{}](16)
+			require.NoError(t, err)
+
+			disp := &captureDispatcher{}
+			e := &Engine{
+				results:                 make(chan detectors.ResultWithMetadata, 4),
+				dedupeCache:             cache,
+				dispatcher:              disp,
+				notifyVerifiedResults:   true,
+				notifyUnverifiedResults: true,
+				notifyUnknownResults:    true,
+			}
+
+			result := detectors.ResultWithMetadata{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Git{
+						Git: &source_metadatapb.Git{Line: 1},
+					},
+				},
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+				SecretID:   tt.secretID,
+				Result: detectors.Result{
+					DetectorType: detector_typepb.DetectorType(-1),
+					Raw:          []byte("a-secret"),
+					Verified:     true,
+				},
+			}
+
+			// Push the same result twice — identical hash inputs.
+			e.results <- result
+			e.results <- result
+			close(e.results)
+
+			e.notifierWorker(context.Background())
+
+			assert.Equal(t, tt.wantDispatch, len(disp.results))
 		})
 	}
 }

@@ -15,6 +15,10 @@ type metricsCollector interface {
 	RecordObjectSkipped(bucket, reason string, sizeBytes float64)
 	RecordObjectError(bucket string)
 
+	// Bucket metrics.
+
+	RecordBucketListError(bucket, roleArn string)
+
 	// Role metrics.
 
 	RecordRoleScanned(roleArn string)
@@ -22,11 +26,12 @@ type metricsCollector interface {
 }
 
 type collector struct {
-	objectsScanned *prometheus.HistogramVec
-	objectsSkipped *prometheus.HistogramVec
-	objectsErrors  *prometheus.CounterVec
-	rolesScanned   *prometheus.GaugeVec
-	bucketsPerRole *prometheus.GaugeVec
+	objectsScanned   *prometheus.HistogramVec
+	objectsSkipped   *prometheus.HistogramVec
+	objectsErrors    *prometheus.CounterVec
+	bucketListErrors *prometheus.CounterVec
+	rolesScanned     *prometheus.GaugeVec
+	bucketsPerRole   *prometheus.GaugeVec
 }
 
 var metricsInstance metricsCollector
@@ -58,6 +63,13 @@ func init() {
 			Help:      "Total number of errors encountered during S3 scan",
 		}, []string{"bucket"}),
 
+		bucketListErrors: promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: common.MetricsNamespace,
+			Subsystem: common.MetricsSubsystem,
+			Name:      "bucket_list_errors_total",
+			Help:      "Total number of failures to list objects in an S3 bucket, by bucket and role",
+		}, []string{"bucket", "role_arn"}),
+
 		rolesScanned: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: common.MetricsNamespace,
 			Subsystem: common.MetricsSubsystem,
@@ -84,6 +96,13 @@ func (c *collector) RecordObjectSkipped(bucket, reason string, sizeBytes float64
 
 func (c *collector) RecordObjectError(bucket string) {
 	c.objectsErrors.WithLabelValues(bucket).Inc()
+}
+
+func (c *collector) RecordBucketListError(bucket, roleArn string) {
+	if roleArn == "" {
+		roleArn = defaultRoleARN
+	}
+	c.bucketListErrors.WithLabelValues(bucket, roleArn).Inc()
 }
 
 const defaultRoleARN = "default"

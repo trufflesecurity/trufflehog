@@ -679,6 +679,88 @@ func TestResumptionWithNestedDirectories(t *testing.T) {
 	assert.Equal(t, 1, len(reporter.Chunks), "expected exactly 1 file to be scanned")
 }
 
+func TestResumptionWithPrefixSiblingDirectories(t *testing.T) {
+	ctx := trContext.Background()
+
+	// Create sibling directories where one name is a prefix of the other:
+	// root/
+	//   blue-team/
+	//     project-notes.txt
+	//   blue-team-deprecated/
+	//     AWSCredentials.txt
+	//
+	// os.ReadDir sorts "blue-team" before "blue-team-deprecated", so a scan that
+	// resumes inside blue-team must still descend into blue-team-deprecated. A raw
+	// string comparison of the directory path against the resume point would skip
+	// blue-team-deprecated, because '-' (0x2D) sorts before the separator '/' (0x2F).
+	rootDir, err := os.MkdirTemp("", "trufflehog-resumption-prefix-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(rootDir) })
+
+	dirs := map[string]string{
+		"blue-team":            "project-notes.txt",
+		"blue-team-deprecated": "AWSCredentials.txt",
+	}
+	for dir, file := range dirs {
+		dirPath := filepath.Join(rootDir, dir)
+		require.NoError(t, os.Mkdir(dirPath, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dirPath, file), []byte("content of "+file), 0644))
+	}
+
+	conn, err := anypb.New(&sourcespb.Filesystem{})
+	require.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(ctx, "test resumption prefix sibling", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	// Resume inside blue-team. project-notes.txt is the resume point (already
+	// scanned); AWSCredentials.txt in the sibling blue-team-deprecated comes after
+	// it in traversal order and must still be scanned.
+	resumePoint := filepath.Join(rootDir, "blue-team", "project-notes.txt")
+	s.SetEncodedResumeInfoFor(rootDir, resumePoint)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: rootDir}, &reporter)
+	require.NoError(t, err)
+
+	scannedFiles := make(map[string]bool)
+	for _, chunk := range reporter.Chunks {
+		scannedFiles[filepath.Base(chunk.SourceMetadata.GetFilesystem().GetFile())] = true
+	}
+
+	assert.False(t, scannedFiles["project-notes.txt"], "project-notes.txt should have been skipped (the resume point itself)")
+	assert.True(t, scannedFiles["AWSCredentials.txt"], "AWSCredentials.txt should have been scanned (sibling dir after the resume point)")
+	assert.Equal(t, 1, len(reporter.Chunks), "expected exactly 1 file to be scanned")
+}
+
+func TestComparePathsForResume(t *testing.T) {
+	sep := string(filepath.Separator)
+	p := func(parts ...string) string { return sep + filepath.Join(parts...) }
+
+	tests := []struct {
+		name string
+		a    string
+		b    string
+		want int
+	}{
+		{"equal", p("root", "aaa"), p("root", "aaa"), 0},
+		{"before sibling", p("root", "aaa"), p("root", "bbb", "file.txt"), -1},
+		{"after sibling", p("root", "ccc"), p("root", "bbb", "file.txt"), 1},
+		{"ancestor before descendant", p("root", "aaa"), p("root", "aaa", "file.txt"), -1},
+		// Prefix-sibling: "blue-team-deprecated" must sort AFTER a resume point
+		// inside "blue-team", matching os.ReadDir order (regression for the raw
+		// string comparison where '-' < '/').
+		{"prefix sibling sorts after", p("root", "blue-team-deprecated"), p("root", "blue-team", "notes.txt"), 1},
+		{"prefix sibling reverse", p("root", "blue-team", "notes.txt"), p("root", "blue-team-deprecated"), -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, comparePathsForResume(tt.a, tt.b))
+		})
+	}
+}
+
 func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 	ctx := trContext.Background()
 

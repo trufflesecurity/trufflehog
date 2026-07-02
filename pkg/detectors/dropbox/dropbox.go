@@ -20,6 +20,12 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
+
+// MaxSecretSize overrides the engine's default keyword window (512 bytes) so the full
+// token is passed to FromData. Newer scoped Dropbox short-lived tokens (sl.u.…) can be
+// ~1.5KB; without this the engine truncates the chunk window and verification fails.
+func (s Scanner) MaxSecretSize() int64 { return 4096 }
 
 var (
 	defaultClient = common.SaneHttpClient()
