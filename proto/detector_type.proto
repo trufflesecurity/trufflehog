@@ -1057,5 +1057,6 @@ enum DetectorType {
   BrainTrustApiKey = 1053;
   PgAnalyzeReadKey = 1054;
   RedHatPyxis = 1055;
-  OpenRouter = 1056;
+  OctopusDeploy = 1056;
+  OpenRouter = 1057;
 }

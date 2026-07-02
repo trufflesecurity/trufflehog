@@ -28,8 +28,9 @@ var (
 	BraintrustDetectorEnabled       atomic.Bool
 	PgAnalyzeReadKeyDetectorEnabled atomic.Bool
 	RedHatPyxisDetectorEnabled      atomic.Bool
+	OctopusDeployDetectorEnabled    atomic.Bool
+	DropUnverifiedJWTResults        atomic.Bool
 	OpenRouterDetectorEnabled       atomic.Bool
-  DropUnverifiedJWTResults        atomic.Bool
 )
 
 type AtomicString struct {
