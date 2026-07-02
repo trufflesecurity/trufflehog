@@ -1055,4 +1055,5 @@ enum DetectorType {
   SpectralOps = 1051;
   AWSAppSync = 1052;
   BcryptHash = 1055;
+  BasicAuth = 1057;
 }
