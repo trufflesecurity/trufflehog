@@ -392,6 +392,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagga"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/impala"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/infura"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/influxdb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/insightly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instabot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instamojo"
@@ -1285,6 +1286,7 @@ func buildDetectorList() []detectors.Detector {
 		&imagga.Scanner{},
 		&impala.Scanner{},
 		&infura.Scanner{},
+		&influxdb.Scanner{},
 		&insightly.Scanner{},
 		&instabot.Scanner{},
 		&instamojo.Scanner{},
