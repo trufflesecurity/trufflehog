@@ -676,7 +676,7 @@ func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) so
 			if diff := pretty.Compare(chunk.SourceMetadata.GetGithub().Repository, wantChunk.SourceMetadata.GetGithub().Repository); diff == "" {
 				return nil
 			}
-			return sources.MatchError
+			return sources.ErrMatch
 		}
 		return nil
 	}
