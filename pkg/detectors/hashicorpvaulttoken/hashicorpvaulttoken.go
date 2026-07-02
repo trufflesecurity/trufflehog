@@ -28,8 +28,8 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Vault tokens:
-	// newer vault tokens are around 90-120 chars and start with hvs. (HashiCorp Vault Service token)
-	// legacy tokens are around 18-40 chars and start with s.
+	// newer vault tokens are around 90-120 chars (exluding the prefix "hvs.") and start with hvs. (HashiCorp Vault Service token)
+	// legacy tokens are around 18-40 chars (exluding the prefix "s.") and start with s.
 	vaultTokenPat = regexp.MustCompile(
 		`\b(hvs\.[A-Za-z0-9_-]{90,120}|s\.[A-Za-z0-9_-]{18,40})(?:$|[^A-Za-z0-9_-])`,
 	)
