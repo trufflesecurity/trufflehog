@@ -33,11 +33,15 @@ var (
 	contextPat = regexp.MustCompile(`(?i)<TKNBatch|<TKNBasic|\.sdtid`)
 )
 
-// Keywords returns the strings used by the Aho-Corasick prefilter. The
-// <TKNBatch> root element and the .sdtid extension are highly distinctive of
-// RSA SecurID software-token export files. Matching is case-insensitive.
+// Keywords returns the strings used by the Aho-Corasick prefilter. Every
+// structural marker recognised by contextPat (<TKNBatch>, <TKNBasic> and the
+// .sdtid extension) must be represented here, otherwise a token carrying only
+// one of those markers is dropped by the prefilter before FromData ever runs.
+// The <TKNBatch>/<TKNBasic> elements and the .sdtid extension are highly
+// distinctive of RSA SecurID software-token export files. Matching is
+// case-insensitive.
 func (s Scanner) Keywords() []string {
-	return []string{"TKNBatch", "sdtid"}
+	return []string{"TKNBatch", "TKNBasic", "sdtid"}
 }
 
 // FromData scans for RSA SecurID software token credentials. A token is only
