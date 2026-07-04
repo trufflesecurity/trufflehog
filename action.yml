@@ -14,6 +14,10 @@ inputs:
   head:
     description: Scan commits until here (usually dev branch).
     required: false
+  no_fail:
+    description: When set, trufflehog does not exit with a 183 code when a credential is found.
+    required: false
+    default: ''
   extra_args:
     default: ""
     description: Extra args to be passed to the trufflehog cli.
@@ -22,6 +26,10 @@ inputs:
     default: "latest"
     description: Scan with this trufflehog cli version.
     required: false
+outputs:
+  results:
+    description: "Trufflehog scan outputs"
+    value: ${{ steps.trufflehog.outputs.results }}
 branding:
   icon: "shield"
   color: "green"
@@ -30,6 +38,7 @@ runs:
   using: "composite"
   steps:
     - shell: bash
+      id: trufflehog
       working-directory: ${{ inputs.path }}
       env:
         BASE: ${{ inputs.base }}
@@ -37,6 +46,7 @@ runs:
         ARGS: ${{ inputs.extra_args }}
         COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
         VERSION: ${{ inputs.version }}
+        NO_FAIL: ${{ inputs.no_fail }}
       run: |
         ##########################################
         ## ADVANCED USAGE                       ##
@@ -90,17 +100,28 @@ runs:
             HEAD=${{github.event.pull_request.head.sha}}
           fi
         fi
+
+        ##########################################
+        ##      Determine additional args       ##
+        ##########################################
+        if [ -n "$NO_FAIL" ]; then
+          FAIL=""
+        else
+          FAIL="--fail"
+        fi
+
         ##########################################
         ##          Run TruffleHog              ##
         ##########################################
-        docker run --rm -v .:/tmp -w /tmp \
+        results=$(docker run --rm -v ${{ github.workspace }}:/tmp -w /tmp \
         ghcr.io/trufflesecurity/trufflehog:${VERSION} \
         git file:///tmp/ \
         --since-commit \
         ${BASE:-''} \
         --branch \
         ${HEAD:-''} \
-        --fail \
+        ${FAIL} \
         --no-update \
         --github-actions \
-        ${ARGS:-''}
+        ${ARGS:-''})
+        echo "results='$(echo $results)'" >> $GITHUB_OUTPUT
