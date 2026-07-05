@@ -33,10 +33,21 @@ var (
 	ktyRSAPat = regexp.MustCompile(`"kty"\s*:\s*"RSA"`)
 
 	// dFieldPat matches the "d" field (RSA private exponent) encoded in base64url.
-	// Arweave wallet private exponents are ~342 base64url chars; we require 100+ to
-	// exclude obviously short/fake values while allowing variation in key size.
+	// We require 100+ chars to exclude obviously short/fake values.
 	dFieldPat = regexp.MustCompile(`"d"\s*:\s*"([A-Za-z0-9_-]{100,})"`)
+
+	// arweaveContextPat matches an explicit mention of Arweave anywhere in the chunk.
+	arweaveContextPat = regexp.MustCompile(`(?i)arweave`)
 )
+
+// minArweaveSizedDLen is the minimum length of a base64url-encoded "d" field
+// consistent with the 4096-bit RSA keys Arweave wallets use (~683 chars).
+// Common RSA JWKs used for JWT signing, Auth0, and Azure AD are 2048-bit
+// (~342 chars) or 3072-bit (~512 chars), well under this threshold. Without
+// an explicit "arweave" mention nearby, only "d" fields at least this long
+// are reported as Arweave keys, so a same-shaped-but-smaller RSA JWK from an
+// unrelated service isn't mislabeled as an Arweave wallet key.
+const minArweaveSizedDLen = 600
 
 // Keywords returns the strings used by the Aho-Corasick prefilter.
 // Either "kty" (present in any JWK) or "arweave" (explicit mention) triggers the detector.
@@ -46,7 +57,11 @@ func (s Scanner) Keywords() []string {
 
 // FromData scans for Arweave RSA JWK private keys in the provided data.
 // An Arweave wallet key is a JSON Web Key with "kty":"RSA" and a "d" field
-// containing the RSA private exponent in base64url encoding.
+// containing the RSA private exponent in base64url encoding. Because that
+// shape alone is indistinguishable from any other RSA JWK (JWT signing keys,
+// Auth0, Azure AD, ...), a match is only reported when it also carries some
+// Arweave-specific signal: either an explicit "arweave" mention nearby, or a
+// "d" field sized like Arweave's 4096-bit keys. See minArweaveSizedDLen.
 // No live API verification is available for Arweave wallet keys.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -56,9 +71,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		return nil, nil
 	}
 
+	hasArweaveContext := arweaveContextPat.MatchString(dataStr)
+
 	uniqueKeys := make(map[string]struct{})
 	for _, match := range dFieldPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueKeys[match[1]] = struct{}{}
+		d := match[1]
+		// Without an explicit Arweave mention, require a key size consistent
+		// with Arweave's 4096-bit wallets to avoid mislabeling a generic,
+		// smaller RSA JWK (e.g. a 2048-bit JWT signing key) as an Arweave key.
+		if !hasArweaveContext && len(d) < minArweaveSizedDLen {
+			continue
+		}
+		uniqueKeys[d] = struct{}{}
 	}
 
 	for key := range uniqueKeys {

@@ -14,10 +14,17 @@ import (
 
 // fakeD is a synthetic 400-char base64url string used as a fake RSA private exponent.
 // It is clearly artificial (all same character) and contains no real key material.
+// It is shorter than minArweaveSizedDLen, so tests using it rely on the
+// "arweave" keyword context to match.
 var fakeD = strings.Repeat("A", 400)
 
 // fakeN is a synthetic 400-char base64url string used as a fake RSA modulus.
 var fakeN = strings.Repeat("B", 400)
+
+// generic2048D is a synthetic 342-char base64url string representing the
+// size of a typical 2048-bit RSA private exponent, the size commonly used by
+// JWT signing keys, Auth0, and Azure AD RSA JWKs, none of which are Arweave.
+var generic2048D = strings.Repeat("Z", 342)
 
 // Field sizes of a real 4096-bit Arweave wallet keyfile: n and d are ~683
 // base64url chars (512 bytes), the CRT params p/q/dp/dq/qi are ~342 chars
@@ -42,14 +49,15 @@ func TestArweaveKey_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - RSA JWK with long d field",
-			input: `{"kty":"RSA","e":"AQAB","n":"` + fakeN + `","d":"` + fakeD + `"}`,
-			want:  []string{fakeD},
+			name:  "valid pattern - RSA JWK sized like a 4096-bit Arweave key, no arweave keyword needed",
+			input: `{"kty":"RSA","e":"AQAB","n":"` + fullN + `","d":"` + fullD + `"}`,
+			want:  []string{fullD},
 		},
 		{
-			name:  "valid pattern - RSA JWK with spaces around colons",
-			input: `{ "kty" : "RSA", "e" : "AQAB", "d" : "` + fakeD + `" }`,
-			want:  []string{fakeD},
+			name: "valid pattern - RSA JWK with spaces around colons, arweave keyword present",
+			input: `# arweave wallet
+{ "kty" : "RSA", "e" : "AQAB", "d" : "` + fakeD + `" }`,
+			want: []string{fakeD},
 		},
 		{
 			name: "valid pattern - arweave keyword with RSA JWK",
@@ -81,6 +89,16 @@ func TestArweaveKey_Pattern(t *testing.T) {
 			name:  "invalid pattern - kty present but wrong value",
 			input: `{"kty":"oct","k":"` + fakeD + `"}`,
 			want:  nil,
+		},
+		{
+			name:  "invalid pattern - generic 2048-bit RSA JWK (JWT/Auth0/Azure-style), no arweave context",
+			input: `{"kty":"RSA","e":"AQAB","n":"` + generic2048D + `","d":"` + generic2048D + `"}`,
+			want:  nil,
+		},
+		{
+			name:  "valid pattern - generic-sized RSA JWK still matches when arweave context is present",
+			input: `arweave-keyfile.json: {"kty":"RSA","e":"AQAB","n":"` + generic2048D + `","d":"` + generic2048D + `"}`,
+			want:  []string{generic2048D},
 		},
 	}
 
