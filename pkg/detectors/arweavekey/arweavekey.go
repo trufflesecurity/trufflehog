@@ -11,8 +11,22 @@ import (
 
 type Scanner struct{}
 
-// Compile-time interface check.
-var _ detectors.Detector = (*Scanner)(nil)
+// Compile-time interface checks.
+var _ interface {
+	detectors.Detector
+	detectors.MaxSecretSizeProvider
+} = (*Scanner)(nil)
+
+// maxSecretSize is the number of bytes the engine extracts after a matched
+// keyword. An Arweave wallet key is a 4096-bit RSA JWK: n and d are ~683
+// base64url chars each and the five CRT params ~342 each, so a full keyfile
+// is ~3.1KB and the "d" field ends well beyond the engine's default 512-byte
+// window. 4096 covers a complete keyfile with headroom.
+const maxSecretSize = 4096
+
+// MaxSecretSize returns the maximum size of a secret this detector can find.
+// Without it the engine truncates the JWK before the "d" field is reached.
+func (s Scanner) MaxSecretSize() int64 { return maxSecretSize }
 
 var (
 	// ktyRSAPat matches the "kty":"RSA" JSON field (with optional whitespace).
