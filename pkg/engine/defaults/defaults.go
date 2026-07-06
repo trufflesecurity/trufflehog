@@ -115,6 +115,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintrust"
 	brandfetchv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v1"
 	brandfetchv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
@@ -522,6 +523,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nvapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oanda"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/octopusdeploy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/okta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/omnisend"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onedesk"
@@ -533,6 +535,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openaiadmin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openrouter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
@@ -562,6 +565,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pganalyzereadkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/photoroom"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
@@ -619,6 +623,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/reallysimplesystems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rebrandly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rechargepayments"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/redhatpyxis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/redis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
@@ -628,6 +633,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rev"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/revampcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ringcentral"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ritekit"
@@ -811,6 +817,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/upwave"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uri"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/urlscan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/user"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
@@ -996,6 +1003,7 @@ func buildDetectorList() []detectors.Detector {
 		&box.Scanner{},
 		&boxoauth.Scanner{},
 		&braintreepayments.Scanner{},
+		&braintrust.Scanner{},
 		&brandfetchv1.Scanner{},
 		&brandfetchv2.Scanner{},
 		&browserstack.Scanner{},
@@ -1418,6 +1426,7 @@ func buildDetectorList() []detectors.Detector {
 		&nvapi.Scanner{},
 		&nylas.Scanner{},
 		&oanda.Scanner{},
+		&octopusdeploy.Scanner{},
 		&okta.Scanner{},
 		&omnisend.Scanner{},
 		&onedesk.Scanner{},
@@ -1429,6 +1438,7 @@ func buildDetectorList() []detectors.Detector {
 		&openai.Scanner{},
 		&openaiadmin.Scanner{},
 		&opencagedata.Scanner{},
+		&openrouter.Scanner{},
 		&openuv.Scanner{},
 		&openvpn.Scanner{},
 		&openweather.Scanner{},
@@ -1458,6 +1468,7 @@ func buildDetectorList() []detectors.Detector {
 		&peopledatalabs.Scanner{},
 		&pepipost.Scanner{},
 		&percy.Scanner{},
+		&pganalyzereadkey.Scanner{},
 		&photoroom.Scanner{},
 		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
@@ -1516,6 +1527,7 @@ func buildDetectorList() []detectors.Detector {
 		&reallysimplesystems.Scanner{},
 		&rebrandly.Scanner{},
 		&rechargepayments.Scanner{},
+		&redhatpyxis.Scanner{},
 		&redis.Scanner{},
 		&refiner.Scanner{},
 		&rentman.Scanner{},
@@ -1526,6 +1538,7 @@ func buildDetectorList() []detectors.Detector {
 		// &restpack.Scanner{},
 		&restpackhtmltopdfapi.Scanner{},
 		&restpackscreenshotapi.Scanner{},
+		&rev.Scanner{},
 		&revampcrm.Scanner{},
 		&ringcentral.Scanner{},
 		&ritekit.Scanner{},
@@ -1713,6 +1726,7 @@ func buildDetectorList() []detectors.Detector {
 		&upwave.Scanner{},
 		&uri.Scanner{},
 		&urlscan.Scanner{},
+		&user.Scanner{},
 		&userflow.Scanner{},
 		&userstack.Scanner{},
 		&vagrantcloudpersonaltoken.Scanner{},
@@ -1794,6 +1808,20 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.TlyDetectorEnabled.Load()
 		case *wit.Scanner:
 			return !feature.WitDetectorEnabled.Load()
+		case *rev.Scanner:
+			return !feature.RevDetectorEnabled.Load()
+		case *user.Scanner:
+			return !feature.UserDetectorEnabled.Load()
+		case *braintrust.Scanner:
+			return !feature.BraintrustDetectorEnabled.Load()
+		case *pganalyzereadkey.Scanner:
+			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
+		case *redhatpyxis.Scanner:
+			return !feature.RedHatPyxisDetectorEnabled.Load()
+		case *octopusdeploy.Scanner:
+			return !feature.OctopusDeployDetectorEnabled.Load()
+		case *openrouter.Scanner:
+			return !feature.OpenRouterDetectorEnabled.Load()
 		default:
 			return false
 		}

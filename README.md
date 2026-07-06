@@ -358,19 +358,23 @@ For more information on Cross Fork Object References, please [read our blog post
 
 ## 17. Scan Hugging Face
 
-### Scan a Hugging Face Model, Dataset or Space
+### Scan a Hugging Face Model, Dataset, Space or Bucket
 
 ```bash
-trufflehog huggingface --model <model_id> --space <space_id> --dataset <dataset_id>
+trufflehog huggingface \
+    --model <model_id> \
+    --dataset <dataset_id> \
+    --space <space_id> \
+    --bucket <bucket_id>
 ```
 
-### Scan all Models, Datasets and Spaces belonging to a Hugging Face Organization or User
+### Scan all Models, Datasets, Spaces and Buckets belonging to a Hugging Face Organization or User
 
 ```bash
 trufflehog huggingface --org <orgname> --user <username>
 ```
 
-(Optionally) When scanning an organization or user, you can skip an entire class of resources with `--skip-models`, `--skip-datasets`, `--skip-spaces` OR a particular resource with `--ignore-models <model_id>`, `--ignore-datasets <dataset_id>`, `--ignore-spaces <space_id>`.
+(Optionally) When scanning an organization or user, you can skip an entire class of resources with `--skip-all-models`, `--skip-all-datasets`, `--skip-all-spaces`, `--skip-all-buckets` OR a particular resource with `--ignore-models <model_id>`, `--ignore-datasets <dataset_id>`, `--ignore-spaces <space_id>`, `--ignore-buckets <bucket_id>`.
 
 ### Scan Discussion and PR Comments
 
@@ -422,6 +426,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - git
 - github
 - gitlab
+- huggingface
 - docker
 - s3
 - filesystem (files and directories)

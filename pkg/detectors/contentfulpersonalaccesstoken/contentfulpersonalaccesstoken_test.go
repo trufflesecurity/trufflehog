@@ -2,6 +2,7 @@ package contentfulpersonalaccesstoken
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -9,6 +10,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
+
+const validToken = "CFPAT-fakeabcdefghijklmnopqrstuvwxyz0123456789xyz"
 
 var (
 	validPattern = `
@@ -29,6 +32,12 @@ var (
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
+
+	validPatternWithToken = fmt.Sprintf(`
+		api:
+			auth_type: "Bearer"
+			contentful_access_token: "%s"
+	`, validToken)
 )
 
 func TestContentfulPersonalAccessToken_Pattern(t *testing.T) {
@@ -44,6 +53,11 @@ func TestContentfulPersonalAccessToken_Pattern(t *testing.T) {
 			name:  "valid pattern - not found",
 			input: validPattern,
 			want:  nil,
+		},
+		{
+			name:  "valid pattern with token - found",
+			input: validPatternWithToken,
+			want:  []string{validToken},
 		},
 	}
 
@@ -87,5 +101,24 @@ func TestContentfulPersonalAccessToken_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+func TestContentfulPersonalAccessToken_SecretRedacted(t *testing.T) {
+	d := Scanner{}
+
+	results, err := d.FromData(context.Background(), false, []byte(validPatternWithToken))
+	if err != nil {
+		t.Errorf("error = %v", err)
+		return
+	}
+
+	if len(results) == 0 {
+		t.Fatal("did not receive result")
+	}
+
+	want := "..." + validToken[len(validToken)-4:]
+	if results[0].Redacted != want {
+		t.Errorf("expected redacted secret to be '%s', got '%s'", want, results[0].Redacted)
 	}
 }
