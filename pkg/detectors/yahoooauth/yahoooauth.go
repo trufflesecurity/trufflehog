@@ -2,9 +2,7 @@ package yahoooauth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -29,7 +27,7 @@ var (
 	// Yahoo OAuth Refresh Token pattern
 	// Shorter tokens (60-100 chars) with alphanumeric, dots, underscores, hyphens, tildes
 	// Example: AOahQ2qfcSxRRa1r4EDFhCDdsx0y~001~Fj.vO_OAW2IXbqFqc8gK3e0wJdTsx6kulrM-
-	refreshTokenPat = regexp.MustCompile(`\b([A-Za-z0-9][A-Za-z0-9._~-]{59,119})\b`)
+	refreshTokenPat = regexp.MustCompile(`\b([A-Za-z0-9][A-Za-z0-9._~-]{59,119})`)
 )
 
 func (s Scanner) Keywords() []string {
@@ -109,20 +107,6 @@ func verifyYahooToken(ctx context.Context, client *http.Client, token string) (b
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return true, nil
-		}
-
-		var userInfo map[string]interface{}
-		if err := json.Unmarshal(body, &userInfo); err == nil {
-			if _, hasEmail := userInfo["email"]; hasEmail {
-				return true, nil
-			}
-			if _, hasSub := userInfo["sub"]; hasSub {
-				return true, nil
-			}
-		}
 		return true, nil
 	}
 
