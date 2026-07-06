@@ -1054,25 +1054,6 @@ enum DetectorType {
   GitLabOauth2 = 1050;
   SpectralOps = 1051;
   AWSAppSync = 1052;
-  ShippoLiveToken = 1053;
-  VisibleNpmRegistryAuthData = 1054;
-  BcryptHash = 1055;
-  Base64PrivateKey = 1056;
+  BrainTrustApiKey = 1053;
   BasicAuth = 1057;
-  DuoAPISecretKey = 1058;
-  DockerSwarmJoinToken = 1059;
-  FernetKey = 1060;
-  RailsMasterKey = 1061;
-  CloudSightAPIKey = 1062;
-  NewRelicUserAPIKey = 1063;
-  NewRelicLicenseKey = 1064;
-  NewRelicBrowserKey = 1065;
-  DockerSwarmUnlock = 1066;
-  Duffel = 1067;
-  VaultToken = 1068;
-  SlackAppToken = 1069;
-  VaultRootToken = 1070;
-  VaultUnsealKey = 1071;
-  YahooOAuth = 1072;
-  BrainTrustApiKey = 1073;
 }
