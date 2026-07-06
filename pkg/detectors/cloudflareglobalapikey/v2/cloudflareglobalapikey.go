@@ -9,13 +9,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	cfglobalapikey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
-	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
-	v1.Scanner
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
@@ -28,7 +26,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// 2026+ format: cfk_ prefix, sufficiently unique to match without keyword proximity.
-	apiKeyV2Pat = regexp.MustCompile(`\b(cfk_[a-zA-Z0-9]{40}[a-f0-9]{8})\b`)
+	apiKeyPat = regexp.MustCompile(`\b(cfk_[a-zA-Z0-9]{40}[a-f0-9]{8})\b`)
 
 	emailPat = regexp.MustCompile(common.EmailPattern)
 )
@@ -42,7 +40,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	apiKeyMatches := apiKeyV2Pat.FindAllStringSubmatch(dataStr, -1)
+	apiKeyMatches := apiKeyPat.FindAllStringSubmatch(dataStr, -1)
 
 	uniqueEmailMatches := make(map[string]struct{})
 	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
@@ -92,5 +90,5 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Cloudflare is a web infrastructure and website security company. Its services include content delivery network (CDN), DDoS mitigation, Internet security, and distributed domain name server (DNS) services. Cloudflare API keys (cfk_ prefixed, 2026+ format) can be used to access and modify these services."
+	return "Cloudflare is a web infrastructure and website security company. Cloudflare API keys (cfk_ prefixed, 2026+ format) can be used to access and modify these services."
 }

@@ -9,13 +9,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	cfapitoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
-	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
-	v1.Scanner
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
@@ -28,7 +26,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// 2026+ formats: cfut_ (user token) and cfat_ (account token), self-identifying.
-	keyV2Pat = regexp.MustCompile(`\b(cf[ua]t_[a-zA-Z0-9]{40}[a-f0-9]{8})\b`)
+	keyPat = regexp.MustCompile(`\b(cf[ua]t_[a-zA-Z0-9]{40}[a-f0-9]{8})\b`)
 	// Cloudflare account ID pattern for cfat_ token verification.
 	accountIDPat = regexp.MustCompile(`\b([a-f0-9]{32})\b`)
 )
@@ -42,7 +40,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyV2Pat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	// Extract account IDs from surrounding data for cfat_ verification.
 	uniqueAccountIDs := make(map[string]struct{})

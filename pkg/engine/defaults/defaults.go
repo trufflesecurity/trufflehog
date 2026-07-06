@@ -1852,6 +1852,10 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.HashiCorpVaultBatchTokenDetectorEnabled.Load()
 		case *hashicorpvaulttoken.Scanner:
 			return !feature.HashiCorpVaultTokenDetectorEnabled.Load()
+		case *cloudflareapitokenv2.Scanner:
+			return !feature.CloudflareApiTokenV2DetectorEnabled.Load()
+		case *cloudflareglobalapikeyv2.Scanner:
+			return !feature.CloudflareGlobalApiKeyV2DetectorEnabled.Load()
 		default:
 			return false
 		}

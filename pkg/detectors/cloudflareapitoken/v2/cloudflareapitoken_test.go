@@ -20,19 +20,119 @@ func TestCloudFlareAPITokenV2_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid v2 user token - no keyword proximity needed",
-			input: "token: cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe",
-			want:  []string{"cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe"},
+			name: "valid v2 user token - go http client",
+			input: `
+				func setupCloudflareClient() (*http.Client, error) {
+					req, err := http.NewRequest("GET", "https://api.cloudflare.com/client/v4/user", http.NoBody)
+					if err != nil {
+						return nil, err
+					}
+					// Rotated to the new self-identifying user token format during the March migration.
+					req.Header.Set("Authorization", "Bearer cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe")
+
+					client := &http.Client{}
+					resp, _ := client.Do(req)
+					defer func() { _ = resp.Body.Close() }()
+
+					return client, nil
+				}
+				`,
+			want: []string{
+				"cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe",
+			},
 		},
 		{
-			name:  "valid v2 account token - no keyword proximity needed",
-			input: "token: cfat_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe",
-			want:  []string{"cfat_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfe"},
+			name: "valid v2 account token - wrangler config",
+			input: `
+				# wrangler.toml
+				name = "edge-worker"
+				main = "src/index.js"
+				compatibility_date = "2026-01-15"
+
+				[env.production]
+				account_id = "a4c123b1612dd272d1371c17149d4395"
+
+				# CF_API_TOKEN used by the deploy pipeline
+				CF_API_TOKEN = "cfat_OhbVrpoiVgRV5IfLBcbfnoGMbJmTPSIAoCLrZ3aW5da846a3"
+				`,
+			want: []string{
+				"cfat_OhbVrpoiVgRV5IfLBcbfnoGMbJmTPSIAoCLrZ3aW5da846a3a4c123b1612dd272d1371c17149d4395",
+			},
 		},
 		{
-			name:  "no match for legacy format",
-			input: "cfut_: kOjD1yceduu2jxL2uuwT9dkOIudU3_54sLCEud6j",
-			want:  nil,
+			name: "no match for legacy format",
+			input: `
+				# .env.legacy
+				# Pre-2026 tokens don't carry the cfut_/cfat_ prefix and shouldn't match the new pattern.
+				CLOUDFLARE_API_TOKEN=kOjD1yceduu2jxL2uuwT9dkOIudU3_54sLCEud6j
+				`,
+			want: nil,
+		},
+		{
+			name: "valid pattern - key rotation script with multiple tokens",
+			input: `
+				#!/usr/bin/env bash
+				# rotate-cf-tokens.sh - retires the old worker token and provisions a replacement
+				set -euo pipefail
+
+				echo "Retiring old token..."
+				OLD_TOKEN="cfut_fygw2wMqZcUDIh7yfJs1ON43xKmTecQoXsf2o3gy8eb5bb68"
+
+				echo "Provisioning new token..."
+				NEW_TOKEN="cfut_S7RPeMOkIUpkDyr7OSJoRu1XXdo0cZuzren68K4Ta6fce484"
+
+				curl -s -X DELETE "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+					-H "Authorization: Bearer ${OLD_TOKEN}"
+				curl -s -X PUT "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+					-H "Authorization: Bearer ${NEW_TOKEN}"
+				`,
+			want: []string{
+				"cfut_fygw2wMqZcUDIh7yfJs1ON43xKmTecQoXsf2o3gy8eb5bb68",
+				"cfut_S7RPeMOkIUpkDyr7OSJoRu1XXdo0cZuzren68K4Ta6fce484",
+			},
+		},
+		{
+			name: "invalid pattern - too short",
+			input: `
+				func setupCloudflareClient() {
+					// Truncated token accidentally committed during a config export
+					token := "cfut_ZE4CrcFhEIDXk9vL2sTLe"
+					client.SetToken(token)
+				}
+				`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern - too long",
+			input: `
+				func setupCloudflareClient() {
+					// Extra characters appended by a bad find-and-replace
+					token := "cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbfeEXTRA"
+					client.SetToken(token)
+				}
+				`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern - invalid characters",
+			input: `
+				func setupCloudflareClient() {
+					// Token was mangled when pasted from a Slack message with markdown formatting
+					token := "cfut_ZE4CrcFhEIDXk9vL2sTLeARsFp2ZZYbydVDhhIUq8573bbf!"
+					client.SetToken(token)
+				}
+				`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern - keyword only",
+			input: `
+				// TODO: load the real token instead of reading cfut_ from env
+				func isCloudflareUserToken(s string) bool {
+					return strings.HasPrefix(s, "cfut_")
+				}
+				`,
+			want: nil,
 		},
 	}
 
