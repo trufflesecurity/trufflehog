@@ -29,7 +29,7 @@ var (
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"hvs.", "hvb.", "hvr.", "vault_token", "VAULT_TOKEN"}
+	return []string{"hvs.", "hvb.", "hvr.", "s.", "vault_token", "VAULT_TOKEN"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
