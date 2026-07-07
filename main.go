@@ -550,6 +550,9 @@ func run(state overseer.State, logSync func() error) {
 	feature.BraintrustDetectorEnabled.Store(true)
 	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
 	feature.RedHatPyxisDetectorEnabled.Store(true)
+	feature.OctopusDeployDetectorEnabled.Store(true)
+	feature.OpenRouterDetectorEnabled.Store(true)
+	feature.NewRelicInsightsInsertKeyDetectorEnabled.Store(true)
 	feature.DuffelTokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
