@@ -87,11 +87,12 @@ var (
 	noVerificationCache = cli.Flag("no-verification-cache", "Disable verification caching").Bool()
 
 	// Add feature flags
-	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
-	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
-	gitCloneTimeout    = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
-	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
-	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
+	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
+	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()
 
 	gitScan                = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -249,11 +250,12 @@ var (
 	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
 	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
 
-	huggingfaceScan     = cli.Command("huggingface", "Find credentials in HuggingFace datasets, models and spaces.")
+	huggingfaceScan     = cli.Command("huggingface", "Find credentials in HuggingFace datasets, models, spaces and buckets.")
 	huggingfaceEndpoint = huggingfaceScan.Flag("endpoint", "HuggingFace endpoint.").Default("https://huggingface.co").String()
 	huggingfaceModels   = huggingfaceScan.Flag("model", "HuggingFace model to scan. You can repeat this flag. Example: 'username/model'").Strings()
 	huggingfaceSpaces   = huggingfaceScan.Flag("space", "HuggingFace space to scan. You can repeat this flag. Example: 'username/space'").Strings()
 	huggingfaceDatasets = huggingfaceScan.Flag("dataset", "HuggingFace dataset to scan. You can repeat this flag. Example: 'username/dataset'").Strings()
+	huggingfaceBuckets  = huggingfaceScan.Flag("bucket", "HuggingFace bucket to scan. You can repeat this flag. Example: 'username/bucket'").Strings()
 	huggingfaceOrgs     = huggingfaceScan.Flag("org", `HuggingFace organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
 	huggingfaceUsers    = huggingfaceScan.Flag("user", `HuggingFace user to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
 	huggingfaceToken    = huggingfaceScan.Flag("token", "HuggingFace token. Can be provided with environment variable HUGGINGFACE_TOKEN.").Envar("HUGGINGFACE_TOKEN").String()
@@ -264,9 +266,12 @@ var (
 	huggingfaceIgnoreModels       = huggingfaceScan.Flag("ignore-models", "Models to ignore in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)").Strings()
 	huggingfaceIgnoreSpaces       = huggingfaceScan.Flag("ignore-spaces", "Spaces to ignore in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)").Strings()
 	huggingfaceIgnoreDatasets     = huggingfaceScan.Flag("ignore-datasets", "Datasets to ignore in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)").Strings()
+	huggingfaceIncludeBuckets     = huggingfaceScan.Flag("include-buckets", "Buckets to include in scan. You can repeat this flag. Must use HuggingFace bucket full name. Example: 'username/bucket' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreBuckets      = huggingfaceScan.Flag("ignore-buckets", "Buckets to ignore in scan. You can repeat this flag. Must use HuggingFace bucket full name. Example: 'username/bucket' (Only used with --user or --org)").Strings()
 	huggingfaceSkipAllModels      = huggingfaceScan.Flag("skip-all-models", "Skip all model scans. (Only used with --user or --org)").Bool()
 	huggingfaceSkipAllSpaces      = huggingfaceScan.Flag("skip-all-spaces", "Skip all space scans. (Only used with --user or --org)").Bool()
 	huggingfaceSkipAllDatasets    = huggingfaceScan.Flag("skip-all-datasets", "Skip all dataset scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllBuckets     = huggingfaceScan.Flag("skip-all-buckets", "Skip all bucket scans. (Only used with --user or --org)").Bool()
 	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
@@ -512,6 +517,10 @@ func run(state overseer.State, logSync func() error) {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
 	}
 
+	if *dropUnverifiedJWTResults {
+		feature.DropUnverifiedJWTResults.Store(true)
+	}
+
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
 
@@ -534,6 +543,18 @@ func run(state overseer.State, logSync func() error) {
 	feature.GitLabOAuthDetectorEnabled.Store(true)
 	feature.EnigmaDetectorEnabled.Store(true)
 	feature.DatadogApiKeyDetectorEnabled.Store(true)
+	feature.TlyDetectorEnabled.Store(true)
+	feature.WitDetectorEnabled.Store(true)
+	feature.RevDetectorEnabled.Store(true)
+	feature.UserDetectorEnabled.Store(true)
+	feature.BraintrustDetectorEnabled.Store(true)
+	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
+	feature.RedHatPyxisDetectorEnabled.Store(true)
+	feature.OctopusDeployDetectorEnabled.Store(true)
+	feature.OpenRouterDetectorEnabled.Store(true)
+	feature.NewRelicInsightsInsertKeyDetectorEnabled.Store(true)
+	feature.DuffelTokenDetectorEnabled.Store(true)
+	feature.ShippoDetectorEnabled.Store(true)
 	feature.IPInfoDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
@@ -1120,8 +1141,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			*huggingfaceEndpoint = strings.TrimRight(*huggingfaceEndpoint, "/")
 		}
 
-		if len(*huggingfaceModels) == 0 && len(*huggingfaceSpaces) == 0 && len(*huggingfaceDatasets) == 0 && len(*huggingfaceOrgs) == 0 && len(*huggingfaceUsers) == 0 {
-			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space or dataset")
+		if len(*huggingfaceModels) == 0 && len(*huggingfaceSpaces) == 0 && len(*huggingfaceDatasets) == 0 && len(*huggingfaceBuckets) == 0 && len(*huggingfaceOrgs) == 0 && len(*huggingfaceUsers) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space, dataset or bucket")
 		}
 
 		cfg := engine.HuggingfaceConfig{
@@ -1129,18 +1150,22 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Models:             *huggingfaceModels,
 			Spaces:             *huggingfaceSpaces,
 			Datasets:           *huggingfaceDatasets,
+			Buckets:            *huggingfaceBuckets,
 			Organizations:      *huggingfaceOrgs,
 			Users:              *huggingfaceUsers,
 			Token:              *huggingfaceToken,
 			IncludeModels:      *huggingfaceIncludeModels,
 			IncludeSpaces:      *huggingfaceIncludeSpaces,
 			IncludeDatasets:    *huggingfaceIncludeDatasets,
+			IncludeBuckets:     *huggingfaceIncludeBuckets,
 			IgnoreModels:       *huggingfaceIgnoreModels,
 			IgnoreSpaces:       *huggingfaceIgnoreSpaces,
 			IgnoreDatasets:     *huggingfaceIgnoreDatasets,
+			IgnoreBuckets:      *huggingfaceIgnoreBuckets,
 			SkipAllModels:      *huggingfaceSkipAllModels,
 			SkipAllSpaces:      *huggingfaceSkipAllSpaces,
 			SkipAllDatasets:    *huggingfaceSkipAllDatasets,
+			SkipAllBuckets:     *huggingfaceSkipAllBuckets,
 			IncludeDiscussions: *huggingfaceIncludeDiscussions,
 			IncludePrs:         *huggingfaceIncludePrs,
 			Concurrency:        *concurrency,

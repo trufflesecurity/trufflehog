@@ -20,7 +20,7 @@ jobs:
         uses: jaxxstorm/action-install-gh-release@25e24d2d23ae098373794ef1d6faecb48ee52da8 # v3.0.0
         with:
           repo: gotestyourself/gotestsum
-      - uses: rwx-research/setup-captain@f761ee3671e4c027299f8a5842a53fba8ddd8e37 # v1
+      - uses: rwx-research/setup-captain@f761ee3671e4c027299f8a5842a53fba8ddd8e37 # v1.4.1
       - name: Test Go
         run: |
           export CGO_ENABLED=1

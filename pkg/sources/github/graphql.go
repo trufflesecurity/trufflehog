@@ -17,7 +17,7 @@ import (
 
 // processIssuesWithComments process github repo issues with comments using graphql API
 func (s *Source) processIssuesWithComments(
-	ctx context.Context, repoInfo repoInfo,
+	ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo,
 	reporter sources.ChunkReporter, cutoffTime *time.Time,
 ) error {
 	vars := map[string]any{
@@ -34,7 +34,7 @@ func (s *Source) processIssuesWithComments(
 	// loop will continue as long as there are issues in the repository
 	for {
 		var query issuesWithComments
-		err := s.connector.GraphQLClient().Query(ctx, &query, vars)
+		err := graphqlClient.Query(ctx, &query, vars)
 		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
 			continue
 		}
@@ -75,7 +75,7 @@ func (s *Source) processIssuesWithComments(
 
 				// request this issue more comments
 				var commentsQuery singleIssueComments
-				err := s.connector.GraphQLClient().Query(ctx, &commentsQuery, commentVars)
+				err := graphqlClient.Query(ctx, &commentsQuery, commentVars)
 				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &commentsQuery.RateLimit, err) {
 					continue
 				}
@@ -111,7 +111,7 @@ func (s *Source) processIssuesWithComments(
 }
 
 // processPRWithComments process github repo pull requests with inline comments
-func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processPRWithComments(ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	vars := map[string]any{
 		owner:                 githubv4.String(repoInfo.owner),
 		repository:            githubv4.String(repoInfo.name),
@@ -126,7 +126,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 	// continue loop as long as there are pull requests remaining
 	for {
 		var query pullRequestWithComments
-		err := s.connector.GraphQLClient().Query(ctx, &query, vars)
+		err := graphqlClient.Query(ctx, &query, vars)
 		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
 			continue
 		}
@@ -166,7 +166,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 					commentsPagination: pr.Comments.PageInfo.EndCursor,
 				}
 
-				err := s.connector.GraphQLClient().Query(ctx, &commentQuery, singlePRVars)
+				err := graphqlClient.Query(ctx, &commentQuery, singlePRVars)
 				if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &commentQuery.RateLimit, err) {
 					continue
 				}
@@ -202,7 +202,7 @@ func (s *Source) processPRWithComments(ctx context.Context, repoInfo repoInfo, r
 }
 
 // processReviewThreads process github repo pull request review threads
-func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) processReviewThreads(ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	vars := map[string]any{
 		owner:                 githubv4.String(repoInfo.owner),
 		repository:            githubv4.String(repoInfo.name),
@@ -217,7 +217,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 	// continue as long as pull requests have threads
 	for {
 		var query prWithReviewThreadIDs
-		err := s.connector.GraphQLClient().Query(ctx, &query, vars)
+		err := graphqlClient.Query(ctx, &query, vars)
 		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
 			continue
 		}
@@ -249,7 +249,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 		for _, batch := range chunkIDs(threadIDs, 100) {
 			ctx.Logger().V(5).Info("Processing Thread comments in Batches", "batch_length", len(batch))
 			// fetch comments for the batch of threads
-			if err := s.fetchThreadComments(ctx, batch, repoInfo, reporter, cutoffTime); err != nil {
+			if err := s.fetchThreadComments(ctx, graphqlClient, batch, repoInfo, reporter, cutoffTime); err != nil {
 				return fmt.Errorf("error fetching thread review comments: %w", err)
 			}
 		}
@@ -259,7 +259,7 @@ func (s *Source) processReviewThreads(ctx context.Context, repoInfo repoInfo, re
 }
 
 // fetchThreadComments process github repo pull request threads and their comments
-func (s *Source) fetchThreadComments(ctx context.Context, threadIDs []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+func (s *Source) fetchThreadComments(ctx context.Context, graphqlClient *githubv4.Client, threadIDs []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	// Process in batches of 100
 	var query multiReviewThreadComments
 	vars := map[string]any{
@@ -268,7 +268,7 @@ func (s *Source) fetchThreadComments(ctx context.Context, threadIDs []string, re
 		commentsPagination: (*githubv4.String)(nil),
 	}
 
-	if err := s.connector.GraphQLClient().Query(ctx, &query, vars); err != nil {
+	if err := graphqlClient.Query(ctx, &query, vars); err != nil {
 		return fmt.Errorf("multi-thread query failed: %w", err)
 	}
 
@@ -288,7 +288,7 @@ func (s *Source) fetchThreadComments(ctx context.Context, threadIDs []string, re
 				commentsPagination: (*githubv4.String)(nil),
 			}
 
-			err := s.connector.GraphQLClient().Query(ctx, &query, reviewThreadVars)
+			err := graphqlClient.Query(ctx, &query, reviewThreadVars)
 			if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
 				continue
 			}
@@ -348,8 +348,8 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 	// if resume time is not empty and is after current time, than put the request to sleep till that.
 	if !resumeTime.IsZero() && time.Now().Before(resumeTime) {
 		retryAfter := time.Until(resumeTime)
-		time.Sleep(retryAfter)
-		return true
+		_, canceled := sleepWithContext(ctx, retryAfter)
+		return !canceled
 	}
 
 	var retryAfter time.Duration
@@ -393,10 +393,10 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-	time.Sleep(retryAfter)
-	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
+	slept, canceled := sleepWithContext(ctx, retryAfter)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(slept.Seconds())
 
-	return true
+	return !canceled
 }
 
 func (s *Source) chunkGraphqlIssues(ctx context.Context, repoInfo repoInfo, issues []issue, reporter sources.ChunkReporter) error {
