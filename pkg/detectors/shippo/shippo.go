@@ -60,7 +60,7 @@ func (s Scanner) FromData(
 		result := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Shippo,
 			Raw:          []byte(token),
-			Redacted:     token[:5] + "...",
+			Redacted:     token[:12] + "...",
 			SecretParts: map[string]string{
 				"key": token,
 			},
