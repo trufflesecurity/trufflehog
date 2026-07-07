@@ -11,3 +11,7 @@ pkg/writers/ @trufflesecurity/scanning
 
 # Contracts -- co-owned, changes affect both teams
 proto/ @trufflesecurity/integrations @trufflesecurity/scanning
+
+# Detectors are fully owned by integrations
+proto/detector_type.proto @trufflesecurity/integrations
+pkg/engine/defaults/ @trufflesecurity/integrations
