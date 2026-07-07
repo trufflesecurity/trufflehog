@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -252,8 +253,10 @@ func (c *appConnector) createAPIClientForInstallation(installationID int64) (*gi
 		return nil, fmt.Errorf("could not create app transport for installation %d: %w", installationID, err)
 	}
 
+	// NewFromAppsTransport inherits BaseURL from appsTransport, which
+	// newAppsTransport already set correctly (incl. GHE.com). Don't override it
+	// with the raw endpoint here or GHE.com token refresh would 401.
 	transport := ghinstallation.NewFromAppsTransport(appsTransport, installationID)
-	transport.BaseURL = c.apiEndpoint
 
 	client, err := newGitHubClientWithTransport(c.apiEndpoint, transport)
 	if err != nil {
@@ -268,12 +271,41 @@ func newAppsTransport(apiEndpoint string, appID int64, privateKey []byte) (*ghin
 	if err != nil {
 		return nil, err
 	}
-	appsTransport.BaseURL = apiEndpoint
+
+	// ghinstallation uses BaseURL to build the token exchange URL
+	// {BaseURL}/app/installations/{id}/access_tokens. For GHE.com this must be
+	// the api.SUBDOMAIN.ghe.com base with no /api/v3 and no trailing slash
+	// (which ghinstallation does not expect), otherwise token refresh 401s.
+	baseURL, err := appsBaseURL(apiEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	appsTransport.BaseURL = baseURL
 	return appsTransport, nil
+}
+
+// appsBaseURL returns the BaseURL that ghinstallation transports should use for
+// token exchange/refresh. For GHE.com it resolves to the api.* subdomain with
+// the trailing slash trimmed; for github.com and GHES it is the endpoint as-is.
+func appsBaseURL(apiEndpoint string) (string, error) {
+	if isGHECloud(apiEndpoint) {
+		normalizedURL, err := normalizeGHECloudAPIEndpoint(apiEndpoint)
+		if err != nil {
+			return "", fmt.Errorf("could not normalize GHE.com endpoint: %w", err)
+		}
+		return strings.TrimRight(normalizedURL, "/"), nil
+	}
+	return apiEndpoint, nil
 }
 
 func newGitHubClientWithTransport(apiEndpoint string, transport http.RoundTripper) (*github.Client, error) {
 	httpClient := common.RetryableHTTPClientTimeout(githubHTTPTimeoutSeconds)
 	httpClient.Transport = transport
+
+	// GHE.com (GHEC with data residency) serves its REST API at the root of
+	// api.SUBDOMAIN.ghe.com (like api.github.com), NOT under the GHES /api/v3 path.
+	if isGHECloud(apiEndpoint) {
+		return createGHECloudClient(httpClient, apiEndpoint)
+	}
 	return github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 }
