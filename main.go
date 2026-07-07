@@ -555,6 +555,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.NewRelicInsightsInsertKeyDetectorEnabled.Store(true)
 	feature.DuffelTokenDetectorEnabled.Store(true)
 	feature.ShippoDetectorEnabled.Store(true)
+	feature.IPInfoDetectorEnabled.Store(true)
 	feature.LobDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
@@ -881,6 +882,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if len(*githubScanOrgs) > 0 && len(*githubScanRepos) > 0 {
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories at the same time")
+		}
+		// --include-repos/--exclude-repos only filter repos enumerated from an org/user scan;
+		// explicit --repo entries bypass that filtering step entirely (see enumerate() in
+		// pkg/sources/github/github.go), so combining them with --repo would silently no-op
+		// the filters instead of erroring.
+		if len(*githubScanRepos) > 0 && (len(*githubIncludeRepos) > 0 || len(*githubExcludeRepos) > 0) {
+			return scanMetrics, fmt.Errorf("invalid config: --include-repos and --exclude-repos only apply to organization or user scans and cannot be used with --repo")
 		}
 
 		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {

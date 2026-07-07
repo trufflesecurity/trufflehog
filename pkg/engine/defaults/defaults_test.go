@@ -118,9 +118,8 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// to buildDetectorList() — discovered by TestAllDetectorTypesAreInDefaultList.
 	// They are not added immediately out of caution for the impact on customers/users.
 	// Remove each entry once its detector has been carefully added.
-	detector_typepb.DetectorType_Guru:   {},
-	detector_typepb.DetectorType_IPInfo: {},
-	detector_typepb.DetectorType_Tru:    {},
+	detector_typepb.DetectorType_Guru: {},
+	detector_typepb.DetectorType_Tru:  {},
 
 	// Feature flag gated detectors
 	// These should be removed from this list when we remove the feature flag
@@ -141,6 +140,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_NewRelicInsightsInsertKey: {},
 	detector_typepb.DetectorType_DuffelToken:               {},
 	detector_typepb.DetectorType_Shippo:                    {},
+	detector_typepb.DetectorType_IPInfo:                    {},
 	detector_typepb.DetectorType_Lob:                       {},
 
 	// Reserved / special types.

@@ -404,6 +404,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ip2location"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipgeolocation"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipinfo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipinfodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
@@ -1303,6 +1304,7 @@ func buildDetectorList() []detectors.Detector {
 		&ip2location.Scanner{},
 		&ipapi.Scanner{},
 		&ipgeolocation.Scanner{},
+		&ipinfo.Scanner{},
 		&ipinfodb.Scanner{},
 		&ipquality.Scanner{},
 		&ipstack.Scanner{},
@@ -1834,6 +1836,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.DuffelTokenDetectorEnabled.Load()
 		case *shippo.Scanner:
 			return !feature.ShippoDetectorEnabled.Load()
+		case *ipinfo.Scanner:
+			return !feature.IPInfoDetectorEnabled.Load()
 		case *lob.Scanner:
 			return !feature.LobDetectorEnabled.Load()
 		default:
