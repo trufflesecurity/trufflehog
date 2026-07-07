@@ -55,6 +55,7 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		Redacted       string
 		ExtraData      map[string]string
 		StructuredData *detectorspb.StructuredData
+		SecretParts    map[string]string
 	}{
 		SourceMetadata:        r.SourceMetadata,
 		SourceID:              r.SourceID,
@@ -72,6 +73,7 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		Redacted:              r.Redacted,
 		ExtraData:             r.ExtraData,
 		StructuredData:        r.StructuredData,
+		SecretParts:           r.SecretParts,
 	}
 	out, err := json.Marshal(v)
 	if err != nil {
