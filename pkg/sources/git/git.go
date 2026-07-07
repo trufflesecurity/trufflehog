@@ -1019,7 +1019,18 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		}
 	}
 	if err := originalChunk.Err(); err != nil {
-		ctx.Logger().Error(err, "error scanning chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
+		// A single diff line exceeding maxScanTokenSize (e.g. minified JS or a
+		// base64 blob) is an expected condition for pathological files, not a
+		// failure. bufio.Scanner stops after this line, so the remainder of the
+		// diff is not scanned; log at a lower level to keep it out of the error
+		// stream while still recording that content was truncated. Genuine reader
+		// errors are still surfaced at ERROR.
+		if errors.Is(err, bufio.ErrTooLong) {
+			ctx.Logger().V(2).Info("skipping oversize diff line; remainder of file not scanned",
+				"filename", fileName, "commit", hash, "file", diff.PathB, "max_line_bytes", maxScanTokenSize)
+		} else {
+			ctx.Logger().Error(err, "error scanning chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
+		}
 	}
 	// Send anything still in the new chunk buffer
 	if newChunkBuffer.Len() > 0 {
