@@ -173,7 +173,24 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 		}()
 
 		start := time.Now()
-		err := h.processAPK(ctx, input, apkChan)
+
+		zipReader, err := createZipReader(input)
+		if err != nil {
+			h.measureLatencyAndHandleErrors(ctx, start, err, apkChan)
+			return
+		}
+
+		resTable, err := parseResTable(zipReader)
+		if err != nil {
+			h.measureLatencyAndHandleErrors(ctx, start, err, apkChan)
+			return
+		}
+
+		if pkgName := extractPackageName(zipReader, resTable); pkgName != "" {
+			ctx = logContext.WithValues(ctx, "apk_package", pkgName)
+		}
+
+		err = h.processAPK(ctx, zipReader, resTable, apkChan)
 		if err == nil {
 			h.metrics.incFilesProcessed()
 		}
@@ -185,19 +202,7 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 }
 
 // processAPK processes the apk file and sends the extracted data to the provided channel.
-func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkChan chan DataOrErr) error {
-	// Create a ZIP reader from the input fileReader
-	zipReader, err := createZipReader(input)
-	if err != nil {
-		return err
-	}
-
-	// Extract the resources.arsc file into a ResourceTable (needed for XML decoding)
-	resTable, err := parseResTable(zipReader)
-	if err != nil {
-		return err
-	}
-
+func (h *apkHandler) processAPK(ctx logContext.Context, zipReader *zip.Reader, resTable *apkparser.ResourceTable, apkChan chan DataOrErr) error {
 	// Process the ResourceTable file for secrets
 	if err := h.processResources(ctx, resTable, apkChan); err != nil {
 		ctx.Logger().Error(err, "failed to process resources.arsc")
@@ -206,7 +211,7 @@ func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkCha
 	// Process all files for secrets
 	for _, file := range zipReader.File {
 		if err := h.processFile(ctx, file, resTable, apkChan); err != nil {
-			ctx.Logger().V(2).Info(fmt.Sprintf("failed to process file: %s", file.Name), "error", err)
+			ctx.Logger().V(2).Info("failed to process file", "file", file.Name, "error", err)
 		}
 	}
 	return nil
@@ -217,10 +222,8 @@ func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparse
 	if resTable == nil {
 		return errors.New("ResourceTable is nil")
 	}
-	rscStrRdr, err := extractStringsFromResTable(resTable)
-	if err != nil {
-		return fmt.Errorf("failed to parse strings from resources.arsc: %w", err)
-	}
+	provider := &apkResourceTable{table: resTable}
+	rscStrRdr := extractStringsFromResTable(provider)
 	return h.handleAPKFileContent(ctx, rscStrRdr, "resources.arsc", apkChan)
 }
 
@@ -255,7 +258,7 @@ func (h *apkHandler) processFile(
 			return fmt.Errorf("failed to decode xml file %s: %w", file.Name, err)
 		}
 	case ".dex":
-		contentReader, err = h.processDexFile(ctx, rdr)
+		contentReader, err = h.processDexFile(ctx, rdr, file.Name)
 		if err != nil {
 			return fmt.Errorf("failed to decode dex file %s: %w", file.Name, err)
 		}
@@ -326,55 +329,98 @@ func openFile(file *zip.File) (io.ReadCloser, error) {
 	return rc, nil
 }
 
-// extractStringsFromResTable extracts the strings from the resources table
-// Note: This is a hacky way to get the strings from the resources table
-// APK strings are typically (always?) stored in the 0x7f000000-0x7fffffff range
+// resourceEntryData holds the extracted fields from a single resource table entry.
+type resourceEntryData struct {
+	Key          string
+	ResourceType string
+	Value        string
+}
+
+// GetEntryer abstracts resource table lookups for testability.
+type GetEntryer interface {
+	GetEntry(id uint32) (*resourceEntryData, error)
+}
+
+// apkResourceTable adapts *apkparser.ResourceTable to the GetEntryer interface.
+type apkResourceTable struct {
+	table *apkparser.ResourceTable
+}
+
+// GetEntry retrieves a resource entry by ID, returning nil if the entry does not exist.
+func (t *apkResourceTable) GetEntry(id uint32) (*resourceEntryData, error) {
+	entry, _ := t.table.GetResourceEntry(id)
+	if entry == nil {
+		return nil, nil
+	}
+	val, err := entry.GetValue().String()
+	return &resourceEntryData{
+		Key:          entry.Key,
+		ResourceType: entry.ResourceType,
+		Value:        val,
+	}, err
+}
+
+// extractStringsFromResTable extracts the strings from the resources table, which is provided by the
+// `GetEntryer` interface (a thin wrapper around `apkparser.ResourceTable` for testability).
+// APK strings are typically stored in the 0x7f000000-0x7fffffff range.
 // https://chromium.googlesource.com/chromium/src/+/master/build/android/docs/life_of_a_resource.md
-func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, error) {
+func extractStringsFromResTable(provider GetEntryer) io.Reader {
 	var resourceStrings bytes.Buffer
 	inStrings := false
 	for i := 0x7f000000; i <= 0x7fffffff; i++ {
-		entry, _ := resTable.GetResourceEntry(uint32(i))
+		entry, err := provider.GetEntry(uint32(i))
 		if entry == nil {
 			continue
 		}
 		if entry.ResourceType == "string" {
-			inStrings = true
-			val, err := entry.GetValue().String()
 			if err != nil {
-				return nil, err
+				continue
 			}
-			// Write directly to the buffer
+			inStrings = true
 			resourceStrings.WriteString(entry.Key)
 			resourceStrings.WriteString(": ")
-			resourceStrings.WriteString(val)
+			resourceStrings.WriteString(entry.Value)
 			resourceStrings.WriteString("\n")
 		}
-		// Exit the loop if we've finished processing the strings
+		// The contiguity assumption is valid for standard AAPT output, but we might want to revisit this if there's
+		// shared libs or multiple packages in a group.
 		if inStrings && entry.ResourceType != "string" {
 			break
 		}
 	}
-	return &resourceStrings, nil
+	return &resourceStrings
 }
 
 // processDexFile decodes the dex file and returns the relevant instructions
-func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt) (io.Reader, error) {
+func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt, dexFile string) (io.Reader, error) {
 	dexReader, err := dextk.Read(rdr, dextk.WithReadCache(16))
 	if err != nil {
 		return nil, err
 	}
 
-	// Get relevant instruction data from the dex file
 	var dexOutput bytes.Buffer
-	ci := dexReader.ClassIter()
-	for ci.HasNext() {
-		node, err := ci.Next()
-		if err != nil {
-			ctx.Logger().Error(err, "failed to process a dex class")
-			break
-		}
-		h.processDexClass(ctx, dexReader, node, &dexOutput)
+	var classErrors int
+	// Use an index-based loop instead of ClassIter to guarantee progress.
+	// The iterator's pos field only advances after a successful `ReadClassAndParse`, so a panic would leave it stuck
+	// on the same class and the HasNext loop would spin forever.
+	for id := uint32(0); id < dexReader.ClassDefCount; id++ {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					classErrors++
+				}
+			}()
+
+			node, err := dexReader.ReadClassAndParse(id)
+			if err != nil {
+				classErrors++
+				return
+			}
+			h.processDexClass(ctx, dexReader, node, &dexOutput)
+		}()
+	}
+	if classErrors > 0 {
+		ctx.Logger().V(2).Info("skipped malformed dex classes", "dex_file", dexFile, "skipped_classes", classErrors)
 	}
 
 	return &dexOutput, nil
@@ -387,6 +433,12 @@ func (h *apkHandler) processDexClass(
 	node dextk.ClassNode,
 	dexOutput *bytes.Buffer,
 ) {
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.Logger().V(2).Info("panic processing dex class", "class", node.Name.Parsed, "error", fmt.Sprintf("%v", r))
+		}
+	}()
+
 	var classOutput bytes.Buffer
 	methodValues := make(map[string]struct{})
 
@@ -428,20 +480,38 @@ func processDexMethod(
 	}
 }
 
-// parseDexInstructions processes a dex method and returns the string representation of the instruction
-func parseDexInstructions(r *dextk.Reader, m dextk.MethodNode, methodValues map[string]struct{}) (*bytes.Buffer, error) {
+// parseDexInstructions processes a dex method and returns the string representation of the instruction.
+func parseDexInstructions(r *dextk.Reader, m dextk.MethodNode, methodValues map[string]struct{}) (buf *bytes.Buffer, err error) {
 	var instrBuf bytes.Buffer
 
 	if m.CodeOff == 0 {
 		return &instrBuf, nil
 	}
 
+	// This deferred recovery catches panics from dextk which can occur with obfuscated APKs.
+	// This ensures it keeps processing and returns a valid *bytes.Buffer pointer even when a panic occurs.
+	// Specifically, a panic like `runtime error: slice bounds out of range [65536:16384]` becomes a normal error
+	// return. The caller (processDexMethod) already handles errors gracefully. It logs and moves on to the next
+	// method. Without this recovery, the panic would propagate up and abort the entire APK.
+	// Finally, it returns a valid non-zero *bytes.Buffer even when a panic occurs.
+	defer func() {
+		if r := recover(); r != nil {
+			if e, ok := r.(error); ok {
+				err = e
+			} else {
+				err = fmt.Errorf("%v", r)
+			}
+			buf = &instrBuf
+		}
+	}()
+
 	c, err := r.ReadCodeAndParse(m.CodeOff)
 	if err != nil {
 		return &instrBuf, err
 	}
 
-	// Iterate over the instructions and extract the relevant values
+	// Iterate over the instructions and extract possible secrets into `methodValues` if the instruction type is
+	// `const-string`.
 	for _, o := range c.Ops {
 		oStr := o.String()
 
@@ -504,4 +574,53 @@ func decodeXML(rdr io.ReadSeeker, resTable *apkparser.ResourceTable) (io.Reader,
 		return rdr, nil
 	}
 	return nil, err
+}
+
+// extractPackageName attempts to extract the Android package name from AndroidManifest.xml.
+// Returns an empty string if the manifest is missing or the package attribute cannot be parsed.
+// This is only for logging the package name, however it can be extremely difficult to debug trufflehog when running
+// against gigabytes of APKs. You will want this metadata in the error messages.
+func extractPackageName(zipReader *zip.Reader, resTable *apkparser.ResourceTable) (pkgName string) {
+	defer func() {
+		if r := recover(); r != nil {
+			pkgName = ""
+		}
+	}()
+
+	for _, file := range zipReader.File {
+		if file.Name != "AndroidManifest.xml" {
+			continue
+		}
+		rc, err := openFile(file)
+		if err != nil {
+			return ""
+		}
+		defer func() { _ = rc.Close() }()
+
+		rdr := iobuf.NewBufferedReaderSeeker(rc)
+		defer func() { _ = rdr.Close() }()
+
+		decoded, err := decodeXML(rdr, resTable)
+		if err != nil {
+			return ""
+		}
+
+		decoder := xml.NewDecoder(decoded)
+		for {
+			tok, err := decoder.Token()
+			if err != nil {
+				break
+			}
+			if se, ok := tok.(xml.StartElement); ok && se.Name.Local == "manifest" {
+				for _, attr := range se.Attr {
+					if attr.Name.Local == "package" {
+						return attr.Value
+					}
+				}
+				break
+			}
+		}
+		break
+	}
+	return ""
 }

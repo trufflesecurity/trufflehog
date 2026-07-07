@@ -139,3 +139,17 @@ func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
+
+func TestPostgres_RawVsPrimarySecret(t *testing.T) {
+	s := Scanner{}
+	input := "postgres://user:pass@host/dbname"
+	results, err := s.FromData(context.Background(), false, []byte(input))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	res := results[0]
+	expectedRaw := "postgres://user:pass@host:5432"
+	assert.Equal(t, expectedRaw, string(res.Raw))
+	assert.Equal(t, expectedRaw, string(res.RawV2))
+	assert.Equal(t, input, res.GetPrimarySecretValue())
+}

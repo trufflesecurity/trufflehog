@@ -6,8 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	image "github.com/docker/docker/api/types/image"
-	dockerClient "github.com/docker/docker/client"
+	dockerClient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -255,13 +254,13 @@ func TestDockerImageScanFromLocalDaemon(t *testing.T) {
 	// pull the image here to ensure it exists locally
 	img := "docker.io/trufflesecurity/secrets:latest"
 
-	client, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv, dockerClient.WithAPIVersionNegotiation())
+	client, err := dockerClient.New(dockerClient.FromEnv)
 	if err != nil {
 		t.Errorf("Failed to create Docker client: %v", err)
 		return
 	}
 
-	resp, err := client.ImagePull(context.TODO(), img, image.PullOptions{})
+	resp, err := client.ImagePull(context.TODO(), img, dockerClient.ImagePullOptions{})
 	if err != nil {
 		t.Errorf("Failed to load image %s: %v", img, err)
 		return

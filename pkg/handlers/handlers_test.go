@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	stdctx "context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+//go:embed testdata/aws-canary-creds.zip
+var awsCanaryCredsZip []byte
+
+//go:embed testdata/sm.zip
+var smJSONZip []byte
+
 func TestHandleFileCancelledContext(t *testing.T) {
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 2)}
 
@@ -39,22 +46,14 @@ func TestHandleFile(t *testing.T) {
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 513)}
 
 	// Only one chunk is sent on the channel.
-	// TODO: Embed a zip without making an HTTP request.
-	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
-	assert.NoError(t, err)
-	defer func() {
-		if resp != nil && resp.Body != nil {
-			_ = resp.Body.Close()
-		}
-	}()
-
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(context.Background(), resp.Body, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(context.Background(), bytes.NewReader(awsCanaryCredsZip), &sources.Chunk{}, reporter))
 	assert.Equal(t, 1, len(reporter.Ch))
 }
 
+// Fetched over HTTP; the ~5 MB upstream fixture would notably grow pkg/handlers/testdata/ if embedded.
 func TestHandleHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm_random_data.json")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/sm_random_data.json")
 	assert.NoError(t, err)
 	defer func() {
 		if resp != nil && resp.Body != nil {
@@ -78,18 +77,10 @@ func TestHandleHTTPJson(t *testing.T) {
 }
 
 func TestHandleHTTPJsonZip(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
-	assert.NoError(t, err)
-	defer func() {
-		if resp != nil && resp.Body != nil {
-			_ = resp.Body.Close()
-		}
-	}()
-
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), bytes.NewReader(smJSONZip), &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -105,21 +96,12 @@ func BenchmarkHandleHTTPJsonZip(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		func() {
-			resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
-			assert.NoError(b, err)
-
-			defer func() {
-				if resp != nil && resp.Body != nil {
-					_ = resp.Body.Close()
-				}
-			}()
-
 			chunkCh := make(chan *sources.Chunk, 1)
 
 			b.StartTimer()
 			go func() {
 				defer close(chunkCh)
-				err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+				err := HandleFile(context.Background(), bytes.NewReader(smJSONZip), &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 				assert.NoError(b, err)
 			}()
 
@@ -424,8 +406,9 @@ func BenchmarkHandleTar(b *testing.B) {
 	}
 }
 
+// Fetched over HTTP; the ~18 MB upstream fixture would substantially grow pkg/handlers/testdata/ if embedded.
 func TestHandleLargeHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/md_random_data.json.zip")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/md_random_data.json.zip")
 	if !assert.NoError(t, err) {
 		return
 	}
