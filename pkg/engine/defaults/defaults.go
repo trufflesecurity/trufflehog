@@ -1822,6 +1822,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.OctopusDeployDetectorEnabled.Load()
 		case *openrouter.Scanner:
 			return !feature.OpenRouterDetectorEnabled.Load()
+		case *newrelicinsightsinsertkey.Scanner:
+			return !feature.NewRelicInsightsInsertKeyDetectorEnabled.Load()
 		default:
 			return false
 		}

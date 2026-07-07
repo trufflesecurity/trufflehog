@@ -125,20 +125,21 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 
 	// Feature flag gated detectors
 	// These should be removed from this list when we remove the feature flag
-	detector_typepb.DetectorType_Cloudinary:       {},
-	detector_typepb.DetectorType_DatadogApikey:    {},
-	detector_typepb.DetectorType_Enigma:           {},
-	detector_typepb.DetectorType_GitLabOauth2:     {},
-	detector_typepb.DetectorType_Pinecone:         {},
-	detector_typepb.DetectorType_TLy:              {},
-	detector_typepb.DetectorType_Wit:              {},
-	detector_typepb.DetectorType_Rev:              {},
-	detector_typepb.DetectorType_User:             {},
-	detector_typepb.DetectorType_BrainTrustApiKey: {},
-	detector_typepb.DetectorType_PgAnalyzeReadKey: {},
-	detector_typepb.DetectorType_RedHatPyxis:      {},
-	detector_typepb.DetectorType_OctopusDeploy:    {},
-	detector_typepb.DetectorType_OpenRouter:       {},
+	detector_typepb.DetectorType_Cloudinary:                {},
+	detector_typepb.DetectorType_DatadogApikey:             {},
+	detector_typepb.DetectorType_Enigma:                    {},
+	detector_typepb.DetectorType_GitLabOauth2:              {},
+	detector_typepb.DetectorType_Pinecone:                  {},
+	detector_typepb.DetectorType_TLy:                       {},
+	detector_typepb.DetectorType_Wit:                       {},
+	detector_typepb.DetectorType_Rev:                       {},
+	detector_typepb.DetectorType_User:                      {},
+	detector_typepb.DetectorType_BrainTrustApiKey:          {},
+	detector_typepb.DetectorType_PgAnalyzeReadKey:          {},
+	detector_typepb.DetectorType_RedHatPyxis:               {},
+	detector_typepb.DetectorType_OctopusDeploy:             {},
+	detector_typepb.DetectorType_OpenRouter:                {},
+	detector_typepb.DetectorType_NewRelicInsightsInsertKey: {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
