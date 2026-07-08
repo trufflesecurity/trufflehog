@@ -34,7 +34,7 @@ func TestOpenAI_DefaultClientRetriesTransientErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("expected retries to reach a 200 response, got %d", res.StatusCode)
