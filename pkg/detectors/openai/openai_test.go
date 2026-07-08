@@ -44,6 +44,34 @@ func TestOpenAI_DefaultClientRetriesTransientErrors(t *testing.T) {
 	}
 }
 
+// When the API never recovers, the client must give up after the configured
+// retry budget (initial attempt + 2 retries) and surface the failure rather
+// than retrying indefinitely.
+func TestOpenAI_DefaultClientGivesUpAfterRetryBudget(t *testing.T) {
+	var requests atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	res, err := defaultClient.Do(req)
+	if res != nil {
+		defer func() { _ = res.Body.Close() }()
+	}
+
+	if err == nil && res.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected exhausted retries to surface the failure, got status %d with no error", res.StatusCode)
+	}
+	if got := requests.Load(); got != 3 {
+		t.Errorf("expected 3 attempts (initial + 2 retries), got %d", got)
+	}
+}
+
 func TestOpenAI_DoesNotMatchAdminKeys(t *testing.T) {
 	d := Scanner{}
 	adminKey := `OPENAI_ADMIN_KEY = "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"`
