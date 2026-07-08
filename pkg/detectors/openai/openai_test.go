@@ -2,11 +2,47 @@ package openai
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
+
+// The default client must retry transient failures so a single slow or
+// failed OpenAI API response does not record an indeterminate verification
+// result (CSM-2131).
+func TestOpenAI_DefaultClientRetriesTransientErrors(t *testing.T) {
+	var requests atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requests.Add(1) < 3 {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	res, err := defaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("expected retries to reach a 200 response, got %d", res.StatusCode)
+	}
+	if got := requests.Load(); got != 3 {
+		t.Errorf("expected 3 attempts (initial + 2 retries), got %d", got)
+	}
+}
 
 func TestOpenAI_DoesNotMatchAdminKeys(t *testing.T) {
 	d := Scanner{}
