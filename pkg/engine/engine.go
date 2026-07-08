@@ -232,6 +232,10 @@ type Engine struct {
 	verificationOverlapWorkerMultiplier int
 
 	maxDecodeDepth int
+
+	// runtimeCollector exposes live channel/worker/scan counters to Prometheus
+	// while the engine is running. Set in Start, cleared in Finish.
+	runtimeCollector *runtimeCollector
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.
@@ -639,6 +643,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) Start(ctx context.Context) {
 	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
 	e.sanityChecks(ctx)
+	e.registerRuntimeMetrics(ctx)
 	e.startWorkers(ctx)
 }
 
@@ -755,6 +760,8 @@ func (e *Engine) Finish(ctx context.Context) error {
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
 
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
+
+	e.unregisterRuntimeMetrics()
 
 	return err
 }
@@ -1210,7 +1217,7 @@ func (e *Engine) filterResults(
 		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
 	if e.filterUnverified || ignoreConfig {
-		results = clean(results)
+		results = clean(results, e.verify)
 	}
 
 	if e.filterEntropy != 0 {
@@ -1294,12 +1301,18 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// custom detectors which have the same type.
 		// MD5 hash of the key is used to reduce memory usage of the dedupe cache,
 		// since the raw result and source metadata can be large.
-		h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
-		key := string(h[:])
-		if _, ok := e.dedupeCache.Get(key); ok {
-			continue
+		//
+		// This deduplication only applies to results that are *not*
+		// from reverification, since we are expected to see the same
+		// result from reverification and want to Dispatch it below.
+		if result.SecretID == 0 {
+			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
+			key := string(h[:])
+			if _, ok := e.dedupeCache.Get(key); ok {
+				continue
+			}
+			e.dedupeCache.Add(key, struct{}{})
 		}
-		e.dedupeCache.Add(key, struct{}{})
 
 		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
