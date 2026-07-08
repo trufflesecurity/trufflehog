@@ -644,6 +644,152 @@ func TestChunkUnit(t *testing.T) {
 	assert.Equal(t, 0, len(reporter.ChunkErrs))
 }
 
+func TestIsReftableRepo(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		configPath []string
+		config     string
+		want       bool
+	}{
+		{
+			name:       "working tree reftable repo",
+			configPath: []string{".git", "config"},
+			config: "[core]\n" +
+				"\trepositoryformatversion = 1\n" +
+				"[extensions]\n" +
+				"\trefstorage = reftable\n",
+			want: true,
+		},
+		{
+			name:       "case insensitive refstorage value",
+			configPath: []string{".git", "config"},
+			config: "[extensions]\n" +
+				"\trefstorage = ReFtAbLe\n",
+			want: true,
+		},
+		{
+			name:       "working tree files ref repo",
+			configPath: []string{".git", "config"},
+			config: "[core]\n" +
+				"\trepositoryformatversion = 0\n",
+			want: false,
+		},
+		{
+			name:       "bare reftable repo",
+			configPath: []string{"config"},
+			config: "[extensions]\n" +
+				"\trefstorage = reftable\n",
+			want: true,
+		},
+		{
+			name: "missing config",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repoPath := t.TempDir()
+			if len(tt.configPath) > 0 {
+				configPath := filepath.Join(append([]string{repoPath}, tt.configPath...)...)
+				assert.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
+				assert.NoError(t, os.WriteFile(configPath, []byte(tt.config), 0644))
+			}
+
+			got, err := isReftableRepo(repoPath)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsReftableRepo_WorktreeCommonDir(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	repoPath := filepath.Join(tempDir, "worktree")
+	commonGitDir := filepath.Join(tempDir, "main.git")
+	worktreeGitDir := filepath.Join(commonGitDir, "worktrees", "worktree")
+
+	assert.NoError(t, os.MkdirAll(repoPath, 0755))
+	assert.NoError(t, os.MkdirAll(worktreeGitDir, 0755))
+	assert.NoError(t, os.WriteFile(filepath.Join(repoPath, ".git"), []byte("gitdir: "+worktreeGitDir+"\n"), 0644))
+	assert.NoError(t, os.WriteFile(filepath.Join(worktreeGitDir, "commondir"), []byte("../..\n"), 0644))
+	assert.NoError(t, os.WriteFile(filepath.Join(commonGitDir, "config"), []byte("[extensions]\n\trefstorage = reftable\n"), 0644))
+
+	got, err := isReftableRepo(repoPath)
+	assert.NoError(t, err)
+	assert.True(t, got)
+}
+
+func TestChunkUnit_ReftableRepo(t *testing.T) {
+	ctx := context.Background()
+	repoPath := setupReftableTestRepo(t)
+
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.Git{})
+	assert.NoError(t, err)
+	assert.NoError(t, s.Init(ctx, "test reftable chunk", 0, 0, true, conn, 1))
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, SourceUnit{
+		ID:   repoPath,
+		Kind: UnitDir,
+	}, &reporter)
+	assert.NoError(t, err)
+	assert.Empty(t, reporter.ChunkErrs)
+
+	var foundReadme bool
+	for _, chunk := range reporter.Chunks {
+		if bytes.Contains(chunk.Data, []byte("hello from reftable")) {
+			foundReadme = true
+			break
+		}
+	}
+	assert.True(t, foundReadme, "expected reftable repo contents to be chunked")
+}
+
+func TestChunkUnit_ReftableRepoInvalid(t *testing.T) {
+	ctx := context.Background()
+	repoPath := t.TempDir()
+	assert.NoError(t, os.MkdirAll(filepath.Join(repoPath, ".git"), 0755))
+	assert.NoError(t, os.WriteFile(filepath.Join(repoPath, ".git", "config"), []byte("[extensions]\n\trefstorage = reftable\n"), 0644))
+
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.Git{})
+	assert.NoError(t, err)
+	assert.NoError(t, s.Init(ctx, "test invalid reftable chunk", 0, 0, true, conn, 1))
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, SourceUnit{
+		ID:   repoPath,
+		Kind: UnitDir,
+	}, &reporter)
+	assert.NoError(t, err)
+	if assert.Len(t, reporter.ChunkErrs, 1) {
+		assert.Contains(t, reporter.ChunkErrs[0].Error(), "unable to open git repository with system git")
+	}
+}
+
+func TestRunGitOutputIgnoresSuccessfulStderr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a Unix shell script as a fake git executable")
+	}
+
+	fakeGitDir := t.TempDir()
+	fakeGitPath := filepath.Join(fakeGitDir, "git")
+	assert.NoError(t, os.WriteFile(fakeGitPath, []byte("#!/bin/sh\nprintf 'git warning\\n' >&2\nprintf 'abc123\\n'\n"), 0755))
+	t.Setenv("PATH", fakeGitDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	output, err := runGitOutput(context.Background(), t.TempDir(), "rev-parse", "HEAD")
+	assert.NoError(t, err)
+	assert.Equal(t, "abc123", output)
+}
+
 func setupTestRepo(t *testing.T, repoName string) string {
 	tempDir := t.TempDir()
 	repoPath := filepath.Join(tempDir, repoName)
@@ -652,6 +798,21 @@ func setupTestRepo(t *testing.T, repoName string) string {
 	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.name", "Test User").Run())
 	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.email", "test@example.com").Run())
 	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "commit.gpgsign", "false").Run())
+
+	return repoPath
+}
+
+func setupReftableTestRepo(t *testing.T) string {
+	repoPath := filepath.Join(t.TempDir(), "reftable-repo")
+
+	output, err := exec.Command("git", "init", "--ref-format=reftable", repoPath).CombinedOutput()
+	if err != nil {
+		t.Skipf("git init --ref-format=reftable is not supported: %v\n%s", err, output)
+	}
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.name", "Test User").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.email", "test@example.com").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "commit.gpgsign", "false").Run())
+	addTestFileAndCommit(t, repoPath, "README.md", "hello from reftable\n")
 
 	return repoPath
 }
