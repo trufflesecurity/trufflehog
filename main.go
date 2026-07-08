@@ -89,7 +89,7 @@ var (
 	// Add feature flags
 	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
 	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
-	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Duration()
 	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()

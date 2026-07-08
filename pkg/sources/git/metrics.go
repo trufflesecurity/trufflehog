@@ -1,8 +1,8 @@
 package git
 
 import (
-	"fmt"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -13,7 +13,7 @@ import (
 // metricsCollector defines the interface for recording Git scan metrics.
 type metricsCollector interface {
 	// Clone metrics
-	RecordCloneOperation(status string, reason string, exitCode int)
+	RecordCloneOperation(status string, reason string, duration time.Duration)
 
 	// Scan metrics
 	RecordCommitScanned()
@@ -50,10 +50,13 @@ const (
 
 	// Other/unknown errors
 	cloneFailureOther = "other_error"
+
+	// Clone exceeded the configured timeout
+	cloneFailureTimeout = "timeout"
 )
 
 type collector struct {
-	cloneOperations *prometheus.CounterVec
+	cloneOperations *prometheus.HistogramVec
 	commitsScanned  prometheus.Counter
 	reposScanned    *prometheus.CounterVec
 }
@@ -61,14 +64,17 @@ type collector struct {
 var metricsInstance metricsCollector
 
 func init() {
-	// These are package-level metrics that are incremented by all git scans across the lifetime of the process.
+	// These are package-level metrics that are recorded by all git scans across the lifetime of the process.
 	metricsInstance = &collector{
-		cloneOperations: promauto.NewCounterVec(prometheus.CounterOpts{
+		// Labeled by status/reason only (not exit_code) to keep series count bounded -
+		// reason is already a small fixed set (see ClassifyCloneError), exit_code is not.
+		cloneOperations: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
 			Subsystem: common.MetricsSubsystem,
-			Name:      "git_clone_operations_total",
-			Help:      "Total number of git clone operations by status, reason, and exit code",
-		}, []string{"status", "reason", "exit_code"}),
+			Name:      "git_clone_operations_duration_seconds",
+			Help:      "Duration in seconds of git clone operations by status and reason",
+			Buckets:   []float64{1, 5, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200},
+		}, []string{"status", "reason"}),
 
 		commitsScanned: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
@@ -86,8 +92,8 @@ func init() {
 	}
 }
 
-func (c *collector) RecordCloneOperation(status string, reason string, exitCode int) {
-	c.cloneOperations.WithLabelValues(status, reason, fmt.Sprintf("%d", exitCode)).Inc()
+func (c *collector) RecordCloneOperation(status string, reason string, duration time.Duration) {
+	c.cloneOperations.WithLabelValues(status, reason).Observe(duration.Seconds())
 }
 
 func (c *collector) RecordCommitScanned() {
