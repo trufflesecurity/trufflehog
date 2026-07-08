@@ -1,8 +1,7 @@
-package lob
+package openrouter
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,13 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern     = "live_0979969b3f6cc23ed67e9b650bfaf64f710"
-	validPatternTest = "test_0979969b3f6cc23ed67e9b650bfaf64f710"
-	invalidPattern   = "live_0979969b3f6cc23ed67e9b650bfaf64f71"
-)
-
-func TestLob_Pattern(t *testing.T) {
+func TestOpenRouter_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,31 +19,25 @@ func TestLob_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid live pattern",
-			input: fmt.Sprintf("token = '%s'", validPattern),
-			want:  []string{validPattern},
+			name:  "API key",
+			input: `OPENROUTER_API_KEY = "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"`,
+			want:  []string{"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"},
 		},
 		{
-			name:  "valid test pattern",
-			input: fmt.Sprintf("token = '%s'", validPatternTest),
-			want:  []string{validPatternTest},
-		},
-		{
-			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("token = '%s' | '%s'", validPattern, validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("'%s'", invalidPattern),
-			want:  []string{},
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the openrouter API
+				[DEBUG] Using Key=sk-or-v1-a2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
+			detectorMatches := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(detectorMatches) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
