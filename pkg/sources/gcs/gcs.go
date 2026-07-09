@@ -99,7 +99,7 @@ func newPersistableCache(increment int, cache cache.Cache[string], p *sources.Pr
 func (c *persistableCache) Set(key string, val string) {
 	c.Cache.Set(key, val)
 	if ok, contents := c.shouldPersist(); ok {
-		c.Progress.EncodedResumeInfo = contents
+		c.EncodedResumeInfo = contents
 	}
 }
 
@@ -261,7 +261,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		return fmt.Errorf("error listing objects: %w", err)
 	}
 	s.chunksCh = chunksChan
-	s.Progress.Message = "starting to process objects..."
+	s.Message = "starting to process objects..."
 
 	var wg sync.WaitGroup
 	for obj := range objectCh {
@@ -295,8 +295,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	var c cache.Cache[string]
-	if s.Progress.EncodedResumeInfo != "" {
-		keys := strings.Split(s.Progress.EncodedResumeInfo, ",")
+	if s.EncodedResumeInfo != "" {
+		keys := strings.Split(s.EncodedResumeInfo, ",")
 		entries := make([]simple.CacheEntry[string], len(keys))
 		for i, val := range keys {
 			entries[i] = simple.CacheEntry[string]{Key: val, Value: val}
@@ -321,14 +321,14 @@ func (s *Source) setProgress(ctx context.Context, md5, objName string, cache cac
 	s.SectionsCompleted++
 
 	cache.Set(md5, md5)
-	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
-	s.Progress.PercentComplete = int64(float64(s.SectionsCompleted) / float64(s.stats.numObjects) * 100)
+	s.SectionsRemaining = int32(s.stats.numObjects)
+	s.PercentComplete = int64(float64(s.SectionsCompleted) / float64(s.stats.numObjects) * 100)
 }
 
 func (s *Source) completeProgress(ctx context.Context) {
 	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
 	ctx.Logger().Info(msg)
-	s.Progress.Message = msg
+	s.Message = msg
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {

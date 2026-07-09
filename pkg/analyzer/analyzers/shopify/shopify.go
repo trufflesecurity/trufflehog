@@ -213,7 +213,7 @@ func getShopInfo(cfg *config.Config, key string, store string) (ShopInfoJSON, er
 		return shopInfo, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&shopInfo)
 	if err != nil {
@@ -252,7 +252,7 @@ func getAccessScopes(cfg *config.Config, key string, store string) (AccessScopes
 		return accessScopes, resp.StatusCode, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&accessScopes)
 	if err != nil {

@@ -123,16 +123,13 @@ def render(main, pr, changed=None, new_detectors=None):
     new_detectors = new_detectors or set()
 
     if changed:
-        all_names = {d for d in (set(main) | set(pr))
-                     if d.lower() in changed}
+        all_names = {d for d in (set(main) | set(pr)) if d.lower() in changed}
         # Detectors that the PR claims to have changed (or added) but that
-        # produced zero matches on either side. These don't appear in JSONL,
-        # so we surface them as a warning row.
-        seen_lower = {d.lower() for d in (set(main) | set(pr))}
-        missing = sorted(d for d in changed if d not in seen_lower)
+        # produced zero matches on either side don't appear in JSONL, so we
+        # add them explicitly so they get a 0/0 row in the table.
+        all_names |= changed - {d.lower() for d in all_names}
     else:
         all_names = set(main) | set(pr)
-        missing = []
 
     _empty = {"identities": set(), "total": 0}
     rows = []
@@ -177,70 +174,54 @@ def render(main, pr, changed=None, new_detectors=None):
         PREAMBLE,
         "",
     ]
-    if rows:
-        parts += [build_top_line_summary(rows, changed), ""]
-
-    if not rows and not missing:
-        parts += ["_(No findings on either side for the changed detectors.)_", ""]
+    if not rows:
+        parts += ["_0 findings on either side for the changed detectors._", ""]
         return "\n".join(parts)
 
-    if rows:
-        if has_diff or any(r["is_new"] for r in rows):
-            rows.sort(
-                key=lambda r: (
-                    0 if r["is_new"] else 1,
-                    -(r["new_count"] + r["removed_count"]),
-                    r["detector"],
-                )
+    parts += [build_top_line_summary(rows, changed), ""]
+
+    if has_diff or any(r["is_new"] for r in rows):
+        rows.sort(
+            key=lambda r: (
+                0 if r["is_new"] else 1,
+                -(r["new_count"] + r["removed_count"]),
+                r["detector"],
             )
+        )
+    else:
+        rows.sort(key=lambda r: r["detector"])
+
+    cols = ["Status", "Detector", "Unique matches (main)", "Unique matches (PR)",
+            "New", "Removed"]
+    aligns = ["", "", "---:", "---:", "---:", "---:"]
+    parts += [
+        "| " + " | ".join(cols) + " |",
+        "|" + "|".join(a if a else "---" for a in aligns) + "|",
+    ]
+
+    for r in rows:
+        if r["is_new"]:
+            cells = [
+                r["emoji"],
+                r["detector"],
+                "—",
+                str(r["unique_pr"]),
+                "—",
+                "—",
+            ]
         else:
-            rows.sort(key=lambda r: r["detector"])
-
-        cols = ["Status", "Detector", "Unique matches (main)", "Unique matches (PR)",
-                "New", "Removed"]
-        aligns = ["", "", "---:", "---:", "---:", "---:"]
-        parts += [
-            "| " + " | ".join(cols) + " |",
-            "|" + "|".join(a if a else "---" for a in aligns) + "|",
-        ]
-
-        for r in rows:
-            if r["is_new"]:
-                cells = [
-                    r["emoji"],
-                    r["detector"],
-                    "—",
-                    str(r["unique_pr"]),
-                    "—",
-                    "—",
-                ]
-            else:
-                cells = [
-                    r["emoji"],
-                    r["detector"],
-                    str(r["unique_main"]),
-                    str(r["unique_pr"]),
-                    str(r["new_count"]),
-                    str(r["removed_count"]),
-                ]
-            parts.append("| " + " | ".join(cells) + " |")
-        parts.append("")
-        parts.append(STATUS_KEY)
-        parts.append("")
-
-    if missing:
-        parts += [
-            "### ⚠️ Changed detectors with zero matches in both builds",
-            "",
-            "These detectors were modified by the PR but produced no matches "
-            "against the corpus on either side. Could be a deliberate scope "
-            "narrowing, or — more concerning — a regex so loose the engine "
-            "silently filtered the flood (issue #3578). Worth a manual look.",
-            "",
-        ]
-        for d in missing:
-            parts.append(f"- `{d}`")
-        parts.append("")
+            cells = [
+                r["emoji"],
+                r["detector"],
+                str(r["unique_main"]),
+                str(r["unique_pr"]),
+                str(r["new_count"]),
+                str(r["removed_count"]),
+            ]
+        parts.append("| " + " | ".join(cells) + " |")
+    parts.append("")
+    parts.append(STATUS_KEY)
+    parts.append("")
 
     return "\n".join(parts)
 

@@ -132,7 +132,7 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 		return false, nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {

@@ -977,7 +977,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 			if !s.printLegacyJSON {
 				if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-					defer os.RemoveAll(path)
+					defer func() { _ = os.RemoveAll(path) }()
 				}
 			}
 
@@ -1180,7 +1180,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 	if !s.printLegacyJSON {
 		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-			defer os.RemoveAll(path)
+			defer func() { _ = os.RemoveAll(path) }()
 		}
 	}
 

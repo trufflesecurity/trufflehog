@@ -173,7 +173,7 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationErr = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "verificationError", "SecretParts", "ExtraData")
 			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
 				t.Errorf("MongoDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
@@ -310,7 +310,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationErr = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "verificationError", "SecretParts", "ExtraData")
 			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
 				t.Errorf("MongoDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

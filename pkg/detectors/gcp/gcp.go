@@ -212,7 +212,7 @@ func findMatchingCertificateKID(ctx context.Context, certsURL, privateKeyPEM str
 		}
 
 		// Compare RSA public keys
-		if publicKey.PublicKey.N.Cmp(certPublicKey.N) == 0 && publicKey.PublicKey.E == certPublicKey.E {
+		if publicKey.N.Cmp(certPublicKey.N) == 0 && publicKey.E == certPublicKey.E {
 			return kid, nil
 		}
 	}
@@ -233,7 +233,7 @@ func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, nil

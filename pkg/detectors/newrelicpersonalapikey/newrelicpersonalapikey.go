@@ -58,12 +58,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resEU, errEU := client.Do(reqEU)
 
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				}
 			} else if errEU == nil {
-				defer resEU.Body.Close()
+				defer func() { _ = resEU.Body.Close() }()
 				if resEU.StatusCode >= 200 && resEU.StatusCode < 300 {
 					s1.Verified = true
 				}

@@ -319,7 +319,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURI string, reporter sources.
 		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 		if !s.conn.GetPrintLegacyJson() {
 			if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-				defer os.RemoveAll(path)
+				defer func() { _ = os.RemoveAll(path) }()
 			}
 		}
 
@@ -373,7 +373,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 		if !s.conn.GetPrintLegacyJson() {
 			if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-				defer os.RemoveAll(gitDir)
+				defer func() { _ = os.RemoveAll(gitDir) }()
 			}
 		}
 
@@ -404,7 +404,7 @@ func RepoFromPath(path string) (*git.Repository, error) {
 
 func CleanOnError(err *error, path string) {
 	if *err != nil {
-		os.RemoveAll(path)
+		_ = os.RemoveAll(path)
 	}
 }
 
@@ -678,6 +678,50 @@ func (s *Git) CommitsScanned() uint64 {
 
 const gitDirName = ".git"
 
+// resolveGitDir resolves the actual git directory path for a repository.
+// In a regular repository, .git is a directory containing the git data.
+// In a git worktree, .git is a file containing a "gitdir: <path>" reference
+// to the actual git directory location.
+// This function handles both cases and returns the path to the actual git directory.
+func resolveGitDir(repoPath string) (string, error) {
+	gitPath := filepath.Join(repoPath, gitDirName)
+
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat .git: %w", err)
+	}
+
+	// If .git is a directory, return it directly
+	if info.IsDir() {
+		return gitPath, nil
+	}
+
+	// .git is a file (worktree) - read and parse the gitdir reference
+	content, err := os.ReadFile(gitPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read .git file: %w", err)
+	}
+
+	// Parse "gitdir: <path>" format
+	line := strings.TrimSpace(string(content))
+	const gitdirPrefix = "gitdir: "
+	if !strings.HasPrefix(line, gitdirPrefix) {
+		return "", fmt.Errorf("invalid .git file format: expected 'gitdir: <path>', got %q", line)
+	}
+
+	gitdirPath := strings.TrimPrefix(line, gitdirPrefix)
+
+	// The path may be relative to the worktree directory
+	if !filepath.IsAbs(gitdirPath) {
+		gitdirPath = filepath.Join(repoPath, gitdirPath)
+	}
+
+	// Clean the path to resolve any ".." components
+	gitdirPath = filepath.Clean(gitdirPath)
+
+	return gitdirPath, nil
+}
+
 // getGitDir returns the likely path of the ".git" directory.
 // If the repository is bare, it will be at the top-level; otherwise, it
 // exists in the ".git" directory at the root of the working tree.
@@ -750,7 +794,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
 		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
@@ -863,7 +906,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				)
 				return nil
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			data := make([]byte, d.Len())
 			if _, err := io.ReadFull(reader, data); err != nil {
@@ -898,9 +941,17 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		ctx.Logger().Error(err, "error creating reader for chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	originalChunk := bufio.NewScanner(reader)
+	// Default bufio max token size (64 KB) is too small for files with long lines
+	// (e.g. minified JS, base64 blobs). Raise the cap to 10 MB so those lines
+	// are still scanned; the oversize-line path below will chunk them correctly.
+	// The initial buffer starts at 4 KB (same as bufio's default) and grows only
+	// when a line actually exceeds the current size, keeping allocations cheap for
+	// the common case of small diffs.
+	const maxScanTokenSize = 10 * 1024 * 1024
+	originalChunk.Buffer(make([]byte, 4096), maxScanTokenSize)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
@@ -966,6 +1017,9 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		if _, err := newChunkBuffer.Write(line); err != nil {
 			ctx.Logger().Error(err, "error writing to chunk buffer", "filename", fileName, "commit", hash, "file", diff.PathB)
 		}
+	}
+	if err := originalChunk.Err(); err != nil {
+		ctx.Logger().Error(err, "error scanning chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
 	}
 	// Send anything still in the new chunk buffer
 	if newChunkBuffer.Len() > 0 {
@@ -1115,7 +1169,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				logger.Error(err, "error creating reader for staged")
 				return nil
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			data := make([]byte, d.Len())
 			if _, err := reader.Read(data); err != nil {
@@ -1418,8 +1472,13 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
 				uriPath := normalizedURI.Path
 
-				originalIndexPath := filepath.Join(uriPath, gitDirName, "index")
+				// Resolve the actual git directory (handles both regular repos and worktrees)
+				originalGitDir, err := resolveGitDir(uriPath)
+				if err != nil {
+					return path, remote, fmt.Errorf("failed to resolve git directory: %w", err)
+				}
 
+				originalIndexPath := filepath.Join(originalGitDir, "index")
 				clonedIndexPath := filepath.Join(path, gitDirName, "index")
 
 				indexData, err := os.ReadFile(originalIndexPath)
@@ -1428,6 +1487,24 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 				}
 				if err := os.WriteFile(clonedIndexPath, indexData, 0644); err != nil {
 					return path, remote, fmt.Errorf("failed to write index file: %w", err)
+				}
+
+				// Add the source object store as an alternate so staged blobs are accessible.
+				// git clone with file:// only transfers reachable objects; staged blobs must
+				// be reached via the original object store.
+				// For worktrees, the commondir file points to the main repo's git dir
+				// which holds the actual shared object store.
+				sourceObjectsPath := filepath.Join(originalGitDir, "objects")
+				if commondirData, err := os.ReadFile(filepath.Join(originalGitDir, "commondir")); err == nil {
+					commondir := strings.TrimSpace(string(commondirData))
+					if !filepath.IsAbs(commondir) {
+						commondir = filepath.Join(originalGitDir, commondir)
+					}
+					sourceObjectsPath = filepath.Join(filepath.Clean(commondir), "objects")
+				}
+				alternatesPath := filepath.Join(path, gitDirName, "objects", "info", "alternates")
+				if err := os.MkdirAll(filepath.Dir(alternatesPath), 0755); err == nil {
+					_ = os.WriteFile(alternatesPath, []byte(sourceObjectsPath+"\n"), 0644)
 				}
 			}
 		}

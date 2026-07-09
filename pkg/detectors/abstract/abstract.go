@@ -3,9 +3,10 @@ package abstract
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -80,7 +81,7 @@ func verifyAbstract(ctx context.Context, client *http.Client, resMatch string) (
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// https://docs.abstractapi.com/exchange-rates#response-and-error-codes
 	switch res.StatusCode {

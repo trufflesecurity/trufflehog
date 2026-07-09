@@ -82,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								"access_scopes": strings.Join(handleArray, ","),
 							}
 						}
-						res.Body.Close()
+						_ = res.Body.Close()
 					}
 				}
 			}

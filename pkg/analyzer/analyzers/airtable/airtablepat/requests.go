@@ -18,12 +18,12 @@ func fetchAirtableRecords(token string, baseID string, tableID string) ([]common
 	if !exists {
 		return nil, fmt.Errorf("endpoint for ListRecordsEndpoint does not exist")
 	}
-	url := strings.Replace(strings.Replace(endpoint.URL, "{baseID}", baseID, -1), "{tableID}", tableID, -1)
+	url := strings.ReplaceAll(strings.ReplaceAll(endpoint.URL, "{baseID}", baseID), "{tableID}", tableID)
 	resp, err := common.CallAirtableAPI(token, "GET", url)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch Airtable records, status: %d", resp.StatusCode)

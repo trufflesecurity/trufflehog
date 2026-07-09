@@ -103,7 +103,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		var domains domainResponse
 		if err := json.NewDecoder(res.Body).Decode(&domains); err != nil {
 			return false, nil, fmt.Errorf("error decoding response body: %w", err)
@@ -132,9 +133,9 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		}
 
 		return true, extraData, nil
-	} else if res.StatusCode == http.StatusUnauthorized {
+	case http.StatusUnauthorized:
 		return false, nil, nil
-	} else {
+	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }

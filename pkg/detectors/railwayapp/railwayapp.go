@@ -119,7 +119,7 @@ func verifyRailwayApp(ctx context.Context, client *http.Client, match string) (b
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	/*
 		GraphQL queries return response with 200 OK status code even for errors

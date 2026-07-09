@@ -70,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// req.Header.Add("Square-Version", "2020-08-12")
 			res, err := client.Do(req)
 			if err == nil {
-				res.Body.Close() // The request body is unused.
+				_ = res.Body.Close() // The request body is unused.
 
 				// 200 means good key and has `merchants` scope - default allowed by square
 				// 401 is bad key
