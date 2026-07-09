@@ -55,8 +55,8 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 					Verified:     true,
 					ExtraData: map[string]string{
 						"admin":    "false",
-						"email":    "aman.ullah.jalal@trufflesec.com",
-						"username": "aman-ullah-jalal",
+						"email":    "muneeb.khan@trufflesec.com",
+						"username": "muneeb-khan-222",
 						"version":  "2",
 					},
 				},
@@ -150,7 +150,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("WeightsandbiasesV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

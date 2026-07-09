@@ -1842,6 +1842,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.IPInfoDetectorEnabled.Load()
 		case *lob.Scanner:
 			return !feature.LobDetectorEnabled.Load()
+		case *weightsandbiasesv2.Scanner:
+			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
 		default:
 			return false
 		}
