@@ -275,6 +275,15 @@ Run trufflehog from the parent directory (outside the git repo).
 trufflehog git file://test_keys --results=verified,unknown
 ```
 
+For self-hosted Git providers or private repositories that need custom
+authentication or TLS configuration, the safest pattern is to let your CI system
+or local Git client clone the repository first, then scan the local checkout
+with `file://` as shown above. This keeps credentials in your existing Git
+credential helper, SSH agent, CI secret store, or Docker secret workflow instead
+of embedding them in the TruffleHog command line. If the Git server uses a
+private certificate authority, configure trust for that CA in the environment
+that performs the clone and scan.
+
 To guard against malicious git configs in local scanning (see CVE-2025-41390), TruffleHog clones local git repositories to a temporary directory prior to scanning. This follows [Git's security best practices](https://git-scm.com/docs/git#_security). If you want to specify a custom path to clone the repository to (instead of tmp), you can use the `--clone-path` flag. If you'd like to skip the local cloning process and scan the repository directly (only do this for trusted repos), you can use the `--trust-local-git-config` flag.
 
 ## 11: Scan GCS buckets for only verified secrets
