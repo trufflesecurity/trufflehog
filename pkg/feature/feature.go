@@ -36,6 +36,7 @@ var (
 	ShippoDetectorEnabled                    atomic.Bool
 	IPInfoDetectorEnabled                    atomic.Bool
 	LobDetectorEnabled                       atomic.Bool
+	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 )
 
 type AtomicString struct {

@@ -1842,6 +1842,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.IPInfoDetectorEnabled.Load()
 		case *lob.Scanner:
 			return !feature.LobDetectorEnabled.Load()
+		case *microsoftteamswebhookv2.Scanner:
+			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		default:
 			return false
 		}
