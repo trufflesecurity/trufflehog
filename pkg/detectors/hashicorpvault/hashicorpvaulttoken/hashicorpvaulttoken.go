@@ -2,16 +2,14 @@ package hashicorpvaulttoken
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvault"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -92,9 +90,10 @@ func (s Scanner) FromData(
 			}
 
 			if verify {
-				verified, verificationResp, verificationErr := verifyVaultToken(
+				verified, verificationResp, verificationErr := hashicorpvault.VerifyVaultToken(
 					ctx,
 					s.getClient(),
+					detector_typepb.DetectorType_HashiCorpVaultToken,
 					endpoint,
 					token,
 				)
@@ -116,69 +115,6 @@ func (s Scanner) FromData(
 	}
 
 	return
-}
-
-type lookupResponse struct {
-	Data struct {
-		DisplayName string   `json:"display_name"`
-		EntityId    string   `json:"entity_id"`
-		ExpireTime  string   `json:"expire_time"`
-		Orphan      bool     `json:"orphan"`
-		Policies    []string `json:"policies"`
-		Renewable   bool     `json:"renewable"`
-		Type        string   `json:"type"`
-	}
-}
-
-func verifyVaultToken(
-	ctx context.Context,
-	client *http.Client,
-	baseUrl string,
-	token string,
-) (bool, *lookupResponse, error) {
-	url, err := url.JoinPath(baseUrl, "/v1/auth/token/lookup-self")
-	if err != nil {
-		return false, nil, err
-	}
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		url,
-		http.NoBody,
-	)
-	if err != nil {
-		return false, nil, err
-	}
-
-	req.Header.Set("X-Vault-Token", token)
-
-	res, err := client.Do(req)
-	if err != nil {
-		return false, nil, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
-
-	switch res.StatusCode {
-	case http.StatusOK:
-		var resp lookupResponse
-		if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-			return false, nil, err
-		}
-
-		return true, &resp, nil
-
-	case http.StatusForbidden, http.StatusUnauthorized:
-		return false, nil, nil
-
-	default:
-		return false, nil, fmt.Errorf(
-			"unexpected HTTP response status %d",
-			res.StatusCode,
-		)
-	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
