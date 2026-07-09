@@ -96,7 +96,7 @@ func TestScanner_FromData(t *testing.T) {
 						got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError", "primarySecret", "SecretParts")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
 			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
 				t.Errorf("FromData() diff (-want +got):\n%s", diff)
 			}
