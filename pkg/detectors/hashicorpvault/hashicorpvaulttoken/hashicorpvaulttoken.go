@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
+	defaultClient = detectors.NewClientWithDedup(detectors.DetectorHttpClientWithNoLocalAddresses)
 
 	// Vault tokens:
 	// newer vault tokens are around 90-120 chars (exluding the prefix "hvs.") and start with hvs. (HashiCorp Vault Service token)
