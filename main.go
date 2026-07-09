@@ -130,6 +130,7 @@ var (
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
+	githubExcludeArchived       = githubScan.Flag("exclude-archived", "Exclude archived repositories from scan.").Bool()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -550,6 +551,13 @@ func run(state overseer.State, logSync func() error) {
 	feature.BraintrustDetectorEnabled.Store(true)
 	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
 	feature.RedHatPyxisDetectorEnabled.Store(true)
+	feature.OctopusDeployDetectorEnabled.Store(true)
+	feature.OpenRouterDetectorEnabled.Store(true)
+	feature.NewRelicInsightsInsertKeyDetectorEnabled.Store(true)
+	feature.DuffelTokenDetectorEnabled.Store(true)
+	feature.ShippoDetectorEnabled.Store(true)
+	feature.IPInfoDetectorEnabled.Store(true)
+	feature.LobDetectorEnabled.Store(true)
 	feature.HashiCorpVaultBatchTokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
@@ -877,6 +885,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if len(*githubScanOrgs) > 0 && len(*githubScanRepos) > 0 {
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories at the same time")
 		}
+		// --include-repos/--exclude-repos only filter repos enumerated from an org/user scan;
+		// explicit --repo entries bypass that filtering step entirely (see enumerate() in
+		// pkg/sources/github/github.go), so combining them with --repo would silently no-op
+		// the filters instead of erroring.
+		if len(*githubScanRepos) > 0 && (len(*githubIncludeRepos) > 0 || len(*githubExcludeRepos) > 0) {
+			return scanMetrics, fmt.Errorf("invalid config: --include-repos and --exclude-repos only apply to organization or user scans and cannot be used with --repo")
+		}
 
 		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {
 			return scanMetrics, err
@@ -902,6 +917,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ClonePath:                  *githubClonePath,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
+			ExcludeArchived:            *githubExcludeArchived,
 			PrintLegacyJSON:            *jsonLegacy,
 		}
 
