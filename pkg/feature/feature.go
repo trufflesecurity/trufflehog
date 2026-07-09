@@ -36,6 +36,7 @@ var (
 	ShippoDetectorEnabled                    atomic.Bool
 	IPInfoDetectorEnabled                    atomic.Bool
 	LobDetectorEnabled                       atomic.Bool
+	HashiCorpVaultBatchTokenDetectorEnabled  atomic.Bool
 )
 
 type AtomicString struct {

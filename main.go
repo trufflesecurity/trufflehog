@@ -558,6 +558,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.ShippoDetectorEnabled.Store(true)
 	feature.IPInfoDetectorEnabled.Store(true)
 	feature.LobDetectorEnabled.Store(true)
+	feature.HashiCorpVaultBatchTokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
