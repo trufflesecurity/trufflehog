@@ -1,4 +1,4 @@
-package lob
+package newrelicinsightsinsertkey
 
 import (
 	"context"
@@ -12,12 +12,11 @@ import (
 )
 
 var (
-	validPattern     = "live_0979969b3f6cc23ed67e9b650bfaf64f710"
-	validPatternTest = "test_0979969b3f6cc23ed67e9b650bfaf64f710"
-	invalidPattern   = "live_0979969b3f6cc23ed67e9b650bfaf64f71"
+	validPattern   = "NRII-d-2Vf-L1w-8B9Y_--6x8-_QjA"
+	invalidPattern = "NRII-d-2Vf-L1w-8B9Y_--6x8-_Qj"
 )
 
-func TestLob_Pattern(t *testing.T) {
+func TestNewRelicInsightsInsertKey_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,23 +25,13 @@ func TestLob_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid live pattern",
-			input: fmt.Sprintf("token = '%s'", validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "valid test pattern",
-			input: fmt.Sprintf("token = '%s'", validPatternTest),
-			want:  []string{validPatternTest},
-		},
-		{
-			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("token = '%s' | '%s'", validPattern, validPattern),
+			name:  "valid pattern",
+			input: fmt.Sprintf("new relic insights insert key = '%s'", validPattern),
 			want:  []string{validPattern},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("'%s'", invalidPattern),
+			input: fmt.Sprintf("new relic insights insert key = '%s'", invalidPattern),
 			want:  []string{},
 		},
 	}
