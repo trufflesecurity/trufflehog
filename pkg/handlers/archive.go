@@ -140,7 +140,7 @@ func (h *archiveHandler) openArchive(
 		if err != nil {
 			return fmt.Errorf("error opening decompressor with format: %s %w", reader.format.MediaType(), err)
 		}
-		defer compReader.Close()
+		defer func() { _ = compReader.Close() }()
 
 		rdr, err := newFileReader(ctx, compReader)
 		if err != nil {
@@ -154,7 +154,7 @@ func (h *archiveHandler) openArchive(
 				err,
 			)
 		}
-		defer rdr.Close()
+		defer func() { _ = rdr.Close() }()
 
 		return h.openArchive(ctx, depth+1, rdr, dataOrErrChan)
 	case archives.Extractor:
@@ -211,7 +211,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		if err != nil {
 			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		// Archiver v4 is in alpha and using an experimental version of
 		// rardecode. There is a bug somewhere with rar decoder format 29
@@ -237,7 +237,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 			}
 			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
 		}
-		defer rdr.Close()
+		defer func() { _ = rdr.Close() }()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)

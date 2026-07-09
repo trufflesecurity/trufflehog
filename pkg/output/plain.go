@@ -30,16 +30,16 @@ type PlainPrinter struct{ mu sync.Mutex }
 
 func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
-		DetectorType:        r.Result.DetectorType.String(),
+		DetectorType:        r.DetectorType.String(),
 		DecoderType:         r.DecoderType.String(),
-		Verified:            r.Result.Verified,
-		VerificationError:   r.Result.VerificationError(),
+		Verified:            r.Verified,
+		VerificationError:   r.VerificationError(),
 		MetaData:            r.SourceMetadata,
-		Raw:                 strings.TrimSpace(string(r.Result.Raw)),
+		Raw:                 strings.TrimSpace(string(r.Raw)),
 		DetectorDescription: r.DetectorDescription,
 	}
 
-	meta, err := structToMap(out.MetaData.Data)
+	meta, err := structToMap(out.Data)
 	if err != nil {
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
@@ -49,43 +49,42 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	defer p.mu.Unlock()
 
 	if out.Verified {
-		boldGreenPrinter.Print("✅ Found verified result 🐷🔑\n")
+		_, _ = boldGreenPrinter.Print("✅ Found verified result 🐷🔑\n")
 	} else {
 		printer = whitePrinter
-		boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
+		_, _ = boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
 		if out.VerificationError != nil {
-			yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
+			_, _ = yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
 		}
 	}
 
 	if r.VerificationFromCache {
-		cyanPrinter.Print("(🔍 Using cached verification)\n")
+		_, _ = cyanPrinter.Print("(🔍 Using cached verification)\n")
 	}
+	_, _ = printer.Printf("Detector Type: %s\n", out.DetectorType)
+	_, _ = printer.Printf("Decoder Type: %s\n", out.DecoderType)
+	_, _ = printer.Printf("Raw result: %s\n", whitePrinter.Sprint(out.Raw))
 
-	printer.Printf("Detector Type: %s\n", out.DetectorType)
-	printer.Printf("Decoder Type: %s\n", out.DecoderType)
-	printer.Printf("Raw result: %s\n", whitePrinter.Sprint(out.Raw))
-
-	for k, v := range r.Result.ExtraData {
-		printer.Printf(
+	for k, v := range r.ExtraData {
+		_, _ = printer.Printf(
 			"%s: %v\n",
 			cases.Title(language.AmericanEnglish).String(k),
 			v)
 	}
 
-	if r.Result.StructuredData != nil {
-		for idx, v := range r.Result.StructuredData.GithubSshKey {
-			printer.Printf("GithubSshKey %d User: %s\n", idx, v.User)
+	if r.StructuredData != nil {
+		for idx, v := range r.StructuredData.GithubSshKey {
+			_, _ = printer.Printf("GithubSshKey %d User: %s\n", idx, v.User)
 
 			if v.PublicKeyFingerprint != "" {
-				printer.Printf("GithubSshKey %d Fingerprint: %s\n", idx, v.PublicKeyFingerprint)
+				_, _ = printer.Printf("GithubSshKey %d Fingerprint: %s\n", idx, v.PublicKeyFingerprint)
 			}
 		}
 
-		for idx, v := range r.Result.StructuredData.TlsPrivateKey {
-			printer.Printf("TlsPrivateKey %d Fingerprint: %s\n", idx, v.CertificateFingerprint)
-			printer.Printf("TlsPrivateKey %d Verification URL: %s\n", idx, v.VerificationUrl)
-			printer.Printf("TlsPrivateKey %d Expiration: %d\n", idx, v.ExpirationTimestamp)
+		for idx, v := range r.StructuredData.TlsPrivateKey {
+			_, _ = printer.Printf("TlsPrivateKey %d Fingerprint: %s\n", idx, v.CertificateFingerprint)
+			_, _ = printer.Printf("TlsPrivateKey %d Verification URL: %s\n", idx, v.VerificationUrl)
+			_, _ = printer.Printf("TlsPrivateKey %d Expiration: %d\n", idx, v.ExpirationTimestamp)
 		}
 	}
 
@@ -100,12 +99,12 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	}
 	sort.Strings(aggregateDataKeys)
 	for _, k := range aggregateDataKeys {
-		printer.Printf("%s: %v\n", cases.Title(language.AmericanEnglish).String(k), aggregateData[k])
+		_, _ = printer.Printf("%s: %v\n", cases.Title(language.AmericanEnglish).String(k), aggregateData[k])
 	}
 
 	// if analysis info is not nil, means the detector added key for analyzer and result is verified
-	if r.Result.SecretParts != nil && r.Result.Verified {
-		printer.Printf("Analyze: Run `trufflehog analyze` to analyze this key's permissions\n")
+	if r.SecretParts != nil && r.Verified {
+		_, _ = printer.Printf("Analyze: Run `trufflehog analyze` to analyze this key's permissions\n")
 	}
 
 	fmt.Println("")

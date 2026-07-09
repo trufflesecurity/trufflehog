@@ -31,7 +31,7 @@ var (
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", ".azure-api.net", "subscription", "key"}) + `([a-zA-Z-0-9]{32})`) // pattern for both Primary and secondary key
 
 	invalidHosts  = simple.NewCache[struct{}]()
-	noSuchHostErr = errors.New("no such host")
+	errNoSuchHost = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -81,7 +81,7 @@ EndpointLoop:
 				isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, key)
 				s1.Verified = isVerified
 				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
+					if errors.Is(verificationErr, errNoSuchHost) {
 						invalidHosts.Set(baseUrl, struct{}{})
 						continue EndpointLoop
 					}
@@ -120,7 +120,7 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, baseUrl, 
 	if err != nil {
 		return false, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

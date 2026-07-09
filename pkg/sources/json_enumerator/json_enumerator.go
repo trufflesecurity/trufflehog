@@ -198,7 +198,7 @@ func (s *Source) chunkJSONEnumerator(
 	if err != nil {
 		return fmt.Errorf("unable to open file: %w", err)
 	}
-	defer enumeratorFile.Close()
+	defer func() { _ = enumeratorFile.Close() }()
 
 	return s.chunkJSONEnumeratorReader(ctx, enumeratorFile, chunksChan)
 }

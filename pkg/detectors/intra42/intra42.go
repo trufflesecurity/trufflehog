@@ -102,7 +102,7 @@ func verifyIntra42(ctx context.Context, client *http.Client, resMatch string, re
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:

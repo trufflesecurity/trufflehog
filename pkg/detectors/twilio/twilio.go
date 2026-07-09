@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -23,7 +24,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.RetryableHTTPClient()
+	defaultClient = detectors.NewClientWithDedup(common.RetryableHTTPClient())
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
 )
@@ -56,11 +57,17 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllString(dataStr, -1)
-	sidMatches := sidPat.FindAllString(dataStr, -1)
+	uniqueKeys := make(map[string]struct{})
+	for _, k := range keyPat.FindAllString(dataStr, -1) {
+		uniqueKeys[k] = struct{}{}
+	}
+	uniqueSIDs := make(map[string]struct{})
+	for _, s := range sidPat.FindAllString(dataStr, -1) {
+		uniqueSIDs[s] = struct{}{}
+	}
 
-	for _, sid := range sidMatches {
-		for _, key := range keyMatches {
+	for sid := range uniqueSIDs {
+		for key := range uniqueKeys {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Twilio,
 				Raw:          []byte(sid),
@@ -78,9 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr)
 
-				for key, value := range extraData {
-					s1.ExtraData[key] = value
-				}
+				maps.Copy(s1.ExtraData, extraData)
 			}
 
 			results = append(results, s1)
@@ -107,7 +112,7 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid string) (ma
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Accept", "*/*")
 	req.SetBasicAuth(sid, key)
-	resp, err := client.Do(req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Twilio, sid+key, req)
 	if err != nil {
 		return nil, false, nil
 	}

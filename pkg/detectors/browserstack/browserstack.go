@@ -106,7 +106,7 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode == http.StatusOK {
 		return true, nil

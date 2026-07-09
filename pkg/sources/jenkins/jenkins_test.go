@@ -58,10 +58,10 @@ func createMockJenkinsServer(jobName string, buildNumber int, logContent string)
 			response := fmt.Sprintf(
 				`{"jobs":[{"_class":"org.jenkinsci.plugins.workflow.job.WorkflowJob",`+
 					`"name":"%s","url":"%s/job/%s/"}]}`, jobName, server.URL, jobName)
-			fmt.Fprint(w, response)
+			_, _ = fmt.Fprint(w, response)
 		} else {
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprint(w, `{"jobs":[]}`)
+			_, _ = fmt.Fprint(w, `{"jobs":[]}`)
 		}
 	})
 
@@ -71,10 +71,10 @@ func createMockJenkinsServer(jobName string, buildNumber int, logContent string)
 			w.Header().Set("Content-Type", "application/json")
 			response := fmt.Sprintf(
 				`{"builds":[{"number":%d,"url":"%s/job/%s/%d/"}]}`, buildNumber, server.URL, jobName, buildNumber)
-			fmt.Fprint(w, response)
+			_, _ = fmt.Fprint(w, response)
 		} else {
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprint(w, `{"builds":[]}`)
+			_, _ = fmt.Fprint(w, `{"builds":[]}`)
 		}
 	})
 
@@ -82,7 +82,7 @@ func createMockJenkinsServer(jobName string, buildNumber int, logContent string)
 	// This is where the test data payload is served to verify chunking behavior.
 	mux.HandleFunc(fmt.Sprintf("/job/%s/%d/consoleText", jobName, buildNumber), func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprint(w, logContent)
+		_, _ = fmt.Fprint(w, logContent)
 	})
 
 	return server
@@ -224,7 +224,7 @@ func TestJenkinsChunkBuildDirect(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/consoleText") {
 			w.Header().Set("Content-Type", "text/plain")
-			fmt.Fprint(w, largeLogContent)
+			_, _ = fmt.Fprint(w, largeLogContent)
 		} else {
 			http.NotFound(w, r)
 		}

@@ -188,7 +188,7 @@ func (ui *AnalyzeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return ui, nil
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, ui.Common.KeyMap.Back):
+		case key.Matches(msg, ui.KeyMap.Back):
 			return nil, tea.Quit
 		}
 	}

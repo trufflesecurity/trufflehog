@@ -79,7 +79,7 @@ func verifyAdafruitIO(ctx context.Context, client *http.Client, resMatch string)
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// https://learn.adafruit.com/adafruit-io/http-status-codes
 	switch res.StatusCode {

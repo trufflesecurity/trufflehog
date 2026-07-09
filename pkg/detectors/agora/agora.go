@@ -99,7 +99,7 @@ func verifyAgora(ctx context.Context, client *http.Client, resMatch, resSecret s
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// https://docs.agora.io/en/voice-calling/reference/agora-console-rest-api#get-all-projects
 	switch res.StatusCode {

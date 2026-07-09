@@ -113,13 +113,14 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 	if err != nil {
 		return false, nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return false, nil, err
 	}
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		var tokenRes tokenResponse
 		if err := json.Unmarshal(body, &tokenRes); (err != nil || tokenRes == tokenResponse{}) {
 			return false, nil, err
@@ -140,7 +141,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 			return true, extraData, nil
 		}
 		return true, nil, nil
-	} else if res.StatusCode == http.StatusUnauthorized {
+	case http.StatusUnauthorized:
 		// Valid credentials can still return a 401 status code if 2FA is enabled
 		var mfaRes mfaRequiredResponse
 		if err := json.Unmarshal(body, &mfaRes); err != nil || mfaRes.MfaToken == "" {
@@ -152,7 +153,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 			"2fa_required": "true",
 		}
 		return true, extraData, nil
-	} else {
+	default:
 		return false, nil, fmt.Errorf("unexpected response status %d", res.StatusCode)
 	}
 }

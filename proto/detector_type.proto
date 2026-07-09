@@ -1050,4 +1050,16 @@ enum DetectorType {
   JiraDataCenterPAT = 1046;
   ConfluenceDataCenter = 1047;
   Cloudinary = 1048;
+  Pinecone = 1049;
+  GitLabOauth2 = 1050;
+  SpectralOps = 1051;
+  AWSAppSync = 1052;
+  BrainTrustApiKey = 1053;
+  PgAnalyzeReadKey = 1054;
+  RedHatPyxis = 1055;
+  OctopusDeploy = 1056;
+  OpenRouter = 1057;
+  NewRelicInsightsInsertKey = 1058;
+  DuffelToken = 1059;
+  Shippo = 1060;
 }

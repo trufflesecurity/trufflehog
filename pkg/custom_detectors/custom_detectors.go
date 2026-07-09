@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"maps"
 	"net/http"
@@ -62,6 +63,12 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 			return nil, err
 		}
 		if err := ValidateVerifyHeaders(verify.Headers); err != nil {
+			return nil, err
+		}
+		if err := ValidateVerifyRanges(verify.SuccessRanges); err != nil {
+			return nil, err
+		}
+		if err := ValidateVerifyRanges(verify.RotatedRanges); err != nil {
 			return nil, err
 		}
 	}
@@ -275,10 +282,15 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		// disrupt other verification.
 		return nil
 	}
-	// Try each config until we successfully verify.
+
+	var (
+		definitive     bool
+		rangesInEffect bool
+	)
+
+	// Try each config until we get a definitive answer.
 	for _, verifyConfig := range c.GetVerify() {
 		if common.IsDone(ctx) {
-			// TODO: Log we're possibly leaving out results.
 			return ctx.Err()
 		}
 		req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
@@ -288,7 +300,6 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		for _, header := range verifyConfig.GetHeaders() {
 			key, value, found := strings.Cut(header, ":")
 			if !found {
-				// Should be unreachable due to validation.
 				continue
 			}
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
@@ -305,27 +316,58 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			_ = resp.Body.Close()
 		}()
 
-		if resp.StatusCode == http.StatusOK {
-			// mark the result as verified
+		successRanges := verifyConfig.GetSuccessRanges()
+		rotatedRanges := verifyConfig.GetRotatedRanges()
+
+		if len(successRanges) == 0 && len(rotatedRanges) == 0 {
+			// Backward compat: no ranges configured, use legacy behavior.
+			if resp.StatusCode == http.StatusOK {
+				result.Verified = true
+				definitive = true
+				storeResponseBody(resp, result.ExtraData)
+				break
+			}
+			// Legacy non-200 is a meaningful response (verifier said "no");
+			// mark definitive so a prior ranged verifier with rangesInEffect
+			// does not cause a spurious verification error.
+			definitive = true
+			continue
+		}
+
+		rangesInEffect = true
+		bothConfigured := len(successRanges) > 0 && len(rotatedRanges) > 0
+
+		if StatusCodeMatchesRanges(resp.StatusCode, successRanges) {
 			result.Verified = true
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				continue
-			}
-
-			// TODO: handle different content-type responses seperatly when implement custom detector configurations
-			responseStr := string(body)
-			// truncate to 200 characters if response length exceeds 200
-			if len(responseStr) > 200 {
-				responseStr = responseStr[:200]
-			}
-
-			// store the processed response in ExtraData
-			result.ExtraData["response"] = responseStr
-
+			definitive = true
+			storeResponseBody(resp, result.ExtraData)
 			break
 		}
+
+		if StatusCodeMatchesRanges(resp.StatusCode, rotatedRanges) {
+			definitive = true
+			break
+		}
+
+		// Status matched neither configured range.
+		if !bothConfigured {
+			// Only one side was configured: the non-matching response is
+			// treated as the opposite state.
+			//   successRanges only -> non-match means rotated
+			//   rotatedRanges only -> non-match means live
+			definitive = true
+			if len(rotatedRanges) > 0 {
+				result.Verified = true
+				storeResponseBody(resp, result.ExtraData)
+			}
+			break
+		}
+
+		// Both configured but neither matched -- try the next verifier.
+	}
+
+	if rangesInEffect && !definitive {
+		result.SetVerificationError(errors.New("verification response status code did not match any configured successRanges or rotatedRanges"))
 	}
 
 	select {
@@ -334,6 +376,20 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	case results <- result:
 		return nil
 	}
+}
+
+const maxResponseLen = 200
+
+func storeResponseBody(resp *http.Response, extraData map[string]string) {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	responseStr := string(body)
+	if len(responseStr) > maxResponseLen {
+		responseStr = responseStr[:maxResponseLen]
+	}
+	extraData["response"] = responseStr
 }
 
 func (c *CustomRegexWebhook) Keywords() []string {
