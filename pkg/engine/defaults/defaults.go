@@ -365,8 +365,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
+	hashicorpbatchtoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvault/hashicorpvaultbatchtoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvault/hashicorpvaulttoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvaultauth"
-	hashicorpbatchtoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvaultbatchtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hasura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
@@ -1264,8 +1265,9 @@ func buildDetectorList() []detectors.Detector {
 		&happyscribe.Scanner{},
 		&harness.Scanner{},
 		&harvest.Scanner{},
-		&hashicorpvaultauth.Scanner{},
 		&hashicorpbatchtoken.Scanner{},
+		&hashicorpvaultauth.Scanner{},
+		&hashicorpvaulttoken.Scanner{},
 		&hasura.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
@@ -1844,6 +1846,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.LobDetectorEnabled.Load()
 		case *hashicorpbatchtoken.Scanner:
 			return !feature.HashiCorpVaultBatchTokenDetectorEnabled.Load()
+		case *hashicorpvaulttoken.Scanner:
+			return !feature.HashiCorpVaultTokenDetectorEnabled.Load()
 		default:
 			return false
 		}

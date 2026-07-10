@@ -1478,6 +1478,7 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 		detector_typepb.DetectorType_ConfluenceDataCenter:       {},
 		detector_typepb.DetectorType_BitbucketDataCenter:        {},
 		detector_typepb.DetectorType_HashiCorpVaultBatchToken:   {},
+		detector_typepb.DetectorType_HashiCorpVaultToken:        {},
 		// these do not have any cloud endpoint
 	}
 

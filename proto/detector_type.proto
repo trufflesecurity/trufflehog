@@ -1063,4 +1063,5 @@ enum DetectorType {
   DuffelToken = 1059;
   Shippo = 1060;
   HashiCorpVaultBatchToken = 1061;
+  HashiCorpVaultToken = 1062;
 }
