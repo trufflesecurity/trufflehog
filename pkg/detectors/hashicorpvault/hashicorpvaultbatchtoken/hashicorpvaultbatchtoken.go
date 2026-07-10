@@ -91,7 +91,7 @@ func (s Scanner) FromData(
 				verified, verificationResp, verificationErr := hashicorpvault.VerifyVaultToken(
 					ctx,
 					s.getClient(),
-					detector_typepb.DetectorType_HashiCorpVaultBatchToken,
+					s.Type(),
 					endpoint,
 					token,
 				)
