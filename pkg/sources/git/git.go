@@ -366,7 +366,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 
 	isReftable, err := isReftableRepo(gitDir)
 	if err != nil {
-		return fmt.Errorf("failed to inspect git repository format: %w", err)
+		return reporter.ChunkErr(ctx, fmt.Errorf("failed to inspect git repository format: %w", err))
 	}
 	if isReftable {
 		if err := s.git.ScanRepoPath(ctx, gitDir, s.scanOptions, reporter); err != nil {

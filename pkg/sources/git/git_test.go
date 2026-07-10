@@ -775,6 +775,29 @@ func TestChunkUnit_ReftableRepoInvalid(t *testing.T) {
 	}
 }
 
+func TestChunkUnit_ReftableDetectionError(t *testing.T) {
+	ctx := context.Background()
+	repoPath := t.TempDir()
+	assert.NoError(t, os.MkdirAll(filepath.Join(repoPath, ".git"), 0755))
+	assert.NoError(t, os.WriteFile(filepath.Join(repoPath, ".git", "config"), []byte("[extensions\n"), 0644))
+
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.Git{})
+	assert.NoError(t, err)
+	assert.NoError(t, s.Init(ctx, "test malformed reftable config", 0, 0, true, conn, 1))
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, SourceUnit{
+		ID:   repoPath,
+		Kind: UnitDir,
+	}, &reporter)
+	assert.NoError(t, err)
+	if assert.Len(t, reporter.ChunkErrs, 1) {
+		assert.Contains(t, reporter.ChunkErrs[0].Error(), "failed to inspect git repository format")
+		assert.Contains(t, reporter.ChunkErrs[0].Error(), "failed to parse git config")
+	}
+}
+
 func TestRunGitOutputIgnoresSuccessfulStderr(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test uses a Unix shell script as a fake git executable")
