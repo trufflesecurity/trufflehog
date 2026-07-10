@@ -25,7 +25,7 @@ func testClientForServer(t *testing.T, serverURL string) *github.Client {
 
 // downloadByPathServer answers the exact-path contents lookup, the raw
 // download it points at, and the repository lookup repoReachable makes.
-func downloadByPathServer(t *testing.T, fileStatus, repoStatus int) *httptest.Server {
+func downloadByPathServer(t *testing.T, fileStatus, rawStatus, repoStatus int) *httptest.Server {
 	t.Helper()
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +39,12 @@ func downloadByPathServer(t *testing.T, fileStatus, repoStatus int) *httptest.Se
 			}
 			_, _ = w.Write([]byte(`{"message":"Not Found"}`))
 		case "/raw/dir/f.txt":
-			_, _ = w.Write([]byte("file body"))
+			w.WriteHeader(rawStatus)
+			if rawStatus == http.StatusOK {
+				_, _ = w.Write([]byte("file body"))
+				return
+			}
+			_, _ = w.Write([]byte("raw host error page"))
 		case "/repos/o/r":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(repoStatus)
@@ -57,7 +62,7 @@ func downloadByPathServer(t *testing.T, fileStatus, repoStatus int) *httptest.Se
 }
 
 func TestDownloadContentsByPathFetchesFileBody(t *testing.T) {
-	server := downloadByPathServer(t, http.StatusOK, http.StatusOK)
+	server := downloadByPathServer(t, http.StatusOK, http.StatusOK, http.StatusOK)
 	defer server.Close()
 
 	s := &Source{}
@@ -72,7 +77,7 @@ func TestDownloadContentsByPathFetchesFileBody(t *testing.T) {
 }
 
 func TestDownloadContentsByPathReturns404Response(t *testing.T) {
-	server := downloadByPathServer(t, http.StatusNotFound, http.StatusOK)
+	server := downloadByPathServer(t, http.StatusNotFound, http.StatusOK, http.StatusOK)
 	defer server.Close()
 
 	s := &Source{}
@@ -87,7 +92,7 @@ func TestDownloadContentsByPathReturns404Response(t *testing.T) {
 }
 
 func TestDownloadContentsByPathNon404Failure(t *testing.T) {
-	server := downloadByPathServer(t, http.StatusForbidden, http.StatusOK)
+	server := downloadByPathServer(t, http.StatusForbidden, http.StatusOK, http.StatusOK)
 	defer server.Close()
 
 	s := &Source{}
@@ -99,7 +104,7 @@ func TestDownloadContentsByPathNon404Failure(t *testing.T) {
 }
 
 func TestRepoReachable(t *testing.T) {
-	server := downloadByPathServer(t, http.StatusNotFound, http.StatusOK)
+	server := downloadByPathServer(t, http.StatusNotFound, http.StatusOK, http.StatusOK)
 	defer server.Close()
 
 	s := &Source{}
@@ -108,7 +113,7 @@ func TestRepoReachable(t *testing.T) {
 }
 
 func TestRepoNotReachable(t *testing.T) {
-	server := downloadByPathServer(t, http.StatusNotFound, http.StatusNotFound)
+	server := downloadByPathServer(t, http.StatusNotFound, http.StatusOK, http.StatusNotFound)
 	defer server.Close()
 
 	s := &Source{}
@@ -119,10 +124,27 @@ func TestRepoNotReachable(t *testing.T) {
 }
 
 func TestRepoReachableServerDown(t *testing.T) {
-	server := downloadByPathServer(t, http.StatusNotFound, http.StatusOK)
+	server := downloadByPathServer(t, http.StatusNotFound, http.StatusOK, http.StatusOK)
 	server.Close()
 
 	s := &Source{}
 	client := testClientForServer(t, server.URL)
 	assert.False(t, s.repoReachable(context.Background(), client, "o", "r"))
+}
+
+func TestDownloadContentsByPathNon200Download(t *testing.T) {
+	server := downloadByPathServer(t, http.StatusOK, http.StatusInternalServerError, http.StatusOK)
+	defer server.Close()
+
+	s := &Source{}
+	client := testClientForServer(t, server.URL)
+	rc, resp, err := s.downloadContentsByPath(context.Background(), client, "o", "r", "dir/f.txt", "abc123")
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "unexpected HTTP response status")
+	assert.Nil(t, rc)
+	// The returned response is the exact-path lookup's (200), not the failed
+	// download's, so the caller cannot mistake a download failure for the
+	// target being gone.
+	assert.NotNil(t, resp)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }

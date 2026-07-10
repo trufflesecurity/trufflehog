@@ -2250,8 +2250,10 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 // downloadContentsByPath fetches a file the same way DownloadContents does,
 // but resolves it with an exact-path contents lookup instead of searching a
 // directory listing, so it is immune to the 1000-entry listing cap. On
-// failure the returned response is the exact-path lookup's, whose 404 is an
-// authoritative statement about the path at that ref.
+// failure the returned response is always the exact-path lookup's, whose 404
+// is an authoritative statement about the path at that ref; a failure of the
+// download itself must not be mistaken for the target being gone, because
+// the lookup just proved it exists.
 func (s *Source) downloadContentsByPath(ctx context.Context, apiClient *github.Client, owner, repo, filePath, ref string) (io.ReadCloser, *github.Response, error) {
 	fileContent, _, resp, err := apiClient.Repositories.GetContents(
 		ctx, owner, repo, filePath, &github.RepositoryContentGetOptions{Ref: ref})
@@ -2267,7 +2269,11 @@ func (s *Source) downloadContentsByPath(ctx context.Context, apiClient *github.C
 	}
 	dlResp, err := apiClient.Client().Do(dlReq)
 	if err != nil {
-		return nil, &github.Response{Response: dlResp}, err
+		return nil, resp, err
+	}
+	if dlResp.StatusCode != http.StatusOK {
+		_ = dlResp.Body.Close()
+		return nil, resp, fmt.Errorf("unexpected HTTP response status when trying to download file for scan: %v", dlResp.Status)
 	}
 	return dlResp.Body, &github.Response{Response: dlResp}, nil
 }
