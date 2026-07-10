@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -84,6 +85,48 @@ func TestJiraToken_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestJiraToken_Verify(t *testing.T) {
+	tests := []struct {
+		name         string
+		statusCode   int
+		body         string
+		wantVerified bool
+	}{
+		{
+			name:         "authenticated user in body is verified",
+			statusCode:   200,
+			body:         `{"data":{"me":{"user":{"name":"Jira User"}}}}`,
+			wantVerified: true,
+		},
+		{
+			// A non-Atlassian host can happily return 200 with unrelated JSON, so the status code alone can't be trusted.
+			name:         "200 without a jira user is not verified",
+			statusCode:   200,
+			body:         `{"method":"POST","host":"example.com"}`,
+			wantVerified: false,
+		},
+		{
+			name:         "unauthorized is not verified",
+			statusCode:   401,
+			body:         `{"code":401,"message":"Unauthorized"}`,
+			wantVerified: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := common.ConstantResponseHttpClient(test.statusCode, test.body)
+			verified, err := VerifyJiraToken(context.Background(), client, "user@example.com", "example.atlassian.net", validTokenPattern)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if verified != test.wantVerified {
+				t.Errorf("got verified = %v, want %v", verified, test.wantVerified)
 			}
 		})
 	}
