@@ -335,8 +335,8 @@ func TestBIP39_Detection(t *testing.T) {
 
 func TestBIP39_Type(t *testing.T) {
 	d := Scanner{}
-	if int(d.Type()) != 1056 {
-		t.Errorf("expected type 1056 (BIP39SeedPhrase), got %d", d.Type())
+	if int(d.Type()) != 1063 {
+		t.Errorf("expected type 1063 (BIP39SeedPhrase), got %d", d.Type())
 	}
 }
 

@@ -1057,6 +1057,13 @@ enum DetectorType {
   BrainTrustApiKey = 1053;
   PgAnalyzeReadKey = 1054;
   RedHatPyxis = 1055;
-  BIP39SeedPhrase = 1056;
-  MoneroSeedPhrase = 1057;
+  OctopusDeploy = 1056;
+  OpenRouter = 1057;
+  NewRelicInsightsInsertKey = 1058;
+  DuffelToken = 1059;
+  Shippo = 1060;
+  HashiCorpVaultBatchToken = 1061;
+  HashiCorpVaultToken = 1062;
+  BIP39SeedPhrase = 1063;
+  MoneroSeedPhrase = 1064;
 }

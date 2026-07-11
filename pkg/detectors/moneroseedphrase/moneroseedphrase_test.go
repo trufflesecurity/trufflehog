@@ -278,8 +278,8 @@ func TestMonero_RawContent(t *testing.T) {
 
 func TestMonero_Type(t *testing.T) {
 	d := Scanner{}
-	if int(d.Type()) != 1057 {
-		t.Errorf("expected type 1057 (MoneroSeedPhrase), got %d", d.Type())
+	if int(d.Type()) != 1064 {
+		t.Errorf("expected type 1064 (MoneroSeedPhrase), got %d", d.Type())
 	}
 }
 

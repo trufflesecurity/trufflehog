@@ -22,6 +22,10 @@ inputs:
     default: "latest"
     description: Scan with this trufflehog cli version.
     required: false
+  image:
+    default: "ghcr.io/trufflesecurity/trufflehog"
+    description: Docker image to use. Override to point at a registry mirror.
+    required: false
 branding:
   icon: "shield"
   color: "green"
@@ -37,6 +41,7 @@ runs:
         ARGS: ${{ inputs.extra_args }}
         COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
         VERSION: ${{ inputs.version }}
+        IMAGE: ${{ inputs.image }}
       run: |
         ##########################################
         ## ADVANCED USAGE                       ##
@@ -94,7 +99,7 @@ runs:
         ##          Run TruffleHog              ##
         ##########################################
         docker run --rm -v .:/tmp -w /tmp \
-        ghcr.io/trufflesecurity/trufflehog:${VERSION} \
+        "${IMAGE}:${VERSION}" \
         git file:///tmp/ \
         --since-commit \
         ${BASE:-''} \

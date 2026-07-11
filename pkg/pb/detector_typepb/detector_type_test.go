@@ -15,12 +15,12 @@ func TestDetectorTypeDescriptorIncludesSeedPhraseTypes(t *testing.T) {
 		{
 			name: "BIP39SeedPhrase",
 			typ:  DetectorType_BIP39SeedPhrase,
-			num:  1056,
+			num:  1063,
 		},
 		{
 			name: "MoneroSeedPhrase",
 			typ:  DetectorType_MoneroSeedPhrase,
-			num:  1057,
+			num:  1064,
 		},
 	}
 
