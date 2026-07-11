@@ -15,51 +15,28 @@ import (
 //go:embed wordlist-monero-en.txt
 var wordlistRaw string
 
-//go:embed common-words.txt
-var commonWordsRaw string
-
 var (
 	moneroWords    map[string]int
 	moneroKeywords []string
 )
 
-var commonSeedKeywords = map[string]struct{}{
-	"act": {},
-	"add": {},
-	"age": {},
-	"aim": {},
-	"air": {},
-	"all": {},
-	"any": {},
-	"arm": {},
-	"art": {},
-	"ask": {},
-}
-
 func init() {
 	moneroWords = make(map[string]int)
-	moneroKeywords = []string{"monero", "mnemonic", "seed phrase", "recovery phrase", "25 words"}
-
-	commonWords := make(map[string]bool)
-	for _, w := range strings.Split(strings.TrimSpace(commonWordsRaw), "\n") {
-		commonWords[strings.TrimSpace(strings.ToLower(w))] = true
-	}
+	moneroKeywords = seedphrase.BuildKeywords(
+		[]string{"monero", "mnemonic", "seed phrase", "recovery phrase", "25 words"},
+		wordlistRaw,
+	)
 
 	for i, w := range strings.Split(strings.TrimSpace(wordlistRaw), "\n") {
 		word := strings.TrimSpace(strings.ToLower(w))
 		moneroWords[word] = i
-		if !commonWords[word] && !isCommonSeedKeyword(word) {
-			moneroKeywords = append(moneroKeywords, word)
-		}
 	}
 }
 
-func isCommonSeedKeyword(word string) bool {
-	_, ok := commonSeedKeywords[word]
-	return ok
-}
-
 const minSequenceLength = 25
+
+// Current Monero English mnemonics use a 3-character unique prefix.
+// EnglishOld uses 4 and is intentionally not supported by this detector.
 const checksumPrefixLength = 3
 
 type Scanner struct{}

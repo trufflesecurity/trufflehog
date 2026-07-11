@@ -17,48 +17,25 @@ import (
 //go:embed wordlist-bip39-en.txt
 var wordlistRaw string
 
-//go:embed common-words.txt
-var commonWordsRaw string
-
 var (
 	bip39Words    map[string]int
 	bip39Keywords []string
 )
 
-var commonSeedKeywords = map[string]struct{}{
-	"act": {},
-	"add": {},
-	"age": {},
-	"aim": {},
-	"air": {},
-	"all": {},
-	"any": {},
-	"arm": {},
-	"art": {},
-	"ask": {},
-}
+var bip39ExcludedKeywords = []string{"act", "add", "age", "aim", "air", "all", "any", "arm", "art", "ask"}
 
 func init() {
 	bip39Words = make(map[string]int)
-	bip39Keywords = []string{"mnemonic", "seed phrase", "recovery phrase", "twelve words", "backup phrase", "wallet seed"}
-
-	commonWords := make(map[string]bool)
-	for _, w := range strings.Split(strings.TrimSpace(commonWordsRaw), "\n") {
-		commonWords[strings.TrimSpace(strings.ToLower(w))] = true
-	}
+	bip39Keywords = seedphrase.BuildKeywords(
+		[]string{"mnemonic", "seed phrase", "recovery phrase", "twelve words", "backup phrase", "wallet seed"},
+		wordlistRaw,
+		bip39ExcludedKeywords...,
+	)
 
 	for i, w := range strings.Split(strings.TrimSpace(wordlistRaw), "\n") {
 		word := strings.TrimSpace(strings.ToLower(w))
 		bip39Words[word] = i
-		if !commonWords[word] && !isCommonSeedKeyword(word) {
-			bip39Keywords = append(bip39Keywords, word)
-		}
 	}
-}
-
-func isCommonSeedKeyword(word string) bool {
-	_, ok := commonSeedKeywords[word]
-	return ok
 }
 
 const minSequenceLength = 12

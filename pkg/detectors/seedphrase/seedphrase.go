@@ -1,12 +1,18 @@
 package seedphrase
 
 import (
+	_ "embed"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 )
 
 var wordPat = regexp.MustCompile(`[a-zA-Z]+`)
+
+//go:embed common-words.txt
+var commonWordsRaw string
+
+var commonWords = wordSet(strings.Fields(strings.ToLower(commonWordsRaw)))
 
 // Candidate is a normalized seed phrase window found in tokenized input.
 type Candidate struct {
@@ -23,6 +29,33 @@ func NormalizeWords(data []byte) []string {
 		words[i] = strings.ToLower(token)
 	}
 	return words
+}
+
+// BuildKeywords appends distinctive wordlist entries to baseKeywords.
+func BuildKeywords(baseKeywords []string, wordlist string, excludedWords ...string) []string {
+	keywords := append([]string{}, baseKeywords...)
+	excluded := wordSet(excludedWords)
+
+	for _, word := range strings.Fields(strings.ToLower(wordlist)) {
+		if commonWords[word] || excluded[word] {
+			continue
+		}
+		keywords = append(keywords, word)
+	}
+
+	return keywords
+}
+
+func wordSet(words []string) map[string]bool {
+	set := make(map[string]bool, len(words))
+	for _, word := range words {
+		word = strings.TrimSpace(strings.ToLower(word))
+		if word == "" {
+			continue
+		}
+		set[word] = true
+	}
+	return set
 }
 
 // HasOnlyOneUniqueWord reports whether a non-empty word window repeats one word.

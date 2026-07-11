@@ -5,6 +5,39 @@ import (
 	"testing"
 )
 
+func TestBuildKeywords(t *testing.T) {
+	tests := []struct {
+		name          string
+		baseKeywords  []string
+		wordlist      string
+		excludedWords []string
+		want          []string
+	}{
+		{
+			name:         "keeps base keywords and distinctive words",
+			baseKeywords: []string{"seed phrase"},
+			wordlist:     "alpha abandon zebra",
+			want:         []string{"seed phrase", "abandon", "zebra"},
+		},
+		{
+			name:          "filters common and explicitly excluded words",
+			baseKeywords:  []string{"mnemonic"},
+			wordlist:      "all abandon act zebra",
+			excludedWords: []string{"act"},
+			want:          []string{"mnemonic", "abandon", "zebra"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildKeywords(tt.baseKeywords, tt.wordlist, tt.excludedWords...)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("BuildKeywords() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeWords(t *testing.T) {
 	input := []byte("1. Alpha,\t2. BETA\nthree-four five's SIX")
 	want := []string{"alpha", "beta", "three", "four", "five", "s", "six"}

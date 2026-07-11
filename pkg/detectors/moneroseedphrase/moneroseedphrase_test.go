@@ -290,7 +290,7 @@ func TestMonero_KeywordsDoesNotIncludeCommonWords(t *testing.T) {
 		keywords[keyword] = struct{}{}
 	}
 
-	commonWords := []string{"all", "air", "age", "act", "art", "ask", "arm", "add", "any", "aim"}
+	commonWords := []string{"army", "asked", "audio"}
 	for _, w := range commonWords {
 		if _, ok := keywords[w]; ok {
 			t.Errorf("expected common word %q to be excluded from Keywords()", w)
