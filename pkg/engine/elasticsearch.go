@@ -21,6 +21,7 @@ func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchC
 		CloudId:        c.CloudID,
 		ApiKey:         c.APIKey,
 		ServiceToken:   c.ServiceToken,
+		BearerToken:    c.BearerToken,
 		IndexPattern:   c.IndexPattern,
 		QueryJson:      c.QueryJSON,
 		SinceTimestamp: c.SinceTimestamp,

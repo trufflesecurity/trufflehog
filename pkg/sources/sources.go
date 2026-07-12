@@ -473,6 +473,7 @@ type ElasticsearchConfig struct {
 	CloudID        string
 	APIKey         string
 	ServiceToken   string
+	BearerToken    string
 	IndexPattern   string
 	QueryJSON      string
 	SinceTimestamp string

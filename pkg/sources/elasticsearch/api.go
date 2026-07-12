@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -232,11 +233,59 @@ func fetchIndexDocumentCount(
 	return int(count), nil
 }
 
+// openSearchOpenPIT opens a point-in-time the OpenSearch way: OpenSearch
+// exposes this at POST /{index}/_search/point_in_time, not Elasticsearch's
+// POST /{index}/_pit, so the vendored esapi.OpenPointInTimeRequest (which is
+// hardcoded to the ES8 path) 404s against a real OpenSearch cluster.
+func openSearchOpenPIT(
+	ctx context.Context,
+	client *es.TypedClient,
+	index string,
+) (string, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"http:///"+index+"/_search/point_in_time?keep_alive=1m",
+		nil,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	res, err := client.Perform(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	rawData, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+
+	data := make(map[string]any)
+	if err := json.Unmarshal(rawData, &data); err != nil {
+		return "", err
+	}
+
+	pitID, ok := data["pit_id"].(string)
+	if !ok {
+		return "", fmt.Errorf("no pit_id in OpenSearch response: %s", rawData)
+	}
+
+	return pitID, nil
+}
+
 func createPITForSearch(
 	ctx context.Context,
 	client *es.TypedClient,
 	docSearch *DocumentSearch,
+	isOpenSearch bool,
 ) (string, error) {
+	if isOpenSearch {
+		return openSearchOpenPIT(ctx, client, docSearch.index.name)
+	}
+
 	req := esapi.OpenPointInTimeRequest{
 		Index:     []string{docSearch.index.name},
 		KeepAlive: "1m",
@@ -261,9 +310,10 @@ func processSearchedDocuments(
 	ctx context.Context,
 	client *es.TypedClient,
 	docSearch *DocumentSearch,
+	isOpenSearch bool,
 	processDocument func(document *Document) error,
 ) (int, error) {
-	pitID, err := createPITForSearch(ctx, client, docSearch)
+	pitID, err := createPITForSearch(ctx, client, docSearch, isOpenSearch)
 	if err != nil {
 		return 0, err
 	}
@@ -272,13 +322,21 @@ func processSearchedDocuments(
 	documentsProcessed := 0
 	sort := []int{}
 
+	// Elasticsearch's PIT tiebreaker sort field is "_shard_doc"; OpenSearch
+	// doesn't recognize that field and rejects the search with a
+	// query_shard_exception, but accepts the equivalent "_doc".
+	tiebreaker := "_shard_doc"
+	if isOpenSearch {
+		tiebreaker = "_doc"
+	}
+
 	for documentsProcessed < docSearch.documentCount {
 		searchReqBody := SearchRequestBody{
 			PIT: PointInTime{
 				ID:        pitID,
 				KeepAlive: "1m",
 			},
-			Sort: []string{"_shard_doc"},
+			Sort: []string{tiebreaker},
 		}
 
 		query, err := docSearch.filterParams.Query(docSearch.index.latestTimestamp)

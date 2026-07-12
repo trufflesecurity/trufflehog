@@ -280,6 +280,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				ctx,
 				es,
 				&docSearch,
+				false,
 				func(document *Document) error {
 					docs = append(docs, *document)
 					return nil
@@ -367,6 +368,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				ctx,
 				es,
 				&docSearch,
+				false,
 				func(document *Document) error {
 					messagesProcessed += 1
 					return nil
@@ -399,6 +401,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				ctx,
 				es,
 				&docSearch,
+				false,
 				func(document *Document) error {
 					messagesProcessed += 1
 					return nil

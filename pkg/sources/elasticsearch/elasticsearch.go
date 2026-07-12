@@ -2,6 +2,7 @@ package elasticsearch
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
@@ -30,6 +31,7 @@ type Source struct {
 	esConfig       es.Config
 	filterParams   FilterParams
 	bestEffortScan bool
+	isOpenSearch   bool
 	ctx            context.Context
 	client         *es.TypedClient
 	log            logr.Logger
@@ -87,6 +89,23 @@ func (s *Source) Init(
 	if conn.ServiceToken != "" {
 		esConfig.ServiceToken = conn.ServiceToken
 		log.RedactGlobally(conn.ServiceToken)
+	}
+
+	// OpenSearch's JWT auth plugin expects a raw "Authorization: Bearer <jwt>"
+	// header rather than Elasticsearch's APIKey/ServiceToken schemes, and its
+	// responses don't reliably carry the X-Elastic-Product header the
+	// vendored ES client requires on every request. bearer_token routes
+	// around both: it sets the header directly and wraps the transport so
+	// the product check is satisfied.
+	if conn.BearerToken != "" {
+		esConfig.Header = http.Header{
+			"Authorization": []string{"Bearer " + conn.BearerToken},
+		}
+		esConfig.Transport = &openSearchTransport{
+			base: http.DefaultTransport,
+		}
+		log.RedactGlobally(conn.BearerToken)
+		s.isOpenSearch = true
 	}
 
 	s.esConfig = esConfig
@@ -183,6 +202,7 @@ func (s *Source) Chunks(
 						s.ctx,
 						client,
 						&docSearch,
+						s.isOpenSearch,
 						func(document *Document) error {
 							if docSearch.index.DocumentAlreadySeen(document) {
 								return nil
@@ -275,4 +295,25 @@ func (s *Source) Chunks(
 	}
 
 	return nil
+}
+
+// openSearchTransport injects the X-Elastic-Product header the vendored
+// go-elasticsearch client demands on every successful response, since
+// OpenSearch clusters (unlike Elasticsearch) don't reliably send it, which
+// otherwise makes the client reject the connection with "the client noticed
+// that the server is not Elasticsearch and we do not support this unknown
+// product".
+type openSearchTransport struct {
+	base http.RoundTripper
+}
+
+func (t *openSearchTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	res, err := t.base.RoundTrip(req)
+	if err != nil || res == nil {
+		return res, err
+	}
+	if res.StatusCode >= 200 && res.StatusCode < 300 && res.Header.Get("X-Elastic-Product") == "" {
+		res.Header.Set("X-Elastic-Product", "Elasticsearch")
+	}
+	return res, nil
 }
