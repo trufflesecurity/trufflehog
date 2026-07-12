@@ -93,6 +93,15 @@ func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error)
 		timestampRangeQueryClause["range"] = timestamp
 	}
 
+	// An empty query clause (no --query-json, --since-timestamp, or resumed
+	// latestTimestamp) is accepted by Elasticsearch as an implicit match-all,
+	// but OpenSearch's stricter query parser rejects "query": {} outright
+	// with "illegal_argument_exception: query malformed, empty clause found".
+	// match_all is the explicit, portable equivalent on both.
+	if len(timestampRangeQueryClause) == 0 {
+		timestampRangeQueryClause["match_all"] = make(map[string]any)
+	}
+
 	query := make(map[string]any)
 	query["query"] = timestampRangeQueryClause
 
