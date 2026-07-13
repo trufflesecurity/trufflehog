@@ -244,7 +244,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docker"
 	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
 	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerswarmunlock"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -827,7 +826,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vatlayer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vaulttoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vbout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vercel"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifier"
@@ -1141,7 +1139,6 @@ func buildDetectorList() []detectors.Detector {
 		&docker.Scanner{},
 		&dockerhubv1.Scanner{},
 		&dockerhubv2.Scanner{},
-		&dockerswarmunlock.Scanner{},
 		&docparser.Scanner{},
 		&documo.Scanner{},
 		&docusign.Scanner{},
@@ -1742,7 +1739,6 @@ func buildDetectorList() []detectors.Detector {
 		&userstack.Scanner{},
 		&vagrantcloudpersonaltoken.Scanner{},
 		&vatlayer.Scanner{},
-		&vaulttoken.Scanner{},
 		&vbout.Scanner{},
 		&vercel.Scanner{},
 		&verifier.Scanner{},
