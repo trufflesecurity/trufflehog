@@ -29,7 +29,7 @@ var _ detectors.CloudProvider = (*Scanner)(nil)
 func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	appPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
@@ -100,7 +100,7 @@ func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
 		return s.client
 	}
-	return client
+	return defaultClient
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -124,43 +124,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for endpoint := range uniqueFoundUrls {
 		endpoints = append(endpoints, endpoint)
 	}
+	client := s.getClient()
 
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
 		for _, appMatch := range appMatches {
 			resAppMatch := strings.TrimSpace(appMatch[1])
-			s1 := detectors.Result{
-				DetectorType: detector_typepb.DetectorType_DatadogToken,
-				Raw:          []byte(resAppMatch),
-				RawV2:        []byte(resAppMatch + resApiMatch),
-				ExtraData: map[string]string{
-					"Type": "Application+APIKey",
-				},
-				SecretParts: map[string]string{"api_key": resApiMatch, "app_key": resAppMatch},
-			}
+			for _, baseURL := range s.Endpoints(endpoints...) {
+				s1 := detectors.Result{
+					DetectorType: detector_typepb.DetectorType_DatadogToken,
+					Raw:          []byte(resAppMatch),
+					RawV2:        []byte(resAppMatch + resApiMatch),
+					ExtraData: map[string]string{
+						"Type": "Application+APIKey",
+					},
+					SecretParts: map[string]string{"api_key": resApiMatch, "app_key": resAppMatch, "endpoint": baseURL},
+				}
 
-			if verify {
-				for _, baseURL := range s.Endpoints(endpoints...) {
-					client := s.getClient()
+				if verify {
 					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
-					if isVerified {
-						s1.SecretParts["endpoint"] = baseURL
-						if res != nil {
-							if len(res.Data) > 0 {
-								setUserEmails(res.Data, &s1)
-							}
-							if len(res.Included) > 0 {
-								setOrganizationInfo(res.Included, &s1)
-							}
+					if isVerified && res != nil {
+						if len(res.Data) > 0 {
+							setUserEmails(res.Data, &s1)
 						}
-						// break the loop once we've successfully validated the token against a baseURL
-						break
+						if len(res.Included) > 0 {
+							setOrganizationInfo(res.Included, &s1)
+						}
 					}
 				}
+				results = append(results, s1)
 			}
-			results = append(results, s1)
 		}
 	}
 
@@ -200,7 +195,7 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, appKey, baseU
 	case http.StatusOK:
 		var serviceResponse userServiceResponse
 		if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err != nil {
-			return nil, false, err
+			return nil, true, nil
 		}
 		return &serviceResponse, true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
