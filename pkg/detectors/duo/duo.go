@@ -91,9 +91,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// we will try auth api verification if admin api verification fails without error,
 					// which is in the case of it returning 401 unauthorized due to invalid credentials.
 					if !verified && verificationErr == nil {
-						verified, verificationErr = VerifyAuthToken(ctx, s.getClient(), host, apiKey, apiSecret)
-						s1.ExtraData["application"] = "Auth API"
-						s1.SecretParts["application"] = "Auth API"
+						var authStatusCode int
+						verified, authStatusCode, verificationErr = VerifyAuthToken(ctx, s.getClient(), host, apiKey, apiSecret)
+						// The Auth API responds 403 (not 401) when ikey/skey are
+						// structurally valid Admin API keys, active or not. That still
+						// counts as verified, but the keys remain Admin API keys, so
+						// only relabel to Auth API when the check actually succeeded (200).
+						if authStatusCode != http.StatusForbidden {
+							s1.ExtraData["application"] = "Auth API"
+							s1.SecretParts["application"] = "Auth API"
+						}
 					}
 					s1.SetVerificationError(verificationErr, host, apiKey, apiSecret)
 					s1.Verified = verified
@@ -105,12 +112,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// returns verified=true if credentials are valid and belong to auth api, false if creds are invalid, and error if creds belong to auth api or for anything else (e.g., network error)
+// returns verified=true if credentials are valid and belong to auth api, false if creds are invalid, and error if creds belong to auth api or for anything else (e.g., network error).
+// The HTTP status code is also returned so callers can distinguish a genuine 200 from a
+// 403, which the Auth API returns for structurally valid Admin API keys (active or not).
 func VerifyAuthToken(
 	ctx context.Context,
 	client *http.Client,
 	host, ikey, skey string,
-) (bool, error) {
+) (bool, int, error) {
 	// Docs: https://duo.com/docs/authapi#check
 	return verifyDuoRequest(
 		ctx,
@@ -129,7 +138,7 @@ func VerifyAdminToken(
 	host, ikey, skey string,
 ) (bool, error) {
 	// Docs: https://duo.com/docs/adminapi#account-info
-	return verifyDuoRequest(
+	verified, _, err := verifyDuoRequest(
 		ctx,
 		client,
 		host,
@@ -137,6 +146,7 @@ func VerifyAdminToken(
 		skey,
 		"/admin/v1/info/summary",
 	)
+	return verified, err
 }
 
 func verifyDuoRequest(
@@ -144,7 +154,7 @@ func verifyDuoRequest(
 	client *http.Client,
 	host, ikey, skey string,
 	path string,
-) (bool, error) {
+) (bool, int, error) {
 
 	timestamp := time.Now().UTC().Format(http.TimeFormat)
 
@@ -175,7 +185,7 @@ func verifyDuoRequest(
 		nil,
 	)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 
 	req.Header.Set("Authorization", "Basic "+auth)
@@ -183,7 +193,7 @@ func verifyDuoRequest(
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -192,13 +202,13 @@ func verifyDuoRequest(
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, nil
+		return true, res.StatusCode, nil
 	case http.StatusUnauthorized:
-		return false, nil
+		return false, res.StatusCode, nil
 	case http.StatusForbidden: // Auth API returns 403 if credentials are admin keys be it active or inactive
-		return true, nil
+		return true, res.StatusCode, nil
 	default:
-		return false, fmt.Errorf("unexpected HTTP status %d", res.StatusCode)
+		return false, res.StatusCode, fmt.Errorf("unexpected HTTP status %d", res.StatusCode)
 	}
 }
 
