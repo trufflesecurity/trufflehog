@@ -14,12 +14,12 @@ jobs:
     steps:
     - name: Login to GCP
       id: auth
-      uses: "google-github-actions/auth@v2"
+      uses: "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" # v3
       with:
         credentials_json: ${{ secrets.GCP_SA_TRUFFLE_RELEASE_BOT }}
 
     - name: Login to GAR
-      uses: docker/login-action@v3
+      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
       with:
         registry: us-central1-docker.pkg.dev
         username: _json_key

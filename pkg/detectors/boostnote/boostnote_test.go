@@ -39,7 +39,7 @@ func TestBoostNote_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"fb1026ac5994e3ad01799fe040289317ba2594a20e9e45307a143be82b49d213"},
@@ -77,7 +77,7 @@ func TestBoostNote_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

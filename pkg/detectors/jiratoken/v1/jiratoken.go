@@ -105,6 +105,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 						"version":        fmt.Sprintf("%d", s.Version()),
 					},
+					SecretParts: map[string]string{
+						"token":  token,
+						"domain": domain,
+						"email":  email,
+					},
 				}
 
 				if verify {
@@ -117,13 +122,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 
 						s1.SetVerificationError(verificationErr, token)
-					}
-					if isVerified {
-						s1.SecretParts = map[string]string{
-							"token":  token,
-							"domain": domain,
-							"email":  email,
-						}
 					}
 				}
 
@@ -180,7 +178,9 @@ func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, to
 			return false, nil // can't decode response in case of 200 OK = not valid JIRA domain
 		}
 
-		return true, nil
+		// A 200 on its own isn't enough - unrelated hosts can also return JSON and get flagged as verified.
+		// Only trust it when the body actually carries the authenticated user's name.
+		return jiraResp.Data.Me.User.Name != "", nil
 	case http.StatusUnauthorized:
 		return false, nil
 	default:

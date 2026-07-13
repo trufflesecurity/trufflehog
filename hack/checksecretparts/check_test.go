@@ -49,7 +49,7 @@ func FromData() detectors.Result {
 			wantLen: 0,
 		},
 		{
-			name: "SecretParts assigned later is accepted",
+			name: "SecretParts assigned later is not accepted",
 			files: map[string]string{
 				"det.go": `package det
 
@@ -65,7 +65,7 @@ func FromData() detectors.Result {
 }
 `,
 			},
-			wantLen: 0,
+			wantLen: 1,
 		},
 		{
 			name: "no detectors.Result construction is a no-op",

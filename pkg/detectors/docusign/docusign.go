@@ -83,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "ey")
-				res.Body.Close()
+				_ = res.Body.Close()
 
 				if err != nil {
 					return nil, err

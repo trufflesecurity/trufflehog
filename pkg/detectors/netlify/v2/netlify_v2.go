@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Netlify,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": rotationGuideUrl,
@@ -62,10 +63,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, match)
-
-			if s1.Verified {
-				s1.SecretParts = map[string]string{"key": match}
-			}
 		}
 
 		results = append(results, s1)

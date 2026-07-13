@@ -93,7 +93,7 @@ func verifyAccuweather(ctx context.Context, client *http.Client, key string) (bo
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// https://developer.accuweather.com/accuweather-locations-api/apis/get/locations/v1/cities/autocomplete
 	switch res.StatusCode {

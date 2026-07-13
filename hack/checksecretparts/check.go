@@ -21,12 +21,7 @@ type Finding struct {
 }
 
 // CheckPackageDir runs the SecretParts check on a single directory. It returns
-// one Finding per detectors.Result{} construction site in the directory,
-// filtered so that packages which mention SecretParts anywhere produce no
-// findings. Test files (_test.go) are ignored on both sides: construction
-// sites in them are not reported, and references in them do not suppress
-// findings (test files commonly zero the field for comparison — see
-// pkg/detectors/gitlab/v1/gitlab_integration_test.go).
+// one Finding per detectors.Result{} construction site in the directory.
 func CheckPackageDir(dir string) ([]Finding, error) {
 	fset := token.NewFileSet()
 	entries, err := os.ReadDir(dir)
@@ -61,20 +56,10 @@ func CheckPackageDir(dir string) ([]Finding, error) {
 // and returns findings. It is separated from CheckPackageDir so that tests can
 // drive it with synthetic ASTs.
 func checkFiles(fset *token.FileSet, dir string, files []*ast.File) []Finding {
-	var (
-		constructions  []token.Position
-		hasSecretParts bool
-	)
+	var constructions []token.Position
 
 	for _, f := range files {
-		if fileReferencesSecretParts(f) {
-			hasSecretParts = true
-		}
 		constructions = append(constructions, findResultConstructions(fset, f)...)
-	}
-
-	if hasSecretParts || len(constructions) == 0 {
-		return nil
 	}
 
 	sort.Slice(constructions, func(i, j int) bool {
@@ -154,31 +139,4 @@ func hasSecretPartsKey(lit *ast.CompositeLit) bool {
 		}
 	}
 	return false
-}
-
-// fileReferencesSecretParts returns true if the file mentions the identifier
-// "SecretParts" in any form: a composite-literal key, a selector expression
-// (x.SecretParts), or a bare identifier. The rationale is that if a detector
-// package touches SecretParts at all — whether on the construction site or in
-// a later assignment — it has been migrated; the check's job is to find
-// packages that never touch it.
-func fileReferencesSecretParts(f *ast.File) bool {
-	found := false
-	ast.Inspect(f, func(n ast.Node) bool {
-		if found {
-			return false
-		}
-		switch x := n.(type) {
-		case *ast.Ident:
-			if x.Name == "SecretParts" {
-				found = true
-			}
-		case *ast.SelectorExpr:
-			if x.Sel != nil && x.Sel.Name == "SecretParts" {
-				found = true
-			}
-		}
-		return !found
-	})
-	return found
 }

@@ -106,18 +106,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_Coinbase,
 				Raw:          []byte(resPrivateKey),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", resKeyName, resPrivateKey)),
+				SecretParts: map[string]string{
+					"key_name": resKeyName,
+					"key":      resPrivateKey,
+				},
 			}
 
 			if verify {
 				isVerified, verificationErr := s.verifyMatch(ctx, client, resKeyName, resPrivateKey)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resPrivateKey)
-				if isVerified {
-					s1.SecretParts = map[string]string{
-						"key_name": resKeyName,
-						"key":      resPrivateKey,
-					}
-				}
 			}
 			results = append(results, s1)
 

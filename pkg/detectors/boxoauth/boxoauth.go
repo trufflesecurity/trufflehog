@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -26,7 +27,18 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	clientIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"id"}) + `\b([a-zA-Z0-9]{32})\b`)
 	clientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"secret"}) + `\b([a-zA-Z0-9]{32})\b`)
+	// Box enterprise and user IDs are numeric strings.
+	subjectIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{
+		"enterprise", "enterprise_id", "user", "user_id", "subject", "box_subject",
+	}) + `\b([0-9]{6,20})\b`)
 )
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -52,34 +64,45 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueSecretMatches[match[1]] = struct{}{}
 	}
 
+	var subjectIds []string
+	uniqueSubjectIdMatches := make(map[string]struct{})
+	for _, match := range subjectIdPat.FindAllStringSubmatch(dataStr, -1) {
+		if _, seen := uniqueSubjectIdMatches[match[1]]; !seen {
+			uniqueSubjectIdMatches[match[1]] = struct{}{}
+			subjectIds = append(subjectIds, match[1])
+		}
+	}
+	slices.Sort(subjectIds)
+
 	for resIdMatch := range uniqueIdMatches {
 		for resSecretMatch := range uniqueSecretMatches {
-
-			// ignore if the id and secret are the same
 			if resIdMatch == resSecretMatch {
 				continue
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detector_typepb.DetectorType_BoxOauth,
+				DetectorType: s.Type(),
 				Raw:          []byte(resIdMatch),
+				RawV2:        []byte(resIdMatch + resSecretMatch),
 				SecretParts: map[string]string{
-					"id":     resIdMatch,
-					"secret": resSecretMatch,
+					"client_id":     resIdMatch,
+					"client_secret": resSecretMatch,
 				},
-				RawV2: []byte(resIdMatch + resSecretMatch),
 			}
 
 			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, extraData, verificationErr := verifyMatch(ctx, client, resIdMatch, resSecretMatch)
+				isVerified, verificationErr := verifyMatch(ctx, s.getClient(), resIdMatch, resSecretMatch)
 				s1.Verified = isVerified
-				s1.ExtraData = extraData
 				s1.SetVerificationError(verificationErr, resIdMatch)
+
+				if isVerified {
+					for _, subjectId := range subjectIds {
+						if verifySubjectID(ctx, s.getClient(), resIdMatch, resSecretMatch, subjectId) {
+							s1.SecretParts["subject_id"] = subjectId
+							break
+						}
+					}
+				}
 			}
 
 			results = append(results, s1)
@@ -94,19 +117,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, id string, secret string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, id string, secret string) (bool, error) {
 	url := "https://api.box.com/oauth2/token"
 	payload := strings.NewReader("grant_type=client_credentials&client_id=" + id + "&client_secret=" + secret)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 
 	req.Header = http.Header{"content-type": []string{"application/x-www-form-urlencoded"}}
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -125,20 +148,53 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 		{
 			bodyBytes, err := io.ReadAll(res.Body)
 			if err != nil {
-				return false, nil, err
+				return false, err
 			}
 			body := string(bodyBytes)
 			if strings.Contains(body, "unauthorized_client") {
-				return true, nil, nil
+				return true, nil
 			} else if strings.Contains(body, "invalid_client") {
-				return false, nil, nil
+				return false, nil
 			} else {
-				return false, nil, fmt.Errorf("response body missing expected keyword")
+				return false, fmt.Errorf("response body missing expected keyword")
 			}
 		}
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+}
+
+// verifySubjectID checks whether a subject ID is valid for the given client
+// credentials by attempting the Box CCG (Client Credentials Grant) auth flow.
+// It mirrors the analyzer's Authenticate logic: try enterprise subject type
+// first, then fall back to user subject type. Returns true on the first
+// successful authentication (HTTP 200).
+func verifySubjectID(ctx context.Context, client *http.Client, clientID, clientSecret, subjectID string) bool {
+	for _, subjectType := range []string{"enterprise", "user"} {
+		payload := fmt.Sprintf(
+			"grant_type=client_credentials&client_id=%s&client_secret=%s&box_subject_type=%s&box_subject_id=%s",
+			clientID, clientSecret, subjectType, subjectID,
+		)
+
+		req, err := http.NewRequestWithContext(
+			ctx, http.MethodPost, "https://api.box.com/oauth2/token", strings.NewReader(payload))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		res, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+
+		if res.StatusCode == http.StatusOK {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

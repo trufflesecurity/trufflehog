@@ -41,7 +41,7 @@ func TestGitEngine(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll(path)
+	defer func() { _ = os.RemoveAll(path) }()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -130,7 +130,7 @@ func TestGitEngineWithMirrorAndBareClones(t *testing.T) {
 	if err != nil {
 		t.Fail()
 	}
-	defer os.RemoveAll(parent)
+	defer func() { _ = os.RemoveAll(parent) }()
 	localRepo := filepath.Join(parent, "test_keys.git")
 	cloneCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

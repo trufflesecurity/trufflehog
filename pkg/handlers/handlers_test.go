@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	stdctx "context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+//go:embed testdata/aws-canary-creds.zip
+var awsCanaryCredsZip []byte
+
+//go:embed testdata/sm.zip
+var smJSONZip []byte
+
 func TestHandleFileCancelledContext(t *testing.T) {
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 2)}
 
@@ -39,26 +46,18 @@ func TestHandleFile(t *testing.T) {
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 513)}
 
 	// Only one chunk is sent on the channel.
-	// TODO: Embed a zip without making an HTTP request.
-	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
-	assert.NoError(t, err)
-	defer func() {
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
-	}()
-
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(context.Background(), resp.Body, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(context.Background(), bytes.NewReader(awsCanaryCredsZip), &sources.Chunk{}, reporter))
 	assert.Equal(t, 1, len(reporter.Ch))
 }
 
+// Fetched over HTTP; the ~5 MB upstream fixture would notably grow pkg/handlers/testdata/ if embedded.
 func TestHandleHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm_random_data.json")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/sm_random_data.json")
 	assert.NoError(t, err)
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
@@ -78,18 +77,10 @@ func TestHandleHTTPJson(t *testing.T) {
 }
 
 func TestHandleHTTPJsonZip(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
-	assert.NoError(t, err)
-	defer func() {
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
-	}()
-
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), bytes.NewReader(smJSONZip), &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -105,21 +96,12 @@ func BenchmarkHandleHTTPJsonZip(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		func() {
-			resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
-			assert.NoError(b, err)
-
-			defer func() {
-				if resp != nil && resp.Body != nil {
-					resp.Body.Close()
-				}
-			}()
-
 			chunkCh := make(chan *sources.Chunk, 1)
 
 			b.StartTimer()
 			go func() {
 				defer close(chunkCh)
-				err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+				err := HandleFile(context.Background(), bytes.NewReader(smJSONZip), &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 				assert.NoError(b, err)
 			}()
 
@@ -134,7 +116,7 @@ func BenchmarkHandleHTTPJsonZip(b *testing.B) {
 func BenchmarkHandleFile(b *testing.B) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(b, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -323,7 +305,7 @@ func TestHandleFileDOC(t *testing.T) {
 func BenchmarkHandleAR(b *testing.B) {
 	file, err := os.Open("testdata/test.deb")
 	assert.Nil(b, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -382,7 +364,7 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 func TestHandleTar(t *testing.T) {
 	file, err := os.Open("testdata/test.tar")
 	assert.Nil(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
@@ -402,7 +384,7 @@ func TestHandleTar(t *testing.T) {
 func BenchmarkHandleTar(b *testing.B) {
 	file, err := os.Open("testdata/test.tar")
 	assert.Nil(b, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -424,15 +406,16 @@ func BenchmarkHandleTar(b *testing.B) {
 	}
 }
 
+// Fetched over HTTP; the ~18 MB upstream fixture would substantially grow pkg/handlers/testdata/ if embedded.
 func TestHandleLargeHTTPJson(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/md_random_data.json.zip")
+	resp, err := http.Get("https://raw.githubusercontent.com/trufflesecurity/trufflehog-test-assets/main/md_random_data.json.zip")
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
@@ -455,10 +438,10 @@ func TestHandlePipe(t *testing.T) {
 	r, w := io.Pipe()
 
 	go func() {
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 		file, err := os.Open("testdata/test.tar")
 		assert.NoError(t, err)
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		_, err = io.Copy(w, file)
 		assert.NoError(t, err)
 	}()
@@ -543,7 +526,7 @@ func TestHandleGitCatFile(t *testing.T) {
 			} else {
 				gitDir = setupTempGitRepoWithUnsupportedFile(t, tt.fileName, tt.fileSize)
 			}
-			defer os.RemoveAll(gitDir)
+			defer func() { _ = os.RemoveAll(gitDir) }()
 
 			cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
 			hashBytes, err := cmd.Output()
@@ -634,7 +617,7 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if isUnsupported {
 		// Write ELF header for unsupported file.
@@ -758,7 +741,7 @@ func TestHandleGitCatFileWithPipeError(t *testing.T) {
 	simulatedError := errors.New("simulated error during newFileReader")
 
 	gitDir := setupTempGitRepo(t, fileName, fileSize)
-	defer os.RemoveAll(gitDir)
+	defer func() { _ = os.RemoveAll(gitDir) }()
 
 	commitHash := getGitCommitHash(t, gitDir)
 

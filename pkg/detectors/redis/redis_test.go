@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -21,6 +23,46 @@ var (
 	invalidAzureRedis = invalidDomain + ",password=" + password + ",ssl=False,abortConnect=True"
 	keyword           = "redis"
 )
+
+func TestRedis_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+	}{
+		{
+			name:         "standard redis URI",
+			data:         `redis://myuser:mysecretpass@redis.example.com:6379/0`,
+			wantHost:     "redis.example.com:6379",
+			wantUsername: "myuser",
+		},
+		{
+			name:         "redis URI with default username",
+			data:         `redis://default:mysecretpass@redis.example.com:6379`,
+			wantHost:     "redis.example.com:6379",
+			wantUsername: "default",
+		},
+		{
+			name:     "azure redis pattern without username",
+			data:     `mycache.redis.cache.windows.net:6380,password=Xcc3S9d7And6aMdfOcUc0acHJh3CiDh3l9DsapNwGwyS,ssl=True,abortConnect=False`,
+			wantHost: "mycache.redis.cache.windows.net:6380",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			require.NoError(t, err)
+			require.NotEmpty(t, results, "expected at least one result")
+
+			r := results[0]
+			assert.Equal(t, tt.wantHost, r.ExtraData["host"])
+			assert.Equal(t, tt.wantUsername, r.ExtraData["username"])
+		})
+	}
+}
 
 func TestRedisIntegration_Pattern(t *testing.T) {
 	d := Scanner{}

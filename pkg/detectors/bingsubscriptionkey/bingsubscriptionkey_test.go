@@ -39,7 +39,7 @@ func TestBingsubscriptionkey_Pattern(t *testing.T) {
 						// Perform the request
 						client := &http.Client{}
 						resp, _ := client.Do(req)
-						defer resp.Body.Close()
+						defer func() { _ = resp.Body.Close() }()
 					}`,
 			want: []string{"89017d414ed64edb9c776d4a52102b9a"},
 		},
@@ -77,7 +77,7 @@ func TestBingsubscriptionkey_Pattern(t *testing.T) {
 						// Perform the request
 						client := &http.Client{}
 						resp, _ := client.Do(req)
-						defer resp.Body.Close()
+						defer func() { _ = resp.Body.Close() }()
 					}`,
 			want: []string{},
 		},

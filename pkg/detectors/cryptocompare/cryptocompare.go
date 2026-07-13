@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				bodyString := string(bodyBytes)
 				errCode := strings.Contains(bodyString, `"Response":"Success"`)
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					if errCode {
 						s1.Verified = true
