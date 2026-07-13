@@ -38,6 +38,7 @@ var (
 	LobDetectorEnabled                       atomic.Bool
 	HashiCorpVaultBatchTokenDetectorEnabled  atomic.Bool
 	HashiCorpVaultTokenDetectorEnabled       atomic.Bool
+	DuoDetectorEnabled                       atomic.Bool
 )
 
 type AtomicString struct {

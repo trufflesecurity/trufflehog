@@ -1850,6 +1850,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.HashiCorpVaultBatchTokenDetectorEnabled.Load()
 		case *hashicorpvaulttoken.Scanner:
 			return !feature.HashiCorpVaultTokenDetectorEnabled.Load()
+		case *duo.Scanner:
+			return !feature.DuoDetectorEnabled.Load()
 		default:
 			return false
 		}
