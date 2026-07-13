@@ -91,7 +91,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/basicauth"
 	bannerbearv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v1"
 	bannerbearv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
@@ -245,7 +244,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docker"
 	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
 	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerswarmunlock"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -255,7 +253,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dronahq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/droneci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dropbox"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duffel"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dwolla"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dynalist"
@@ -704,7 +701,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/siteleaf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/skrappio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/skybiometry"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/slack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/slackwebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smartsheets"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smartystreets"
@@ -820,7 +816,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vatlayer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vaulttoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vbout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vercel"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifier"
@@ -974,7 +969,6 @@ func buildDetectorList() []detectors.Detector {
 		&azuresearchquerykey.Scanner{},
 		&azure_storage.Scanner{},
 		&azurerepositorykey.Scanner{},
-		&basicauth.Scanner{},
 		&bannerbearv1.Scanner{},
 		&bannerbearv2.Scanner{},
 		&baremetrics.Scanner{},
@@ -1135,7 +1129,6 @@ func buildDetectorList() []detectors.Detector {
 		&docker.Scanner{},
 		&dockerhubv1.Scanner{},
 		&dockerhubv2.Scanner{},
-		&dockerswarmunlock.Scanner{},
 		&docparser.Scanner{},
 		&documo.Scanner{},
 		&docusign.Scanner{},
@@ -1145,7 +1138,6 @@ func buildDetectorList() []detectors.Detector {
 		&dronahq.Scanner{},
 		&droneci.Scanner{},
 		&dropbox.Scanner{},
-		&duffel.Scanner{},
 		&duply.Scanner{},
 		&dwolla.Scanner{},
 		&dynalist.Scanner{},
@@ -1609,7 +1601,6 @@ func buildDetectorList() []detectors.Detector {
 		&siteleaf.Scanner{},
 		&skrappio.Scanner{},
 		&skybiometry.Scanner{},
-		&slack.Scanner{}, // has 4 secret types
 		&slackwebhook.Scanner{},
 		&smartsheets.Scanner{},
 		&smartystreets.Scanner{},
@@ -1728,7 +1719,6 @@ func buildDetectorList() []detectors.Detector {
 		&userstack.Scanner{},
 		&vagrantcloudpersonaltoken.Scanner{},
 		&vatlayer.Scanner{},
-		&vaulttoken.Scanner{},
 		&vbout.Scanner{},
 		&vercel.Scanner{},
 		&verifier.Scanner{},
