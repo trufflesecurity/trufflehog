@@ -51,7 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_PubNubPublishKey,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + "/" + ressubMatch),
+				SecretParts: map[string]string{
+					"key":           resMatch,
+					"subscribe_key": ressubMatch,
+				},
+				RawV2: []byte(resMatch + "/" + ressubMatch),
 			}
 
 			if verify {
@@ -87,10 +91,10 @@ func verifyPubNub(ctx context.Context, client *http.Client, resMatch, ressubMatc
 		return false, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
-	} else if !(res.StatusCode == 400 || res.StatusCode == 403) {
+	} else if res.StatusCode != 400 && res.StatusCode != 403 {
 		// 403 is suggested by the API docs (https://www.pubnub.com/docs/sdks/rest-api/send-signal-to-channel)
 		// 400 is what actually seems to be coming back for invalid credentials
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)

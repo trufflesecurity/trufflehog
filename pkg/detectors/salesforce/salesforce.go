@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Salesforce,
 				Raw:          []byte(tokenMatch),
+				SecretParts:  map[string]string{"key": tokenMatch},
 			}
 
 			if verify {
@@ -81,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "records")
 
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
 					s1.Verified = true
 				} else if res.StatusCode >= 200 && res.StatusCode < 300 && !verifiedBodyResponse {

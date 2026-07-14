@@ -144,14 +144,14 @@ func TestFilterFromFile(t *testing.T) {
 			if err := testFilterWriteFile(includeTestFile, []byte(test.includeFileContents)); err != nil {
 				t.Fatalf("failed to create include rules file: %s", err)
 			}
-			defer os.Remove(includeTestFile)
+			defer func() { _ = os.Remove(includeTestFile) }()
 		}
 		if test.excludeFile {
 			excludeTestFile = "/tmp/trufflehog_test_xfilter.txt"
 			if err := testFilterWriteFile(excludeTestFile, []byte(test.excludeFileContents)); err != nil {
 				t.Fatalf("failed to create include rules file: %s", err)
 			}
-			defer os.Remove(excludeTestFile)
+			defer func() { _ = os.Remove(excludeTestFile) }()
 		}
 
 		filter, err := FilterFromFiles(includeTestFile, excludeTestFile)

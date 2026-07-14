@@ -142,6 +142,7 @@ func createResult(accessId string, accessKey string, endpoint string, verified b
 	r := &detectors.Result{
 		DetectorType: detector_typepb.DetectorType_SumoLogicKey,
 		Raw:          []byte(accessKey),
+		SecretParts:  map[string]string{"key": accessKey},
 		Verified:     verified,
 		ExtraData: map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/sumologic/",

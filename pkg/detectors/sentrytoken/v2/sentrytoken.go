@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_SentryToken,
 			Raw:          []byte(authToken),
+			SecretParts:  map[string]string{"key": authToken},
 		}
 
 		if verify {

@@ -25,8 +25,7 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeAir
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
-		)
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -109,7 +108,7 @@ func validateKey(cfg *config.Config, key string) (bool, []Project, error) {
 	}
 
 	// read response
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// if status code is 200, decode response
 	if resp.StatusCode == 200 {
@@ -150,7 +149,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, err
 	}
 	if !valid {
-		return nil, fmt.Errorf("Invalid Airbrake User API Key")
+		return nil, fmt.Errorf("invalid Airbrake User API Key")
 	}
 
 	info := &SecretInfo{

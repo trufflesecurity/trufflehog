@@ -51,7 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detector_typepb.DetectorType_FacebookOAuth,
 				Redacted:     apiIdRes,
 				Raw:          []byte(apiSecretRes),
-				RawV2:        []byte(apiIdRes + apiSecretRes),
+				SecretParts: map[string]string{
+					"id":     apiIdRes,
+					"secret": apiSecretRes,
+				},
+				RawV2: []byte(apiIdRes + apiSecretRes),
 			}
 
 			if verify {
@@ -63,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					}

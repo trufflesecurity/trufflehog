@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Typeform,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 		}
 
 		if verify {
@@ -99,16 +100,17 @@ func verifyMatch(ctx context.Context, client *http.Client, secret string) (bool,
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode == 200 {
+	switch res.StatusCode {
+	case 200:
 		var response *TypeFormResponse
 		if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
 			return false, nil, err
 		}
 
 		return true, response, nil
-	} else if res.StatusCode == 401 || res.StatusCode == 403 {
+	case 401, 403:
 		return false, nil, nil
-	} else {
+	default:
 		return false, nil, fmt.Errorf("unexpected status code %d", res.StatusCode)
 	}
 }

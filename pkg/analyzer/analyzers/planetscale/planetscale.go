@@ -137,7 +137,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string, 
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status code
 	switch {
@@ -539,7 +539,7 @@ func sendGetRequest(cfg *config.Config, id, key, url string, responseObj interfa
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status code
 	switch resp.StatusCode {

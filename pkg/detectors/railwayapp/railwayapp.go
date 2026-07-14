@@ -73,6 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_RailwayApp,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/railwayapp/",
 			},
@@ -118,7 +119,7 @@ func verifyRailwayApp(ctx context.Context, client *http.Client, match string) (b
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	/*
 		GraphQL queries return response with 200 OK status code even for errors

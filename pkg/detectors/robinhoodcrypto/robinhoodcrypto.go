@@ -61,7 +61,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_RobinhoodCrypto,
 				Raw:          []byte(apiKey),
-				RawV2:        []byte(apiKey + base64PrivateKey),
+				SecretParts: map[string]string{
+					"key":         apiKey,
+					"private_key": base64PrivateKey,
+				},
+				RawV2: []byte(apiKey + base64PrivateKey),
 			}
 
 			if verify {

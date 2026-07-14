@@ -73,7 +73,7 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 	if err != nil {
 		return fmt.Errorf("error opening temp dir: %w", err)
 	}
-	defer dir.Close()
+	defer func() { _ = dir.Close() }()
 
 	for {
 		entries, err := dir.ReadDir(1) // read only one entry

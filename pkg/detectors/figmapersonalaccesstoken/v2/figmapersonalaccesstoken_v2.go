@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},
+			SecretParts: map[string]string{"token": resMatch},
 		}
 
 		if verify {
@@ -69,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("X-Figma-Token", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else if res.StatusCode != 403 {
@@ -78,9 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			} else {
 				s1.SetVerificationError(err, resMatch)
-			}
-			if s1.Verified {
-				s1.SecretParts = map[string]string{"token": resMatch}
 			}
 		}
 

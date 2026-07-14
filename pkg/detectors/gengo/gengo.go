@@ -58,7 +58,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Gengo,
 				Raw:          []byte(resSecretMatch),
-				RawV2:        []byte(resMatch + resSecretMatch),
+				SecretParts: map[string]string{
+					"key":    resMatch,
+					"secret": resSecretMatch,
+				},
+				RawV2: []byte(resMatch + resSecretMatch),
 			}
 
 			if verify {
@@ -73,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Accept", "application/json")
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					body, errBody := io.ReadAll(res.Body)
 
 					if errBody == nil {

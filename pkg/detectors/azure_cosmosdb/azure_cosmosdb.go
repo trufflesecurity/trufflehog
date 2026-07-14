@@ -82,8 +82,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureCosmosDBKeyIdentifiable,
 				Raw:          []byte(key),
-				RawV2:        []byte("key: " + key + " account_url: " + accountUrl), // key: <key> account_url: <account_url>
-				ExtraData:    map[string]string{},
+				SecretParts: map[string]string{
+					"key":         key,
+					"account_url": accountUrl,
+				},
+				RawV2:     []byte("key: " + key + " account_url: " + accountUrl), // key: <key> account_url: <account_url>
+				ExtraData: map[string]string{},
 			}
 
 			if verify {

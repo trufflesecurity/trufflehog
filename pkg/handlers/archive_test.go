@@ -81,7 +81,7 @@ func TestArchiveHandler(t *testing.T) {
 			resp, err := http.Get(testCase.archiveURL)
 			assert.NoError(t, err)
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			handler := newArchiveHandler()
 
@@ -89,7 +89,7 @@ func TestArchiveHandler(t *testing.T) {
 			if err != nil {
 				t.Errorf("error creating reusable reader: %s", err)
 			}
-			defer newReader.Close()
+			defer func() { _ = newReader.Close() }()
 
 			dataOrErrChan := handler.HandleFile(logContext.Background(), newReader)
 			if testCase.expectErr {
@@ -121,7 +121,7 @@ func TestOpenInvalidArchive(t *testing.T) {
 
 	rdr, err := newFileReader(ctx, io.NopCloser(reader))
 	assert.NoError(t, err)
-	defer rdr.Close()
+	defer func() { _ = rdr.Close() }()
 
 	dataOrErrChan := make(chan DataOrErr)
 

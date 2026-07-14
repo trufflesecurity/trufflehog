@@ -50,7 +50,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Loggly,
 				Raw:          []byte(key),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", domainRes, key)),
+				SecretParts: map[string]string{
+					"domain": domainRes,
+					"key":    key,
+				},
+				RawV2: []byte(fmt.Sprintf("%s:%s", domainRes, key)),
 			}
 
 			if verify {
@@ -65,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else if res.StatusCode == 401 {

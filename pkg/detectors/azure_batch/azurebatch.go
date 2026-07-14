@@ -56,8 +56,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureBatch,
 				Raw:          []byte(endpoint),
-				RawV2:        []byte(endpoint + accountKey),
-				Redacted:     endpoint,
+				SecretParts: map[string]string{
+					"url":         endpoint,
+					"account_key": accountKey,
+				},
+				RawV2:    []byte(endpoint + accountKey),
+				Redacted: endpoint,
 			}
 
 			if verify {
@@ -112,7 +116,7 @@ func verifyMatch(ctx context.Context, client *http.Client, endpoint, accountName
 		}
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

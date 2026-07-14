@@ -285,17 +285,21 @@ func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets
 	}
 }
 
+// scanBuckets scans the given buckets using the given role and adds the number
+// of objects it scanned to totalObjectCount. The counter is owned by Chunks and
+// shared across role passes so that the completion message reflects the whole
+// scan, not just the last role's pass.
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.Client,
 	role string,
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
+	totalObjectCount *uint64,
 ) {
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
-	var totalObjectCount uint64
 
 	checkpointer := NewCheckpointer(ctx, &s.Progress, false)
 	pos := determineResumePosition(ctx, checkpointer, bucketsToScan)
@@ -326,7 +330,7 @@ func (s *Source) scanBuckets(
 			bucketIdx,
 			len(bucketsToScan),
 			fmt.Sprintf("Bucket: %s", bucket),
-			s.Progress.EncodedResumeInfo,
+			s.EncodedResumeInfo,
 		)
 
 		var startAfter *string
@@ -340,13 +344,13 @@ func (s *Source) scanBuckets(
 		}
 
 		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
-		totalObjectCount += objectCount
+		*totalObjectCount += objectCount
 	}
 
 	s.SetProgressComplete(
 		len(bucketsToScan),
 		len(bucketsToScan),
-		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, totalObjectCount),
+		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, *totalObjectCount),
 		"",
 	)
 }
@@ -390,15 +394,19 @@ func (s *Source) scanBucket(
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
-			if role == "" {
-				ctx.Logger().Error(err, "could not list objects in bucket")
-			} else {
+			if s.listErrorsAreExpected(role) {
 				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
 				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
 				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
 				// and therefore not an error.
 				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
+			} else {
+				// This can also be a failure to assume the role itself: role credentials
+				// are resolved lazily, so the first request that needs them surfaces the
+				// STS error here rather than at client construction.
+				ctx.Logger().Error(err, "could not list objects in bucket")
 			}
+			s.metricsCollector.RecordBucketListError(bucket, role)
 			break
 		}
 		pageMetadata := pageMetadata{
@@ -419,10 +427,21 @@ func (s *Source) scanBucket(
 	return objectCount
 }
 
+// listErrorsAreExpected reports whether a failure to list a bucket's objects
+// should be suppressed rather than logged as an error. When a role is assumed
+// without an explicit bucket list, the scanner attempts every bucket in the
+// account and is expected to be denied on some of them. When buckets are
+// explicitly configured, a listing failure means a configured target is being
+// silently skipped, so it is always an error, even under an assumed role.
+func (s *Source) listErrorsAreExpected(role string) bool {
+	return role != "" && len(s.conn.GetBuckets()) == 0
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	var totalObjectCount uint64
 	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
-		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
+		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan, &totalObjectCount)
 		return nil
 	}
 
@@ -554,7 +573,7 @@ func (s *Source) pageChunker(
 				// It's uncertain if the body will be nil in such cases,
 				// but we'll close it if it's not.
 				if res != nil && res.Body != nil {
-					res.Body.Close()
+					_ = res.Body.Close()
 				}
 
 				nErr, ok := state.errorCount.Load(prefix)
@@ -573,7 +592,7 @@ func (s *Source) pageChunker(
 				}
 				return nil
 			}
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			email := "Unknown"
 			if obj.Owner != nil {
@@ -748,7 +767,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	checkpointer := NewCheckpointer(ctx, &s.Progress, true)
 
 	var startAfterPtr *string
-	startAfter := s.Progress.GetEncodedResumeInfoFor(unitID)
+	startAfter := s.GetEncodedResumeInfoFor(unitID)
 	if startAfter != "" {
 		ctx.Logger().V(3).Info(
 			"Resuming unit scan",
@@ -757,7 +776,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		)
 		startAfterPtr = &startAfter
 	}
-	defer s.Progress.ClearEncodedResumeInfoFor(unitID)
+	defer s.ClearEncodedResumeInfoFor(unitID)
 	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer)
 	return nil
 }

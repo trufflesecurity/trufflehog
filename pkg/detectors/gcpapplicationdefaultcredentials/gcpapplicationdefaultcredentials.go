@@ -78,7 +78,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_GCPApplicationDefaultCredentials,
 			Raw:          []byte(detectedClientID),
-			RawV2:        []byte(detectedClientID + creds.RefreshToken),
+			SecretParts: map[string]string{
+				"client_id":     detectedClientID,
+				"refresh_token": creds.RefreshToken,
+			},
+			RawV2: []byte(detectedClientID + creds.RefreshToken),
 		}
 
 		if len(creds.RefreshToken) > 3 {

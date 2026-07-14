@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -57,7 +57,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Metabase,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resURLMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"url": resURLMatch,
+				},
+				RawV2: []byte(resMatch + resURLMatch),
 			}
 
 			if verify {
@@ -69,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("X-Metabase-Session", resMatch)
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					body, err := io.ReadAll(res.Body)
 					if err != nil {
 						continue

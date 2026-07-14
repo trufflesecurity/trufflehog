@@ -53,7 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Bulksms,
 				Raw:          []byte(key),
-				RawV2:        []byte(key + id),
+				SecretParts: map[string]string{
+					"key": key,
+					"id":  id,
+				},
+				RawV2: []byte(key + id),
 			}
 
 			if verify {

@@ -278,7 +278,7 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	role, privs, err := getUserPrivs(db)
 	if err != nil {
@@ -372,7 +372,7 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roleName string
 	var isSuperuser, canInherit, canCreateRole, canCreateDB, canLogin, isReplicationRole, bypassesRLS bool
@@ -389,7 +389,7 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 	}
 
 	// Map roles to privileges
-	var mapRoles map[string]bool = map[string]bool{
+	var mapRoles = map[string]bool{
 		"Superuser":            isSuperuser,
 		"Inheritance of Privs": canInherit,
 		"Create Role":          canCreateRole,
@@ -427,7 +427,7 @@ func getDBPrivs(db *sql.DB) (string, []DB, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	dbs := make([]DB, 0)
 
@@ -501,7 +501,7 @@ func getDBWriter(db DB, current_user string) func(a ...interface{}) string {
 func buildSliceDBNames(dbs []DB) []string {
 	var dbNames []string
 	for _, db := range dbs {
-		if db.DBPrivs.Connect {
+		if db.Connect {
 			dbNames = append(dbNames, db.DatabaseName)
 		}
 	}
@@ -519,7 +519,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 			// color.Red("[x] Failed to connect to Postgres database: %s", dbase)
 			continue
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		// Get table privs
 		query := `
@@ -543,7 +543,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		// Iterate through the result set
 		for rows.Next() {
@@ -589,7 +589,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 		if err = rows.Err(); err != nil {
 			return nil, err
 		}
-		db.Close()
+		_ = db.Close()
 	}
 
 	return tablePrivileges, nil

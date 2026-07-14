@@ -10,3 +10,7 @@ tmp/go-test.json
 .captain/detectors/quarantines.yaml
 .captain/detectors/flakes.yaml
 .vscode
+
+# Python
+__pycache__/
+*.pyc

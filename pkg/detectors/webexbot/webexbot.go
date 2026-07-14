@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_WebexBot,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 			Redacted:     match[:5] + "...",
 			ExtraData:    map[string]string{},
 		}

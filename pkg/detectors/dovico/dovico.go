@@ -65,7 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Dovico,
 				Raw:          []byte(key),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", key, userKey)),
+				SecretParts: map[string]string{
+					"key":      key,
+					"user_key": userKey,
+				},
+				RawV2: []byte(fmt.Sprintf("%s:%s", key, userKey)),
 			}
 
 			if verify {

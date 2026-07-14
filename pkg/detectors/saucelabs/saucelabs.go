@@ -67,7 +67,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_SauceLabs,
 					Raw:          []byte(userName),
-					RawV2:        []byte(userName + key),
+					SecretParts: map[string]string{
+						"username": userName,
+						"key":      key,
+					},
+					RawV2: []byte(userName + key),
 					ExtraData: map[string]string{
 						// add base url in extradata to know which base url was used for verification
 						"Base URL": baseURL,

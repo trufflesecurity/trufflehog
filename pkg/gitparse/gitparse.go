@@ -371,10 +371,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 
 	defer common.RecoverWithExit(ctx)
 	defer close(diffChan)
-	for {
-		if common.IsDone(ctx) {
-			break
-		}
+	for !common.IsDone(ctx) {
 
 		line, err := outReader.ReadBytes([]byte("\n")[0])
 		if err != nil && len(line) == 0 {
@@ -616,15 +613,15 @@ func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
 
 // commit 7a95bbf0199e280a0e42dbb1d1a3f56cdd0f6e05
 func isCommitLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if isStaged || !(latestState == Initial ||
-		latestState == MessageStartLine ||
-		latestState == MessageEndLine ||
-		latestState == ModeLine ||
-		latestState == IndexLine ||
-		latestState == BinaryFileLine ||
-		latestState == ToFileLine ||
-		latestState == HunkContentLine ||
-		latestState == ParseFailure) {
+	if isStaged || (latestState != Initial &&
+		latestState != MessageStartLine &&
+		latestState != MessageEndLine &&
+		latestState != ModeLine &&
+		latestState != IndexLine &&
+		latestState != BinaryFileLine &&
+		latestState != ToFileLine &&
+		latestState != HunkContentLine &&
+		latestState != ParseFailure) {
 		return false
 	}
 
@@ -636,7 +633,7 @@ func isCommitLine(isStaged bool, latestState ParseState, line []byte) bool {
 
 // Author: Bill Rich <bill.rich@trufflesec.com>
 func isAuthorLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if isStaged || !(latestState == CommitLine || latestState == MergeLine) {
+	if isStaged || (latestState != CommitLine && latestState != MergeLine) {
 		return false
 	}
 	if len(line) > 8 && bytes.Equal(line[:7], []byte("Author:")) {
@@ -692,7 +689,7 @@ func isMessageStartLine(isStaged bool, latestState ParseState, line []byte) bool
 
 // Line that starts with 4 spaces
 func isMessageLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if isStaged || !(latestState == MessageStartLine || latestState == MessageLine) {
+	if isStaged || (latestState != MessageStartLine && latestState != MessageLine) {
 		return false
 	}
 	if len(line) > 4 && bytes.Equal(line[:4], []byte("    ")) {
@@ -726,7 +723,7 @@ func isNotesStartLine(isStaged bool, latestState ParseState, line []byte) bool {
 
 // Line after NotesStartLine that starts with 4 spaces
 func isNotesLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if isStaged || !(latestState == NotesStartLine || latestState == NotesLine) {
+	if isStaged || (latestState != NotesStartLine && latestState != NotesLine) {
 		return false
 	}
 	if len(line) > 4 && bytes.Equal(line[:4], []byte("    ")) {
@@ -748,15 +745,15 @@ func isNotesEndLine(isStaged bool, latestState ParseState, line []byte) bool {
 
 // diff --git a/internal/addrs/move_endpoint_module.go b/internal/addrs/move_endpoint_module.go
 func isDiffLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if !(latestState == MessageStartLine || // Empty commit messages can go from MessageStart->Diff
-		latestState == MessageEndLine ||
-		latestState == NotesEndLine ||
-		latestState == BinaryFileLine ||
-		latestState == ModeLine ||
-		latestState == IndexLine ||
-		latestState == HunkContentLine ||
-		latestState == ParseFailure) {
-		if !(isStaged && latestState == Initial) {
+	if latestState != MessageStartLine &&
+		latestState != MessageEndLine &&
+		latestState != NotesEndLine &&
+		latestState != BinaryFileLine &&
+		latestState != ModeLine &&
+		latestState != IndexLine &&
+		latestState != HunkContentLine &&
+		latestState != ParseFailure {
+		if !isStaged || latestState != Initial {
 			return false
 		}
 	}
@@ -774,7 +771,7 @@ func isDiffLine(isStaged bool, latestState ParseState, line []byte) bool {
 // rename to new.txt
 // deleted file mode 100644
 func isModeLine(latestState ParseState, line []byte) bool {
-	if !(latestState == DiffLine || latestState == ModeLine) {
+	if latestState != DiffLine && latestState != ModeLine {
 		return false
 	}
 	// This could probably be better written.
@@ -793,7 +790,7 @@ func isModeLine(latestState ParseState, line []byte) bool {
 // index 1ed6fbee1..aea1e643a 100644
 // index 00000000..e69de29b
 func isIndexLine(latestState ParseState, line []byte) bool {
-	if !(latestState == DiffLine || latestState == ModeLine) {
+	if latestState != DiffLine && latestState != ModeLine {
 		return false
 	}
 	if len(line) > 6 && bytes.Equal(line[:6], []byte("index ")) {
@@ -848,7 +845,7 @@ func pathFromBinaryLine(line []byte) (string, bool) {
 // --- a/internal/addrs/move_endpoint_module.go
 // --- /dev/null
 func isFromFileLine(latestState ParseState, line []byte) bool {
-	if !(latestState == IndexLine || latestState == ModeLine) {
+	if latestState != IndexLine && latestState != ModeLine {
 		return false
 	}
 	if len(line) >= 6 && bytes.Equal(line[:4], []byte("--- ")) {
@@ -906,7 +903,7 @@ func pathFromToFileLine(line []byte) (string, bool) {
 
 // @@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)
 func isHunkLineNumberLine(latestState ParseState, line []byte) bool {
-	if !(latestState == ToFileLine || latestState == HunkContentLine) {
+	if latestState != ToFileLine && latestState != HunkContentLine {
 		return false
 	}
 	if len(line) >= 8 && bytes.Equal(line[:2], []byte("@@")) {
@@ -918,7 +915,7 @@ func isHunkLineNumberLine(latestState ParseState, line []byte) bool {
 // fmt.Println("ok")
 // (There's a space before `fmt` that gets removed by the formatter.)
 func isHunkContextLine(latestState ParseState, line []byte) bool {
-	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+	if latestState != HunkLineNumberLine && latestState != HunkContentLine {
 		return false
 	}
 	if len(line) >= 1 && bytes.Equal(line[:1], []byte(" ")) {
@@ -929,7 +926,7 @@ func isHunkContextLine(latestState ParseState, line []byte) bool {
 
 // +fmt.Println("ok")
 func isHunkPlusLine(latestState ParseState, line []byte) bool {
-	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+	if latestState != HunkLineNumberLine && latestState != HunkContentLine {
 		return false
 	}
 	if len(line) >= 1 && bytes.Equal(line[:1], []byte("+")) {
@@ -940,7 +937,7 @@ func isHunkPlusLine(latestState ParseState, line []byte) bool {
 
 // -fmt.Println("ok")
 func isHunkMinusLine(latestState ParseState, line []byte) bool {
-	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+	if latestState != HunkLineNumberLine && latestState != HunkContentLine {
 		return false
 	}
 	if len(line) >= 1 && bytes.Equal(line[:1], []byte("-")) {
@@ -965,7 +962,7 @@ func isHunkNewlineWarningLine(latestState ParseState, line []byte) bool {
 //
 // commit 00920984e3435057f09cee5468850f7546dfa637 (tag: v3.42.0)
 func isHunkEmptyLine(latestState ParseState, line []byte) bool {
-	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+	if latestState != HunkLineNumberLine && latestState != HunkContentLine {
 		return false
 	}
 	// TODO: Can this also be `\n\r`?

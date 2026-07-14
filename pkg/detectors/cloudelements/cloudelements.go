@@ -51,7 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_CloudElements,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resOrgMatch),
+				SecretParts: map[string]string{
+					"key":          resMatch,
+					"organization": resOrgMatch,
+				},
+				RawV2: []byte(resMatch + resOrgMatch),
 			}
 
 			if verify {
@@ -62,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("User %s, Organization %s", resMatch, resOrgMatch))
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					}

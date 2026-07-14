@@ -101,7 +101,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_URI,
 			Raw:          []byte(rawUrlWithoutPath),
 			RawV2:        []byte(rawUrlWithPath),
-			Redacted:     detectors.RedactURL(*parsedURL),
+			SecretParts: map[string]string{
+				"host":     parsedURL.Host,
+				"username": parsedURL.User.Username(),
+				"password": password,
+			},
+			Redacted: detectors.RedactURL(*parsedURL),
 		}
 
 		if verify {

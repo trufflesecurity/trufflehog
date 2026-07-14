@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_ZipBooks,
 				Raw:          []byte(emailMatch),
+				SecretParts:  map[string]string{"key": emailMatch},
 			}
 
 			if verify {

@@ -311,9 +311,13 @@ type GithubConfig struct {
 	Repos []string
 	// Orgs is the list of organizations to scan.
 	Orgs []string
-	// ExcludeRepos is a list of repositories to exclude from the scan.
+	// ExcludeRepos is a list of repositories to exclude from an org/user scan.
+	// It only filters repos enumerated via Orgs; it has no effect when Repos is set
+	// explicitly, since explicit repos bypass the filtering step entirely.
 	ExcludeRepos []string
-	// IncludeRepos is a list of repositories to include in the scan.
+	// IncludeRepos is a list of repositories to include in an org/user scan.
+	// It only filters repos enumerated via Orgs; it has no effect when Repos is set
+	// explicitly, since explicit repos bypass the filtering step entirely.
 	IncludeRepos []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
@@ -336,6 +340,8 @@ type GithubConfig struct {
 	// NoCleanup allows to keeps cloned repositories in ClonePath after scanning instead of removing them.
 	NoCleanup   bool
 	IgnoreGists bool
+	// ExcludeArchived indicates whether to exclude archived repositories from the scan.
+	ExcludeArchived bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
 }

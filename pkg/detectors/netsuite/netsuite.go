@@ -88,7 +88,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1 := detectors.Result{
 							DetectorType: detector_typepb.DetectorType_Netsuite,
 							Raw:          []byte(consumerKey),
-							RawV2:        []byte(consumerKey + consumerSecret),
+							SecretParts: map[string]string{
+								"consumer_key":    consumerKey,
+								"consumer_secret": consumerSecret,
+							},
+							RawV2: []byte(consumerKey + consumerSecret),
 						}
 
 						if verify {
@@ -123,7 +127,7 @@ func (s Scanner) Description() string {
 
 func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSet) (bool, error) {
 	// for url, filter or replace underscore in accountID if needed and lower case the accountID
-	urlAccountId := strings.ToLower(strings.Replace(cs.accountID, "_", "-", -1))
+	urlAccountId := strings.ToLower(strings.ReplaceAll(cs.accountID, "_", "-"))
 
 	baseUrl := "https://" + urlAccountId + ".suitetalk.api.netsuite.com"
 
@@ -165,7 +169,7 @@ func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSe
 		}
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil

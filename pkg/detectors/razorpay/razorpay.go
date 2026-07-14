@@ -48,8 +48,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_RazorPay,
 				Raw:          []byte(key),
-				RawV2:        []byte(key + secret),
-				Redacted:     key,
+				SecretParts: map[string]string{
+					"key":    key,
+					"secret": secret,
+				},
+				RawV2:    []byte(key + secret),
+				Redacted: key,
 			}
 
 			if verify {
@@ -64,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						continue
 					}
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if json.Valid(bodyBytes) {
 							s1.Verified = true

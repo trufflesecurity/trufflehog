@@ -8,7 +8,8 @@ import (
 
 type ChunkFunc func(chunk *Chunk) error
 
-var MatchError = errors.New("chunk doesn't match")
+// ErrMatch indicates a chunk did not match and the helper should keep waiting.
+var ErrMatch = errors.New("chunk doesn't match")
 
 func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
 	for {
@@ -16,7 +17,7 @@ func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
 		case gotChunk := <-chunksCh:
 			err := cf(gotChunk)
 			if err != nil {
-				if errors.Is(err, MatchError) {
+				if errors.Is(err, ErrMatch) {
 					continue
 				}
 				return err

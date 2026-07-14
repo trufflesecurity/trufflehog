@@ -116,10 +116,10 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Invalid Asana API Key")
+		return nil, fmt.Errorf("invalid Asana API Key")
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&me)
 	if err != nil {
@@ -127,7 +127,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	if me.Data.Email == "" {
-		return nil, fmt.Errorf("Invalid Asana API Key")
+		return nil, fmt.Errorf("invalid Asana API Key")
 	}
 	return &me, nil
 }

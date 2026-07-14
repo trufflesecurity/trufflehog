@@ -292,7 +292,7 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 	if err != nil {
 		return nil, fmt.Errorf("connecting to the MySQL database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Get the current user
 	user, err := getUser(db)
@@ -434,7 +434,7 @@ func getDatabases(db *sql.DB, databases map[string]*Database) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var dbName string
@@ -462,7 +462,7 @@ func getTables(db *sql.DB, databases map[string]*Database) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var dbName string
@@ -486,7 +486,7 @@ func getRoutines(db *sql.DB, databases map[string]*Database) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var dbName string
@@ -513,7 +513,7 @@ func getGrants(db *sql.DB) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var grants []string
 	for rows.Next() {
@@ -568,7 +568,7 @@ func processGrant(grant string, databases map[string]*Database, globalPrivs *Glo
 	// Split on " ON "
 	parts := strings.Split(grant, " ON ")
 	if len(parts) < 2 {
-		return fmt.Errorf("Error processing grant: %s", grant)
+		return fmt.Errorf("error processing grant: %s", grant)
 	}
 
 	// Put privs in a slice

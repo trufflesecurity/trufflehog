@@ -65,7 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Hasura,
 				Raw:          []byte(key),
-				RawV2:        fmt.Appendf([]byte(""), "%s:%s", domain, key),
+				SecretParts: map[string]string{
+					"domain": domain,
+					"key":    key,
+				},
+				RawV2: fmt.Appendf([]byte(""), "%s:%s", domain, key),
 			}
 
 			if verify {

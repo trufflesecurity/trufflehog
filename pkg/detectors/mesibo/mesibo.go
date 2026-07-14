@@ -59,6 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Mesibo,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -95,7 +96,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// The backend API always returns HTTP 200, with the actual result encoded in the
 	// JSON response body.

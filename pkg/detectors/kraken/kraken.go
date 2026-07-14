@@ -58,7 +58,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Kraken,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resPrivKeyMatch),
+				SecretParts: map[string]string{
+					"key":         resMatch,
+					"private_key": resPrivKeyMatch,
+				},
+				RawV2: []byte(resMatch + resPrivKeyMatch),
 			}
 
 			if verify {
@@ -82,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					out, _ := io.ReadAll(res.Body)
 					if !strings.Contains(string(out), "Invalid key") {
 						s1.Verified = true

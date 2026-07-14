@@ -27,6 +27,7 @@ func TestDataDogApiKey_Pattern_WithValidAPIKey(t *testing.T) {
 		{
 			DetectorType: detector_typepb.DetectorType_DatadogApikey,
 			Raw:          []byte(apiKey),
+			SecretParts:  map[string]string{"api_key": apiKey},
 		},
 	}
 	matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(input))
@@ -40,7 +41,7 @@ func TestDataDogApiKey_Pattern_WithValidAPIKey(t *testing.T) {
 		return
 	}
 
-	if diff := cmp.Diff(wantedResult, results, cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret")); diff != "" {
+	if diff := cmp.Diff(wantedResult, results, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 		t.Errorf("%s diff: (-want +got)\n%s", "TestDataDogApiKey_Pattern_WithValidAPIKeyOnly", diff)
 	}
 }

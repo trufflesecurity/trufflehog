@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -82,17 +84,72 @@ func TestPostgres_Pattern(t *testing.T) {
 	}
 }
 
+func TestPostgres_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+		wantDatabase string
+	}{
+		{
+			name:         "standard URI with database",
+			data:         "postgres://myuser:mypass@dbhost.example.com:5432/mydb",
+			wantHost:     "dbhost.example.com:5432",
+			wantUsername: "myuser",
+			wantDatabase: "mydb",
+		},
+		{
+			name:         "postgresql scheme",
+			data:         "postgresql://admin:secret@10.0.0.1:5433/production",
+			wantHost:     "10.0.0.1:5433",
+			wantUsername: "admin",
+			wantDatabase: "production",
+		},
+		{
+			name:         "without database",
+			data:         "postgres://sN19x:d7N8bs@1.2.3.4:5432?sslmode=require",
+			wantHost:     "1.2.3.4:5432",
+			wantUsername: "sN19x",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{detectLoopback: true}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			require.NoError(t, err)
+			require.NotEmpty(t, results, "expected at least one result")
+
+			r := results[0]
+			assert.Equal(t, tt.wantHost, r.ExtraData["host"])
+			assert.Equal(t, tt.wantUsername, r.ExtraData["username"])
+			assert.Equal(t, tt.wantDatabase, r.ExtraData["database"])
+			assert.Contains(t, r.ExtraData, "sslmode", "ExtraData[sslmode] should still be present")
+		})
+	}
+}
+
 func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
 	s := New(
 		WithIgnorePattern([]string{
 			`1\.2\.3\.4`,
 		}))
 	got, err := s.FromData(context.Background(), false, []byte(validUriPattern))
-	if err != nil {
-		t.Errorf("FromData() error = %v", err)
-		return
-	}
-	if len(got) != 0 {
-		t.Errorf("expected no results, but got %d", len(got))
-	}
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+func TestPostgres_RawVsPrimarySecret(t *testing.T) {
+	s := Scanner{}
+	input := "postgres://user:pass@host/dbname"
+	results, err := s.FromData(context.Background(), false, []byte(input))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	res := results[0]
+	expectedRaw := "postgres://user:pass@host:5432"
+	assert.Equal(t, expectedRaw, string(res.Raw))
+	assert.Equal(t, expectedRaw, string(res.RawV2))
+	assert.Equal(t, input, res.GetPrimarySecretValue())
 }

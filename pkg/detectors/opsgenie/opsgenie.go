@@ -64,6 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		r := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Opsgenie,
 			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
 		}
 
 		if verify {
@@ -76,9 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if isVerified {
 				r.Verified = isVerified
 				r.ExtraData = extraData
-				r.SecretParts = map[string]string{
-					"key": key,
-				}
 			}
 			r.SetVerificationError(vErr, key)
 		}

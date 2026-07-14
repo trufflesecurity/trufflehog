@@ -116,8 +116,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			r := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Docker,
 				Raw:          []byte(b64encoded),
-				RawV2:        []byte(`{"registry":"` + registry + `","auth":"` + b64encoded + `"}`),
-				ExtraData:    map[string]string{"Username": username},
+				SecretParts: map[string]string{
+					"registry": registry,
+					"auth":     b64encoded,
+				},
+				RawV2:     []byte(`{"registry":"` + registry + `","auth":"` + b64encoded + `"}`),
+				ExtraData: map[string]string{"Username": username},
 			}
 
 			if verify {

@@ -78,6 +78,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Raw:          []byte(secret),
 					RawV2:        fmt.Appendf(nil, "%s:%s:%s", domain, clientId, secret),
+					SecretParts: map[string]string{
+						"domain":        domain,
+						"client_id":     clientId,
+						"client_secret": secret,
+					},
 				}
 
 				if verify {
