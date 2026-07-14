@@ -863,12 +863,18 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
 		sourceVerify := chunk.SourceVerify
+		sourceTypeStr := chunk.SourceType.String()
+		chunksEnteredStage.WithLabelValues("scanner", sourceTypeStr).Inc()
 
 		chunk.OriginalData = chunk.Data
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
 		for _, d := range decoded {
 			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Data)
+			if len(matchingDetectors) == 0 {
+				chunksDropped.WithLabelValues("scanner", "no_matching_detectors", sourceTypeStr).Inc()
+				continue
+			}
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -1004,8 +1010,11 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
+		sourceTypeStr := chunk.chunk.SourceType.String()
+		chunksEnteredStage.WithLabelValues("verification_overlap", sourceTypeStr).Inc()
 		for _, detector := range chunk.detectors {
 			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
+			detectorNameStr := detector.Key.Type().String()
 
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
@@ -1016,8 +1025,9 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				if err != nil {
 					ctx.Logger().Error(
 						err, "error finding results in chunk during verification overlap",
-						"detector", detector.Key.Type().String(),
+						"detector", detectorNameStr,
 					)
+					chunksDropped.WithLabelValues("verification_overlap", "detector_error", sourceTypeStr).Inc()
 				}
 
 				if len(results) == 0 {
@@ -1033,7 +1043,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				// disable filtration for targeted scans, but if you're here because this problem surfaced for a
 				// non-targeted scan then we'll have to solve it correctly.
 				if chunk.chunk.SecretID == 0 {
-					results = e.filterResults(ctx, detector, results)
+					results = e.filterResults(ctx, "verification_overlap", detector, results)
 				}
 
 				for _, res := range results {
@@ -1050,6 +1060,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 					key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
 					if _, ok := chunkSecrets[key]; ok {
+						resultsDropped.WithLabelValues("verification_overlap", "intra_chunk_duplicate", detectorNameStr).Inc()
 						continue
 					}
 
@@ -1128,6 +1139,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	ctx.Logger().V(5).Info("Starting to detect chunk")
 
+	sourceTypeStr := data.chunk.SourceType.String()
+	detectorNameStr := data.detector.Type().String()
+	chunksEnteredStage.WithLabelValues("detect", sourceTypeStr).Inc()
+
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
 	var matchCount int
@@ -1155,16 +1170,21 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		cancel()
 		if err != nil {
 			ctx.Logger().Error(err, "error finding results in chunk")
+			chunksDropped.WithLabelValues("detect", "detector_error", sourceTypeStr).Inc()
 			continue
 		}
 
+		if len(results) > 0 {
+			resultsProduced.WithLabelValues(detectorNameStr).Add(float64(len(results)))
+		}
+
 		detectorExecutionCount.WithLabelValues(
-			data.detector.Type().String(),
+			detectorNameStr,
 			strconv.Itoa(int(data.chunk.JobID)),
 			data.chunk.SourceName,
 		).Inc()
 		detectorExecutionDuration.WithLabelValues(
-			data.detector.Type().String(),
+			detectorNameStr,
 		).Observe(float64(time.Since(start).Milliseconds()))
 
 		if e.printAvgDetectorTime && len(results) > 0 {
@@ -1188,7 +1208,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		// scans, but if you're here because this problem surfaced for a non-targeted scan then we'll have to solve it
 		// correctly.
 		if data.chunk.SecretID == 0 {
-			results = e.filterResults(ctx, data.detector, results)
+			results = e.filterResults(ctx, "detect", data.detector, results)
 		}
 
 		AssignDuplicateLineOffsets(&data.chunk, results)
@@ -1207,9 +1227,11 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 func (e *Engine) filterResults(
 	ctx context.Context,
+	stage string,
 	detector *ahocorasick.DetectorMatch,
 	results []detectors.Result,
 ) []detectors.Result {
+	detectorNameStr := detector.Type().String()
 	clean := detectors.CleanResults
 	ignoreConfig := false
 	if cleaner, ok := detector.Detector.(detectors.CustomResultsCleaner); ok {
@@ -1217,11 +1239,23 @@ func (e *Engine) filterResults(
 		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
 	if e.filterUnverified || ignoreConfig {
+		reason := "filter_unverified"
+		if !e.filterUnverified && ignoreConfig {
+			reason = "custom_cleaner"
+		}
+		before := len(results)
 		results = clean(results, e.verify)
+		if dropped := before - len(results); dropped > 0 {
+			resultsDropped.WithLabelValues(stage, reason, detectorNameStr).Add(float64(dropped))
+		}
 	}
 
 	if e.filterEntropy != 0 {
+		before := len(results)
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
+		if dropped := before - len(results); dropped > 0 {
+			resultsDropped.WithLabelValues(stage, "filter_entropy", detectorNameStr).Add(float64(dropped))
+		}
 	}
 
 	return results
@@ -1248,11 +1282,13 @@ func (e *Engine) processResult(
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
 		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
 			ctx.Logger().Error(err, "error setting link")
+			resultsDropped.WithLabelValues("process_result", "update_link_error", res.DetectorType.String()).Inc()
 			return
 		}
 		chunk = copyChunk
 	}
 	if ignoreLinePresent {
+		resultsDropped.WithLabelValues("process_result", "ignore_line_tag", res.DetectorType.String()).Inc()
 		return
 	}
 
@@ -1271,23 +1307,28 @@ func (e *Engine) processResult(
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
 		startTime := time.Now()
+		detectorNameStr := result.DetectorType.String()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
 			if result.IsWordlistFalsePositive && !e.retainFalsePositives {
 				// Skip false positives
+				resultsDropped.WithLabelValues("notifier", "wordlist_false_positive", detectorNameStr).Inc()
 				continue
 			} else if result.VerificationError() != nil {
 				if !e.notifyUnknownResults {
 					// Skip results with verification errors.
+					resultsDropped.WithLabelValues("notifier", "unknown_result_filtered", detectorNameStr).Inc()
 					continue
 				}
 			} else if !e.notifyUnverifiedResults {
 				// Skip unverified results.
+				resultsDropped.WithLabelValues("notifier", "unverified_result_filtered", detectorNameStr).Inc()
 				continue
 			}
 		} else if !e.notifyVerifiedResults {
 			// Skip verified results.
 			// TODO: Is this a legitimate use case?
+			resultsDropped.WithLabelValues("notifier", "verified_result_filtered", detectorNameStr).Inc()
 			continue
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
@@ -1309,6 +1350,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
 			key := string(h[:])
 			if _, ok := e.dedupeCache.Get(key); ok {
+				resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
 				continue
 			}
 			e.dedupeCache.Add(key, struct{}{})
@@ -1322,6 +1364,9 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 
 		if err := e.dispatcher.Dispatch(ctx, result); err != nil {
 			ctx.Logger().Error(err, "error notifying result")
+			resultsDispatched.WithLabelValues(detectorNameStr, strconv.FormatBool(result.Verified), "false").Inc()
+		} else {
+			resultsDispatched.WithLabelValues(detectorNameStr, strconv.FormatBool(result.Verified), "true").Inc()
 		}
 
 		chunksNotifiedLatency.Observe(float64(time.Since(startTime).Milliseconds()))
