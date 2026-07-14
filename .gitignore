@@ -10,7 +10,7 @@ tmp/go-test.json
 .captain/detectors/quarantines.yaml
 .captain/detectors/flakes.yaml
 .vscode
-
+trufflehog.exe
 # Python
 __pycache__/
 *.pyc

@@ -55,6 +55,7 @@ var (
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	sarifOut            = cli.Flag("sarif", "Output in SARIF format.").Bool()
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").PlaceHolder("N").Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
@@ -594,11 +595,13 @@ func run(state overseer.State, logSync func() error) {
 		printer = new(output.JSONPrinter)
 	case *gitHubActionsFormat:
 		printer = new(output.GitHubActionsPrinter)
+	case *sarifOut:
+		printer = new(output.SARIFPrinter)
 	default:
 		printer = new(output.PlainPrinter)
 	}
 
-	if !*jsonLegacy && !*jsonOut {
+	if !*jsonLegacy && !*jsonOut && !*sarifOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
@@ -656,10 +659,20 @@ func run(state overseer.State, logSync func() error) {
 		if err := compareScans(ctx, cmd, engConf); err != nil {
 			logFatal(err, "error comparing detection strategies")
 		}
+		if fp, ok := printer.(interface{ Flush(context.Context) error }); ok {
+			if err := fp.Flush(ctx); err != nil {
+				logFatal(err, "error flushing printer")
+			}
+		}
 		return
 	}
 
 	metrics, err := runSingleScan(ctx, cmd, engConf)
+	if fp, ok := printer.(interface{ Flush(context.Context) error }); ok {
+		if flushErr := fp.Flush(ctx); flushErr != nil {
+			logFatal(flushErr, "error flushing printer")
+		}
+	}
 	if err != nil {
 		logFatal(err, "error running scan")
 	}
