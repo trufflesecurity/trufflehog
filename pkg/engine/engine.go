@@ -1361,10 +1361,12 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		} else {
 			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
 		}
-		resultsDispatched.WithLabelValues(detectorNameStr, strconv.FormatBool(result.Verified)).Inc()
 
 		if err := e.dispatcher.Dispatch(ctx, result); err != nil {
 			ctx.Logger().Error(err, "error notifying result")
+			resultsDispatched.WithLabelValues(detectorNameStr, strconv.FormatBool(result.Verified), "false").Inc()
+		} else {
+			resultsDispatched.WithLabelValues(detectorNameStr, strconv.FormatBool(result.Verified), "true").Inc()
 		}
 
 		chunksNotifiedLatency.Observe(float64(time.Since(startTime).Milliseconds()))

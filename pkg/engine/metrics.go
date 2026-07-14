@@ -145,9 +145,9 @@ var (
 	resultsDispatched = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
-		Name:      "results_dispatched_total",
-		Help:      "Total number of results successfully dispatched.",
+		Name:      "result_dispatch_attempts_count",
+		Help:      "Count of result dispatch attempts.",
 	},
-		[]string{"detector_name", "verified"},
+		[]string{"detector_name", "verified", "success"},
 	)
 )
