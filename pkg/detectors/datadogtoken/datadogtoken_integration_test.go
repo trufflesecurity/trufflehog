@@ -80,6 +80,11 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"Type": "Application+APIKey",
 					},
+					SecretParts: map[string]string{
+						"api_key":  apiKey,
+						"app_key":  inactiveAppKey,
+						"endpoint": "https://api.datadoghq.com", // default endpoint
+					},
 				},
 			},
 			wantErr: false,
@@ -123,7 +128,6 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 				"ExtraData",
 				"verificationError",
 				"primarySecret",
-				"SecretParts",
 				"chunkOffset",
 				"chunkOffsetSet",
 			)

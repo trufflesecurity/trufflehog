@@ -153,6 +153,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if len(res.Included) > 0 {
 							setOrganizationInfo(res.Included, &s1)
 						}
+						break
 					}
 				}
 			}
