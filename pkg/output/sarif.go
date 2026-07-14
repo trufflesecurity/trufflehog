@@ -35,9 +35,10 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 	defer p.mu.Unlock()
 
 	// Deduplicate findings using a content-based hash (similar to GitHubActionsPrinter)
+	// Prepare rules map and results slice for SARIF schema
 	var dedupe = make(map[string]struct{})
 	rulesMap := make(map[string]sarifRule)
-	var sarifResults []sarifResult
+	sarifResults := make([]sarifResult, 0)
 
 	for _, r := range p.results {
 		var startLine int = 1
@@ -138,7 +139,7 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 	}
 
 	// Sort rules deterministically by ID
-	var rules []sarifRule
+	rules := make([]sarifRule, 0, len(rulesMap))
 	for _, rule := range rulesMap {
 		rules = append(rules, rule)
 	}
