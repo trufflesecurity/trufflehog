@@ -36,76 +36,10 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 
 	// Deduplicate findings using a content-based hash (similar to GitHubActionsPrinter)
 	var dedupe = make(map[string]struct{})
-	var uniqueResults []*detectors.ResultWithMetadata
+	rulesMap := make(map[string]sarifRule)
+	var sarifResults []sarifResult
 
 	for _, r := range p.results {
-		var startLine int64 = 1
-		var filename string = "unknown"
-
-		if r.SourceMetadata != nil && r.SourceMetadata.Data != nil {
-			meta, err := structToMap(r.SourceMetadata.Data)
-			if err == nil {
-				for _, data := range meta {
-					for k, v := range data {
-						if k == "line" {
-							if line, ok := v.(float64); ok {
-								startLine = int64(line)
-							}
-						}
-						if k == "file" {
-							if name, ok := v.(string); ok {
-								filename = name
-							}
-						}
-					}
-				}
-			}
-		}
-
-		verifiedStatus := "unverified"
-		if r.Verified {
-			verifiedStatus = "verified"
-		}
-
-		key := fmt.Sprintf("%s:%s:%s:%s:%d", r.DecoderType.String(), r.DetectorType.String(), verifiedStatus, filename, startLine)
-		h := sha256.New()
-		h.Write([]byte(key))
-		hashKey := hex.EncodeToString(h.Sum(nil))
-
-		if _, ok := dedupe[hashKey]; !ok {
-			dedupe[hashKey] = struct{}{}
-			uniqueResults = append(uniqueResults, r)
-		}
-	}
-
-	// Prepare rules map and results slice for SARIF schema
-	rulesMap := make(map[string]Rule)
-	var sarifResults []SarifResult
-
-	for _, r := range uniqueResults {
-		detectorID := r.DetectorType.String()
-		if detectorID == "" || r.DetectorType == 0 {
-			detectorID = r.DetectorName
-		}
-		if detectorID == "" {
-			detectorID = "unknown_detector"
-		}
-
-		if _, ok := rulesMap[detectorID]; !ok {
-			desc := r.DetectorDescription
-			if desc == "" {
-				desc = fmt.Sprintf("Credential detected by %s detector", detectorID)
-			}
-			rulesMap[detectorID] = Rule{
-				ID:   detectorID,
-				Name: detectorID,
-				ShortDescription: MultiformatMessageString{
-					Text: desc,
-				},
-				HelpURI: "https://github.com/trufflesecurity/trufflehog",
-			}
-		}
-
 		var startLine int = 1
 		var filename string = "unknown"
 
@@ -129,6 +63,44 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 			}
 		}
 
+		verifiedStatus := "unverified"
+		if r.Verified {
+			verifiedStatus = "verified"
+		}
+
+		key := fmt.Sprintf("%s:%s:%s:%s:%d", r.DecoderType.String(), r.DetectorType.String(), verifiedStatus, filename, startLine)
+		h := sha256.New()
+		h.Write([]byte(key))
+		hashKey := hex.EncodeToString(h.Sum(nil))
+
+		if _, ok := dedupe[hashKey]; ok {
+			continue
+		}
+		dedupe[hashKey] = struct{}{}
+
+		detectorID := r.DetectorType.String()
+		if detectorID == "" || r.DetectorType == 0 {
+			detectorID = r.DetectorName
+		}
+		if detectorID == "" {
+			detectorID = "unknown_detector"
+		}
+
+		if _, ok := rulesMap[detectorID]; !ok {
+			desc := r.DetectorDescription
+			if desc == "" {
+				desc = fmt.Sprintf("Credential detected by %s detector", detectorID)
+			}
+			rulesMap[detectorID] = sarifRule{
+				ID:   detectorID,
+				Name: detectorID,
+				ShortDescription: sarifMessageString{
+					Text: desc,
+				},
+				HelpURI: "https://github.com/trufflesecurity/trufflehog",
+			}
+		}
+
 		level := "warning"
 		verifiedText := "unverified"
 		if r.Verified {
@@ -141,21 +113,21 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 			name = fmt.Sprintf(" (%s)", nameValue)
 		}
 
-		messageText := fmt.Sprintf("Found %s %s%s result 🐷🔑", verifiedText, detectorID, name)
+		messageText := fmt.Sprintf("Found %s %s%s result \U0001F437\U0001F511", verifiedText, detectorID, name)
 
-		sarifResults = append(sarifResults, SarifResult{
+		sarifResults = append(sarifResults, sarifResult{
 			RuleID:  detectorID,
 			Level:   level,
-			Message: Message{Text: messageText},
-			Locations: []Location{
+			Message: sarifMessage{Text: messageText},
+			Locations: []sarifLocation{
 				{
-					PhysicalLocation: PhysicalLocation{
-						ArtifactLocation: ArtifactLocation{
+					PhysicalLocation: sarifPhysicalLocation{
+						ArtifactLocation: sarifArtifactLocation{
 							URI: filename,
 						},
-						Region: Region{
+						Region: sarifRegion{
 							StartLine: startLine,
-							Snippet: &Snippet{
+							Snippet: &sarifSnippet{
 								Text: r.Redacted,
 							},
 						},
@@ -166,7 +138,7 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 	}
 
 	// Sort rules deterministically by ID
-	var rules []Rule
+	var rules []sarifRule
 	for _, rule := range rulesMap {
 		rules = append(rules, rule)
 	}
@@ -175,13 +147,13 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 	})
 
 	// Wrap in top-level SARIF structure
-	log := SarifLog{
+	log := sarifLog{
 		Schema:  "https://json.schemastore.org/sarif-2.1.0.json",
 		Version: "2.1.0",
-		Runs: []SarifRun{
+		Runs: []sarifRun{
 			{
-				Tool: Tool{
-					Driver: Driver{
+				Tool: sarifTool{
+					Driver: sarifDriver{
 						Name:           "TruffleHog",
 						InformationURI: "https://github.com/trufflesecurity/trufflehog",
 						Rules:          rules,
@@ -207,67 +179,67 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 
 // SARIF Go structs mapping to the SARIF 2.1.0 JSON Schema
 
-type SarifLog struct {
+type sarifLog struct {
 	Schema  string     `json:"$schema"`
 	Version string     `json:"version"`
-	Runs    []SarifRun `json:"runs"`
+	Runs    []sarifRun `json:"runs"`
 }
 
-type SarifRun struct {
-	Tool    Tool          `json:"tool"`
-	Results []SarifResult `json:"results"`
+type sarifRun struct {
+	Tool    sarifTool     `json:"tool"`
+	Results []sarifResult `json:"results"`
 }
 
-type Tool struct {
-	Driver Driver `json:"driver"`
+type sarifTool struct {
+	Driver sarifDriver `json:"driver"`
 }
 
-type Driver struct {
-	Name           string `json:"name"`
-	InformationURI string `json:"informationUri"`
-	Rules          []Rule `json:"rules"`
+type sarifDriver struct {
+	Name           string      `json:"name"`
+	InformationURI string      `json:"informationUri"`
+	Rules          []sarifRule `json:"rules"`
 }
 
-type Rule struct {
-	ID               string                   `json:"id"`
-	Name             string                   `json:"name"`
-	ShortDescription MultiformatMessageString `json:"shortDescription"`
-	HelpURI          string                   `json:"helpUri"`
+type sarifRule struct {
+	ID               string             `json:"id"`
+	Name             string             `json:"name"`
+	ShortDescription sarifMessageString `json:"shortDescription"`
+	HelpURI          string             `json:"helpUri"`
 }
 
-type MultiformatMessageString struct {
+type sarifMessageString struct {
 	Text string `json:"text"`
 }
 
-type SarifResult struct {
-	RuleID    string     `json:"ruleId"`
-	Level     string     `json:"level,omitempty"`
-	Message   Message    `json:"message"`
-	Locations []Location `json:"locations"`
+type sarifResult struct {
+	RuleID    string          `json:"ruleId"`
+	Level     string          `json:"level,omitempty"`
+	Message   sarifMessage    `json:"message"`
+	Locations []sarifLocation `json:"locations"`
 }
 
-type Message struct {
+type sarifMessage struct {
 	Text string `json:"text"`
 }
 
-type Location struct {
-	PhysicalLocation PhysicalLocation `json:"physicalLocation"`
+type sarifLocation struct {
+	PhysicalLocation sarifPhysicalLocation `json:"physicalLocation"`
 }
 
-type PhysicalLocation struct {
-	ArtifactLocation ArtifactLocation `json:"artifactLocation"`
-	Region           Region           `json:"region"`
+type sarifPhysicalLocation struct {
+	ArtifactLocation sarifArtifactLocation `json:"artifactLocation"`
+	Region           sarifRegion           `json:"region"`
 }
 
-type ArtifactLocation struct {
+type sarifArtifactLocation struct {
 	URI string `json:"uri"`
 }
 
-type Region struct {
-	StartLine int      `json:"startLine"`
-	Snippet   *Snippet `json:"snippet,omitempty"`
+type sarifRegion struct {
+	StartLine int           `json:"startLine"`
+	Snippet   *sarifSnippet `json:"snippet,omitempty"`
 }
 
-type Snippet struct {
+type sarifSnippet struct {
 	Text string `json:"text"`
 }

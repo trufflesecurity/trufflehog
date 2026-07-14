@@ -92,7 +92,7 @@ func TestSARIFPrinter(t *testing.T) {
 	output := buf.String()
 
 	// Parse output back into SarifLog structure to validate correctness
-	var log SarifLog
+	var log sarifLog
 	if err := json.Unmarshal([]byte(output), &log); err != nil {
 		t.Fatalf("Failed to parse output as JSON: %v. Output was:\n%s", err, output)
 	}
@@ -126,7 +126,7 @@ func TestSARIFPrinter(t *testing.T) {
 	}
 
 	// The first result should be URI (verified) or AWS (unverified) depending on ordering, let's look up both
-	var awsResult, uriResult *SarifResult
+	var awsResult, uriResult *sarifResult
 	for i := range run.Results {
 		res := &run.Results[i]
 		if res.RuleID == "AWS" {
