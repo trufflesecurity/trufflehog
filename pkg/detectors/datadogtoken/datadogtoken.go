@@ -145,6 +145,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
+					s1.SecretParts["endpoint"] = baseURL
 					if isVerified && res != nil {
 						if len(res.Data) > 0 {
 							setUserEmails(res.Data, &s1)
