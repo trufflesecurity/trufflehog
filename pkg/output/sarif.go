@@ -69,7 +69,15 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 			verifiedStatus = "verified"
 		}
 
-		key := fmt.Sprintf("%s:%s:%s:%s:%d", r.DecoderType.String(), r.DetectorType.String(), verifiedStatus, filename, startLine)
+		detectorID := r.DetectorType.String()
+		if r.DetectorName != "" {
+			detectorID = r.DetectorName
+		}
+		if detectorID == "" {
+			detectorID = "unknown_detector"
+		}
+
+		key := fmt.Sprintf("%s:%s:%s:%s:%d", r.DecoderType.String(), detectorID, verifiedStatus, filename, startLine)
 		h := sha256.New()
 		h.Write([]byte(key))
 		hashKey := hex.EncodeToString(h.Sum(nil))
@@ -78,14 +86,6 @@ func (p *SARIFPrinter) Flush(ctx context.Context) error {
 			continue
 		}
 		dedupe[hashKey] = struct{}{}
-
-		detectorID := r.DetectorType.String()
-		if detectorID == "" || r.DetectorType == 0 {
-			detectorID = r.DetectorName
-		}
-		if detectorID == "" {
-			detectorID = "unknown_detector"
-		}
 
 		if _, ok := rulesMap[detectorID]; !ok {
 			desc := r.DetectorDescription
