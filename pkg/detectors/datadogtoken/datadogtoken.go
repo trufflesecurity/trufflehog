@@ -130,18 +130,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resApiMatch := strings.TrimSpace(apiMatch[1])
 		for _, appMatch := range appMatches {
 			resAppMatch := strings.TrimSpace(appMatch[1])
-			for _, baseURL := range s.Endpoints(endpoints...) {
-				s1 := detectors.Result{
-					DetectorType: detector_typepb.DetectorType_DatadogToken,
-					Raw:          []byte(resAppMatch),
-					RawV2:        []byte(resAppMatch + resApiMatch),
-					ExtraData: map[string]string{
-						"Type": "Application+APIKey",
-					},
-					SecretParts: map[string]string{"api_key": resApiMatch, "app_key": resAppMatch, "endpoint": baseURL},
-				}
+			s1 := detectors.Result{
+				DetectorType: detector_typepb.DetectorType_DatadogToken,
+				Raw:          []byte(resAppMatch),
+				RawV2:        []byte(resAppMatch + resApiMatch),
+				ExtraData: map[string]string{
+					"Type": "Application+APIKey",
+				},
+				SecretParts: map[string]string{"api_key": resApiMatch, "app_key": resAppMatch},
+			}
 
-				if verify {
+			if verify {
+				for _, baseURL := range s.Endpoints(endpoints...) {
 					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
@@ -154,11 +154,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 					}
 				}
-				results = append(results, s1)
 			}
+			results = append(results, s1)
 		}
 	}
-
 	return results, nil
 }
 
