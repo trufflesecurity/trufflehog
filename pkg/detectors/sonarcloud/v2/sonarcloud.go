@@ -79,7 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	// Format-compliant (lowercase alphanumeric + hyphens) dummy key that won't match a
 	// real organization, so the API returns 404 rather than rejecting it as malformed.
-	organizationKey := "trufflehog-dummy-org"
+	organizationKey := "nonexistent-org-9f2a7c4e1b8d4a6f"
 	url := fmt.Sprintf("https://sonarcloud.io/api/projects/search?organization=%s", organizationKey)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
