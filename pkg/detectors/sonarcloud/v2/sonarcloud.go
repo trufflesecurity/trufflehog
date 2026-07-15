@@ -106,7 +106,7 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, token str
 	// https://community.sonarsource.com/t/api-access-issue-for-read-only-user-despite-ui-access/140025
 	// https://community.sonarsource.com/t/http-403-when-accessing-api-projects-search-but-other-endpoint-works-like-components/20668
 	switch res.StatusCode {
-	case http.StatusNotFound, http.StatusForbidden:
+	case http.StatusOK, http.StatusNotFound, http.StatusForbidden:
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
