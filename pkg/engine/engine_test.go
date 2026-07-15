@@ -1324,7 +1324,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 				verify:               tt.verify,
 			}
 
-			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
+			cleaned := engine.filterResults(context.Background(), "detect", &match, tt.resultsToClean)
 
 			assert.ElementsMatch(t, tt.wantResults, cleaned)
 		})
@@ -1477,6 +1477,8 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 		detector_typepb.DetectorType_JiraDataCenterPAT:          {},
 		detector_typepb.DetectorType_ConfluenceDataCenter:       {},
 		detector_typepb.DetectorType_BitbucketDataCenter:        {},
+		detector_typepb.DetectorType_HashiCorpVaultBatchToken:   {},
+		detector_typepb.DetectorType_HashiCorpVaultToken:        {},
 		// these do not have any cloud endpoint
 	}
 

@@ -103,4 +103,51 @@ var (
 		Help:      "Time taken to notify a chunk in milliseconds.",
 		Buckets:   prometheus.ExponentialBuckets(5, 2, 12),
 	})
+
+	// Pipeline flow metrics tracks chunks/results entering each stage,
+	// where they are dropped, and where they exit.
+	chunksEnteredStage = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "chunks_entered_stage_total",
+		Help:      "Total number of chunks (or per-detector work items) entering each pipeline stage.",
+	},
+		[]string{"stage", "source_type"},
+	)
+
+	chunksDropped = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "chunks_dropped_total",
+		Help:      "Total number of chunks dropped by pipeline stage and reason.",
+	},
+		[]string{"stage", "reason", "source_type"},
+	)
+
+	resultsProduced = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "results_produced_total",
+		Help:      "Total number of raw detector results produced by the detect stage (before filtering).",
+	},
+		[]string{"detector_name"},
+	)
+
+	resultsDropped = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "results_dropped_total",
+		Help:      "Total number of detector results dropped by pipeline stage and reason.",
+	},
+		[]string{"stage", "reason", "detector_name"},
+	)
+
+	resultsDispatched = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "result_dispatch_attempts_count",
+		Help:      "Count of result dispatch attempts.",
+	},
+		[]string{"detector_name", "verified", "success"},
+	)
 )

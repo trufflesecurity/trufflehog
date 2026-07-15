@@ -37,6 +37,10 @@ var (
 	ShippoDetectorEnabled                    atomic.Bool
 	IPInfoDetectorEnabled                    atomic.Bool
 	LobDetectorEnabled                       atomic.Bool
+	HashiCorpVaultBatchTokenDetectorEnabled  atomic.Bool
+	HashiCorpVaultTokenDetectorEnabled       atomic.Bool
+	CloudflareApiTokenV2DetectorEnabled      atomic.Bool
+	CloudflareGlobalApiKeyV2DetectorEnabled  atomic.Bool
 )
 
 type AtomicString struct {
