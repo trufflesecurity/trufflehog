@@ -97,7 +97,7 @@ func TestCreateClonePath(t *testing.T) {
 	t.Run("temp dir when clonePath is empty", func(t *testing.T) {
 		path, err := createClonePath("https://github.com/org/repo.git", "")
 		assert.NoError(t, err)
-		defer os.RemoveAll(path)
+		defer func() { _ = os.RemoveAll(path) }()
 
 		info, err := os.Stat(path)
 		assert.NoError(t, err)
@@ -114,11 +114,11 @@ func TestCreateClonePath(t *testing.T) {
 		// mean cloning into a non-empty directory, which git refuses.
 		first, err := createClonePath("https://github.com/org/repo.git", "")
 		assert.NoError(t, err)
-		defer os.RemoveAll(first)
+		defer func() { _ = os.RemoveAll(first) }()
 
 		second, err := createClonePath("https://github.com/org/repo.git", "")
 		assert.NoError(t, err)
-		defer os.RemoveAll(second)
+		defer func() { _ = os.RemoveAll(second) }()
 
 		assert.NotEqual(t, first, second)
 	})
