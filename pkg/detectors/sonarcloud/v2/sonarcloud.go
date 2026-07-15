@@ -77,7 +77,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 // verifyMatch attempts to validate a SonarCloud token.
 func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
-	organizationKey := "~dummy~" // Dummy key that won't match a real organization key
+	// Format-compliant (lowercase alphanumeric + hyphens) dummy key that won't match a
+	// real organization, so the API returns 404 rather than rejecting it as malformed.
+	organizationKey := "trufflehog-dummy-org"
 	url := fmt.Sprintf("https://sonarcloud.io/api/projects/search?organization=%s", organizationKey)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
@@ -98,14 +100,14 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, token str
 		_ = res.Body.Close()
 	}()
 
+	// The official Sonar API docs don't document the response codes for this
+	// endpoint, but community evidence indicates 403 is returned when the
+	// token is valid but lacks org-admin permissions on the queried org:
+	// https://community.sonarsource.com/t/api-access-issue-for-read-only-user-despite-ui-access/140025
+	// https://community.sonarsource.com/t/http-403-when-accessing-api-projects-search-but-other-endpoint-works-like-components/20668
 	switch res.StatusCode {
 	case http.StatusNotFound, http.StatusForbidden:
 		return true, nil
-		// The official Sonar API docs don't document the response codes for this
-		// endpoint, but community evidence indicates 403 is returned when the
-		// token is valid but lacks org-admin permissions on the queried org:
-		// https://community.sonarsource.com/t/api-access-issue-for-read-only-user-despite-ui-access/140025
-		// https://community.sonarsource.com/t/http-403-when-accessing-api-projects-search-but-other-endpoint-works-like-components/20668
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
