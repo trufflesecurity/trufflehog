@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	validPattern   = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012 / testuser1005@example.com"
-	invalidPattern = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012/testing@go"
+	validPattern   = "abcdef1234567890abcdef1234567890abcdef0 / testuser1005@example.com"
+	invalidPattern = "abcdef1234567890abcdef1234567890abcdef0/testing@go"
 )
 
 func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
@@ -28,7 +28,7 @@ func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: fmt.Sprintf("cloudflare: %s", validPattern),
-			want:  []string{"abcD123efg456HIJklmn789OPQ_rstUVWxYZ-testuser1005@example.com"},
+			want:  []string{"abcdef1234567890abcdef1234567890abcdef0testuser1005@example.com"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
