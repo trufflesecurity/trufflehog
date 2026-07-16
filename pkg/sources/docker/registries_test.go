@@ -217,7 +217,7 @@ func TestGenericOCIRegistryListImages_MalformedLinkHeader(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Link", `<ht!tp://invalid url with spaces>; rel="next"`)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"repositories":["repo1","repo2"]}`))
+		_, _ = w.Write([]byte(`{"repositories":["repo1","repo2"]}`))
 	}))
 	defer server.Close()
 
