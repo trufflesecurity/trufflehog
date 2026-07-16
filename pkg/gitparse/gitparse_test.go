@@ -2,6 +2,7 @@ package gitparse
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,46 @@ import (
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
+
+func TestPrepGitArgs(t *testing.T) {
+	t.Setenv("GIT_OBJECT_DIRECTORY", "")
+	t.Setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", "")
+	repopath := t.TempDir()
+
+	p := Parser{}
+
+	args := p.prepGitArgs(repopath, "", false, nil, false)
+	assert.Equal(t, []string{"-C", repopath}, args.global)
+	assert.Contains(t, args.log, "--abbrev=12")
+	assert.Contains(t, args.log, "--all")
+	assert.NotContains(t, args.log, "--diff-filter=AM")
+	assert.Equal(t, []string{"GIT_DIR=" + filepath.Join(repopath, ".git")}, args.env)
+	assert.Empty(t, args.paths)
+
+	args = p.prepGitArgs(repopath, "branchname", true, []string{"some/file.txt", "bloated.dat"}, true)
+	// head
+	assert.Contains(t, args.log, "branchname")
+	assert.NotContains(t, args.log, "--all")
+	// abbreviatedLog
+	assert.Contains(t, args.log, "--diff-filter=AM")
+	assert.Contains(t, args.show, "--diff-filter=AM")
+	// excludedGlobs
+	assert.Contains(t, args.paths, "--")
+	assert.Contains(t, args.paths, ":(exclude)bloated.dat")
+	// isBare
+	assert.Equal(t, []string{"GIT_DIR=" + repopath}, args.env)
+
+	// test env passthrough used for pre-receive
+	t.Setenv("GIT_OBJECT_DIRECTORY", "foo")
+	t.Setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", "bar")
+
+	args = p.prepGitArgs(repopath, "", false, nil, true)
+	assert.Equal(t, []string{
+		"GIT_DIR=" + repopath,
+		"GIT_OBJECT_DIRECTORY=foo",
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES=bar",
+	}, args.env)
+}
 
 type testCaseLine struct {
 	latestState ParseState
@@ -750,7 +791,6 @@ func TestToFileLinePathParse(t *testing.T) {
 // `asserts` on `Diff`'s _structure_, giving better test output than just comparing two
 // diffs.
 func assertDiffEqualToExpected(t *testing.T, expected *Diff, actual *Diff) {
-
 	// Use `cmp.Diff` to automatically compare all the exported fields.  This allows this test to grow automatically if
 	// new exported fields are added to these structs.  However, the most important field we want to test is unexpected
 	// (i.e. contentWriter) which is where the actual content of the diff is stored.  We break this out next.
@@ -1476,8 +1516,8 @@ func TestMaxCommitSize(t *testing.T) {
 	if diffCount != 2 {
 		t.Errorf("Commit count does not match. Got: %d, expected: %d", diffCount, 2)
 	}
-
 }
+
 func TestWaitDelay(t *testing.T) {
 	// Test that WithWaitDelay sets the waitDelay correctly
 	customDelay := 10 * time.Second
