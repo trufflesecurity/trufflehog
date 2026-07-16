@@ -3,11 +3,13 @@ package gitparse
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -233,8 +235,16 @@ func NewParser(options ...Option) *Parser {
 	return parser
 }
 
+type gitArgs struct {
+	env    []string
+	global []string
+	log    []string
+	show   []string
+}
+
 // RepoPath parses the output of the `git log` command for the `source` path.
-// The Diff chan will return diffs in the order they are parsed from the log.
+// The Diff chan will return diffs in the order they are parsed from the log,
+// though the diffs are generated using `git show` in groups.
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
@@ -242,51 +252,141 @@ func (c *Parser) RepoPath(
 	abbreviatedLog bool,
 	excludedGlobs []string,
 	isBare bool,
-	additionalArgs ...string,
 ) (chan *Diff, error) {
-	args := []string{
-		"-C", source,
-		"log",
-		"--patch", // https://git-scm.com/docs/git-log#Documentation/git-log.txt---patch
-		"--full-history",
-		"--date=iso-strict",
-		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
-		"--notes",         // https://git-scm.com/docs/git-log#Documentation/git-log.txt---notesltrefgt
-	}
-	if abbreviatedLog {
-		args = append(args, "--diff-filter=AM")
-	}
-	if head != "" {
-		args = append(args, head)
-	} else {
-		args = append(args, "--all")
-	}
-	args = append(args, additionalArgs...) // These need to come before --
-	for _, glob := range excludedGlobs {
-		args = append(args, "--", ".", ":(exclude)"+glob)
+	const abbrevCommit = 20
+	const showGroupSize = 250
+	// Windows has a command length limit of 32767, so at these values we
+	// should only be using a tiny part of of that for the commit list
+	// ((abbrevCommit + 1) * showGroupSize), leaving plenty of space for
+	// other args.  We don't target any platforms with shorter limits.
+
+	args := c.prepGitArgs(source, abbrevCommit, head, abbreviatedLog, excludedGlobs, isBare)
+
+	diffChan := make(chan *Diff)
+
+	allCommits, err := c.gatherGitLog(ctx, args)
+	if err != nil {
+		return diffChan, err
 	}
 
-	cmd := exec.CommandContext(ctx, "git", args...)
-	absPath, err := filepath.Abs(source)
-	if err == nil {
-		if !isBare {
-			cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
-		} else {
-			cmd.Env = append(cmd.Env,
-				"GIT_DIR="+absPath,
-			)
-			// We need those variables to handle incoming commits
-			// while using trufflehog in pre-receive hooks
-			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
-				cmd.Env = append(cmd.Env, "GIT_OBJECT_DIRECTORY="+dir)
+	// c.executeCommand returns a channel that is later closed by a
+	// different goroutine, but we're not running a single command anymore.
+	// we'll use a channel of channels to reduce back to one channel we
+	// return to our caller.  Unbuffered so we have at most one git show
+	// running and one git show draining.
+	groupchan := make(chan chan *Diff)
+
+	go func() {
+		defer common.RecoverWithExit(ctx)
+		defer close(groupchan)
+
+		for group := range slices.Chunk(allCommits, showGroupSize) {
+			if common.IsDone(ctx) {
+				return
 			}
-			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
-				cmd.Env = append(cmd.Env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+
+			showCmd := exec.CommandContext(ctx, "git", slices.Concat(args.global, []string{"show"}, args.show, group)...)
+			showCmd.Env = args.env
+
+			groupdiffs, err := c.executeCommand(ctx, showCmd, false, c.waitDelay)
+			if err != nil {
+				ctx.Logger().Error(err, "Error executing git show for commit group.")
+				return
 			}
+			groupchan <- groupdiffs
+		}
+	}()
+
+	go func() {
+		defer common.RecoverWithExit(ctx)
+		defer close(diffChan)
+
+		for groupdiffs := range groupchan {
+			for diff := range groupdiffs {
+				diffChan <- diff
+			}
+		}
+	}()
+
+	return diffChan, nil
+}
+
+// Ask git for a list of all relevant commit hashes but only hashes.  Git takes
+// on the work of linearizing history for us, then we work through the commit
+// list.
+func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "git", slices.Concat(args.global, []string{"log"}, args.log)...)
+	cmd.WaitDelay = c.waitDelay
+	cmd.Env = args.env
+
+	commitLog, err := cmd.Output()
+	if err != nil {
+		if e, ok := err.(*exec.ExitError); ok {
+			ctx.Logger().V(2).Info(string(e.Stderr))
+		}
+		return nil, fmt.Errorf("failed to execute git log: %w", err)
+	}
+	return strings.Split(string(commitLog), "\n"), nil
+}
+
+func (c *Parser) prepGitArgs(source string, abbrevCommit int, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) gitArgs {
+	args := gitArgs{
+		global: []string{
+			"-C", source,
+		},
+		log: []string{
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---full-history
+			"--full-history",
+			// https://git-scm.com/docs/git-log#_pretty_formats
+			"--pretty=format:%h",
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---abbrevn
+			fmt.Sprintf("--abbrev=%d", abbrevCommit),
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
+			cmp.Or(head, "--all"),
+		},
+		show: []string{
+			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---patch
+			"--patch",
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---dateformat
+			"--date=iso-strict",
+			// https://git-scm.com/docs/git-show#_pretty_formats
+			"--pretty=fuller",
+			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---notesref
+			"--notes",
+		},
+	}
+
+	if abbreviatedLog {
+		// https://git-scm.com/docs/git-show#Documentation/git-show.txt---diff-filterACDMRTUXB
+		args.log = append(args.log, "--diff-filter=AM")
+		args.show = append(args.show, "--diff-filter=AM")
+	}
+
+	if len(excludedGlobs) != 0 {
+		args.log = append(args.log, "--", ".")
+		for _, glob := range excludedGlobs {
+			// This is not directly doc'd but added in git 1.9.0 and found in pathspec.c
+			args.log = append(args.log, ":(exclude)"+glob)
 		}
 	}
 
-	return c.executeCommand(ctx, cmd, false, c.waitDelay)
+	absPath, err := filepath.Abs(source)
+	if err == nil {
+		if !isBare {
+			args.env = append(args.env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+		} else {
+			args.env = append(args.env, "GIT_DIR="+absPath)
+			// We need those variables to handle incoming commits
+			// while using trufflehog in pre-receive hooks
+			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
+				args.env = append(args.env, "GIT_OBJECT_DIRECTORY="+dir)
+			}
+			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
+				args.env = append(args.env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+			}
+		}
+	}
+	return args
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
@@ -355,7 +455,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 
 		totalLogSize int
 	)
-	var latestState = Initial
+	latestState := Initial
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
 		opts = append(opts, withCustomContentWriter(bufferwriter.New()))
