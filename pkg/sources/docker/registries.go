@@ -454,7 +454,7 @@ func (g *GenericOCIRegistry) ListImages(ctx context.Context, _ string) ([]string
 	baseURL := &url.URL{
 		Scheme: scheme,
 		Host:   g.Host,
-		Path:   "v2/_catalog",
+		Path:   "/v2/_catalog",
 	}
 
 	query := baseURL.Query()
