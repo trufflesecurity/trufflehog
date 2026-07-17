@@ -1119,6 +1119,7 @@ const (
 	DetectorType_HashiCorpVaultToken                     DetectorType = 1062
 	DetectorType_Duo                                     DetectorType = 1063
 	DetectorType_Waveapps                                DetectorType = 1064
+	DetectorType_MercadoPago                             DetectorType = 1065
 )
 
 // Enum value maps for DetectorType.
@@ -3249,6 +3250,7 @@ var (
 		"HashiCorpVaultToken":               1062,
 		"Duo":                               1063,
 		"Waveapps":                          1064,
+		"MercadoPago":                       1065,
 	}
 )
 
@@ -3283,7 +3285,7 @@ var File_detector_type_proto protoreflect.FileDescriptor
 
 const file_detector_type_proto_rawDesc = "" +
 	"\n" +
-	"\x13detector_type.proto\x12\rdetector_type*؊\x01\n" +
+	"\x13detector_type.proto\x12\rdetector_type*\xea\x8a\x01\n" +
 	"\fDetectorType\x12\v\n" +
 	"\aAlibaba\x10\x00\x12\b\n" +
 	"\x04AMQP\x10\x01\x12\a\n" +
@@ -4511,7 +4513,8 @@ const file_detector_type_proto_rawDesc = "" +
 	"\x18HashiCorpVaultBatchToken\x10\xa5\b\x12\x18\n" +
 	"\x13HashiCorpVaultToken\x10\xa6\b\x12\b\n" +
 	"\x03Duo\x10\xa7\b\x12\r\n" +
-	"\bWaveapps\x10\xa8\bBAZ?github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepbb\x06proto3"
+	"\bWaveapps\x10\xa8\b\x12\x10\n" +
+	"\vMercadoPago\x10\xa9\bBAZ?github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepbb\x06proto3"
 
 var (
 	file_detector_type_proto_rawDescOnce sync.Once
