@@ -246,6 +246,8 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				"8fe6f04ef1839e3fc54b5147e3d0e0b7ab971bd5-aws":   {B: []byte("blah blaj\n\nthis is the secret: AKIA2E0A8F3B244C9986\n\nokay thank you bye\n"), Multi: true},
 				"84e9c75e388ae3e866e121087ea2dd45a71068f2-":      {B: []byte("Dylan Ayrey <dxa4481@rit.edu>\nGitHub <noreply@github.com>\nUpdate aws\n")},
 				"84e9c75e388ae3e866e121087ea2dd45a71068f2-aws":   {B: []byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n"), Multi: false},
+				"90c75f884c65dc3638ca1610bd9844e668f213c2-":      {B: []byte("Dustin Decker <dustindecker@protonmail.com>\nGitHub <noreply@github.com>\nMerge pull request #1 from dxa4481/patch-1\n\nUpdate aws\n")},
+				"90c75f884c65dc3638ca1610bd9844e668f213c2-aws":   {B: []byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n"), Multi: false},
 			},
 		},
 		{
@@ -270,6 +272,23 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			scanOptions: ScanOptions{
 				HeadHash: "some_branch",
 				BaseHash: "master",
+			},
+		},
+		{
+			name:    "remote repo, secret only present in merge",
+			repoURL: "https://github.com/mariduv/git-merge-leak.git",
+			expectedChunkData: map[string]*byteCompare{
+				"c68b1b9f952e5bd6e69aaaabea79ae28fcc0d53d-":           {B: []byte("Meredith Howard <meredith.howard@trufflesec.com>\nMeredith Howard <meredith.howard@trufflesec.com>\nMerge branch 'some-branch'\n")},
+				"c68b1b9f952e5bd6e69aaaabea79ae28fcc0d53d-blah.txt":   {B: []byte("\n\nWed Jul 15 10:00:58 CDT 2026\n")},
+				"c68b1b9f952e5bd6e69aaaabea79ae28fcc0d53d-blah2.txt":  {B: []byte("Wed Jul 15 10:00:58 CDT 2026\n")},
+				"c68b1b9f952e5bd6e69aaaabea79ae28fcc0d53d-secret.aws": {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
+				"be526890e9cbdf98233f2332c3617d13a26a8c32-":           {B: []byte("Meredith Howard <meredith.howard@trufflesec.com>\nMeredith Howard <meredith.howard@trufflesec.com>\nUpdates\n")},
+				"be526890e9cbdf98233f2332c3617d13a26a8c32-blah.txt":   {B: []byte("\nWed Jul 15 10:00:58 CDT 2026\n")},
+				"be526890e9cbdf98233f2332c3617d13a26a8c32-blah2.txt":  {B: []byte("Wed Jul 15 10:00:58 CDT 2026\n")},
+			},
+			scanOptions: ScanOptions{
+				HeadHash: "c68b1b9f952e5bd6e69aaaabea79ae28fcc0d53d",
+				BaseHash: "c48635b82f3a203fee843cdc915abca1876e026b",
 			},
 		},
 	}

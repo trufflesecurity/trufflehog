@@ -247,7 +247,8 @@ func (c *Parser) RepoPath(
 	args := []string{
 		"-C", source,
 		"log",
-		"--patch", // https://git-scm.com/docs/git-log#Documentation/git-log.txt---patch
+		"--patch",                    // https://git-scm.com/docs/git-log#Documentation/git-log.txt---patch
+		"--diff-merges=first-parent", // https://git-scm.com/docs/git-log#Documentation/git-log.txt-first-parent
 		"--full-history",
 		"--date=iso-strict",
 		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
