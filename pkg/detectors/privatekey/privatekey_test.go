@@ -2,8 +2,14 @@ package privatekey
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"fmt"
+	"strings"
 	"testing"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -94,5 +100,61 @@ func TestPrivatekey_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+// generateEncryptedPrivateKey generates an ed25519 private key encrypted with a
+// passphrase that is not in the detector's built-in wordlist, so Crack() cannot
+// recover it.
+func generateEncryptedPrivateKey(t *testing.T, passphrase string) string {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	// MarshalPrivateKeyWithPassphrase produces an OpenSSH-format encrypted PEM
+	// block.
+	block, err := ssh.MarshalPrivateKeyWithPassphrase(priv, "", []byte(passphrase))
+	if err != nil {
+		t.Fatalf("marshal encrypted key: %v", err)
+	}
+	return string(pem.EncodeToMemory(block))
+}
+
+// TestPrivatekey_EncryptedUncrackable verifies that an encrypted private key
+// whose passphrase is not in the built-in wordlist is still surfaced as an
+// unverified finding (rather than silently dropped). See issue #5115.
+func TestPrivatekey_EncryptedUncrackable(t *testing.T) {
+	// Use a long, random-looking passphrase that the wordlist cannot guess.
+	const passphrase = "Zx9qK4mR7vW2pY8sT3nB6hJ5eL0cA1"
+
+	encKey := generateEncryptedPrivateKey(t, passphrase)
+	// Sanity check: the generated key must actually be encrypted, i.e.
+	// ssh.ParseRawPrivateKey rejects it as passphrase-protected.
+	if _, err := ssh.ParseRawPrivateKey([]byte(encKey)); err == nil ||
+		!strings.Contains(err.Error(), "passphrase protected") {
+		t.Fatalf("generated key is not passphrase-protected (err=%v)", err)
+	}
+
+	d := Scanner{}
+	data := []byte(fmt.Sprintf("privatekey = '%s'", encKey))
+	results, err := d.FromData(context.Background(), false, data)
+	if err != nil {
+		t.Fatalf("FromData error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 unverified finding for encrypted-uncrackable key, got %d", len(results))
+	}
+
+	r := results[0]
+	if r.Verified {
+		t.Errorf("encrypted-uncrackable key should be unverified, got Verified=true")
+	}
+	if r.ExtraData["encrypted"] != "true" {
+		t.Errorf("expected ExtraData[encrypted]=true, got %q", r.ExtraData["encrypted"])
+	}
+	if r.VerificationError() == nil {
+		t.Errorf("expected a verification error describing the failed crack")
 	}
 }

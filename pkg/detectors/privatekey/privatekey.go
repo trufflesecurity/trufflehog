@@ -81,7 +81,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.ExtraData["encrypted"] = "true"
 			parsedKey, passphrase, err = Crack([]byte(token))
 			if err != nil {
+				// The key is encrypted and its passphrase is not in the built-in
+				// wordlist. An encrypted private key in a repo is still a real
+				// exposure (offline-crackable, weak legacy KDFs, passphrase often
+				// reused/committed nearby), so surface it as an unverified finding
+				// instead of silently dropping it.
 				s1.SetVerificationError(err, token)
+				results = append(results, s1)
 				continue
 			}
 			if passphrase != "" {
