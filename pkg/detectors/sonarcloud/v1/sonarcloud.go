@@ -145,7 +145,7 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 // filters SHA-1 commit hashes reported as SonarCloud false positives; see
 // issue #5000.
 func endsWithCommitPath(s string) bool {
-	idx := strings.LastIndex(strings.ToLower(s), "commit/")
+	idx := lastIndexFoldASCII(s, "commit/")
 	if idx < 0 {
 		return false
 	}
@@ -156,6 +156,24 @@ func endsWithCommitPath(s string) bool {
 	// The remainder must be exactly the 40-char hash that the caller passed in
 	// (s already ends at the end of the matched token).
 	return len(tail) == 40
+}
+
+// lastIndexFoldASCII returns the start index of the last case-insensitive
+// occurrence of needle (which must be ASCII) in s, or -1. It scans s directly
+// instead of lowercasing the whole haystack, so the returned offset is always
+// a valid byte offset into the original s even when strings.ToLower would
+// change the byte length of non-ASCII characters in s.
+func lastIndexFoldASCII(s, needle string) int {
+	if needle == "" {
+		return len(s)
+	}
+	n := len(needle)
+	for i := len(s) - n; i >= 0; i-- {
+		if strings.EqualFold(s[i:i+n], needle) {
+			return i
+		}
+	}
+	return -1
 }
 
 func (s Scanner) Description() string {
