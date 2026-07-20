@@ -2590,6 +2590,10 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for PrintLegacyJson
 
+	// no validation rules for ScanAllInstallations
+
+	// no validation rules for ExcludeArchived
+
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
 		if v == nil {
@@ -3443,6 +3447,8 @@ func (m *Huggingface) validate(all bool) error {
 	// no validation rules for IncludeDiscussions
 
 	// no validation rules for IncludePrs
+
+	// no validation rules for SkipAllBuckets
 
 	switch v := m.Credential.(type) {
 	case *Huggingface_Token:

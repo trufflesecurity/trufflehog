@@ -96,16 +96,38 @@ func verifyGrafanaKey(ctx context.Context, client *http.Client, token string) (b
 	}()
 
 	switch resp.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusForbidden:
+		// 200: token is valid and has permission to list tokens.
+		// 403: token is valid (authenticated) but lacks permission for this
+		// resource. Either way the credentials are genuine, so it's verified.
 		return true, nil
 	case http.StatusUnauthorized:
+		// Grafana returns 401 for two very different cases that can only be
+		// told apart by the response body:
+		//
+		//   1. A valid token that authenticated successfully but lacks the
+		//      accesspolicies:read scope. The body reports a permission/scope
+		//      error, e.g.:
+		//        {"code":"Unauthorized","message":"invalid permission: access
+		//         policy missing required scope [accesspolicies:read], ..."}
+		//
+		//   2. An invalid/revoked token that failed authentication, e.g.:
+		//        {"code":"InvalidCredentials","message":"Token could not be parsed"}
+		//
+		// A permission/scope error can only be produced after authentication
+		// succeeds, so use that as the positive signal. We deliberately do not
+		// match the looser "Unauthorized" string because revoked tokens can
+		// also surface it, which previously caused false positives.
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return false, err
 		}
+		body := string(bodyBytes)
 
-		// token is valid but has restricted permissions
-		return strings.Contains(string(bodyBytes), "Unauthorized"), nil
+		if strings.Contains(body, "invalid permission") || strings.Contains(body, "required scope") {
+			return true, nil
+		}
+		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}

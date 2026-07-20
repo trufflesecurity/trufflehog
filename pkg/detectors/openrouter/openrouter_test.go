@@ -1,8 +1,7 @@
-package cloudflareglobalapikey
+package openrouter
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,41 +10,34 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012 / testuser1005@example.com"
-	invalidPattern = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012/testing@go"
-)
-
-func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
+func TestOpenRouter_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("cloudflare: %s", validPattern),
-			want:  []string{"abcD123efg456HIJklmn789OPQ_rstUVWxYZ-testuser1005@example.com"},
+			name:  "API key",
+			input: `OPENROUTER_API_KEY = "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"`,
+			want:  []string{"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"},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("cloudflare keyword is not close to the real key and id = %s", validPattern),
-			want:  nil,
-		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("cloudflare: %s", invalidPattern),
-			want:  nil,
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the openrouter API
+				[DEBUG] Using Key=sk-or-v1-a2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 && test.want != nil {
+			detectorMatches := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(detectorMatches) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
@@ -57,7 +49,11 @@ func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				t.Errorf("expected %d results, got %d", len(test.want), len(results))
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
 				return
 			}
 
