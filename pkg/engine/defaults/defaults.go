@@ -1870,6 +1870,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.DuoDetectorEnabled.Load()
 		case *newreliclicensekey.Scanner:
 			return !feature.NewRelicLicenseKeyDetectorEnabled.Load()
+		case *newrelicbrowserkey.Scanner:
+			return !feature.NewRelicBrowserKeyDetectorEnabled.Load()
 		default:
 			return false
 		}

@@ -43,6 +43,7 @@ var (
 	CloudflareGlobalApiKeyV2DetectorEnabled  atomic.Bool
 	DuoDetectorEnabled                       atomic.Bool
 	NewRelicLicenseKeyDetectorEnabled        atomic.Bool
+	NewRelicBrowserKeyDetectorEnabled        atomic.Bool
 )
 
 type AtomicString struct {
