@@ -43,10 +43,11 @@ type JobProgressHook interface {
 // If the job supports it, the reference can also be used to cancel running via
 // CancelRun.
 type JobProgressRef struct {
-	JobID       JobID    `json:"job_id"`
-	SourceID    SourceID `json:"source_id"`
-	SourceName  string   `json:"source_name"`
-	jobProgress *JobProgress
+	JobID        JobID        `json:"job_id"`
+	SourceID     SourceID     `json:"source_id"`
+	SourceName   string       `json:"source_name"`
+	JobAttemptID JobAttemptID `json:"job_attempt_id,omitempty"`
+	jobProgress  *JobProgress
 }
 
 // Snapshot returns a snapshot of the job's current metrics.
@@ -108,6 +109,8 @@ type JobProgress struct {
 	JobID      JobID
 	SourceID   SourceID
 	SourceName string
+	// Caller-defined identity for a specific attempt of this job.
+	jobAttemptID JobAttemptID
 	// Tracks whether the job is finished or not.
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -156,6 +159,10 @@ func WithHooks(hooks ...JobProgressHook) func(*JobProgress) {
 // WithCancel allows cancelling the job by the JobProgressRef.
 func WithCancel(cancel context.CancelCauseFunc) func(*JobProgress) {
 	return func(jp *JobProgress) { jp.jobCancel = cancel }
+}
+
+func withJobAttemptID(attemptID JobAttemptID) func(*JobProgress) {
+	return func(jp *JobProgress) { jp.jobAttemptID = attemptID }
 }
 
 // NewJobProgress creates a new job report for the given source and job ID.
@@ -300,10 +307,11 @@ func (jp *JobProgress) ReportError(err error) {
 // Ref provides a read-only reference to the JobProgress.
 func (jp *JobProgress) Ref() JobProgressRef {
 	return JobProgressRef{
-		SourceID:    jp.SourceID,
-		JobID:       jp.JobID,
-		SourceName:  jp.SourceName,
-		jobProgress: jp,
+		SourceID:     jp.SourceID,
+		JobID:        jp.JobID,
+		SourceName:   jp.SourceName,
+		JobAttemptID: jp.jobAttemptID,
+		jobProgress:  jp,
 	}
 }
 

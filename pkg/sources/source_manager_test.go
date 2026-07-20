@@ -109,6 +109,17 @@ func tryRead(ch <-chan *Chunk) (*Chunk, error) {
 	}
 }
 
+func readUnitMetrics(t *testing.T, ch <-chan UnitMetrics) UnitMetrics {
+	t.Helper()
+	select {
+	case metrics := <-ch:
+		return metrics
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for unit metrics")
+		return UnitMetrics{}
+	}
+}
+
 func TestSourceManagerRun(t *testing.T) {
 	mgr := NewManager(WithBufferedOutput(8))
 	source, err := buildDummy(&counterChunker{count: 1})
@@ -223,6 +234,67 @@ func TestSourceManagerScan(t *testing.T) {
 		// The Chunks channel should be empty now.
 		_, err = tryRead(mgr.Chunks())
 		assert.Error(t, err)
+	}
+}
+
+func TestSourceManagerJobAttemptID(t *testing.T) {
+	const attemptID JobAttemptID = 7
+
+	tests := map[string]func(*SourceManager, context.Context, Source) (JobProgressRef, error){
+		"enumerate and scan": func(mgr *SourceManager, ctx context.Context, source Source) (JobProgressRef, error) {
+			return mgr.EnumerateAndScan(ctx, "dummy", source)
+		},
+		"enumerate": func(mgr *SourceManager, ctx context.Context, source Source) (JobProgressRef, error) {
+			return mgr.Enumerate(ctx, "dummy", source, nil)
+		},
+		"scan": func(mgr *SourceManager, ctx context.Context, source Source) (JobProgressRef, error) {
+			return mgr.Scan(ctx, "dummy", source, countChunk(1))
+		},
+	}
+
+	for name, start := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+			source, err := buildDummy(&counterChunker{count: 1})
+			assert.NoError(t, err)
+			ctx := ContextWithJobAttemptID(context.Background(), attemptID)
+
+			ref, err := start(mgr, ctx, source)
+			assert.NoError(t, err)
+			assert.Equal(t, attemptID, ref.JobAttemptID)
+			<-ref.Done()
+		})
+	}
+}
+
+func TestSourceManagerPreflightPreservesJobAttemptID(t *testing.T) {
+	const attemptID JobAttemptID = 7
+
+	tests := map[string]func(*SourceManager, context.Context, Source) (JobProgressRef, error){
+		"enumerate and scan": func(mgr *SourceManager, ctx context.Context, source Source) (JobProgressRef, error) {
+			return mgr.EnumerateAndScan(ctx, "dummy", source)
+		},
+		"enumerate": func(mgr *SourceManager, ctx context.Context, source Source) (JobProgressRef, error) {
+			return mgr.Enumerate(ctx, "dummy", source, nil)
+		},
+		"scan": func(mgr *SourceManager, ctx context.Context, source Source) (JobProgressRef, error) {
+			return mgr.Scan(ctx, "dummy", source, countChunk(1))
+		},
+	}
+
+	for name, start := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := NewManager()
+			source, err := buildDummy(&counterChunker{count: 1})
+			assert.NoError(t, err)
+			ctx, cancel := context.WithCancel(context.Background())
+			ctx = ContextWithJobAttemptID(ctx, attemptID)
+			cancel()
+
+			ref, err := start(mgr, ctx, source)
+			assert.Error(t, err)
+			assert.Equal(t, attemptID, ref.JobAttemptID)
+		})
 	}
 }
 
@@ -510,4 +582,46 @@ func TestSourceManagerUnitHookNoUnits(t *testing.T) {
 	assert.NotZero(t, m.EndTime)
 	assert.NotZero(t, m.ElapsedTime())
 	assert.Equal(t, 0, len(m.Errors))
+}
+
+func TestUnitHookSeparatesJobAttempts(t *testing.T) {
+	hook, ch := NewUnitHook(context.TODO())
+	unit := CommonSourceUnit{ID: "same unit"}
+	ref1 := JobProgressRef{JobID: 123, SourceID: 456, JobAttemptID: 1}
+	ref2 := JobProgressRef{JobID: 123, SourceID: 456, JobAttemptID: 2}
+	start := time.Now()
+
+	hook.StartUnitChunking(ref1, unit, start)
+	hook.StartUnitChunking(ref2, unit, start)
+	hook.ReportChunk(ref1, unit, &Chunk{Data: []byte("one")})
+	hook.ReportChunk(ref2, unit, &Chunk{Data: []byte("second")})
+	hook.EndUnitChunking(ref1, unit, start.Add(time.Second))
+	hook.EndUnitChunking(ref2, unit, start.Add(2*time.Second))
+
+	first, second := readUnitMetrics(t, ch), readUnitMetrics(t, ch)
+	assert.Equal(t, JobAttemptID(1), first.Parent.JobAttemptID)
+	assert.Equal(t, uint64(3), first.TotalBytes)
+	assert.Equal(t, JobAttemptID(2), second.Parent.JobAttemptID)
+	assert.Equal(t, uint64(6), second.TotalBytes)
+}
+
+func TestUnitHookSeparatesJobAttemptsWithoutUnits(t *testing.T) {
+	hook, ch := NewUnitHook(context.TODO())
+	ref1 := JobProgressRef{JobID: 123, SourceID: 456, JobAttemptID: 1}
+	ref2 := JobProgressRef{JobID: 123, SourceID: 456, JobAttemptID: 2}
+
+	hook.ReportChunk(ref1, nil, &Chunk{Data: []byte("one")})
+	hook.ReportChunk(ref2, nil, &Chunk{Data: []byte("second")})
+	hook.Finish(ref1)
+	inProgress := hook.InProgressSnapshot()
+	if assert.Len(t, inProgress, 1) {
+		assert.Equal(t, JobAttemptID(2), inProgress[0].Parent.JobAttemptID)
+	}
+	hook.Finish(ref2)
+
+	first, second := readUnitMetrics(t, ch), readUnitMetrics(t, ch)
+	assert.Equal(t, JobAttemptID(1), first.Parent.JobAttemptID)
+	assert.Equal(t, uint64(3), first.TotalBytes)
+	assert.Equal(t, JobAttemptID(2), second.Parent.JobAttemptID)
+	assert.Equal(t, uint64(6), second.TotalBytes)
 }

@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -36,10 +37,12 @@ func TestJobProgressFatalErrors(t *testing.T) {
 }
 
 func TestJobProgressRef(t *testing.T) {
-	jp := NewJobProgress(123, 456, "source name")
+	jp := NewJobProgress(123, 456, "source name", withJobAttemptID(7))
 	ref := jp.Ref()
 	assert.Equal(t, JobID(123), ref.JobID)
 	assert.Equal(t, SourceID(456), ref.SourceID)
+	assert.Equal(t, JobAttemptID(7), ref.JobAttemptID)
+	assert.Contains(t, map[JobProgressRef]bool{ref: true}, ref)
 
 	// Test Done() blocks until Finish() is called.
 	select {
@@ -54,6 +57,16 @@ func TestJobProgressRef(t *testing.T) {
 	default:
 		assert.FailNow(t, "job should be finished")
 	}
+}
+
+func TestJobProgressRefAttemptJSON(t *testing.T) {
+	legacy, err := json.Marshal(NewJobProgress(123, 456, "source name").Ref())
+	assert.NoError(t, err)
+	assert.NotContains(t, string(legacy), "job_attempt_id")
+
+	attempt, err := json.Marshal(NewJobProgress(123, 456, "source name", withJobAttemptID(7)).Ref())
+	assert.NoError(t, err)
+	assert.Contains(t, string(attempt), `"job_attempt_id":7`)
 }
 
 func TestJobProgressHook(t *testing.T) {
