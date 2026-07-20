@@ -66,6 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, extraData, verificationErr := s.verify(ctx, resMatch)
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
+			if extraData != nil {
+				s1.SecretParts["region"] = extraData["region"]
+			}
 			s1.SetVerificationError(verificationErr)
 		}
 
