@@ -55,6 +55,7 @@ func TestNewRelicBrowserKey_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"region": "us",
 					},
+					SecretParts: map[string]string{"key": key, "region": "us"},
 				},
 			},
 			wantErr: false,
@@ -74,6 +75,7 @@ func TestNewRelicBrowserKey_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"region": "eu",
 					},
+					SecretParts: map[string]string{"key": keyEU, "region": "eu"},
 				},
 			},
 			wantErr: false,
@@ -90,6 +92,7 @@ func TestNewRelicBrowserKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_NewRelicBrowserKey,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": keyInactive},
 				},
 			},
 			wantErr: false,
