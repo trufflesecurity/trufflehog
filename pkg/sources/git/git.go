@@ -488,18 +488,21 @@ type cloneParams struct {
 // starting from a fresh clone directory. All other failures, including clone
 // timeouts (see feature.GitCloneTimeoutDuration), are returned immediately.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clonePath string, authInUrl bool, args ...string) (string, *git.Repository, error) {
-	path, err := createClonePath(gitURL, clonePath)
-	if err != nil {
-		return "", nil, err
-	}
-
 	timeout := time.Duration(feature.GitCloneTimeoutDuration.Load())
 
+	var path string
 	var repo *git.Repository
-	for attempt := 1; ; attempt++ {
+	var err error
+	for attempt := 1; attempt <= maxCloneAttempts; attempt++ {
+		// Each attempt starts from a fresh clone directory.
+		path, err = createClonePath(gitURL, clonePath)
+		if err != nil {
+			return "", nil, err
+		}
+
 		repo, err = executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl, timeout})
 		if err == nil {
-			break
+			return path, repo, nil
 		}
 
 		if attempt >= maxCloneAttempts || !isRetryableCloneError(err) || common.IsDone(ctx) {
@@ -512,17 +515,10 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 			return "", nil, err
 		}
 
-		// Discard the partial clone and start the next attempt from a fresh directory.
+		// Discard the partial clone; the next iteration recreates a fresh directory.
 		if rmErr := os.RemoveAll(path); rmErr != nil {
-			err = fmt.Errorf("failed to clean clone path for retry: %w (original clone error: %w)", rmErr, err)
-			return "", nil, err
+			return "", nil, fmt.Errorf("failed to clean clone path for retry: %w (original clone error: %w)", rmErr, err)
 		}
-		newPath, mkErr := createClonePath(gitURL, clonePath)
-		if mkErr != nil {
-			err = fmt.Errorf("failed to recreate clone path for retry: %w (original clone error: %w)", mkErr, err)
-			return "", nil, err
-		}
-		path = newPath
 
 		ctx.Logger().Info("git clone interrupted by network error; retrying",
 			"attempt", attempt,
@@ -531,13 +527,12 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 		)
 		select {
 		case <-ctx.Done():
-			CleanOnError(&err, path)
-			return "", nil, err
+			return "", nil, ctx.Err()
 		case <-time.After(cloneRetryBackoff * time.Duration(attempt)):
 		}
 	}
 
-	return path, repo, nil
+	return "", nil, err
 }
 
 // isRetryableCloneError reports whether a clone failure looks like a
