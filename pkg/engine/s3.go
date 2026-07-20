@@ -54,6 +54,13 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 		connection.Roles = c.Roles
 	}
 
+	if len(c.Endpoint) > 0 {
+		if len(c.Roles) > 0 {
+			return sources.JobProgressRef{}, fmt.Errorf("cannot use a custom endpoint and role assumption together")
+		}
+		connection.Endpoint = c.Endpoint
+	}
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {

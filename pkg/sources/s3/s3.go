@@ -102,6 +102,10 @@ func (s *Source) Init(
 		return errors.New("either a bucket include list or a bucket ignore list can be specified, but not both")
 	}
 
+	if conn.GetEndpoint() != "" && len(conn.GetRoles()) > 0 {
+		return errors.New("role assumption is not supported when a custom endpoint is specified")
+	}
+
 	return nil
 }
 
@@ -171,17 +175,35 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		credsProvider = aws.NewCredentialsCache(provider)
 	}
 
-	cfg, err := config.LoadDefaultConfig(
-		ctx,
-		config.WithRegion(region),
+	loadOpts := []func(*config.LoadOptions) error{
 		config.WithCredentialsProvider(credsProvider),
-	)
+	}
+	if s.conn.GetEndpoint() != "" {
+		// With a custom endpoint, the region is only used for request
+		// signing, and some S3-compatible providers (e.g. Wasabi regional
+		// endpoints) reject requests signed for the wrong region. Honor the
+		// standard AWS region resolution (AWS_REGION, config files, etc.) and
+		// only fall back to the provided region if nothing else is set.
+		loadOpts = append(loadOpts, config.WithDefaultRegion(region))
+	} else {
+		loadOpts = append(loadOpts, config.WithRegion(region))
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, loadOpts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return s3.NewFromConfig(cfg, func(options *s3.Options) {
 		options.DisableLogOutputChecksumValidationSkipped = true
+		if endpoint := s.conn.GetEndpoint(); endpoint != "" {
+			options.BaseEndpoint = aws.String(endpoint)
+			// Custom S3-compatible providers (e.g. MinIO) frequently do not
+			// support virtual-hosted-style addressing, and path-style requests
+			// work with all of them, so default to path-style when a custom
+			// endpoint is in use.
+			options.UsePathStyle = true
+		}
 	}), nil
 }
 
@@ -454,6 +476,13 @@ func (s *Source) getRegionalClientForBucket(
 	role string,
 	bucket string,
 ) (*s3.Client, error) {
+	// When a custom endpoint is configured, all requests are routed to that
+	// endpoint, so AWS bucket-region discovery is neither meaningful nor
+	// reliably supported by S3-compatible providers.
+	if s.conn.GetEndpoint() != "" {
+		return defaultRegionClient, nil
+	}
+
 	region, err := s3manager.GetBucketRegion(ctx, defaultRegionClient, bucket)
 	if err != nil {
 		return nil, fmt.Errorf("could not get s3 region for bucket: %s: %w", bucket, err)
@@ -609,7 +638,7 @@ func (s *Source) pageChunker(
 						S3: &source_metadatapb.S3{
 							Bucket:    metadata.bucket,
 							File:      sanitizer.UTF8(*obj.Key),
-							Link:      sanitizer.UTF8(makeS3Link(metadata.bucket, metadata.client.Options().Region, *obj.Key)),
+							Link:      sanitizer.UTF8(makeS3Link(s.conn.GetEndpoint(), metadata.bucket, metadata.client.Options().Region, *obj.Key)),
 							Email:     sanitizer.UTF8(email),
 							Timestamp: sanitizer.UTF8(modified),
 						},
@@ -716,11 +745,19 @@ func (s *Source) visitRoles(
 	return nil
 }
 
-// makeS3Link creates a S3 virtual-hosted–style URIs. They have the format of:
+// makeS3Link creates a link to an S3 object.
+//
+// For AWS, S3 virtual-hosted–style URIs are used. They have the format of:
 // https://[bucket-name].s3.[region-code].amazonaws.com/[key-name]
 //
 // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/VirtualHosting.html#virtual-hosted-style-access
-func makeS3Link(bucket, region, key string) string {
+//
+// When a custom endpoint is configured, path-style URIs are used instead:
+// [endpoint]/[bucket-name]/[key-name]
+func makeS3Link(endpoint, bucket, region, key string) string {
+	if endpoint != "" {
+		return fmt.Sprintf("%s/%s/%s", strings.TrimRight(endpoint, "/"), bucket, key)
+	}
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key)
 }
 
