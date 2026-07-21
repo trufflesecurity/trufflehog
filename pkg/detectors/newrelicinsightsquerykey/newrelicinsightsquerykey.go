@@ -69,12 +69,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(keyResMatch),
 				RawV2:        []byte(keyResMatch + accountIDResMatch),
 				Redacted:     keyResMatch[:8] + "...",
+				SecretParts: map[string]string{
+					"key":        keyResMatch,
+					"account_id": accountIDResMatch,
+				},
 			}
 
 			if verify {
 				isVerified, extraData, verificationErr := s.verify(ctx, keyResMatch, accountIDResMatch)
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
+				if extraData != nil {
+					s1.SecretParts["region"] = extraData["region"]
+				}
 				s1.SetVerificationError(verificationErr)
 			}
 

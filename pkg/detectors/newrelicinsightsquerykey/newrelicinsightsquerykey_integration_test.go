@@ -28,7 +28,7 @@ func TestNewRelicInsightsQueryKey_FromChunk(t *testing.T) {
 	accountID := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_ACCOUNT_ID")
 	keyEU := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_QUERY_KEY_EU")
 	accountIDEU := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_ACCOUNT_ID_EU")
-	keyInactive := "NRIQ-Xc_V8HruIZ271_l9FQm-_nJ7_"
+	keyInactive := "NRIQ-Xc_V8HruIZ271_l9FQm-_nJ8_"
 
 	type args struct {
 		ctx    context.Context
@@ -57,6 +57,11 @@ func TestNewRelicInsightsQueryKey_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"region": "us",
 					},
+					SecretParts: map[string]string{
+						"key":        key,
+						"account_id": accountID,
+						"region":     "us",
+					},
 				},
 			},
 			wantErr: false,
@@ -76,6 +81,11 @@ func TestNewRelicInsightsQueryKey_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"region": "eu",
 					},
+					SecretParts: map[string]string{
+						"key":        keyEU,
+						"account_id": accountIDEU,
+						"region":     "eu",
+					},
 				},
 			},
 			wantErr: false,
@@ -92,6 +102,10 @@ func TestNewRelicInsightsQueryKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_NewRelicInsightsQueryKey,
 					Verified:     false,
+					SecretParts: map[string]string{
+						"key":        keyInactive,
+						"account_id": accountID,
+					},
 				},
 			},
 			wantErr: false,
