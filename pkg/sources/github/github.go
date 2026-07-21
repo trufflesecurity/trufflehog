@@ -930,6 +930,8 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 	if len(wantedRepos) > 0 {
 		errs = errors.Join(errs, s.mapRemainingAccessibleRepos(ctx, connector, wantedRepos))
 		if len(wantedRepos) == 0 {
+			// Every requested repo was mapped, so returning errs would fail
+			// repos that succeeded; log partial enumeration errors instead.
 			if errs != nil {
 				ctx.Logger().Error(errs, "some installations could not be fully enumerated while mapping repos")
 			}
@@ -1047,14 +1049,19 @@ func (s *Source) mapRemainingReposByMetadata(
 // installation token can still read repos that are visible to it (public
 // repos in particular), so a repo that the API confirms accessible is mapped
 // to the default installation instead of failing the scan.
-func (s *Source) mapRemainingAccessibleRepos(ctx context.Context, connector *appConnector, wantedRepos map[string]repoMappingRequest) error {
+func (s *Source) mapRemainingAccessibleRepos(
+	ctx context.Context,
+	connector *appConnector,
+	wantedRepos map[string]repoMappingRequest,
+) error {
 	var errs error
 	client := connector.APIClient()
 	for _, requested := range wantedRepos {
 		for i, lookupURL := range requested.lookupURLs {
 			_, parts, err := getRepoURLParts(lookupURL)
 			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("could not parse configured repo %q: %w", requested.original, err))
+				errs = errors.Join(errs,
+					fmt.Errorf("could not parse configured repo %q: %w", requested.original, err))
 				break
 			}
 
@@ -1070,7 +1077,8 @@ func (s *Source) mapRemainingAccessibleRepos(ctx context.Context, connector *app
 				if isGitHub404Error(err) {
 					continue
 				}
-				errs = errors.Join(errs, fmt.Errorf("could not fetch repo %q with default installation: %w", requested.original, err))
+				errs = errors.Join(errs,
+					fmt.Errorf("could not fetch repo %q with default installation: %w", requested.original, err))
 				break
 			}
 			if !sameRepoHost(requested.normalized, repo.GetCloneURL()) {
