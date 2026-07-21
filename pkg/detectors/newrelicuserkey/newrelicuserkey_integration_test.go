@@ -56,6 +56,10 @@ func TestNewRelicUserKey_FromChunk(t *testing.T) {
 						"region":  "us",
 						"user_id": "1007651396",
 					},
+					SecretParts: map[string]string{
+						"key":    key,
+						"region": "us",
+					},
 				},
 			},
 			wantErr: false,
@@ -76,6 +80,10 @@ func TestNewRelicUserKey_FromChunk(t *testing.T) {
 						"region":  "eu",
 						"user_id": "1007651478",
 					},
+					SecretParts: map[string]string{
+						"key":    keyEU,
+						"region": "eu",
+					},
 				},
 			},
 			wantErr: false,
@@ -92,6 +100,9 @@ func TestNewRelicUserKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_NewRelicUserKey,
 					Verified:     false,
+					SecretParts: map[string]string{
+						"key": keyInactive,
+					},
 				},
 			},
 			wantErr: false,

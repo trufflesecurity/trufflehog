@@ -1866,6 +1866,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudflareGlobalApiKeyV2DetectorEnabled.Load()
 		case *duo.Scanner:
 			return !feature.DuoDetectorEnabled.Load()
+		case *newrelicuserkey.Scanner:
+			return !feature.NewRelicUserKeyDetectorEnabled.Load()
 		default:
 			return false
 		}
