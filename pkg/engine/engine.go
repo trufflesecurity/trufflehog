@@ -869,12 +869,13 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		chunk.OriginalData = chunk.Data
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
+		anyMatched := false
 		for _, d := range decoded {
 			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Data)
 			if len(matchingDetectors) == 0 {
-				chunksDropped.WithLabelValues("scanner", "no_matching_detectors", sourceTypeStr).Inc()
 				continue
 			}
+			anyMatched = true
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -896,6 +897,9 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 					wgDoneFn: wgDetect.Done,
 				}
 			}
+		}
+		if !anyMatched {
+			chunksDropped.WithLabelValues("scanner", "no_matching_detectors", sourceTypeStr).Inc()
 		}
 
 		dataSize := float64(len(chunk.Data))
@@ -1012,6 +1016,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	for chunk := range e.verificationOverlapChunksChan {
 		sourceTypeStr := chunk.chunk.SourceType.String()
 		chunksEnteredStage.WithLabelValues("verification_overlap", sourceTypeStr).Inc()
+		hadDetectorError := false
 		for _, detector := range chunk.detectors {
 			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
 			detectorNameStr := detector.Key.Type().String()
@@ -1027,7 +1032,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						err, "error finding results in chunk during verification overlap",
 						"detector", detectorNameStr,
 					)
-					chunksDropped.WithLabelValues("verification_overlap", "detector_error", sourceTypeStr).Inc()
+					hadDetectorError = true
 				}
 
 				if len(results) == 0 {
@@ -1109,6 +1114,10 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			delete(detectorKeysWithResults, k)
 		}
 
+		if hadDetectorError {
+			chunksDropped.WithLabelValues("verification_overlap", "detector_error", sourceTypeStr).Inc()
+		}
+
 		chunk.verificationOverlapWgDoneFn()
 	}
 
@@ -1146,6 +1155,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
 	var matchCount int
+	hadDetectorError := false
 	// To reduce the overhead of regex calls in the detector,
 	// we limit the amount of data passed to each detector.
 	// The matches field of the DetectorMatch struct contains the
@@ -1170,7 +1180,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		cancel()
 		if err != nil {
 			ctx.Logger().Error(err, "error finding results in chunk")
-			chunksDropped.WithLabelValues("detect", "detector_error", sourceTypeStr).Inc()
+			hadDetectorError = true
 			continue
 		}
 
@@ -1219,6 +1229,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	matchesPerChunk.Observe(float64(matchCount))
+
+	if hadDetectorError {
+		chunksDropped.WithLabelValues("detect", "detector_error", sourceTypeStr).Inc()
+	}
 
 	ctx.Logger().V(5).Info("Finished detecting chunk")
 
