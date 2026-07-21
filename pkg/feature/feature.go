@@ -42,6 +42,7 @@ var (
 	CloudflareApiTokenV2DetectorEnabled      atomic.Bool
 	CloudflareGlobalApiKeyV2DetectorEnabled  atomic.Bool
 	DuoDetectorEnabled                       atomic.Bool
+	NewRelicMobileAppTokenDetectorEnabled    atomic.Bool
 )
 
 type AtomicString struct {

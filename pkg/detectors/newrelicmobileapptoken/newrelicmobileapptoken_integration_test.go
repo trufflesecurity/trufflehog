@@ -55,6 +55,10 @@ func TestNewRelicMobileAppToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"region": "us",
 					},
+					SecretParts: map[string]string{
+						"key":    key,
+						"region": "us",
+					},
 				},
 			},
 			wantErr: false,
@@ -74,6 +78,10 @@ func TestNewRelicMobileAppToken_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"region": "eu",
 					},
+					SecretParts: map[string]string{
+						"key":    keyEU,
+						"region": "eu",
+					},
 				},
 			},
 			wantErr: false,
@@ -91,6 +99,10 @@ func TestNewRelicMobileAppToken_FromChunk(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_NewRelicMobileAppToken,
 					Verified:     false,
 					ExtraData: map[string]string{
+						"region": "us",
+					},
+					SecretParts: map[string]string{
+						"key":    keyInactive,
 						"region": "us",
 					},
 				},
