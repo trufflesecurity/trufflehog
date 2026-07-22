@@ -42,7 +42,8 @@ func TestJobProgressRef(t *testing.T) {
 	assert.Equal(t, JobID(123), ref.JobID)
 	assert.Equal(t, SourceID(456), ref.SourceID)
 	assert.Equal(t, JobAttemptID(7), ref.JobAttemptID)
-	assert.Contains(t, map[JobProgressRef]bool{ref: true}, ref)
+	// This map literal is a compile-time assertion that JobProgressRef remains comparable.
+	_ = map[JobProgressRef]struct{}{ref: {}}
 
 	// Test Done() blocks until Finish() is called.
 	select {
