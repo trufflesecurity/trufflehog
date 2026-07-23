@@ -3,6 +3,8 @@ package datadogtoken
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -14,6 +16,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.EndpointSetter
 	detectors.DefaultMultiPartCredentialProvider
 }
@@ -26,7 +29,7 @@ var _ detectors.CloudProvider = (*Scanner)(nil)
 func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	appPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
@@ -93,6 +96,13 @@ func setOrganizationInfo(opt []*options, s1 *detectors.Result) {
 
 }
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -114,6 +124,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for endpoint := range uniqueFoundUrls {
 		endpoints = append(endpoints, endpoint)
 	}
+	client := s.getClient()
 
 	for _, apiMatch := range apiMatches {
 		resApiMatch := strings.TrimSpace(apiMatch[1])
@@ -131,40 +142,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				for _, baseURL := range s.Endpoints(endpoints...) {
-					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					req.Header.Add("DD-API-KEY", resApiMatch)
-					req.Header.Add("DD-APPLICATION-KEY", resAppMatch)
-					res, err := client.Do(req)
-					if err == nil {
-						defer func() { _ = res.Body.Close() }()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							s1.SecretParts["endpoint"] = baseURL
-							var serviceResponse userServiceResponse
-							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
-								// setup emails
-								if len(serviceResponse.Data) > 0 {
-									setUserEmails(serviceResponse.Data, &s1)
-								}
-								// setup organizations
-								if len(serviceResponse.Included) > 0 {
-									setOrganizationInfo(serviceResponse.Included, &s1)
-								}
-							}
-							// break the loop once we've successfully validated the token against a baseURL
-							break
+					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)
+					s1.SecretParts["endpoint"] = baseURL
+					if isVerified && res != nil {
+						if len(res.Data) > 0 {
+							setUserEmails(res.Data, &s1)
 						}
+						if len(res.Included) > 0 {
+							setOrganizationInfo(res.Included, &s1)
+						}
+						break
 					}
 				}
 			}
 			results = append(results, s1)
 		}
 	}
-
 	return results, nil
 }
 
@@ -174,4 +169,39 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, apiKey, appKey, baseUrl string) (*userServiceResponse, bool, error) {
+	// Reference: https://docs.datadoghq.com/api/latest/users/
+
+	req, err := http.NewRequestWithContext(ctx, "GET", baseUrl+"/api/v2/users", nil)
+	if err != nil {
+		return nil, false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("DD-API-KEY", apiKey)
+	req.Header.Add("DD-APPLICATION-KEY", appKey)
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		var serviceResponse userServiceResponse
+		if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err != nil {
+			return nil, true, nil
+		}
+		return &serviceResponse, true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil, false, nil
+	default:
+		return nil, false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
