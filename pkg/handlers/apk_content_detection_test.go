@@ -92,3 +92,25 @@ func TestNewFileReaderAPKDetectionDisabled(t *testing.T) {
 	assert.Equal(t, string(zipMime), rdr.mime.String())
 	require.NoError(t, rdr.Close())
 }
+
+// TestNewFileReaderAPKCheckErrorFallsThrough ensures that when the APK feature
+// flag is on and mimetype identifies a file as a zip, but the content-based APK
+// check fails to parse it (e.g. truncated/corrupted zip, or a polyglot that
+// mimetype still reports as zip), newFileReader does NOT return a fatal error.
+// Instead it must fall through to normal handling so the file is still processed
+// rather than skipped entirely. This guards the regression where dropping the
+// .apk extension guard made every unparseable zip/jar unprocessable.
+func TestNewFileReaderAPKCheckErrorFallsThrough(t *testing.T) {
+	feature.EnableAPKHandler.Store(true)
+	t.Cleanup(func() { feature.EnableAPKHandler.Store(false) })
+
+	// Start from a valid zip (so mimetype detects "application/zip") then truncate
+	// the tail, removing the end-of-central-directory record so zip.NewReader fails.
+	valid := makeNonAPKZip(t)
+	truncated := valid[:len(valid)-10]
+
+	rdr, err := newFileReader(context.Background(), bytes.NewReader(truncated))
+	require.NoError(t, err, "APK check failure must not be fatal; file should fall through to normal handling")
+	assert.Equal(t, string(zipMime), rdr.mime.String(), "file should remain a generic zip, not be skipped")
+	require.NoError(t, rdr.Close())
+}
