@@ -136,14 +136,20 @@ func newFileReader(ctx context.Context, r io.Reader, options ...readerOption) (f
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
-	// Check for APK files
-	if shouldHandleAsAPK(cfg, fReader) {
+	// Detection is content-based, so this now runs for every zip/jar rather than only for files with an apk extension
+	if shouldHandleAsAPK(fReader) {
 		isAPK, err := isAPKFile(&fReader)
 		if err != nil {
 			return fReader, fmt.Errorf("error checking for APK: %w", err)
 		}
 		if isAPK {
 			return handleAPKFile(&fReader)
+		}
+
+		// isAPKFile inspects the archive via zip.NewReader, which leaves the reader positioned mid-stream.
+		// Reset to the start so archive identification and any downstream handler read from the beginning.
+		if _, seekErr := fReader.Seek(0, io.SeekStart); seekErr != nil {
+			return fReader, fmt.Errorf("error resetting reader after APK check: %w", seekErr)
 		}
 	}
 
@@ -224,7 +230,6 @@ const (
 	rpmHandlerType     handlerType = "rpm"
 	apkHandlerType     handlerType = "apk"
 	defaultHandlerType handlerType = "default"
-	apkExt                         = ".apk"
 )
 
 type mimeType string
@@ -570,13 +575,14 @@ func getFileExtension(chunkSkel *sources.Chunk) string {
 	return ext
 }
 
-// shouldHandleAsAPK checks if the file should be handled as an APK based on config and MIME type.
-// Note: We can't extend the mimetype package with an APK detection function b/c it would require adjusting settings
+// shouldHandleAsAPK reports whether the file should be inspected as a potential APK.
+// Detection is content-based (file magic): after confirming the file is a zip/jar, the caller runs isAPKFile, which
+// inspects the archive entries for APK markers such as AndroidManifest.xml and classes.dex.
+// It deliberately does NOT rely on the file extension so APKs are detected regardless of the source or filename.
+// Note: Don't extend the mimetype package with APK detection function. It would require adjusting settings
 // so that all files are fully read into a byte slice for detection (mimetype.SetLimit(0)), which would bloat memory.
-// Instead we call the isAPKFile function in here after ensuring it's a zip/jar file and has an .apk extension.
-func shouldHandleAsAPK(cfg readerConfig, fReader fileReader) bool {
+func shouldHandleAsAPK(fReader fileReader) bool {
 	return feature.EnableAPKHandler.Load() &&
-		cfg.fileExtension == apkExt &&
 		(fReader.mime.String() == string(zipMime) || fReader.mime.String() == string(jarMime))
 }
 
