@@ -564,6 +564,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.CloudflareApiTokenV2DetectorEnabled.Store(true)
 	feature.CloudflareGlobalApiKeyV2DetectorEnabled.Store(true)
 	feature.DuoDetectorEnabled.Store(true)
+	feature.ArcGISProxyConfigDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
