@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,7 +26,8 @@ var (
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "ghs_RWGUZ6kS8_Ut7PbtR72k2miJwwYtxkpe8mOpT8feAWYZcwz43PxBVGCNATnycaQV9VUlPJe1uST5Xen7d3uZ5lilVlEVvT9AbxnhURdT3OzPtCvXydIrvE4LrDO"
+	secret               = "ghs_RWGUZ6kS8_Ut7PbtR72k2miJwwYtxkpe8mOpT8feAWYZcwz43PxBVGCNATnycaQV9VUlPJe1uST5Xen7d3uZ5lilVlEVvT9AbxnhURdT3OzPtCvXydIrvE4LrDO"
+	newInstallationToken = "ghs_123456_" + strings.Repeat("a", 170) + "." + strings.Repeat("b", 170) + "." + strings.Repeat("c", 169) + "-"
 )
 
 func TestGithub_Pattern(t *testing.T) {
@@ -41,6 +43,11 @@ func TestGithub_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "new GitHub App installation token",
+			input: newInstallationToken,
+			want:  []string{newInstallationToken},
 		},
 	}
 
