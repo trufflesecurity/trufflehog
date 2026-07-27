@@ -1,7 +1,6 @@
 package groq
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -25,13 +24,11 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	tests := []struct {
 		name    string
 		apiKey  string
-		want    string
 		wantErr bool
 	}{
 		{
-			name:    "valid dockerhub credentials",
+			name:    "valid groq credentials",
 			apiKey:  apiKey,
-			want:    `{"AnalyzerType":2,"Bindings":[],"UnboundedResources":null,"Metadata":{"Valid_Key":true}}`,
 			wantErr: false,
 		},
 	}
@@ -45,7 +42,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				return
 			}
 
-			// marshal the actual result to JSON
 			gotJSON, err := json.Marshal(got)
 			if err != nil {
 				t.Fatalf("could not marshal got to JSON: %s", err)
@@ -53,19 +49,22 @@ func TestAnalyzer_Analyze(t *testing.T) {
 
 			fmt.Println(string(gotJSON))
 
-			// compare the JSON strings
-			if string(gotJSON) != string(tt.want) {
-				// pretty-print both JSON strings for easier comparison
-				var gotIndented, wantIndented []byte
-				gotIndented, err = json.MarshalIndent(got, "", " ")
-				if err != nil {
-					t.Fatalf("could not marshal got to indented JSON: %s", err)
+			if got == nil {
+				t.Fatal("Analyzer.Analyze() returned nil result")
+			}
+
+			if got.Metadata["Valid_Key"] != true {
+				t.Fatalf("expected Valid_Key metadata to be true, got %#v", got.Metadata["Valid_Key"])
+			}
+
+			if len(got.Bindings) == 0 {
+				t.Fatal("expected at least one model binding for a valid Groq API key")
+			}
+
+			for _, binding := range got.Bindings {
+				if binding.Permission.Value != PermissionStrings[FullAccess] {
+					t.Fatalf("expected full_access permission, got %q", binding.Permission.Value)
 				}
-				wantIndented, err = json.MarshalIndent(tt.want, "", " ")
-				if err != nil {
-					t.Fatalf("could not marshal want to indented JSON: %s", err)
-				}
-				t.Errorf("Analyzer.Analyze() = %s, want %s", gotIndented, wantIndented)
 			}
 		})
 	}
