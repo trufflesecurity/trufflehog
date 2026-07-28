@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package lob
+package newrelicinsightsinsertkey
 
 import (
 	"context"
@@ -10,21 +10,23 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-func TestLob_FromChunk(t *testing.T) {
+func TestNewRelicInsightsInsertKey_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LOB")
-	inactiveSecret := testSecrets.MustGetField("LOB_INACTIVE")
+
+	key := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_INSERT_KEY")
+	keyEU := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_INSERT_KEY_EU")
+	keyInactive := "NRII-d-2Vf-L1w-8B9Y_--6x8-_QjA"
 
 	type args struct {
 		ctx    context.Context
@@ -43,15 +45,34 @@ func TestLob_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a lob secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a new relic insights insert key %s within", key)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Lob,
+					DetectorType: detector_typepb.DetectorType_NewRelicInsightsInsertKey,
 					Verified:     true,
 					ExtraData: map[string]string{
-						"environment": "live",
+						"region": "us",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found eu, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a new EU relic insights insert key %s within", keyEU)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_NewRelicInsightsInsertKey,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"region": "eu",
 					},
 				},
 			},
@@ -62,16 +83,13 @@ func TestLob_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a lob secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a new relic insights insert key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Lob,
+					DetectorType: detector_typepb.DetectorType_NewRelicInsightsInsertKey,
 					Verified:     false,
-					ExtraData: map[string]string{
-						"environment": "live",
-					},
 				},
 			},
 			wantErr: false,
@@ -93,7 +111,7 @@ func TestLob_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Lob.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewRelicInsightsInsertKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -101,13 +119,17 @@ func TestLob_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if len(got[i].Redacted) == 0 {
+					t.Fatalf("no redacted secret present: \n %+v", got[i])
+				}
+				got[i].Redacted = ""
 				if len(got[i].SecretParts) == 0 {
 					t.Fatalf("no secret parts present: \n %+v", got[i])
 				}
 				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Lob.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("NewRelicInsightsInsertKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

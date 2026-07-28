@@ -87,11 +87,12 @@ var (
 	noVerificationCache = cli.Flag("no-verification-cache", "Disable verification caching").Bool()
 
 	// Add feature flags
-	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
-	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
-	gitCloneTimeout    = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
-	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
-	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
+	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
+	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()
 
 	gitScan                = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -516,6 +517,10 @@ func run(state overseer.State, logSync func() error) {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
 	}
 
+	if *dropUnverifiedJWTResults {
+		feature.DropUnverifiedJWTResults.Store(true)
+	}
+
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
 
@@ -543,6 +548,15 @@ func run(state overseer.State, logSync func() error) {
 	feature.RevDetectorEnabled.Store(true)
 	feature.UserDetectorEnabled.Store(true)
 	feature.BraintrustDetectorEnabled.Store(true)
+	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
+	feature.RedHatPyxisDetectorEnabled.Store(true)
+	feature.OctopusDeployDetectorEnabled.Store(true)
+	feature.OpenRouterDetectorEnabled.Store(true)
+	feature.NewRelicInsightsInsertKeyDetectorEnabled.Store(true)
+	feature.DuffelTokenDetectorEnabled.Store(true)
+	feature.ShippoDetectorEnabled.Store(true)
+	feature.IPInfoDetectorEnabled.Store(true)
+	feature.LobDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -868,6 +882,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if len(*githubScanOrgs) > 0 && len(*githubScanRepos) > 0 {
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories at the same time")
+		}
+		// --include-repos/--exclude-repos only filter repos enumerated from an org/user scan;
+		// explicit --repo entries bypass that filtering step entirely (see enumerate() in
+		// pkg/sources/github/github.go), so combining them with --repo would silently no-op
+		// the filters instead of erroring.
+		if len(*githubScanRepos) > 0 && (len(*githubIncludeRepos) > 0 || len(*githubExcludeRepos) > 0) {
+			return scanMetrics, fmt.Errorf("invalid config: --include-repos and --exclude-repos only apply to organization or user scans and cannot be used with --repo")
 		}
 
 		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {

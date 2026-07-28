@@ -9,6 +9,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 // This tests the JWT detector for a number of different cases (mostly HMAC-based) without verification enabled.
@@ -108,6 +109,72 @@ func TestJwt_Pattern(t *testing.T) {
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			require.NoError(t, err)
+
+			if len(results) != len(test.want) {
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestJwt_SkipUnverified(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	tests := []struct {
+		name           string
+		input          string
+		want           []string
+		skipUnverified bool
+	}{
+		{
+			name:           "expired token - results should be skipped when skipUnverified is true",
+			input:          "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcwNDA2NzIwMCwiZXhwIjoxNzA0MDcwODAwfQ.9z15Ku3lWBC8rFPlvxkX3wx6wRalhoN7PlBRtE7fUXyoHqVLiZG2l5eMo6KwBlAu1L2hFtkvQwiJ79G5o3a4Bw",
+			want:           []string{},
+			skipUnverified: true,
+		},
+		{
+			name:           "expired token - results should not be skipped when skipUnverified is false",
+			input:          "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcwNDA2NzIwMCwiZXhwIjoxNzA0MDcwODAwfQ.9z15Ku3lWBC8rFPlvxkX3wx6wRalhoN7PlBRtE7fUXyoHqVLiZG2l5eMo6KwBlAu1L2hFtkvQwiJ79G5o3a4Bw",
+			want:           []string{"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTcwNDA2NzIwMCwiZXhwIjoxNzA0MDcwODAwfQ.9z15Ku3lWBC8rFPlvxkX3wx6wRalhoN7PlBRtE7fUXyoHqVLiZG2l5eMo6KwBlAu1L2hFtkvQwiJ79G5o3a4Bw"},
+			skipUnverified: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
+				return
+			}
+
+			if test.skipUnverified {
+				feature.DropUnverifiedJWTResults.Store(true)
+			} else {
+				feature.DropUnverifiedJWTResults.Store(false)
+			}
+
+			results, err := d.FromData(context.Background(), true, []byte(test.input))
 			require.NoError(t, err)
 
 			if len(results) != len(test.want) {

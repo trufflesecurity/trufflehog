@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package lob
+package openrouter
 
 import (
 	"context"
@@ -10,27 +10,28 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-func TestLob_FromChunk(t *testing.T) {
+func TestOpenRouter_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LOB")
-	inactiveSecret := testSecrets.MustGetField("LOB_INACTIVE")
+
+	secret := testSecrets.MustGetField("OPENROUTER")
+	inactiveSecret := testSecrets.MustGetField("OPENROUTER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
+
 	tests := []struct {
 		name    string
 		s       Scanner
@@ -39,39 +40,35 @@ func TestLob_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "Found, unverified OpenRouter token sk-or-v1-",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a lob secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find an OpenRouter secret %s within", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Lob,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"environment": "live",
-					},
+					DetectorType: detector_typepb.DetectorType_OpenRouter,
+					Redacted:     inactiveSecret[:12] + "..." + inactiveSecret[70:],
+					Verified:     false,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "found, unverified",
+			name: "Found, verified OpenRouter token sk-or-v1-",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a lob secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find an OpenRouter secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Lob,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"environment": "live",
-					},
+					DetectorType: detector_typepb.DetectorType_OpenRouter,
+					Verified:     true,
+					Redacted:     secret[:12] + "..." + secret[70:],
 				},
 			},
 			wantErr: false,
@@ -93,21 +90,19 @@ func TestLob_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Lob.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("OpenRouter.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
+					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
-				if len(got[i].SecretParts) == 0 {
-					t.Fatalf("no secret parts present: \n %+v", got[i])
-				}
+				got[i].ExtraData = nil
 				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Lob.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("OpenRouter.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
