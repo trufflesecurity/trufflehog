@@ -13,6 +13,7 @@ import (
 
 var (
 	validPattern   = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_Zqr"
+	validPattern48 = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_ZqrAbcde"
 	invalidPattern = "phx_C1rP9fnAtEFJvb0IYCF?eQhar2WdwUFBYHJym1F_Zqr"
 	keyword        = "posthog"
 )
@@ -29,6 +30,11 @@ func TestAppPosthog_Pattern(t *testing.T) {
 			name:  "valid pattern - with keyword posthog",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
 			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern 48 chars - with keyword posthog",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern48),
+			want:  []string{validPattern48},
 		},
 		{
 			name:  "invalid pattern",

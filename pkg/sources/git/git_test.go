@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -58,6 +59,131 @@ func TestClone_Timeout(t *testing.T) {
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "timed out")
 		}
+	})
+}
+
+func TestIsRetryableCloneError(t *testing.T) {
+	retryable := []string{
+		// Connection reset mid-transfer.
+		`could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, error: RPC failed; curl 56 Recv failure: Connection reset by peer
+error: 7589 bytes of body are still expected
+fetch-pack: unexpected disconnect while reading sideband packet
+fatal: early EOF
+fatal: fetch-pack: invalid index-pack output`,
+		// HTTP/2 stream reset by the server.
+		`could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, error: RPC failed; curl 92 HTTP/2 stream 7 reset by server (error 0x8 CANCEL)
+error: 7457 bytes of body are still expected
+fetch-pack: unexpected disconnect while reading sideband packet
+fatal: early EOF
+fatal: fetch-pack: invalid index-pack output`,
+	}
+	for _, msg := range retryable {
+		assert.True(t, isRetryableCloneError(errors.New(msg)), "expected retryable: %q", msg)
+	}
+
+	notRetryable := []string{
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: The requested URL returned error: 403",
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, The requested URL returned error: 429",
+		"git clone timed out (after 1h0m0s)",
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, fatal: repository 'https://github.com/org/repo.git/' not found",
+	}
+	for _, msg := range notRetryable {
+		assert.False(t, isRetryableCloneError(errors.New(msg)), "expected not retryable: %q", msg)
+	}
+	assert.False(t, isRetryableCloneError(nil))
+}
+
+func TestCreateClonePath(t *testing.T) {
+	t.Run("temp dir when clonePath is empty", func(t *testing.T) {
+		path, err := createClonePath("https://github.com/org/repo.git", "")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(path) }()
+
+		info, err := os.Stat(path)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+		if runtime.GOOS != "windows" {
+			// os.MkdirTemp guarantees 0700 so private repo contents aren't
+			// exposed to other users on shared systems.
+			assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+		}
+	})
+
+	t.Run("temp dirs are unique across calls", func(t *testing.T) {
+		// A retry replaces the previous directory; a colliding name would
+		// mean cloning into a non-empty directory, which git refuses.
+		first, err := createClonePath("https://github.com/org/repo.git", "")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(first) }()
+
+		second, err := createClonePath("https://github.com/org/repo.git", "")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(second) }()
+
+		assert.NotEqual(t, first, second)
+	})
+
+	t.Run("clonePath set builds trufflehog-<repo> subdirectory", func(t *testing.T) {
+		base := t.TempDir()
+		path, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(base, "trufflehog-repo"), path)
+
+		info, err := os.Stat(path)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+		if runtime.GOOS != "windows" {
+			assert.Equal(t, os.FileMode(0755), info.Mode().Perm())
+		}
+	})
+
+	t.Run("repo name without .git suffix", func(t *testing.T) {
+		base := t.TempDir()
+		path, err := createClonePath("https://github.com/org/repo", base)
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(base, "trufflehog-repo"), path)
+	})
+
+	t.Run("trailing slash in repo URL", func(t *testing.T) {
+		base := t.TempDir()
+		path, err := createClonePath("https://github.com/org/repo.git/", base)
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(base, "trufflehog-repo"), path)
+	})
+
+	t.Run("nonexistent clonePath parents are created", func(t *testing.T) {
+		base := filepath.Join(t.TempDir(), "a", "b", "c")
+		path, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(base, "trufflehog-repo"), path)
+
+		info, err := os.Stat(path)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("second call with same arguments reuses the directory", func(t *testing.T) {
+		// The retry path calls this again after RemoveAll; it must also
+		// tolerate the directory already existing (MkdirAll semantics).
+		base := t.TempDir()
+		first, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+
+		second, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+		assert.Equal(t, first, second)
+	})
+
+	t.Run("error when clonePath location is not writable", func(t *testing.T) {
+		base := t.TempDir()
+		// Create a *file* where the subdirectory should go so MkdirAll fails.
+		blocker := filepath.Join(base, "trufflehog-repo")
+		assert.NoError(t, os.WriteFile(blocker, []byte("x"), 0644))
+
+		path, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.Error(t, err)
+		assert.Empty(t, path)
+		assert.Contains(t, err.Error(), "failed to create clone path")
 	})
 }
 

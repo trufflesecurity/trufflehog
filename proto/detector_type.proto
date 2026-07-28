@@ -1062,9 +1062,7 @@ enum DetectorType {
   NewRelicInsightsInsertKey = 1058;
   DuffelToken = 1059;
   Shippo = 1060;
-  DockerSwarmUnlock = 1062;
-  VaultToken = 1063;
-  BasicAuth = 1057;
-  VaultToken = 1068;
-}
+  HashiCorpVaultBatchToken = 1061;
+  HashiCorpVaultToken = 1062;
+  Duo = 1063;
 }
