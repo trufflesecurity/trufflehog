@@ -14,4 +14,4 @@ proto/ @trufflesecurity/integrations @trufflesecurity/scanning
 
 # Detectors are fully owned by integrations
 proto/detector_type.proto @trufflesecurity/integrations
-pkg/engine/defaults/ @trufflesecurity/integrations
+pkg/engine/defaults/ @trufflesecurity
