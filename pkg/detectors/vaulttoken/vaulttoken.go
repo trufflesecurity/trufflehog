@@ -90,7 +90,6 @@ func verifyVaultToken(ctx context.Context, client *http.Client, vaultUrls []stri
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
 
 		switch resp.StatusCode {
 		case http.StatusOK:
@@ -98,18 +97,23 @@ func verifyVaultToken(ctx context.Context, client *http.Client, vaultUrls []stri
 			var result map[string]interface{}
 			if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
 				if _, ok := result["data"]; ok {
+					resp.Body.Close()
 					return true, nil
 				}
 			}
+			resp.Body.Close()
 			return true, nil
 		case http.StatusForbidden, http.StatusUnauthorized:
 			// 403/401 - Invalid or expired token
+			resp.Body.Close()
 			return false, nil
 		case http.StatusBadRequest:
 			// 400 - Malformed request, continue to next URL
+			resp.Body.Close()
 			continue
 		default:
 			// Try next URL
+			resp.Body.Close()
 			continue
 		}
 	}

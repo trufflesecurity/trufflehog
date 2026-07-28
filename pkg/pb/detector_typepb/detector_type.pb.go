@@ -1117,6 +1117,7 @@ const (
 	DetectorType_HashiCorpVaultBatchToken                DetectorType = 1061
 	DetectorType_HashiCorpVaultToken                     DetectorType = 1062
 	DetectorType_Duo                                     DetectorType = 1063
+	DetectorType_VaultToken                              DetectorType = 1064
 )
 
 // Enum value maps for DetectorType.
@@ -2182,6 +2183,7 @@ var (
 		1061: "HashiCorpVaultBatchToken",
 		1062: "HashiCorpVaultToken",
 		1063: "Duo",
+		1064: "VaultToken",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3244,6 +3246,7 @@ var (
 		"HashiCorpVaultBatchToken":          1061,
 		"HashiCorpVaultToken":               1062,
 		"Duo":                               1063,
+		"VaultToken":                        1064,
 	}
 )
 
