@@ -1867,6 +1867,7 @@ func buildDetectorList() []detectors.Detector {
 		case *duo.Scanner:
 			return !feature.DuoDetectorEnabled.Load()
 		case *microsoftteamswebhookv2.Scanner:
+			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		default:
 			return false
 		}
