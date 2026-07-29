@@ -49,6 +49,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appoptics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/arcgisproxyconfig"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactoryreferencetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artsy"
@@ -946,6 +947,7 @@ func buildDetectorList() []detectors.Detector {
 		&appsync.Scanner{},
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
+		&arcgisproxyconfig.Scanner{},
 		&artifactory.Scanner{},
 		&artifactoryreferencetoken.Scanner{},
 		&artsy.Scanner{},
@@ -1864,6 +1866,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudflareGlobalApiKeyV2DetectorEnabled.Load()
 		case *duo.Scanner:
 			return !feature.DuoDetectorEnabled.Load()
+		case *arcgisproxyconfig.Scanner:
+			return !feature.ArcGISProxyConfigDetectorEnabled.Load()
 		default:
 			return false
 		}
