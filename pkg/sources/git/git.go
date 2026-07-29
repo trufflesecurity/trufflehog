@@ -643,14 +643,17 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	logger.V(3).Info("git subcommand finished", "output", output)
 
 	if common.IsDone(ctx) {
-		return nil, fmt.Errorf("git clone timed out (after %s)", time.Since(start))
+		elapsed := time.Since(start)
+		logger.V(1).Info("git clone timed out", "time_seconds", elapsed.Seconds())
+		metricsInstance.RecordCloneOperation(statusFailure, cloneFailureTimeout, elapsed)
+		return nil, fmt.Errorf("git clone timed out (after %s)", elapsed)
 	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "error", err)
+		elapsed := time.Since(start)
+		logger.V(1).Info("git clone failed", "error", err, "time_seconds", elapsed.Seconds(), "exit_code", cloneCmd.ProcessState.ExitCode())
 		failureReason := ClassifyCloneError(output)
-		exitCode := cloneCmd.ProcessState.ExitCode()
-		metricsInstance.RecordCloneOperation(statusFailure, failureReason, exitCode)
+		metricsInstance.RecordCloneOperation(statusFailure, failureReason, elapsed)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
@@ -658,9 +661,10 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	if err != nil {
 		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-	logger.V(1).Info("successfully cloned repo", "time_seconds", time.Since(start).Seconds())
+	elapsed := time.Since(start)
+	logger.V(1).Info("successfully cloned repo", "time_seconds", elapsed.Seconds())
 
-	metricsInstance.RecordCloneOperation(statusSuccess, cloneSuccess, 0)
+	metricsInstance.RecordCloneOperation(statusSuccess, cloneSuccess, elapsed)
 
 	return repo, nil
 }
@@ -687,16 +691,13 @@ func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
 	fakeRef := "TRUFFLEHOG_CHECK_GIT_REMOTE_URL_REACHABILITY"
 	gitArgs := []string{"ls-remote", lsUrl.String(), "--quiet", fakeRef}
 	cmd := exec.Command("git", gitArgs...)
+	start := time.Now()
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		// Record the ping failure with the appropriate reason and exit code
+		// Record the ping failure with the appropriate reason
 		failureReason := ClassifyCloneError(string(output))
-		exitCode := 0
-		if cmd.ProcessState != nil {
-			exitCode = cmd.ProcessState.ExitCode()
-		}
-		metricsInstance.RecordCloneOperation(statusFailure, failureReason, exitCode)
+		metricsInstance.RecordCloneOperation(statusFailure, failureReason, time.Since(start))
 	}
 
 	return err
