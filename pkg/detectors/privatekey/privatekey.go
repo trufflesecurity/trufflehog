@@ -81,7 +81,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.ExtraData["encrypted"] = "true"
 			parsedKey, passphrase, err = Crack([]byte(token))
 			if err != nil {
+				// The key is encrypted and the passphrase could not be
+				// recovered from the wordlist. It still represents a real
+				// exposure (offline-crackable, weak/legacy KDFs, passphrase
+				// often reused or committed nearby), so surface it as an
+				// unverified finding instead of dropping it silently.
 				s1.SetVerificationError(err, token)
+				results = append(results, s1)
 				continue
 			}
 			if passphrase != "" {

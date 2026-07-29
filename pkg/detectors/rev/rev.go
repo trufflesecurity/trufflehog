@@ -3,9 +3,10 @@ package rev
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -49,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Rev,
 				Raw:          []byte(resUserMatch),
-				SecretParts:  map[string]string{"key": resUserMatch},
+				SecretParts:  map[string]string{"key": resUserMatch, "client": resClientMatch},
 			}
 
 			if verify {

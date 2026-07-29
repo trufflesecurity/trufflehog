@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package sonarcloud
+package cloudflareapitoken
 
 import (
 	"context"
@@ -10,21 +10,25 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-func TestSonarCloud_FromChunk(t *testing.T) {
+func TestCloudflareApiTokenV2_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SONARCLOUD")
-	inactiveSecret := testSecrets.MustGetField("SONARCLOUD_INACTIVE")
+
+	userToken := testSecrets.MustGetField("CLOUDFLARE_USER_API_TOKEN_V2")
+	userTokenInactive := testSecrets.MustGetField("CLOUDFLARE_USER_API_TOKEN_V2_INACTIVE")
+	accountToken := testSecrets.MustGetField("CLOUDFLARE_ACCOUNT_API_TOKEN_V2")
+	accountID := testSecrets.MustGetField("CLOUDFLARE_ACCOUNT_API_TOKEN_V2_ACCOUNT_ID")
+	accountTokenInactive := testSecrets.MustGetField("CLOUDFLARE_ACCOUNT_API_TOKEN_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -39,32 +43,64 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "cfut_ found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("cloudflare token %s", userToken)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_SonarCloud,
+					DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
 					Verified:     true,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "found, unverified",
+			name: "cfut_ found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("cloudflare token %s", userTokenInactive)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_SonarCloud,
+					DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "cfat_ found, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("cloudflare token %s account %s", accountToken, accountID)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "cfat_ found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("cloudflare token %s account %s", accountTokenInactive, accountID)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_CloudflareApiToken,
 					Verified:     false,
 				},
 			},
@@ -87,7 +123,7 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("SonarCloud.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CloudflareApiTokenV2.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -95,9 +131,10 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("SonarCloud.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("CloudflareApiTokenV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

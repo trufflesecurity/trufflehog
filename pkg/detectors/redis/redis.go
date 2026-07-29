@@ -65,7 +65,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"host":     parsedURL.Host,
 				"password": password,
 			},
-			Redacted: redact,
+			Redacted:  redact,
+			ExtraData: extraDataFromURL(parsedURL),
 		}
 
 		if verify {
@@ -108,7 +109,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"host":     parsedURL.Host,
 				"password": password,
 			},
-			Redacted: redact,
+			Redacted:  redact,
+			ExtraData: extraDataFromURL(parsedURL),
 		}
 
 		if verify {
@@ -126,6 +128,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func extraDataFromURL(u *url.URL) map[string]string {
+	extraData := make(map[string]string)
+	if u.Host != "" {
+		extraData["host"] = u.Host
+	}
+	if u.User != nil && u.User.Username() != "" {
+		extraData["username"] = u.User.Username()
+	}
+	return extraData
 }
 
 func verifyRedis(ctx context.Context, u *url.URL) bool {

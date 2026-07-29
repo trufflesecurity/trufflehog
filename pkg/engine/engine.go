@@ -5,6 +5,7 @@ package engine
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"runtime"
@@ -127,8 +128,11 @@ type Config struct {
 
 	Dispatcher ResultsDispatcher
 
-	// SourceManager is used to manage the sources and units.
-	// TODO (ahrav): Update this comment, i'm dumb and don't really know what else it does.
+	// SourceManager orchestrates source enumeration and concurrent chunk production.
+	// The engine consumes chunks from its output channel via ChunksChan, and during
+	// Finish it calls SourceManager.Wait() to drain in-flight work before closing the
+	// downstream channels. Callers construct and own the SourceManager; the engine
+	// neither creates nor closes it.
 	SourceManager *sources.SourceManager
 
 	// PrintAvgDetectorTime sets the printAvgDetectorTime flag on the engine. If set to
@@ -215,7 +219,7 @@ type Engine struct {
 
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
-	dedupeCache *lru.Cache[string, detectorspb.DecoderType]
+	dedupeCache *lru.Cache[string, struct{}]
 
 	// verify determines whether the scanner will attempt to verify candidate secrets.
 	verify bool
@@ -231,6 +235,10 @@ type Engine struct {
 	verificationOverlapWorkerMultiplier int
 
 	maxDecodeDepth int
+
+	// runtimeCollector exposes live channel/worker/scan counters to Prometheus
+	// while the engine is running. Set in Start, cleared in Finish.
+	runtimeCollector *runtimeCollector
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.
@@ -503,14 +511,11 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
-	// TODO (ahrav): Determine the optimal cache size.
-	// KNOWN ISSUE: 512 entries is far too small for large scans. Under concurrent notifier
-	// workers a single burst of unique findings easily evicts previously seen keys, allowing
-	// the same secret to be re-emitted on every subsequent pass. Raise to at least 10000
-	// (or make configurable via Config).
-	const cacheSize = 512 // number of entries in the LRU cache
+	// The cache size is set to 5000 entries, which is a balance between memory usage and the need for effective deduplication.
+	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
+	const cacheSize = 5000
 
-	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
+	cache, err := lru.New[string, struct{}](cacheSize)
 	if err != nil {
 		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
@@ -641,6 +646,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) Start(ctx context.Context) {
 	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
 	e.sanityChecks(ctx)
+	e.registerRuntimeMetrics(ctx)
 	e.startWorkers(ctx)
 }
 
@@ -758,6 +764,8 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
+	e.unregisterRuntimeMetrics()
+
 	return err
 }
 
@@ -858,12 +866,18 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
 		sourceVerify := chunk.SourceVerify
+		sourceTypeStr := chunk.SourceType.String()
+		chunksEnteredStage.WithLabelValues("scanner", sourceTypeStr).Inc()
 
 		chunk.OriginalData = chunk.Data
 		decoded := iterativeDecode(chunk, e.decoders, e.maxDecodeDepth)
 
 		for _, d := range decoded {
 			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(d.Data)
+			if len(matchingDetectors) == 0 {
+				chunksDropped.WithLabelValues("scanner", "no_matching_detectors", sourceTypeStr).Inc()
+				continue
+			}
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -999,8 +1013,11 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
+		sourceTypeStr := chunk.chunk.SourceType.String()
+		chunksEnteredStage.WithLabelValues("verification_overlap", sourceTypeStr).Inc()
 		for _, detector := range chunk.detectors {
 			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
+			detectorNameStr := detector.Key.Type().String()
 
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
@@ -1011,8 +1028,9 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				if err != nil {
 					ctx.Logger().Error(
 						err, "error finding results in chunk during verification overlap",
-						"detector", detector.Key.Type().String(),
+						"detector", detectorNameStr,
 					)
+					chunksDropped.WithLabelValues("verification_overlap", "detector_error", sourceTypeStr).Inc()
 				}
 
 				if len(results) == 0 {
@@ -1028,7 +1046,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				// disable filtration for targeted scans, but if you're here because this problem surfaced for a
 				// non-targeted scan then we'll have to solve it correctly.
 				if chunk.chunk.SecretID == 0 {
-					results = e.filterResults(ctx, detector, results)
+					results = e.filterResults(ctx, "verification_overlap", detector, results)
 				}
 
 				for _, res := range results {
@@ -1045,6 +1063,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 					key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
 					if _, ok := chunkSecrets[key]; ok {
+						resultsDropped.WithLabelValues("verification_overlap", "intra_chunk_duplicate", detectorNameStr).Inc()
 						continue
 					}
 
@@ -1123,6 +1142,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	ctx.Logger().V(5).Info("Starting to detect chunk")
 
+	sourceTypeStr := data.chunk.SourceType.String()
+	detectorNameStr := data.detector.Type().String()
+	chunksEnteredStage.WithLabelValues("detect", sourceTypeStr).Inc()
+
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
 	var matchCount int
@@ -1150,16 +1173,21 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		cancel()
 		if err != nil {
 			ctx.Logger().Error(err, "error finding results in chunk")
+			chunksDropped.WithLabelValues("detect", "detector_error", sourceTypeStr).Inc()
 			continue
 		}
 
+		if len(results) > 0 {
+			resultsProduced.WithLabelValues(detectorNameStr).Add(float64(len(results)))
+		}
+
 		detectorExecutionCount.WithLabelValues(
-			data.detector.Type().String(),
-			strconv.Itoa(int(data.chunk.JobID)),
+			detectorNameStr,
+			sourceTypeStr,
 			data.chunk.SourceName,
 		).Inc()
 		detectorExecutionDuration.WithLabelValues(
-			data.detector.Type().String(),
+			detectorNameStr,
 		).Observe(float64(time.Since(start).Milliseconds()))
 
 		if e.printAvgDetectorTime && len(results) > 0 {
@@ -1183,8 +1211,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		// scans, but if you're here because this problem surfaced for a non-targeted scan then we'll have to solve it
 		// correctly.
 		if data.chunk.SecretID == 0 {
-			results = e.filterResults(ctx, data.detector, results)
+			results = e.filterResults(ctx, "detect", data.detector, results)
 		}
+
+		AssignDuplicateLineOffsets(&data.chunk, results)
 
 		for _, res := range results {
 			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Description(), isFalsePositive)
@@ -1200,9 +1230,11 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 func (e *Engine) filterResults(
 	ctx context.Context,
+	stage string,
 	detector *ahocorasick.DetectorMatch,
 	results []detectors.Result,
 ) []detectors.Result {
+	detectorNameStr := detector.Type().String()
 	clean := detectors.CleanResults
 	ignoreConfig := false
 	if cleaner, ok := detector.Detector.(detectors.CustomResultsCleaner); ok {
@@ -1210,11 +1242,23 @@ func (e *Engine) filterResults(
 		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
 	if e.filterUnverified || ignoreConfig {
-		results = clean(results)
+		reason := "filter_unverified"
+		if !e.filterUnverified && ignoreConfig {
+			reason = "custom_cleaner"
+		}
+		before := len(results)
+		results = clean(results, e.verify)
+		if dropped := before - len(results); dropped > 0 {
+			resultsDropped.WithLabelValues(stage, reason, detectorNameStr).Add(float64(dropped))
+		}
 	}
 
 	if e.filterEntropy != 0 {
+		before := len(results)
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
+		if dropped := before - len(results); dropped > 0 {
+			resultsDropped.WithLabelValues(stage, "filter_entropy", detectorNameStr).Add(float64(dropped))
+		}
 	}
 
 	return results
@@ -1241,11 +1285,13 @@ func (e *Engine) processResult(
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
 		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
 			ctx.Logger().Error(err, "error setting link")
+			resultsDropped.WithLabelValues("process_result", "update_link_error", res.DetectorType.String()).Inc()
 			return
 		}
 		chunk = copyChunk
 	}
 	if ignoreLinePresent {
+		resultsDropped.WithLabelValues("process_result", "ignore_line_tag", res.DetectorType.String()).Inc()
 		return
 	}
 
@@ -1264,47 +1310,54 @@ func (e *Engine) processResult(
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
 		startTime := time.Now()
+		detectorNameStr := result.DetectorType.String()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
 			if result.IsWordlistFalsePositive && !e.retainFalsePositives {
 				// Skip false positives
+				resultsDropped.WithLabelValues("notifier", "wordlist_false_positive", detectorNameStr).Inc()
 				continue
 			} else if result.VerificationError() != nil {
 				if !e.notifyUnknownResults {
 					// Skip results with verification errors.
+					resultsDropped.WithLabelValues("notifier", "unknown_result_filtered", detectorNameStr).Inc()
 					continue
 				}
 			} else if !e.notifyUnverifiedResults {
 				// Skip unverified results.
+				resultsDropped.WithLabelValues("notifier", "unverified_result_filtered", detectorNameStr).Inc()
 				continue
 			}
 		} else if !e.notifyVerifiedResults {
 			// Skip verified results.
 			// TODO: Is this a legitimate use case?
+			resultsDropped.WithLabelValues("notifier", "verified_result_filtered", detectorNameStr).Inc()
 			continue
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
 
 		// Dedupe results by comparing the detector type, raw result, and source metadata.
-		// We want to avoid duplicate results with different decoder types, but we also
-		// want to include duplicate results with the same decoder type.
-		// Duplicate results with the same decoder type SHOULD have their own entry in the
-		// results list, this would happen if the same secret is found multiple times.
-		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
+		// The key includes SourceMetadata (file path, line numbers, etc.) so genuinely
+		// different occurrences of the same credential at different locations are not
+		// suppressed. Only exact duplicates — same credential at the same location — are
+		// filtered, which handles peek-overlap re-scans and cross-decoder duplicates alike.
+		// The key also include the DetectorName to prevent deduping the results for
+		// custom detectors which have the same type.
+		// MD5 hash of the key is used to reduce memory usage of the dedupe cache,
+		// since the raw result and source metadata can be large.
 		//
-		// KNOWN ISSUE: The condition below only suppresses duplicates when the decoder type
-		// differs (cross-decoder dedup). For the same decoder type the condition evaluates to
-		// false and EVERY occurrence passes through, even when key is already in the cache.
-		// The LRU cache size of 512 entries further compounds this under concurrent notifier
-		// workers: entries are evicted quickly, re-admitting the same finding on every pass.
-		// Proposed fix: change the condition to `if _, ok := e.dedupeCache.Get(key); ok`
-		// and raise the cache size (see cacheSize const in initialize()).
-		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
-		if val, ok := e.dedupeCache.Get(key); ok && (val != result.DecoderType ||
-			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
-			continue
+		// This deduplication only applies to results that are *not*
+		// from reverification, since we are expected to see the same
+		// result from reverification and want to Dispatch it below.
+		if result.SecretID == 0 {
+			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
+			key := string(h[:])
+			if _, ok := e.dedupeCache.Get(key); ok {
+				resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
+				continue
+			}
+			e.dedupeCache.Add(key, struct{}{})
 		}
-		e.dedupeCache.Add(key, result.DecoderType)
 
 		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
@@ -1314,6 +1367,9 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 
 		if err := e.dispatcher.Dispatch(ctx, result); err != nil {
 			ctx.Logger().Error(err, "error notifying result")
+			resultsDispatched.WithLabelValues(detectorNameStr, strconv.FormatBool(result.Verified), "false").Inc()
+		} else {
+			resultsDispatched.WithLabelValues(detectorNameStr, strconv.FormatBool(result.Verified), "true").Inc()
 		}
 
 		chunksNotifiedLatency.Observe(float64(time.Since(startTime).Milliseconds()))
@@ -1339,21 +1395,39 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	}
 }
 
+// effectiveSecret returns the canonical secret string for a result, preferring
+// the primary secret value and falling back to Raw. Callers that compute or
+// consume chunk offsets must go through this helper so the two stay in sync.
+func effectiveSecret(r *detectors.Result) string {
+	secret := r.GetPrimarySecretValue()
+	if secret == "" {
+		secret = string(r.Raw)
+	}
+	return secret
+}
+
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	// get the primary secret value from the result if set
-	secret := result.GetPrimarySecretValue()
-	if secret == "" {
-		secret = string(result.Raw)
+	secretBytes := []byte(effectiveSecret(result))
+
+	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
+	// pre-assigned (for duplicate secrets), use it directly to find the correct
+	// occurrence instead of always matching the first one.
+	var offset int
+	if result.HasChunkOffset() {
+		offset = int(result.ChunkOffset())
+	} else {
+		offset = bytes.Index(chunk.Data, secretBytes)
+		if offset == -1 {
+			return 0, false
+		}
 	}
 
-	before, after, found := bytes.Cut(chunk.Data, []byte(secret))
-	if !found {
-		return 0, false
-	}
-	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
 	result.SetPrimarySecretLine(lineNumber)
-	// If the line contains the ignore tag, we should ignore the result.
+
+	// If the line containing the secret has the ignore tag, we should ignore the result.
+	after := chunk.Data[offset+len(secretBytes):]
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
 		endLine = len(after)
@@ -1362,6 +1436,46 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		return lineNumber, true
 	}
 	return lineNumber, false
+}
+
+// AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same
+// secret value within a chunk. This allows FragmentLineOffset to locate the correct
+// occurrence instead of always finding the first one.
+func AssignDuplicateLineOffsets(chunk *sources.Chunk, results []detectors.Result) {
+	// Group result indices by their secret value.
+	type group struct {
+		secret  string
+		indices []int
+	}
+	seen := make(map[string]int) // secret -> index into groups slice
+	var groups []group
+
+	for i := range results {
+		secret := effectiveSecret(&results[i])
+		if idx, ok := seen[secret]; ok {
+			groups[idx].indices = append(groups[idx].indices, i)
+		} else {
+			seen[secret] = len(groups)
+			groups = append(groups, group{secret: secret, indices: []int{i}})
+		}
+	}
+
+	for _, g := range groups {
+		if len(g.indices) <= 1 {
+			continue
+		}
+		secretBytes := []byte(g.secret)
+		searchStart := 0
+		for _, ri := range g.indices {
+			pos := bytes.Index(chunk.Data[searchStart:], secretBytes)
+			if pos == -1 {
+				break
+			}
+			absPos := searchStart + pos
+			results[ri].SetChunkOffset(int64(absPos))
+			searchStart = absPos + len(secretBytes)
+		}
+	}
 }
 
 // FragmentFirstLineAndLink extracts the first line number and the link from the chunk metadata.
