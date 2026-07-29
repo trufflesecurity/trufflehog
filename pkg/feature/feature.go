@@ -19,6 +19,7 @@ var (
 	PineconeDetectorEnabled                  atomic.Bool
 	CloudinaryDetectorEnabled                atomic.Bool
 	GitLabOAuthDetectorEnabled               atomic.Bool
+	SonarCloudV2DetectorEnabled              atomic.Bool
 	EnigmaDetectorEnabled                    atomic.Bool
 	DatadogApiKeyDetectorEnabled             atomic.Bool
 	TlyDetectorEnabled                       atomic.Bool
@@ -38,6 +39,9 @@ var (
 	LobDetectorEnabled                       atomic.Bool
 	HashiCorpVaultBatchTokenDetectorEnabled  atomic.Bool
 	HashiCorpVaultTokenDetectorEnabled       atomic.Bool
+	CloudflareApiTokenV2DetectorEnabled      atomic.Bool
+	CloudflareGlobalApiKeyV2DetectorEnabled  atomic.Bool
+	DuoDetectorEnabled                       atomic.Bool
 )
 
 type AtomicString struct {

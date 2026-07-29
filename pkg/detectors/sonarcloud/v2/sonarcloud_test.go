@@ -1,4 +1,4 @@
-package cloudflareglobalapikey
+package sonarcloud
 
 import (
 	"context"
@@ -12,14 +12,13 @@ import (
 )
 
 var (
-	validPattern   = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012 / testuser1005@example.com"
-	invalidPattern = "abcD123efg456HIJklmn789OPQ_rstUVWxYZ-012/testing@go"
+	validPattern   = "sqco_FbT1v5HrMX6qyKUkaoLQdYOniAVhbEccERraQABuhBayDOkyCZTa8TDQFRp"
+	invalidPattern = "sqco_FbT1v5HrMX6qyKUkaoLQdYOniAVhbEccERraQABuhBayDOkyCZTa8TDQF=="
 )
 
-func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
+func TestSonarCloud_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
@@ -27,25 +26,25 @@ func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("cloudflare: %s", validPattern),
-			want:  []string{"abcD123efg456HIJklmn789OPQ_rstUVWxYZ-testuser1005@example.com"},
+			input: fmt.Sprintf("token = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("cloudflare keyword is not close to the real key and id = %s", validPattern),
-			want:  nil,
+			name:  "valid pattern - ignore duplicate",
+			input: fmt.Sprintf("token = '%s' | '%s'", validPattern, validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("cloudflare: %s", invalidPattern),
-			want:  nil,
+			input: fmt.Sprintf("token = '%s'", invalidPattern),
+			want:  []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 && test.want != nil {
+			if len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
@@ -57,7 +56,11 @@ func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				t.Errorf("expected %d results, got %d", len(test.want), len(results))
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
 				return
 			}
 

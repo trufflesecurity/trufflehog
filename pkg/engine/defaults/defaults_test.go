@@ -144,6 +144,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Lob:                       {},
 	detector_typepb.DetectorType_HashiCorpVaultBatchToken:  {},
 	detector_typepb.DetectorType_HashiCorpVaultToken:       {},
+	detector_typepb.DetectorType_Duo:                       {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()

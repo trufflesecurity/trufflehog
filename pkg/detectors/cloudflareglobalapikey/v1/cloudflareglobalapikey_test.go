@@ -1,4 +1,4 @@
-package posthog
+package cloudflareglobalapikey
 
 import (
 	"context"
@@ -12,41 +12,40 @@ import (
 )
 
 var (
-	validPattern   = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_Zqr"
-	validPattern48 = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_ZqrAbcde"
-	invalidPattern = "phx_C1rP9fnAtEFJvb0IYCF?eQhar2WdwUFBYHJym1F_Zqr"
-	keyword        = "posthog"
+	validPattern   = "abcdef1234567890abcdef1234567890abcdef0 / testuser1005@example.com"
+	invalidPattern = "abcdef1234567890abcdef1234567890abcdef0/testing@go"
 )
 
-func TestAppPosthog_Pattern(t *testing.T) {
+func TestCloudFlareGlobalAPIKey_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword posthog",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			name:  "valid pattern",
+			input: fmt.Sprintf("cloudflare: %s", validPattern),
+			want:  []string{"abcdef1234567890abcdef1234567890abcdef0testuser1005@example.com"},
 		},
 		{
-			name:  "valid pattern 48 chars - with keyword posthog",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern48),
-			want:  []string{validPattern48},
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("cloudflare keyword is not close to the real key and id = %s", validPattern),
+			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
+			input: fmt.Sprintf("cloudflare: %s", invalidPattern),
+			want:  nil,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
+			if len(matchedDetectors) == 0 && test.want != nil {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
@@ -58,11 +57,7 @@ func TestAppPosthog_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("expected %d results, got %d", len(test.want), len(results))
 				return
 			}
 

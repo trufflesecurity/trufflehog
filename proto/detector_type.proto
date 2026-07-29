@@ -1064,4 +1064,5 @@ enum DetectorType {
   Shippo = 1060;
   HashiCorpVaultBatchToken = 1061;
   HashiCorpVaultToken = 1062;
+  Duo = 1063;
 }
