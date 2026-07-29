@@ -2,13 +2,14 @@ package vaulttoken
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvault"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -20,16 +21,13 @@ type Scanner struct {
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
-	// HashiCorp Vault token patterns
-	// Service tokens (Vault 1.10+): hvs.CAESXXXX... (90+ chars)
-	// Batch tokens: hvb.AAAAAQXXXX... (138+ chars)
-	// Recovery tokens: hvr.CAESXXXX... (138+ chars)
-	// Legacy service tokens: s.XXXXXXXX... (24+ chars)
-	tokenPat = regexp.MustCompile(`\b(hvs\.[A-Za-z0-9_-]{20,}|hvb\.[A-Za-z0-9_-]{100,}|hvr\.[A-Za-z0-9_-]{100,}|s\.[a-zA-Z0-9]{24,})\b`)
+	// Recovery tokens are not covered by existing HashiCorpVaultToken/BatchToken detectors.
+	tokenPat    = regexp.MustCompile(`\b(hvr\.[A-Za-z0-9_-]{100,})(?:$|[^A-Za-z0-9_-])`)
+	vaultURLPat = regexp.MustCompile(`(https?:\/\/[^\s\/]*\.hashicorp\.cloud(?::\d+)?)(?:\/[^\s]*)?`)
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"hvs.", "hvb.", "hvr.", "s.", "vault_token", "VAULT_TOKEN"}
+	return []string{"hvr.", "vault"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -38,6 +36,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	uniqueMatches := make(map[string]struct{})
 	for _, match := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueMatches[match[1]] = struct{}{}
+	}
+
+	uniqueVaultURLs := make(map[string]struct{})
+	for _, match := range vaultURLPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueVaultURLs[strings.TrimSpace(match[1])] = struct{}{}
+	}
+	endpoints := make([]string, 0, len(uniqueVaultURLs))
+	for endpoint := range uniqueVaultURLs {
+		endpoints = append(endpoints, endpoint)
 	}
 
 	for token := range uniqueMatches {
@@ -52,17 +59,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			// Try to get Vault server URL from endpoints or use common defaults
-			vaultUrls := s.Endpoints("https://vault.example.com")
-			if len(vaultUrls) == 0 {
-				vaultUrls = []string{
-					"http://127.0.0.1:8200",
-					"http://localhost:8200",
-					"https://vault.hashicorp.cloud",
-				}
-			}
-
-			isVerified, verificationErr := verifyVaultToken(ctx, client, vaultUrls, token)
+			vaultURLs := s.Endpoints(endpoints...)
+			isVerified, verificationErr := verifyVaultToken(ctx, client, vaultURLs, token)
 			s1.Verified = isVerified
 
 			if verificationErr != nil {
@@ -77,49 +75,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyVaultToken(ctx context.Context, client *http.Client, vaultUrls []string, token string) (bool, error) {
+	if len(vaultUrls) == 0 {
+		return false, fmt.Errorf("no vault endpoint found for verification")
+	}
+
+	var lastErr error
 	for _, baseURL := range vaultUrls {
-		// Use token lookup-self endpoint to verify token
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/v1/auth/token/lookup-self", nil)
+		verified, _, err := hashicorpvault.VerifyVaultToken(
+			ctx,
+			client,
+			detector_typepb.DetectorType_VaultToken,
+			baseURL,
+			token,
+		)
 		if err != nil {
+			lastErr = err
 			continue
 		}
-
-		req.Header.Set("X-Vault-Token", token)
-
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-
-		switch resp.StatusCode {
-		case http.StatusOK:
-			// Token is valid - parse response to confirm
-			var result map[string]interface{}
-			if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
-				if _, ok := result["data"]; ok {
-					resp.Body.Close()
-					return true, nil
-				}
-			}
-			resp.Body.Close()
+		if verified {
 			return true, nil
-		case http.StatusForbidden, http.StatusUnauthorized:
-			// 403/401 - Invalid or expired token
-			resp.Body.Close()
-			return false, nil
-		case http.StatusBadRequest:
-			// 400 - Malformed request, continue to next URL
-			resp.Body.Close()
-			continue
-		default:
-			// Try next URL
-			resp.Body.Close()
-			continue
 		}
 	}
 
-	// Could not verify with any URL - return error
-	return false, fmt.Errorf("unable to verify token with provided Vault endpoints")
+	if lastErr != nil {
+		return false, lastErr
+	}
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

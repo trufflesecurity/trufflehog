@@ -21,20 +21,8 @@ func TestVaultToken_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "valid service token format (hvs)",
-			data: `export VAULT_TOKEN="hvs.CAESIJZm1j2kPxvbKIoZ8q5cN3bXKdXhN0ZGRjN0ZGRjN0ZG1234567890"`,
-			want: []detectors.Result{
-				{
-					DetectorType: detector_typepb.DetectorType_VaultToken,
-					Verified:     false, // Will be false without actual Vault server
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true, // No server available
-		},
-		{
-			name: "valid legacy token format (s.)",
-			data: `vault_token: s.1234567890abcdefghijklmn`,
+			name: "valid recovery token format (hvr)",
+			data: `vault_url=https://example.hashicorp.cloud hvr.CAESIJZm1j2kPxvbKIoZ8q5cN3bXKdXhN0ZGRjN0ZGRjN0ZG1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890AB`,
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_VaultToken,
@@ -45,8 +33,14 @@ func TestVaultToken_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
-			name: "token in code",
-			data: `client.SetToken("hvs.CAESIAbcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ")`,
+			name:    "service token handled by hashicorpvault detector",
+			data:    `hvs.CAESIJZm1j2kPxvbKIoZ8q5cN3bXKdXhN0ZGRjN0ZGRjN0ZG1234567890`,
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "token ending with hyphen is not truncated",
+			data: `https://example.hashicorp.cloud token=hvr.CAESIAbcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_abcdefghijklmnopqrstuvwxyz--- `,
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_VaultToken,
@@ -67,18 +61,6 @@ func TestVaultToken_FromChunk(t *testing.T) {
 			data: `export TOKEN="xyz.1234567890abcdefghijklmnopqrstuvwxyz"`,
 			want: nil,
 			wantErr: false,
-		},
-		{
-			name: "batch token format",
-			data: `VAULT_BATCH_TOKEN=hvb.` + "A" + "AAAA" + "QIbC" + "0tLS" + "0tCR" + "UdJT" + "iBQR" + "1AgT" + "UVNT" + "0FHRS" + "0tLS" + "0tCgp" + "3Y0JN" + "QTFOR" + "01uOV" + "Fnnn" + "d3QVF" + "mL3pM" + "Q3Mv" + "12345" + "67890" + "abcde" + "fghij" + "klmno" + "pqrst" + "uvwxy" + "zABCD" + "EF",
-			want: []detectors.Result{
-				{
-					DetectorType: detector_typepb.DetectorType_VaultToken,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
 		},
 	}
 
