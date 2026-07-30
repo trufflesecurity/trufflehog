@@ -67,7 +67,7 @@ func (u *UnitHook) id(ref JobProgressRef, unit SourceUnit) string {
 		id, kind := unit.SourceUnitID()
 		unitID = fmt.Sprintf("%s:%s", kind, id)
 	}
-	return fmt.Sprintf("%d/%d/%s", ref.SourceID, ref.JobID, unitID)
+	return fmt.Sprintf("%d/%d/%s/%d", ref.SourceID, ref.JobID, unitID, ref.JobAttemptID)
 }
 
 func (u *UnitHook) ejectFinishedMetrics(metrics UnitMetrics) {

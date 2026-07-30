@@ -17,6 +17,8 @@ import (
 type (
 	SourceID int64
 	JobID    int64
+	// JobAttemptID identifies a caller-defined attempt of a job.
+	JobAttemptID int64
 )
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.

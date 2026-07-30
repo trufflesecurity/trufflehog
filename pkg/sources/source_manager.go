@@ -128,12 +128,14 @@ func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sour
 // JobProgressRef as it becomes available.
 func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string, source Source, targets ...ChunkingTarget) (JobProgressRef, error) {
 	sourceID, jobID := source.SourceID(), source.JobID()
+	jobAttemptID := jobAttemptIDFromContext(ctx)
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
 		return JobProgressRef{
-			SourceName: sourceName,
-			SourceID:   sourceID,
-			JobID:      jobID,
+			SourceName:   sourceName,
+			SourceID:     sourceID,
+			JobID:        jobID,
+			JobAttemptID: jobAttemptID,
 		}, err
 	}
 	// Create a JobProgress object for tracking progress.
@@ -142,7 +144,7 @@ func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string,
 		sem = s.prioritySem
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
-	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
+	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel), withJobAttemptID(jobAttemptID))
 	if err := sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
 		progress.ReportError(Fatal{err})
@@ -177,18 +179,20 @@ func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string,
 
 func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source Source, reporter UnitReporter) (JobProgressRef, error) {
 	sourceID, jobID := source.SourceID(), source.JobID()
+	jobAttemptID := jobAttemptIDFromContext(ctx)
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
 		return JobProgressRef{
-			SourceName: sourceName,
-			SourceID:   sourceID,
-			JobID:      jobID,
+			SourceName:   sourceName,
+			SourceID:     sourceID,
+			JobID:        jobID,
+			JobAttemptID: jobAttemptID,
 		}, err
 	}
 
 	// Create a JobProgress object for tracking progress.
 	ctx, cancel := context.WithCancelCause(ctx)
-	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
+	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel), withJobAttemptID(jobAttemptID))
 
 	// Wrap the passed in reporter so we update the progress information.
 	reporter = baseUnitReporter{
@@ -222,17 +226,19 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 // accessible via the JobProgressRef as it becomes available.
 func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Source, unit SourceUnit) (JobProgressRef, error) {
 	sourceID, jobID := source.SourceID(), source.JobID()
+	jobAttemptID := jobAttemptIDFromContext(ctx)
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
 		return JobProgressRef{
-			SourceName: sourceName,
-			SourceID:   sourceID,
-			JobID:      jobID,
+			SourceName:   sourceName,
+			SourceID:     sourceID,
+			JobID:        jobID,
+			JobAttemptID: jobAttemptID,
 		}, err
 	}
 	// Create a JobProgress object for tracking progress.
 	ctx, cancel := context.WithCancelCause(ctx)
-	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
+	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel), withJobAttemptID(jobAttemptID))
 	if err := s.sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
 		progress.ReportError(Fatal{err})
