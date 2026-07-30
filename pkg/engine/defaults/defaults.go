@@ -510,7 +510,9 @@ import (
 	netlifyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicbrowserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicinsightsinsertkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newreliclicensekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
@@ -1424,7 +1426,9 @@ func buildDetectorList() []detectors.Detector {
 		&netlifyv2.Scanner{},
 		&netsuite.Scanner{},
 		&neutrinoapi.Scanner{},
+		&newrelicbrowserkey.Scanner{},
 		&newrelicinsightsinsertkey.Scanner{},
+		&newreliclicensekey.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
 		&newrelicuserkey.Scanner{},
 		&newsapi.Scanner{},
@@ -1866,6 +1870,10 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudflareGlobalApiKeyV2DetectorEnabled.Load()
 		case *duo.Scanner:
 			return !feature.DuoDetectorEnabled.Load()
+		case *newreliclicensekey.Scanner:
+			return !feature.NewRelicLicenseKeyDetectorEnabled.Load()
+		case *newrelicbrowserkey.Scanner:
+			return !feature.NewRelicBrowserKeyDetectorEnabled.Load()
 		case *newrelicuserkey.Scanner:
 			return !feature.NewRelicUserKeyDetectorEnabled.Load()
 		default:
