@@ -1065,5 +1065,6 @@ enum DetectorType {
   HashiCorpVaultBatchToken = 1061;
   HashiCorpVaultToken = 1062;
   Duo = 1063;
-  AdobeIMS = 1064;
+  NewRelicLicenseKey = 1064;
+  AdobeIMS = 1065;
 }
