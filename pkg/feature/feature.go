@@ -44,6 +44,7 @@ var (
 	DuoDetectorEnabled                       atomic.Bool
 	NewRelicLicenseKeyDetectorEnabled        atomic.Bool
 	NewRelicBrowserKeyDetectorEnabled        atomic.Bool
+	NewRelicUserKeyDetectorEnabled           atomic.Bool
 )
 
 type AtomicString struct {

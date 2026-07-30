@@ -514,6 +514,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicinsightsinsertkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newreliclicensekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
@@ -1429,6 +1430,7 @@ func buildDetectorList() []detectors.Detector {
 		&newrelicinsightsinsertkey.Scanner{},
 		&newreliclicensekey.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
+		&newrelicuserkey.Scanner{},
 		&newsapi.Scanner{},
 		&newscatcher.Scanner{},
 		&nexmoapikey.Scanner{},
@@ -1872,6 +1874,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.NewRelicLicenseKeyDetectorEnabled.Load()
 		case *newrelicbrowserkey.Scanner:
 			return !feature.NewRelicBrowserKeyDetectorEnabled.Load()
+		case *newrelicuserkey.Scanner:
+			return !feature.NewRelicUserKeyDetectorEnabled.Load()
 		default:
 			return false
 		}

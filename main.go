@@ -566,6 +566,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.DuoDetectorEnabled.Store(true)
 	feature.NewRelicLicenseKeyDetectorEnabled.Store(true)
 	feature.NewRelicBrowserKeyDetectorEnabled.Store(true)
+	feature.NewRelicUserKeyDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

@@ -1067,4 +1067,5 @@ enum DetectorType {
   Duo = 1063;
   NewRelicLicenseKey = 1064;
   NewRelicBrowserKey = 1065;
+  NewRelicUserKey = 1066;
 }
