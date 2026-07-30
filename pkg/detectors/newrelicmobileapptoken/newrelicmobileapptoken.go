@@ -61,13 +61,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			SecretParts:  map[string]string{"key": resMatch},
 		}
 
+		if strings.HasPrefix(resMatch, "eu01xx") {
+			s1.SecretParts["region"] = "eu"
+			s1.ExtraData = map[string]string{"region": "eu"}
+		} else {
+			s1.SecretParts["region"] = "us"
+			s1.ExtraData = map[string]string{"region": "us"}
+		}
+
 		if verify {
-			isVerified, extraData, verificationErr := s.verify(ctx, resMatch)
+			isVerified, verificationErr := s.verify(ctx, resMatch, s1.SecretParts["region"])
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
-			if s1.ExtraData != nil {
-				s1.SecretParts["region"] = extraData["region"]
-			}
 			s1.SetVerificationError(verificationErr)
 		}
 
@@ -83,18 +87,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // while a 401 status code indicates that the key is invalid. Any other status code is treated as an error.
 // This API is not documented, and was discovered by digging into New Relic's Android agent SDK code:
 // https://github.com/newrelic/newrelic-android-agent
-func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]string, error) {
+func (s Scanner) verify(ctx context.Context, key, region string) (bool, error) {
 	host := "https://mobile-collector.newrelic.com"
-	region := "us"
-	if strings.HasPrefix(key, "eu01xx") {
+
+	if region == "eu" {
 		// EU region keys have a different host
 		host = "https://mobile-collector.eu01.nr-data.net"
-		region = "eu"
 	}
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, host+"/mobile/v5/connect", http.NoBody)
 	if err != nil {
-		return false, nil, fmt.Errorf("error constructing request: %w", err)
+		return false, fmt.Errorf("error constructing request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-App-License-Key", key)
@@ -102,7 +105,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 	client := s.getClient()
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, fmt.Errorf("error making request: %w", err)
+		return false, fmt.Errorf("error making request: %w", err)
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -111,10 +114,10 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 
 	switch res.StatusCode {
 	case http.StatusBadRequest:
-		return true, map[string]string{"region": region}, nil
+		return true, nil
 	case http.StatusUnauthorized:
-		return false, map[string]string{"region": region}, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 }
