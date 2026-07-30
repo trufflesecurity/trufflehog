@@ -1,4 +1,4 @@
-package posthog
+package newreliclicensekey
 
 import (
 	"context"
@@ -12,13 +12,12 @@ import (
 )
 
 var (
-	validPattern   = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_Zqr"
-	validPattern48 = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_ZqrAbcde"
-	invalidPattern = "phx_C1rP9fnAtEFJvb0IYCF?eQhar2WdwUFBYHJym1F_Zqr"
-	keyword        = "posthog"
+	validPattern   = "72322bc2443d330cf29cde9f24fca105FFFFNRAL"
+	validPatternEU = "eu01xxb7e8b0dddc28ac051a64ffd583FFFFNRAL"
+	invalidPattern = "72322bc2443d330cf29cde9f24fca5FFFFNRAL"
 )
 
-func TestAppPosthog_Pattern(t *testing.T) {
+func TestNewRelicLicenseKey_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -27,18 +26,18 @@ func TestAppPosthog_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword posthog",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			name:  "valid pattern",
+			input: fmt.Sprintf("new relic license key = '%s'", validPattern),
 			want:  []string{validPattern},
 		},
 		{
-			name:  "valid pattern 48 chars - with keyword posthog",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern48),
-			want:  []string{validPattern48},
+			name:  "valid pattern EU",
+			input: fmt.Sprintf("new relic license key EU = '%s'", validPatternEU),
+			want:  []string{validPatternEU},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			input: fmt.Sprintf("new relic license key = '%s'", invalidPattern),
 			want:  []string{},
 		},
 	}

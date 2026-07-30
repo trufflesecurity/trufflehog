@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// more context to be added if this is too generic
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"square"}) + `(EAAA[a-zA-Z0-9\-\+\=]{60})`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"square"}) + `(EAAA[a-zA-Z0-9\-_+=]{60})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
