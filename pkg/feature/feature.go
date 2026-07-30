@@ -45,6 +45,7 @@ var (
 	NewRelicLicenseKeyDetectorEnabled        atomic.Bool
 	NewRelicBrowserKeyDetectorEnabled        atomic.Bool
 	NewRelicUserKeyDetectorEnabled           atomic.Bool
+	NewRelicInsightsQueryKeyDetectorEnabled  atomic.Bool
 )
 
 type AtomicString struct {

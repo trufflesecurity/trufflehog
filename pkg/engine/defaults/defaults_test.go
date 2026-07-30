@@ -148,6 +148,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_NewRelicLicenseKey:        {},
 	detector_typepb.DetectorType_NewRelicBrowserKey:        {},
 	detector_typepb.DetectorType_NewRelicUserKey:           {},
+	detector_typepb.DetectorType_NewRelicInsightsQueryKey:  {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
