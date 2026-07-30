@@ -114,7 +114,7 @@ func TestNewRelicBrowserKey_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewRelicLicenseKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewRelicBrowserKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -128,7 +128,7 @@ func TestNewRelicBrowserKey_FromChunk(t *testing.T) {
 				got[i].Redacted = ""
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("NewRelicLicenseKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("NewRelicBrowserKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
