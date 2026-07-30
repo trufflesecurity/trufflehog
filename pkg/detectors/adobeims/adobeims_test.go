@@ -138,11 +138,11 @@ func TestAdobeIMS_Verification_Request(t *testing.T) {
 		gotContentType = r.Header.Get("Content-Type")
 		b, _ := io.ReadAll(r.Body)
 		gotBody = string(b)
-		fmt.Fprintf(w, `{"valid":true}`)
+		_, _ = fmt.Fprintf(w, `{"valid":true}`)
 	}))
 	defer srv.Close()
 
-	validateToken(context.Background(), srv.Client(), srv.URL, accessToken, payload)
+	_, _ = validateToken(context.Background(), srv.Client(), srv.URL, accessToken, payload)
 
 	if gotMethod != http.MethodPost {
 		t.Errorf("method: want POST, got %s", gotMethod)
@@ -168,7 +168,7 @@ func TestAdobeIMS_Verification_Request(t *testing.T) {
 
 func TestAdobeIMS_Verification_Valid(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, `{"valid":true}`)
+		_, _ = fmt.Fprintf(w, `{"valid":true}`)
 	}))
 	defer srv.Close()
 
@@ -188,7 +188,7 @@ func TestAdobeIMS_Verification_Valid(t *testing.T) {
 
 func TestAdobeIMS_Verification_Invalid(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, `{"valid":false}`)
+		_, _ = fmt.Fprintf(w, `{"valid":false}`)
 	}))
 	defer srv.Close()
 

@@ -185,7 +185,7 @@ func validateToken(ctx context.Context, client *http.Client, baseURL, token stri
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read the full response body into memory.
 	body, err := io.ReadAll(resp.Body)
