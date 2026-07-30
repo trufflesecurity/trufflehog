@@ -62,13 +62,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			SecretParts:  map[string]string{"key": resMatch},
 		}
 
+		if strings.HasPrefix(resMatch, "eu01xx") {
+			s1.SecretParts["region"] = "eu"
+			s1.ExtraData = map[string]string{"region": "eu"}
+		} else {
+			s1.SecretParts["region"] = "us"
+			s1.ExtraData = map[string]string{"region": "us"}
+		}
+
 		if verify {
-			isVerified, extraData, verificationErr := s.verify(ctx, resMatch)
+			isVerified, verificationErr := s.verify(ctx, resMatch, s1.SecretParts["region"])
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
-			if extraData != nil {
-				s1.SecretParts["region"] = extraData["region"]
-			}
 			s1.SetVerificationError(verificationErr)
 		}
 
@@ -82,18 +86,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // It sends a POST request to the metrics endpoint. A valid key will result in a 202 Accepted response, while an invalid key will return a 403 Forbidden.
 // Even though the response is 202, no data is actually published to New Relic since the request body is empty.
 // https://docs.newrelic.com/docs/data-apis/ingest-apis/metric-api/report-metrics-metric-api/
-func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]string, error) {
+func (s Scanner) verify(ctx context.Context, key, region string) (bool, error) {
 	host := "https://metric-api.newrelic.com"
-	region := "us"
-	if strings.HasPrefix(key, "eu01xx") {
+	if region == "eu" {
 		// EU region keys have a different host
 		host = "https://metric-api.eu.newrelic.com"
-		region = "eu"
 	}
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, host+"/metric/v1", http.NoBody)
 	if err != nil {
-		return false, nil, fmt.Errorf("error constructing request: %w", err)
+		return false, fmt.Errorf("error constructing request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Api-Key", key)
@@ -101,7 +103,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 	client := s.getClient()
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, fmt.Errorf("error making request: %w", err)
+		return false, fmt.Errorf("error making request: %w", err)
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -110,10 +112,10 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 
 	switch res.StatusCode {
 	case http.StatusAccepted:
-		return true, map[string]string{"region": region}, nil
+		return true, nil
 	case http.StatusForbidden:
-		return false, map[string]string{"region": region}, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 }
