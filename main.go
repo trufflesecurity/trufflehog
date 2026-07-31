@@ -568,6 +568,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.NewRelicBrowserKeyDetectorEnabled.Store(true)
 	feature.NewRelicUserKeyDetectorEnabled.Store(true)
 	feature.NewRelicInsightsQueryKeyDetectorEnabled.Store(true)
+	feature.NewRelicMobileAppTokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
