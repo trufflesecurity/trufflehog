@@ -1183,7 +1183,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 		detectorExecutionCount.WithLabelValues(
 			detectorNameStr,
-			strconv.Itoa(int(data.chunk.JobID)),
+			sourceTypeStr,
 			data.chunk.SourceName,
 		).Inc()
 		detectorExecutionDuration.WithLabelValues(

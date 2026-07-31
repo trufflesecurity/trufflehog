@@ -928,6 +928,18 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 	}
 
 	if len(wantedRepos) > 0 {
+		errs = errors.Join(errs, s.mapRemainingAccessibleRepos(ctx, connector, wantedRepos))
+		if len(wantedRepos) == 0 {
+			// Every requested repo was mapped, so returning errs would fail
+			// repos that succeeded; log partial enumeration errors instead.
+			if errs != nil {
+				ctx.Logger().Error(errs, "some installations could not be fully enumerated while mapping repos")
+			}
+			return nil
+		}
+	}
+
+	if len(wantedRepos) > 0 {
 		unmatched := make([]string, 0, len(wantedRepos))
 		for _, requested := range wantedRepos {
 			unmatched = append(unmatched, requested.original)
@@ -1026,6 +1038,61 @@ func (s *Source) mapRemainingReposByMetadata(
 				}
 				break
 			}
+		}
+	}
+	return errs
+}
+
+// mapRemainingAccessibleRepos handles repos that no installation owns, such
+// as org members' personal repos enumerated via scan_users. Installations
+// only ever contain repos owned by the installing account, but the default
+// installation token can still read repos that are visible to it (public
+// repos in particular), so a repo that the API confirms accessible is mapped
+// to the default installation instead of failing the scan.
+func (s *Source) mapRemainingAccessibleRepos(
+	ctx context.Context,
+	connector *appConnector,
+	wantedRepos map[string]repoMappingRequest,
+) error {
+	var errs error
+	client := connector.APIClient()
+	for _, requested := range wantedRepos {
+		for i, lookupURL := range requested.lookupURLs {
+			_, parts, err := getRepoURLParts(lookupURL)
+			if err != nil {
+				errs = errors.Join(errs,
+					fmt.Errorf("could not parse configured repo %q: %w", requested.original, err))
+				break
+			}
+
+			var repo *github.Repository
+			for {
+				repo, _, err = client.Repositories.Get(ctx, parts[1], parts[2])
+				if s.handleRateLimit(ctx, err) {
+					continue
+				}
+				break
+			}
+			if err != nil {
+				if isGitHub404Error(err) {
+					continue
+				}
+				errs = errors.Join(errs,
+					fmt.Errorf("could not fetch repo %q with default installation: %w", requested.original, err))
+				break
+			}
+			if !sameRepoHost(requested.normalized, repo.GetCloneURL()) {
+				if i == 0 {
+					break
+				}
+				continue
+			}
+
+			ctx.Logger().Info("repo is not owned by any app installation; scanning with the default installation token",
+				"repo", requested.original)
+			deleteRepoMappingRequest(wantedRepos, requested)
+			s.recordRepoInstallation(connector, connector.installationID, repo, requested)
+			break
 		}
 	}
 	return errs

@@ -1380,7 +1380,12 @@ func TestMapExplicitReposToInstallationsRejectsHostMismatch(t *testing.T) {
 	assert.Contains(t, err.Error(), "configured repos were not found")
 }
 
-func TestMapExplicitReposToInstallationsRejectsRepoMissingFromInstallationList(t *testing.T) {
+// A repo absent from every installation listing but readable with the
+// default installation token (e.g. a public repo, or one the listing missed)
+// maps to the default installation instead of failing the scan. Repos the
+// default token cannot read are still rejected (see the preceding test and
+// TestScanAllInstallationsInaccessibleRepoStillFailsMapping).
+func TestMapExplicitReposToInstallationsFallsBackToDefaultForReadableRepo(t *testing.T) {
 	privateKey := createPrivateKey()
 	const repoURL = "https://github.com/other-org/repo.git"
 
@@ -1415,8 +1420,12 @@ func TestMapExplicitReposToInstallationsRejectsRepoMissingFromInstallationList(t
 		},
 	})
 	err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "configured repos were not found")
+	require.NoError(t, err)
+
+	connector := s.connector.(*appConnector)
+	installationID, mapped := connector.installationIDForRepo(repoURL)
+	require.True(t, mapped)
+	assert.Equal(t, int64(1337), installationID)
 }
 
 func TestMapExplicitReposToInstallationsMapsWikiRepoURL(t *testing.T) {
@@ -1679,6 +1688,136 @@ func TestScanAllInstallationsMapsUnitBeforeMetadataFetch(t *testing.T) {
 	installationID, mapped := connector.installationIDForRepo("https://github.com/other-org/repo.git")
 	assert.True(t, mapped)
 	assert.Equal(t, int64(2448), installationID)
+}
+
+// Regression test for member personal repos under scan_all_installations
+// (INT-789): they belong to no app installation, so the mapping must fall
+// back to the default installation when the API confirms the repo is
+// readable, both at chunk time and at enumeration time.
+func TestScanAllInstallationsMemberPersonalRepoFallsBackToDefaultInstallation(t *testing.T) {
+	privateKey := createPrivateKey()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/app/installations/") && strings.HasSuffix(r.URL.Path, "/access_tokens"):
+			parts := strings.Split(r.URL.Path, "/")
+			installID := parts[len(parts)-2]
+			_, _ = fmt.Fprintf(w, `{"token":"token-%s","expires_at":"2099-01-01T00:00:00Z"}`, installID)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/app/installations"):
+			_, _ = w.Write([]byte(`[
+				{"id":1337,"account":{"login":"test-org","type":"Organization"}},
+				{"id":2448,"account":{"login":"other-org","type":"Organization"}}
+			]`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/installation/repositories"):
+			// Installations only ever contain org-owned repos.
+			auth := r.Header.Get("Authorization")
+			switch {
+			case strings.Contains(auth, "token-1337"):
+				_, _ = w.Write([]byte(`{"total_count":1,"repositories":[
+					{"name":"backend","full_name":"test-org/backend","clone_url":"https://github.com/test-org/backend.git","owner":{"login":"test-org","type":"Organization"},"size":1}
+				]}`))
+			case strings.Contains(auth, "token-2448"):
+				_, _ = w.Write([]byte(`{"total_count":0,"repositories":[]}`))
+			default:
+				http.Error(w, "unexpected installation token", http.StatusUnauthorized)
+			}
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/repos/alice/dns-data"):
+			// The member's personal repo exists and is public: any valid
+			// token can read it, mirroring real GitHub behavior.
+			_, _ = w.Write([]byte(`{"name":"dns-data","full_name":"alice/dns-data","clone_url":"https://github.com/alice/dns-data.git","owner":{"login":"alice","type":"User"},"private":false,"size":1}`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/users/alice/repos"):
+			_, _ = w.Write([]byte(`[{"name":"dns-data","full_name":"alice/dns-data","clone_url":"https://github.com/alice/dns-data.git","owner":{"login":"alice","type":"User"},"private":false,"size":1}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:             server.URL,
+		ScanAllInstallations: true,
+		ScanUsers:            true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
+
+	// The org-owned repo maps to its owning installation.
+	connector := s.connector.(*appConnector)
+	err := s.mapReposToInstallations(context.Background(), connector, []string{"https://github.com/test-org/backend.git"})
+	require.NoError(t, err)
+
+	// The member's public personal repo is in no installation, but the API
+	// confirms it is accessible, so it maps to the default installation.
+	err = s.mapReposToInstallations(context.Background(), connector, []string{"https://github.com/alice/dns-data.git"})
+	require.NoError(t, err)
+
+	installationID, mapped := connector.installationIDForRepo("https://github.com/alice/dns-data.git")
+	require.True(t, mapped)
+	require.Equal(t, int64(1337), installationID)
+
+	// Enumeration must map member repos up front so same-process ChunkUnit
+	// short-circuits without any mapping API calls.
+	connector.mu.Lock()
+	delete(connector.repoInstallationMap, "https://github.com/alice/dns-data.git")
+	connector.mu.Unlock()
+
+	require.NoError(t, s.getReposByUser(context.Background(), "alice", false, noopReporter()))
+	installationID, mapped = connector.installationIDForRepo("https://github.com/alice/dns-data.git")
+	require.True(t, mapped)
+	require.Equal(t, int64(1337), installationID)
+}
+
+// Repos that no installation owns AND the default installation token cannot
+// read must still fail the mapping: the accessibility fallback must not turn
+// the check fail-open.
+func TestScanAllInstallationsInaccessibleRepoStillFailsMapping(t *testing.T) {
+	privateKey := createPrivateKey()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/app/installations/") && strings.HasSuffix(r.URL.Path, "/access_tokens"):
+			parts := strings.Split(r.URL.Path, "/")
+			installID := parts[len(parts)-2]
+			_, _ = fmt.Fprintf(w, `{"token":"token-%s","expires_at":"2099-01-01T00:00:00Z"}`, installID)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/app/installations"):
+			_, _ = w.Write([]byte(`[{"id":1337,"account":{"login":"test-org","type":"Organization"}}]`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/installation/repositories"):
+			_, _ = w.Write([]byte(`{"total_count":0,"repositories":[]}`))
+		default:
+			// /repos/... lookups 404: repo is private/nonexistent for
+			// every installation token.
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:             server.URL,
+		ScanAllInstallations: true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
+
+	connector := s.connector.(*appConnector)
+	err := s.mapReposToInstallations(context.Background(), connector, []string{"https://github.com/ghost/private-repo.git"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "configured repos were not found in any GitHub App installation")
 }
 
 func TestEnumerateAllInstallationReposReportsInstallationErrors(t *testing.T) {

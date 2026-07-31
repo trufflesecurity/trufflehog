@@ -42,6 +42,10 @@ var (
 	CloudflareApiTokenV2DetectorEnabled      atomic.Bool
 	CloudflareGlobalApiKeyV2DetectorEnabled  atomic.Bool
 	DuoDetectorEnabled                       atomic.Bool
+	NewRelicLicenseKeyDetectorEnabled        atomic.Bool
+	NewRelicBrowserKeyDetectorEnabled        atomic.Bool
+	NewRelicUserKeyDetectorEnabled           atomic.Bool
+	NewRelicInsightsQueryKeyDetectorEnabled  atomic.Bool
 	NewRelicMobileAppTokenDetectorEnabled    atomic.Bool
 )
 

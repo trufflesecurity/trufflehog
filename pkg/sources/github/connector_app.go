@@ -178,6 +178,27 @@ func (c *appConnector) setRepoInstallation(repoURL string, installationID int64)
 	c.setRepoInstallationForWiki(repoURL, installationID, wikiCloneURLForRepo)
 }
 
+// ensureRepoInstallation maps a repo to the default installation unless an
+// installation already claims it. Used for repos discovered outside
+// installation listings (e.g. org members' personal repos), which no
+// installation owns but which the default installation token can still
+// access when they are public. The check and set happen under one lock so a
+// concurrent mapping to a real installation is never overwritten.
+func (c *appConnector) ensureRepoInstallation(repoURL, repoName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, ok := c.repoInstallationMap[repoURL]; ok {
+		return
+	}
+	c.repoInstallationMap[repoURL] = c.installationID
+	if wikiURL, ok := wikiCloneURLForRepoName(repoURL, repoName); ok {
+		if _, taken := c.repoInstallationMap[wikiURL]; !taken {
+			c.repoInstallationMap[wikiURL] = c.installationID
+		}
+	}
+}
+
 func (c *appConnector) setRepoInstallationForRepoName(repoURL, repoName string, installationID int64) {
 	c.setRepoInstallationForWiki(repoURL, installationID, func(repoURL string) (string, bool) {
 		return wikiCloneURLForRepoName(repoURL, repoName)
