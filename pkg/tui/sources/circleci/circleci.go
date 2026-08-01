@@ -1,41 +1,29 @@
 package circleci
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type circleCiCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetFields() circleCiCmdModel {
-	token := textinputs.InputConfig{
-		Label:       "API Token",
-		Key:         "token",
-		Required:    true,
-		Placeholder: "top secret token",
+// Definition returns the circleci source configuration.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "circleci",
+		Title:       "CircleCI",
+		Description: "Scan CircleCI, a CI/CD platform.",
+		Tier:        sources.TierOSS,
+		Command:     "circleci",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "token",
+				Label:       "API Token",
+				Kind:        form.KindSecret,
+				Placeholder: "top secret token",
+				Emit:        form.EmitLongFlagEq,
+				Validators:  []form.Validate{form.Required()},
+			},
+		},
 	}
-
-	return circleCiCmdModel{textinputs.New([]textinputs.InputConfig{token})}
-}
-
-func (m circleCiCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "circleci")
-
-	inputs := m.GetInputs()
-	command = append(command, "--token="+inputs["token"].Value)
-
-	return strings.Join(command, " ")
-}
-
-func (m circleCiCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-	keys := []string{"token"}
-
-	return common.SummarizeSource(keys, inputs, labels)
 }
