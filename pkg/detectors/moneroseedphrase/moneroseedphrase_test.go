@@ -194,8 +194,8 @@ func TestMonero_Detection(t *testing.T) {
 				if result.Verified {
 					t.Errorf("result %d is verified", i)
 				}
-				if result.SecretParts != nil {
-					t.Errorf("result %d SecretParts = %v, want nil", i, result.SecretParts)
+				if diff := cmp.Diff(map[string]string{"seed_phrase": gotRaw[len(gotRaw)-1]}, result.SecretParts); diff != "" {
+					t.Errorf("result %d SecretParts mismatch (-want +got):\n%s", i, diff)
 				}
 				wantExtraData := map[string]string{"word_count": strconv.Itoa(len(strings.Fields(gotRaw[len(gotRaw)-1])))}
 				if diff := cmp.Diff(wantExtraData, result.ExtraData); diff != "" {
@@ -227,8 +227,8 @@ func TestMonero_ChecksumVerification(t *testing.T) {
 	if results[0].Verified {
 		t.Error("expected valid Monero mnemonic to remain unverified")
 	}
-	if results[0].SecretParts != nil {
-		t.Errorf("SecretParts = %v, want nil", results[0].SecretParts)
+	if diff := cmp.Diff(map[string]string{"seed_phrase": validMoneroMnemonic}, results[0].SecretParts); diff != "" {
+		t.Errorf("SecretParts mismatch (-want +got):\n%s", diff)
 	}
 	if diff := cmp.Diff(map[string]string{"word_count": "25"}, results[0].ExtraData); diff != "" {
 		t.Errorf("ExtraData mismatch (-want +got):\n%s", diff)
@@ -267,8 +267,8 @@ func TestMonero_RawContent(t *testing.T) {
 		t.Errorf("Raw mismatch (-want +got):\n%s", diff)
 	}
 
-	if results[0].SecretParts != nil {
-		t.Errorf("SecretParts = %v, want nil", results[0].SecretParts)
+	if diff := cmp.Diff(map[string]string{"seed_phrase": validMoneroMnemonic}, results[0].SecretParts); diff != "" {
+		t.Errorf("SecretParts mismatch (-want +got):\n%s", diff)
 	}
 
 	if diff := cmp.Diff(map[string]string{"word_count": "25"}, results[0].ExtraData); diff != "" {
@@ -278,8 +278,8 @@ func TestMonero_RawContent(t *testing.T) {
 
 func TestMonero_Type(t *testing.T) {
 	d := Scanner{}
-	if int(d.Type()) != 1064 {
-		t.Errorf("expected type 1064 (MoneroSeedPhrase), got %d", d.Type())
+	if int(d.Type()) != 1070 {
+		t.Errorf("expected type 1070 (MoneroSeedPhrase), got %d", d.Type())
 	}
 }
 

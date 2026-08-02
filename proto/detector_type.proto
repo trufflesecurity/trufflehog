@@ -1064,6 +1064,12 @@ enum DetectorType {
   Shippo = 1060;
   HashiCorpVaultBatchToken = 1061;
   HashiCorpVaultToken = 1062;
-  BIP39SeedPhrase = 1063;
-  MoneroSeedPhrase = 1064;
+  Duo = 1063;
+  NewRelicLicenseKey = 1064;
+  NewRelicBrowserKey = 1065;
+  NewRelicUserKey = 1066;
+  NewRelicInsightsQueryKey = 1067;
+  NewRelicMobileAppToken = 1068;
+  BIP39SeedPhrase = 1069;
+  MoneroSeedPhrase = 1070;
 }

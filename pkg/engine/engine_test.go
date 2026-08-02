@@ -1324,7 +1324,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 				verify:               tt.verify,
 			}
 
-			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
+			cleaned := engine.filterResults(context.Background(), "detect", &match, tt.resultsToClean)
 
 			assert.ElementsMatch(t, tt.wantResults, cleaned)
 		})

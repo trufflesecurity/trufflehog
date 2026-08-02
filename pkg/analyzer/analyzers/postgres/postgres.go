@@ -27,13 +27,15 @@ type Analyzer struct {
 
 func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePostgres }
 
-func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	uri, ok := credInfo["connection_string"]
 	if !ok {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("connection string not found in credInfo"))
+		err := errors.New("connection string not found in credInfo")
+		ctx.Logger().Error(err, "postgres credentials missing connection string")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", err)
 	}
 
-	info, err := AnalyzePermissions(a.Cfg, uri)
+	info, err := AnalyzePermissions(ctx, a.Cfg, uri)
 	if err != nil {
 		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceDatabase, "", err)
 	}
@@ -239,7 +241,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, connectionStr string) {
 		return
 	}
 
-	info, err := AnalyzePermissions(cfg, connectionStr)
+	info, err := AnalyzePermissions(context.Background(), cfg, connectionStr)
 	if err != nil {
 		color.Red("[x] Error: %s", err.Error())
 		return
@@ -263,32 +265,34 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, connectionStr string) {
 	}
 }
 
-func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, error) {
+func AnalyzePermissions(ctx context.Context, cfg *config.Config, connectionStr string) (*SecretInfo, error) {
 
 	connStr, err := pq.ParseURL(string(connectionStr))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse Postgres connection string: %w", err)
+		err = fmt.Errorf("failed to parse Postgres connection string: %w", err)
+		ctx.Logger().Error(err, "invalid postgres connection string")
+		return nil, err
 	}
 	parts := connStrPartPattern.FindAllStringSubmatch(connStr, -1)
 	params := make(map[string]string, len(parts))
 	for _, part := range parts {
 		params[part[1]] = part[2]
 	}
-	db, err := createConnection(params, "")
+	db, err := createConnection(ctx, params, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres database: %w", err)
 	}
 	defer func() { _ = db.Close() }()
 
-	role, privs, err := getUserPrivs(db)
+	role, privs, err := getUserPrivs(ctx, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user privileges: %w", err)
 	}
-	currentUser, dbs, err := getDBPrivs(db)
+	currentUser, dbs, err := getDBPrivs(ctx, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve database privileges: %w", err)
 	}
-	tablePrivs, err := getTablePrivs(params, buildSliceDBNames(dbs))
+	tablePrivs, err := getTablePrivs(ctx, params, buildSliceDBNames(dbs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve table privileges: %w", err)
 	}
@@ -313,7 +317,7 @@ func isErrorDatabaseNotFound(err error, dbName string, user string) bool {
 	return false
 }
 
-func createConnection(params map[string]string, database string) (*sql.DB, error) {
+func createConnection(ctx context.Context, params map[string]string, database string) (*sql.DB, error) {
 	if sslmode := params[pg_sslmode]; sslmode == pg_sslmode_allow || sslmode == pg_sslmode_prefer {
 		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
 		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
@@ -331,31 +335,35 @@ func createConnection(params map[string]string, database string) (*sql.DB, error
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to open postgres connection", "database", database)
 		return nil, err
 	}
 
-	err = db.Ping()
+	err = db.PingContext(ctx)
 	switch {
 	case err == nil:
 		return db, nil
 	case strings.Contains(err.Error(), "password authentication failed"):
-		return nil, errors.New("password authentication failed")
+		err := errors.New("password authentication failed")
+		ctx.Logger().V(2).Info("postgres password authentication failed", "database", database)
+		return nil, err
 	case errors.Is(err, pq.ErrSSLNotSupported) && params[pg_sslmode] == "":
 		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
 		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
 		// connections are acceptable, so now we try a connection without SSL.
 		params[pg_sslmode] = pg_sslmode_disable
 		defer delete(params, pg_sslmode) // We want to return with the original params map intact (for ExtraData)
-		return createConnection(params, database)
+		return createConnection(ctx, params, database)
 	case isErrorDatabaseNotFound(err, params[pg_dbname], params[pg_user]):
 		color.Green("[!] Successfully connected to Postgres database.")
 		return nil, err
 	default:
+		ctx.Logger().Error(err, "failed to ping postgres database", "database", database)
 		return nil, err
 	}
 }
 
-func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
+func getUserPrivs(ctx context.Context, db *sql.DB) (string, map[string]bool, error) {
 	// Prepare the SQL statement
 	query := `SELECT rolname AS role_name,
 				rolsuper AS is_superuser,
@@ -368,8 +376,9 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 			FROM pg_roles WHERE rolname = current_user;`
 
 	// Execute the SQL query
-	rows, err := db.Query(query)
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to query postgres user privileges")
 		return "", nil, err
 	}
 	defer func() { _ = rows.Close() }()
@@ -379,12 +388,14 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 	// Iterate over the rows
 	for rows.Next() {
 		if err := rows.Scan(&roleName, &isSuperuser, &canInherit, &canCreateRole, &canCreateDB, &canLogin, &isReplicationRole, &bypassesRLS); err != nil {
+			ctx.Logger().Error(err, "failed to scan postgres user privileges row")
 			return "", nil, err
 		}
 	}
 
 	// Check for errors during iteration
 	if err := rows.Err(); err != nil {
+		ctx.Logger().Error(err, "error iterating postgres user privileges rows")
 		return "", nil, err
 	}
 
@@ -402,7 +413,7 @@ func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 	return roleName, mapRoles, nil
 }
 
-func getDBPrivs(db *sql.DB) (string, []DB, error) {
+func getDBPrivs(ctx context.Context, db *sql.DB) (string, []DB, error) {
 	query := `
         SELECT
             d.datname AS database_name,
@@ -423,8 +434,9 @@ func getDBPrivs(db *sql.DB) (string, []DB, error) {
 	// Originally had WHERE NOT d.datistemplate  AND d.datallowconn
 
 	// Execute the query
-	rows, err := db.Query(query)
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to query postgres database privileges")
 		return "", nil, err
 	}
 	defer func() { _ = rows.Close() }()
@@ -438,6 +450,7 @@ func getDBPrivs(db *sql.DB) (string, []DB, error) {
 		var canConnect, canCreate, canCreateTemp bool
 		err := rows.Scan(&dbName, &owner, &currentUser, &canConnect, &canCreate, &canCreateTemp)
 		if err != nil {
+			ctx.Logger().Error(err, "failed to scan postgres database privileges row")
 			return "", nil, err
 		}
 
@@ -453,6 +466,7 @@ func getDBPrivs(db *sql.DB) (string, []DB, error) {
 		dbs = append(dbs, db)
 	}
 	if err = rows.Err(); err != nil {
+		ctx.Logger().Error(err, "error iterating postgres database privileges rows")
 		return "", nil, err
 	}
 
@@ -508,15 +522,15 @@ func buildSliceDBNames(dbs []DB) []string {
 	return dbNames
 }
 
-func getTablePrivs(params map[string]string, databases []string) (map[string]map[string]*TableData, error) {
+func getTablePrivs(ctx context.Context, params map[string]string, databases []string) (map[string]map[string]*TableData, error) {
 
 	tablePrivileges := make(map[string]map[string]*TableData, 0)
 
 	for _, dbase := range databases {
 		// Connect to db
-		db, err := createConnection(params, dbase)
+		db, err := createConnection(ctx, params, dbase)
 		if err != nil {
-			// color.Red("[x] Failed to connect to Postgres database: %s", dbase)
+			ctx.Logger().Error(err, "failed to connect to postgres database while fetching table privileges", "database", dbase)
 			continue
 		}
 		defer func() { _ = db.Close() }()
@@ -539,8 +553,9 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 		`
 
 		// Execute the query
-		rows, err := db.Query(query)
+		rows, err := db.QueryContext(ctx, query)
 		if err != nil {
+			ctx.Logger().Error(err, "failed to query postgres table privileges", "database", dbase)
 			return nil, err
 		}
 		defer func() { _ = rows.Close() }()
@@ -550,6 +565,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 			var database, table, priv, size, row_count string
 			err := rows.Scan(&database, &table, &priv, &size, &row_count)
 			if err != nil {
+				ctx.Logger().Error(err, "failed to scan postgres table privileges row", "database", dbase)
 				return nil, err
 			}
 
@@ -587,6 +603,7 @@ func getTablePrivs(params map[string]string, databases []string) (map[string]map
 			}
 		}
 		if err = rows.Err(); err != nil {
+			ctx.Logger().Error(err, "error iterating postgres table privileges rows", "database", dbase)
 			return nil, err
 		}
 		_ = db.Close()

@@ -60,6 +60,7 @@ func (s Scanner) FromData(_ context.Context, _ bool, data []byte) ([]detectors.R
 		results = append(results, detectors.Result{
 			DetectorType: detector_typepb.DetectorType_MoneroSeedPhrase,
 			Raw:          []byte(candidate.Phrase),
+			SecretParts:  map[string]string{"seed_phrase": candidate.Phrase},
 			ExtraData:    map[string]string{"word_count": strconv.Itoa(len(strings.Fields(candidate.Phrase)))},
 		})
 	}

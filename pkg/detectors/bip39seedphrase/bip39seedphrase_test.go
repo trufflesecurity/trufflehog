@@ -249,8 +249,8 @@ func TestBIP39_ChecksumVerification(t *testing.T) {
 				t.Errorf("Raw mismatch (-want +got):\n%s", diff)
 			}
 
-			if results[0].SecretParts != nil {
-				t.Errorf("SecretParts = %v, want nil", results[0].SecretParts)
+			if diff := cmp.Diff(map[string]string{"seed_phrase": tt.seed}, results[0].SecretParts); diff != "" {
+				t.Errorf("SecretParts mismatch (-want +got):\n%s", diff)
 			}
 
 			wantExtraData := map[string]string{"word_count": strconv.Itoa(len(strings.Fields(tt.seed)))}
@@ -317,8 +317,8 @@ func TestBIP39_Detection(t *testing.T) {
 				if result.Verified {
 					t.Errorf("result %d is verified", i)
 				}
-				if result.SecretParts != nil {
-					t.Errorf("result %d SecretParts = %v, want nil", i, result.SecretParts)
+				if diff := cmp.Diff(map[string]string{"seed_phrase": gotRaw[len(gotRaw)-1]}, result.SecretParts); diff != "" {
+					t.Errorf("result %d SecretParts mismatch (-want +got):\n%s", i, diff)
 				}
 				wantExtraData := map[string]string{"word_count": strconv.Itoa(len(strings.Fields(gotRaw[len(gotRaw)-1])))}
 				if diff := cmp.Diff(wantExtraData, result.ExtraData); diff != "" {
@@ -335,8 +335,8 @@ func TestBIP39_Detection(t *testing.T) {
 
 func TestBIP39_Type(t *testing.T) {
 	d := Scanner{}
-	if int(d.Type()) != 1063 {
-		t.Errorf("expected type 1063 (BIP39SeedPhrase), got %d", d.Type())
+	if int(d.Type()) != 1069 {
+		t.Errorf("expected type 1069 (BIP39SeedPhrase), got %d", d.Type())
 	}
 }
 
