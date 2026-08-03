@@ -246,8 +246,9 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 	opts := listOpts.getListOptions()
 
 	var (
-		numRepos, numForks int
-		uniqueOrgs         = map[string]struct{}{}
+		numRepos, numForks, numArchived int
+		numArchivedSkipped              int
+		uniqueOrgs                      = map[string]struct{}{}
 	)
 
 	// loop to handle pagination.
@@ -262,12 +263,26 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 
 		ctx.Logger().V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
-			if r.GetFork() {
-				if !s.conn.IncludeForks {
-					continue
-				}
+			isFork, isArchived := r.GetFork(), r.GetArchived()
+
+			if isFork && !s.conn.IncludeForks {
+				continue
+			}
+
+			if isArchived && s.conn.ExcludeArchived {
+				numArchivedSkipped++
+				logger.V(3).Info("skipping archived repository", "repo", r.GetFullName())
+				continue
+			}
+
+			if isFork {
 				numForks++
 			}
+
+			if isArchived {
+				numArchived++
+			}
+
 			numRepos++
 
 			// track unique organizations.
@@ -285,6 +300,13 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
 			s.cacheRepoInfo(r)
+			// Repos enumerated outside installation listings (e.g. member
+			// personal repos) belong to no installation; map them to the
+			// default installation so the scan-all mapping in ChunkUnit
+			// doesn't reject repos we just enumerated.
+			if connector, ok := s.connector.(*appConnector); ok && s.conn.GetScanAllInstallations() {
+				connector.ensureRepoInstallation(repoURL, r.GetName())
+			}
 			if err := reporter.UnitOk(ctx, RepoUnit{Name: repoName, URL: repoURL}); err != nil {
 				return err
 			}
@@ -299,7 +321,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 	}
 
 	// final logging of repository stats.
-	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
+	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_archived", numArchived, "num_archived_skipped", numArchivedSkipped, "num_orgs", len(uniqueOrgs))
 	githubOrgsEnumerated.WithLabelValues(s.name).Add(float64(len(uniqueOrgs)))
 
 	return nil

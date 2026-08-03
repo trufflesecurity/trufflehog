@@ -130,6 +130,7 @@ var (
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
 	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
+	githubExcludeArchived       = githubScan.Flag("exclude-archived", "Exclude archived repositories from scan.").Bool()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -541,6 +542,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.PineconeDetectorEnabled.Store(true)
 	feature.CloudinaryDetectorEnabled.Store(true)
 	feature.GitLabOAuthDetectorEnabled.Store(true)
+	feature.SonarCloudV2DetectorEnabled.Store(true)
 	feature.EnigmaDetectorEnabled.Store(true)
 	feature.DatadogApiKeyDetectorEnabled.Store(true)
 	feature.TlyDetectorEnabled.Store(true)
@@ -557,6 +559,16 @@ func run(state overseer.State, logSync func() error) {
 	feature.ShippoDetectorEnabled.Store(true)
 	feature.IPInfoDetectorEnabled.Store(true)
 	feature.LobDetectorEnabled.Store(true)
+	feature.HashiCorpVaultBatchTokenDetectorEnabled.Store(true)
+	feature.HashiCorpVaultTokenDetectorEnabled.Store(true)
+	feature.CloudflareApiTokenV2DetectorEnabled.Store(true)
+	feature.CloudflareGlobalApiKeyV2DetectorEnabled.Store(true)
+	feature.DuoDetectorEnabled.Store(true)
+	feature.NewRelicLicenseKeyDetectorEnabled.Store(true)
+	feature.NewRelicBrowserKeyDetectorEnabled.Store(true)
+	feature.NewRelicUserKeyDetectorEnabled.Store(true)
+	feature.NewRelicInsightsQueryKeyDetectorEnabled.Store(true)
+	feature.NewRelicMobileAppTokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -915,6 +927,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ClonePath:                  *githubClonePath,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
+			ExcludeArchived:            *githubExcludeArchived,
 			PrintLegacyJSON:            *jsonLegacy,
 		}
 

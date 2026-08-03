@@ -25,7 +25,14 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	// The OpenAI API can be slow to respond under load, so use a longer
+	// per-attempt timeout than the default 5s and retry transient failures
+	// (timeouts, connection errors, 429/5xx) so a single slow response does
+	// not record an indeterminate verification result.
+	defaultClient = common.RetryableHTTPClient(
+		common.WithTimeout(10*time.Second),
+		common.WithMaxRetries(2),
+	)
 
 	// The magic string T3BlbkFJ is the base64-encoded string: OpenAI
 	// Matches: legacy keys (sk-{alnum}T3BlbkFJ...), project keys (sk-proj-...),

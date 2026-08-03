@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -510,4 +511,34 @@ func TestSourceManagerUnitHookNoUnits(t *testing.T) {
 	assert.NotZero(t, m.EndTime)
 	assert.NotZero(t, m.ElapsedTime())
 	assert.Equal(t, 0, len(m.Errors))
+}
+
+// TestUnitHookCloseConcurrentWithFinish tests that Close does not panic with
+// "send on closed channel" when job goroutines are still ejecting finished
+// metrics. Close must wait for in-flight sends and drop metrics that arrive
+// after it.
+func TestUnitHookCloseConcurrentWithFinish(t *testing.T) {
+	hook, ch := NewUnitHook(context.TODO())
+
+	// Drain the channel until Close closes it.
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		for range ch {
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			ref := JobProgressRef{SourceID: SourceID(i), JobID: JobID(i)}
+			hook.StartUnitChunking(ref, nil, time.Now())
+			hook.Finish(ref)
+		}(i)
+	}
+	assert.NoError(t, hook.Close())
+	wg.Wait()
+	<-drained
 }
