@@ -1069,4 +1069,5 @@ enum DetectorType {
   NewRelicBrowserKey = 1065;
   NewRelicUserKey = 1066;
   NewRelicInsightsQueryKey = 1067;
+  NewRelicMobileAppToken = 1068;
 }
