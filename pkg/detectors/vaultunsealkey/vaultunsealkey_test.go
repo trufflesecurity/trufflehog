@@ -21,7 +21,7 @@ func TestVaultUnsealKey_FromChunk(t *testing.T) {
 	}{
 		{
 			name: "valid unseal key in vault init output",
-			data: `Unseal Key 1: aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789+/AB==`,
+			data: `Unseal Key 1: aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789+/ABCDEF`,
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_VaultUnsealKey,
@@ -32,7 +32,7 @@ func TestVaultUnsealKey_FromChunk(t *testing.T) {
 		},
 		{
 			name: "valid unseal key in environment variable",
-			data: `export VAULT_UNSEAL_KEY="aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789+/AB=="`,
+			data: `export VAULT_UNSEAL_KEY="aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789+/ABCDEF"`,
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_VaultUnsealKey,
@@ -45,7 +45,7 @@ func TestVaultUnsealKey_FromChunk(t *testing.T) {
 			name: "valid unseal key in terraform config",
 			data: `
 variable "vault_unseal_key_1" {
-  default = "aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789+/AB=="
+  default = "aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789+/ABCDEF"
 }`,
 			want: []detectors.Result{
 				{

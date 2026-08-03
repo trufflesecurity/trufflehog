@@ -928,6 +928,18 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 	}
 
 	if len(wantedRepos) > 0 {
+		errs = errors.Join(errs, s.mapRemainingAccessibleRepos(ctx, connector, wantedRepos))
+		if len(wantedRepos) == 0 {
+			// Every requested repo was mapped, so returning errs would fail
+			// repos that succeeded; log partial enumeration errors instead.
+			if errs != nil {
+				ctx.Logger().Error(errs, "some installations could not be fully enumerated while mapping repos")
+			}
+			return nil
+		}
+	}
+
+	if len(wantedRepos) > 0 {
 		unmatched := make([]string, 0, len(wantedRepos))
 		for _, requested := range wantedRepos {
 			unmatched = append(unmatched, requested.original)
@@ -1026,6 +1038,61 @@ func (s *Source) mapRemainingReposByMetadata(
 				}
 				break
 			}
+		}
+	}
+	return errs
+}
+
+// mapRemainingAccessibleRepos handles repos that no installation owns, such
+// as org members' personal repos enumerated via scan_users. Installations
+// only ever contain repos owned by the installing account, but the default
+// installation token can still read repos that are visible to it (public
+// repos in particular), so a repo that the API confirms accessible is mapped
+// to the default installation instead of failing the scan.
+func (s *Source) mapRemainingAccessibleRepos(
+	ctx context.Context,
+	connector *appConnector,
+	wantedRepos map[string]repoMappingRequest,
+) error {
+	var errs error
+	client := connector.APIClient()
+	for _, requested := range wantedRepos {
+		for i, lookupURL := range requested.lookupURLs {
+			_, parts, err := getRepoURLParts(lookupURL)
+			if err != nil {
+				errs = errors.Join(errs,
+					fmt.Errorf("could not parse configured repo %q: %w", requested.original, err))
+				break
+			}
+
+			var repo *github.Repository
+			for {
+				repo, _, err = client.Repositories.Get(ctx, parts[1], parts[2])
+				if s.handleRateLimit(ctx, err) {
+					continue
+				}
+				break
+			}
+			if err != nil {
+				if isGitHub404Error(err) {
+					continue
+				}
+				errs = errors.Join(errs,
+					fmt.Errorf("could not fetch repo %q with default installation: %w", requested.original, err))
+				break
+			}
+			if !sameRepoHost(requested.normalized, repo.GetCloneURL()) {
+				if i == 0 {
+					break
+				}
+				continue
+			}
+
+			ctx.Logger().Info("repo is not owned by any app installation; scanning with the default installation token",
+				"repo", requested.original)
+			deleteRepoMappingRequest(wantedRepos, requested)
+			s.recordRepoInstallation(connector, connector.installationID, repo, requested)
+			break
 		}
 	}
 	return errs
@@ -2214,7 +2281,30 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		return fmt.Errorf("could not download file for scan: %w", err)
+		// DownloadContents locates the file by listing its parent directory,
+		// and the contents API caps listings at 1000 entries, so it can fail
+		// for files that exist. Retry with an exact-path lookup, which also
+		// serves as the existence probe when it fails.
+		retryCloser, retryResp, retryErr := s.downloadContentsByPath(
+			ctx, apiClient, segments[1], segments[2], meta.GetFile(), meta.GetCommit())
+		if retryResp != nil && retryResp.Response != nil && retryResp.Body != nil {
+			defer func() { _ = retryResp.Body.Close() }()
+		}
+		if retryErr != nil {
+			wrapped := fmt.Errorf("could not download file for scan: %w", retryErr)
+			// The exact-path lookup 404ing is authoritative for the path, but
+			// GitHub also returns 404 for existing resources the credentials
+			// cannot see, so only classify the target as gone when the
+			// repository itself is still reachable with the same client.
+			if retryResp != nil && retryResp.Response != nil &&
+				retryResp.StatusCode == http.StatusNotFound &&
+				s.repoReachable(ctx, apiClient, segments[1], segments[2]) {
+				return &sources.TargetNotFoundError{Err: wrapped}
+			}
+			return wrapped
+		}
+		fileCtx := context.WithValues(ctx, "path", meta.GetFile())
+		return handlers.HandleFile(fileCtx, retryCloser, &chunkSkel, reporter)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected HTTP response status when trying to download file for scan: %v", resp.Status)
@@ -2222,6 +2312,44 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 
 	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
 	return handlers.HandleFile(fileCtx, readCloser, &chunkSkel, reporter)
+}
+
+// downloadContentsByPath fetches a file the same way DownloadContents does,
+// but resolves it with an exact-path contents lookup instead of searching a
+// directory listing, so it is immune to the 1000-entry listing cap. On
+// failure the returned response is always the exact-path lookup's, whose 404
+// is an authoritative statement about the path at that ref; a failure of the
+// download itself must not be mistaken for the target being gone, because
+// the lookup just proved it exists.
+func (s *Source) downloadContentsByPath(ctx context.Context, apiClient *github.Client, owner, repo, filePath, ref string) (io.ReadCloser, *github.Response, error) {
+	fileContent, _, resp, err := apiClient.Repositories.GetContents(
+		ctx, owner, repo, filePath, &github.RepositoryContentGetOptions{Ref: ref})
+	if err != nil {
+		return nil, resp, err
+	}
+	if fileContent == nil || fileContent.GetDownloadURL() == "" {
+		return nil, resp, fmt.Errorf("no download link found for %s", filePath)
+	}
+	dlReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fileContent.GetDownloadURL(), nil)
+	if err != nil {
+		return nil, resp, err
+	}
+	dlResp, err := apiClient.Client().Do(dlReq)
+	if err != nil {
+		return nil, resp, err
+	}
+	if dlResp.StatusCode != http.StatusOK {
+		_ = dlResp.Body.Close()
+		return nil, resp, fmt.Errorf("unexpected HTTP response status when trying to download file for scan: %v", dlResp.Status)
+	}
+	return dlResp.Body, &github.Response{Response: dlResp}, nil
+}
+
+// repoReachable reports whether the repository is still visible with the
+// same client.
+func (s *Source) repoReachable(ctx context.Context, apiClient *github.Client, owner, repo string) bool {
+	_, resp, err := apiClient.Repositories.Get(ctx, owner, repo)
+	return err == nil && resp != nil && resp.StatusCode == http.StatusOK
 }
 
 func (s *Source) scanWikiTarget(ctx context.Context, wikiURL string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
