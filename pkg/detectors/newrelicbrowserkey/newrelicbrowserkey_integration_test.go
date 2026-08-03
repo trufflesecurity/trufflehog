@@ -1,74 +1,149 @@
-//go:build integration
+//go:build detectors
+// +build detectors
 
 package newrelicbrowserkey
 
 import (
-	"bytes"
 	"context"
-	"os"
+	"fmt"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-func TestNewRelicBrowserKey_Integration(t *testing.T) {
-	ctx := context.Background()
-	s := Scanner{}
-	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{s})
-
-	tests := []struct {
-		name         string
-		input        string
-		want         []string
-		wantVerified bool
-	}{
-		{
-			name:         "valid key from environment",
-			input:        "NEW_RELIC_BROWSER_KEY=" + os.Getenv("NEWRELIC_BROWSER_KEY"),
-			want:         []string{os.Getenv("NEWRELIC_BROWSER_KEY")},
-			wantVerified: true,
-		},
+func TestNewRelicBrowserKey_FromChunk(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if os.Getenv("NEWRELIC_BROWSER_KEY") == "" {
-				t.Skip("Skipping integration test: NEWRELIC_BROWSER_KEY not set")
-			}
+	key := testSecrets.MustGetField("NEW_RELIC_BROWSER_KEY")
+	keyEU := testSecrets.MustGetField("NEW_RELIC_BROWSER_KEY_EU")
+	keyInactive := "NRBR-cd83c5e6c53fe2edc1a"
 
-			chunkSpecificDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(chunkSpecificDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", s.Keywords(), test.input)
+	type args struct {
+		ctx    context.Context
+		data   []byte
+		verify bool
+	}
+	tests := []struct {
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
+	}{
+		{
+			name: "found, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a new relic browser key %s within", key)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_NewRelicBrowserKey,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"region": "us",
+					},
+					SecretParts: map[string]string{"key": key, "region": "us"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found eu, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a new EU relic browser key %s within", keyEU)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_NewRelicBrowserKey,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"region": "eu",
+					},
+					SecretParts: map[string]string{"key": keyEU, "region": "eu"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a new relic browser key %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_NewRelicBrowserKey,
+					Verified:     false,
+					SecretParts:  map[string]string{"key": keyInactive},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewRelicBrowserKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
-			results, err := s.FromData(ctx, true, []byte(test.input))
-			assert.NoError(t, err)
-			assert.NotEmpty(t, results)
-
-			if test.wantVerified {
-				assert.Equal(t, test.wantVerified, results[0].Verified)
-				t.Logf("✅ Verified: %v", results[0].Verified)
-				t.Logf("✅ ExtraData: %v", results[0].ExtraData)
-			}
-
-			// Check that all expected secrets were found
-			actual := make(map[string]struct{})
-			for _, r := range results {
-				var key string
-				if len(r.RawV2) > 0 {
-					key = string(r.RawV2)
-				} else {
-					key = string(r.Raw)
+			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				actual[key] = struct{}{}
+				got[i].Raw = nil
+				if len(got[i].Redacted) == 0 {
+					t.Fatalf("no redacted secret present: \n %+v", got[i])
+				}
+				got[i].Redacted = ""
 			}
+			if diff := pretty.Compare(got, tt.want); diff != "" {
+				t.Errorf("NewRelicBrowserKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
 
-			for _, w := range test.want {
-				if _, found := actual[w]; !found && !bytes.Contains([]byte(w), []byte("EXAMPLE")) {
-					t.Errorf("expected secret %q not found", w)
+func BenchmarkFromData(benchmark *testing.B) {
+	ctx := context.Background()
+	s := Scanner{}
+	for name, data := range detectors.MustGetBenchmarkData() {
+		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				_, err := s.FromData(ctx, false, data)
+				if err != nil {
+					b.Fatal(err)
 				}
 			}
 		})

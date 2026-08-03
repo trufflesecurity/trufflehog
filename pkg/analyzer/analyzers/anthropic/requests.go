@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 var endpoints = map[string]string{
@@ -79,10 +81,11 @@ type APIKeysResponse struct {
 }
 
 // makeAnthropicRequest send the API request to passed url with passed key as API Key and return response body and status code
-func makeAnthropicRequest(client *http.Client, url, key string) ([]byte, int, error) {
+func makeAnthropicRequest(ctx context.Context, client *http.Client, url, key string) ([]byte, int, error) {
 	// create request
-	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to create anthropic request", "url", url)
 		return nil, 0, err
 	}
 
@@ -93,6 +96,7 @@ func makeAnthropicRequest(client *http.Client, url, key string) ([]byte, int, er
 
 	resp, err := client.Do(req)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to send anthropic request", "url", url)
 		return nil, 0, err
 	}
 
@@ -103,6 +107,7 @@ func makeAnthropicRequest(client *http.Client, url, key string) ([]byte, int, er
 
 	responseBodyByte, err := io.ReadAll(resp.Body)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to read anthropic response body", "url", url)
 		return nil, 0, err
 	}
 
@@ -110,12 +115,12 @@ func makeAnthropicRequest(client *http.Client, url, key string) ([]byte, int, er
 }
 
 // captureAPIKeyResources capture resources associated with api key
-func captureAPIKeyResources(client *http.Client, apiKey string, secretInfo *SecretInfo) error {
-	if err := captureModels(client, apiKey, secretInfo); err != nil {
+func captureAPIKeyResources(ctx context.Context, client *http.Client, apiKey string, secretInfo *SecretInfo) error {
+	if err := captureModels(ctx, client, apiKey, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureMessageBatches(client, apiKey, secretInfo); err != nil {
+	if err := captureMessageBatches(ctx, client, apiKey, secretInfo); err != nil {
 		return err
 	}
 
@@ -123,24 +128,24 @@ func captureAPIKeyResources(client *http.Client, apiKey string, secretInfo *Secr
 }
 
 // captureAdminKeyResources capture resources associated with admin key
-func captureAdminKeyResources(client *http.Client, adminKey string, secretInfo *SecretInfo) error {
-	if err := captureOrgUsers(client, adminKey, secretInfo); err != nil {
+func captureAdminKeyResources(ctx context.Context, client *http.Client, adminKey string, secretInfo *SecretInfo) error {
+	if err := captureOrgUsers(ctx, client, adminKey, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureWorkspaces(client, adminKey, secretInfo); err != nil {
+	if err := captureWorkspaces(ctx, client, adminKey, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureAPIKeys(client, adminKey, secretInfo); err != nil {
+	if err := captureAPIKeys(ctx, client, adminKey, secretInfo); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func captureModels(client *http.Client, apiKey string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeAnthropicRequest(client, endpoints["models"], apiKey)
+func captureModels(ctx context.Context, client *http.Client, apiKey string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeAnthropicRequest(ctx, client, endpoints["models"], apiKey)
 	if err != nil {
 		return err
 	}
@@ -150,6 +155,7 @@ func captureModels(client *http.Client, apiKey string, secretInfo *SecretInfo) e
 		var models ModelsResponse
 
 		if err := json.Unmarshal(response, &models); err != nil {
+			ctx.Logger().Error(err, "failed to unmarshal models response")
 			return err
 		}
 
@@ -163,14 +169,18 @@ func captureModels(client *http.Client, apiKey string, secretInfo *SecretInfo) e
 
 		return nil
 	case http.StatusNotFound, http.StatusUnauthorized:
-		return fmt.Errorf("invalid/revoked api-key")
+		err := fmt.Errorf("invalid/revoked api-key")
+		ctx.Logger().Error(err, "anthropic key invalid while fetching models", "status_code", statusCode)
+		return err
 	default:
-		return fmt.Errorf("unexpected status code: %d while fetching models", statusCode)
+		err := fmt.Errorf("unexpected status code: %d while fetching models", statusCode)
+		ctx.Logger().Error(err, "unexpected status code while fetching models", "status_code", statusCode)
+		return err
 	}
 }
 
-func captureMessageBatches(client *http.Client, apiKey string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeAnthropicRequest(client, endpoints["messageBatches"], apiKey)
+func captureMessageBatches(ctx context.Context, client *http.Client, apiKey string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeAnthropicRequest(ctx, client, endpoints["messageBatches"], apiKey)
 	if err != nil {
 		return err
 	}
@@ -180,6 +190,7 @@ func captureMessageBatches(client *http.Client, apiKey string, secretInfo *Secre
 		var messageBatches MessageResponse
 
 		if err := json.Unmarshal(response, &messageBatches); err != nil {
+			ctx.Logger().Error(err, "failed to unmarshal message batches response")
 			return err
 		}
 
@@ -197,14 +208,18 @@ func captureMessageBatches(client *http.Client, apiKey string, secretInfo *Secre
 
 		return nil
 	case http.StatusNotFound, http.StatusUnauthorized:
-		return fmt.Errorf("invalid/revoked api-key")
+		err := fmt.Errorf("invalid/revoked api-key")
+		ctx.Logger().Error(err, "anthropic key invalid while fetching message batches", "status_code", statusCode)
+		return err
 	default:
-		return fmt.Errorf("unexpected status code: %d while fetching models", statusCode)
+		err := fmt.Errorf("unexpected status code: %d while fetching message batches", statusCode)
+		ctx.Logger().Error(err, "unexpected status code while fetching message batches", "status_code", statusCode)
+		return err
 	}
 }
 
-func captureOrgUsers(client *http.Client, adminKey string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeAnthropicRequest(client, endpoints["orgUsers"], adminKey)
+func captureOrgUsers(ctx context.Context, client *http.Client, adminKey string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeAnthropicRequest(ctx, client, endpoints["orgUsers"], adminKey)
 	if err != nil {
 		return err
 	}
@@ -214,6 +229,7 @@ func captureOrgUsers(client *http.Client, adminKey string, secretInfo *SecretInf
 		var users OrgUsersResponse
 
 		if err := json.Unmarshal(response, &users); err != nil {
+			ctx.Logger().Error(err, "failed to unmarshal org users response")
 			return err
 		}
 
@@ -231,14 +247,18 @@ func captureOrgUsers(client *http.Client, adminKey string, secretInfo *SecretInf
 
 		return nil
 	case http.StatusNotFound, http.StatusUnauthorized:
-		return fmt.Errorf("invalid/revoked api-key")
+		err := fmt.Errorf("invalid/revoked api-key")
+		ctx.Logger().Error(err, "anthropic key invalid while fetching org users", "status_code", statusCode)
+		return err
 	default:
-		return fmt.Errorf("unexpected status code: %d while fetching models", statusCode)
+		err := fmt.Errorf("unexpected status code: %d while fetching org users", statusCode)
+		ctx.Logger().Error(err, "unexpected status code while fetching org users", "status_code", statusCode)
+		return err
 	}
 }
 
-func captureWorkspaces(client *http.Client, adminKey string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeAnthropicRequest(client, endpoints["workspaces"], adminKey)
+func captureWorkspaces(ctx context.Context, client *http.Client, adminKey string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeAnthropicRequest(ctx, client, endpoints["workspaces"], adminKey)
 	if err != nil {
 		return err
 	}
@@ -248,6 +268,7 @@ func captureWorkspaces(client *http.Client, adminKey string, secretInfo *SecretI
 		var workspaces WorkspacesResponse
 
 		if err := json.Unmarshal(response, &workspaces); err != nil {
+			ctx.Logger().Error(err, "failed to unmarshal workspaces response")
 			return err
 		}
 
@@ -260,21 +281,25 @@ func captureWorkspaces(client *http.Client, adminKey string, secretInfo *SecretI
 
 			secretInfo.AnthropicResources = append(secretInfo.AnthropicResources, resource)
 			// capture each workspace members
-			if err := captureWorkspaceMembers(client, adminKey, resource, secretInfo); err != nil {
+			if err := captureWorkspaceMembers(ctx, client, adminKey, resource, secretInfo); err != nil {
 				return err
 			}
 		}
 
 		return nil
 	case http.StatusNotFound, http.StatusUnauthorized:
-		return fmt.Errorf("invalid/revoked api-key")
+		err := fmt.Errorf("invalid/revoked api-key")
+		ctx.Logger().Error(err, "anthropic key invalid while fetching workspaces", "status_code", statusCode)
+		return err
 	default:
-		return fmt.Errorf("unexpected status code: %d while fetching models", statusCode)
+		err := fmt.Errorf("unexpected status code: %d while fetching workspaces", statusCode)
+		ctx.Logger().Error(err, "unexpected status code while fetching workspaces", "status_code", statusCode)
+		return err
 	}
 }
 
-func captureWorkspaceMembers(client *http.Client, key string, parentWorkspace AnthropicResource, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeAnthropicRequest(client, fmt.Sprintf(endpoints["workspaceMembers"], parentWorkspace.ID), key)
+func captureWorkspaceMembers(ctx context.Context, client *http.Client, key string, parentWorkspace AnthropicResource, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeAnthropicRequest(ctx, client, fmt.Sprintf(endpoints["workspaceMembers"], parentWorkspace.ID), key)
 	if err != nil {
 		return err
 	}
@@ -284,6 +309,7 @@ func captureWorkspaceMembers(client *http.Client, key string, parentWorkspace An
 		var members WorkspaceMembersResponse
 
 		if err := json.Unmarshal(response, &members); err != nil {
+			ctx.Logger().Error(err, "failed to unmarshal workspace members response", "workspace_id", parentWorkspace.ID)
 			return err
 		}
 
@@ -298,14 +324,18 @@ func captureWorkspaceMembers(client *http.Client, key string, parentWorkspace An
 
 		return nil
 	case http.StatusNotFound, http.StatusUnauthorized:
-		return fmt.Errorf("invalid/revoked api-key")
+		err := fmt.Errorf("invalid/revoked api-key")
+		ctx.Logger().Error(err, "anthropic key invalid while fetching workspace members", "workspace_id", parentWorkspace.ID, "status_code", statusCode)
+		return err
 	default:
-		return fmt.Errorf("unexpected status code: %d while fetching models", statusCode)
+		err := fmt.Errorf("unexpected status code: %d while fetching workspace members", statusCode)
+		ctx.Logger().Error(err, "unexpected status code while fetching workspace members", "workspace_id", parentWorkspace.ID, "status_code", statusCode)
+		return err
 	}
 }
 
-func captureAPIKeys(client *http.Client, adminKey string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeAnthropicRequest(client, endpoints["apiKeys"], adminKey)
+func captureAPIKeys(ctx context.Context, client *http.Client, adminKey string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeAnthropicRequest(ctx, client, endpoints["apiKeys"], adminKey)
 	if err != nil {
 		return err
 	}
@@ -315,6 +345,7 @@ func captureAPIKeys(client *http.Client, adminKey string, secretInfo *SecretInfo
 		var apiKeys APIKeysResponse
 
 		if err := json.Unmarshal(response, &apiKeys); err != nil {
+			ctx.Logger().Error(err, "failed to unmarshal api keys response")
 			return err
 		}
 
@@ -334,8 +365,12 @@ func captureAPIKeys(client *http.Client, adminKey string, secretInfo *SecretInfo
 
 		return nil
 	case http.StatusNotFound, http.StatusUnauthorized:
-		return fmt.Errorf("invalid/revoked api-key")
+		err := fmt.Errorf("invalid/revoked api-key")
+		ctx.Logger().Error(err, "anthropic key invalid while fetching api keys", "status_code", statusCode)
+		return err
 	default:
-		return fmt.Errorf("unexpected status code: %d while fetching models", statusCode)
+		err := fmt.Errorf("unexpected status code: %d while fetching api keys", statusCode)
+		ctx.Logger().Error(err, "unexpected status code while fetching api keys", "status_code", statusCode)
+		return err
 	}
 }

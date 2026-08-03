@@ -5,6 +5,7 @@ package huggingface
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -30,13 +31,15 @@ type Analyzer struct {
 
 func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeHuggingFace }
 
-func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok || key == "" {
-		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", fmt.Errorf("key not found in credentialInfo"))
+		err := fmt.Errorf("key not found in credentialInfo")
+		ctx.Logger().Error(err, "huggingface credentials missing key")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", err)
 	}
 
-	info, err := AnalyzePermissions(a.Cfg, key)
+	info, err := AnalyzePermissions(ctx, a.Cfg, key)
 	if err != nil {
 		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
@@ -309,13 +312,14 @@ type Model struct {
 
 // getModelsByAuthor calls the HF API /models endpoint with the author query param
 // returns a list of models and an error
-func getModelsByAuthor(cfg *config.Config, key string, author string) ([]Model, error) {
+func getModelsByAuthor(ctx context.Context, cfg *config.Config, key string, author string) ([]Model, error) {
 	var modelsJSON []Model
 
 	// create a new request
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://huggingface.co/api/models", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://huggingface.co/api/models", nil)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to create huggingface models request", "author", author)
 		return modelsJSON, err
 	}
 
@@ -330,14 +334,25 @@ func getModelsByAuthor(cfg *config.Config, key string, author string) ([]Model, 
 	// send the request
 	resp, err := client.Do(req)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to send huggingface models request", "author", author)
 		return modelsJSON, err
 	}
 
 	// defer the response body closing
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		err := fmt.Errorf("unexpected status code: %d while fetching models for author %s", resp.StatusCode, author)
+		ctx.Logger().Error(err, "unexpected status code while fetching huggingface models", "author", author, "status_code", resp.StatusCode)
+		return modelsJSON, err
+	}
 
 	// read response
 	if err := json.NewDecoder(resp.Body).Decode(&modelsJSON); err != nil {
+		ctx.Logger().Error(err, "failed to decode huggingface models response", "author", author)
 		return modelsJSON, err
 	}
 	return modelsJSON, nil
@@ -345,13 +360,14 @@ func getModelsByAuthor(cfg *config.Config, key string, author string) ([]Model, 
 
 // getTokenInfo calls the HF API /whoami-v2 endpoint to get the token info
 // returns the token info, a boolean indicating token validity, and an error
-func getTokenInfo(cfg *config.Config, key string) (HFTokenJSON, bool, error) {
+func getTokenInfo(ctx context.Context, cfg *config.Config, key string) (HFTokenJSON, bool, error) {
 	var tokenJSON HFTokenJSON
 
 	// create a new request
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://huggingface.co/api/whoami-v2", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://huggingface.co/api/whoami-v2", nil)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to create huggingface whoami request")
 		return tokenJSON, false, err
 	}
 
@@ -361,19 +377,25 @@ func getTokenInfo(cfg *config.Config, key string) (HFTokenJSON, bool, error) {
 	// send the request
 	resp, err := client.Do(req)
 	if err != nil {
+		ctx.Logger().Error(err, "failed to send huggingface whoami request")
 		return tokenJSON, false, err
 	}
 
+	// defer the response body closing
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
 	// check if the response is 200
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
+		ctx.Logger().V(2).Info("huggingface token invalid while fetching whoami", "status_code", resp.StatusCode)
 		return tokenJSON, false, nil
 	}
 
-	// defer the response body closing
-	defer func() { _ = resp.Body.Close() }()
-
 	// read response
 	if err := json.NewDecoder(resp.Body).Decode(&tokenJSON); err != nil {
+		ctx.Logger().Error(err, "failed to decode huggingface whoami response")
 		return tokenJSON, true, err
 	}
 	return tokenJSON, true, nil
@@ -384,20 +406,22 @@ type SecretInfo struct {
 	Models []Model
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*SecretInfo, error) {
 	// get token info
-	token, success, err := getTokenInfo(cfg, key)
+	token, success, err := getTokenInfo(ctx, cfg, key)
 	if err != nil {
 		return nil, err
 	}
 
 	if !success {
-		return nil, fmt.Errorf("invalid HuggingFace Access Token")
+		err := fmt.Errorf("invalid HuggingFace Access Token")
+		ctx.Logger().V(2).Info("huggingface access token validation failed")
+		return nil, err
 	}
 
 	// get all models by username
 	var allModels []Model
-	userModels, err := getModelsByAuthor(cfg, key, token.Username)
+	userModels, err := getModelsByAuthor(ctx, cfg, key, token.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +429,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	// get all models from all orgs
 	for _, org := range token.Orgs {
-		orgModels, err := getModelsByAuthor(cfg, key, org.Name)
+		orgModels, err := getModelsByAuthor(ctx, cfg, key, org.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -420,7 +444,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 // AnalyzeAndPrintPermissions prints the permissions of a HuggingFace API key
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	info, err := AnalyzePermissions(cfg, key)
+	info, err := AnalyzePermissions(context.Background(), cfg, key)
 	if err != nil {
 		color.Red("[x] Error: %s", err.Error())
 		return

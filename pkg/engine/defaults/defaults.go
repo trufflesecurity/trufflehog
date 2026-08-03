@@ -168,9 +168,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/closecrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudconvert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudelements"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
+	cloudflareapitokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken/v1"
+	cloudflareapitokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflarecakey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
+	cloudflareglobalapikeyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey/v1"
+	cloudflareglobalapikeyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudimage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudinary"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudmersive"
@@ -253,6 +255,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dronahq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/droneci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dropbox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duffeltoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dwolla"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dynalist"
@@ -364,6 +368,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
+	hashicorpbatchtoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvault/hashicorpvaultbatchtoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvault/hashicorpvaulttoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hashicorpvaultauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hasura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
@@ -403,6 +409,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ip2location"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipgeolocation"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipinfo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipinfodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
@@ -445,6 +452,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/liveagent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/livestorm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loadmill"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lob"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/locationiq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loggly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loginradius"
@@ -503,7 +511,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicbrowserkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicinsightsinsertkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicinsightsquerykey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newreliclicensekey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicmobileapptoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
@@ -524,6 +537,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nvapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oanda"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/octopusdeploy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/okta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/omnisend"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onedesk"
@@ -535,6 +549,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openaiadmin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openrouter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
@@ -564,6 +579,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pganalyzereadkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/photoroom"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/phraseaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
@@ -620,6 +636,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/reallysimplesystems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rebrandly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rechargepayments"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/redhatpyxis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/redis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
@@ -681,6 +698,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sheety"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sherpadesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shipday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shippo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shodankey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopifyoauth"
@@ -710,7 +728,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snipcart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snykkey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud"
+	sonarcloudv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v1"
+	sonarcloudv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spectralops"
@@ -1052,9 +1071,11 @@ func buildDetectorList() []detectors.Detector {
 		&closecrm.Scanner{},
 		&cloudconvert.Scanner{},
 		&cloudelements.Scanner{},
-		&cloudflareapitoken.Scanner{},
+		&cloudflareapitokenv1.Scanner{},
+		&cloudflareapitokenv2.Scanner{},
 		&cloudflarecakey.Scanner{},
-		&cloudflareglobalapikey.Scanner{},
+		&cloudflareglobalapikeyv1.Scanner{},
+		&cloudflareglobalapikeyv2.Scanner{},
 		&cloudimage.Scanner{},
 		&cloudinary.Scanner{},
 		&cloudmersive.Scanner{},
@@ -1140,6 +1161,8 @@ func buildDetectorList() []detectors.Detector {
 		&dronahq.Scanner{},
 		&droneci.Scanner{},
 		&dropbox.Scanner{},
+		&duffeltoken.Scanner{},
+		&duo.Scanner{},
 		&duply.Scanner{},
 		&dwolla.Scanner{},
 		&dynalist.Scanner{},
@@ -1254,7 +1277,9 @@ func buildDetectorList() []detectors.Detector {
 		&happyscribe.Scanner{},
 		&harness.Scanner{},
 		&harvest.Scanner{},
+		&hashicorpbatchtoken.Scanner{},
 		&hashicorpvaultauth.Scanner{},
+		&hashicorpvaulttoken.Scanner{},
 		&hasura.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
@@ -1295,6 +1320,7 @@ func buildDetectorList() []detectors.Detector {
 		&ip2location.Scanner{},
 		&ipapi.Scanner{},
 		&ipgeolocation.Scanner{},
+		&ipinfo.Scanner{},
 		&ipinfodb.Scanner{},
 		&ipquality.Scanner{},
 		&ipstack.Scanner{},
@@ -1339,6 +1365,7 @@ func buildDetectorList() []detectors.Detector {
 		&liveagent.Scanner{},
 		&livestorm.Scanner{},
 		&loadmill.Scanner{},
+		&lob.Scanner{},
 		&locationiq.Scanner{},
 		&loggly.Scanner{},
 		&loginradius.Scanner{},
@@ -1402,7 +1429,12 @@ func buildDetectorList() []detectors.Detector {
 		&netsuite.Scanner{},
 		&neutrinoapi.Scanner{},
 		&newrelicbrowserkey.Scanner{},
+		&newrelicinsightsinsertkey.Scanner{},
+		&newrelicinsightsquerykey.Scanner{},
+		&newreliclicensekey.Scanner{},
+		&newrelicmobileapptoken.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
+		&newrelicuserkey.Scanner{},
 		&newsapi.Scanner{},
 		&newscatcher.Scanner{},
 		&nexmoapikey.Scanner{},
@@ -1423,6 +1455,7 @@ func buildDetectorList() []detectors.Detector {
 		&nvapi.Scanner{},
 		&nylas.Scanner{},
 		&oanda.Scanner{},
+		&octopusdeploy.Scanner{},
 		&okta.Scanner{},
 		&omnisend.Scanner{},
 		&onedesk.Scanner{},
@@ -1434,6 +1467,7 @@ func buildDetectorList() []detectors.Detector {
 		&openai.Scanner{},
 		&openaiadmin.Scanner{},
 		&opencagedata.Scanner{},
+		&openrouter.Scanner{},
 		&openuv.Scanner{},
 		&openvpn.Scanner{},
 		&openweather.Scanner{},
@@ -1463,6 +1497,7 @@ func buildDetectorList() []detectors.Detector {
 		&peopledatalabs.Scanner{},
 		&pepipost.Scanner{},
 		&percy.Scanner{},
+		&pganalyzereadkey.Scanner{},
 		&photoroom.Scanner{},
 		&phraseaccesstoken.Scanner{},
 		&pinata.Scanner{},
@@ -1520,6 +1555,7 @@ func buildDetectorList() []detectors.Detector {
 		&reallysimplesystems.Scanner{},
 		&rebrandly.Scanner{},
 		&rechargepayments.Scanner{},
+		&redhatpyxis.Scanner{},
 		&redis.Scanner{},
 		&refiner.Scanner{},
 		&rentman.Scanner{},
@@ -1583,6 +1619,7 @@ func buildDetectorList() []detectors.Detector {
 		&sheety.Scanner{},
 		&sherpadesk.Scanner{},
 		&shipday.Scanner{},
+		&shippo.Scanner{},
 		&shodankey.Scanner{},
 		&shopify.Scanner{},
 		&shopifyoauth.Scanner{},
@@ -1612,7 +1649,8 @@ func buildDetectorList() []detectors.Detector {
 		&snipcart.Scanner{},
 		&snowflake.Scanner{},
 		&snykkey.Scanner{},
-		&sonarcloud.Scanner{},
+		&sonarcloudv1.Scanner{},
+		&sonarcloudv2.Scanner{},
 		&sourcegraph.Scanner{},
 		&sourcegraphcody.Scanner{},
 		// &sparkpost.Scanner{},
@@ -1792,6 +1830,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *sonarcloudv2.Scanner:
+			return !feature.SonarCloudV2DetectorEnabled.Load()
 		case *enigma.Scanner:
 			return !feature.EnigmaDetectorEnabled.Load()
 		case *datadogapikey.Scanner:
@@ -1806,6 +1846,44 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.UserDetectorEnabled.Load()
 		case *braintrust.Scanner:
 			return !feature.BraintrustDetectorEnabled.Load()
+		case *pganalyzereadkey.Scanner:
+			return !feature.PgAnalyzeReadKeyDetectorEnabled.Load()
+		case *redhatpyxis.Scanner:
+			return !feature.RedHatPyxisDetectorEnabled.Load()
+		case *octopusdeploy.Scanner:
+			return !feature.OctopusDeployDetectorEnabled.Load()
+		case *openrouter.Scanner:
+			return !feature.OpenRouterDetectorEnabled.Load()
+		case *newrelicinsightsinsertkey.Scanner:
+			return !feature.NewRelicInsightsInsertKeyDetectorEnabled.Load()
+		case *duffeltoken.Scanner:
+			return !feature.DuffelTokenDetectorEnabled.Load()
+		case *shippo.Scanner:
+			return !feature.ShippoDetectorEnabled.Load()
+		case *ipinfo.Scanner:
+			return !feature.IPInfoDetectorEnabled.Load()
+		case *lob.Scanner:
+			return !feature.LobDetectorEnabled.Load()
+		case *hashicorpbatchtoken.Scanner:
+			return !feature.HashiCorpVaultBatchTokenDetectorEnabled.Load()
+		case *hashicorpvaulttoken.Scanner:
+			return !feature.HashiCorpVaultTokenDetectorEnabled.Load()
+		case *cloudflareapitokenv2.Scanner:
+			return !feature.CloudflareApiTokenV2DetectorEnabled.Load()
+		case *cloudflareglobalapikeyv2.Scanner:
+			return !feature.CloudflareGlobalApiKeyV2DetectorEnabled.Load()
+		case *duo.Scanner:
+			return !feature.DuoDetectorEnabled.Load()
+		case *newreliclicensekey.Scanner:
+			return !feature.NewRelicLicenseKeyDetectorEnabled.Load()
+		case *newrelicbrowserkey.Scanner:
+			return !feature.NewRelicBrowserKeyDetectorEnabled.Load()
+		case *newrelicuserkey.Scanner:
+			return !feature.NewRelicUserKeyDetectorEnabled.Load()
+		case *newrelicinsightsquerykey.Scanner:
+			return !feature.NewRelicInsightsQueryKeyDetectorEnabled.Load()
+		case *newrelicmobileapptoken.Scanner:
+			return !feature.NewRelicMobileAppTokenDetectorEnabled.Load()
 		default:
 			return false
 		}
