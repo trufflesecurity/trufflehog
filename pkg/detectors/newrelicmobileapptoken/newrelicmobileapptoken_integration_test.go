@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package sonarcloud
+package newrelicmobileapptoken
 
 import (
 	"context"
@@ -10,21 +10,23 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-func TestSonarCloud_FromChunk(t *testing.T) {
+func TestNewRelicMobileAppToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SONARCLOUD")
-	inactiveSecret := testSecrets.MustGetField("SONARCLOUD_INACTIVE")
+
+	key := testSecrets.MustGetField("NEW_RELIC_MOBILE_APP_TOKEN")
+	keyEU := testSecrets.MustGetField("NEW_RELIC_MOBILE_APP_TOKEN_EU")
+	keyInactive := "AAcc7eb96551e8cd65818865695f35bb109455d623-NRMA"
 
 	type args struct {
 		ctx    context.Context
@@ -43,13 +45,43 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a new relic mobile app token %s within", key)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_SonarCloud,
+					DetectorType: detector_typepb.DetectorType_NewRelicMobileAppToken,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"region": "us",
+					},
+					SecretParts: map[string]string{
+						"key":    key,
+						"region": "us",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found eu, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a new EU relic mobile app token %s within", keyEU)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_NewRelicMobileAppToken,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"region": "eu",
+					},
+					SecretParts: map[string]string{
+						"key":    keyEU,
+						"region": "eu",
+					},
 				},
 			},
 			wantErr: false,
@@ -59,13 +91,20 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a new relic mobile app token %s within", keyInactive)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_SonarCloud,
+					DetectorType: detector_typepb.DetectorType_NewRelicMobileAppToken,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"region": "us",
+					},
+					SecretParts: map[string]string{
+						"key":    keyInactive,
+						"region": "us",
+					},
 				},
 			},
 			wantErr: false,
@@ -87,7 +126,7 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("SonarCloud.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewRelicMobileAppToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -95,9 +134,13 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if len(got[i].Redacted) == 0 {
+					t.Fatalf("no redacted secret present: \n %+v", got[i])
+				}
+				got[i].Redacted = ""
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("SonarCloud.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("NewRelicMobileAppToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

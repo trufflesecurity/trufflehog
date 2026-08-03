@@ -48,7 +48,7 @@ func TestSource_Scan(t *testing.T) {
 				verify: true,
 			},
 			wantErr:              false,
-			totalScannedProjects: 2,
+			totalScannedProjects: 3,
 		},
 		{
 			name: "invalid token",

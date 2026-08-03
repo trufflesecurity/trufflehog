@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	validPattern   = "XUTbwiuF1_qmP5BvXi4hMeDafM2VoNz5yMH__rI5"
-	invalidPattern = "XUTbwiuF1_qmP5BvXi4hMeDafM2VoNz5yMH__rI"
-	keyword        = "lob"
+	validPattern     = "live_0979969b3f6cc23ed67e9b650bfaf64f710"
+	validPatternTest = "test_0979969b3f6cc23ed67e9b650bfaf64f710"
+	invalidPattern   = "live_0979969b3f6cc23ed67e9b650bfaf64f71"
 )
 
 func TestLob_Pattern(t *testing.T) {
@@ -26,23 +26,23 @@ func TestLob_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword lob",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			name:  "valid live pattern",
+			input: fmt.Sprintf("token = '%s'", validPattern),
 			want:  []string{validPattern},
+		},
+		{
+			name:  "valid test pattern",
+			input: fmt.Sprintf("token = '%s'", validPatternTest),
+			want:  []string{validPatternTest},
 		},
 		{
 			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
+			input: fmt.Sprintf("token = '%s' | '%s'", validPattern, validPattern),
 			want:  []string{validPattern},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
-			want:  []string{},
-		},
-		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			input: fmt.Sprintf("'%s'", invalidPattern),
 			want:  []string{},
 		},
 	}

@@ -1054,13 +1054,21 @@ enum DetectorType {
   GitLabOauth2 = 1050;
   SpectralOps = 1051;
   AWSAppSync = 1052;
-  ShippoLiveToken = 1053;
-  VisibleNpmRegistryAuthData = 1054;
-  BcryptHash = 1055;
-  Base64PrivateKey = 1056;
-  BasicAuth = 1057;
-  DuoAPISecretKey = 1058;
-  DockerSwarmJoinToken = 1059;
-  DockerSwarmUnlock = 1066;
-}
+  BrainTrustApiKey = 1053;
+  PgAnalyzeReadKey = 1054;
+  RedHatPyxis = 1055;
+  OctopusDeploy = 1056;
+  OpenRouter = 1057;
+  NewRelicInsightsInsertKey = 1058;
+  DuffelToken = 1059;
+  Shippo = 1060;
+  HashiCorpVaultBatchToken = 1061;
+  HashiCorpVaultToken = 1062;
+  Duo = 1063;
+  NewRelicLicenseKey = 1064;
+  NewRelicBrowserKey = 1065;
+  NewRelicUserKey = 1066;
+  NewRelicInsightsQueryKey = 1067;
+  NewRelicMobileAppToken = 1068;
+  DockerSwarmUnlock = 1069;
 }
