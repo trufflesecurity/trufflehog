@@ -837,6 +837,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vatlayer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vaultroottoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vbout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vercel"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifier"
@@ -1761,6 +1762,7 @@ func buildDetectorList() []detectors.Detector {
 		&userstack.Scanner{},
 		&vagrantcloudpersonaltoken.Scanner{},
 		&vatlayer.Scanner{},
+		&vaultroottoken.Scanner{},
 		&vbout.Scanner{},
 		&vercel.Scanner{},
 		&verifier.Scanner{},
