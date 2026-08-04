@@ -1,4 +1,4 @@
-package posthog
+package newrelicmobileapptoken
 
 import (
 	"context"
@@ -12,13 +12,12 @@ import (
 )
 
 var (
-	validPattern   = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_Zqr"
-	validPattern48 = "phx_C1rP9fnAtEFJvb0IYCFdeQhar2WdwUFBYHJym1F_ZqrAbcde"
-	invalidPattern = "phx_C1rP9fnAtEFJvb0IYCF?eQhar2WdwUFBYHJym1F_Zqr"
-	keyword        = "posthog"
+	validPattern   = "AAcc7eb96551e8cd65818865695f35bb109455d623-NRMA"
+	validPatternEU = "eu01xxbfd4a807e4099453ba160493119a126319cb-NRMA"
+	invalidPattern = "AAcc7eb96551e8cd65818865695f35bb109455d6-NRMA"
 )
 
-func TestAppPosthog_Pattern(t *testing.T) {
+func TestNewRelicMobileAppToken_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -27,18 +26,18 @@ func TestAppPosthog_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword posthog",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			name:  "valid pattern",
+			input: fmt.Sprintf("new relic mobile app token = '%s'", validPattern),
 			want:  []string{validPattern},
 		},
 		{
-			name:  "valid pattern 48 chars - with keyword posthog",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern48),
-			want:  []string{validPattern48},
+			name:  "valid pattern EU",
+			input: fmt.Sprintf("new relic mobile app token EU = '%s'", validPatternEU),
+			want:  []string{validPatternEU},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			input: fmt.Sprintf("new relic mobile app token = '%s'", invalidPattern),
 			want:  []string{},
 		},
 	}
