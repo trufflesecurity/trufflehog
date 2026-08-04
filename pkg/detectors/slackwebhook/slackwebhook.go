@@ -88,6 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 					case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
 						s1.Verified = true
+					case res.StatusCode == http.StatusBadRequest && bytes.Contains(bodyBytes, []byte("invalid_token")):
+						// When a webhook is revoked or the workspace/channel is gone: determinate verified=false (SCAN-1018)
 					case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden:
 						// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
 						// You might want to handle this case or log it.
