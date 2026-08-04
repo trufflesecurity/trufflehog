@@ -154,7 +154,7 @@ Scan bare repository (e.g. useful while using in pre-receive hooks)
 Custom path where the repository should be cloned (default: temp dir).
 .TP
 \fB--no-cleanup\fR
-Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone gets its own directory, so repeated runs accumulate.
+Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.
 .TP
 \fB--trust-local-git-config\fR
 Trust local git config.
@@ -223,7 +223,7 @@ Embed authentication credentials in repository URLs instead of using secure HTTP
 Custom path where the repository should be cloned (default: temp dir).
 .TP
 \fB--no-cleanup\fR
-Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone gets its own directory, so repeated runs accumulate.
+Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.
 .TP
 \fB--ignore-gists\fR
 Ignore all gists in scan.
@@ -280,10 +280,10 @@ Repositories to exclude in an org scan. This can also be a glob pattern. You can
 Embed authentication credentials in repository URLs instead of using secure HTTP headers
 .TP
 \fB--clone-path=CLONE-PATH\fR
-Custom path where the repository should be cloned (default: temp dir)
+Custom path where the repository should be cloned (default: temp dir).
 .TP
 \fB--no-cleanup\fR
-Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone gets its own directory, so repeated runs accumulate.
+Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.
 .SS
 \fBfilesystem [<flags>] [<path>...]\fR
 Find credentials in a filesystem.
