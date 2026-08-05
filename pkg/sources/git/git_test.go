@@ -1288,19 +1288,9 @@ func TestNormalizeFileURI(t *testing.T) {
 
 func TestPrepareRepoWithNormalization(t *testing.T) {
 	repoPath := setupTestRepo(t, "test-repo")
+	t.Chdir(repoPath)
 	addTestFileAndCommit(t, repoPath, "test.txt", "test content")
 
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get current directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Fatalf("failed to restore original directory: %v", err)
-		}
-	}()
-
-	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
 		name             string
 		uri              string
@@ -1336,11 +1326,6 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 				_ = os.RemoveAll(path)
 			}
 		})
-	}
-
-	// Now change to temp directory for relative path tests
-	if err := os.Chdir(repoPath); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
 	}
 
 	relativeTests := []struct {
@@ -1382,12 +1367,12 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 }
 
 func TestPrepareRepoWithNormalizationBare(t *testing.T) {
-	t.Parallel()
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
 
 	workingRepoPath := setupTestRepo(t, "working-repo-original")
 	addTestFileAndCommit(t, workingRepoPath, "test.txt", "test content")
 
-	tempDir := t.TempDir()
 	bareRepoPath := filepath.Join(tempDir, "bare-repo")
 	assert.NoError(t, exec.Command("git", "clone", workingRepoPath, bareRepoPath, "--bare").Run())
 
@@ -1396,17 +1381,6 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 	_, err = os.Stat(filepath.Join(bareRepoPath, "HEAD"))
 	assert.NoError(t, err, "Bare repository should have HEAD file")
 
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get current directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Fatalf("failed to restore original directory: %v", err)
-		}
-	}()
-
-	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
 		name             string
 		uri              string
@@ -1454,11 +1428,6 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 				_ = os.RemoveAll(path)
 			}
 		})
-	}
-
-	// Now change to temp directory for relative path tests
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
 	}
 
 	relativeTests := []struct {
