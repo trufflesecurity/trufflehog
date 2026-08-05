@@ -1286,16 +1286,11 @@ func TestNormalizeFileURI(t *testing.T) {
 	}
 }
 
-// Relative file URIs resolve against the process working directory, so this
-// test has to chdir and cannot run in parallel: every other test in this
-// package shells out to git, and a git subprocess that inherits a working
-// directory this test later removes fails with "Unable to read current
-// working directory".
 func TestPrepareRepoWithNormalization(t *testing.T) {
 	repoPath := setupTestRepo(t, "test-repo")
+	t.Chdir(repoPath)
 	addTestFileAndCommit(t, repoPath, "test.txt", "test content")
 
-	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
 		name             string
 		uri              string
@@ -1332,9 +1327,6 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 			}
 		})
 	}
-
-	// Now change to temp directory for relative path tests.
-	t.Chdir(repoPath)
 
 	relativeTests := []struct {
 		name             string
@@ -1375,10 +1367,12 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 }
 
 func TestPrepareRepoWithNormalizationBare(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
+
 	workingRepoPath := setupTestRepo(t, "working-repo-original")
 	addTestFileAndCommit(t, workingRepoPath, "test.txt", "test content")
 
-	tempDir := t.TempDir()
 	bareRepoPath := filepath.Join(tempDir, "bare-repo")
 	assert.NoError(t, exec.Command("git", "clone", workingRepoPath, bareRepoPath, "--bare").Run())
 
@@ -1387,7 +1381,6 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 	_, err = os.Stat(filepath.Join(bareRepoPath, "HEAD"))
 	assert.NoError(t, err, "Bare repository should have HEAD file")
 
-	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
 		name             string
 		uri              string
@@ -1437,7 +1430,6 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 		})
 	}
 
-	t.Chdir(tempDir)
 	relativeTests := []struct {
 		name             string
 		uri              string
