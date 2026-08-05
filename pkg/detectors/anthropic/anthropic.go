@@ -83,15 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-/*
-verifyAnthropicKey verify the anthropic key passed against the endpoint
-
-Endpoints:
-
-  - For api keys: https://docs.anthropic.com/en/api/models-list
-
-  - For admin keys:  https://docs.anthropic.com/en/api/admin-api/apikeys/list-api-keys
-*/
+// verifyAnthropicKey verifies key against endpoint (models-list for API keys,
+// admin api_keys-list for admin keys).
 func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
@@ -120,19 +113,14 @@ func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key 
 		return false, nil
 
 	default:
-		// Everything else is indeterminate. In particular a 400 is always
-		// invalid_request_error: the API returns it for a missing or malformed
-		// anthropic-version header or a bad query parameter, and never for the state of
-		// the key itself (every bad-key case above returns 401). A 400 therefore means
-		// the request was altered in transit rather than that the key is dead, so it
-		// must not be treated as determinate not-live. Include the API's own error
-		// type and message so the cause is diagnosable from the log alone.
+		// A 400 is invalid_request_error, never a bad-key signal (that's always 401),
+		// so it must stay indeterminate rather than count as not-live.
 		return false, apiError(res)
 	}
 }
 
-// anthropicErrorResponse is the error envelope the Anthropic API returns on a non-2xx
-// response. See https://platform.claude.com/docs/en/api/errors.
+// anthropicErrorResponse is the Anthropic API's error envelope for non-2xx responses.
+// See https://platform.claude.com/docs/en/api/errors.
 type anthropicErrorResponse struct {
 	Error struct {
 		Type    string `json:"type"`
@@ -140,13 +128,9 @@ type anthropicErrorResponse struct {
 	} `json:"error"`
 }
 
-// maxErrorBodySize bounds how much of an error response is read before giving up on
-// extracting a description from it.
-const maxErrorBodySize = 4 << 10
+const maxErrorBodySize = 4 << 10 // cap how much of the error body we bother parsing
 
-// apiError describes an unexpected response, enriching it with the API's own error type
-// and message when the body carries them. The message describes the request, not the
-// credential, so it is safe to attach to the verification error.
+// apiError enriches an unexpected status with the API's own error type/message when present.
 func apiError(res *http.Response) error {
 	body, err := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
 	if err != nil {
