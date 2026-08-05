@@ -665,7 +665,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "error", err)
+		logger.V(0).Info("git clone failed", "error", err)
 		failureReason := ClassifyCloneError(output)
 		exitCode := cloneCmd.ProcessState.ExitCode()
 		metricsInstance.RecordCloneOperation(statusFailure, failureReason, exitCode)
