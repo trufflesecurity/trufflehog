@@ -1286,19 +1286,14 @@ func TestNormalizeFileURI(t *testing.T) {
 	}
 }
 
+// Relative file URIs resolve against the process working directory, so this
+// test has to chdir and cannot run in parallel: every other test in this
+// package shells out to git, and a git subprocess that inherits a working
+// directory this test later removes fails with "Unable to read current
+// working directory".
 func TestPrepareRepoWithNormalization(t *testing.T) {
 	repoPath := setupTestRepo(t, "test-repo")
 	addTestFileAndCommit(t, repoPath, "test.txt", "test content")
-
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get current directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Fatalf("failed to restore original directory: %v", err)
-		}
-	}()
 
 	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
@@ -1338,10 +1333,8 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 		})
 	}
 
-	// Now change to temp directory for relative path tests
-	if err := os.Chdir(repoPath); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	// Now change to temp directory for relative path tests.
+	t.Chdir(repoPath)
 
 	relativeTests := []struct {
 		name             string
@@ -1382,8 +1375,6 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 }
 
 func TestPrepareRepoWithNormalizationBare(t *testing.T) {
-	t.Parallel()
-
 	workingRepoPath := setupTestRepo(t, "working-repo-original")
 	addTestFileAndCommit(t, workingRepoPath, "test.txt", "test content")
 
@@ -1395,16 +1386,6 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 	assert.NoError(t, err, "Bare repository should have refs directory")
 	_, err = os.Stat(filepath.Join(bareRepoPath, "HEAD"))
 	assert.NoError(t, err, "Bare repository should have HEAD file")
-
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get current directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Fatalf("failed to restore original directory: %v", err)
-		}
-	}()
 
 	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
@@ -1456,11 +1437,7 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 		})
 	}
 
-	// Now change to temp directory for relative path tests
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
-
+	t.Chdir(tempDir)
 	relativeTests := []struct {
 		name             string
 		uri              string
