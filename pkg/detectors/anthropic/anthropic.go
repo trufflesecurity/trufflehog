@@ -2,8 +2,9 @@ package anthropic
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -59,22 +60,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isAdminKey := isAdminKey(keyMatch)
-			var isVerified bool
-			var err error
+			var (
+				isVerified      bool
+				verificationErr error
+			)
 
-			if isAdminKey {
-				isVerified, err = verifyAnthropicKey(ctx, client, adminKeyEndpoint, keyMatch)
+			if isAdminKey(keyMatch) {
 				s1.ExtraData["Type"] = "Admin Key"
-			} else if !isAdminKey {
-				isVerified, err = verifyAnthropicKey(ctx, client, apiKeyEndpoint, keyMatch)
-				s1.ExtraData["Type"] = "API Key"
+				isVerified, verificationErr = verifyAnthropicKey(ctx, client, adminKeyEndpoint, keyMatch)
 			} else {
-				return nil, errors.New("unknown key type detected for anthropic")
+				s1.ExtraData["Type"] = "API Key"
+				isVerified, verificationErr = verifyAnthropicKey(ctx, client, apiKeyEndpoint, keyMatch)
 			}
 
 			s1.Verified = isVerified
-			s1.SetVerificationError(err, keyMatch)
+			s1.SetVerificationError(verificationErr, keyMatch)
 		}
 
 		results = append(results, s1)
@@ -106,7 +106,10 @@ func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key 
 	if err != nil {
 		return false, err
 	}
-	defer func() { _ = res.Body.Close() }()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -117,8 +120,46 @@ func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key 
 		return false, nil
 
 	default:
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		// Everything else is indeterminate. In particular a 400 is always
+		// invalid_request_error: the API returns it for a missing or malformed
+		// anthropic-version header or a bad query parameter, and never for the state of
+		// the key itself (every bad-key case above returns 401). A 400 therefore means
+		// the request was altered in transit rather than that the key is dead, so it
+		// must not be treated as determinate not-live. Include the API's own error
+		// type and message so the cause is diagnosable from the log alone.
+		return false, apiError(res)
 	}
+}
+
+// anthropicErrorResponse is the error envelope the Anthropic API returns on a non-2xx
+// response. See https://platform.claude.com/docs/en/api/errors.
+type anthropicErrorResponse struct {
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// maxErrorBodySize bounds how much of an error response is read before giving up on
+// extracting a description from it.
+const maxErrorBodySize = 4 << 10
+
+// apiError describes an unexpected response, enriching it with the API's own error type
+// and message when the body carries them. The message describes the request, not the
+// credential, so it is safe to attach to the verification error.
+func apiError(res *http.Response) error {
+	body, err := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
+	if err != nil {
+		return fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	var apiErr anthropicErrorResponse
+	if err := json.Unmarshal(body, &apiErr); err != nil || apiErr.Error.Type == "" {
+		return fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return fmt.Errorf("unexpected HTTP response status %d (%s: %s)",
+		res.StatusCode, apiErr.Error.Type, apiErr.Error.Message)
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
