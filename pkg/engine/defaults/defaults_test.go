@@ -142,6 +142,14 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Shippo:                    {},
 	detector_typepb.DetectorType_IPInfo:                    {},
 	detector_typepb.DetectorType_Lob:                       {},
+	detector_typepb.DetectorType_HashiCorpVaultBatchToken:  {},
+	detector_typepb.DetectorType_HashiCorpVaultToken:       {},
+	detector_typepb.DetectorType_Duo:                       {},
+	detector_typepb.DetectorType_NewRelicLicenseKey:        {},
+	detector_typepb.DetectorType_NewRelicBrowserKey:        {},
+	detector_typepb.DetectorType_NewRelicUserKey:           {},
+	detector_typepb.DetectorType_NewRelicInsightsQueryKey:  {},
+	detector_typepb.DetectorType_NewRelicMobileAppToken:    {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()

@@ -233,6 +233,8 @@ Expected output:
 ...
 ```
 
+TruffleHog can also output [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) with `--sarif` instead of `--json`. GitHub code scanning understands SARIF natively, so uploading it surfaces findings inline on pull request diffs and in the repository's Security tab, and tracks findings as new/fixed across scans instead of reporting the same one every run — see the [TruffleHog Github Action](#octocat-trufflehog-github-action) section below for how to upload it. Note that, unlike the other output formats, SARIF results are buffered in memory for the full scan and written out at the end, since SARIF requires a single JSON document rather than a stream — fine for typical scans, but scans producing a very large number of results will use proportionally more memory.
+
 ## 5: Scan a GitHub Repo + its Issues and Pull Requests
 
 ```bash
@@ -464,6 +466,8 @@ Flags:
       --[no-]json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab,
                                  and github sources.
       --[no-]github-actions      Output in GitHub Actions format.
+      --[no-]sarif               Output in SARIF format for upload to GitHub code scanning (e.g.
+                                 via github/codeql-action/upload-sarif).
       --concurrency=12           Number of concurrent workers.
       --[no-]no-verification     Don't verify the results.
       --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed
@@ -724,6 +728,17 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
 ```
 
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
+
+To upload results to GitHub code scanning instead, run TruffleHog directly with `--sarif` and pass the output to `github/codeql-action/upload-sarif`:
+
+```yaml
+- name: TruffleHog
+  run: trufflehog filesystem . --sarif --no-verification > results.sarif
+- name: Upload SARIF results
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
 
 #### Advanced Usage: Scan entire branch
 
