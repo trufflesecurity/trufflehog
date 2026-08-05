@@ -2,6 +2,7 @@ package figmapersonalaccesstoken
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -27,10 +28,15 @@ var (
 	}]`
 	secret = "figp_EZe7plhYvN92IyiDCjkvTcbNVZsuRVpDcHOwNNP1"
 
+	// A token ending in '=' or '-' can't be anchored with \b, so keyPat requires the
+	// next character to fall outside the token charset instead.
+	secretWithTrailingPadding = "figp_EZe7plhYvN92IyiDCjkvTcbNVZsuRVpDcHOwNN=="
+
 	invalidPatterns = []string{
 		`figp_short`, // too short
 		`figd_EZe7plhYvN92IyiDCjkvTcbNVZsuRVpDcHOwNNP1`,       // wrong prefix (v2 token)
 		`figp_!!!invalid_chars_here!!!!!!!!!!!!!!!!!!!!!!!!!`, // invalid characters
+		`figp_` + strings.Repeat("a", 60),                     // over-length, must not match a truncated prefix
 	}
 )
 
@@ -47,6 +53,11 @@ func TestFigmaPersonalAccessToken_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "token ending in padding characters",
+			input: `FigmaAuthToken=` + secretWithTrailingPadding,
+			want:  []string{secretWithTrailingPadding},
 		},
 	}
 
