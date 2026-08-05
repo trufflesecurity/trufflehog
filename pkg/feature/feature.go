@@ -47,6 +47,7 @@ var (
 	NewRelicUserKeyDetectorEnabled           atomic.Bool
 	NewRelicInsightsQueryKeyDetectorEnabled  atomic.Bool
 	NewRelicMobileAppTokenDetectorEnabled    atomic.Bool
+	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 )
 
 type AtomicString struct {
