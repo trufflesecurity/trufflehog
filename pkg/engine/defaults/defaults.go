@@ -99,7 +99,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
@@ -1001,7 +1000,7 @@ func buildDetectorList() []detectors.Detector {
 		&besttime.Scanner{},
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
-		&bingsubscriptionkey.Scanner{},
+		// &bingsubscriptionkey.Scanner{}, deprecated
 		&bitbar.Scanner{},
 		&bitbucketdatacenter.Scanner{},
 		&bitbucketapppassword.Scanner{},
