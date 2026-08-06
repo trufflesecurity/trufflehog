@@ -95,7 +95,7 @@ Endpoints:
 func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	req.Header.Set("x-api-key", key)
