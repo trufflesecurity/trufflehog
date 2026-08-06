@@ -1888,6 +1888,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.NewRelicMobileAppTokenDetectorEnabled.Load()
 		case *microsoftteamswebhookv2.Scanner:
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
+		case *solarwindsobservability.Scanner:
+			return !feature.SolarwindsDetectorEnabled.Load()
 		default:
 			return false
 		}
