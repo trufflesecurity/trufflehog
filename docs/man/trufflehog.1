@@ -38,6 +38,9 @@ Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
 \fB--github-actions\fR
 Output in GitHub Actions format.
 .TP
+\fB--sarif\fR
+Output in SARIF format for upload to GitHub code scanning (e.g. via github/codeql-action/upload-sarif).
+.TP
 \fB--concurrency=N\fR
 Number of concurrent workers.
 .TP
@@ -116,6 +119,9 @@ Skip additional references.
 \fB--user-agent-suffix=USER-AGENT-SUFFIX\fR
 Suffix to add to User-Agent.
 .TP
+\fB--drop-unverified-jwt-results\fR
+Drop unverified results without any verification errors from the JWT detector.
+.TP
 \fB--version\fR
 Show application version.
 .SH COMMANDS
@@ -151,7 +157,7 @@ Scan bare repository (e.g. useful while using in pre-receive hooks)
 Custom path where the repository should be cloned (default: temp dir).
 .TP
 \fB--no-cleanup\fR
-Do not delete cloned repositories after scanning (can only be used with --clone-path).
+Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.
 .TP
 \fB--trust-local-git-config\fR
 Trust local git config.
@@ -220,10 +226,13 @@ Embed authentication credentials in repository URLs instead of using secure HTTP
 Custom path where the repository should be cloned (default: temp dir).
 .TP
 \fB--no-cleanup\fR
-Do not delete cloned repositories after scanning (can only be used with --clone-path).
+Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.
 .TP
 \fB--ignore-gists\fR
 Ignore all gists in scan.
+.TP
+\fB--exclude-archived\fR
+Exclude archived repositories from scan.
 .SS
 \fBgithub-experimental --repo=REPO [<flags>]\fR
 Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.
@@ -274,10 +283,10 @@ Repositories to exclude in an org scan. This can also be a glob pattern. You can
 Embed authentication credentials in repository URLs instead of using secure HTTP headers
 .TP
 \fB--clone-path=CLONE-PATH\fR
-Custom path where the repository should be cloned (default: temp dir)
+Custom path where the repository should be cloned (default: temp dir).
 .TP
 \fB--no-cleanup\fR
-Do not delete cloned repositories after scanning (can only be used with --clone-path).
+Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.
 .SS
 \fBfilesystem [<flags>] [<path>...]\fR
 Find credentials in a filesystem.
