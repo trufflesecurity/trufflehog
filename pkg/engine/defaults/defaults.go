@@ -1000,7 +1000,6 @@ func buildDetectorList() []detectors.Detector {
 		&besttime.Scanner{},
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
-		// &bingsubscriptionkey.Scanner{}, deprecated
 		&bitbar.Scanner{},
 		&bitbucketdatacenter.Scanner{},
 		&bitbucketapppassword.Scanner{},
