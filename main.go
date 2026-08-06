@@ -543,6 +543,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.PineconeDetectorEnabled.Store(true)
 	feature.CloudinaryDetectorEnabled.Store(true)
 	feature.GitLabOAuthDetectorEnabled.Store(true)
+	feature.FigmaV3DetectorEnabled.Store(true)
 	feature.SonarCloudV2DetectorEnabled.Store(true)
 	feature.EnigmaDetectorEnabled.Store(true)
 	feature.DatadogApiKeyDetectorEnabled.Store(true)
