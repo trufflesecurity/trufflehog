@@ -83,8 +83,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// verifyAnthropicKey verifies key against endpoint (models-list for API keys,
-// admin api_keys-list for admin keys).
+/*
+verifyAnthropicKey verify the anthropic key passed against the endpoint
+
+Endpoints:
+
+  - For api keys: https://docs.anthropic.com/en/api/models-list
+
+  - For admin keys:  https://docs.anthropic.com/en/api/admin-api/apikeys/list-api-keys
+*/
 func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
