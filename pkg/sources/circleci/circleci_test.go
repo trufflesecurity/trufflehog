@@ -2,10 +2,15 @@ package circleci
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -106,6 +111,84 @@ func TestSource_Scan(t *testing.T) {
 			assert.Equal(t, tt.totalScannedProjects, progress.SectionsCompleted)
 		})
 	}
+}
+
+func TestGetOutputUrlResponseStreamsBody(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("partial log\n"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+
+		close(started)
+		<-release
+		_, _ = w.Write([]byte("rest of log\n"))
+	}))
+	defer server.Close()
+	defer close(release)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	s := &Source{client: server.Client()}
+	done := make(chan struct {
+		body io.ReadCloser
+		err  error
+	}, 1)
+
+	go func() {
+		body, err := s.getOutputUrlResponse(ctx, server.URL)
+		done <- struct {
+			body io.ReadCloser
+			err  error
+		}{body: body, err: err}
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("test server did not start streaming the response")
+	}
+
+	select {
+	case got := <-done:
+		assert.NoError(t, got.err)
+		if got.body != nil {
+			_ = got.body.Close()
+		}
+	case <-time.After(time.Second):
+		t.Fatal("getOutputUrlResponse waited for the whole response body")
+	}
+}
+
+func TestChunkReadsFromReader(t *testing.T) {
+	ctx := context.Background()
+	s := Source{name: "test-circleci", verify: true}
+	chunksCh := make(chan *sources.Chunk, 10)
+
+	proj := project{
+		VCS:      "github",
+		Username: "trufflesecurity",
+		Reponame: "trufflehog",
+	}
+
+	err := s.chunk(ctx, proj, 42, "run tests", strings.NewReader("hello\nCIRCLE_SHA1=abc123\nworld"), chunksCh)
+	close(chunksCh)
+
+	assert.NoError(t, err)
+	require.Len(t, chunksCh, 1)
+
+	chunk := <-chunksCh
+	assert.Equal(t, "test-circleci", chunk.SourceName)
+	assert.Equal(t, SourceType, chunk.SourceType)
+	assert.True(t, chunk.SourceVerify)
+	assert.NotContains(t, string(chunk.Data), "CIRCLE_SHA1")
+	assert.Equal(t, "run tests", chunk.SourceMetadata.GetCircleci().BuildStep)
+	assert.Equal(t, int64(42), chunk.SourceMetadata.GetCircleci().BuildNumber)
 }
 
 // additional test for edge cases
