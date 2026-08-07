@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -59,6 +60,245 @@ func TestClone_Timeout(t *testing.T) {
 			assert.Contains(t, err.Error(), "timed out")
 		}
 	})
+}
+
+func TestIsRetryableCloneError(t *testing.T) {
+	retryable := []string{
+		// Connection reset mid-transfer.
+		`could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, error: RPC failed; curl 56 Recv failure: Connection reset by peer
+error: 7589 bytes of body are still expected
+fetch-pack: unexpected disconnect while reading sideband packet
+fatal: early EOF
+fatal: fetch-pack: invalid index-pack output`,
+		// HTTP/2 stream reset by the server.
+		`could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, error: RPC failed; curl 92 HTTP/2 stream 7 reset by server (error 0x8 CANCEL)
+error: 7457 bytes of body are still expected
+fetch-pack: unexpected disconnect while reading sideband packet
+fatal: early EOF
+fatal: fetch-pack: invalid index-pack output`,
+	}
+	for _, msg := range retryable {
+		assert.True(t, isRetryableCloneError(errors.New(msg)), "expected retryable: %q", msg)
+	}
+
+	notRetryable := []string{
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: The requested URL returned error: 403",
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, The requested URL returned error: 429",
+		"git clone timed out (after 1h0m0s)",
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, fatal: repository 'https://github.com/org/repo.git/' not found",
+	}
+	for _, msg := range notRetryable {
+		assert.False(t, isRetryableCloneError(errors.New(msg)), "expected not retryable: %q", msg)
+	}
+	assert.False(t, isRetryableCloneError(nil))
+}
+
+func TestCreateClonePath(t *testing.T) {
+	t.Run("temp dir when clonePath is empty", func(t *testing.T) {
+		path, err := createClonePath("https://github.com/org/repo.git", "")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(path) }()
+
+		info, err := os.Stat(path)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+		if runtime.GOOS != "windows" {
+			// os.MkdirTemp guarantees 0700 so private repo contents aren't
+			// exposed to other users on shared systems.
+			assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+		}
+	})
+
+	t.Run("temp dirs are unique across calls", func(t *testing.T) {
+		// A retry replaces the previous directory; a colliding name would
+		// mean cloning into a non-empty directory, which git refuses.
+		first, err := createClonePath("https://github.com/org/repo.git", "")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(first) }()
+
+		second, err := createClonePath("https://github.com/org/repo.git", "")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(second) }()
+
+		assert.NotEqual(t, first, second)
+	})
+
+	t.Run("clonePath set builds trufflehog-<repo>-<random> subdirectory", func(t *testing.T) {
+		base := t.TempDir()
+		path, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+		assert.Equal(t, base, filepath.Dir(path))
+		// The trufflehog- prefix is what CleanTempDirsForLegacyJSON sweeps.
+		assert.True(t, strings.HasPrefix(filepath.Base(path), "trufflehog-repo-"),
+			"unexpected directory name %q", filepath.Base(path))
+
+		info, err := os.Stat(path)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+		if runtime.GOOS != "windows" {
+			assert.Equal(t, os.FileMode(0755), info.Mode().Perm())
+		}
+	})
+
+	t.Run("repo name without .git suffix", func(t *testing.T) {
+		base := t.TempDir()
+		path, err := createClonePath("https://github.com/org/repo", base)
+		assert.NoError(t, err)
+		assert.True(t, strings.HasPrefix(filepath.Base(path), "trufflehog-repo-"),
+			"unexpected directory name %q", filepath.Base(path))
+	})
+
+	t.Run("trailing slash in repo URL", func(t *testing.T) {
+		base := t.TempDir()
+		path, err := createClonePath("https://github.com/org/repo.git/", base)
+		assert.NoError(t, err)
+		assert.True(t, strings.HasPrefix(filepath.Base(path), "trufflehog-repo-"),
+			"unexpected directory name %q", filepath.Base(path))
+	})
+
+	t.Run("nonexistent clonePath parents are created", func(t *testing.T) {
+		base := filepath.Join(t.TempDir(), "a", "b", "c")
+		path, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+		assert.Equal(t, base, filepath.Dir(path))
+
+		info, err := os.Stat(path)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("second call with same arguments gets a fresh directory", func(t *testing.T) {
+		// The retry path calls this again after RemoveAll, and concurrent
+		// workers may be scanning the same repo; neither may be handed a
+		// directory another caller already owns.
+		base := t.TempDir()
+		first, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+
+		second, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.NoError(t, err)
+		assert.NotEqual(t, first, second)
+	})
+
+	t.Run("error when clonePath location is not writable", func(t *testing.T) {
+		// Create a *file* where the clone path should go so MkdirAll fails.
+		base := filepath.Join(t.TempDir(), "blocker")
+		assert.NoError(t, os.WriteFile(base, []byte("x"), 0644))
+
+		path, err := createClonePath("https://github.com/org/repo.git", base)
+		assert.Error(t, err)
+		assert.Empty(t, path)
+		assert.Contains(t, err.Error(), "failed to create clone path")
+	})
+
+	t.Run("distinct repos sharing a basename get distinct paths", func(t *testing.T) {
+		// Only the last URL segment is used as the directory slug, so repos
+		// that live under different groups but share a name collide. With
+		// concurrency > 1 two workers then clone into and delete the same
+		// directory, producing spurious clone errors and partial scans.
+		base := t.TempDir()
+
+		urls := []string{
+			"https://gitlab.com/group-a/api.git",
+			"https://gitlab.com/group-b/api.git",
+			"https://gitlab.com/group-b/subgroup/api.git",
+			"https://gitlab.example.com/other/api",
+		}
+
+		seen := make(map[string]string, len(urls))
+		for _, u := range urls {
+			path, err := createClonePath(u, base)
+			assert.NoError(t, err)
+			if prev, ok := seen[path]; ok {
+				t.Errorf("clone path collision: %q and %q both resolve to %q", prev, u, path)
+			}
+			seen[path] = u
+		}
+	})
+
+	t.Run("concurrent calls for the same repo get distinct paths", func(t *testing.T) {
+		// The same repo can be cloned concurrently (e.g. a unit retried while
+		// another worker still holds the directory). Each caller owns its
+		// directory, so no two callers may be handed the same one.
+		base := t.TempDir()
+
+		const workers = 8
+		var (
+			mu    sync.Mutex
+			paths = make(map[string]int, workers)
+			wg    sync.WaitGroup
+			start = make(chan struct{})
+		)
+		for range workers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				path, err := createClonePath("https://gitlab.com/group-a/api.git", base)
+				assert.NoError(t, err)
+				mu.Lock()
+				paths[path]++
+				mu.Unlock()
+			}()
+		}
+		close(start)
+		wg.Wait()
+
+		assert.Len(t, paths, workers, "expected %d distinct clone paths, got %v", workers, paths)
+	})
+}
+
+// TestCloneRepo_ConcurrentSameBasename reproduces the failure end to end: two
+// workers cloning different repos that share a basename into a shared
+// --clone-path. They are handed the same directory, so one clone fails
+// ("already exists and is not an empty directory") or one worker's cleanup
+// deletes the other's working tree mid-scan.
+func TestCloneRepo_ConcurrentSameBasename(t *testing.T) {
+	ctx := context.Background()
+	clonePath := t.TempDir()
+
+	// Two distinct source repos that both end in "api".
+	sources := make([]string, 2)
+	for i, group := range []string{"group-a", "group-b"} {
+		repoPath := filepath.Join(t.TempDir(), group, "api")
+		assert.NoError(t, os.MkdirAll(filepath.Dir(repoPath), 0755))
+		assert.NoError(t, exec.Command("git", "init", repoPath).Run())
+		assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.name", "Test User").Run())
+		assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.email", "test@example.com").Run())
+		assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "commit.gpgsign", "false").Run())
+		addTestFileAndCommit(t, repoPath, "secret.txt", "content for "+group)
+		sources[i] = "file://" + repoPath
+	}
+
+	var (
+		wg    sync.WaitGroup
+		start = make(chan struct{})
+		mu    sync.Mutex
+		errs  []error
+		dests = make(map[string]int)
+	)
+	for _, gitURL := range sources {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			path, _, err := CloneRepo(ctx, nil, gitURL, clonePath, false)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				errs = append(errs, err)
+				return
+			}
+			dests[path]++
+			// Mirrors the cleanup the callers do once a repo is scanned.
+			_ = os.RemoveAll(path)
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	assert.Empty(t, errs, "concurrent clones of same-named repos should not fail")
+	assert.Len(t, dests, len(sources), "each repo should clone into its own directory, got %v", dests)
 }
 
 func TestSource_Scan(t *testing.T) {
@@ -1048,19 +1288,9 @@ func TestNormalizeFileURI(t *testing.T) {
 
 func TestPrepareRepoWithNormalization(t *testing.T) {
 	repoPath := setupTestRepo(t, "test-repo")
+	t.Chdir(repoPath)
 	addTestFileAndCommit(t, repoPath, "test.txt", "test content")
 
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get current directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Fatalf("failed to restore original directory: %v", err)
-		}
-	}()
-
-	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
 		name             string
 		uri              string
@@ -1096,11 +1326,6 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 				_ = os.RemoveAll(path)
 			}
 		})
-	}
-
-	// Now change to temp directory for relative path tests
-	if err := os.Chdir(repoPath); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
 	}
 
 	relativeTests := []struct {
@@ -1142,12 +1367,12 @@ func TestPrepareRepoWithNormalization(t *testing.T) {
 }
 
 func TestPrepareRepoWithNormalizationBare(t *testing.T) {
-	t.Parallel()
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
 
 	workingRepoPath := setupTestRepo(t, "working-repo-original")
 	addTestFileAndCommit(t, workingRepoPath, "test.txt", "test content")
 
-	tempDir := t.TempDir()
 	bareRepoPath := filepath.Join(tempDir, "bare-repo")
 	assert.NoError(t, exec.Command("git", "clone", workingRepoPath, bareRepoPath, "--bare").Run())
 
@@ -1156,17 +1381,6 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 	_, err = os.Stat(filepath.Join(bareRepoPath, "HEAD"))
 	assert.NoError(t, err, "Bare repository should have HEAD file")
 
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get current directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Fatalf("failed to restore original directory: %v", err)
-		}
-	}()
-
-	// Test absolute paths first (without changing directory)
 	absoluteTests := []struct {
 		name             string
 		uri              string
@@ -1214,11 +1428,6 @@ func TestPrepareRepoWithNormalizationBare(t *testing.T) {
 				_ = os.RemoveAll(path)
 			}
 		})
-	}
-
-	// Now change to temp directory for relative path tests
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
 	}
 
 	relativeTests := []struct {
