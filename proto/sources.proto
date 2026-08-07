@@ -541,6 +541,7 @@ message Elasticsearch {
   string query_json = 8;
   string since_timestamp = 9;
   bool best_effort_scan = 10;
+  string bearer_token = 11;
 }
 
 message Sentry {

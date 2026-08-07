@@ -239,6 +239,7 @@ var (
 	elasticsearchUsername       = elasticsearchScan.Flag("username", "Elasticsearch username").Envar("ELASTICSEARCH_USERNAME").String()
 	elasticsearchPassword       = elasticsearchScan.Flag("password", "Elasticsearch password").Envar("ELASTICSEARCH_PASSWORD").String()
 	elasticsearchServiceToken   = elasticsearchScan.Flag("service-token", "Elasticsearch service token").Envar("ELASTICSEARCH_SERVICE_TOKEN").String()
+	elasticsearchBearerToken    = elasticsearchScan.Flag("bearer-token", "Bearer/JWT token, for OpenSearch clusters using JWT auth").Envar("ELASTICSEARCH_BEARER_TOKEN").String()
 	elasticsearchCloudId        = elasticsearchScan.Flag("cloud-id", "Elasticsearch cloud ID. Can also be provided with environment variable").Envar("ELASTICSEARCH_CLOUD_ID").String()
 	elasticsearchAPIKey         = elasticsearchScan.Flag("api-key", "Elasticsearch API key. Can also be provided with environment variable").Envar("ELASTICSEARCH_API_KEY").String()
 	elasticsearchIndexPattern   = elasticsearchScan.Flag("index-pattern", "Filters the indices to search").Default("*").Envar("ELASTICSEARCH_INDEX_PATTERN").String()
@@ -1149,6 +1150,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CloudID:        *elasticsearchCloudId,
 			APIKey:         *elasticsearchAPIKey,
 			ServiceToken:   *elasticsearchServiceToken,
+			BearerToken:    *elasticsearchBearerToken,
 			IndexPattern:   *elasticsearchIndexPattern,
 			QueryJSON:      *elasticsearchQueryJSON,
 			SinceTimestamp: *elasticsearchSinceTimestamp,

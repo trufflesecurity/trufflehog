@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
 	"testing"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/testcontainers/testcontainers-go"
 	elasticcontainer "github.com/testcontainers/testcontainers-go/modules/elasticsearch"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 const USER string = "elastic" // This is hardcoded in the container
@@ -280,6 +283,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				ctx,
 				es,
 				&docSearch,
+				false,
 				func(document *Document) error {
 					docs = append(docs, *document)
 					return nil
@@ -367,6 +371,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				ctx,
 				es,
 				&docSearch,
+				false,
 				func(document *Document) error {
 					messagesProcessed += 1
 					return nil
@@ -399,6 +404,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				ctx,
 				es,
 				&docSearch,
+				false,
 				func(document *Document) error {
 					messagesProcessed += 1
 					return nil
@@ -417,4 +423,140 @@ func TestSource_ElasticAPI(t *testing.T) {
 			}
 		},
 	)
+}
+
+// TestSource_OpenSearchAPI demonstrates the OpenSearch incompatibilities described in
+// https://github.com/trufflesecurity/trufflehog/issues/5124: the same document-processing
+// path that works fine against real Elasticsearch (isOpenSearch: false) fails against a
+// real OpenSearch cluster, and only succeeds once the OpenSearch-specific PIT/tiebreaker/
+// query-clause handling (isOpenSearch: true) is used.
+//
+// Security is disabled on the test container: JWT bearer-token auth (also added in this PR)
+// is a header-setting concern orthogonal to these server-side incompatibilities, which
+// reproduce identically with or without auth -- see manual testing notes on the PR itself
+// for end-to-end verification against a real OpenSearch cluster with JWT auth enabled.
+func TestSource_OpenSearchAPI(t *testing.T) {
+	ctx := context.Background()
+
+	req := testcontainers.ContainerRequest{
+		Image:        "opensearchproject/opensearch:2.17.0",
+		ExposedPorts: []string{"9200/tcp"},
+		Env: map[string]string{
+			"discovery.type":          "single-node",
+			"DISABLE_SECURITY_PLUGIN": "true",
+		},
+		WaitingFor: wait.ForHTTP("/_cluster/health").
+			WithPort("9200/tcp").
+			WithStartupTimeout(60 * time.Second),
+	}
+
+	osC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		log.Fatalf("could not start opensearch: %s", err)
+	}
+	defer func() {
+		if err := osC.Terminate(ctx); err != nil {
+			log.Fatalf("could not stop opensearch: %s", err)
+		}
+	}()
+
+	host, err := osC.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := osC.MappedPort(ctx, "9200")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mirrors what Source.Init does when --bearer-token is set: OpenSearch doesn't
+	// reliably send the X-Elastic-Product header the vendored client demands on every
+	// request, so without this wrapper even a plain index/search call is rejected with
+	// "the client noticed that the server is not Elasticsearch...", before ever reaching
+	// the PIT/tiebreaker/query-clause behavior this test actually exercises.
+	client, err := es.NewTypedClient(es.Config{
+		Addresses: []string{fmt.Sprintf("http://%s:%s", host, port.Port())},
+		Transport: &openSearchTransport{base: http.DefaultTransport},
+	})
+	if err != nil {
+		t.Fatalf("error creating the opensearch client: %s", err)
+	}
+
+	indexName := gofakeit.Word()
+	now := time.Now()
+
+	payload := make(map[string]string)
+	payload["message"] = gofakeit.SentenceSimple()
+	payload["@timestamp"] = now.Format(time.RFC3339)
+
+	jsonMessage, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	indexReq := esapi.IndexRequest{
+		Index:   indexName,
+		Body:    bytes.NewReader(jsonMessage),
+		Refresh: "true",
+	}
+
+	res, err := indexReq.Do(ctx, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	docSearch := DocumentSearch{
+		index: &Index{
+			name:          indexName,
+			documentCount: 1,
+		},
+		documentCount: 1,
+		offset:        0,
+		filterParams:  &FilterParams{},
+	}
+
+	t.Run("fails against real OpenSearch without OpenSearch-specific handling", func(t *testing.T) {
+		_, err := processSearchedDocuments(
+			ctx,
+			client,
+			&docSearch,
+			false,
+			func(document *Document) error { return nil },
+		)
+		if err == nil {
+			t.Fatal("wanted an error processing documents against OpenSearch with isOpenSearch=false, got nil")
+		}
+	})
+
+	t.Run("succeeds against real OpenSearch with OpenSearch-specific handling", func(t *testing.T) {
+		docs := []Document{}
+
+		docsProcessed, err := processSearchedDocuments(
+			ctx,
+			client,
+			&docSearch,
+			true,
+			func(document *Document) error {
+				docs = append(docs, *document)
+				return nil
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if docsProcessed != 1 {
+			t.Fatalf("wanted 1 document processed, got %d\n", docsProcessed)
+		}
+		if len(docs) != 1 {
+			t.Fatalf("wanted 1 document, got %d\n", len(docs))
+		}
+		if docs[0].message != payload["message"] {
+			t.Errorf("wanted message %s, got %s\n", payload["message"], docs[0].message)
+		}
+	})
 }
