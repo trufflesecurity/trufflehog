@@ -417,6 +417,10 @@ type S3Config struct {
 	Roles []string
 	// MaxObjectSize is the maximum object size to scan.
 	MaxObjectSize int64
+	// Endpoint is an optional custom endpoint for S3-compatible providers
+	// (e.g. Wasabi, MinIO, Backblaze B2). If empty, the default AWS
+	// endpoints are used.
+	Endpoint string
 }
 
 // SyslogConfig defines the optional configuration for a syslog source.

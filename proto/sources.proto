@@ -392,6 +392,9 @@ message S3 {
   repeated string roles = 7;
   repeated string ignore_buckets = 8;
   bool enable_resumption = 9 [deprecated = true];
+  // Custom endpoint for S3-compatible providers (e.g. Wasabi, MinIO, Backblaze B2).
+  // If empty, the default AWS endpoints are used.
+  string endpoint = 10 [(validate.rules).string.uri_ref = true];
 }
 
 message Slack {
