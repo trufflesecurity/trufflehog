@@ -16,7 +16,7 @@ var (
 			Name:      "detector_execution_count",
 			Help:      "Total number of times a detector has been executed.",
 		},
-		[]string{"detector_name", "job_id", "source_name"},
+		[]string{"detector_name", "source_type", "source_name"},
 	)
 
 	// Note this is the time taken to call FromData on each detector, not necessarily the time taken

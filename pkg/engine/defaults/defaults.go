@@ -292,6 +292,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
 	figmapersonalaccesstokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
 	figmapersonalaccesstokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
+	figmapersonalaccesstokenv3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
@@ -488,7 +489,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metabase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metrilo"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
+	microsoftteamswebhookv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook/v1"
+	microsoftteamswebhookv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/miro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mite"
@@ -510,8 +512,13 @@ import (
 	netlifyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicbrowserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicinsightsinsertkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicinsightsquerykey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newreliclicensekey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicmobileapptoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
@@ -1194,6 +1201,7 @@ func buildDetectorList() []detectors.Detector {
 		&fibery.Scanner{},
 		&figmapersonalaccesstokenv1.Scanner{},
 		&figmapersonalaccesstokenv2.Scanner{},
+		&figmapersonalaccesstokenv3.Scanner{},
 		&fileio.Scanner{},
 		&finage.Scanner{},
 		&financialmodelingprep.Scanner{},
@@ -1400,7 +1408,8 @@ func buildDetectorList() []detectors.Detector {
 		&metaapi.Scanner{},
 		&metabase.Scanner{},
 		&metrilo.Scanner{},
-		&microsoftteamswebhook.Scanner{},
+		&microsoftteamswebhookv1.Scanner{},
+		&microsoftteamswebhookv2.Scanner{},
 		&mindmeister.Scanner{},
 		&miro.Scanner{},
 		&mite.Scanner{},
@@ -1424,8 +1433,13 @@ func buildDetectorList() []detectors.Detector {
 		&netlifyv2.Scanner{},
 		&netsuite.Scanner{},
 		&neutrinoapi.Scanner{},
+		&newrelicbrowserkey.Scanner{},
 		&newrelicinsightsinsertkey.Scanner{},
+		&newrelicinsightsquerykey.Scanner{},
+		&newreliclicensekey.Scanner{},
+		&newrelicmobileapptoken.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
+		&newrelicuserkey.Scanner{},
 		&newsapi.Scanner{},
 		&newscatcher.Scanner{},
 		&nexmoapikey.Scanner{},
@@ -1822,6 +1836,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *figmapersonalaccesstokenv3.Scanner:
+			return !feature.FigmaV3DetectorEnabled.Load()
 		case *sonarcloudv2.Scanner:
 			return !feature.SonarCloudV2DetectorEnabled.Load()
 		case *enigma.Scanner:
@@ -1866,6 +1882,18 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudflareGlobalApiKeyV2DetectorEnabled.Load()
 		case *duo.Scanner:
 			return !feature.DuoDetectorEnabled.Load()
+		case *newreliclicensekey.Scanner:
+			return !feature.NewRelicLicenseKeyDetectorEnabled.Load()
+		case *newrelicbrowserkey.Scanner:
+			return !feature.NewRelicBrowserKeyDetectorEnabled.Load()
+		case *newrelicuserkey.Scanner:
+			return !feature.NewRelicUserKeyDetectorEnabled.Load()
+		case *newrelicinsightsquerykey.Scanner:
+			return !feature.NewRelicInsightsQueryKeyDetectorEnabled.Load()
+		case *newrelicmobileapptoken.Scanner:
+			return !feature.NewRelicMobileAppTokenDetectorEnabled.Load()
+		case *microsoftteamswebhookv2.Scanner:
+			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		default:
 			return false
 		}
