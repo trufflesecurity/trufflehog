@@ -106,7 +106,7 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, dataO
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
 				dataOrErrChan <- DataOrErr{
-					Err: fmt.Errorf("%w: error handling archive content in AR: %v", ErrProcessingWarning, err),
+					Err: fmt.Errorf("%w: error handling archive content in AR: %w", ErrProcessingWarning, err),
 				}
 				h.metrics.incErrors()
 				continue
