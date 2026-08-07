@@ -293,6 +293,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
 	figmapersonalaccesstokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
 	figmapersonalaccesstokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
+	figmapersonalaccesstokenv3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
@@ -489,7 +490,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metabase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metrilo"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
+	microsoftteamswebhookv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook/v1"
+	microsoftteamswebhookv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/miro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mite"
@@ -1201,6 +1203,7 @@ func buildDetectorList() []detectors.Detector {
 		&fibery.Scanner{},
 		&figmapersonalaccesstokenv1.Scanner{},
 		&figmapersonalaccesstokenv2.Scanner{},
+		&figmapersonalaccesstokenv3.Scanner{},
 		&fileio.Scanner{},
 		&finage.Scanner{},
 		&financialmodelingprep.Scanner{},
@@ -1407,7 +1410,8 @@ func buildDetectorList() []detectors.Detector {
 		&metaapi.Scanner{},
 		&metabase.Scanner{},
 		&metrilo.Scanner{},
-		&microsoftteamswebhook.Scanner{},
+		&microsoftteamswebhookv1.Scanner{},
+		&microsoftteamswebhookv2.Scanner{},
 		&mindmeister.Scanner{},
 		&miro.Scanner{},
 		&mite.Scanner{},
@@ -1834,6 +1838,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *figmapersonalaccesstokenv3.Scanner:
+			return !feature.FigmaV3DetectorEnabled.Load()
 		case *sonarcloudv2.Scanner:
 			return !feature.SonarCloudV2DetectorEnabled.Load()
 		case *enigma.Scanner:
@@ -1888,6 +1894,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.NewRelicInsightsQueryKeyDetectorEnabled.Load()
 		case *newrelicmobileapptoken.Scanner:
 			return !feature.NewRelicMobileAppTokenDetectorEnabled.Load()
+		case *microsoftteamswebhookv2.Scanner:
+			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		default:
 			return false
 		}
