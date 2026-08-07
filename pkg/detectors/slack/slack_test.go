@@ -20,6 +20,8 @@ var (
 	invalidWorkspaceAccessToken  = "xoxa-08532509747?07570405353c"
 	validWorkspaceRefreshToken   = "xoxr-833485595373-24619897332l"
 	invalidWorkspaceRefreshToken = "xoxr-833485595373?24619897332l"
+	validAppLevelToken           = "xapp-1-A01234567890-1234567890123-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOP"
+	invalidAppLevelToken         = "xapp-1-A01234567890?1234567890123?ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	keyword                      = "slack"
 )
 
@@ -33,12 +35,12 @@ func TestSlack_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern - with keyword slack",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, validBotToken, keyword, validUserToken, keyword, validWorkspaceAccessToken, keyword, validWorkspaceRefreshToken),
-			want:  []string{validBotToken, validUserToken, validWorkspaceAccessToken, validWorkspaceRefreshToken},
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, validBotToken, keyword, validUserToken, keyword, validWorkspaceAccessToken, keyword, validWorkspaceRefreshToken, keyword, validAppLevelToken),
+			want:  []string{validBotToken, validUserToken, validWorkspaceAccessToken, validWorkspaceRefreshToken, validAppLevelToken},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, invalidBotToken, keyword, invalidUserToken, keyword, invalidWorkspaceAccessToken, keyword, invalidWorkspaceRefreshToken),
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, invalidBotToken, keyword, invalidUserToken, keyword, invalidWorkspaceAccessToken, keyword, invalidWorkspaceRefreshToken, keyword, invalidAppLevelToken),
 			want:  []string{},
 		},
 	}
