@@ -8,12 +8,16 @@ import (
 	"time"
 )
 
-var (
+const (
+	modelsURL  = "https://api.groq.com/openai/v1/models"
+	batchesURL = "https://api.groq.com/openai/v1/batches"
+	filesURL   = "https://api.groq.com/openai/v1/files"
+
 	permissionErr       = "permissions_error"
 	notAvailableForPlan = "not_available_for_plan"
 )
 
-// errorResponse is the response from groq APIs in case of any error
+// errorResponse is the body Groq returns when a call is denied.
 type errorResponse struct {
 	Error struct {
 		Message string `json:"message"`
@@ -22,12 +26,25 @@ type errorResponse struct {
 	} `json:"error"`
 }
 
-// listBatchesResponse is the response of /v1/batches API
+// listModelsResponse is the response of GET /openai/v1/models.
+type listModelsResponse struct {
+	Data []model `json:"data"`
+}
+
+// model is a single entry from the models list (free and paid plans).
+type model struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	OwnedBy string `json:"owned_by"`
+	Created int64  `json:"created"`
+}
+
+// listBatchesResponse is the response of GET /openai/v1/batches (paid Developer tier).
 type listBatchesResponse struct {
 	Data []batch `json:"data"`
 }
 
-// batch represent a single batch inside batches list
+// batch is a single batch job.
 type batch struct {
 	ID          string `json:"id"`
 	Object      string `json:"object"`
@@ -37,12 +54,12 @@ type batch struct {
 	ExpiresAt   int64  `json:"expires_at"`
 }
 
-// listBatchesResponse is the response of /v1/files API
+// listFilesResponse is the response of GET /openai/v1/files (paid Developer tier).
 type listFilesResponse struct {
 	Data []file `json:"data"`
 }
 
-// file represents a single file object inside files list
+// file is a single uploaded file object.
 type file struct {
 	ID        string `json:"id"`
 	Object    string `json:"object"`
@@ -51,24 +68,17 @@ type file struct {
 	Purpose   string `json:"purpose"`
 }
 
-func isPermissionError(err errorResponse) bool {
-	// has permissions error or not available for the plan subscribed
-	if err.Error.Type == permissionErr && err.Error.Code == notAvailableForPlan {
-		return true
-	}
-
-	return false
+func isPlanRestricted(err errorResponse) bool {
+	return err.Error.Type == permissionErr && err.Error.Code == notAvailableForPlan
 }
 
-// makeGroqRequest send the API request to passed url with passed key as API Key and return response body and status code
+// makeGroqRequest sends an authenticated GET and returns body and status code.
 func makeGroqRequest(client *http.Client, url, key string) ([]byte, int, error) {
-	// create request
 	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// add required keys in the header
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -90,9 +100,50 @@ func makeGroqRequest(client *http.Client, url, key string) ([]byte, int, error) 
 	return responseBodyByte, resp.StatusCode, nil
 }
 
+// captureModels lists models via the free-tier endpoint used for detector verification.
+// docs: https://console.groq.com/docs/api-reference#models-list
+//
+// Every valid key can list models, so this is what guarantees analyze bindings
+// even when batches/files are plan-restricted or empty.
+func captureModels(client *http.Client, key string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeGroqRequest(client, modelsURL, key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var models listModelsResponse
+		if err := json.Unmarshal(response, &models); err != nil {
+			return err
+		}
+
+		for _, m := range models.Data {
+			resource := &GroqResource{
+				ID:         m.ID,
+				Name:       m.ID,
+				Type:       m.Object,
+				Permission: PermissionStrings[FullAccess],
+			}
+			resource.updateMetadata("owned by", m.OwnedBy)
+			resource.updateMetadata("created at", time.Unix(m.Created, 0).UTC().Format("2006-01-02 15:04:05 UTC"))
+			secretInfo.appendGroqResource(*resource)
+		}
+		return nil
+	case http.StatusUnauthorized:
+		secretInfo.Valid = false
+		return fmt.Errorf("invalid Groq API key")
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureBatches lists batch jobs when the account plan includes Batch API.
 // docs: https://console.groq.com/docs/api-reference#batches-list
+//
+// Free-tier keys get not_available_for_plan; treat that as empty, not invalid.
 func captureBatches(client *http.Client, key string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeGroqRequest(client, "https://api.groq.com/openai/v1/batches", key)
+	response, statusCode, err := makeGroqRequest(client, batchesURL, key)
 	if err != nil {
 		return err
 	}
@@ -100,48 +151,44 @@ func captureBatches(client *http.Client, key string, secretInfo *SecretInfo) err
 	switch statusCode {
 	case http.StatusOK:
 		var batches listBatchesResponse
-
 		if err := json.Unmarshal(response, &batches); err != nil {
 			return err
 		}
 
-		for _, batch := range batches.Data {
-			resource := GroqResource{
-				ID:         batch.ID,
-				Name:       batch.ID, // no specific name for batch
-				Type:       batch.Object,
+		for _, b := range batches.Data {
+			resource := &GroqResource{
+				ID:         b.ID,
+				Name:       b.ID,
+				Type:       b.Object,
 				Permission: PermissionStrings[FullAccess],
 			}
-
-			resource.updateMetadata("status", batch.Status)
-			resource.updateMetadata("endpoint", batch.Endpoint)
-			resource.updateMetadata("input file id", batch.InputFileID)
-			resource.updateMetadata("expires at", time.Unix(batch.ExpiresAt, 0).UTC().Format("2006-01-02 15:04:05 UTC"))
-
-			secretInfo.appendGroqResource(resource)
+			resource.updateMetadata("status", b.Status)
+			resource.updateMetadata("endpoint", b.Endpoint)
+			resource.updateMetadata("input file id", b.InputFileID)
+			resource.updateMetadata("expires at", time.Unix(b.ExpiresAt, 0).UTC().Format("2006-01-02 15:04:05 UTC"))
+			secretInfo.appendGroqResource(*resource)
 		}
-
 		return nil
 	case http.StatusForbidden:
 		var errResp errorResponse
-
 		if err := json.Unmarshal(response, &errResp); err != nil {
 			return err
 		}
-
-		if isPermissionError(errResp) {
+		if isPlanRestricted(errResp) {
 			return nil
 		}
-
 		return fmt.Errorf("unexpected error: %s", errResp.Error.Message)
 	default:
 		return fmt.Errorf("unexpected status code: %d", statusCode)
 	}
 }
 
+// captureFiles lists uploaded files when the account plan includes Files API.
 // docs: https://console.groq.com/docs/api-reference#files-list
+//
+// Free-tier keys get not_available_for_plan; treat that as empty, not invalid.
 func captureFiles(client *http.Client, key string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeGroqRequest(client, "https://api.groq.com/openai/v1/files", key)
+	response, statusCode, err := makeGroqRequest(client, filesURL, key)
 	if err != nil {
 		return err
 	}
@@ -149,37 +196,30 @@ func captureFiles(client *http.Client, key string, secretInfo *SecretInfo) error
 	switch statusCode {
 	case http.StatusOK:
 		var files listFilesResponse
-
 		if err := json.Unmarshal(response, &files); err != nil {
 			return err
 		}
 
-		for _, file := range files.Data {
-			resource := GroqResource{
-				ID:         file.ID,
-				Name:       file.Filename,
-				Type:       file.Object,
+		for _, f := range files.Data {
+			resource := &GroqResource{
+				ID:         f.ID,
+				Name:       f.Filename,
+				Type:       f.Object,
 				Permission: PermissionStrings[FullAccess],
 			}
-
-			resource.updateMetadata("purpose", file.Purpose)
-			resource.updateMetadata("created at", time.Unix(file.CreatedAt, 0).UTC().Format("2006-01-02 15:04:05 UTC"))
-
-			secretInfo.appendGroqResource(resource)
+			resource.updateMetadata("purpose", f.Purpose)
+			resource.updateMetadata("created at", time.Unix(f.CreatedAt, 0).UTC().Format("2006-01-02 15:04:05 UTC"))
+			secretInfo.appendGroqResource(*resource)
 		}
-
 		return nil
 	case http.StatusForbidden:
 		var errResp errorResponse
-
 		if err := json.Unmarshal(response, &errResp); err != nil {
 			return err
 		}
-
-		if isPermissionError(errResp) {
+		if isPlanRestricted(errResp) {
 			return nil
 		}
-
 		return fmt.Errorf("unexpected error: %s", errResp.Error.Message)
 	default:
 		return fmt.Errorf("unexpected status code: %d", statusCode)
