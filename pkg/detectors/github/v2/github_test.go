@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,7 +26,8 @@ var (
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "ghs_RWGUZ6kS8_Ut7PbtR72k2miJwwYtxkpe8mOpT8feAWYZcwz43PxBVGCNATnycaQV9VUlPJe1uST5Xen7d3uZ5lilVlEVvT9AbxnhURdT3OzPtCvXydIrvE4LrDO"
+	secret               = "ghs_RWGUZ6kS8_Ut7PbtR72k2miJwwYtxkpe8mOpT8feAWYZcwz43PxBVGCNATnycaQV9VUlPJe1uST5Xen7d3uZ5lilVlEVvT9AbxnhURdT3OzPtCvXydIrvE4LrDO"
+	newInstallationToken = "ghs_123456_eyJ" + strings.Repeat("a", 167) + ".eyJ" + strings.Repeat("b", 167) + "." + strings.Repeat("c", 170)
 )
 
 func TestGithub_Pattern(t *testing.T) {
@@ -41,6 +43,11 @@ func TestGithub_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "new GitHub App installation token",
+			input: newInstallationToken,
+			want:  []string{newInstallationToken},
 		},
 	}
 
@@ -84,5 +91,43 @@ func TestGithub_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+func TestGithub_LongInstallationTokenThroughEngineWindow(t *testing.T) {
+	d := Scanner{}
+	core := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	matches := core.FindDetectorMatches([]byte("GITHUB_TOKEN=" + newInstallationToken + "\n"))
+	if len(matches) == 0 {
+		t.Fatal("no detector matches for long installation token")
+	}
+
+	var found bool
+	for _, match := range matches {
+		for _, data := range match.Matches() {
+			results, err := d.FromData(context.Background(), false, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, result := range results {
+				if string(result.Raw) == newInstallationToken {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Errorf("full %d-char token was not captured through the engine window", len(newInstallationToken))
+	}
+}
+
+func TestGithub_PatternDoesNotOvermatchLegacyToken(t *testing.T) {
+	legacyToken := "ghs_42_" + strings.Repeat("a", 36) + ".config.yaml"
+	results, err := (Scanner{}).FromData(context.Background(), false, []byte(legacyToken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || string(results[0].Raw) != "ghs_42_"+strings.Repeat("a", 36) {
+		t.Fatalf("legacy token was over-matched: %#v", results)
 	}
 }
