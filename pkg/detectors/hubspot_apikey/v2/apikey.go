@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -91,8 +92,18 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	case http.StatusUnauthorized:
 		return false, nil
 	case http.StatusForbidden:
-		// The token is valid but lacks permission for the endpoint.
-		return true, nil
+		// HubSpot returns 403 for two distinct cases:
+		// 1. A valid token lacking permission for the endpoint (JSON error).
+		// 2. A WAF block page (HTML), which can happen for any token, valid or not.
+		// Only treat the JSON case as a verified token.
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		if strings.Contains(string(bodyBytes), "correlationId") {
+			return true, nil
+		}
+		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
