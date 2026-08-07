@@ -24,7 +24,10 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b((live|test)_[a-zA-Z0-9_]{35})\b`)
+	// Real Lob keys are alphanumeric only (no underscores) after the live_/test_ prefix; allowing underscores
+	// here causes collisions with snake_case identifiers such as unit test function names
+	// (e.g. test_calculate_total_price_with_tax_rate, which is exactly 35 chars after "test_").
+	keyPat = regexp.MustCompile(`\b((live|test)_[a-zA-Z0-9]{35})\b`)
 )
 
 func (s Scanner) getClient() *http.Client {
