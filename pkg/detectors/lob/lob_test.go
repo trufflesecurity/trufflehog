@@ -45,6 +45,14 @@ func TestLob_Pattern(t *testing.T) {
 			input: fmt.Sprintf("'%s'", invalidPattern),
 			want:  []string{},
 		},
+		{
+			// Regression test: snake_case identifiers (e.g. unit test function
+			// names) can coincidentally be exactly 35 chars after "test_", colliding
+			// with the key shape when underscores are allowed in the suffix.
+			name:  "false positive - snake_case identifier same length as key suffix",
+			input: "def test_calculate_total_price_with_tax_rate():",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
