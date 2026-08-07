@@ -140,6 +140,21 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		s.conn.Images = append(s.conn.Images, namespaceImages...)
 	}
 
+	// if a registry host is set, enumerate all images from that registry via /v2/_catalog.
+	if registryHost := s.conn.GetRegistry(); registryHost != "" {
+		start := time.Now()
+		registry := MakeRegistryFromHost(registryHost)
+		if token := s.conn.GetRegistryToken(); token != "" {
+			registry.WithRegistryToken(token)
+		}
+		registryImages, err := registry.ListImages(ctx, "")
+		if err != nil {
+			return fmt.Errorf("failed to list registry %s images: %w", registryHost, err)
+		}
+		dockerListImagesAPIDuration.WithLabelValues(s.name).Observe(time.Since(start).Seconds())
+		s.conn.Images = append(s.conn.Images, registryImages...)
+	}
+
 	for _, image := range s.conn.GetImages() {
 		if common.IsDone(ctx) {
 			return nil
