@@ -120,8 +120,17 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 		if owner := repo.GetOwner(); owner != nil {
 			parent = userToResource(owner)
 		}
+		// repo.GetName() could theoretically be empty for a deleted/ghost repo
+		// object; fall back to FullName so Name is never empty.
+		name := repo.GetName()
+		if name == "" {
+			name = repo.GetFullName()
+		}
+		if name == "" {
+			continue
+		}
 		resource := analyzers.Resource{
-			Name:               repo.GetName(),
+			Name:               name,
 			FullyQualifiedName: fmt.Sprintf("github.com/%s", repo.GetFullName()),
 			Type:               "repository",
 			Parent:             parent,
@@ -140,8 +149,14 @@ func secretInfoToGistBindings(info *common.SecretInfo) []analyzers.Binding {
 		if gist.GetOwner() == nil {
 			continue
 		}
+		// Gist descriptions are optional; fall back to the gist ID so Name is
+		// never empty (proto validation requires len >= 1).
+		name := gist.GetDescription()
+		if name == "" {
+			name = gist.GetID()
+		}
 		resource := analyzers.Resource{
-			Name:               gist.GetDescription(),
+			Name:               name,
 			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", gist.GetOwner().GetLogin(), gist.GetID()),
 			Type:               "gist",
 			Parent:             userToResource(gist.GetOwner()),
