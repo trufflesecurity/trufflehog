@@ -22,6 +22,11 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
+	// verifyURL is the PubNub App Context endpoint used to confirm a
+	// subscription key is live. It is a package variable (not a const) so the
+	// verification path can be exercised against a stub HTTP server in tests.
+	verifyURL = "https://ps.pndsn.com/v2/objects/%s/uuids"
+
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(sub-c-[0-9a-z]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
 )
@@ -68,7 +73,7 @@ func (s Scanner) Description() string {
 }
 
 func verifyKey(ctx context.Context, client *http.Client, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ps.pndsn.com/v2/objects/"+key+"/uuids", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf(verifyURL, key), nil)
 	if err != nil {
 		return false, err
 	}
@@ -92,7 +97,11 @@ func verifyKey(ctx context.Context, client *http.Client, key string) (bool, erro
 			return false, err
 		}
 
-		if strings.Contains(string(bodyBytes), "Objects not enabled for this subscriber key.") {
+		// Both 403 bodies indicate the key is valid but the App Context
+		// (formerly "Objects") feature is not enabled for the subscribe key.
+		// PubNub renamed the feature, so either message confirms the key works.
+		if strings.Contains(string(bodyBytes), "Objects not enabled for this subscriber key.") ||
+			strings.Contains(string(bodyBytes), "App Context is not enabled for this subscribe key.") {
 			return true, nil
 		}
 
