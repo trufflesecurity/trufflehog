@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -37,7 +36,6 @@ func decodeTokenToSecretInfo(jwtToken string, secretInfo *SecretInfo) error {
 	type hubJwtClaims struct {
 		Scope     string     `json:"scope"`
 		HubClaims userClaims `json:"https://hub.docker.com"`
-		ExpiresIn int        `json:"exp"`
 		jwt.RegisteredClaims
 	}
 
@@ -53,8 +51,6 @@ func decodeTokenToSecretInfo(jwtToken string, secretInfo *SecretInfo) error {
 			Username: claims.HubClaims.Username,
 			Email:    claims.HubClaims.Email,
 		}
-
-		secretInfo.ExpiresIn = humandReadableTime(claims.ExpiresIn)
 
 		secretInfo.Permissions = append(secretInfo.Permissions, claims.Scope)
 		secretInfo.Valid = true
@@ -136,11 +132,3 @@ func assignHighestPermission(permissions []string) string {
 
 }
 
-// humandReadableTime converts seconds to days, hours, minutes, or seconds based on the value
-func humandReadableTime(seconds int) string {
-	// Convert Unix timestamp to time.Time object
-	t := time.Unix(int64(seconds), 0)
-
-	// Format the time as "March 2" (Month Day format)
-	return t.Format("January 2, 2006")
-}
