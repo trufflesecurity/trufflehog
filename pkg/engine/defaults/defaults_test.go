@@ -150,6 +150,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_NewRelicUserKey:           {},
 	detector_typepb.DetectorType_NewRelicInsightsQueryKey:  {},
 	detector_typepb.DetectorType_NewRelicMobileAppToken:    {},
+	detector_typepb.DetectorType_SolarWindsObservability:   {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
@@ -191,6 +192,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_SportRadar:          {},
 	detector_typepb.DetectorType_Squareup:            {},
 	detector_typepb.DetectorType_Text2Data:           {},
+	detector_typepb.DetectorType_AppOptics:           {},
 
 	// Intentionally commented out in buildDetectorList() — implementation
 	// exists but the detector is disabled (API issues, false positives, etc.).

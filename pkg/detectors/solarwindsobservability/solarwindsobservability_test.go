@@ -1,4 +1,4 @@
-package appoptics
+package solarwindsobservability
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAppOptics_Pattern(t *testing.T) {
+func TestSolarWindsObservability_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -23,11 +23,11 @@ func TestAppOptics_Pattern(t *testing.T) {
 		{
 			name: "valid pattern",
 			input: `
-				func validateAppOpticsKey() bool {
-					appopticsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2he3a1tzkpJ4-PznQukQruRjqMFbEG73L92LJyBGMZ"
+				func validateSolarWindsKey() bool {
+					solarwindsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2he3a1tzkpJ4-PznQukQruRjqMFbEG73L92LJyBGMZ"
 					log.Println("Checking API key status...")
 
-					if !isActive(appopticsKey) {
+					if !isActive(solarwindsKey) {
 						log.Println("API key is inactive or invalid.")
 						return false
 					}
@@ -42,7 +42,7 @@ func TestAppOptics_Pattern(t *testing.T) {
 			input: `
 				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
   					<scope>GLOBAL</scope>
-  					<id>{appoptics}</id>
+  					<id>{solarwinds}</id>
   					<secret>{AQAAABAAA zxsb8yzT0RbIJ1TAalB87LOVUcT1b4uEgvT4tXCcSqv_gcmlrx5aQRleHPDFKePjpHFof5J}</secret>
   					<description>configuration for production</description>
 					<creationDate>2023-05-18T14:32:10Z</creationDate>
@@ -54,11 +54,11 @@ func TestAppOptics_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern",
 			input: `
-				func validateAppOpticsKey() bool {
-					appopticsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2h:3a1tzkpJ43PznQukQruRjqMFbEG73L92LJyBGMZ"
+				func validateSolarWindsKey() bool {
+					solarwindsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2h:3a1tzkpJ43PznQukQruRjqMFbEG73L92LJyBGMZ"
 					log.Println("Checking API key status...")
 
-					if !isActive(appopticsKey) {
+					if !isActive(solarwindsKey) {
 						log.Println("API key is inactive or invalid.")
 						return false
 					}

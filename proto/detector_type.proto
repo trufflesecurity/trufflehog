@@ -950,7 +950,7 @@ enum DetectorType {
   VagrantCloudPersonalToken = 946;
   BetterStack = 947;
   ZeroTier = 948;
-  AppOptics = 949;
+  AppOptics = 949 [deprecated = true];
   Metabase = 950;
   CoinbaseWaaS = 951 [deprecated = true];
   LemonSqueezy = 952;
@@ -1070,4 +1070,5 @@ enum DetectorType {
   NewRelicUserKey = 1066;
   NewRelicInsightsQueryKey = 1067;
   NewRelicMobileAppToken = 1068;
+  SolarWindsObservability = 1069;
 }
