@@ -116,6 +116,8 @@ docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/truffl
 Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
 ```
 
+**Windows:** download the Windows archive from [Releases](https://github.com/trufflesecurity/trufflehog/releases), extract `trufflehog.exe`, and place it on your `PATH`. Official WinGet packaging is tracked in [#5010](https://github.com/trufflesecurity/trufflehog/issues/5010) (blocked on publishing Windows builds as `.zip`).
+
 ### Compile from source
 
 ```bash
