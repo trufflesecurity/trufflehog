@@ -1070,4 +1070,6 @@ enum DetectorType {
   NewRelicUserKey = 1066;
   NewRelicInsightsQueryKey = 1067;
   NewRelicMobileAppToken = 1068;
+  BIP39SeedPhrase = 1069;
+  MoneroSeedPhrase = 1070;
 }
