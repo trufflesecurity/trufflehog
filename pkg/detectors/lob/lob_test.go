@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	validPattern     = "live_0979969b3f6cc23ed67e9b650bfaf64f710"
-	validPatternTest = "test_0979969b3f6cc23ed67e9b650bfaf64f710"
-	invalidPattern   = "live_0979969b3f6cc23ed67e9b650bfaf64f71"
+	validPattern       = "live_0979969b3f6cc23ed67e9b650bfaf64f710"
+	validPatternTest   = "test_0979969b3f6cc23ed67e9b650bfaf64f710"
+	invalidPattern     = "live_0979969b3f6cc23ed67e9b650bfaf64f71"
+	publishablePattern = "live_pub_0979969b3f6cc23ed67e9b650bfaf64"
 )
 
 func TestLob_Pattern(t *testing.T) {
@@ -46,11 +47,18 @@ func TestLob_Pattern(t *testing.T) {
 			want:  []string{},
 		},
 		{
-			// Regression test: snake_case identifiers (e.g. unit test function
-			// names) can coincidentally be exactly 35 chars after "test_", colliding
-			// with the key shape when underscores are allowed in the suffix.
-			name:  "false positive - snake_case identifier same length as key suffix",
+			name:  "snake_case identifier of key length",
 			input: "def test_calculate_total_price_with_tax_rate():",
+			want:  []string{},
+		},
+		{
+			name:  "camelCase identifier of key length",
+			input: "func test_someVeryLongCamelCaseFunctionNameXy() {}",
+			want:  []string{},
+		},
+		{
+			name:  "publishable key",
+			input: fmt.Sprintf("token = '%s'", publishablePattern),
 			want:  []string{},
 		},
 	}
