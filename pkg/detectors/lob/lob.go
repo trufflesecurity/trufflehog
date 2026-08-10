@@ -2,6 +2,8 @@ package lob
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -87,10 +89,27 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, error) {
 	}
 	defer func() { _ = res.Body.Close() }()
 	switch res.StatusCode {
-	case http.StatusForbidden, http.StatusUnprocessableEntity:
-		// 403 indicates key is active but no billing method on file
+	case http.StatusUnprocessableEntity:
 		// 422 indicates key is active but request body is invalid
 		return true, nil
+	case http.StatusForbidden:
+		var body struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+			return false, errors.New("invalid API response")
+		}
+		switch body.Error.Code {
+		case "billing_address_required", "payment_method_unverified", "feature_limit_reached":
+			// The key authenticated and it is the account, not the key, that is rejected.
+			return true, nil
+		case "invalid_api_key":
+			return false, nil
+		default:
+			return false, fmt.Errorf("unexpected error code: <%s> in the API response body", body.Error.Code)
+		}
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
