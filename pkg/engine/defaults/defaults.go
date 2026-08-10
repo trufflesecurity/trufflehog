@@ -46,7 +46,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appcues"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appfollow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appointedd"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appoptics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
@@ -949,7 +948,6 @@ func buildDetectorList() []detectors.Detector {
 		&appcues.Scanner{},
 		&appfollow.Scanner{},
 		&appointedd.Scanner{},
-		&appoptics.Scanner{},
 		&appsync.Scanner{},
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
