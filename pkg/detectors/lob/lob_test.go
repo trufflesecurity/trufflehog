@@ -145,12 +145,6 @@ func TestLob_Verify(t *testing.T) {
 			want:   true,
 		},
 		{
-			name:   "active key without a verified payment method",
-			status: http.StatusForbidden,
-			body:   lobError("payment_method_unverified"),
-			want:   true,
-		},
-		{
 			name:   "active key past its free request quota",
 			status: http.StatusForbidden,
 			body:   lobError("feature_limit_reached"),

@@ -102,7 +102,7 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, error) {
 			return false, errors.New("invalid API response")
 		}
 		switch body.Error.Code {
-		case "billing_address_required", "payment_method_unverified", "feature_limit_reached":
+		case "billing_address_required", "feature_limit_reached":
 			// The key authenticated and it is the account, not the key, that is rejected.
 			return true, nil
 		case "invalid_api_key":
