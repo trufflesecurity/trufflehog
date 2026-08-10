@@ -730,6 +730,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snipcart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snykkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/solarwindsobservability"
 	sonarcloudv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v1"
 	sonarcloudv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
@@ -1653,6 +1654,7 @@ func buildDetectorList() []detectors.Detector {
 		&snipcart.Scanner{},
 		&snowflake.Scanner{},
 		&snykkey.Scanner{},
+		&solarwindsobservability.Scanner{},
 		&sonarcloudv1.Scanner{},
 		&sonarcloudv2.Scanner{},
 		&sourcegraph.Scanner{},
@@ -1892,6 +1894,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.NewRelicMobileAppTokenDetectorEnabled.Load()
 		case *microsoftteamswebhookv2.Scanner:
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
+		case *solarwindsobservability.Scanner:
+			return !feature.SolarwindsDetectorEnabled.Load()
 		default:
 			return false
 		}
