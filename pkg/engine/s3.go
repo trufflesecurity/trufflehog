@@ -54,6 +54,9 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 		connection.Roles = c.Roles
 	}
 
+	connection.Endpoint = c.Endpoint
+	connection.Region = c.Region
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {

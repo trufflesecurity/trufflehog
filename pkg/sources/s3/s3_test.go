@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -251,4 +252,115 @@ func TestSource_UnmarshalSourceUnit(t *testing.T) {
 
 	assert.Equal(t, "my-test-bucket", s3Unit.Bucket, "Bucket field should match")
 	assert.Equal(t, "my-test-role", s3Unit.Role, "Role field should match")
+}
+
+func TestSource_ObjectLink(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{
+			name: "aws",
+			want: "https://my-bucket.s3.eu-west-1.amazonaws.com/dir/key.txt",
+		},
+		{
+			name:     "custom endpoint",
+			endpoint: "https://s3.internal.example.com",
+			want:     "https://s3.internal.example.com/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "custom endpoint with trailing slash",
+			endpoint: "https://s3.internal.example.com/",
+			want:     "https://s3.internal.example.com/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "custom endpoint with port and base path",
+			endpoint: "http://minio.test:9000/base",
+			want:     "http://minio.test:9000/base/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "endpoint without a scheme is assumed https",
+			endpoint: "s3.internal.example.com",
+			want:     "https://s3.internal.example.com/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "host and port without a scheme is assumed https",
+			endpoint: "s3.internal.example.com:9000",
+			want:     "https://s3.internal.example.com:9000/my-bucket/dir/key.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn, err := anypb.New(&sourcespb.S3{
+				Credential: &sourcespb.S3_Unauthenticated{},
+				Endpoint:   tt.endpoint,
+			})
+			require.NoError(t, err)
+
+			s := Source{}
+			require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+			assert.Equal(t, tt.want, s.objectLink("my-bucket", "eu-west-1", "dir/key.txt"))
+		})
+	}
+}
+
+func TestSource_Init_InvalidEndpoint(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   "https://s3.internal.example.com:not-a-port",
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	assert.ErrorContains(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1), "endpoint")
+}
+
+func TestSource_ClientAddressing(t *testing.T) {
+	tests := []struct {
+		name          string
+		conn          *sourcespb.S3
+		wantRegion    string
+		wantEndpoint  *string
+		wantPathStyle bool
+	}{
+		{
+			name:       "aws defaults",
+			conn:       &sourcespb.S3{},
+			wantRegion: defaultAWSRegion,
+		},
+		{
+			name:       "explicit region without endpoint",
+			conn:       &sourcespb.S3{Region: "ap-south-1"},
+			wantRegion: "ap-south-1",
+		},
+		{
+			name:          "custom endpoint implies path style",
+			conn:          &sourcespb.S3{Endpoint: "https://s3.internal.example.com"},
+			wantRegion:    defaultAWSRegion,
+			wantEndpoint:  aws.String("https://s3.internal.example.com"),
+			wantPathStyle: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.conn.Credential = &sourcespb.S3_Unauthenticated{}
+			conn, err := anypb.New(tt.conn)
+			require.NoError(t, err)
+
+			s := Source{}
+			require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+			client, err := s.newClient(context.Background(), s.defaultRegion(), "")
+			require.NoError(t, err)
+
+			opts := client.Options()
+			assert.Equal(t, tt.wantRegion, opts.Region)
+			assert.Equal(t, tt.wantEndpoint, opts.BaseEndpoint)
+			assert.Equal(t, tt.wantPathStyle, opts.UsePathStyle)
+		})
+	}
 }
