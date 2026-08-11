@@ -1070,4 +1070,5 @@ enum DetectorType {
   NewRelicUserKey = 1066;
   NewRelicInsightsQueryKey = 1067;
   NewRelicMobileAppToken = 1068;
+  ArcGISProxyConfig = 1069;
 }
