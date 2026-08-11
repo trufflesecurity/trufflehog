@@ -20,7 +20,9 @@ func makeOwner(login, userType string) *gh.User {
 }
 
 // TestSecretInfoToGistBindings exercises nil-field edge cases that caused a
-// production panic (nil Description and nil Owner from the GitHub API).
+// production panic (nil Description and nil Owner from the GitHub API), and
+// the empty-description proto-validation failure (CSM-1554) where Name must
+// be non-empty.
 func TestSecretInfoToGistBindings(t *testing.T) {
 	owner := makeOwner("truffle-sandbox", "User")
 	scope := []analyzers.Permission{{Value: "gist"}}
@@ -33,13 +35,22 @@ func TestSecretInfoToGistBindings(t *testing.T) {
 		wantNames []string // parallel to wantFQNs; checked unconditionally (including empty string)
 	}{
 		{
-			name: "nil description produces empty name, gist is still included",
+			name: "nil description falls back to gist ID as name",
 			gists: []*gh.Gist{
 				{ID: strPtr("abc123"), Description: nil, Owner: owner},
 			},
 			wantLen:   1,
 			wantFQNs:  []string{"gist.github.com/truffle-sandbox/abc123"},
-			wantNames: []string{""},
+			wantNames: []string{"abc123"},
+		},
+		{
+			name: "empty description falls back to gist ID as name",
+			gists: []*gh.Gist{
+				{ID: strPtr("abc123"), Description: strPtr(""), Owner: owner},
+			},
+			wantLen:   1,
+			wantFQNs:  []string{"gist.github.com/truffle-sandbox/abc123"},
+			wantNames: []string{"abc123"},
 		},
 		{
 			name: "nil owner: gist is skipped entirely",
@@ -107,7 +118,8 @@ func TestSecretInfoToRepoBindings(t *testing.T) {
 		repos         []*gh.Repository
 		wantLen       int
 		wantFQNs      []string
-		wantParentNil []bool // parallel to wantFQNs
+		wantNames     []string // parallel to wantFQNs; nil slice skips the check
+		wantParentNil []bool   // parallel to wantFQNs
 	}{
 		{
 			name: "valid repo produces binding with populated parent",
@@ -116,7 +128,25 @@ func TestSecretInfoToRepoBindings(t *testing.T) {
 			},
 			wantLen:       1,
 			wantFQNs:      []string{"github.com/truffle-sandbox/my-repo"},
+			wantNames:     []string{"my-repo"},
 			wantParentNil: []bool{false},
+		},
+		{
+			name: "empty repo name falls back to full name (CSM-1554: Name must be non-empty)",
+			repos: []*gh.Repository{
+				{Name: strPtr(""), FullName: strPtr("truffle-sandbox/ghost-repo"), Owner: owner},
+			},
+			wantLen:       1,
+			wantFQNs:      []string{"github.com/truffle-sandbox/ghost-repo"},
+			wantNames:     []string{"truffle-sandbox/ghost-repo"},
+			wantParentNil: []bool{false},
+		},
+		{
+			name: "both name and full name empty: repo is skipped",
+			repos: []*gh.Repository{
+				{Name: strPtr(""), FullName: strPtr(""), Owner: owner},
+			},
+			wantLen: 0,
 		},
 		{
 			name: "nil owner: repo is still included with nil parent",
@@ -167,6 +197,14 @@ func TestSecretInfoToRepoBindings(t *testing.T) {
 				gotNil := got[i].Resource.Parent == nil
 				if gotNil != wantNil {
 					t.Errorf("binding[%d].Parent nil = %v, want %v", i, gotNil, wantNil)
+				}
+			}
+			for i, name := range tt.wantNames {
+				if i >= len(got) {
+					break
+				}
+				if got[i].Resource.Name != name {
+					t.Errorf("binding[%d].Name = %q, want %q", i, got[i].Resource.Name, name)
 				}
 			}
 		})

@@ -1065,5 +1065,10 @@ enum DetectorType {
   HashiCorpVaultBatchToken = 1061;
   HashiCorpVaultToken = 1062;
   Duo = 1063;
-  ArcGISProxyConfig = 1064;
+  NewRelicLicenseKey = 1064;
+  NewRelicBrowserKey = 1065;
+  NewRelicUserKey = 1066;
+  NewRelicInsightsQueryKey = 1067;
+  NewRelicMobileAppToken = 1068;
+  ArcGISProxyConfig = 1069;
 }

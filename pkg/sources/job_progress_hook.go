@@ -17,6 +17,13 @@ type UnitHook struct {
 	mu              sync.Mutex
 	finishedMetrics chan UnitMetrics
 	logBackPressure func()
+	// closeMu, closed, done, and inflight coordinate Close with in-flight
+	// ejectFinishedMetrics sends from still-running job goroutines, so
+	// finishedMetrics is never closed while a send is possible.
+	closeMu  sync.Mutex
+	closed   bool
+	done     chan struct{}
+	inflight sync.WaitGroup
 	NoopHook
 }
 
@@ -36,6 +43,7 @@ func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) (*UnitHook, <-chan Un
 	hook := UnitHook{
 		metrics:         make(map[string]*UnitMetrics, runtime.NumCPU()),
 		finishedMetrics: make(chan UnitMetrics, 1024),
+		done:            make(chan struct{}),
 		logBackPressure: func() {
 			once.Do(func() {
 				ctx.Logger().Info("back pressure detected in unit hook")
@@ -71,6 +79,17 @@ func (u *UnitHook) id(ref JobProgressRef, unit SourceUnit) string {
 }
 
 func (u *UnitHook) ejectFinishedMetrics(metrics UnitMetrics) {
+	// Register as an in-flight sender so Close waits for us before closing
+	// the channel; metrics arriving after Close are dropped.
+	u.closeMu.Lock()
+	if u.closed {
+		u.closeMu.Unlock()
+		return
+	}
+	u.inflight.Add(1)
+	u.closeMu.Unlock()
+	defer u.inflight.Done()
+
 	// Intentionally block the hook from returning to supply back-pressure
 	// to the source.
 	select {
@@ -79,7 +98,12 @@ func (u *UnitHook) ejectFinishedMetrics(metrics UnitMetrics) {
 	default:
 		u.logBackPressure()
 	}
-	u.finishedMetrics <- metrics
+	select {
+	case u.finishedMetrics <- metrics:
+	case <-u.done:
+		// Close was called with no consumer draining the channel; drop the
+		// metrics rather than block Close forever.
+	}
 }
 
 func (u *UnitHook) StartUnitChunking(ref JobProgressRef, unit SourceUnit, start time.Time) {
@@ -189,6 +213,19 @@ func (u *UnitHook) InProgressSnapshot() []UnitMetrics {
 }
 
 func (u *UnitHook) Close() error {
+	u.closeMu.Lock()
+	if u.closed {
+		u.closeMu.Unlock()
+		return nil
+	}
+	u.closed = true
+	close(u.done)
+	u.closeMu.Unlock()
+
+	// Wait for in-flight sends before closing the channel; a send on a
+	// closed channel is a panic, and job goroutines can still be finishing
+	// units when Close is called.
+	u.inflight.Wait()
 	close(u.finishedMetrics)
 	return nil
 }
