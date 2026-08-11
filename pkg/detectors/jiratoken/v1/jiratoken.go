@@ -30,14 +30,13 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
-var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) Version() int { return 1 }
 
-// CloudEndpoint is used whenever the scanned data carries no Atlassian host of its own.
+// CloudHost is used whenever the scanned data carries no Atlassian host of its own.
 // reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
 // The graphql API answers on this host as long as the credentials are valid.
-func (Scanner) CloudEndpoint() string { return "https://api.atlassian.com" }
+const CloudHost = "api.atlassian.com"
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
@@ -78,57 +77,28 @@ func EndpointHost(endpoint string) string {
 	return endpoint
 }
 
-// AtlassianEndpoints filters found domains down to the Atlassian-owned ones, as scheme-qualified
-// endpoints suitable for EndpointSetter. The returned slice is sorted so results are deterministic.
-func AtlassianEndpoints(domains map[string]struct{}) []string {
-	endpoints := make([]string, 0, len(domains))
+// FoundHosts returns the Atlassian hosts among the domains matched in the data, sorted so results are
+// deterministic. domainPat matches any domain-shaped string, so everything else is dropped rather than
+// being sent the email and token. CloudHost is used when the data carried no Atlassian host of its own.
+func FoundHosts(domains map[string]struct{}) []string {
+	hosts := make([]string, 0, len(domains))
 	for domain := range domains {
-		if !IsAtlassianHost(domain) {
-			continue
+		if IsAtlassianHost(domain) {
+			hosts = append(hosts, domain)
 		}
-		endpoints = append(endpoints, "https://"+domain)
 	}
-	sort.Strings(endpoints)
-	return endpoints
+	if len(hosts) == 0 {
+		return []string{CloudHost}
+	}
+	sort.Strings(hosts)
+	return hosts
 }
 
-// verificationURL builds the graphql URL for endpoint, which may be a bare host such as
-// "acme.atlassian.net" or a full base URL such as a user-configured "https://jira.example.com".
-func verificationURL(endpoint string) string {
-	endpoint = strings.TrimSuffix(strings.TrimSpace(endpoint), "/")
-	if !strings.Contains(endpoint, "://") {
-		endpoint = "https://" + endpoint
-	}
-	return endpoint + "/gateway/api/graphql"
-}
-
-// WithCloudFallback treats the cloud endpoint as a fallback rather than an additional target. When the
-// data carried its own Atlassian host, that host is the one worth checking: it is what the analyzer needs
-// in SecretParts["domain"], and EndpointSetter would otherwise place the cloud endpoint ahead of it.
-//
-// cloudEndpoint is matched by host, so a user who explicitly configures the cloud host as their verifier
-// endpoint has it dropped too when the data carried a host of its own.
-func WithCloudFallback(endpoints []string, cloudEndpoint string, haveFound bool) []string {
-	if !haveFound || cloudEndpoint == "" {
-		return endpoints
-	}
-
-	cloudHost := EndpointHost(cloudEndpoint)
-	kept := make([]string, 0, len(endpoints))
-	for _, endpoint := range endpoints {
-		if EndpointHost(endpoint) == cloudHost {
-			continue
-		}
-		kept = append(kept, endpoint)
-	}
-	return kept
-}
-
-// DedupeByHost drops endpoints that resolve to a host already seen, so a domain found in the data that
-// also happens to be the cloud endpoint doesn't produce two identical results.
-func DedupeByHost(endpoints []string) []string {
+// DedupeHosts reduces endpoints to their bare hosts, dropping duplicates. The analyzer expects
+// SecretParts["domain"] to be a bare host, and a user-configured endpoint can repeat a found one.
+func DedupeHosts(endpoints []string) []string {
 	seen := make(map[string]struct{}, len(endpoints))
-	deduped := make([]string, 0, len(endpoints))
+	hosts := make([]string, 0, len(endpoints))
 	for _, endpoint := range endpoints {
 		host := EndpointHost(endpoint)
 		if host == "" {
@@ -138,9 +108,14 @@ func DedupeByHost(endpoints []string) []string {
 			continue
 		}
 		seen[host] = struct{}{}
-		deduped = append(deduped, endpoint)
+		hosts = append(hosts, host)
 	}
-	return deduped
+	return hosts
+}
+
+// verificationURL builds the graphql URL for a bare host such as "acme.atlassian.net".
+func verificationURL(host string) string {
+	return "https://" + host + "/gateway/api/graphql"
 }
 
 type JIRAGraphQLResponse struct {
@@ -184,15 +159,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
 	}
 
-	// Verify against any user-configured endpoints and the Atlassian hosts found in the data, falling back
-	// to the cloud endpoint only when the data carried no Atlassian host of its own.
-	found := AtlassianEndpoints(uniqueDomains)
-	endpoints := DedupeByHost(WithCloudFallback(s.Endpoints(found...), s.CloudEndpoint(), len(found) > 0))
+	hosts := DedupeHosts(s.Endpoints(FoundHosts(uniqueDomains)...))
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {
-			for _, endpoint := range endpoints {
-				domain := EndpointHost(endpoint)
+			for _, domain := range hosts {
 				if invalidHosts.Exists(domain) {
 					continue
 				}
@@ -214,7 +185,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					client := s.getClient()
-					isVerified, verificationErr := VerifyJiraToken(ctx, client, email, endpoint, token)
+					isVerified, verificationErr := VerifyJiraToken(ctx, client, email, domain, token)
 					s1.Verified = isVerified
 					if verificationErr != nil {
 						if errors.Is(verificationErr, errNoHost) {
@@ -240,8 +211,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// VerifyJiraToken checks the credentials against endpoint, which may be a bare host or a full base URL.
-func VerifyJiraToken(ctx context.Context, client *http.Client, email, endpoint, token string) (bool, error) {
+func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, token string) (bool, error) {
 	// wrap the query in a JSON body
 	body := map[string]string{
 		"query": `query verify { me { user { name } } }`,
@@ -254,7 +224,7 @@ func VerifyJiraToken(ctx context.Context, client *http.Client, email, endpoint, 
 	}
 
 	// api docs: https://developer.atlassian.com/platform/atlassian-graphql-api/graphql/#authentication
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, verificationURL(endpoint), bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, verificationURL(domain), bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return false, err
 	}

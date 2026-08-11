@@ -26,8 +26,6 @@ var (
 
 func TestJiraToken_Pattern(t *testing.T) {
 	d := Scanner{}
-	d.SetCloudEndpoint(d.CloudEndpoint())
-	d.UseCloudEndpoint(true)
 	d.UseFoundEndpoints(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -128,80 +126,48 @@ func TestIsAtlassianHost(t *testing.T) {
 	}
 }
 
-func TestWithCloudFallback(t *testing.T) {
-	const cloud = "https://api.atlassian.com"
-
+func TestFoundHosts(t *testing.T) {
 	tests := []struct {
-		name      string
-		endpoints []string
-		haveFound bool
-		want      []string
+		name    string
+		domains []string
+		want    []string
 	}{
 		{
-			// EndpointSetter puts the cloud endpoint ahead of the found ones, so leaving it in would let
-			// it win the break-on-verified and report the wrong domain.
-			name:      "cloud dropped when the data carried a host",
-			endpoints: []string{cloud, "https://tenant.atlassian.net"},
-			haveFound: true,
-			want:      []string{"https://tenant.atlassian.net"},
+			name:    "non-atlassian domains are dropped",
+			domains: []string{"tenant.atlassian.net", "hooks.example.com"},
+			want:    []string{"tenant.atlassian.net"},
 		},
 		{
-			name:      "cloud kept when nothing was found",
-			endpoints: []string{cloud},
-			haveFound: false,
-			want:      []string{cloud},
+			name:    "nothing found falls back to the cloud host",
+			domains: []string{"hooks.example.com"},
+			want:    []string{CloudHost},
 		},
 		{
-			name:      "configured endpoint survives either way",
-			endpoints: []string{"https://jira.example.com", cloud, "https://tenant.atlassian.net"},
-			haveFound: true,
-			want:      []string{"https://jira.example.com", "https://tenant.atlassian.net"},
+			// The cloud host is a normal Atlassian host when it shows up in the data.
+			name:    "cloud host in the data is kept",
+			domains: []string{CloudHost},
+			want:    []string{CloudHost},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := WithCloudFallback(test.endpoints, cloud, test.haveFound)
-			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("WithCloudFallback() diff: (-want +got)\n%s", diff)
+			domains := make(map[string]struct{}, len(test.domains))
+			for _, d := range test.domains {
+				domains[d] = struct{}{}
+			}
+			if diff := cmp.Diff(test.want, FoundHosts(domains)); diff != "" {
+				t.Errorf("FoundHosts() diff: (-want +got)\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestEndpointHostAndURL(t *testing.T) {
-	tests := []struct {
-		endpoint string
-		wantHost string
-		wantURL  string
-	}{
-		{
-			endpoint: "example.atlassian.net",
-			wantHost: "example.atlassian.net",
-			wantURL:  "https://example.atlassian.net/gateway/api/graphql",
-		},
-		{
-			endpoint: "https://api.atlassian.com",
-			wantHost: "api.atlassian.com",
-			wantURL:  "https://api.atlassian.com/gateway/api/graphql",
-		},
-		{
-			// A user-configured endpoint may carry a scheme, a port and a trailing slash.
-			endpoint: "https://jira.example.com:8443/",
-			wantHost: "jira.example.com:8443",
-			wantURL:  "https://jira.example.com:8443/gateway/api/graphql",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.endpoint, func(t *testing.T) {
-			if got := EndpointHost(test.endpoint); got != test.wantHost {
-				t.Errorf("EndpointHost(%q) = %q, want %q", test.endpoint, got, test.wantHost)
-			}
-			if got := verificationURL(test.endpoint); got != test.wantURL {
-				t.Errorf("verificationURL(%q) = %q, want %q", test.endpoint, got, test.wantURL)
-			}
-		})
+func TestDedupeHosts(t *testing.T) {
+	got := DedupeHosts([]string{"https://jira.example.com:8443/", "tenant.atlassian.net", "https://tenant.atlassian.net", ""})
+	want := []string{"jira.example.com:8443", "tenant.atlassian.net"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("DedupeHosts() diff: (-want +got)\n%s", diff)
 	}
 }
 

@@ -24,14 +24,8 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
-var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) Version() int { return 2 }
-
-// CloudEndpoint is used whenever the scanned data carries no Atlassian host of its own.
-// reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
-// The graphql API answers on this host as long as the credentials are valid.
-func (Scanner) CloudEndpoint() string { return "https://api.atlassian.com" }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
@@ -74,17 +68,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
 	}
 
-	// domainPat here is not even keyword-gated, so it captures every domain in the chunk. Only Atlassian
-	// hosts can answer the verification request, so everything else is dropped rather than being sent the
-	// email and token. The cloud endpoint is a fallback for data that carried no Atlassian host.
-	found := v1.AtlassianEndpoints(uniqueDomains)
-	endpoints := v1.DedupeByHost(v1.WithCloudFallback(s.Endpoints(found...), s.CloudEndpoint(), len(found) > 0))
+	// domainPat here is not even keyword-gated, so it captures every domain in the chunk.
+	hosts := v1.DedupeHosts(s.Endpoints(v1.FoundHosts(uniqueDomains)...))
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {
-			for _, endpoint := range endpoints {
-				domain := v1.EndpointHost(endpoint)
-
+			for _, domain := range hosts {
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Raw:          []byte(token),
@@ -102,7 +91,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					client := s.getClient()
-					isVerified, verificationErr := v1.VerifyJiraToken(ctx, client, email, endpoint, token)
+					isVerified, verificationErr := v1.VerifyJiraToken(ctx, client, email, domain, token)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, token)
 
