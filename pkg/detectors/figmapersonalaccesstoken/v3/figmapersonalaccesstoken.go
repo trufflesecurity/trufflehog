@@ -18,24 +18,25 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int { return 2 }
+func (Scanner) Version() int { return 3 }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b`)
+	// The figp_ token charset includes '=' and '-', which are not word characters,
+	// so a \b word boundary can't be used to anchor the end of the match. Instead we
+	// require the next character to be outside the token charset (or end of input).
+	keyPat = regexp.MustCompile(`(figp_[a-zA-Z0-9_=-]{40,54})(?:[^a-zA-Z0-9_=-]|\z)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"figma"}
+	return []string{"figp_"}
 }
 
-// Description returns a description for the result being detected.
 func (s Scanner) Description() string {
 	return "Figma is a collaborative interface design tool. Figma Personal Access Tokens can be used to access and manipulate design files and other resources on behalf of a user."
 }
