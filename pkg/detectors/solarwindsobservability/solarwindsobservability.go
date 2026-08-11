@@ -49,9 +49,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			isVerified, verificationErr := verifySolarWindsObservability(ctx, client, resMatch)
+			isVerified, region, verificationErr := verifySolarWindsObservability(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
+			if region != "" {
+				s1.SecretParts["region"] = region
+				s1.ExtraData = map[string]string{"region": region}
+			}
 		}
 
 		results = append(results, s1)
@@ -60,7 +64,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifySolarWindsObservability(ctx context.Context, client *http.Client, token string) (bool, error) {
+// verifySolarWindsObservability tries the token against each regional endpoint and returns the
+// region it verified against, if any.
+func verifySolarWindsObservability(ctx context.Context, client *http.Client, token string) (bool, string, error) {
 	var lastErr error
 	for _, region := range regions {
 		url := fmt.Sprintf("https://api.%s.cloud.solarwinds.com/v1/metrics", region)
@@ -90,14 +96,14 @@ func verifySolarWindsObservability(ctx context.Context, client *http.Client, tok
 		}()
 
 		if verified {
-			return true, nil
+			return true, region, nil
 		}
 		if regionErr != nil {
 			lastErr = regionErr
 		}
 	}
 
-	return false, lastErr
+	return false, "", lastErr
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
