@@ -76,8 +76,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	// domainPat here is not even keyword-gated, so it captures every domain in the chunk. Only Atlassian
 	// hosts can answer the verification request, so everything else is dropped rather than being sent the
-	// email and token. Endpoints adds any user-configured endpoints and the cloud endpoint.
-	endpoints := v1.DedupeByHost(s.Endpoints(v1.AtlassianEndpoints(uniqueDomains)...))
+	// email and token. The cloud endpoint is a fallback for data that carried no Atlassian host.
+	found := v1.AtlassianEndpoints(uniqueDomains)
+	endpoints := v1.DedupeByHost(v1.WithCloudFallback(s.Endpoints(found...), s.CloudEndpoint(), len(found) > 0))
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {

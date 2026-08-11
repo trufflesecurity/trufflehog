@@ -102,6 +102,28 @@ func verificationURL(endpoint string) string {
 	return endpoint + "/gateway/api/graphql"
 }
 
+// WithCloudFallback treats the cloud endpoint as a fallback rather than an additional target. When the
+// data carried its own Atlassian host, that host is the one worth checking: it is what the analyzer needs
+// in SecretParts["domain"], and EndpointSetter would otherwise place the cloud endpoint ahead of it.
+//
+// cloudEndpoint is matched by host, so a user who explicitly configures the cloud host as their verifier
+// endpoint has it dropped too when the data carried a host of its own.
+func WithCloudFallback(endpoints []string, cloudEndpoint string, haveFound bool) []string {
+	if !haveFound || cloudEndpoint == "" {
+		return endpoints
+	}
+
+	cloudHost := EndpointHost(cloudEndpoint)
+	kept := make([]string, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		if EndpointHost(endpoint) == cloudHost {
+			continue
+		}
+		kept = append(kept, endpoint)
+	}
+	return kept
+}
+
 // DedupeByHost drops endpoints that resolve to a host already seen, so a domain found in the data that
 // also happens to be the cloud endpoint doesn't produce two identical results.
 func DedupeByHost(endpoints []string) []string {
@@ -162,10 +184,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
 	}
 
-	// Endpoints combines any user-configured endpoints with the cloud endpoint and the Atlassian hosts
-	// found in the data. When nothing is found the cloud endpoint alone is used, which is what the
-	// detector already fell back to.
-	endpoints := DedupeByHost(s.Endpoints(AtlassianEndpoints(uniqueDomains)...))
+	// Verify against any user-configured endpoints and the Atlassian hosts found in the data, falling back
+	// to the cloud endpoint only when the data carried no Atlassian host of its own.
+	found := AtlassianEndpoints(uniqueDomains)
+	endpoints := DedupeByHost(WithCloudFallback(s.Endpoints(found...), s.CloudEndpoint(), len(found) > 0))
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {

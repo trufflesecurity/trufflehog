@@ -38,10 +38,9 @@ func TestJiraToken_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword jira",
 			input: fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern, keyword, validEmailPattern),
-			want: []string{
-				validEmailPattern + ":" + validTokenPattern + ":" + cloudDomain,
-				validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern,
-			},
+			// The tenant host found in the data is used on its own. The cloud endpoint must not shadow it,
+			// or SecretParts["domain"] would stop being the host the analyzer needs.
+			want: []string{validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern},
 		},
 		{
 			// A domain that isn't Atlassian-owned can't answer the verification request, so it is dropped
@@ -124,6 +123,47 @@ func TestIsAtlassianHost(t *testing.T) {
 		t.Run(host, func(t *testing.T) {
 			if got := IsAtlassianHost(host); got != want {
 				t.Errorf("IsAtlassianHost(%q) = %v, want %v", host, got, want)
+			}
+		})
+	}
+}
+
+func TestWithCloudFallback(t *testing.T) {
+	const cloud = "https://api.atlassian.com"
+
+	tests := []struct {
+		name      string
+		endpoints []string
+		haveFound bool
+		want      []string
+	}{
+		{
+			// EndpointSetter puts the cloud endpoint ahead of the found ones, so leaving it in would let
+			// it win the break-on-verified and report the wrong domain.
+			name:      "cloud dropped when the data carried a host",
+			endpoints: []string{cloud, "https://tenant.atlassian.net"},
+			haveFound: true,
+			want:      []string{"https://tenant.atlassian.net"},
+		},
+		{
+			name:      "cloud kept when nothing was found",
+			endpoints: []string{cloud},
+			haveFound: false,
+			want:      []string{cloud},
+		},
+		{
+			name:      "configured endpoint survives either way",
+			endpoints: []string{"https://jira.example.com", cloud, "https://tenant.atlassian.net"},
+			haveFound: true,
+			want:      []string{"https://jira.example.com", "https://tenant.atlassian.net"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := WithCloudFallback(test.endpoints, cloud, test.haveFound)
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("WithCloudFallback() diff: (-want +got)\n%s", diff)
 			}
 		})
 	}
