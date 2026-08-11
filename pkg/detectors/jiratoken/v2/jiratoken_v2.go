@@ -24,8 +24,11 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) Version() int { return 2 }
+
+func (Scanner) CloudEndpoint() string { return "https://" + v1.CloudHost }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
@@ -69,7 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	// domainPat here is not even keyword-gated, so it captures every domain in the chunk.
-	hosts := v1.DedupeHosts(s.Endpoints(v1.FoundHosts(uniqueDomains)...))
+	found := v1.FoundHosts(uniqueDomains)
+	hosts := v1.VerificationHosts(s.Endpoints(found...), found)
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {

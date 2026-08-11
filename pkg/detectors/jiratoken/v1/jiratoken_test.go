@@ -26,6 +26,8 @@ var (
 
 func TestJiraToken_Pattern(t *testing.T) {
 	d := Scanner{}
+	d.SetCloudEndpoint(d.CloudEndpoint())
+	d.UseCloudEndpoint(true)
 	d.UseFoundEndpoints(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -138,9 +140,9 @@ func TestFoundHosts(t *testing.T) {
 			want:    []string{"tenant.atlassian.net"},
 		},
 		{
-			name:    "nothing found falls back to the cloud host",
+			name:    "nothing atlassian found",
 			domains: []string{"hooks.example.com"},
-			want:    []string{CloudHost},
+			want:    []string{},
 		},
 		{
 			// The cloud host is a normal Atlassian host when it shows up in the data.
@@ -163,11 +165,50 @@ func TestFoundHosts(t *testing.T) {
 	}
 }
 
-func TestDedupeHosts(t *testing.T) {
-	got := DedupeHosts([]string{"https://jira.example.com:8443/", "tenant.atlassian.net", "https://tenant.atlassian.net", ""})
-	want := []string{"jira.example.com:8443", "tenant.atlassian.net"}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("DedupeHosts() diff: (-want +got)\n%s", diff)
+func TestVerificationHosts(t *testing.T) {
+	const cloudEndpoint = "https://" + CloudHost
+
+	tests := []struct {
+		name      string
+		endpoints []string
+		found     []string
+		want      []string
+	}{
+		{
+			// EndpointSetter puts the cloud endpoint ahead of the found ones, so leaving it in would let it
+			// win the break-on-verified and report a domain the analyzer cannot use.
+			name:      "cloud dropped when the data named a host",
+			endpoints: []string{cloudEndpoint, "tenant.atlassian.net"},
+			found:     []string{"tenant.atlassian.net"},
+			want:      []string{"tenant.atlassian.net"},
+		},
+		{
+			name:      "cloud kept when the data named nothing",
+			endpoints: []string{cloudEndpoint},
+			found:     nil,
+			want:      []string{CloudHost},
+		},
+		{
+			// Dropping the cloud host here would leave no hosts at all and produce no results.
+			name:      "cloud kept when the data named it",
+			endpoints: []string{cloudEndpoint, CloudHost},
+			found:     []string{CloudHost},
+			want:      []string{CloudHost},
+		},
+		{
+			name:      "configured endpoints are reduced to hosts and deduped",
+			endpoints: []string{"https://jira.example.com:8443/", cloudEndpoint, "tenant.atlassian.net", "https://tenant.atlassian.net", ""},
+			found:     []string{"tenant.atlassian.net"},
+			want:      []string{"jira.example.com:8443", "tenant.atlassian.net"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if diff := cmp.Diff(test.want, VerificationHosts(test.endpoints, test.found)); diff != "" {
+				t.Errorf("VerificationHosts() diff: (-want +got)\n%s", diff)
+			}
+		})
 	}
 }
 

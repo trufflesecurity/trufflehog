@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 
@@ -30,6 +31,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) Version() int { return 1 }
 
@@ -37,6 +39,8 @@ func (Scanner) Version() int { return 1 }
 // reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
 // The graphql API answers on this host as long as the credentials are valid.
 const CloudHost = "api.atlassian.com"
+
+func (Scanner) CloudEndpoint() string { return "https://" + CloudHost }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
@@ -79,7 +83,7 @@ func EndpointHost(endpoint string) string {
 
 // FoundHosts returns the Atlassian hosts among the domains matched in the data, sorted so results are
 // deterministic. domainPat matches any domain-shaped string, so everything else is dropped rather than
-// being sent the email and token. CloudHost is used when the data carried no Atlassian host of its own.
+// being sent the email and token.
 func FoundHosts(domains map[string]struct{}) []string {
 	hosts := make([]string, 0, len(domains))
 	for domain := range domains {
@@ -87,21 +91,25 @@ func FoundHosts(domains map[string]struct{}) []string {
 			hosts = append(hosts, domain)
 		}
 	}
-	if len(hosts) == 0 {
-		return []string{CloudHost}
-	}
 	sort.Strings(hosts)
 	return hosts
 }
 
-// DedupeHosts reduces endpoints to their bare hosts, dropping duplicates. The analyzer expects
-// SecretParts["domain"] to be a bare host, and a user-configured endpoint can repeat a found one.
-func DedupeHosts(endpoints []string) []string {
+// VerificationHosts reduces endpoints to the bare hosts to verify against, dropping duplicates. The
+// analyzer expects SecretParts["domain"] to be a bare host, and a user-configured endpoint can repeat a
+// found one.
+//
+// CloudHost is only a fallback for data that named no Atlassian host, and EndpointSetter places it ahead
+// of the found hosts, so it is dropped when the data named hosts of its own. Data that named CloudHost
+// itself keeps it, since then it is a found host rather than the fallback.
+func VerificationHosts(endpoints, found []string) []string {
 	seen := make(map[string]struct{}, len(endpoints))
 	hosts := make([]string, 0, len(endpoints))
+	dropCloud := len(found) > 0 && !slices.Contains(found, CloudHost)
+
 	for _, endpoint := range endpoints {
 		host := EndpointHost(endpoint)
-		if host == "" {
+		if host == "" || (dropCloud && host == CloudHost) {
 			continue
 		}
 		if _, ok := seen[host]; ok {
@@ -159,7 +167,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
 	}
 
-	hosts := DedupeHosts(s.Endpoints(FoundHosts(uniqueDomains)...))
+	found := FoundHosts(uniqueDomains)
+	hosts := VerificationHosts(s.Endpoints(found...), found)
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {
