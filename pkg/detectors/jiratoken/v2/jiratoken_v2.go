@@ -17,13 +17,21 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) Version() int { return 2 }
+
+// CloudEndpoint is used whenever the scanned data carries no Atlassian host of its own.
+// reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
+// The graphql API answers on this host as long as the credentials are valid.
+func (Scanner) CloudEndpoint() string { return "https://api.atlassian.com" }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
@@ -66,19 +74,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
 	}
 
-	if len(uniqueDomains) == 0 {
-		// reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
-		// In case we don't find any domain matches we can use this as the graphql API works with this domain if our authentication is valid
-		uniqueDomains["api.atlassian.com"] = struct{}{}
-	}
+	// domainPat here is not even keyword-gated, so it captures every domain in the chunk. Only Atlassian
+	// hosts can answer the verification request, so everything else is dropped rather than being sent the
+	// email and token. Endpoints adds any user-configured endpoints and the cloud endpoint.
+	endpoints := v1.DedupeByHost(s.Endpoints(v1.AtlassianEndpoints(uniqueDomains)...))
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {
-			for domain := range uniqueDomains {
+			for _, endpoint := range endpoints {
+				domain := v1.EndpointHost(endpoint)
+
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Raw:          []byte(token),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", email, token, domain)),
+					RawV2:        fmt.Appendf(nil, "%s:%s:%s", email, token, domain),
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 						"version":        fmt.Sprintf("%d", s.Version()),
@@ -92,9 +101,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					client := s.getClient()
-					isVerified, verificationErr := v1.VerifyJiraToken(ctx, client, email, domain, token)
+					isVerified, verificationErr := v1.VerifyJiraToken(ctx, client, email, endpoint, token)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, token)
+
+					// The credential is the same across endpoints, so once one of them verifies it there
+					// is nothing to learn from the rest.
+					if s1.Verified {
+						results = append(results, s1)
+						break
+					}
 				}
 
 				results = append(results, s1)

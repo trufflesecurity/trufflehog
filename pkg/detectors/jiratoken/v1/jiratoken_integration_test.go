@@ -118,7 +118,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, verified but unexpected api surface",
+			name: "found, unexpected api surface is terminal and not an error",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
@@ -136,7 +136,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 	}
 	for _, tt := range tests {

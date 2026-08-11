@@ -12,6 +12,9 @@ import (
 
 func TestJiraToken_Pattern(t *testing.T) {
 	d := Scanner{}
+	d.SetCloudEndpoint(d.CloudEndpoint())
+	d.UseCloudEndpoint(true)
+	d.UseFoundEndpoints(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
 		name       string
@@ -48,7 +51,11 @@ func TestJiraToken_Pattern(t *testing.T) {
 							},
 						}
 					]}`,
-			want: []string{"trufflesecurity@example.com" + ":" + "ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC" + ":" + "example.atlassian.net"},
+			// The cloud endpoint is always tried alongside any Atlassian host found in the data.
+			want: []string{
+				"trufflesecurity@example.com" + ":" + "ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC" + ":" + "api.atlassian.com",
+				"trufflesecurity@example.com" + ":" + "ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC" + ":" + "example.atlassian.net",
+			},
 		},
 		{
 			name: "valid pattern - without domain",

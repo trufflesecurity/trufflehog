@@ -15,7 +15,9 @@ import (
 var (
 	validTokenPattern    = "Z7VoIYJ0K4rFWLBfkhOsLAWX"
 	invalidTokenPattern  = "Z7VoI?J0K4rF#LBfkhO&LAWX"
-	validDomainPattern   = "hereisavalidsubdomain.heresalongdomain.com"
+	validDomainPattern   = "hereisavalidsubdomain.atlassian.net"
+	foreignDomainPattern = "hereisavalidsubdomain.heresalongdomain.com"
+	cloudDomain          = "api.atlassian.com"
 	invalidDomainPattern = "?y4r3fs1ewqec12v1e3tl.5Hcsrcehic89saXd.ro@"
 	validEmailPattern    = "xfkf_bz7@grum.com"
 	invalidEmailPattern  = "xfKF_BZq7/grum.com"
@@ -24,6 +26,9 @@ var (
 
 func TestJiraToken_Pattern(t *testing.T) {
 	d := Scanner{}
+	d.SetCloudEndpoint(d.CloudEndpoint())
+	d.UseCloudEndpoint(true)
+	d.UseFoundEndpoints(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
 		name  string
@@ -33,7 +38,17 @@ func TestJiraToken_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword jira",
 			input: fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern, keyword, validEmailPattern),
-			want:  []string{validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern},
+			want: []string{
+				validEmailPattern + ":" + validTokenPattern + ":" + cloudDomain,
+				validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern,
+			},
+		},
+		{
+			// A domain that isn't Atlassian-owned can't answer the verification request, so it is dropped
+			// and only the cloud endpoint remains.
+			name:  "non-atlassian domain falls back to the cloud endpoint",
+			input: fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, foreignDomainPattern, keyword, validEmailPattern),
+			want:  []string{validEmailPattern + ":" + validTokenPattern + ":" + cloudDomain},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
@@ -90,12 +105,73 @@ func TestJiraToken_Pattern(t *testing.T) {
 	}
 }
 
+func TestIsAtlassianHost(t *testing.T) {
+	tests := map[string]bool{
+		"example.atlassian.net": true,
+		"atlassian.net":         true,
+		"api.atlassian.com":     true,
+		"acme.jira.com":         true,
+		"EXAMPLE.Atlassian.Net": true,
+		"example.atlassian.net.": true,
+		// Suffix lookalikes must not pass, or the filter would be trivially bypassed.
+		"notatlassian.net":            false,
+		"atlassian.net.evil.com":      false,
+		"example.com":                 false,
+		"hereisavalidsubdomain.co.uk": false,
+	}
+
+	for host, want := range tests {
+		t.Run(host, func(t *testing.T) {
+			if got := IsAtlassianHost(host); got != want {
+				t.Errorf("IsAtlassianHost(%q) = %v, want %v", host, got, want)
+			}
+		})
+	}
+}
+
+func TestEndpointHostAndURL(t *testing.T) {
+	tests := []struct {
+		endpoint string
+		wantHost string
+		wantURL  string
+	}{
+		{
+			endpoint: "example.atlassian.net",
+			wantHost: "example.atlassian.net",
+			wantURL:  "https://example.atlassian.net/gateway/api/graphql",
+		},
+		{
+			endpoint: "https://api.atlassian.com",
+			wantHost: "api.atlassian.com",
+			wantURL:  "https://api.atlassian.com/gateway/api/graphql",
+		},
+		{
+			// A user-configured endpoint may carry a scheme, a port and a trailing slash.
+			endpoint: "https://jira.example.com:8443/",
+			wantHost: "jira.example.com:8443",
+			wantURL:  "https://jira.example.com:8443/gateway/api/graphql",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.endpoint, func(t *testing.T) {
+			if got := EndpointHost(test.endpoint); got != test.wantHost {
+				t.Errorf("EndpointHost(%q) = %q, want %q", test.endpoint, got, test.wantHost)
+			}
+			if got := verificationURL(test.endpoint); got != test.wantURL {
+				t.Errorf("verificationURL(%q) = %q, want %q", test.endpoint, got, test.wantURL)
+			}
+		})
+	}
+}
+
 func TestJiraToken_Verify(t *testing.T) {
 	tests := []struct {
 		name         string
 		statusCode   int
 		body         string
 		wantVerified bool
+		wantErr      bool
 	}{
 		{
 			name:         "authenticated user in body is verified",
@@ -116,14 +192,48 @@ func TestJiraToken_Verify(t *testing.T) {
 			body:         `{"code":401,"message":"Unauthorized"}`,
 			wantVerified: false,
 		},
+		{
+			name:         "forbidden is not verified",
+			statusCode:   403,
+			body:         `{"code":403,"message":"Forbidden"}`,
+			wantVerified: false,
+		},
+		{
+			// Atlassian never answers 202 here. It comes from unrelated hosts that accept the POST, and it
+			// would repeat on every retry, so it has to be terminal rather than an indeterminate error.
+			name:         "accepted is not verified and not an error",
+			statusCode:   202,
+			body:         `{"status":"accepted"}`,
+			wantVerified: false,
+		},
+		{
+			name:         "not found is not verified and not an error",
+			statusCode:   404,
+			body:         `{"code":404,"message":"Not Found"}`,
+			wantVerified: false,
+		},
+		{
+			name:         "rate limited is indeterminate",
+			statusCode:   429,
+			body:         `{"code":429,"message":"Too Many Requests"}`,
+			wantVerified: false,
+			wantErr:      true,
+		},
+		{
+			name:         "server error is indeterminate",
+			statusCode:   500,
+			body:         `{"code":500,"message":"Internal Server Error"}`,
+			wantVerified: false,
+			wantErr:      true,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := common.ConstantResponseHttpClient(test.statusCode, test.body)
 			verified, err := VerifyJiraToken(context.Background(), client, "user@example.com", "example.atlassian.net", validTokenPattern)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("got error = %v, wantErr %v", err, test.wantErr)
 			}
 			if verified != test.wantVerified {
 				t.Errorf("got verified = %v, want %v", verified, test.wantVerified)
