@@ -107,7 +107,7 @@ message Bitbucket {
     string token = 2;
     credentials.Oauth2 oauth = 3;
     credentials.BasicAuth basic_auth = 4;
-
+    credentials.BitbucketApiToken api_token = 14;
   }
   repeated string repositories = 5;
   repeated string ignore_repos = 6;

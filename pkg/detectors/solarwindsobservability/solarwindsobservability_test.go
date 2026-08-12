@@ -1,4 +1,4 @@
-package bingsubscriptionkey
+package solarwindsobservability
 
 import (
 	"context"
@@ -11,9 +11,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestBingsubscriptionkey_Pattern(t *testing.T) {
+func TestSolarWindsObservability_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
@@ -22,64 +23,50 @@ func TestBingsubscriptionkey_Pattern(t *testing.T) {
 		{
 			name: "valid pattern",
 			input: `
-					func main() {
-						url := "https://api.example.net/v2/api"
+				func validateSolarWindsKey() bool {
+					solarwindsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2he3a1tzkpJ4-PznQukQruRjqMFbEG73L92LJyBGMZ"
+					log.Println("Checking API key status...")
 
-						// Create a new request with the secret as a header
-						req, err := http.NewRequest("GET", url, http.NoBody)
-						if err != nil {
-							fmt.Println("Error creating request:", err)
-							return
-						}
-						
-						// set bing subscription key
-						bingKey := "89017d414ed64edb9c776d4a52102b9a"
-						req.Header.Set("Ocp-Apim-Subscription-Key", bingKey)
+					if !isActive(solarwindsKey) {
+						log.Println("API key is inactive or invalid.")
+						return false
+					}
 
-						// Perform the request
-						client := &http.Client{}
-						resp, _ := client.Do(req)
-						defer func() { _ = resp.Body.Close() }()
-					}`,
-			want: []string{"89017d414ed64edb9c776d4a52102b9a"},
+					log.Println("API key is valid and active.")
+					return true
+				}`,
+			want: []string{"Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2he3a1tzkpJ4-PznQukQruRjqMFbEG73L92LJyBGMZ"},
 		},
 		{
 			name: "valid pattern - xml",
 			input: `
 				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
   					<scope>GLOBAL</scope>
-  					<id>{bing}</id>
-  					<secret>{bing AQAAABAAA dB963b030A1DafB02d8299F04A00a306}</secret>
+  					<id>{solarwinds}</id>
+  					<secret>{AQAAABAAA zxsb8yzT0RbIJ1TAalB87LOVUcT1b4uEgvT4tXCcSqv_gcmlrx5aQRleHPDFKePjpHFof5J}</secret>
   					<description>configuration for production</description>
 					<creationDate>2023-05-18T14:32:10Z</creationDate>
   					<owner>jenkins-admin</owner>
 				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
 			`,
-			want: []string{"dB963b030A1DafB02d8299F04A00a306"},
+			want: []string{"zxsb8yzT0RbIJ1TAalB87LOVUcT1b4uEgvT4tXCcSqv_gcmlrx5aQRleHPDFKePjpHFof5J"},
 		},
 		{
 			name: "invalid pattern",
 			input: `
-					func main() {
-						url := "https://api.example.net/v2/api"
+				func validateSolarWindsKey() bool {
+					solarwindsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2h:3a1tzkpJ43PznQukQruRjqMFbEG73L92LJyBGMZ"
+					log.Println("Checking API key status...")
 
-						// Create a new request with the secret as a header
-						req, err := http.NewRequest("GET", url, http.NoBody)
-						if err != nil {
-							fmt.Println("Error creating request:", err)
-							return
-						}
-						
-						// set bing subscription key
-						bingKey := "89017d414ed64edb9c776d4J52102b9"
-						req.Header.Set("Ocp-Apim-Subscription-Key", bingKey)
+					if !isActive(solarwindsKey) {
+						log.Println("API key is inactive or invalid.")
+						return false
+					}
 
-						// Perform the request
-						client := &http.Client{}
-						resp, _ := client.Do(req)
-						defer func() { _ = resp.Body.Close() }()
-					}`,
-			want: []string{},
+					log.Println("API key is valid and active.")
+					return true
+				}`,
+			want: nil,
 		},
 	}
 

@@ -150,6 +150,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_NewRelicUserKey:           {},
 	detector_typepb.DetectorType_NewRelicInsightsQueryKey:  {},
 	detector_typepb.DetectorType_NewRelicMobileAppToken:    {},
+	detector_typepb.DetectorType_SolarWindsObservability:   {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
@@ -159,6 +160,8 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// no longer exists or has been superseded by a different type.
 	detector_typepb.DetectorType_AirtableApiKey:      {},
 	detector_typepb.DetectorType_ApiScience:          {},
+	detector_typepb.DetectorType_AppOptics:           {},
+	detector_typepb.DetectorType_BingSubscriptionKey: {},
 	detector_typepb.DetectorType_Blablabus:           {},
 	detector_typepb.DetectorType_CoinbaseWaaS:        {},
 	detector_typepb.DetectorType_CoinMarketCap:       {},
