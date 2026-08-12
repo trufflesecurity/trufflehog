@@ -572,6 +572,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.NewRelicInsightsQueryKeyDetectorEnabled.Store(true)
 	feature.NewRelicMobileAppTokenDetectorEnabled.Store(true)
 	feature.MSTeamsWebhookV2DetectorEnabled.Store(true)
+	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
