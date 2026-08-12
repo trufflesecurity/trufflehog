@@ -97,7 +97,7 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 
 			// use default cloud endpoint
 			s.UseCloudEndpoint(true)
-			s.SetCloudEndpoint(s.CloudEndpoint())
+			s.SetCloudEndpoints(s.CloudEndpoints()...)
 			s.UseFoundEndpoints(true)
 
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)

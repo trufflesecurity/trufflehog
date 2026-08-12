@@ -107,7 +107,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 
 			// use default cloud endpoint
 			s.UseCloudEndpoint(true)
-			s.SetCloudEndpoint(s.CloudEndpoint())
+			s.SetCloudEndpoints(s.CloudEndpoints()...)
 			s.UseFoundEndpoints(true)
 
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
@@ -158,7 +158,7 @@ func TestDatadogToken_FromChunk_Unverified(t *testing.T) {
 
 	s := Scanner{}
 	s.UseCloudEndpoint(true)
-	s.SetCloudEndpoint(s.CloudEndpoint())
+	s.SetCloudEndpoints(s.CloudEndpoints()...)
 	s.UseFoundEndpoints(true)
 
 	results, err := s.FromData(ctx, true, data)

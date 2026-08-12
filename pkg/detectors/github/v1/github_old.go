@@ -23,7 +23,7 @@ var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (Scanner) Version() int          { return 1 }
-func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
+func (Scanner) CloudEndpoints() []string { return []string{"https://api.github.com"} }
 
 var (
 	// Oauth token
@@ -151,7 +151,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token string) (bool, *UserRes, *HeaderInfo, error) {
 	// https://developer.github.com/v3/users/#get-the-authenticated-user
 	var requestErr error
-	for _, url := range s.Endpoints() {
+	for _, url := range s.Endpoints(nil) {
 		requestErr = nil
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/user", url), nil)

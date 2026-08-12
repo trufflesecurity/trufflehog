@@ -37,7 +37,7 @@ var (
 	errNoHost    = errors.New("no such host")
 )
 
-func (Scanner) CloudEndpoint() string { return "" }
+func (Scanner) CloudEndpoints() []string { return nil }
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	// Add found + configured endpoints to the list
-	for _, endpoint := range s.Endpoints(foundUrls...) {
+	for _, endpoint := range s.Endpoints(foundUrls) {
 		// If any configured endpoint has `https://` remove it because we append that during verification
 		endpoint = strings.TrimPrefix(endpoint, "https://")
 		uniqueUrls[endpoint] = struct{}{}
