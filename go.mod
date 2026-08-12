@@ -2,7 +2,7 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.25.0
 
-toolchain go1.25.10
+toolchain go1.25.12
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2.8
 
