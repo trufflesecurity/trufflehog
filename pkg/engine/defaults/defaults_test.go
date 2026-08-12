@@ -159,6 +159,8 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	// no longer exists or has been superseded by a different type.
 	detector_typepb.DetectorType_AirtableApiKey:      {},
 	detector_typepb.DetectorType_ApiScience:          {},
+	detector_typepb.DetectorType_AppOptics:           {},
+	detector_typepb.DetectorType_BingSubscriptionKey: {},
 	detector_typepb.DetectorType_Blablabus:           {},
 	detector_typepb.DetectorType_CoinbaseWaaS:        {},
 	detector_typepb.DetectorType_CoinMarketCap:       {},
@@ -191,7 +193,6 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_SportRadar:          {},
 	detector_typepb.DetectorType_Squareup:            {},
 	detector_typepb.DetectorType_Text2Data:           {},
-	detector_typepb.DetectorType_AppOptics:           {},
 
 	// Intentionally commented out in buildDetectorList() — implementation
 	// exists but the detector is disabled (API issues, false positives, etc.).
