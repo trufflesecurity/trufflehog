@@ -46,7 +46,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appcues"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appfollow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appointedd"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appoptics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
@@ -99,7 +98,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
@@ -950,7 +948,6 @@ func buildDetectorList() []detectors.Detector {
 		&appcues.Scanner{},
 		&appfollow.Scanner{},
 		&appointedd.Scanner{},
-		&appoptics.Scanner{},
 		&appsync.Scanner{},
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
@@ -1003,7 +1000,6 @@ func buildDetectorList() []detectors.Detector {
 		&besttime.Scanner{},
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
-		&bingsubscriptionkey.Scanner{},
 		&bitbar.Scanner{},
 		&bitbucketdatacenter.Scanner{},
 		&bitbucketapppassword.Scanner{},
