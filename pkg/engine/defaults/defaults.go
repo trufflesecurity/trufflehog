@@ -1912,9 +1912,9 @@ func DefaultDetectors() []detectors.Detector {
 		}
 		// Default to always use the cloud endpoints (if available) and the found endpoints.
 		customizer.UseFoundEndpoints(true)
-		customizer.UseCloudEndpoint(true)
+		customizer.UseCloudEndpoints(true)
 		if cloudProvider, ok := d.(detectors.CloudProvider); ok {
-			customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
+			customizer.SetCloudEndpoints(cloudProvider.CloudEndpoints()...)
 		}
 	}
 

@@ -311,7 +311,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 			}
 
 			if cfg.CustomVerifiersOnly && len(urls) > 0 {
-				customizer.UseCloudEndpoint(false)
+				customizer.UseCloudEndpoints(false)
 				customizer.UseFoundEndpoints(false)
 			}
 

@@ -40,7 +40,7 @@ func (Scanner) Version() int { return 1 }
 // The graphql API answers on this host as long as the credentials are valid.
 const CloudHost = "api.atlassian.com"
 
-func (Scanner) CloudEndpoint() string { return "https://" + CloudHost }
+func (Scanner) CloudEndpoints() []string { return []string{"https://" + CloudHost} }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
@@ -168,7 +168,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	found := FoundHosts(uniqueDomains)
-	hosts := VerificationHosts(s.Endpoints(found...), found)
+	hosts := VerificationHosts(s.Endpoints(found), found)
 
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {

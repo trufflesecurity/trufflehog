@@ -20,7 +20,7 @@ import (
 
 func TestBitbucketDataCenter_Pattern(t *testing.T) {
 	d := Scanner{}
-	d.UseCloudEndpoint(true)
+	d.UseCloudEndpoints(true)
 	d.UseFoundEndpoints(true)
 
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})

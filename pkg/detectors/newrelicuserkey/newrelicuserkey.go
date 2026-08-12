@@ -18,15 +18,40 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.CloudProvider      = (*Scanner)(nil)
+)
 
 var (
 	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(`\b(NRAK-[A-Z0-9]{27})\b`)
 )
+
+const (
+	usEndpoint = "https://api.newrelic.com/graphql"
+	euEndpoint = "https://api.eu.newrelic.com/graphql"
+)
+
+func (Scanner) CloudEndpoints() []string { return []string{usEndpoint, euEndpoint} }
+
+// regionForEndpoint labels the well-known US/EU cloud endpoints. A
+// user-configured or found endpoint has no known region, so it's left blank.
+func regionForEndpoint(endpoint string) string {
+	switch endpoint {
+	case usEndpoint:
+		return "us"
+	case euEndpoint:
+		return "eu"
+	default:
+		return ""
+	}
+}
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
@@ -67,8 +92,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, extraData, verificationErr := s.verify(ctx, resMatch)
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
-			if extraData != nil {
-				s1.SecretParts["region"] = extraData["region"]
+			if region, ok := extraData["region"]; ok {
+				s1.SecretParts["region"] = region
 			}
 			s1.SetVerificationError(verificationErr)
 		}
@@ -92,16 +117,12 @@ type graphqlResponse struct {
 // Invalid key will return in 401 Unauthorized, and a key with incorrect region will return a 403 Forbidden.
 // https://docs.newrelic.com/docs/apis/nerdgraph/get-started/introduction-new-relic-nerdgraph/
 func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]string, error) {
-	regionUrls := map[string]string{
-		"us": "https://api.newrelic.com/graphql",
-		"eu": "https://api.eu.newrelic.com/graphql",
-	}
-
-	errs := make([]error, 0, len(regionUrls))
-	for region, regionUrl := range regionUrls {
-		verified, extraData, err := s.verifyRegion(ctx, key, region, regionUrl)
+	endpoints := s.Endpoints(nil)
+	errs := make([]error, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		verified, extraData, err := s.verifyEndpoint(ctx, key, endpoint)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("error verifying region %s: %w", region, err))
+			errs = append(errs, fmt.Errorf("error verifying endpoint %s: %w", endpoint, err))
 			continue
 		}
 		if verified {
@@ -111,10 +132,10 @@ func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]strin
 	return false, nil, errors.Join(errs...)
 }
 
-func (s Scanner) verifyRegion(ctx context.Context, key, region, regionUrl string) (bool, map[string]string, error) {
+func (s Scanner) verifyEndpoint(ctx context.Context, key, endpoint string) (bool, map[string]string, error) {
 	body := `{"query": "{ requestContext { userId } }"}`
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodPost, regionUrl, strings.NewReader(body))
+		ctx, http.MethodPost, endpoint, strings.NewReader(body))
 	if err != nil {
 		return false, nil, fmt.Errorf("error constructing request: %w", err)
 	}
@@ -135,13 +156,17 @@ func (s Scanner) verifyRegion(ctx context.Context, key, region, regionUrl string
 	case http.StatusOK:
 		var resp graphqlResponse
 		if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-			return false, nil, fmt.Errorf("error decoding response for region %s: %w", region, err)
+			return false, nil, fmt.Errorf("error decoding response for endpoint %s: %w", endpoint, err)
 		}
-		return true, map[string]string{"region": region, "user_id": resp.Data.RequestContext.UserID}, nil
+		extraData := map[string]string{"user_id": resp.Data.RequestContext.UserID}
+		if region := regionForEndpoint(endpoint); region != "" {
+			extraData["region"] = region
+		}
+		return true, extraData, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
-		// 401 means the key is invalid, 403 means the region is incorrect
+		// 401 means the key is invalid, 403 means the endpoint/region is incorrect
 		return false, nil, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected status code for region %s: %d", region, res.StatusCode)
+		return false, nil, fmt.Errorf("unexpected status code for endpoint %s: %d", endpoint, res.StatusCode)
 	}
 }
