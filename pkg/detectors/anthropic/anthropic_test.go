@@ -2,14 +2,100 @@ package anthropic
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
+
+func TestAnthropic_VerifyMatch(t *testing.T) {
+	const key = "sk-ant-api03-Dtjm9IZ_rYhS_ihHLZmPXhjJ6PN8UPp7vNO7qO3735RRDpf8xbWGinsch0McONXznUm-4KWoA7WU2otvvwHBR5QRjiLakAA"
+
+	tests := []struct {
+		name         string
+		statusCode   int
+		body         string
+		wantVerified bool
+		wantErr      bool
+		// wantErrContains, when set, must appear in the verification error. It pins that
+		// the API's own explanation survives into the error rather than being discarded.
+		wantErrContains string
+	}{
+		{
+			name:         "200 is verified",
+			statusCode:   http.StatusOK,
+			body:         `{"data":[]}`,
+			wantVerified: true,
+		},
+		{
+			name:       "401 is determinate not-live",
+			statusCode: http.StatusUnauthorized,
+			body:       `{"type":"error","error":{"type":"authentication_error","message":"API key is invalid."}}`,
+		},
+		{
+			name:       "404 is determinate not-live",
+			statusCode: http.StatusNotFound,
+			body:       `{"type":"error","error":{"type":"not_found_error","message":"Not found"}}`,
+		},
+		{
+			// 400 is invalid_request_error: the API returns it for a malformed request,
+			// never for the state of the key (bad keys return 401). It must stay
+			// indeterminate, otherwise a request mangled in transit silently marks a live
+			// key as not-verified.
+			name:            "400 stays indeterminate and keeps the API message",
+			statusCode:      http.StatusBadRequest,
+			body:            `{"type":"error","error":{"type":"invalid_request_error","message":"anthropic-version: header is required"}}`,
+			wantErr:         true,
+			wantErrContains: "anthropic-version: header is required",
+		},
+		{
+			name:            "429 stays indeterminate",
+			statusCode:      http.StatusTooManyRequests,
+			body:            `{"type":"error","error":{"type":"rate_limit_error","message":"Number of requests has exceeded your rate limit"}}`,
+			wantErr:         true,
+			wantErrContains: "rate_limit_error",
+		},
+		{
+			name:       "500 stays indeterminate",
+			statusCode: http.StatusInternalServerError,
+			body:       `{"type":"error","error":{"type":"api_error","message":"Internal server error"}}`,
+			wantErr:    true,
+		},
+		{
+			// A gateway that returns a non-JSON body must still degrade to a plain
+			// status-code error rather than panicking or losing the error entirely.
+			name:            "unparseable body still yields an error",
+			statusCode:      http.StatusBadRequest,
+			body:            `<html>502 Bad Gateway</html>`,
+			wantErr:         true,
+			wantErrContains: "unexpected HTTP response status 400",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := common.ConstantResponseHttpClient(test.statusCode, test.body)
+
+			verified, err := verifyAnthropicKey(context.Background(), client, apiKeyEndpoint, key)
+
+			if test.wantErr {
+				require.Error(t, err)
+				if test.wantErrContains != "" {
+					assert.Contains(t, err.Error(), test.wantErrContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, test.wantVerified, verified)
+		})
+	}
+}
 
 func TestAnthropic_Pattern(t *testing.T) {
 	d := Scanner{}
