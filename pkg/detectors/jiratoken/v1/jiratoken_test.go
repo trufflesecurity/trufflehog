@@ -106,11 +106,11 @@ func TestJiraToken_Pattern(t *testing.T) {
 
 func TestIsAtlassianHost(t *testing.T) {
 	tests := map[string]bool{
-		"example.atlassian.net": true,
-		"atlassian.net":         true,
-		"api.atlassian.com":     true,
-		"acme.jira.com":         true,
-		"EXAMPLE.Atlassian.Net": true,
+		"example.atlassian.net":  true,
+		"atlassian.net":          true,
+		"api.atlassian.com":      true,
+		"acme.jira.com":          true,
+		"EXAMPLE.Atlassian.Net":  true,
 		"example.atlassian.net.": true,
 		// Suffix lookalikes must not pass, or the filter would be trivially bypassed.
 		"notatlassian.net":            false,
