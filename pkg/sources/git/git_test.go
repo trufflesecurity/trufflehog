@@ -1523,3 +1523,68 @@ func TestGitChunk_LongLine(t *testing.T) {
 	// one chunk for the commit/file metadata, and at least one chunk for the file content
 	assert.Equal(t, 2, count, "expected two chunks from a file with a 100 KB line")
 }
+
+func TestTrimFileURIDriveSlash(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "drive letter with path",
+			input:    "/C:/repo",
+			expected: "C:/repo",
+		},
+		{
+			name:     "lowercase drive letter",
+			input:    "/e:/some/repo",
+			expected: "e:/some/repo",
+		},
+		{
+			name:     "drive letter only",
+			input:    "/C:",
+			expected: "C:",
+		},
+		{
+			name:     "unix absolute path unchanged",
+			input:    "/absolute/path",
+			expected: "/absolute/path",
+		},
+		{
+			name:     "relative path unchanged",
+			input:    "subdir/repo",
+			expected: "subdir/repo",
+		},
+		{
+			name:     "root unchanged",
+			input:    "/",
+			expected: "/",
+		},
+		{
+			name:     "empty unchanged",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "too short to hold a drive letter",
+			input:    "/C",
+			expected: "/C",
+		},
+		{
+			name:     "double slash unchanged",
+			input:    "//C:/repo",
+			expected: "//C:/repo",
+		},
+		{
+			name:     "colon without a drive letter unchanged",
+			input:    "/1:/repo",
+			expected: "/1:/repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, trimFileURIDriveSlash(tt.input))
+		})
+	}
+}
