@@ -9,6 +9,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	mssql "github.com/microsoft/go-mssqldb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 type SqlServerJDBC struct {
@@ -19,7 +20,7 @@ var _ JDBC = (*SqlServerJDBC)(nil)
 
 func (s *SqlServerJDBC) ping(ctx context.Context) pingResult {
 	if hostIsLocal(s.Host) {
-		return pingResult{errNoLocalIP, true}
+		return pingResult{detectors.ErrNoLocalIP, true}
 	}
 	return ping(ctx, "mssql", isSqlServerErrorDeterminate,
 		buildSQLServerConnectionString(s.Host, s.User, s.Password, "master", map[string]string{"connection+timeout": "5"}))

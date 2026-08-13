@@ -261,14 +261,10 @@ func ping(ctx context.Context, driverName string, isDeterminate func(error) bool
 	return pingResult{errors.Join(indeterminateErrors...), false}
 }
 
-// errNoLocalIP mirrors detectors.ErrNoLocalIP used by the URI detector. Returning
-// it from a ping is a determinate result, which stops the candidate-connection
-// waterfall so we never actually dial the local address.
-var errNoLocalIP = errors.New("dialing local IP addresses is not allowed")
-
 // isLocalIP reports whether ip points at the local machine or an internal
 // network. It mirrors the check used by the URI detector in
-// detectors.DetectorHttpClientWithNoLocalAddresses (see pkg/detectors/http.go).
+// detectors.DetectorHttpClientWithNoLocalAddresses (see pkg/detectors/http.go),
+// which is unexported there so it cannot be shared.
 func isLocalIP(ip net.IP) bool {
 	return ip.IsLoopback() ||
 		ip.IsLinkLocalUnicast() ||
@@ -294,6 +290,13 @@ func hostIsLocal(host string) bool {
 	// case host is already bare.
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
+	}
+
+	// Drop a SQL Server named-instance suffix. parseSqlServer keeps the instance
+	// on the host, so localhost\SQLEXPRESS would otherwise parse as neither an IP
+	// nor a resolvable name and slip past the check.
+	if i := strings.IndexByte(host, '\\'); i >= 0 {
+		host = host[:i]
 	}
 
 	if ip := net.ParseIP(host); ip != nil {

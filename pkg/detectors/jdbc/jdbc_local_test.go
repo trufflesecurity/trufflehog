@@ -3,6 +3,7 @@ package jdbc
 import (
 	"context"
 	"errors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"testing"
 )
 
@@ -25,7 +26,15 @@ func TestHostIsLocal(t *testing.T) {
 		{"10.0.0.5", true},
 		{"192.168.1.1", true},
 		{"169.254.1.1", true},
+		// SQL Server named instances: parseSqlServer leaves the instance on the
+		// host, and it used to hide the address from the check completely.
+		{`localhost\SQLEXPRESS`, true},
+		{`127.0.0.1\SQLEXPRESS`, true},
+		{`localhost\SQLEXPRESS:1433`, true},
+		{`127.0.0.1\SQLEXPRESS:1433`, true},
+		{`10.0.0.5\SQLEXPRESS`, true},
 		// Public hosts must not be refused.
+		{`db.example.com\SQLEXPRESS`, false},
 		{"db.example.com:5432", false},
 		{"8.8.8.8", false},
 		{"tcp(8.8.8.8:3306)", false},
@@ -48,6 +57,10 @@ func TestJdbcPingRefusesLocalHosts(t *testing.T) {
 		"postgres":  &PostgresJDBC{ConnectionInfo: ConnectionInfo{Host: "127.0.0.1:5432", User: "u", Password: "p"}},
 		"mysql":     &MysqlJDBC{ConnectionInfo: ConnectionInfo{Host: "tcp(localhost:3306)", User: "u", Password: "p"}},
 		"sqlserver": &SqlServerJDBC{ConnectionInfo: ConnectionInfo{Host: "[::1]:1433", User: "u", Password: "p"}},
+		// parseSqlServer keeps the named instance on the host, and it used to hide
+		// the address from the check entirely
+		"sqlserver-named-instance":    &SqlServerJDBC{ConnectionInfo: ConnectionInfo{Host: `localhost\SQLEXPRESS`, User: "u", Password: "p"}},
+		"sqlserver-named-instance-ip": &SqlServerJDBC{ConnectionInfo: ConnectionInfo{Host: `127.0.0.1\SQLEXPRESS:1433`, User: "u", Password: "p"}},
 	}
 
 	for name, p := range pingers {
@@ -55,8 +68,8 @@ func TestJdbcPingRefusesLocalHosts(t *testing.T) {
 		if !res.determinate {
 			t.Errorf("%s: expected determinate result for local host, got indeterminate", name)
 		}
-		if !errors.Is(res.err, errNoLocalIP) {
-			t.Errorf("%s: expected errNoLocalIP, got %v", name, res.err)
+		if !errors.Is(res.err, detectors.ErrNoLocalIP) {
+			t.Errorf("%s: expected detectors.ErrNoLocalIP, got %v", name, res.err)
 		}
 	}
 }
