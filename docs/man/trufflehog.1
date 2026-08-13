@@ -329,6 +329,12 @@ Name of S3 bucket to ignore. You can repeat this flag. Incompatible with --bucke
 .TP
 \fB--max-object-size=250MB\fR
 Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)
+.TP
+\fB--endpoint=ENDPOINT\fR
+Endpoint of an S3-compatible service to scan instead of AWS S3. (eg. https://s3.internal.example.com)
+.TP
+\fB--region=REGION\fR
+Region used to sign requests. Defaults to us-east-1.
 .SS
 \fBgcs [<flags>]\fR
 Find credentials in GCS buckets.

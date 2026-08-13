@@ -4201,6 +4201,20 @@ func (m *S3) validate(all bool) error {
 
 	// no validation rules for EnableResumption
 
+	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+		err = S3ValidationError{
+			field:  "Endpoint",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for Region
+
 	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
 		if v == nil {
