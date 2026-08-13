@@ -35,6 +35,121 @@ var (
 	_ = sort.Sort
 )
 
+// Validate checks the field values on AWSSecretsManager with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *AWSSecretsManager) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AWSSecretsManager with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AWSSecretsManagerMultiError, or nil if none found.
+func (m *AWSSecretsManager) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AWSSecretsManager) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if !_AWSSecretsManager_SecretArn_Pattern.MatchString(m.GetSecretArn()) {
+		err := AWSSecretsManagerValidationError{
+			field:  "SecretArn",
+			reason: "value does not match regex pattern \"^arn:aws[^:]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return AWSSecretsManagerMultiError(errors)
+	}
+
+	return nil
+}
+
+// AWSSecretsManagerMultiError is an error wrapping multiple validation errors
+// returned by AWSSecretsManager.ValidateAll() if the designated constraints
+// aren't met.
+type AWSSecretsManagerMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AWSSecretsManagerMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AWSSecretsManagerMultiError) AllErrors() []error { return m }
+
+// AWSSecretsManagerValidationError is the validation error returned by
+// AWSSecretsManager.Validate if the designated constraints aren't met.
+type AWSSecretsManagerValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AWSSecretsManagerValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AWSSecretsManagerValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AWSSecretsManagerValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AWSSecretsManagerValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AWSSecretsManagerValidationError) ErrorName() string {
+	return "AWSSecretsManagerValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AWSSecretsManagerValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAWSSecretsManager.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AWSSecretsManagerValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AWSSecretsManagerValidationError{}
+
+var _AWSSecretsManager_SecretArn_Pattern = regexp.MustCompile("^arn:aws[^:]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$")
+
 // Validate checks the field values on Azure with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -5842,6 +5957,47 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "JsonEnumerator",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_AwsSecretsManager:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetAwsSecretsManager()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "AwsSecretsManager",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "AwsSecretsManager",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAwsSecretsManager()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "AwsSecretsManager",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
