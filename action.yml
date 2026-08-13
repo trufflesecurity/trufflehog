@@ -104,6 +104,19 @@ runs:
           fi
         fi
         ##########################################
+        ## Log the resolved scan scope          ##
+        ##########################################
+        if [ -n "$BASE" ] && [ -n "$HEAD" ]; then
+          SCOPE="diff"
+        elif [ -n "$HEAD" ]; then
+          SCOPE="full history of branch '$HEAD'"
+        elif [ -n "$BASE" ]; then
+          SCOPE="every commit after '$BASE'"
+        else
+          SCOPE="full history of all fetched refs"
+        fi
+        echo "TruffleHog scan scope: ${SCOPE} [event='${{ github.event_name }}', since-commit='${BASE}', branch='${HEAD}']"
+        ##########################################
         ##          Run TruffleHog              ##
         ##########################################
         docker run --rm -v .:/tmp -w /tmp \
