@@ -130,6 +130,27 @@ func TestPostgres_ExtraData(t *testing.T) {
 	}
 }
 
+func TestIsNeonHost(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		host string
+		want bool
+	}{
+		{host: "ep-falling-feather-aimmxil4.c-4.us-east-1.aws.neon.tech", want: true},
+		{host: "EP.NEON.TECH", want: true},
+		{host: "db.example.com", want: false},
+		{host: "neon.tech.evil.com", want: false},
+		{host: "neon.tech", want: false},
+		{host: "", want: false},
+	} {
+		t.Run(tc.host, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, isNeonHost(tc.host))
+		})
+	}
+}
+
 func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
 	s := New(
 		WithIgnorePattern([]string{

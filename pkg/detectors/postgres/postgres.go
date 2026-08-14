@@ -252,6 +252,13 @@ func shouldIgnore(uri []byte, ignorePatterns []*regexp.Regexp) bool {
 	return false
 }
 
+// isNeonHost reports whether host is a Neon managed-Postgres endpoint.
+// Neon advertises SCRAM-SHA-256 with iteration count i=1; lib/pq rejects that,
+// so verification for these hosts uses pgx instead (SCAN-1020).
+func isNeonHost(host string) bool {
+	return strings.HasSuffix(strings.ToLower(host), ".neon.tech")
+}
+
 // getDeadlineInSeconds gets the deadline from the context in seconds. If there
 // is no deadline, false is returned. If the deadline is already exceeded, a
 // negative or 0 value will be returned.
