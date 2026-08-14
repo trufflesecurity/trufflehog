@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 	regexp "github.com/wasilibs/go-re2"
 
@@ -173,7 +175,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				break
 			}
 
-			isVerified, verificationErr := verifyPostgres(params)
+			isVerified, verificationErr := verifyPostgres(ctx, params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
 		}
@@ -282,7 +284,63 @@ func isErrorDatabaseNotFound(err error, dbName string) bool {
 	return strings.Contains(err.Error(), missingDbErrorText)
 }
 
-func verifyPostgres(params map[string]string) (bool, error) {
+func verifyPostgres(ctx context.Context, params map[string]string) (bool, error) {
+	// Neon (managed Postgres) advertises SCRAM-SHA-256 with iteration count i=1.
+	// lib/pq rejects iteration fields shorter than 6 chars, which traps these
+	// secrets in indeterminate reverification. pgx accepts any iterations > 0.
+	if isNeonHost(params[pgHost]) {
+		return verifyPostgresPgx(ctx, params)
+	}
+	return verifyPostgresPq(params)
+}
+
+// verifyPostgresPgx verifies credentials with jackc/pgx. Used for Neon hosts
+// where lib/pq's SCRAM client cannot complete the handshake (SCAN-1020).
+func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, error) {
+	// db_type is not a valid configuration parameter, so we remove it before connecting.
+	dbType := params[pgDbType]
+	delete(params, pgDbType)
+	defer func() {
+		params[pgDbType] = dbType
+	}()
+
+	var connStr strings.Builder
+	for key, value := range params {
+		fmt.Fprintf(&connStr, "%s='%s'", key, value)
+	}
+
+	conn, err := pgx.Connect(ctx, connStr.String())
+	if err != nil {
+		return classifyPostgresVerifyError(err, params[pgDbname])
+	}
+	defer conn.Close(ctx)
+
+	if err := conn.Ping(ctx); err != nil {
+		return classifyPostgresVerifyError(err, params[pgDbname])
+	}
+	return true, nil
+}
+
+func classifyPostgresVerifyError(err error, dbName string) (bool, error) {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "28P01": // invalid_password
+			return false, nil
+		case "3D000": // invalid_catalog_name — authenticated, DB missing
+			return true, nil
+		}
+	}
+	if strings.Contains(err.Error(), "password authentication failed") {
+		return false, nil
+	}
+	if isErrorDatabaseNotFound(err, dbName) {
+		return true, nil
+	}
+	return false, err
+}
+
+func verifyPostgresPq(params map[string]string) (bool, error) {
 	if sslmode := params[pgSslmode]; sslmode == pgSslmodeAllow || sslmode == pgSslmodePrefer {
 		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
 		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
@@ -326,7 +384,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 		// connections are acceptable, so now we try a connection without SSL.
 		params[pgSslmode] = pgSslmodeDisable
 		defer delete(params, pgSslmode) // We want to return with the original params map intact (for ExtraData)
-		return verifyPostgres(params)
+		return verifyPostgresPq(params)
 	case isErrorDatabaseNotFound(err, params[pgDbname]):
 		return true, nil // If we know this, we were able to authenticate
 	default:

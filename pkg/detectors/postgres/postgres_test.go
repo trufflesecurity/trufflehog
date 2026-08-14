@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -147,6 +149,63 @@ func TestIsNeonHost(t *testing.T) {
 		t.Run(tc.host, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, isNeonHost(tc.host))
+		})
+	}
+}
+
+func TestClassifyPostgresVerifyError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		err          error
+		dbName       string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "invalid password code",
+			err:          &pgconn.PgError{Code: "28P01", Message: "password authentication failed"},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database code",
+			err:          &pgconn.PgError{Code: "3D000", Message: `database "app" does not exist`},
+			dbName:       "app",
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "password failure by message",
+			err:          errors.New("password authentication failed for user \"x\""),
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database by message",
+			err:          errors.New(`database "postgres" does not exist`),
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "indeterminate error",
+			err:          errors.New("connection refused"),
+			wantVerified: false,
+			wantErr:      true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			verified, err := classifyPostgresVerifyError(tc.err, tc.dbName)
+			assert.Equal(t, tc.wantVerified, verified)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
