@@ -27,7 +27,8 @@ func TestSecretInfoToAnalyzerResult(t *testing.T) {
 		name      string
 		resources []GroqResource
 		wantLen   int
-		wantNames []string 
+		wantNames []string
+	}{
 		{
 			name:      "one resource produces exactly one binding",
 			resources: []GroqResource{resource("batch_123", "batch_123", "batch")},
