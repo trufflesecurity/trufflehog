@@ -40,7 +40,7 @@ const (
 var (
 	// ngrok API keys and authtokens are {prefix}_{suffix} with a digit-leading suffix.
 	// API keys are 27+21 chars; authtokens vary but share the same charset constraints.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b([a-zA-Z0-9]{27}_[a-zA-Z0-9]{21})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b([a-zA-Z0-9]{27}_\d[a-zA-Z0-9]{20})\b`)
 )
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
