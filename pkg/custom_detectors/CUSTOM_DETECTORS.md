@@ -41,6 +41,8 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
 
      When only one of the two fields is configured, non-matching responses are treated as the opposite state (e.g., if only `successRanges` is set, any response that doesn't match is treated as rotated; if only `rotatedRanges` is set, any non-matching response is treated as live). When both fields are configured and the response matches neither, the result is treated as unknown/inconclusive.
 
+     Since `verify` is optional, Custom Detectors can also be used without a webhook to flag generic hardcoded secrets (e.g. `*.password=`, `*.secret=`) in config files such as `.properties`, `.env`, or `.yaml`. [Here](/examples/generic_config_secrets.yml) is an example config tuned for that use case.
+
    Here's an example with configurable verification ranges:
 
    ```yaml

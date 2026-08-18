@@ -798,6 +798,8 @@ Custom Detectors support a few different filtering mechanisms: entropy, regex ta
 and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
 your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
 
+The `verify` section is optional — if you omit it, matches are still reported as unverified, no webhook required. This makes Custom Detectors useful for flagging generic hardcoded secrets (e.g. `*.password=`, `*.secret=`) in config files like `.properties`, `.env`, or `.yaml` that TruffleHog's built-in, verified detectors won't otherwise catch. [Here](examples/generic_config_secrets.yml) is an example tuned for that use case.
+
 **NB:** This feature is alpha and subject to change.
 
 ### Regex Detector Example
