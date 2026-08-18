@@ -1,48 +1,33 @@
 package s3
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type s3CmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetFields() s3CmdModel {
-	bucket := textinputs.InputConfig{
-		Label:       "S3 bucket name(s)",
-		Key:         "buckets",
-		Required:    true,
-		Placeholder: "truffletestbucket",
-		Help:        "Buckets to scan. Separate by space if multiple.",
+// Definition returns the s3 source configuration.
+//
+// Multiple bucket names entered as whitespace-separated values each emit a
+// distinct --bucket=<name> token.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "s3",
+		Title:       "AWS S3",
+		Description: "Scan Amazon S3 buckets.",
+		Tier:        sources.TierOSS,
+		Command:     "s3",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "bucket",
+				Label:       "S3 bucket name(s)",
+				Help:        "Buckets to scan. Separate by space if multiple.",
+				Kind:        form.KindText,
+				Placeholder: "truffletestbucket",
+				Emit:        form.EmitRepeatedLongFlagEq,
+				Validators:  []form.Validate{form.Required()},
+			},
+		},
 	}
-
-	return s3CmdModel{textinputs.New([]textinputs.InputConfig{bucket})}
-}
-
-func (m s3CmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "s3")
-
-	inputs := m.GetInputs()
-	vals := inputs["buckets"].Value
-	if vals != "" {
-		buckets := strings.Fields(vals)
-		for _, bucket := range buckets {
-			command = append(command, "--bucket="+bucket)
-		}
-	}
-
-	return strings.Join(command, " ")
-}
-
-func (m s3CmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-
-	keys := []string{"buckets"}
-	return common.SummarizeSource(keys, inputs, labels)
 }
