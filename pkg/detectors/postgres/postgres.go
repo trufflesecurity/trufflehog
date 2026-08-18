@@ -313,7 +313,12 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 	if err != nil {
 		return classifyPostgresVerifyError(err, params[pgDbname])
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		// Best-effort close after verification; the verify outcome is already decided.
+		if closeErr := conn.Close(ctx); closeErr != nil {
+			return
+		}
+	}()
 
 	if err := conn.Ping(ctx); err != nil {
 		return classifyPostgresVerifyError(err, params[pgDbname])
