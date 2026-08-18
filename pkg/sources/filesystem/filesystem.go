@@ -42,9 +42,11 @@ type Source struct {
 }
 
 // Ensure the Source satisfies the interfaces at compile time
-var _ sources.Source = (*Source)(nil)
-var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
-var _ sources.SourceUnitEnumChunker = (*Source)(nil)
+var (
+	_ sources.Source                 = (*Source)(nil)
+	_ sources.SourceUnitUnmarshaller = (*Source)(nil)
+	_ sources.SourceUnitEnumChunker  = (*Source)(nil)
+)
 
 // max symlink depth allowed
 const defaultMaxSymlinkDepth = 40
@@ -116,7 +118,7 @@ func (s *Source) Chunks(ctx trContext.Context, chunksChan chan *sources.Chunk, _
 		if common.IsDone(ctx) {
 			return nil
 		}
-		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", rootPath), "")
+		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", rootPath), s.GetProgress().EncodedResumeInfo)
 
 		cleanPath := filepath.Clean(rootPath)
 		fileInfo, err := os.Lstat(cleanPath)

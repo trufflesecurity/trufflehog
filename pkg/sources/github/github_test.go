@@ -1425,7 +1425,12 @@ func TestMapExplicitReposToInstallationsRejectsHostMismatch(t *testing.T) {
 	assert.Contains(t, err.Error(), "configured repos were not found")
 }
 
-func TestMapExplicitReposToInstallationsRejectsRepoMissingFromInstallationList(t *testing.T) {
+// A repo absent from every installation listing but readable with the
+// default installation token (e.g. a public repo, or one the listing missed)
+// maps to the default installation instead of failing the scan. Repos the
+// default token cannot read are still rejected (see the preceding test and
+// TestScanAllInstallationsInaccessibleRepoStillFailsMapping).
+func TestMapExplicitReposToInstallationsFallsBackToDefaultForReadableRepo(t *testing.T) {
 	privateKey := createPrivateKey()
 	const repoURL = "https://github.com/other-org/repo.git"
 
@@ -1460,8 +1465,12 @@ func TestMapExplicitReposToInstallationsRejectsRepoMissingFromInstallationList(t
 		},
 	})
 	err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "configured repos were not found")
+	require.NoError(t, err)
+
+	connector := s.connector.(*appConnector)
+	installationID, mapped := connector.installationIDForRepo(repoURL)
+	require.True(t, mapped)
+	assert.Equal(t, int64(1337), installationID)
 }
 
 func TestMapExplicitReposToInstallationsMapsWikiRepoURL(t *testing.T) {
@@ -1724,6 +1733,136 @@ func TestScanAllInstallationsMapsUnitBeforeMetadataFetch(t *testing.T) {
 	installationID, mapped := connector.installationIDForRepo("https://github.com/other-org/repo.git")
 	assert.True(t, mapped)
 	assert.Equal(t, int64(2448), installationID)
+}
+
+// Regression test for member personal repos under scan_all_installations
+// (INT-789): they belong to no app installation, so the mapping must fall
+// back to the default installation when the API confirms the repo is
+// readable, both at chunk time and at enumeration time.
+func TestScanAllInstallationsMemberPersonalRepoFallsBackToDefaultInstallation(t *testing.T) {
+	privateKey := createPrivateKey()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/app/installations/") && strings.HasSuffix(r.URL.Path, "/access_tokens"):
+			parts := strings.Split(r.URL.Path, "/")
+			installID := parts[len(parts)-2]
+			_, _ = fmt.Fprintf(w, `{"token":"token-%s","expires_at":"2099-01-01T00:00:00Z"}`, installID)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/app/installations"):
+			_, _ = w.Write([]byte(`[
+				{"id":1337,"account":{"login":"test-org","type":"Organization"}},
+				{"id":2448,"account":{"login":"other-org","type":"Organization"}}
+			]`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/installation/repositories"):
+			// Installations only ever contain org-owned repos.
+			auth := r.Header.Get("Authorization")
+			switch {
+			case strings.Contains(auth, "token-1337"):
+				_, _ = w.Write([]byte(`{"total_count":1,"repositories":[
+					{"name":"backend","full_name":"test-org/backend","clone_url":"https://github.com/test-org/backend.git","owner":{"login":"test-org","type":"Organization"},"size":1}
+				]}`))
+			case strings.Contains(auth, "token-2448"):
+				_, _ = w.Write([]byte(`{"total_count":0,"repositories":[]}`))
+			default:
+				http.Error(w, "unexpected installation token", http.StatusUnauthorized)
+			}
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/repos/alice/dns-data"):
+			// The member's personal repo exists and is public: any valid
+			// token can read it, mirroring real GitHub behavior.
+			_, _ = w.Write([]byte(`{"name":"dns-data","full_name":"alice/dns-data","clone_url":"https://github.com/alice/dns-data.git","owner":{"login":"alice","type":"User"},"private":false,"size":1}`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/users/alice/repos"):
+			_, _ = w.Write([]byte(`[{"name":"dns-data","full_name":"alice/dns-data","clone_url":"https://github.com/alice/dns-data.git","owner":{"login":"alice","type":"User"},"private":false,"size":1}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:             server.URL,
+		ScanAllInstallations: true,
+		ScanUsers:            true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
+
+	// The org-owned repo maps to its owning installation.
+	connector := s.connector.(*appConnector)
+	err := s.mapReposToInstallations(context.Background(), connector, []string{"https://github.com/test-org/backend.git"})
+	require.NoError(t, err)
+
+	// The member's public personal repo is in no installation, but the API
+	// confirms it is accessible, so it maps to the default installation.
+	err = s.mapReposToInstallations(context.Background(), connector, []string{"https://github.com/alice/dns-data.git"})
+	require.NoError(t, err)
+
+	installationID, mapped := connector.installationIDForRepo("https://github.com/alice/dns-data.git")
+	require.True(t, mapped)
+	require.Equal(t, int64(1337), installationID)
+
+	// Enumeration must map member repos up front so same-process ChunkUnit
+	// short-circuits without any mapping API calls.
+	connector.mu.Lock()
+	delete(connector.repoInstallationMap, "https://github.com/alice/dns-data.git")
+	connector.mu.Unlock()
+
+	require.NoError(t, s.getReposByUser(context.Background(), "alice", false, noopReporter()))
+	installationID, mapped = connector.installationIDForRepo("https://github.com/alice/dns-data.git")
+	require.True(t, mapped)
+	require.Equal(t, int64(1337), installationID)
+}
+
+// Repos that no installation owns AND the default installation token cannot
+// read must still fail the mapping: the accessibility fallback must not turn
+// the check fail-open.
+func TestScanAllInstallationsInaccessibleRepoStillFailsMapping(t *testing.T) {
+	privateKey := createPrivateKey()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/app/installations/") && strings.HasSuffix(r.URL.Path, "/access_tokens"):
+			parts := strings.Split(r.URL.Path, "/")
+			installID := parts[len(parts)-2]
+			_, _ = fmt.Fprintf(w, `{"token":"token-%s","expires_at":"2099-01-01T00:00:00Z"}`, installID)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/app/installations"):
+			_, _ = w.Write([]byte(`[{"id":1337,"account":{"login":"test-org","type":"Organization"}}]`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/installation/repositories"):
+			_, _ = w.Write([]byte(`{"total_count":0,"repositories":[]}`))
+		default:
+			// /repos/... lookups 404: repo is private/nonexistent for
+			// every installation token.
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:             server.URL,
+		ScanAllInstallations: true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
+
+	connector := s.connector.(*appConnector)
+	err := s.mapReposToInstallations(context.Background(), connector, []string{"https://github.com/ghost/private-repo.git"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "configured repos were not found in any GitHub App installation")
 }
 
 func TestEnumerateAllInstallationReposReportsInstallationErrors(t *testing.T) {
@@ -2473,6 +2612,173 @@ func TestExtractRepoNameFromURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractRepoNameFromUrl(tt.url)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSource_ExcludeArchivedRepositories(t *testing.T) {
+	tests := []struct {
+		name            string
+		excludeArchived bool
+		reposJSON       string
+		wantRepoCount   int
+		wantRepos       []string
+	}{
+		{
+			name:            "exclude archived repos when flag is true",
+			excludeArchived: true,
+			reposJSON: `[
+				{"full_name": "test-org/active-repo", "clone_url": "https://github.com/test-org/active-repo.git", "size": 1, "archived": false},
+				{"full_name": "test-org/archived-repo", "clone_url": "https://github.com/test-org/archived-repo.git", "size": 1, "archived": true},
+				{"full_name": "test-org/another-active", "clone_url": "https://github.com/test-org/another-active.git", "size": 1, "archived": false}
+			]`,
+			wantRepoCount: 2, // Only non-archived
+			wantRepos:     []string{"test-org/active-repo", "test-org/another-active"},
+		},
+		{
+			name:            "include archived repos when flag is false",
+			excludeArchived: false,
+			reposJSON: `[
+				{"full_name": "test-org/active-repo", "clone_url": "https://github.com/test-org/active-repo.git", "size": 1, "archived": false},
+				{"full_name": "test-org/archived-repo", "clone_url": "https://github.com/test-org/archived-repo.git", "size": 1, "archived": true},
+				{"full_name": "test-org/another-active", "clone_url": "https://github.com/test-org/another-active.git", "size": 1, "archived": false}
+			]`,
+			wantRepoCount: 3, // All repos
+			wantRepos:     []string{"test-org/active-repo", "test-org/archived-repo", "test-org/another-active"},
+		},
+		{
+			name:            "handle all archived repos",
+			excludeArchived: true,
+			reposJSON: `[
+				{"full_name": "test-org/archived-1", "clone_url": "https://github.com/test-org/archived-1.git", "size": 1, "archived": true},
+				{"full_name": "test-org/archived-2", "clone_url": "https://github.com/test-org/archived-2.git", "size": 1, "archived": true}
+			]`,
+			wantRepoCount: 0, // None included
+			wantRepos:     []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+
+			gock.New("https://api.github.com").
+				Get("/orgs/test-org/repos").
+				Reply(200).
+				JSON(tt.reposJSON)
+
+			s := initTestSource(&sourcespb.GitHub{
+				Credential: &sourcespb.GitHub_Token{
+					Token: "test-token",
+				},
+				ExcludeArchived: tt.excludeArchived,
+			})
+
+			err := s.getReposByOrg(context.Background(), "test-org", noopReporter())
+			assert.Nil(t, err)
+			assert.Equal(t, tt.wantRepoCount, s.filteredRepoCache.Count())
+
+			// Verify expected repos are in cache
+			for _, repo := range tt.wantRepos {
+				ok := s.filteredRepoCache.Exists(repo)
+				assert.True(t, ok, "expected repo %s to be in cache", repo)
+			}
+
+			// Verify archived repos are NOT in cache when excluding
+			if tt.excludeArchived {
+				allRepos := []string{"test-org/archived-repo", "test-org/archived-1", "test-org/archived-2"}
+				for _, repo := range allRepos {
+					if !slices.Contains(tt.wantRepos, repo) {
+						ok := s.filteredRepoCache.Exists(repo)
+						assert.False(t, ok, "archived repo %s should not be in cache when excluding", repo)
+					}
+				}
+			}
+
+			assert.False(t, gock.HasUnmatchedRequest())
+			assert.True(t, gock.IsDone())
+		})
+	}
+}
+
+func TestSource_ExcludeArchivedForkInteraction(t *testing.T) {
+	tests := []struct {
+		name            string
+		includeForks    bool
+		excludeArchived bool
+		reposJSON       string
+		wantRepoCount   int
+		wantRepos       []string
+		notWantRepos    []string
+	}{
+		{
+			name:            "fork+archived skipped when forks included and archived excluded",
+			includeForks:    true,
+			excludeArchived: true,
+			reposJSON: `[
+				{"full_name": "test-org/active", "clone_url": "https://github.com/test-org/active.git", "size": 1, "archived": false, "fork": false},
+				{"full_name": "test-org/fork-active", "clone_url": "https://github.com/test-org/fork-active.git", "size": 1, "archived": false, "fork": true},
+				{"full_name": "test-org/fork-archived", "clone_url": "https://github.com/test-org/fork-archived.git", "size": 1, "archived": true, "fork": true}
+			]`,
+			wantRepoCount: 2,
+			wantRepos:     []string{"test-org/active", "test-org/fork-active"},
+			notWantRepos:  []string{"test-org/fork-archived"},
+		},
+		{
+			name:            "fork+archived included when archived allowed",
+			includeForks:    true,
+			excludeArchived: false,
+			reposJSON: `[
+				{"full_name": "test-org/active", "clone_url": "https://github.com/test-org/active.git", "size": 1, "archived": false, "fork": false},
+				{"full_name": "test-org/fork-archived", "clone_url": "https://github.com/test-org/fork-archived.git", "size": 1, "archived": true, "fork": true}
+			]`,
+			wantRepoCount: 2,
+			wantRepos:     []string{"test-org/active", "test-org/fork-archived"},
+		},
+		{
+			name:            "fork+archived dropped by fork filter when forks excluded",
+			includeForks:    false,
+			excludeArchived: true,
+			reposJSON: `[
+				{"full_name": "test-org/active", "clone_url": "https://github.com/test-org/active.git", "size": 1, "archived": false, "fork": false},
+				{"full_name": "test-org/fork-archived", "clone_url": "https://github.com/test-org/fork-archived.git", "size": 1, "archived": true, "fork": true}
+			]`,
+			wantRepoCount: 1,
+			wantRepos:     []string{"test-org/active"},
+			notWantRepos:  []string{"test-org/fork-archived"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+
+			gock.New("https://api.github.com").
+				Get("/orgs/test-org/repos").
+				Reply(200).
+				JSON(tt.reposJSON)
+
+			s := initTestSource(&sourcespb.GitHub{
+				Credential: &sourcespb.GitHub_Token{
+					Token: "test-token",
+				},
+				IncludeForks:    tt.includeForks,
+				ExcludeArchived: tt.excludeArchived,
+			})
+
+			err := s.getReposByOrg(context.Background(), "test-org", noopReporter())
+			assert.Nil(t, err)
+			assert.Equal(t, tt.wantRepoCount, s.filteredRepoCache.Count())
+
+			for _, repo := range tt.wantRepos {
+				assert.True(t, s.filteredRepoCache.Exists(repo), "expected repo %s to be in cache", repo)
+			}
+			for _, repo := range tt.notWantRepos {
+				assert.False(t, s.filteredRepoCache.Exists(repo), "repo %s should not be in cache", repo)
+			}
+
+			assert.False(t, gock.HasUnmatchedRequest())
+			assert.True(t, gock.IsDone())
 		})
 	}
 }
