@@ -153,6 +153,26 @@ func TestIsNeonHost(t *testing.T) {
 	}
 }
 
+func TestPgxConnStringOmitsClientOnlyParams(t *testing.T) {
+	t.Parallel()
+
+	got := pgxConnString(map[string]string{
+		pgHost:       "ep-example.us-east-1.aws.neon.tech",
+		pgPort:       "5432",
+		pgUser:       "user",
+		pgPassword:   "secret",
+		pgDbname:     "neondb",
+		pgSslmode:    pgSslmodeRequire,
+		pgDbType:     "postgres",
+		pgRequiressl: "1",
+	})
+
+	assert.Contains(t, got, "host='ep-example.us-east-1.aws.neon.tech'")
+	assert.Contains(t, got, "sslmode='require'")
+	assert.NotContains(t, got, "db_type=")
+	assert.NotContains(t, got, "requiressl=")
+}
+
 func TestClassifyPostgresVerifyError(t *testing.T) {
 	t.Parallel()
 

@@ -297,19 +297,7 @@ func verifyPostgres(ctx context.Context, params map[string]string) (bool, error)
 // verifyPostgresPgx verifies credentials with jackc/pgx. Used for Neon hosts
 // where lib/pq's SCRAM client cannot complete the handshake (SCAN-1020).
 func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, error) {
-	// db_type is not a valid configuration parameter, so we remove it before connecting.
-	dbType := params[pgDbType]
-	delete(params, pgDbType)
-	defer func() {
-		params[pgDbType] = dbType
-	}()
-
-	var connStr strings.Builder
-	for key, value := range params {
-		fmt.Fprintf(&connStr, "%s='%s'", key, value)
-	}
-
-	conn, err := pgx.Connect(ctx, connStr.String())
+	conn, err := pgx.Connect(ctx, pgxConnString(params))
 	if err != nil {
 		return classifyPostgresVerifyError(err, params[pgDbname])
 	}
@@ -324,6 +312,20 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 		return classifyPostgresVerifyError(err, params[pgDbname])
 	}
 	return true, nil
+}
+
+// pgxConnString builds a libpq-style connection string for pgx, omitting keys
+// that are detector-only (db_type) or libpq client options pgx would forward as
+// unrecognized server GUCs (requiressl). sslmode is already normalized in FromData.
+func pgxConnString(params map[string]string) string {
+	var connStr strings.Builder
+	for key, value := range params {
+		if key == pgDbType || key == pgRequiressl {
+			continue
+		}
+		fmt.Fprintf(&connStr, "%s='%s'", key, value)
+	}
+	return connStr.String()
 }
 
 func classifyPostgresVerifyError(err error, dbName string) (bool, error) {
