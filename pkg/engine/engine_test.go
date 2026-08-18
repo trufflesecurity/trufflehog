@@ -232,6 +232,45 @@ func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
+func TestFragmentLineOffsetUsesOriginalData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	result.SetPrimarySecretValue(`token = "synthetic-secret-value-123456"`)
+	chunk := &sources.Chunk{
+		Data:         []byte("# Date format:\n\ntoken = \"synthetic-secret-value-123456\""),
+		OriginalData: []byte("# Date format: <yyyymmdd>\n\n\n\n\ntoken = \"synthetic-secret-value-123456\""),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(5), lineOffset)
+}
+
+func TestFragmentLineOffsetFallsBackToDecodedData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	chunk := &sources.Chunk{
+		Data:         []byte("decoded header\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("encoded-source-data"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(1), lineOffset)
+}
+
+func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data:         []byte("synthetic-secret-value-123456\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("synthetic-secret-value-123456\n\nsynthetic-secret-value-123456"),
+	}
+	results := []detectors.Result{{Raw: secret}, {Raw: secret}}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	lineOffset, _ := FragmentLineOffset(chunk, &results[1])
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
 // TestFragmentLineOffset_DuplicateSecrets verifies that when the same secret
 // appears on multiple lines within a chunk, each result receives the correct
 // line number rather than always reporting the first occurrence's line.
