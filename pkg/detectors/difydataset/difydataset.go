@@ -54,9 +54,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+			isVerified, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, match)
 		}
 
@@ -66,16 +65,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.dify.ai/v1/datasets", nil)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -85,13 +84,13 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		// Determinate success: key is live and can list the account's knowledge bases.
-		return true, nil, nil
+		return true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		// Determinate failure: key is invalid/revoked. No error object.
-		return false, nil, nil
+		return false, nil
 	default:
 		// Indeterminate: unexpected status (rate limit, 5xx, etc).
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
