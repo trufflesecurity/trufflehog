@@ -1140,7 +1140,7 @@ func buildDetectorList() []detectors.Detector {
 		&detectify.Scanner{},
 		&detectlanguage.Scanner{},
 		&dfuse.Scanner{},
-		&difydataset.Scanner{},				
+		&difydataset.Scanner{},
 		&diffbot.Scanner{},
 		&diggernaut.Scanner{},
 		&digitaloceantoken.Scanner{},
@@ -1894,6 +1894,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		case *solarwindsobservability.Scanner:
 			return !feature.SolarwindsDetectorEnabled.Load()
+		case *difydataset.Scanner:
+			return !feature.DifyDatasetDetectorEnabled.Load()
 		default:
 			return false
 		}
