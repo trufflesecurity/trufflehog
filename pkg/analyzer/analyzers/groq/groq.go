@@ -19,7 +19,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-// SecretInfo hold the information about the groq key
+// SecretInfo holds information gathered about a Groq API key.
 type SecretInfo struct {
 	Valid         bool
 	Reference     string
@@ -28,7 +28,7 @@ type SecretInfo struct {
 	Misc          map[string]string
 }
 
-// GroqResource is a single groq resource which can be accessed with groq api key
+// GroqResource is a single resource accessible with a Groq API key.
 type GroqResource struct {
 	ID         string
 	Name       string
@@ -37,17 +37,17 @@ type GroqResource struct {
 	Metadata   map[string]string
 }
 
-// appendGroqResource append the single groq resource to secretinfo groqresources list
+// appendGroqResource appends a resource onto the secret info list.
 func (s *SecretInfo) appendGroqResource(resource GroqResource) {
 	s.GroqResources = append(s.GroqResources, resource)
 }
 
-// updateMetadata safely update the metadata of the groq resource
-func (g GroqResource) updateMetadata(key, value string) {
+// updateMetadata sets a metadata key on the resource. Pointer receiver so
+// writes persist when callers mutate before appending.
+func (g *GroqResource) updateMetadata(key, value string) {
 	if g.Metadata == nil {
 		g.Metadata = map[string]string{}
 	}
-
 	g.Metadata[key] = value
 }
 
@@ -74,7 +74,6 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
-		// just print the error in cli and continue as a partial success
 		color.Red("[x] Invalid Groq API key\n")
 		color.Red("[x] Error : %s", err.Error())
 		return
@@ -96,15 +95,18 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 }
 
 func AnalyzePermissions(cfg *config.Config, apiKey string) (*SecretInfo, error) {
-	// create a HTTP client
 	client := analyzers.NewAnalyzeClient(cfg)
+	secretInfo := &SecretInfo{Valid: true}
 
-	var secretInfo = &SecretInfo{Valid: true}
-
+	// Models are on every plan and guarantee analyze bindings. Batches and files
+	// are paid Developer-tier APIs; when available we surface those resources too,
+	// and when the plan denies them we skip without failing the analysis.
+	if err := captureModels(client, apiKey, secretInfo); err != nil {
+		return nil, err
+	}
 	if err := captureBatches(client, apiKey, secretInfo); err != nil {
 		return nil, err
 	}
-
 	if err := captureFiles(client, apiKey, secretInfo); err != nil {
 		return nil, err
 	}
@@ -112,19 +114,22 @@ func AnalyzePermissions(cfg *config.Config, apiKey string) (*SecretInfo, error) 
 	return secretInfo, nil
 }
 
-// secretInfoToAnalyzerResult translate secret info to Analyzer Result
+// secretInfoToAnalyzerResult translates secret info into Analyzer Result bindings.
+// Permissions in the UI come from these bindings; an empty list looks like "no
+// permissions" even when the CLI printed Full Access.
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	if info == nil {
 		return nil
 	}
 
+	fullAccess := analyzers.Permission{Value: PermissionStrings[FullAccess]}
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeGroq,
 		Metadata:     map[string]any{"Valid_Key": info.Valid},
-		Bindings:     make([]analyzers.Binding, len(info.GroqResources)),
+		// Cap only — length 0 so append does not leave zero-value placeholders.
+		Bindings: make([]analyzers.Binding, 0, len(info.GroqResources)),
 	}
 
-	// extract information to create bindings and append to result bindings
 	for _, groqResource := range info.GroqResources {
 		binding := analyzers.Binding{
 			Resource: analyzers.Resource{
@@ -133,15 +138,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 				Type:               groqResource.Type,
 				Metadata:           map[string]any{},
 			},
-			Permission: analyzers.Permission{
-				Value: groqResource.Permission,
-			},
+			Permission: fullAccess,
 		}
-
 		for key, value := range groqResource.Metadata {
 			binding.Resource.Metadata[key] = value
 		}
-
 		result.Bindings = append(result.Bindings, binding)
 	}
 
