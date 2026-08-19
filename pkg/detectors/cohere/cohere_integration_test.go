@@ -25,7 +25,17 @@ func TestCohere_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("COHERE")
-	inactiveSecret := testSecrets.MustGetField("COHERE_INACTIVE")
+	if !keyPat.MatchString("cohere " + secret) {
+		t.Fatalf("COHERE must be 40 alphanumeric characters to match the detector regex, got len=%d", len(secret))
+	}
+	// Flip one character so the candidate still matches the regex but fails verification.
+	inactive := []byte(secret)
+	if inactive[len(inactive)-1] == 'a' {
+		inactive[len(inactive)-1] = 'b'
+	} else {
+		inactive[len(inactive)-1] = 'a'
+	}
+	inactiveSecret := string(inactive)
 
 	type args struct {
 		ctx    context.Context
