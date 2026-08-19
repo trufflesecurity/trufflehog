@@ -21,7 +21,9 @@ func TestCoze_FromData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	// Secrets stored in GCP test project. Maintainers: add COZE / COZE_INACTIVE to detectors6.
+	// Prefer local secrets via TEST_SECRET_FILE (see hack/docs/Adding_Detectors_external.md).
+	// Maintainers: also add COZE / COZE_INACTIVE to GCP secret "detectors6" in project
+	// "trufflehog-testing" so CI can run without TEST_SECRET_FILE.
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
