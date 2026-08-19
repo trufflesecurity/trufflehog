@@ -1141,7 +1141,7 @@ func buildDetectorList() []detectors.Detector {
 		&detectify.Scanner{},
 		&detectlanguage.Scanner{},
 		&dfuse.Scanner{},
-		&difydataset.Scanner{},				
+		&difydataset.Scanner{},
 		&diffbot.Scanner{},
 		&diggernaut.Scanner{},
 		&digitaloceantoken.Scanner{},
@@ -1898,6 +1898,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SolarwindsDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
+		case *difydataset.Scanner:
+			return !feature.DifyDatasetDetectorEnabled.Load()
 		default:
 			return false
 		}
