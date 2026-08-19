@@ -232,6 +232,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectlanguage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dfuse"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/difydataset"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diffbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diggernaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceantoken"
@@ -1140,6 +1141,7 @@ func buildDetectorList() []detectors.Detector {
 		&detectify.Scanner{},
 		&detectlanguage.Scanner{},
 		&dfuse.Scanner{},
+		&difydataset.Scanner{},				
 		&diffbot.Scanner{},
 		&diggernaut.Scanner{},
 		&digitaloceantoken.Scanner{},
