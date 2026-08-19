@@ -87,9 +87,10 @@ func verifyYoutubeAPIKey(ctx context.Context, client *http.Client, key, channelI
 	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusForbidden:
+		// YouTube can return 403 for a recognized key that lacks permission or quota.
 		return true, nil
-	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusBadRequest, http.StatusUnauthorized:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)

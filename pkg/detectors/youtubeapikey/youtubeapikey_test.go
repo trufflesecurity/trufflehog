@@ -98,6 +98,11 @@ func TestYoutubeApiKey_Verification(t *testing.T) {
 			wantVerified: true,
 		},
 		{
+			name:         "verified with restricted access",
+			statusCode:   http.StatusForbidden,
+			wantVerified: true,
+		},
+		{
 			name:       "unverified",
 			statusCode: http.StatusBadRequest,
 		},
