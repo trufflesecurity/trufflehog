@@ -141,7 +141,7 @@ func TestDifydataset_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
+			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
 			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("Difydataset.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
