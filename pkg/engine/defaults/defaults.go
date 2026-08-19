@@ -1894,6 +1894,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		case *solarwindsobservability.Scanner:
 			return !feature.SolarwindsDetectorEnabled.Load()
+		case *cohere.Scanner:
+			return !feature.CohereDetectorEnabled.Load()
 		default:
 			return false
 		}

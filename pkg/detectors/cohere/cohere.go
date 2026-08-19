@@ -58,9 +58,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+			isVerified, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, match)
 		}
 
@@ -71,18 +70,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // https://docs.cohere.com/reference/check-api-key
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.cohere.com/v1/check-api-key", strings.NewReader("{}"))
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Client-Name", "trufflehog")
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -92,32 +90,16 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		var apiResp struct {
-			Valid          bool   `json:"valid"`
-			OrganizationID string `json:"organization_id"`
-			OwnerID        string `json:"owner_id"`
+			Valid bool `json:"valid"`
 		}
 		if err := json.NewDecoder(res.Body).Decode(&apiResp); err != nil {
-			return false, nil, fmt.Errorf("failed to decode response: %w", err)
+			return false, fmt.Errorf("failed to decode response: %w", err)
 		}
-		if !apiResp.Valid {
-			return false, nil, nil
-		}
-
-		extraData := make(map[string]string)
-		if apiResp.OrganizationID != "" {
-			extraData["organization_id"] = apiResp.OrganizationID
-		}
-		if apiResp.OwnerID != "" {
-			extraData["owner_id"] = apiResp.OwnerID
-		}
-		if len(extraData) == 0 {
-			extraData = nil
-		}
-		return true, extraData, nil
+		return apiResp.Valid, nil
 	case http.StatusUnauthorized:
-		return false, nil, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
