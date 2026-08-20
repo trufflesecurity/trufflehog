@@ -14,10 +14,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -1410,23 +1412,16 @@ func effectiveSecret(r *detectors.Result) string {
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
 	secretBytes := []byte(effectiveSecret(result))
 
-	data, offset := chunk.Data, -1
-	if chunk.OriginalData != nil {
-		occurrence := 0
-		if result.HasChunkOffset() {
-			occurrence = bytes.Count(chunk.Data[:result.ChunkOffset()], secretBytes)
-		}
-		offset = nthIndex(chunk.OriginalData, secretBytes, occurrence)
-		if offset >= 0 {
-			data = chunk.OriginalData
-		}
+	offset := bytes.Index(chunk.Data, secretBytes)
+	if result.HasChunkOffset() {
+		offset = int(result.ChunkOffset())
+	} else if offset == -1 {
+		return 0, false
 	}
-	if offset < 0 {
-		if result.HasChunkOffset() {
-			offset = int(result.ChunkOffset())
-		} else if offset = bytes.Index(chunk.Data, secretBytes); offset == -1 {
-			return 0, false
-		}
+
+	data := chunk.Data
+	if originalOffset := sourceOffset(chunk.OriginalData, chunk.Data, offset, len(secretBytes)); originalOffset >= 0 {
+		data, offset = chunk.OriginalData, originalOffset
 	}
 
 	lineNumber := int64(bytes.Count(data[:offset], []byte("\n")))
@@ -1444,18 +1439,31 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	return lineNumber, false
 }
 
-func nthIndex(data, value []byte, occurrence int) int {
-	offset := 0
-	for matchNumber := 0; matchNumber <= occurrence; matchNumber++ {
-		index := bytes.Index(data[offset:], value)
-		if index == -1 {
-			return -1
+func sourceOffset(originalData, data []byte, offset, length int) int {
+	if originalData == nil || offset < 0 || offset+length > len(data) {
+		return -1
+	}
+	if bytes.Equal(originalData, data) {
+		return offset
+	}
+	if !utf8.Valid(originalData) || !utf8.Valid(data) {
+		return -1
+	}
+
+	var originalOffset, dataOffset int
+	for _, diff := range diffmatchpatch.New().DiffMain(string(originalData), string(data), true) {
+		switch diff.Type {
+		case diffmatchpatch.DiffDelete:
+			originalOffset += len(diff.Text)
+		case diffmatchpatch.DiffInsert:
+			dataOffset += len(diff.Text)
+		case diffmatchpatch.DiffEqual:
+			if offset >= dataOffset && offset+length <= dataOffset+len(diff.Text) {
+				return originalOffset + offset - dataOffset
+			}
+			originalOffset += len(diff.Text)
+			dataOffset += len(diff.Text)
 		}
-		offset += index
-		if matchNumber == occurrence {
-			return offset
-		}
-		offset += len(value)
 	}
 	return -1
 }
