@@ -263,7 +263,7 @@ func (c *Parser) RepoPath(
 
 	args := c.prepGitArgs(source, abbrevCommit, head, abbreviatedLog, excludedGlobs, isBare)
 
-	allCommits, err := c.gatherGitLog(ctx, args)
+	commitGroups, err := c.gatherGitLog(ctx, args, showGroupSize)
 	if err != nil {
 		return nil, err
 	}
@@ -273,12 +273,12 @@ func (c *Parser) RepoPath(
 	// running a single command anymore. we'll use a channel of channels to
 	// reduce back to one channel we return to our caller.  Unbuffered so
 	// we have at most one git show running and one git show draining.
-	groupchan := make(chan chan *Diff)
+	diffGroups := make(chan chan *Diff)
 	go func() {
 		defer common.RecoverWithExit(ctx)
-		defer close(groupchan)
+		defer close(diffGroups)
 
-		for group := range slices.Chunk(allCommits, showGroupSize) {
+		for group := range commitGroups {
 			if common.IsDone(ctx) {
 				return
 			}
@@ -294,7 +294,7 @@ func (c *Parser) RepoPath(
 				ctx.Logger().Error(err, "Error executing git show for commit group.")
 				return
 			}
-			groupchan <- groupdiffs
+			diffGroups <- diffGroup
 		}
 	}()
 
@@ -305,7 +305,7 @@ func (c *Parser) RepoPath(
 		defer common.RecoverWithExit(ctx)
 		defer close(diffChan)
 
-		for groupdiffs := range groupchan {
+		for groupdiffs := range diffGroups {
 			for diff := range groupdiffs {
 				diffChan <- diff
 			}
@@ -317,20 +317,54 @@ func (c *Parser) RepoPath(
 
 // Ask git for a list of all relevant commit hashes but only hashes.  Git takes
 // on the work of linearizing history for us, then we work through the commit
-// list.
-func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs) ([]string, error) {
+// list.  Returns a channel of groups of commit IDs, so scanning can start asap
+// even if git log is taking a bit for large repos.
+func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs, showGroupSize int) (chan []string, error) {
 	cmd := exec.CommandContext(ctx, "git", slices.Concat(args.global, []string{"log"}, args.log)...)
 	cmd.WaitDelay = c.waitDelay
 	cmd.Env = args.env
 
-	commitLog, err := cmd.Output()
+	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
-		if e, ok := err.(*exec.ExitError); ok {
-			ctx.Logger().V(2).Info(string(e.Stderr))
-		}
+		return nil, err
+	}
+
+	err = cmd.Start()
+	if err != nil {
 		return nil, fmt.Errorf("failed to execute git log: %w", err)
 	}
-	return strings.Split(string(commitLog), "\n"), nil
+
+	commitGroups := make(chan []string)
+	go func() {
+		defer close(commitGroups)
+		defer func() {
+			err := cmd.Wait()
+			if err != nil {
+				ctx.Logger().Error(err, "git log exited with error", "stderr", cmd.Stderr)
+			}
+		}()
+
+		s := bufio.NewScanner(stdOut)
+		commitGroup := make([]string, 0, showGroupSize)
+
+		for s.Scan() && !common.IsDone(ctx) {
+			commitGroup = append(commitGroup, s.Text())
+
+			if len(commitGroup) == showGroupSize {
+				commitGroups <- commitGroup
+				commitGroup = make([]string, 0, showGroupSize)
+			}
+		}
+		if len(commitGroup) != 0 && !common.IsDone(ctx) {
+			commitGroups <- commitGroup
+		}
+
+		if err := s.Err(); err != nil {
+			ctx.Logger().Error(err, "error reading git log")
+		}
+	}()
+
+	return commitGroups, nil
 }
 
 func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) gitArgs {
