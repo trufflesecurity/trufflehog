@@ -1446,26 +1446,33 @@ func sourceOffset(originalData, data []byte, offset, length int) int {
 	if bytes.Equal(originalData, data) {
 		return offset
 	}
-	if !utf8.Valid(originalData) || !utf8.Valid(data) {
-		return -1
-	}
 
 	var originalOffset, dataOffset int
-	for _, diff := range diffmatchpatch.New().DiffMain(string(originalData), string(data), true) {
+	for _, diff := range diffmatchpatch.New().DiffMain(bytesAsRunes(originalData), bytesAsRunes(data), true) {
+		diffLength := utf8.RuneCountInString(diff.Text)
 		switch diff.Type {
 		case diffmatchpatch.DiffDelete:
-			originalOffset += len(diff.Text)
+			originalOffset += diffLength
 		case diffmatchpatch.DiffInsert:
-			dataOffset += len(diff.Text)
+			dataOffset += diffLength
 		case diffmatchpatch.DiffEqual:
-			if offset >= dataOffset && offset+length <= dataOffset+len(diff.Text) {
+			if offset >= dataOffset && offset+length <= dataOffset+diffLength {
 				return originalOffset + offset - dataOffset
 			}
-			originalOffset += len(diff.Text)
-			dataOffset += len(diff.Text)
+			originalOffset += diffLength
+			dataOffset += diffLength
 		}
 	}
 	return -1
+}
+
+// DiffMain replaces invalid UTF-8, so encode each source byte as one valid rune.
+func bytesAsRunes(data []byte) string {
+	runes := make([]rune, len(data))
+	for i, value := range data {
+		runes[i] = rune(value)
+	}
+	return string(runes)
 }
 
 // AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same
