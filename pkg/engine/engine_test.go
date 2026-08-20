@@ -284,6 +284,20 @@ func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
 	assert.Equal(t, int64(1), lineOffset)
 }
 
+func TestFragmentLineOffsetUsesInvalidOriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	originalData := append([]byte("heading\n\xff\n"), secret...)
+	chunk := &sources.Chunk{
+		Data:         originalData,
+		OriginalData: originalData,
+	}
+	require.NotNil(t, (&decoders.UTF8{}).FromChunk(chunk))
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
 // TestFragmentLineOffset_DuplicateSecrets verifies that when the same secret
 // appears on multiple lines within a chunk, each result receives the correct
 // line number rather than always reporting the first occurrence's line.
