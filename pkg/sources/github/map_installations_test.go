@@ -1,7 +1,6 @@
 package github
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -15,31 +14,36 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// protoEnvelope mirrors how the platform stores a scan unit: the SourceUnit
-// proto marshalled to JSON, carrying the original enumerated payload in the
-// base64 unit_data field. Reproducing it here proves RepoUnit.InstallationID
-// survives the enumerate/scan boundary (the fix for INT-790).
-func protoEnvelope(t *testing.T, kind, id, display string, payload any) []byte {
+// This is meant to track APIUnitReporter.UnitOK in scanner/cmd/scanner/pipeline.go
+// precisely
+func newMarshalledRepoUnit(t *testing.T, su sources.SourceUnit) []byte {
 	t.Helper()
-	payloadBytes, err := json.Marshal(payload)
+
+	id, kind := su.SourceUnitID()
+
+	unitData, err := json.Marshal(su)
 	require.NoError(t, err)
-	envelope := map[string]any{
+
+	out, err := json.Marshal(map[string]any{
 		"id":        id,
-		"kind":      kind,
-		"display":   display,
-		"unit_data": base64.StdEncoding.EncodeToString(payloadBytes),
-	}
-	out, err := json.Marshal(envelope)
+		"kind":      string(kind),
+		"display":   su.Display(),
+		"unit_data": unitData,
+	})
 	require.NoError(t, err)
+
 	return out
 }
 
-func TestUnmarshalSourceUnitPreservesInstallationID(t *testing.T) {
+func TestGitHub_UnmarshalSourceUnit(t *testing.T) {
 	s := &Source{}
 
-	t.Run("proto envelope with unit_data recovers installation id", func(t *testing.T) {
-		data := protoEnvelope(t, "repo", "https://github.com/spotify/backstage.git", "spotify/backstage",
-			RepoUnit{Name: "spotify/backstage", URL: "https://github.com/spotify/backstage.git", InstallationID: 2448})
+	t.Run("source unit with unit_data recovers installation id", func(t *testing.T) {
+		data := newMarshalledRepoUnit(t, RepoUnit{
+			Name:           "spotify/backstage",
+			URL:            "https://github.com/spotify/backstage.git",
+			InstallationID: 2448,
+		})
 
 		unit, err := s.UnmarshalSourceUnit(data)
 		require.NoError(t, err)
@@ -55,8 +59,7 @@ func TestUnmarshalSourceUnitPreservesInstallationID(t *testing.T) {
 		assert.EqualValues(t, "repo", kind)
 	})
 
-	t.Run("legacy proto envelope without unit_data has no installation id", func(t *testing.T) {
-		// In-flight units enumerated before the installation_id field existed.
+	t.Run("legacy source unit without unit_data has no installation id", func(t *testing.T) {
 		data, err := json.Marshal(map[string]any{
 			"id":      "https://github.com/acme/widgets.git",
 			"kind":    "repo",
@@ -76,7 +79,9 @@ func TestUnmarshalSourceUnitPreservesInstallationID(t *testing.T) {
 
 	t.Run("full enumeration payload", func(t *testing.T) {
 		data, err := json.Marshal(RepoUnit{
-			Name: "acme/widgets", URL: "https://github.com/acme/widgets.git", InstallationID: 111,
+			Name:           "acme/widgets",
+			URL:            "https://github.com/acme/widgets.git",
+			InstallationID: 111,
 		})
 		require.NoError(t, err)
 
@@ -89,8 +94,7 @@ func TestUnmarshalSourceUnitPreservesInstallationID(t *testing.T) {
 	})
 
 	t.Run("gist unit round trips", func(t *testing.T) {
-		data := protoEnvelope(t, "gist", "https://gist.github.com/abc.git", "abc",
-			GistUnit{Name: "abc", URL: "https://gist.github.com/abc.git"})
+		data := newMarshalledRepoUnit(t, GistUnit{Name: "abc", URL: "https://gist.github.com/abc.git"})
 
 		unit, err := s.UnmarshalSourceUnit(data)
 		require.NoError(t, err)
@@ -110,7 +114,7 @@ func TestUnmarshalSourceUnitPreservesInstallationID(t *testing.T) {
 // TestProcessReposEmitsInstallationID verifies that scan-all-installations
 // enumeration records the owning installation on each emitted RepoUnit, so the
 // scan job can use it directly instead of re-deriving the mapping.
-func TestProcessReposEmitsInstallationID(t *testing.T) {
+func TestGitHub_ProcessReposEmitsInstallationID(t *testing.T) {
 	ctx := context.Background()
 
 	connector := &appConnector{
@@ -162,46 +166,4 @@ func TestProcessReposEmitsInstallationID(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "https://github.com/spotify/backstage.git", repoUnit.URL)
 	assert.Equal(t, installID, repoUnit.InstallationID)
-}
-
-// TestApplyUnitInstallation is the INT-790 regression at the consumption side:
-// a unit that already carries its installation maps directly, so ChunkUnit does
-// not fall back to re-listing every installation's repos.
-func TestApplyUnitInstallation(t *testing.T) {
-	newConnector := func() *appConnector {
-		return &appConnector{installationID: 1, repoInstallationMap: make(map[string]int64)}
-	}
-	const repoURL = "https://github.com/spotify/backstage.git"
-
-	t.Run("uses the installation carried on the unit", func(t *testing.T) {
-		connector := newConnector()
-		unit := RepoUnit{Name: "spotify/backstage", URL: repoURL, InstallationID: 2448}
-
-		handled := (&Source{}).applyUnitInstallation(connector, unit, repoURL)
-
-		require.True(t, handled, "must not fall back to re-deriving the mapping")
-		id, mapped := connector.installationIDForRepo(repoURL)
-		assert.True(t, mapped)
-		assert.Equal(t, int64(2448), id)
-	})
-
-	t.Run("falls back when the unit carries no installation", func(t *testing.T) {
-		connector := newConnector()
-		unit := RepoUnit{Name: "spotify/backstage", URL: repoURL}
-
-		handled := (&Source{}).applyUnitInstallation(connector, unit, repoURL)
-
-		assert.False(t, handled)
-		_, mapped := connector.installationIDForRepo(repoURL)
-		assert.False(t, mapped, "caller must derive the mapping instead")
-	})
-
-	t.Run("falls back for non-repo units", func(t *testing.T) {
-		connector := newConnector()
-		unit := sources.CommonSourceUnit{Kind: "repo", ID: repoURL}
-
-		handled := (&Source{}).applyUnitInstallation(connector, unit, repoURL)
-
-		assert.False(t, handled)
-	})
 }
