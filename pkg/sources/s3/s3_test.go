@@ -2,6 +2,7 @@ package s3
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -237,21 +238,94 @@ func TestSource_Chunks(t *testing.T) {
 }
 
 func TestSource_UnmarshalSourceUnit(t *testing.T) {
-	s := Source{}
+	roleARN := "arn:aws:iam::123456789012:role/my-role"
 
-	unitJSON := `{
-		"Bucket": "my-test-bucket",
-		"Role": "my-test-role"
-	}`
+	// envelope mirrors the JSON shape thog persists between the enumerate and
+	// scan passes: the SourceUnit proto marshalled with encoding/json, where
+	// unit_data (if present) is the original unit as base64-encoded bytes.
+	type envelope struct {
+		ID       string `json:"id"`
+		Kind     string `json:"kind,omitempty"`
+		Display  string `json:"display,omitempty"`
+		UnitData string `json:"unit_data,omitempty"`
+	}
 
-	unit, err := s.UnmarshalSourceUnit([]byte(unitJSON))
-	require.NoError(t, err, "UnmarshalSourceUnit should not return an error")
+	marshalEnvelope := func(t *testing.T, id string, kind string, unit *S3SourceUnit) []byte {
+		t.Helper()
+		env := envelope{ID: id, Kind: kind, Display: id}
+		if unit != nil {
+			raw, err := json.Marshal(unit)
+			require.NoError(t, err)
+			env.UnitData = base64.StdEncoding.EncodeToString(raw)
+		}
+		data, err := json.Marshal(env)
+		require.NoError(t, err)
+		return data
+	}
 
-	s3Unit, ok := unit.(S3SourceUnit)
-	require.True(t, ok, "Unmarshaled unit should be of type S3SourceUnit")
+	tests := []struct {
+		name     string
+		data     []byte
+		wantUnit S3SourceUnit
+		wantErr  bool
+	}{
+		{
+			name:     "bare unit, role-bearing ARN",
+			data:     []byte(`{"Bucket":"my-test-bucket","Role":"` + roleARN + `"}`),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN},
+		},
+		{
+			name:     "bare unit, role-less",
+			data:     []byte(`{"Bucket":"my-test-bucket"}`),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket"},
+		},
+		{
+			name: "envelope with unit_data, role-bearing",
+			data: marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", roleARN), "bucket",
+				&S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN}),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN},
+		},
+		{
+			name: "envelope with unit_data, role-less",
+			data: marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", ""), "bucket",
+				&S3SourceUnit{Bucket: "my-test-bucket"}),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket"},
+		},
+		{
+			name:     "envelope without unit_data, role-bearing, rebuilt from id",
+			data:     marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", roleARN), "bucket", nil),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN},
+		},
+		{
+			name:     "envelope without unit_data, role-less, rebuilt from id",
+			data:     marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", ""), "bucket", nil),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket"},
+		},
+		{
+			// A CommonSourceUnit-shaped bare unit from another source also has
+			// an "id" field; only S3's own "bucket" kind may trigger the
+			// envelope id-rebuild path, or this would be misread as a bucket.
+			name:    "bare unit from another source is rejected, not misread as an envelope",
+			data:    []byte(`{"kind":"repository","id":"some-repo-id"}`),
+			wantErr: true,
+		},
+	}
 
-	assert.Equal(t, "my-test-bucket", s3Unit.Bucket, "Bucket field should match")
-	assert.Equal(t, "my-test-role", s3Unit.Role, "Role field should match")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+			unit, err := s.UnmarshalSourceUnit(tt.data)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err, "UnmarshalSourceUnit should not return an error")
+
+			s3Unit, ok := unit.(S3SourceUnit)
+			require.True(t, ok, "Unmarshaled unit should be of type S3SourceUnit")
+			assert.Equal(t, tt.wantUnit, s3Unit)
+		})
+	}
 }
 
 func TestSource_ObjectLink(t *testing.T) {

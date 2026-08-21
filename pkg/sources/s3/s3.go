@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -850,7 +851,27 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	return nil
 }
 
+// It accepts three shapes: the persisted envelope carrying unit_data
+// (round-trips the unit exactly), the envelope without unit_data (rebuilt from id),
+// and a bare S3SourceUnit.
 func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	var envelope unitEnvelope
+	if err := json.Unmarshal(data, &envelope); err == nil && envelope.Kind == string(SourceUnitKindBucket) {
+		if envelope.UnitData != "" {
+			if decoded, err := base64.StdEncoding.DecodeString(envelope.UnitData); err == nil {
+				var unit S3SourceUnit
+				if json.Unmarshal(decoded, &unit) == nil && unit.Bucket != "" {
+					return unit, nil
+				}
+			}
+		}
+		if envelope.ID != "" {
+			if role, bucket := splitS3SourceUnitID(envelope.ID); bucket != "" {
+				return S3SourceUnit{Bucket: bucket, Role: role}, nil
+			}
+		}
+	}
+
 	var unit S3SourceUnit
 	if err := json.Unmarshal(data, &unit); err != nil {
 		return nil, err
