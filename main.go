@@ -37,6 +37,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	gitSource "github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcache"
@@ -882,8 +883,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if isPreCommitHook() {
 			ctx.Logger().Info("Running as a pre-commit hook, overriding default flags for hook context")
 
-			// Override git configuration for pre-commit hook context
-			gitCfg.TrustLocalGitConfig = true
+			// Override git configuration for pre-commit hook context.
+			// Probe whether go-git can open the repo directly; if not (e.g. the repo
+			// uses extensions.worktreeConfig or extensions.reftable), fall back to
+			// a clone which strips unsupported extensions.
+			// See: https://github.com/trufflesecurity/trufflehog/issues/5181
+			gitCfg.TrustLocalGitConfig = gitSource.CanTrustLocalGitConfig(*gitScanURI)
 			gitCfg.BaseRef = "HEAD" // Only scan staged changes
 
 			// Override result filters for pre-commit hook context

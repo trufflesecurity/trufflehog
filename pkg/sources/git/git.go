@@ -410,6 +410,22 @@ func RepoFromPath(path string) (*git.Repository, error) {
 	return git.PlainOpenWithOptions(path, options)
 }
 
+// CanTrustLocalGitConfig probes whether go-git can open the repo at uriString
+// directly. Returns true only for file:// URIs that go-git can open without
+// error; false for remote URIs, missing repos, or unsupported formats (e.g.
+// extensions.worktreeConfig, extensions.reftable). When false, PrepareRepo
+// falls back to a clone which strips unsupported extensions.
+func CanTrustLocalGitConfig(uriString string) bool {
+	uri, err := GitURLParse(uriString)
+	if err != nil || uri.Scheme != "file" {
+		return false
+	}
+	// Build the path exactly as PrepareRepo does for the trusted branch, so the
+	// probe opens the same path the scan will.
+	_, err = RepoFromPath(fmt.Sprintf("%s%s", uri.Host, uri.Path))
+	return err == nil
+}
+
 func CleanOnError(err *error, path string) {
 	if *err != nil {
 		_ = os.RemoveAll(path)

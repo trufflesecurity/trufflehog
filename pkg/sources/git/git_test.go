@@ -884,6 +884,38 @@ func TestChunkUnit(t *testing.T) {
 	assert.Equal(t, 0, len(reporter.ChunkErrs))
 }
 
+func TestCanTrustLocalGitConfig(t *testing.T) {
+	normalRepo := setupTestRepo(t, "normal")
+	worktreeConfigRepo := setupTestRepo(t, "worktree-config")
+	for _, args := range [][]string{
+		{"-C", worktreeConfigRepo, "config", "core.repositoryformatversion", "1"},
+		{"-C", worktreeConfigRepo, "config", "extensions.worktreeConfig", "true"},
+	} {
+		if output, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+	}
+
+	tests := []struct {
+		name string
+		uri  string
+		want bool
+	}{
+		{name: "worktree config repo", uri: "file://" + worktreeConfigRepo, want: false},
+		{name: "normal repo", uri: "file://" + normalRepo, want: true},
+		{name: "non-existent path", uri: "file://" + filepath.Join(t.TempDir(), "missing"), want: false},
+		{name: "remote URI", uri: "https://github.com/trufflesecurity/trufflehog.git", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CanTrustLocalGitConfig(tt.uri); got != tt.want {
+				t.Fatalf("CanTrustLocalGitConfig(%q) = %v, want %v", tt.uri, got, tt.want)
+			}
+		})
+	}
+}
+
 func setupTestRepo(t *testing.T, repoName string) string {
 	tempDir := t.TempDir()
 	repoPath := filepath.Join(tempDir, repoName)
