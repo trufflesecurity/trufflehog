@@ -505,6 +505,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mux"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myfreshworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neon"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nethunt"
 	netlifyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v1"
 	netlifyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v2"
@@ -1425,6 +1426,7 @@ func buildDetectorList() []detectors.Detector {
 		&myintervals.Scanner{},
 		// &nasdaqdatalink.Scanner{},
 		&nethunt.Scanner{},
+		&neon.Scanner{},
 		&netlifyv1.Scanner{},
 		&netlifyv2.Scanner{},
 		&netsuite.Scanner{},
@@ -1892,6 +1894,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		case *solarwindsobservability.Scanner:
 			return !feature.SolarwindsDetectorEnabled.Load()
+		case *neon.Scanner:
+			return !feature.NeonDetectorEnabled.Load()
 		default:
 			return false
 		}

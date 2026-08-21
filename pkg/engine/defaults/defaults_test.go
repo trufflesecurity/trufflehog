@@ -151,6 +151,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_NewRelicInsightsQueryKey:  {},
 	detector_typepb.DetectorType_NewRelicMobileAppToken:    {},
 	detector_typepb.DetectorType_SolarWindsObservability:   {},
+	detector_typepb.DetectorType_Neon:                      {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()

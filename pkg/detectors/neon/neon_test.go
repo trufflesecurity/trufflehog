@@ -1,0 +1,172 @@
+package neon
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+)
+
+const sampleKey = "napi_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV"
+
+func TestNeon_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "typical assignment",
+			input: `NEON_API_KEY="` + sampleKey + `"`,
+			want:  []string{sampleKey},
+		},
+		{
+			name:  "bearer header",
+			input: "Authorization: Bearer " + sampleKey,
+			want:  []string{sampleKey},
+		},
+		{
+			name: "xml secret",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+					<scope>GLOBAL</scope>
+					<id>{neon}</id>
+					<secret>{AQAAABAAA ` + sampleKey + `}</secret>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{sampleKey},
+		},
+		{
+			name:  "too short after prefix",
+			input: "napi_shortkey",
+			want:  nil,
+		},
+		{
+			name:  "invalid pattern",
+			input: `NEON_API_KEY="not-a-neon-key-abcdefghijklmnopqrstuvwxyz"`,
+			want:  nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if test.want == nil {
+				results, err := d.FromData(context.Background(), false, []byte(test.input))
+				require.NoError(t, err)
+				require.Empty(t, results)
+				return
+			}
+			if len(matchedDetectors) == 0 {
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
+				return
+			}
+
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			require.NoError(t, err)
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				actual[string(r.Raw)] = struct{}{}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestNeon_Verify(t *testing.T) {
+	tests := []struct {
+		name                string
+		s                   Scanner
+		input               string
+		wantVerified        bool
+		wantVerificationErr bool
+		wantExtra           map[string]string
+	}{
+		{
+			name: "verified account key",
+			s: Scanner{client: common.ConstantResponseHttpClient(200, `{
+				"projects": [{"id": "orange-mode-123"}, {"id": "purple-shape-456"}]
+			}`)},
+			input:        `NEON_API_KEY=` + sampleKey,
+			wantVerified: true,
+			wantExtra: map[string]string{
+				"rotation_guide": rotationGuide,
+				"scope":          "account",
+				"project_count":  "2",
+			},
+		},
+		{
+			name:         "verified project-scoped key",
+			s:            Scanner{client: common.ConstantResponseHttpClient(403, `{"message":"forbidden"}`)},
+			input:        `NEON_API_KEY=` + sampleKey,
+			wantVerified: true,
+			wantExtra: map[string]string{
+				"rotation_guide": rotationGuide,
+				"scope":          "project",
+			},
+		},
+		{
+			name:         "invalid key",
+			s:            Scanner{client: common.ConstantResponseHttpClient(401, `{"message":"unauthorized"}`)},
+			input:        `NEON_API_KEY=` + sampleKey,
+			wantVerified: false,
+			wantExtra:    map[string]string{"rotation_guide": rotationGuide},
+		},
+		{
+			name:                "unexpected status",
+			s:                   Scanner{client: common.ConstantResponseHttpClient(404, "")},
+			input:               `NEON_API_KEY=` + sampleKey,
+			wantVerified:        false,
+			wantVerificationErr: true,
+			wantExtra:           map[string]string{"rotation_guide": rotationGuide},
+		},
+		{
+			name:                "timeout",
+			s:                   Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			input:               `NEON_API_KEY=` + sampleKey,
+			wantVerified:        false,
+			wantVerificationErr: true,
+			wantExtra:           map[string]string{"rotation_guide": rotationGuide},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := test.s.FromData(context.Background(), true, []byte(test.input))
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+
+			got := results[0]
+			require.Equal(t, detector_typepb.DetectorType_Neon, got.DetectorType)
+			require.Equal(t, "Neon", got.DetectorType.String())
+			require.Equal(t, sampleKey, string(got.Raw))
+			require.Equal(t, map[string]string{"key": sampleKey}, got.SecretParts)
+			require.Equal(t, test.wantVerified, got.Verified)
+			if test.wantVerificationErr {
+				require.Error(t, got.VerificationError())
+			} else {
+				require.NoError(t, got.VerificationError())
+			}
+			if diff := cmp.Diff(test.wantExtra, got.ExtraData); diff != "" {
+				t.Errorf("%s ExtraData diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
