@@ -233,6 +233,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectlanguage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dfuse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diffbot"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/difydataset"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diggernaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceantoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceanv2"
@@ -1140,6 +1141,7 @@ func buildDetectorList() []detectors.Detector {
 		&detectlanguage.Scanner{},
 		&dfuse.Scanner{},
 		&diffbot.Scanner{},
+		&difydataset.Scanner{},
 		&diggernaut.Scanner{},
 		&digitaloceantoken.Scanner{},
 		&digitaloceanv2.Scanner{},
@@ -1892,6 +1894,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		case *solarwindsobservability.Scanner:
 			return !feature.SolarwindsDetectorEnabled.Load()
+		case *difydataset.Scanner:
+			return !feature.DifyDatasetDetectorEnabled.Load()
 		default:
 			return false
 		}
