@@ -176,6 +176,38 @@ func TestGithubTokenType_MappingMatchesKeyPatExactly(t *testing.T) {
 	}
 }
 
+// TestTokenTypesByPrefix_RowsAreWellFormed checks each row in
+// tokenTypesByPrefix in isolation, independent of keyPat. The tests above
+// confirm the map's keys line up with keyPat; none of them would catch a
+// malformed row added alongside a correct key — e.g. a copy-pasted value
+// that leaves two different prefixes describing the same token type, or a
+// blank value that silently degrades a finding.
+func TestTokenTypesByPrefix_RowsAreWellFormed(t *testing.T) {
+	const unknown = "Unknown GitHub token"
+
+	seenValues := make(map[string]string, len(tokenTypesByPrefix)) // value -> first prefix that used it
+
+	for prefix, tokenType := range tokenTypesByPrefix {
+		if prefix == "" {
+			t.Error("tokenTypesByPrefix has an empty-string prefix key")
+		}
+		if !strings.HasSuffix(prefix, "_") {
+			t.Errorf("prefix %q does not end in \"_\"; githubTokenType matches by strings.HasPrefix, so a bare prefix can match unrelated tokens", prefix)
+		}
+		if strings.TrimSpace(tokenType) == "" {
+			t.Errorf("prefix %q maps to an empty or blank token type", prefix)
+		}
+		if tokenType == unknown {
+			t.Errorf("prefix %q maps to the reserved fallback value %q; a real row must not collide with it", prefix, unknown)
+		}
+		if other, dup := seenValues[tokenType]; dup {
+			t.Errorf("prefixes %q and %q both map to token type %q; each prefix must describe a distinct credential", prefix, other, tokenType)
+		} else {
+			seenValues[tokenType] = prefix
+		}
+	}
+}
+
 // TestGithubTokenType_EveryKeyPatPrefixResolves closes the loop end to end:
 // build a token for each prefix keyPat actually accepts, confirm keyPat
 // matches it, and confirm githubTokenType resolves it to something other than
