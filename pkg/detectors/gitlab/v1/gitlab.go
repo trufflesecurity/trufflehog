@@ -30,7 +30,7 @@ var (
 )
 
 func (Scanner) Version() int          { return 1 }
-func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
+func (Scanner) CloudEndpoints() []string { return []string{"https://gitlab.com"} }
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -79,7 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		for _, endpoint := range s.Endpoints() {
+		for _, endpoint := range s.Endpoints(nil) {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Gitlab,
 				Raw:          []byte(resMatch),

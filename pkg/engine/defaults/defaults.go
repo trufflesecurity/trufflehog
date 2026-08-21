@@ -1914,7 +1914,7 @@ func DefaultDetectors() []detectors.Detector {
 		customizer.UseFoundEndpoints(true)
 		customizer.UseCloudEndpoint(true)
 		if cloudProvider, ok := d.(detectors.CloudProvider); ok {
-			customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
+			customizer.SetCloudEndpoints(cloudProvider.CloudEndpoints()...)
 		}
 	}
 

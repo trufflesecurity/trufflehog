@@ -12,7 +12,7 @@ import (
 
 func TestGitLab_Pattern(t *testing.T) {
 	d := Scanner{}
-	d.SetCloudEndpoint("https://gitlab.com")
+	d.SetCloudEndpoints("https://gitlab.com")
 	d.UseCloudEndpoint(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 

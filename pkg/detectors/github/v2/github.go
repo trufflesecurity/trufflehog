@@ -25,7 +25,7 @@ var _ detectors.CloudProvider = (*Scanner)(nil)
 func (s Scanner) Version() int {
 	return 2
 }
-func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
+func (Scanner) CloudEndpoints() []string { return []string{"https://api.github.com"} }
 
 var (
 	// Oauth token

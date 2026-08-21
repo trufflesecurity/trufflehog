@@ -37,7 +37,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"hvb."}
 }
 
-func (Scanner) CloudEndpoint() string { return "" }
+func (Scanner) CloudEndpoints() []string { return nil }
 
 func (s Scanner) Description() string {
 	return "This detector detects and verifies HashiCorp Vault batch tokens"
@@ -74,7 +74,7 @@ func (s Scanner) FromData(
 		endpoints = append(endpoints, endpoint)
 	}
 
-	for _, endpoint := range s.Endpoints(endpoints...) {
+	for _, endpoint := range s.Endpoints(endpoints) {
 		for token := range uniqueTokens {
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_HashiCorpVaultBatchToken,

@@ -157,7 +157,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.s.UseCloudEndpoint(true)
-			tt.s.SetCloudEndpoint(tt.s.CloudEndpoint())
+			tt.s.SetCloudEndpoints(tt.s.CloudEndpoints()...)
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Gitlab.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -266,7 +266,7 @@ func TestGitlabV3_FromChunk_WithV1Secrets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.s.SetCloudEndpoint("https://gitlab.com")
+			tt.s.SetCloudEndpoints("https://gitlab.com")
 			tt.s.UseCloudEndpoint(true)
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
