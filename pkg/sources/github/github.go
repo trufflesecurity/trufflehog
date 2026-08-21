@@ -2501,14 +2501,14 @@ func (s *Source) scanCommitMetadata(ctx context.Context, apiClient *github.Clien
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	repoURL, _ := unit.SourceUnitID()
+	repoURL, kind := unit.SourceUnitID()
 	ctx = context.WithValue(ctx, "repo", repoURL)
 
 	// If the unit has an installation ID, use it. Fetching it is slow,
 	// specifically it stalls large multi-org scans on rate limits (INT-790).
 
 	// [CG] This is pretty ugly; if you can clean it up please do (I failed).
-	if ac, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations {
+	if ac, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations && kind == "repo" {
 		if ru, ok := unit.(RepoUnit); ok && ru.InstallationID > 0 {
 			ac.setRepoInstallationForRepoName(repoURL, ru.Name, ru.InstallationID)
 		} else if err := s.mapReposToInstallations(ctx, ac, []string{repoURL}); err != nil {
