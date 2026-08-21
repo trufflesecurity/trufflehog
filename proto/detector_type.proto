@@ -1071,5 +1071,5 @@ enum DetectorType {
   NewRelicInsightsQueryKey = 1067;
   NewRelicMobileAppToken = 1068;
   SolarWindsObservability = 1069;
-  Cohere = 1070;
+  Cohere = 1071;
 }
