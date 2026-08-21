@@ -65,9 +65,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, extraData, verificationErr := verifyMatch(ctx, s.getClient(), match)
+			isVerified, verificationErr := verifyMatch(ctx, s.getClient(), match)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, match)
 		}
 
@@ -82,13 +81,13 @@ type cozeAPIResponse struct {
 	Msg  string `json:"msg"`
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	var lastErr error
 
 	for _, base := range apiBases {
-		verified, extra, err := verifyAgainstBase(ctx, client, base, token)
+		verified, err := verifyAgainstBase(ctx, client, base, token)
 		if verified {
-			return true, extra, nil
+			return true, nil
 		}
 		if err != nil {
 			lastErr = err
@@ -97,23 +96,23 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		// Determinate auth failure on this host — try the other region before giving up.
 	}
 
-	return false, nil, lastErr
+	return false, lastErr
 }
 
-func verifyAgainstBase(ctx context.Context, client *http.Client, base, token string) (bool, map[string]string, error) {
+func verifyAgainstBase(ctx context.Context, client *http.Client, base, token string) (bool, error) {
 	// List workspaces is a lightweight, non-destructive call that authenticates the PAT.
 	// Docs: https://www.coze.com/docs/developer_guides/list_workspace
 	url := base + "/v1/workspaces?page_num=1&page_size=1"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -122,7 +121,7 @@ func verifyAgainstBase(ctx context.Context, client *http.Client, base, token str
 
 	body, err := io.ReadAll(io.LimitReader(res.Body, 4096))
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 
 	var apiRes cozeAPIResponse
@@ -130,22 +129,19 @@ func verifyAgainstBase(ctx context.Context, client *http.Client, base, token str
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, map[string]string{"api_base": base}, nil
+		return true, nil
 	case http.StatusForbidden:
 		// Code 4101 means the token authenticated but lacks the listWorkspace permission.
 		// That is still a live credential.
 		if apiRes.Code == 4101 {
-			return true, map[string]string{
-				"api_base":            base,
-				"permission_required": "listWorkspace",
-			}, nil
+			return true, nil
 		}
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d from %s", res.StatusCode, base)
+		return false, fmt.Errorf("unexpected HTTP response status %d from %s", res.StatusCode, base)
 	case http.StatusUnauthorized:
 		// Code 4100: authentication is invalid for this host.
-		return false, nil, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d from %s", res.StatusCode, base)
+		return false, fmt.Errorf("unexpected HTTP response status %d from %s", res.StatusCode, base)
 	}
 }
 
