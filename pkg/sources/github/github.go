@@ -2514,8 +2514,6 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		} else if err := s.mapReposToInstallations(ctx, ac, []string{repoURL}); err != nil {
 			return err
 		}
-	} else if err := s.mapReposToInstallations(ctx, ac, []string{repoURL}); err != nil {
-		return err
 	}
 
 	// ChunkUnit is not guaranteed to be called from Enumerate, so we must

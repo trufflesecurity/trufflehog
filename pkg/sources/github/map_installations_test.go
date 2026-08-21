@@ -111,9 +111,7 @@ func TestGitHub_UnmarshalSourceUnit(t *testing.T) {
 	})
 }
 
-// TestProcessReposEmitsInstallationID verifies that scan-all-installations
-// enumeration records the owning installation on each emitted RepoUnit, so the
-// scan job can use it directly instead of re-deriving the mapping.
+// Ensure we store installation IDs when enumerating
 func TestGitHub_ProcessReposEmitsInstallationID(t *testing.T) {
 	ctx := context.Background()
 
