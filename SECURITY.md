@@ -9,7 +9,7 @@ Truffle Security treats blind SSRF (the ability to induce outbound requests with
 - Internal Exploitation: Using a blind request to trigger secondary vulnerabilities (e.g. RCE) on restricted internal services configured for defense-in-depth.
 
 **Hardening (No CVE):** We generally will not issue a CVE for:
-- Reflected Payloads: Inducing a request to an attacker-controlled URL that was already present in the scanned source code (i.e., the attacker receiving their own data back).
+- Reflected Payloads: Inducing a request to an attacker-controlled URL by inserting a URL into the scan input (i.e., the attacker receiving data back that they already had access to).
 - Basic Outbound Control: Demonstrating control over the request URL, Path, or Body, without demonstrating a path to credential leakage or internal system exploitation.
 - Service Probing: Simple open/closed port verification or basic interaction with internal services (e.g., triggering a GET request to a local web server) without a demonstrated compromise of data or system integrity.
 - Secondary Vulnerability Dependencies: Where the impact relies entirely on the pre-existing lack of authentication, misconfiguration, or known vulnerabilities of a third-party internal service.
