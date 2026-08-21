@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -176,12 +177,40 @@ func TestGithubTokenType_MappingMatchesKeyPatExactly(t *testing.T) {
 	}
 }
 
+// assertNoBlankFields checks that v is not a blank string, or — if v is a
+// struct — that none of its exported fields are blank strings. It exists so
+// that if a row's value type grows a second field (tokenTypesByPrefix held a
+// {TokenType, Remediation} struct before remediation was removed, and could
+// again), row validation below catches an unset field automatically instead
+// of depending on someone remembering to add a field-specific check.
+func assertNoBlankFields(t *testing.T, label string, v reflect.Value) {
+	t.Helper()
+
+	switch v.Kind() {
+	case reflect.String:
+		if strings.TrimSpace(v.String()) == "" {
+			t.Errorf("%s: blank value", label)
+		}
+	case reflect.Struct:
+		vt := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := vt.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			assertNoBlankFields(t, label+"."+field.Name, v.Field(i))
+		}
+	default:
+		t.Fatalf("%s: assertNoBlankFields does not know how to validate kind %s; extend the helper for the new row type", label, v.Kind())
+	}
+}
+
 // TestTokenTypesByPrefix_RowsAreWellFormed checks each row in
 // tokenTypesByPrefix in isolation, independent of keyPat. The tests above
 // confirm the map's keys line up with keyPat; none of them would catch a
 // malformed row added alongside a correct key — e.g. a copy-pasted value
 // that leaves two different prefixes describing the same token type, or a
-// blank value that silently degrades a finding.
+// field left blank.
 func TestTokenTypesByPrefix_RowsAreWellFormed(t *testing.T) {
 	const unknown = "Unknown GitHub token"
 
@@ -194,9 +223,7 @@ func TestTokenTypesByPrefix_RowsAreWellFormed(t *testing.T) {
 		if !strings.HasSuffix(prefix, "_") {
 			t.Errorf("prefix %q does not end in \"_\"; githubTokenType matches by strings.HasPrefix, so a bare prefix can match unrelated tokens", prefix)
 		}
-		if strings.TrimSpace(tokenType) == "" {
-			t.Errorf("prefix %q maps to an empty or blank token type", prefix)
-		}
+		assertNoBlankFields(t, prefix, reflect.ValueOf(tokenType))
 		if tokenType == unknown {
 			t.Errorf("prefix %q maps to the reserved fallback value %q; a real row must not collide with it", prefix, unknown)
 		}
