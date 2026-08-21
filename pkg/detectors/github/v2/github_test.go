@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -113,20 +115,91 @@ func TestGithubTokenType(t *testing.T) {
 	}
 }
 
-// TestGithubTokenType_KeyPatPrefixesCovered guards against drift: every
-// prefix matched by keyPat must have an entry in tokenTypesByPrefix, so a new
-// token format added to the regex doesn't silently fall back to "Unknown
-// GitHub token".
-func TestGithubTokenType_KeyPatPrefixesCovered(t *testing.T) {
-	keyPatPrefixes := []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"}
+// prefixAlternationPat pulls the prefix alternation out of keyPat's source,
+// e.g. `(?:ghp|gho|ghu|ghs|ghr|github_pat)_` -> `ghp|gho|ghu|ghs|ghr|github_pat`.
+var prefixAlternationPat = regexp.MustCompile(`\(\?:([a-zA-Z0-9_|]+)\)_`)
 
-	for _, prefix := range keyPatPrefixes {
-		if _, ok := tokenTypesByPrefix[prefix]; !ok {
-			t.Errorf("keyPat prefix %q has no entry in tokenTypesByPrefix", prefix)
+// keyPatPrefixes derives the token prefixes directly from keyPat's own source
+// rather than from a hand-maintained list. If the two disagree, the regex is
+// the authority — it is what actually decides whether a token is matched at
+// all.
+func keyPatPrefixes(t *testing.T) []string {
+	t.Helper()
+
+	m := prefixAlternationPat.FindStringSubmatch(keyPat.String())
+	if m == nil {
+		t.Fatalf("could not find a prefix alternation group in keyPat: %s\n"+
+			"keyPat's shape changed; update prefixAlternationPat to match, or this "+
+			"drift guard is silently testing nothing.", keyPat.String())
+	}
+
+	var prefixes []string
+	for _, alt := range strings.Split(m[1], "|") {
+		prefixes = append(prefixes, alt+"_")
+	}
+	return prefixes
+}
+
+// TestGithubTokenType_MappingMatchesKeyPatExactly is the drift guard: it
+// derives the prefix set from keyPat itself rather than a hand-maintained
+// list, so a seventh prefix added to keyPat and forgotten in the map cannot
+// slip past silently — the regex and the map cannot diverge without a
+// failure.
+//
+// This matters more than a normal mapping test: an unmapped prefix does not
+// crash, it silently reports "Unknown GitHub token", which puts a responder
+// back in the position this detector change exists to fix — holding a real
+// leaked credential with no idea how to revoke it.
+func TestGithubTokenType_MappingMatchesKeyPatExactly(t *testing.T) {
+	prefixes := keyPatPrefixes(t)
+
+	if len(prefixes) == 0 {
+		t.Fatal("derived zero prefixes from keyPat; the guard is not testing anything")
+	}
+
+	fromKeyPat := make(map[string]bool, len(prefixes))
+	for _, p := range prefixes {
+		fromKeyPat[p] = true
+		if _, ok := tokenTypesByPrefix[p]; !ok {
+			t.Errorf("keyPat matches prefix %q but tokenTypesByPrefix has no entry for it; "+
+				"a leaked token with this prefix would be reported as %q",
+				p, "Unknown GitHub token")
 		}
 	}
 
-	if len(tokenTypesByPrefix) != len(keyPatPrefixes) {
-		t.Errorf("tokenTypesByPrefix has %d entries, expected %d to match keyPat prefixes exactly", len(tokenTypesByPrefix), len(keyPatPrefixes))
+	// The reverse direction: a mapping entry for a prefix keyPat cannot match is
+	// dead weight, and usually means a prefix was renamed in one place only.
+	for p := range tokenTypesByPrefix {
+		if !fromKeyPat[p] {
+			t.Errorf("tokenTypesByPrefix has an entry for %q, but keyPat never matches that prefix", p)
+		}
+	}
+}
+
+// TestGithubTokenType_EveryKeyPatPrefixResolves closes the loop end to end:
+// build a token for each prefix keyPat actually accepts, confirm keyPat
+// matches it, and confirm githubTokenType resolves it to something other than
+// the unknown fallback. The two tests above check the data structures agree;
+// this one checks the behaviour they produce is correct for every real input.
+func TestGithubTokenType_EveryKeyPatPrefixResolves(t *testing.T) {
+	const unknown = "Unknown GitHub token"
+
+	for _, prefix := range keyPatPrefixes(t) {
+		t.Run(prefix, func(t *testing.T) {
+			token := prefix + strings.Repeat("a", 36)
+
+			if !keyPat.MatchString(token) {
+				t.Fatalf("keyPat does not match %q built from its own prefix alternation; "+
+					"the derived prefix is wrong or keyPat's body changed", token)
+			}
+
+			got := githubTokenType(token)
+			if got == unknown {
+				t.Errorf("githubTokenType(%q) = %q; every prefix keyPat matches must resolve to a real type", token, got)
+			}
+			if got == "" {
+				t.Errorf("githubTokenType(%q) returned an empty type", token)
+			}
+		})
 	}
 }
