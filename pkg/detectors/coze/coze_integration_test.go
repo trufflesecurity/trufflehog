@@ -59,6 +59,7 @@ func TestCoze_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     true,
 					Raw:          []byte(activeToken),
+					SecretParts:  map[string]string{"key": activeToken},
 				},
 			},
 		},
@@ -75,6 +76,7 @@ func TestCoze_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     false,
 					Raw:          []byte(activeToken),
+					SecretParts:  map[string]string{"key": activeToken},
 				},
 			},
 			wantVerificationErr: true,
@@ -92,6 +94,7 @@ func TestCoze_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     false,
 					Raw:          []byte(activeToken),
+					SecretParts:  map[string]string{"key": activeToken},
 				},
 			},
 			wantVerificationErr: true,
@@ -109,6 +112,7 @@ func TestCoze_FromData(t *testing.T) {
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     false,
 					Raw:          []byte(inactiveToken),
+					SecretParts:  map[string]string{"key": inactiveToken},
 				},
 			},
 		},
@@ -144,18 +148,9 @@ func TestCoze_FromData(t *testing.T) {
 				}
 			}
 
-			ignoreOpts := cmpopts.IgnoreFields(
-				detectors.Result{},
-				"ExtraData",
-				"verificationError",
-				"primarySecret",
-				"SecretParts",
-				"Redacted",
-				"chunkOffset",
-				"chunkOffsetSet",
-			)
-
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Redacted", "verificationError")
+			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("Coze.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
