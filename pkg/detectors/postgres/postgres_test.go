@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -126,6 +128,104 @@ func TestPostgres_ExtraData(t *testing.T) {
 			assert.Equal(t, tt.wantUsername, r.ExtraData["username"])
 			assert.Equal(t, tt.wantDatabase, r.ExtraData["database"])
 			assert.Contains(t, r.ExtraData, "sslmode", "ExtraData[sslmode] should still be present")
+		})
+	}
+}
+
+func TestIsNeonHost(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		host string
+		want bool
+	}{
+		{host: "ep-falling-feather-aimmxil4.c-4.us-east-1.aws.neon.tech", want: true},
+		{host: "EP.NEON.TECH", want: true},
+		{host: "db.example.com", want: false},
+		{host: "neon.tech.evil.com", want: false},
+		{host: "neon.tech", want: false},
+		{host: "", want: false},
+	} {
+		t.Run(tc.host, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, isNeonHost(tc.host))
+		})
+	}
+}
+
+func TestPgxConnStringOmitsClientOnlyParams(t *testing.T) {
+	t.Parallel()
+
+	got := pgxConnString(map[string]string{
+		pgHost:       "ep-example.us-east-1.aws.neon.tech",
+		pgPort:       "5432",
+		pgUser:       "user",
+		pgPassword:   "secret",
+		pgDbname:     "neondb",
+		pgSslmode:    pgSslmodeRequire,
+		pgDbType:     "postgres",
+		pgRequiressl: "1",
+	})
+
+	assert.Contains(t, got, "host='ep-example.us-east-1.aws.neon.tech'")
+	assert.Contains(t, got, "sslmode='require'")
+	assert.NotContains(t, got, "db_type=")
+	assert.NotContains(t, got, "requiressl=")
+}
+
+func TestClassifyPostgresVerifyError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		err          error
+		dbName       string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "invalid password code",
+			err:          &pgconn.PgError{Code: "28P01", Message: "password authentication failed"},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database code",
+			err:          &pgconn.PgError{Code: "3D000", Message: `database "app" does not exist`},
+			dbName:       "app",
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "password failure by message",
+			err:          errors.New("password authentication failed for user \"x\""),
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database by message",
+			err:          errors.New(`database "postgres" does not exist`),
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "indeterminate error",
+			err:          errors.New("connection refused"),
+			wantVerified: false,
+			wantErr:      true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			verified, err := classifyPostgresVerifyError(tc.err, tc.dbName)
+			assert.Equal(t, tc.wantVerified, verified)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
