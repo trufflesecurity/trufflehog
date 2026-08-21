@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -84,5 +85,48 @@ func TestGithub_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+func TestGithubTokenType(t *testing.T) {
+	tests := []struct {
+		prefix string
+		token  string
+		want   string
+	}{
+		{"ghp_", "ghp_" + strings.Repeat("a", 36), "Personal Access Token (classic)"},
+		{"github_pat_", "github_pat_" + strings.Repeat("a", 36), "Personal Access Token (fine-grained)"},
+		{"gho_", "gho_" + strings.Repeat("a", 36), "OAuth Access Token"},
+		{"ghu_", "ghu_" + strings.Repeat("a", 36), "GitHub App User-to-Server Token"},
+		{"ghs_", "ghs_" + strings.Repeat("a", 36), "GitHub App Server-to-Server (installation) Token"},
+		{"ghr_", "ghr_" + strings.Repeat("a", 36), "GitHub App Refresh Token"},
+		{"unknown", "not_a_github_token", "Unknown GitHub token"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.prefix, func(t *testing.T) {
+			got := githubTokenType(test.token)
+			if got != test.want {
+				t.Errorf("githubTokenType(%q) = %q, want %q", test.token, got, test.want)
+			}
+		})
+	}
+}
+
+// TestGithubTokenType_KeyPatPrefixesCovered guards against drift: every
+// prefix matched by keyPat must have an entry in tokenTypesByPrefix, so a new
+// token format added to the regex doesn't silently fall back to "Unknown
+// GitHub token".
+func TestGithubTokenType_KeyPatPrefixesCovered(t *testing.T) {
+	keyPatPrefixes := []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"}
+
+	for _, prefix := range keyPatPrefixes {
+		if _, ok := tokenTypesByPrefix[prefix]; !ok {
+			t.Errorf("keyPat prefix %q has no entry in tokenTypesByPrefix", prefix)
+		}
+	}
+
+	if len(tokenTypesByPrefix) != len(keyPatPrefixes) {
+		t.Errorf("tokenTypesByPrefix has %d entries, expected %d to match keyPat prefixes exactly", len(tokenTypesByPrefix), len(keyPatPrefixes))
 	}
 }

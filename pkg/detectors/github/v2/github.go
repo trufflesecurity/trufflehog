@@ -39,31 +39,31 @@ var (
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
 
-	// tokenTypesByPrefix maps each GitHub token prefix to a human-readable type
-	// and its distinct remediation path. Each prefix identifies a materially
-	// different credential (PAT, OAuth grant, or GitHub App token) that is
-	// revoked/rotated through a different GitHub settings page.
+	// tokenTypesByPrefix maps each GitHub token prefix to a human-readable type.
+	// Each prefix identifies a materially different credential (PAT, OAuth
+	// grant, or GitHub App token) that is revoked/rotated through a different
+	// GitHub settings page.
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
-	tokenTypesByPrefix = map[string]struct{ TokenType, Remediation string }{
-		"ghp_":        {"Personal Access Token (classic)", "Revoke at https://github.com/settings/tokens"},
-		"github_pat_": {"Personal Access Token (fine-grained)", "Revoke at https://github.com/settings/personal-access-tokens"},
-		"gho_":        {"OAuth Access Token", "Revoke at https://github.com/settings/applications (Authorized OAuth Apps)"},
-		"ghu_":        {"GitHub App User-to-Server Token", "Revoke at https://github.com/settings/apps/authorizations (Authorized GitHub Apps) or uninstall at https://github.com/settings/installations"},
-		"ghs_":        {"GitHub App Server-to-Server (installation) Token", "Uninstall the GitHub App at https://github.com/settings/installations"},
-		"ghr_":        {"GitHub App Refresh Token", "Uninstall the GitHub App at https://github.com/settings/installations"},
+	tokenTypesByPrefix = map[string]string{
+		"ghp_":        "Personal Access Token (classic)",
+		"github_pat_": "Personal Access Token (fine-grained)",
+		"gho_":        "OAuth Access Token",
+		"ghu_":        "GitHub App User-to-Server Token",
+		"ghs_":        "GitHub App Server-to-Server (installation) Token",
+		"ghr_":        "GitHub App Refresh Token",
 	}
 )
 
-// githubTokenType returns the human-readable token type and remediation path
-// for a matched token, keyed off its prefix. Falls back to a generic label if
-// no known prefix matches (should not happen given keyPat, but keeps this safe).
-func githubTokenType(token string) (tokenType, remediation string) {
-	for prefix, info := range tokenTypesByPrefix {
+// githubTokenType returns the human-readable token type for a matched token,
+// keyed off its prefix. Falls back to a generic label if no known prefix
+// matches (should not happen given keyPat, but keeps this safe).
+func githubTokenType(token string) string {
+	for prefix, tokenType := range tokenTypesByPrefix {
 		if strings.HasPrefix(token, prefix) {
-			return info.TokenType, info.Remediation
+			return tokenType
 		}
 	}
-	return "Unknown GitHub token", "https://github.com/settings/security"
+	return "Unknown GitHub token"
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -82,7 +82,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		// First match is entire regex, second is the first group.
 
 		token := match[1]
-		tokenType, remediation := githubTokenType(token)
 
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Github,
@@ -90,8 +89,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
-				"token_type":     tokenType,
-				"remediation":    remediation,
+				"token_type":     githubTokenType(token),
 			},
 			SecretParts: map[string]string{"key": token},
 		}
