@@ -100,27 +100,40 @@ func TestNeon_Verify(t *testing.T) {
 		wantExtra           map[string]string
 	}{
 		{
-			name: "verified account key",
+			name: "verified personal key",
 			s: Scanner{client: common.ConstantResponseHttpClient(200, `{
-				"projects": [{"id": "orange-mode-123"}, {"id": "purple-shape-456"}]
+				"auth_method": "api_key_user",
+				"account_id": "user_01h84bfr2npa81rn8h8jzz8mx4"
 			}`)},
 			input:        `NEON_API_KEY=` + sampleKey,
 			wantVerified: true,
 			wantExtra: map[string]string{
 				"rotation_guide": rotationGuide,
-				"scope":          "account",
-				"project_count":  "2",
+				"auth_method":    "api_key_user",
+				"account_id":     "user_01h84bfr2npa81rn8h8jzz8mx4",
 			},
 		},
 		{
-			name:         "verified project-scoped key",
-			s:            Scanner{client: common.ConstantResponseHttpClient(403, `{"message":"forbidden"}`)},
+			name: "verified organization or project-scoped key",
+			s: Scanner{client: common.ConstantResponseHttpClient(200, `{
+				"auth_method": "api_key_org",
+				"account_id": "org-example-12345678"
+			}`)},
 			input:        `NEON_API_KEY=` + sampleKey,
 			wantVerified: true,
 			wantExtra: map[string]string{
 				"rotation_guide": rotationGuide,
-				"scope":          "project",
+				"auth_method":    "api_key_org",
+				"account_id":     "org-example-12345678",
 			},
+		},
+		{
+			name:                "forbidden is indeterminate",
+			s:                   Scanner{client: common.ConstantResponseHttpClient(403, `{"message":"forbidden"}`)},
+			input:               `NEON_API_KEY=` + sampleKey,
+			wantVerified:        false,
+			wantVerificationErr: true,
+			wantExtra:           map[string]string{"rotation_guide": rotationGuide},
 		},
 		{
 			name:         "invalid key",

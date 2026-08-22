@@ -21,9 +21,9 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 const (
-	projectsURL    = "https://console.neon.tech/api/v2/projects"
-	rotationGuide  = "https://neon.com/docs/manage/api-keys"
-	maxProjectBody = 1 << 20
+	authURL       = "https://console.neon.tech/api/v2/auth"
+	rotationGuide = "https://neon.com/docs/manage/api-keys"
+	maxAuthBody   = 1 << 16
 )
 
 var (
@@ -77,7 +77,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, projectsURL, nil)
+	// GET /auth is Neon's whoami for the credentials on the request, including
+	// personal, organization, and project-scoped API keys.
+	// https://neon.com/docs/reference/api/users
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, authURL, nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -95,21 +98,24 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		extra := map[string]string{"scope": "account"}
-		body, err := io.ReadAll(io.LimitReader(res.Body, maxProjectBody))
+		extra := map[string]string{}
+		body, err := io.ReadAll(io.LimitReader(res.Body, maxAuthBody))
 		if err != nil {
 			return true, extra, nil
 		}
 		var payload struct {
-			Projects []json.RawMessage `json:"projects"`
+			AuthMethod string `json:"auth_method"`
+			AccountID  string `json:"account_id"`
 		}
 		if json.Unmarshal(body, &payload) == nil {
-			extra["project_count"] = fmt.Sprintf("%d", len(payload.Projects))
+			if payload.AuthMethod != "" {
+				extra["auth_method"] = payload.AuthMethod
+			}
+			if payload.AccountID != "" {
+				extra["account_id"] = payload.AccountID
+			}
 		}
 		return true, extra, nil
-	case http.StatusForbidden:
-		// Project-scoped keys cannot list every project but are still live.
-		return true, map[string]string{"scope": "project"}, nil
 	case http.StatusUnauthorized:
 		return false, nil, nil
 	default:
