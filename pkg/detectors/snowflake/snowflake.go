@@ -28,9 +28,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	// accountIdentifierPat matches Snowflake account identifiers in the format: XXXXXXX-XXXXX
 	// Example: ABC1234-EXAMPLE
-	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z-_]{1,255}(.privatelink)?)\b`)
+	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z-_]{1,255}(.privatelink)?|[a-zA-Z0-9_-]{3,255}(?:\.[a-zA-Z0-9_-]+)+\.privatelink)\b`)
 	// usernameExclusionPat defines characters that should not be present in usernames
-	usernameExclusionPat = `!@#$%^&*{}:<>,.;?()/\+=\s\n`
+	usernameExclusionPat = `#$%^&*{}:<>,.;?()/\+=\s\n`
 )
 
 const (
