@@ -10,6 +10,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 type MysqlJDBC struct {
@@ -19,6 +20,9 @@ type MysqlJDBC struct {
 var _ JDBC = (*MysqlJDBC)(nil)
 
 func (s *MysqlJDBC) ping(ctx context.Context) pingResult {
+	if hostIsLocal(s.Host) {
+		return pingResult{detectors.ErrNoLocalIP, true}
+	}
 	return ping(ctx, "mysql", isMySQLErrorDeterminate,
 		buildMySQLConnectionString(s.Host, "", s.User, s.Password, s.Params))
 }

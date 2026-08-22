@@ -84,7 +84,7 @@ func TestJdbc_Pattern(t *testing.T) {
 			},
 		},
 		{
-			name: "trailing non-alphanumeric characters in password",
+			name:  "trailing non-alphanumeric characters in password",
 			input: `jdbc:hive9://foo.example.com:10191/default;user=MyRoleUser;password=MyPa$$w0rd...`,
 			want: []string{
 				"jdbc:hive9://foo.example.com:10191/default;user=MyRoleUser;password=MyPa$$w0rd...",
