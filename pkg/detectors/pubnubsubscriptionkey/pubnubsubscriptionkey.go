@@ -24,6 +24,8 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(sub-c-[0-9a-z]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
+
+	verifyBaseURL = "https://ps.pndsn.com"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,9 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyKey(ctx, client, resMatch)
+			isVerified, verificationErr := verifyKey(ctx, client, verifyBaseURL, resMatch)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr)
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -67,8 +69,8 @@ func (s Scanner) Description() string {
 	return "PubNub is a real-time communication platform. A PubNub Subscription Key allows access to the PubNub API for subscribing to channels and receiving messages."
 }
 
-func verifyKey(ctx context.Context, client *http.Client, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ps.pndsn.com/v2/objects/"+key+"/uuids", nil)
+func verifyKey(ctx context.Context, client *http.Client, baseURL, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/v2/objects/"+key+"/uuids", nil)
 	if err != nil {
 		return false, err
 	}
@@ -92,7 +94,8 @@ func verifyKey(ctx context.Context, client *http.Client, key string) (bool, erro
 			return false, err
 		}
 
-		if strings.Contains(string(bodyBytes), "Objects not enabled for this subscriber key.") {
+		if strings.Contains(string(bodyBytes), "Objects not enabled for this subscriber key.") ||
+			strings.Contains(string(bodyBytes), "App Context is not enabled for this subscribe key.") {
 			return true, nil
 		}
 
