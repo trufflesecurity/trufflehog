@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	aCtx "context"
 	"fmt"
 	"math/rand"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
+	"pgregory.net/rapid"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -230,6 +232,128 @@ func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
 	assert.False(t, isIgnored)
 	// offset 2 means line 3
 	assert.Equal(t, int64(2), lineOffset)
+}
+
+func TestFragmentLineOffsetUsesOriginalData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	result.SetPrimarySecretValue(`token = "synthetic-secret-value-123456"`)
+	chunk := &sources.Chunk{
+		Data:         []byte("# Date format:\n\ntoken = \"synthetic-secret-value-123456\""),
+		OriginalData: []byte("# Date format: <yyyymmdd>\n\n\n\n\ntoken = \"synthetic-secret-value-123456\""),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(5), lineOffset)
+}
+
+func TestFragmentLineOffsetFallsBackToDecodedData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	chunk := &sources.Chunk{
+		Data:         []byte("decoded header\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("encoded-source-data"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(1), lineOffset)
+}
+
+func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data:         []byte("synthetic-secret-value-123456\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("synthetic-secret-value-123456\n\nsynthetic-secret-value-123456"),
+	}
+	results := []detectors.Result{{Raw: secret}, {Raw: secret}}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	lineOffset, _ := FragmentLineOffset(chunk, &results[1])
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("heading\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("<div class=\"synthetic-secret-value-123456\">heading</div>\n" +
+			"<p>synthetic-secret-value-123456</p>"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(1), lineOffset)
+}
+
+func TestFragmentLineOffsetUsesInvalidOriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	originalData := append([]byte("heading\n\xff\n"), secret...)
+	chunk := &sources.Chunk{
+		Data:         originalData,
+		OriginalData: originalData,
+	}
+	require.NotNil(t, (&decoders.UTF8{}).FromChunk(chunk))
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+func TestFragmentLineOffsetUsesUTF8OriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data:         append([]byte("préface\n"), secret...),
+		OriginalData: append([]byte("préface\n\n"), secret...),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+func TestFragmentLineOffsetMapsInvalidOriginalDataDuplicates(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	originalData := append([]byte("\xff\n"), secret...)
+	originalData = append(originalData, '\n', 0xfe, '\n')
+	originalData = append(originalData, secret...)
+	chunk := &sources.Chunk{Data: originalData, OriginalData: originalData}
+	require.NotNil(t, (&decoders.UTF8{}).FromChunk(chunk))
+	results := []detectors.Result{{Raw: secret}, {Raw: secret}}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	lineOffset, _ := FragmentLineOffset(chunk, &results[1])
+
+	assert.Equal(t, int64(3), lineOffset)
+}
+
+func TestFragmentLineOffsetUsesOriginalDataIgnoreTag(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("synthetic-secret-value-123456\ntext"),
+		OriginalData: []byte("<p>synthetic-secret-value-123456</p>" +
+			"<div class=\"trufflehog:ignore\">text</div>"),
+	}
+
+	_, ignored := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.True(t, ignored)
+}
+
+func TestFragmentLineOffsetMapsArbitraryOriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		prefix := rapid.SliceOfN(rapid.Byte(), 0, 16).Draw(t, "prefix")
+		removed := rapid.SliceOfN(rapid.Byte(), 1, 16).Draw(t, "removed")
+		suffix := rapid.SliceOfN(rapid.Byte(), 0, 16).Draw(t, "suffix")
+		data := append(append(append(bytes.Clone(prefix), secret...), suffix...), '\n')
+		originalData := append(append(append(append(bytes.Clone(prefix), removed...), secret...), suffix...), '\n')
+		chunk := &sources.Chunk{Data: data, OriginalData: originalData}
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		assert.Equal(t, int64(bytes.Count(originalData[:len(prefix)+len(removed)], []byte{'\n'})), lineOffset)
+	})
 }
 
 // TestFragmentLineOffset_DuplicateSecrets verifies that when the same secret
