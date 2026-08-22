@@ -183,3 +183,23 @@ func TestNeon_Verify(t *testing.T) {
 		})
 	}
 }
+
+// Hits Neon's real /auth endpoint with a key that matches the pattern but is
+// not a credential. Confirms 401 is determinate-invalid, not a false verified.
+func TestNeon_LiveInvalidKey(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping live Neon API call")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	results, err := Scanner{}.FromData(ctx, true, []byte("NEON_API_KEY="+sampleKey))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	got := results[0]
+	require.Equal(t, sampleKey, string(got.Raw))
+	require.False(t, got.Verified, "a made-up napi_ key must not verify")
+	require.NoError(t, got.VerificationError(), "401 must be determinate invalid, not indeterminate")
+}
