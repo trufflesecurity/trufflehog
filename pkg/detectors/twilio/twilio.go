@@ -25,8 +25,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = detectors.NewClientWithDedup(common.RetryableHTTPClient())
-	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
-	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
+	sidPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "account", "id", "sid"}) + `\b(AC[0-9a-f]{32})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"twilio", "auth", "token", "secret", "key"}) + `\b([0-9a-f]{32})\b`)
 )
 
 type serviceResponse struct {
@@ -50,7 +50,7 @@ func (s Scanner) getClient() *http.Client {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sid", "twilio"}
+	return []string{"twilio"}
 }
 
 // FromData will find and optionally verify Twilio secrets in a given set of bytes.
@@ -58,12 +58,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	uniqueKeys := make(map[string]struct{})
-	for _, k := range keyPat.FindAllString(dataStr, -1) {
-		uniqueKeys[k] = struct{}{}
+	for _, keyMatch := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[keyMatch[1]] = struct{}{}
 	}
 	uniqueSIDs := make(map[string]struct{})
-	for _, s := range sidPat.FindAllString(dataStr, -1) {
-		uniqueSIDs[s] = struct{}{}
+	for _, sidMatch := range sidPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueSIDs[sidMatch[1]] = struct{}{}
 	}
 
 	for sid := range uniqueSIDs {
@@ -106,7 +106,7 @@ func (s Scanner) Description() string {
 func verifyTwilio(ctx context.Context, client *http.Client, key, sid string) (map[string]string, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
 	if err != nil {
-		return nil, false, nil
+		return nil, false, err
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -114,7 +114,7 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid string) (ma
 	req.SetBasicAuth(sid, key)
 	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Twilio, sid+key, req)
 	if err != nil {
-		return nil, false, nil
+		return nil, false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
