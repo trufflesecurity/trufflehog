@@ -776,6 +776,12 @@ security-secrets:
 
 In the example pipeline above, we're scanning for live secrets in all repository directories and files. This job runs only when the pipeline source is a merge request event, meaning it's triggered when a new merge request is created.
 
+## MegaLinter
+
+TruffleHog is natively embedded within [MegaLinter](https://megalinter.io), an open-source linters aggregator for CI, so you can run it together with other code quality and security tools in a single job.
+
+See the [TruffleHog page in MegaLinter documentation](https://megalinter.io/latest/descriptors/repository_trufflehog/) for more information.
+
 ## Pre-commit Hook
 
 TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
