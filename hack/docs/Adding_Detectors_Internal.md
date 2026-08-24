@@ -21,6 +21,7 @@ The purpose of Secret Detectors is to discover secrets with exceptionally high s
     - [Verification indeterminacy](#verification-indeterminacy)
     - [Managing Test Secrets](#managing-test-secrets)
     - [Setting up Google Cloud SDK](#setting-up-google-cloud-sdk)
+    - [Checking your keywords](#checking-your-keywords)
 
 ## Getting Started
 
@@ -206,3 +207,20 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
 ```bash
    go test ./pkg/detectors/<detector> -tags=detectors
    ```
+
+### Checking your keywords
+
+`Keywords()` decides how often a detector runs. Every chunk containing one is handed to the regex, so a keyword that appears in ordinary code costs the scanner on every hit whether or not it ever finds anything. The findings-count test can't surface this: a loose keyword that never matches produces zero findings, so the detector doesn't show up in the results table at all.
+
+```bash
+# structural checks, no corpus, about a second
+make keywordbench-lint TARGET=YourDetector
+
+# measure against the detector corpus
+make keywordbench CORPUS=contents.jsonl.zstd TARGET=YourDetector
+
+# compare a tighter candidate: what it costs, and whether it still finds the same secrets
+make keywordbench CORPUS=contents.jsonl.zstd TARGET=YourDetector ALT=candidate
+```
+
+The report ranks the detector against every other one on the same bytes, shows the identifiers its keywords actually landed inside, and says whether the keyword is earning its cost. `LIMIT_MB=4000` gives a stable ranking in a couple of minutes. Per-detector and per-keyword CSVs land in `keywordbench-out/` for joining against the findings table.

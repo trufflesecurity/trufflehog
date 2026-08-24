@@ -17,6 +17,7 @@ The purpose of Secret Detectors is to discover secrets with exceptionally high s
     + [Development Dependencies](#development-dependencies)
     + [Creating a new Secret Detector](#creating-a-new-secret-detector)
     + [Testing the Detector](#testing-the-detector)
+    + [Checking your keywords](#checking-your-keywords)
   * [Populating SecretParts](#populating-secretparts)
   * [Addendum](#addendum)
     + [Verification indeterminacy](#verification-indeterminacy)
@@ -129,6 +130,25 @@ To ensure the quality of your PR, make sure your tests are passing with verified
    ```
 
 If the tests are passing, feel free to open a PR!
+
+### Checking your keywords
+
+`Keywords()` is a prefilter: every chunk containing one of them is handed to your regex. A keyword that turns up in ordinary code — a short fragment, an English word — wakes your detector constantly for nothing. A findings count won't show this, because a keyword that fires often but never matches produces no findings at all.
+
+Catch the obvious problems before opening a PR:
+
+```bash
+make keywordbench-lint TARGET=YourDetector
+```
+
+To see how often the keywords really fire, point the benchmark at any large body of text. Your Go module cache works and needs no download:
+
+```bash
+find "$(go env GOMODCACHE)" -type f -name '*.go' | head -20000 |
+  xargs -d '\n' cat | ./scripts/keywordbench.sh -t YourDetector -d -l 250
+```
+
+It ranks your detector against every other one on the same bytes, so the ranking still means something on a modest corpus. Prefer something distinctive: the vendor name, or a token prefix long enough not to collide with ordinary identifiers.
 
 
 ## Populating SecretParts
