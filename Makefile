@@ -11,6 +11,8 @@ PROTOS_IMAGE ?= trufflesecurity/protos:1.22
 .PHONY: vendor
 .PHONY: dogfood
 .PHONY: man
+.PHONY: keywordbench
+.PHONY: keywordbench-lint
 
 dogfood:
 	CGO_ENABLED=0 go run . git file://. --json --log-level=2
@@ -65,6 +67,32 @@ release-protos-image:
 man:
 	@mkdir -p docs/man
 	CGO_ENABLED=0 go run . --generate-man-page > docs/man/trufflehog.1
+
+# Measures what a detector's Keywords() prefilter costs, ranked against every
+# other shipped detector. See cmd/keywordbench.
+#   make keywordbench CORPUS=contents.jsonl.zstd TARGET=Resend
+#   make keywordbench CORPUS=contents.jsonl.zstd TARGET=Resend ALT=resend LIMIT_MB=2000
+CORPUS ?=
+TARGET ?=
+ALT ?=
+LIMIT_MB ?=
+TOP ?=
+WORKERS ?=
+OUT ?= keywordbench-out
+DETECT ?= 1
+
+KWBENCH_FLAGS = $(if $(CORPUS),--corpus $(CORPUS)) $(if $(TARGET),--target $(TARGET)) \
+	$(if $(ALT),--alt $(ALT)) $(if $(LIMIT_MB),--limit-mb $(LIMIT_MB)) \
+	$(if $(TOP),--top $(TOP)) $(if $(WORKERS),--workers $(WORKERS)) \
+	$(if $(filter-out 0,$(DETECT)),--detect)
+
+keywordbench:
+	./scripts/keywordbench.sh $(KWBENCH_FLAGS) --out $(OUT) $(ARGS)
+
+# Static keyword checks only: no corpus, runs in a second. Good for a PR check.
+keywordbench-lint:
+	@test -n "$(TARGET)" || { echo "usage: make keywordbench-lint TARGET=Resend"; exit 2; }
+	CGO_ENABLED=0 go run ./cmd/keywordbench -static -target $(TARGET)
 
 test-release:
 	goreleaser release --clean --skip=publish,sign --snapshot
