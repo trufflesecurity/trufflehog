@@ -815,22 +815,30 @@ func pathFromBinaryLine(line []byte) (string, bool) {
 	if bytes.Contains(line, []byte("and /dev/null")) {
 		return "", true
 	}
+	line = bytes.TrimSuffix(line, []byte("\n"))
 
 	var (
 		path string
 		err  error
 	)
 	if _, after, ok := bytes.Cut(line, []byte(" and b/")); ok {
-		// drop the " differ\n"
-		path = string(after[:len(after)-8])
+		pathBytes, ok := bytes.CutSuffix(after, []byte(" differ"))
+		if !ok {
+			return "", false
+		}
+		path = string(pathBytes)
 	} else if _, after, ok = bytes.Cut(line, []byte(` and "b/`)); ok {
 		// Edge case where the path is quoted.
 		// https://github.com/trufflesecurity/trufflehog/issues/2384
 
-		// Drop the `" differ\n` and handle escaped characters in the path.
+		// Drop the `" differ` and handle escaped characters in the path.
 		// e.g., "\342\200\224" instead of "—".
 		// See https://github.com/trufflesecurity/trufflehog/issues/2418
-		path, err = strconv.Unquote(`"` + string(after[:len(after)-9]) + `"`)
+		pathBytes, ok := bytes.CutSuffix(after, []byte(`" differ`))
+		if !ok {
+			return "", false
+		}
+		path, err = strconv.Unquote(`"` + string(pathBytes) + `"`)
 		if err != nil {
 			return "", false
 		}
