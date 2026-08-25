@@ -2,9 +2,11 @@
 // costs on a corpus, so a new detector can be compared against the existing detector
 // population before it ships.
 //
-// The accuracy-focused scan reuses the engine's own chunker, decoders and
-// Aho-Corasick core, so the "calls" it reports are the exact number of FromData
-// invocations a production scan would make on the same bytes.
+// The scan reuses the engine's own chunker, decoders and Aho-Corasick core, so the
+// "calls" it reports are the unverified regex passes a production scan makes over
+// the same bytes. It is not the total FromData count: with verification overlap on
+// (the default), the engine re-dispatches detectors that produced results for a
+// second, verifying pass, which this deliberately does not model.
 //
 // Typical use, against the same corpus used for the regex-accuracy test:
 //

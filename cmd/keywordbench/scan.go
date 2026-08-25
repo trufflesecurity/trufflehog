@@ -64,6 +64,9 @@ type totals struct {
 	recallTotal    uint64
 
 	elapsed time.Duration
+	// sampleCapped records that a worker stopped collecting identifiers. The cap is
+	// per worker, so the size of the merged map cannot tell you this.
+	sampleCapped bool
 	// interrupted marks a partial scan, so the report can say so rather than
 	// presenting numbers that look like a completed run.
 	interrupted bool
@@ -123,6 +126,7 @@ func (t *totals) merge(o *totals) {
 	t.altVariantsHit += o.altVariantsHit
 	t.recallKept += o.recallKept
 	t.recallTotal += o.recallTotal
+	t.sampleCapped = t.sampleCapped || o.sampleCapped
 }
 
 type scanner struct {
@@ -435,17 +439,14 @@ func (w *worker) processVariant(data []byte) {
 				continue
 			}
 			for _, r := range res {
-				raw := r.Raw
-				if len(raw) == 0 {
-					raw = r.RawV2
-				}
-				if len(raw) == 0 {
+				raw := rawOf(r)
+				if raw == "" {
 					continue
 				}
 				if targetRaw == nil {
 					targetRaw = make(map[string]struct{})
 				}
-				targetRaw[string(raw)] = struct{}{}
+				targetRaw[raw] = struct{}{}
 			}
 		}
 	}
@@ -470,9 +471,30 @@ func (w *worker) processAlt(data []byte, targetRaw map[string]struct{}) {
 		}
 	}
 
+	if len(targetRaw) == 0 {
+		return
+	}
+
+	// Byte containment would only prove the secret was in range of the regex, not
+	// that the regex still returns it. Re-run the detector on the candidate's own
+	// spans instead. This only runs on variants where the current keywords already
+	// found something, so it costs almost nothing.
+	found := make(map[string]struct{}, len(targetRaw))
+	for _, span := range spans {
+		res, err := w.fromData(w.sc.target, span)
+		if err != nil {
+			continue
+		}
+		for _, r := range res {
+			if raw := rawOf(r); raw != "" {
+				found[raw] = struct{}{}
+			}
+		}
+	}
+
 	for raw := range targetRaw {
 		t.recallTotal++
-		if slices.ContainsFunc(spans, func(s []byte) bool { return bytes.Contains(s, []byte(raw)) }) {
+		if _, ok := found[raw]; ok {
 			t.recallKept++
 		}
 	}
@@ -489,10 +511,22 @@ func (w *worker) countKeywords(data []byte) {
 			w.seenKW[k] = struct{}{}
 			ks.variantsHit++
 		}
-		if _, ok := w.sc.targetKW[k]; ok && len(w.tot.samples) < maxSamples {
-			w.tot.samples[tokenAround(lower, int(m.Pos()), len(k))]++
+		if _, ok := w.sc.targetKW[k]; ok {
+			if len(w.tot.samples) < maxSamples {
+				w.tot.samples[tokenAround(lower, int(m.Pos()), len(k))]++
+			} else {
+				w.tot.sampleCapped = true
+			}
 		}
 	}
+}
+
+// rawOf returns the identifier a result is deduped on, preferring Raw.
+func rawOf(r detectors.Result) string {
+	if len(r.Raw) > 0 {
+		return string(r.Raw)
+	}
+	return string(r.RawV2)
 }
 
 // maxSamples bounds per-worker sample memory on a multi-hour run.

@@ -223,4 +223,6 @@ make keywordbench CORPUS=contents.jsonl.zstd TARGET=YourDetector
 make keywordbench CORPUS=contents.jsonl.zstd TARGET=YourDetector ALT=candidate
 ```
 
-The report ranks the detector against every other one on the same bytes, shows the identifiers its keywords actually landed inside, and says whether the keyword is earning its cost. `LIMIT_MB=4000` gives a stable ranking in a couple of minutes. Per-detector and per-keyword CSVs land in `keywordbench-out/` for joining against the findings table.
+The report ranks the detector against every other one on the same bytes, shows the identifiers its keywords actually landed inside, and says whether the keyword is earning its cost. Per-detector and per-keyword CSVs land in `keywordbench-out/` for joining against the findings table.
+
+`LIMIT_MB` is much faster than a full pass, but it truncates rather than samples: it reads a prefix of the file, and the corpus is heavy-tailed enough that a few repos dominate any slice. Two disjoint 1.2GB slices move ~12% of detectors across a cost bucket, and individual detectors swing several-fold between adjacent slices. Treat a capped run as a rough signal and the full pass as the number you quote.

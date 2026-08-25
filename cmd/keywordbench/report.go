@@ -112,10 +112,13 @@ func (r *report) rankPercentiles() {
 	}
 	slices.Sort(calls)
 
-	// Yield is only defined for detectors the prefilter actually woke.
+	// Rank yield only among detectors that found something. Including the
+	// zero-result majority would put any detector with a single finding near the
+	// top of the scale, which is how "13 findings in 801,942 calls" once read as
+	// productive.
 	var yields []float64
 	for _, rw := range r.rows {
-		if rw.calls > 0 {
+		if rw.results > 0 {
 			yields = append(yields, rw.yield)
 		}
 	}
@@ -123,7 +126,7 @@ func (r *report) rankPercentiles() {
 
 	for i := range r.rows {
 		r.rows[i].callsPctl = percentileOf(calls, r.rows[i].callsPerMB)
-		if r.rows[i].calls > 0 {
+		if r.rows[i].results > 0 {
 			r.rows[i].yieldPctl = percentileOf(yields, r.rows[i].yield)
 		}
 	}
@@ -219,7 +222,7 @@ func (r *report) renderVerdict(w io.Writer) {
 		fmtFloat(t.callsPerMB), rankPhrase(t.callsPctl, len(r.rows)))
 	tb.row("  How much corpus it re-scans\t%s\t%s of all prefilter work\n",
 		pct(t.regexLoad), pct(safeDiv(float64(t.regexBytes), float64(r.totalRegex))))
-	tb.row("  How often it is woken\t%s of chunks\t\n", pct(t.wakeRate))
+	tb.row("  How often it is woken\t%s of decoded variants\t\n", pct(t.wakeRate))
 	if r.cfg.detect {
 		tb.row("  What it found\t%s secrets in %s calls\t%s\n",
 			comma(t.results), comma(t.calls), yieldPhrase(t))
@@ -284,7 +287,7 @@ func (r *report) renderSamples(w io.Writer) {
 	}
 	tb.flush(w)
 	capped := ""
-	if len(r.tot.samples) >= maxSamples {
+	if r.tot.sampleCapped {
 		capped = ", sampling capped"
 	}
 	fmt.Fprintf(w, "\n  %s hits across %s distinct identifiers%s.\n",
@@ -365,6 +368,7 @@ func (r *report) renderRanked(w io.Writer) {
 	fmt.Fprintf(w, "\n  calls/MB is how many times a detector's regex runs per MB of corpus.\n")
 	fmt.Fprintf(w, "  re-scans is the share of the corpus its keywords hand back to the regex;\n")
 	fmt.Fprintf(w, "  it passes 100%% when the spans around separate hits overlap.\n")
+	fmt.Fprintf(w, "  wakes on is measured over decoded variants, not raw chunks.\n")
 }
 
 func (r *report) writeRow(tb *alignedTable, rank int, rw row) {
