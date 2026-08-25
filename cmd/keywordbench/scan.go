@@ -62,6 +62,9 @@ type totals struct {
 	altVariantsHit uint64
 	recallKept     uint64
 	recallTotal    uint64
+	// recallErrs counts secrets whose fate is unknown because the detector errored
+	// on the candidate's spans. Counting those as misses would slander the candidate.
+	recallErrs uint64
 
 	elapsed time.Duration
 	// sampleCapped records that a worker stopped collecting identifiers. The cap is
@@ -126,6 +129,7 @@ func (t *totals) merge(o *totals) {
 	t.altVariantsHit += o.altVariantsHit
 	t.recallKept += o.recallKept
 	t.recallTotal += o.recallTotal
+	t.recallErrs += o.recallErrs
 	t.sampleCapped = t.sampleCapped || o.sampleCapped
 }
 
@@ -480,9 +484,11 @@ func (w *worker) processAlt(data []byte, targetRaw map[string]struct{}) {
 	// spans instead. This only runs on variants where the current keywords already
 	// found something, so it costs almost nothing.
 	found := make(map[string]struct{}, len(targetRaw))
+	var failedSpans [][]byte
 	for _, span := range spans {
 		res, err := w.fromData(w.sc.target, span)
 		if err != nil {
+			failedSpans = append(failedSpans, span)
 			continue
 		}
 		for _, r := range res {
@@ -493,10 +499,19 @@ func (w *worker) processAlt(data []byte, targetRaw map[string]struct{}) {
 	}
 
 	for raw := range targetRaw {
-		t.recallTotal++
 		if _, ok := found[raw]; ok {
+			t.recallTotal++
 			t.recallKept++
+			continue
 		}
+		// Only a span that actually held the secret and then failed leaves its fate
+		// unknown. Treating every miss on the variant as unknown would let errors
+		// quietly absorb real misses.
+		if slices.ContainsFunc(failedSpans, func(sp []byte) bool { return bytes.Contains(sp, []byte(raw)) }) {
+			t.recallErrs++
+			continue
+		}
+		t.recallTotal++
 	}
 }
 

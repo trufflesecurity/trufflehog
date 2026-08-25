@@ -55,7 +55,10 @@ done
 # check, and go build needs the module root anyway.
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-args=(-csv "$out/keywordbench")
+# Outputs are written under a temporary prefix and promoted only on success, so an
+# interrupted or failed run cannot destroy the previous results.
+stamp="in-progress.$$"
+args=(-csv "$out/$stamp")
 [[ -n "$target" ]]  && args+=(-target "$target")
 [[ -n "$alt" ]]     && args+=(-alt "$alt")
 [[ -n "$limit" ]]   && args+=(-limit-mb "$limit")
@@ -106,16 +109,17 @@ fi
 
 mkdir -p "$out"
 
-# Stale outputs from a previous run would otherwise survive an interrupted one and
-# read as fresh results. Clear only the files this script writes.
-rm -f "$out/report.txt" "$out/keywordbench-detectors.csv" "$out/keywordbench-keywords.csv"
+# Write this run's outputs under a temporary prefix and promote them only once the
+# benchmark succeeds. Clearing the old files up front instead would mean an
+# interrupted or failed run destroys the previous results and leaves nothing in
+# their place.
 
 tmpdir="$(mktemp -d)"
 bin="$tmpdir/keywordbench"
 # An EXIT trap alone does not fire when bash is killed by SIGINT, which leaks the
 # built binary on every Ctrl-C.
-trap 'rm -rf "$tmpdir"' EXIT
-trap 'rm -rf "$tmpdir"; echo >&2; echo "interrupted; partial results are in $out" >&2; exit 130' INT TERM
+trap 'rm -rf "$tmpdir"; rm -f "$out/$stamp"-*' EXIT
+trap 'rm -rf "$tmpdir"; rm -f "$out/$stamp"-*; echo >&2; echo "interrupted; previous results in $out are untouched" >&2; exit 130' INT TERM
 
 echo "building keywordbench..." >&2
 CGO_ENABLED=0 go build -o "$bin" ./cmd/keywordbench
@@ -125,9 +129,9 @@ mode="keyword-only"
 echo "scanning ${corpus:-stdin} ($mode)..." >&2
 set +e
 if [[ "$unwrap" -eq 1 ]]; then
-  "${reader[@]}" | jq -r "$jq_expr" | "$bin" "${args[@]}" | tee -i "$out/report.txt"
+  "${reader[@]}" | jq -r "$jq_expr" | "$bin" "${args[@]}" | tee -i "$out/$stamp-report.txt"
 else
-  "${reader[@]}" | "$bin" "${args[@]}" | tee -i "$out/report.txt"
+  "${reader[@]}" | "$bin" "${args[@]}" | tee -i "$out/$stamp-report.txt"
 fi
 stages=("${PIPESTATUS[@]}")
 set -e
@@ -152,6 +156,12 @@ if [[ ${stages[last]} -ne 0 ]]; then
   echo "could not write $out/report.txt (exit ${stages[last]})" >&2
   exit "${stages[last]}"
 fi
+
+# Every stage succeeded, so it is now safe to replace the previous run's files.
+mv -f "$out/$stamp-report.txt" "$out/report.txt"
+for name in detectors keywords; do
+  [[ -f "$out/$stamp-$name.csv" ]] && mv -f "$out/$stamp-$name.csv" "$out/keywordbench-$name.csv"
+done
 
 echo >&2
 echo "report:  $out/report.txt" >&2

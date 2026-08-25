@@ -146,8 +146,8 @@ func (r *report) render(w io.Writer) {
 	defer bw.Flush()
 
 	if r.tot.interrupted {
-		fmt.Fprintf(bw, "  NOTE: interrupted. These numbers cover only the %s scanned before it\n"+
-			"  stopped. Rankings are still comparable; absolute totals are not final.\n\n",
+		fmt.Fprintf(bw, "  NOTE: this run was stopped early, so the numbers below cover only the %s\n"+
+			"  that was scanned. Comparisons between detectors still hold; the totals do not.\n\n",
 			humanBytes(r.tot.corpusBytes))
 	}
 
@@ -181,28 +181,28 @@ func section(w io.Writer, title string) {
 func (r *report) verdictFor(t row) (string, string) {
 	switch {
 	case t.calls == 0:
-		return "UNEXERCISED", "These keywords never fired on this corpus, so it says nothing about " +
-			"cost either way. Scan more data, or a corpus that contains this vendor."
+		return "NEVER STARTED UP", "These keywords never matched anything in this data, so it tells us " +
+			"nothing either way. Try more data, or data that actually contains this service."
 	case !r.cfg.detect && t.callsPctl >= 90:
-		return "HIGH COST", "These keywords fire more often than 90% of shipped detectors. " +
-			"Re-run with -detect to find out whether that traffic produces any findings."
+		return "EXPENSIVE", "These keywords start this detector up more often than 90% of all the " +
+			"others. Run again with -detect to see whether all that work actually finds anything."
 	case !r.cfg.detect && t.callsPctl >= 75:
-		return "WATCH", "Cost is in the top quartile. Re-run with -detect for the other half " +
-			"of the picture: whether the regex makes use of all those calls."
+		return "WORTH A LOOK", "This is in the most expensive quarter of all detectors. Run again " +
+			"with -detect to see the other half of the story: whether those runs find anything."
 	case !r.cfg.detect:
-		return "OK", "Prefilter cost sits in the normal range for a shipped detector."
+		return "LOOKS FINE", "This costs about what a normal detector costs."
 	case t.callsPctl >= 90 && (t.results == 0 || t.yieldPctl <= 25):
-		return "LOOSE", "These keywords wake the detector far more often than most, and the regex " +
-			"discarded nearly everything it was handed. That is close to pure scanner overhead, " +
-			"and a findings-count test cannot see it because it produces no findings to count."
+		return "TOO BROAD", "These keywords start this detector up far more often than most, and it " +
+			"threw away nearly everything it was given. That work is mostly wasted. Counting " +
+			"findings will not show this, because there are barely any findings to count."
 	case t.callsPctl >= 90:
-		return "EXPENSIVE BUT PRODUCTIVE", "A high invocation rate, but the regex converts it into " +
-			"findings. The cost is real; the keywords are not the problem."
+		return "EXPENSIVE, BUT IT WORKS", "It starts up a lot, but it does turn that into real findings. " +
+			"The cost is real, but the keywords are not the problem."
 	case t.callsPctl >= 75 && t.yieldPctl <= 25:
-		return "WATCH", "Cost is in the top quartile and yield in the bottom. Worth tightening " +
-			"before this ships."
+		return "WORTH A LOOK", "It is among the most expensive detectors and among the worst at " +
+			"finding things. Worth narrowing the keywords before this ships."
 	default:
-		return "OK", "Prefilter cost and regex yield both sit in the normal range."
+		return "LOOKS FINE", "Both what it costs and what it finds are in the normal range."
 	}
 }
 
@@ -212,48 +212,55 @@ func (r *report) renderVerdict(w io.Writer) {
 	verdict, why := r.verdictFor(t)
 
 	rule(w, "=")
-	fmt.Fprintf(w, "  %s  --  VERDICT: %s\n", strings.ToUpper(t.name), verdict)
+	fmt.Fprintf(w, "  %s  --  RESULT: %s\n", strings.ToUpper(t.name), verdict)
 	rule(w, "=")
 	fmt.Fprintf(w, "\n  keywords: %s\n\n", quoteAll(t.keywords))
 	fmt.Fprintf(w, "  %s\n\n", wrap(why, 74, "  "))
 
 	tb := newTable()
-	tb.row("  How often its regex runs\t%s per MB\t%s\n",
+	tb.row("  How often it runs\t%s times per MB of data\t%s\n",
 		fmtFloat(t.callsPerMB), rankPhrase(t.callsPctl, len(r.rows)))
-	tb.row("  How much corpus it re-scans\t%s\t%s of all prefilter work\n",
+	tb.row("  Extra text it re-reads\t%s of everything scanned\t%s of all the re-reading\n",
 		pct(t.regexLoad), pct(safeDiv(float64(t.regexBytes), float64(r.totalRegex))))
-	tb.row("  How often it is woken\t%s of decoded variants\t\n", pct(t.wakeRate))
+	tb.row("  How often it starts up\ton %s of the text checked\t\n", pct(t.wakeRate))
 	if r.cfg.detect {
-		tb.row("  What it found\t%s secrets in %s calls\t%s\n",
+		tb.row("  What it found\t%s secrets in %s runs\t%s\n",
 			comma(t.results), comma(t.calls), yieldPhrase(t))
-		tb.row("  CPU it costs\t%s ms per GB\t\n", fmtFloat(t.msPerGB))
+		tb.row("  CPU time it uses\t%s ms per GB of data\t\n", fmtFloat(t.msPerGB))
 	} else {
-		tb.row("  Total calls\t%s\t\n", comma(t.calls))
+		tb.row("  Times it ran\t%s\t\n", comma(t.calls))
 	}
-	tb.row("  Rank by cost\t%d of %d detectors\t\n", rank, len(r.rows))
+	if t.calls > 0 {
+		tb.row("  Most expensive rank\t%d out of %d detectors\t\n", rank, len(r.rows))
+	}
 	tb.flush(w)
 	if t.errs > 0 {
-		fmt.Fprintf(w, "\n  note: %s calls returned an error or panicked.\n", comma(t.errs))
+		fmt.Fprintf(w, "\n  note: %s runs failed with an error.\n", comma(t.errs))
 	}
 }
 
 // rankPhrase truncates rather than rounds, so the claim is never stronger than
-// the measurement.
+// the measurement. A percentile of 0 means nothing ranked below it, which is a tie
+// rather than "less often than everything".
 func rankPhrase(pctl float64, population int) string {
-	if pctl >= 50 {
-		return fmt.Sprintf("more than %d%% of all %d detectors", int(pctl), population)
+	switch {
+	case pctl >= 50:
+		return fmt.Sprintf("more often than %d%% of all %d detectors", int(pctl), population)
+	case pctl == 0:
+		return fmt.Sprintf("tied for the lowest of all %d detectors", population)
+	default:
+		return fmt.Sprintf("less often than %d%% of all %d detectors", int(100-pctl), population)
 	}
-	return fmt.Sprintf("cheaper than %d%% of all %d detectors", int(100-pctl), population)
 }
 
 func yieldPhrase(t row) string {
 	switch {
 	case t.results == 0:
-		return "the regex used none of them"
+		return "it found nothing at all"
 	case t.yieldPctl <= 25:
-		return "a lower hit rate than 75% of woken detectors"
+		return "worse than 75% of the detectors that found anything"
 	default:
-		return fmt.Sprintf("%s per call", fmtYield(t.yield, t.calls))
+		return fmt.Sprintf("about %s", fmtYield(t.yield, t.calls))
 	}
 }
 
@@ -268,10 +275,18 @@ func (r *report) renderSamples(w io.Writer) {
 		n     uint64
 	}
 	all := make([]sample, 0, len(r.tot.samples))
-	var total uint64
+	var sampled uint64
 	for tok, n := range r.tot.samples {
 		all = append(all, sample{tok, n})
-		total += n
+		sampled += n
+	}
+
+	// The per-keyword counters are exact; the sample map stops collecting at a cap.
+	var total uint64
+	for _, kw := range r.target.keywords {
+		if st := r.tot.kw[strings.ToLower(kw)]; st != nil {
+			total += st.hits
+		}
 	}
 	sort.Slice(all, func(i, j int) bool {
 		if all[i].n != all[j].n {
@@ -280,18 +295,21 @@ func (r *report) renderSamples(w io.Writer) {
 		return all[i].token < all[j].token
 	})
 
-	section(w, "WHAT THESE KEYWORDS ACTUALLY MATCHED")
+	section(w, "WHAT THESE KEYWORDS ACTUALLY MATCHED IN THE DATA")
 	tb := newTable()
 	for i := 0; i < min(12, len(all)); i++ {
-		tb.row("  %s\t%s\t%s\n", comma(all[i].n), pct(float64(all[i].n)/float64(total)), all[i].token)
+		tb.row("  %s\t%s\t%s\n", comma(all[i].n), pct(float64(all[i].n)/float64(sampled)), all[i].token)
 	}
 	tb.flush(w)
-	capped := ""
+
 	if r.tot.sampleCapped {
-		capped = ", sampling capped"
+		fmt.Fprintf(w, "\n  %s matches in total. The breakdown above covers the first %s words\n"+
+			"  seen (%s matches); the rest were not counted by word, to save memory.\n",
+			comma(total), comma(uint64(len(all))), comma(sampled))
+		return
 	}
-	fmt.Fprintf(w, "\n  %s hits across %s distinct identifiers%s.\n",
-		comma(total), comma(uint64(len(all))), capped)
+	fmt.Fprintf(w, "\n  %s matches in total, across %s different words.\n",
+		comma(total), comma(uint64(len(all))))
 }
 
 func (r *report) renderNotes(w io.Writer) {
@@ -302,7 +320,7 @@ func (r *report) renderNotes(w io.Writer) {
 	if len(findings) == 0 && !perKeyword {
 		return
 	}
-	section(w, "NOTES ON THESE KEYWORDS")
+	section(w, "THINGS TO WATCH OUT FOR")
 
 	if perKeyword {
 		var total uint64
@@ -312,7 +330,7 @@ func (r *report) renderNotes(w io.Writer) {
 			}
 		}
 		tb := newTable()
-		tb.row("%s\n", "  keyword\thits\tshare\talso wakes")
+		tb.row("%s\n", "  keyword\tmatches\tshare\talso starts up")
 		for _, kw := range t.keywords {
 			lower := strings.ToLower(kw)
 			st := r.tot.kw[lower]
@@ -340,12 +358,12 @@ func (r *report) renderRanked(w io.Writer) {
 	if r.cfg.top <= 0 {
 		return
 	}
-	section(w, fmt.Sprintf("COST CONTEXT: the %d most expensive detectors on this corpus", r.cfg.top))
+	section(w, fmt.Sprintf("HOW IT COMPARES -- the %d most expensive detectors on this data", r.cfg.top))
 
 	tb := newTable()
-	head := "  #\tdetector\tcalls/MB\tre-scans\twakes on"
+	head := "  #\tdetector\truns per MB\textra text read\tstarts up on"
 	if r.cfg.detect {
-		head += "\tfound\tyield"
+		head += "\tfound\thow often it finds"
 	}
 	tb.row("%s\n", head)
 
@@ -365,10 +383,13 @@ func (r *report) renderRanked(w io.Writer) {
 	}
 	tb.flush(w)
 
-	fmt.Fprintf(w, "\n  calls/MB is how many times a detector's regex runs per MB of corpus.\n")
-	fmt.Fprintf(w, "  re-scans is the share of the corpus its keywords hand back to the regex;\n")
-	fmt.Fprintf(w, "  it passes 100%% when the spans around separate hits overlap.\n")
-	fmt.Fprintf(w, "  wakes on is measured over decoded variants, not raw chunks.\n")
+	fmt.Fprintf(w, "\n  runs per MB      how many times this detector runs for every MB of data.\n")
+	fmt.Fprintf(w, "  extra text read  every keyword match hands the text around it back to the\n")
+	fmt.Fprintf(w, "                   detector to search again. This is how much of the data\n")
+	fmt.Fprintf(w, "                   that adds up to. It can pass 100%% because the same text\n")
+	fmt.Fprintf(w, "                   gets re-read once per keyword match.\n")
+	fmt.Fprintf(w, "  starts up on     share of the text where a keyword matched, so the\n")
+	fmt.Fprintf(w, "                   detector had to run. Counted after decoding.\n")
 }
 
 func (r *report) writeRow(tb *alignedTable, rank int, rw row) {
@@ -404,9 +425,9 @@ func (r *report) renderKeywords(w io.Writer) {
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].stat.hits > rows[j].stat.hits })
 
-	section(w, fmt.Sprintf("THE %d BUSIEST KEYWORDS ON THIS CORPUS", min(r.cfg.top, len(rows))))
+	section(w, fmt.Sprintf("THE %d BUSIEST KEYWORDS IN THIS DATA", min(r.cfg.top, len(rows))))
 	tb := newTable()
-	tb.row("%s\n", "  #\tkeyword\thits\thits/MB\tdetectors it wakes")
+	tb.row("%s\n", "  #\tkeyword\tmatches\tmatches per MB\tdetectors it starts up")
 	for i := 0; i < min(r.cfg.top, len(rows)); i++ {
 		k := rows[i]
 		owners := strings.Join(k.owner, ", ")
@@ -425,16 +446,21 @@ func (r *report) renderAB(w io.Writer) {
 	altLoad := safeDiv(float64(r.tot.altRegexBytes), float64(r.tot.corpusBytes))
 	altWake := safeDiv(float64(r.tot.altVariantsHit), float64(r.tot.variants))
 
-	section(w, "KEYWORD A/B")
+	section(w, "COMPARING TWO KEYWORD CHOICES")
 	tb := newTable()
-	tb.row("%s\n", "  keywords\tcalls/MB\tre-scans\twakes on\tstill finds")
+	tb.row("%s\n", "  keywords\truns per MB\textra text read\tstarts up on\tsecrets still found")
 
-	recall := "not measured (-detect off)"
+	recall := "not measured (needs -detect)"
 	if r.cfg.detect {
-		if r.tot.recallTotal == 0 {
-			recall = "no secrets here to check"
+		if r.tot.recallTotal == 0 && r.tot.recallErrs > 0 {
+			recall = fmt.Sprintf("none of %s could be checked", comma(r.tot.recallErrs))
+		} else if r.tot.recallTotal == 0 {
+			recall = "no secrets in this data to check"
 		} else {
 			recall = fmt.Sprintf("%s of %s", comma(r.tot.recallKept), comma(r.tot.recallTotal))
+			if r.tot.recallErrs > 0 {
+				recall += fmt.Sprintf(" (+%s unknown)", comma(r.tot.recallErrs))
+			}
 		}
 	}
 	tb.row("  %s (current)\t%s\t%s\t%s\tbaseline\n",
@@ -442,6 +468,10 @@ func (r *report) renderAB(w io.Writer) {
 	tb.row("  %s (candidate)\t%s\t%s\t%s\t%s\n",
 		quoteAll(r.sc.altKeywords), fmtFloat(altCallsPerMB), pct(altLoad), pct(altWake), recall)
 	tb.flush(w)
+	if r.tot.recallErrs > 0 {
+		fmt.Fprintf(w, "\n  %s secret(s) could not be checked because the detector errored on the\n"+
+			"  new keywords' text. They are not counted either way.\n", comma(r.tot.recallErrs))
+	}
 	fmt.Fprintf(w, "\n")
 
 	verdict := func(format string, args ...any) {
@@ -449,61 +479,69 @@ func (r *report) renderAB(w io.Writer) {
 	}
 	switch {
 	case r.tot.altCalls == 0 && t.calls == 0:
-		verdict("Neither keyword set fired on this corpus, so there is nothing to compare.")
+		verdict("Neither set of keywords matched anything here, so there is nothing to compare.")
 	case r.tot.altCalls == 0:
-		verdict("The candidate never fires on this corpus. That is cheap, but check recall " +
-			"on a corpus that actually contains this vendor before trusting it.")
+		verdict("The new keywords never match anything here. That is cheap, but try them on data " +
+			"that actually contains this service before trusting them.")
 	case t.calls == 0:
-		verdict("The current keywords never fire here, so there is no cost to compare against.")
+		verdict("The current keywords never match here, so there is no cost to compare against.")
 	case !r.cfg.detect:
-		verdict("The candidate is %s on invocations. Re-run with -detect to measure whether "+
-			"it still reaches the same secrets.", costDelta(t.calls, r.tot.altCalls))
-	case r.tot.recallTotal == 0:
-		verdict("The candidate is %s, but no secrets were found here, so recall is unmeasured. "+
-			"Re-run on a corpus that contains this vendor before switching.", costDelta(t.calls, r.tot.altCalls))
-	case r.tot.recallKept == r.tot.recallTotal && r.tot.altCalls*2 <= t.calls:
-		verdict("The candidate is %s and still reaches every secret the current keywords found. "+
-			"Switch to it.", costDelta(t.calls, r.tot.altCalls))
-	case r.tot.recallKept == r.tot.recallTotal:
-		verdict("The candidate keeps full recall but is only %s. Not worth churning for.",
+		verdict("The new keywords are %s to run. Run again with -detect to check whether they "+
+			"still find the same secrets.", costDelta(t.calls, r.tot.altCalls))
+	case r.tot.recallTotal == 0 && r.tot.recallErrs > 0:
+		verdict("The new keywords are %s, but the detector failed on every secret we tried to "+
+			"check, so we cannot tell whether they would still be found.",
 			costDelta(t.calls, r.tot.altCalls))
+	case r.tot.recallTotal == 0:
+		verdict("The new keywords are %s, but no secrets turned up here, so we cannot tell whether "+
+			"they would still find them. Try data that contains this service first.",
+			costDelta(t.calls, r.tot.altCalls))
+	case r.tot.recallKept == r.tot.recallTotal && r.tot.altCalls*2 <= t.calls:
+		verdict("The new keywords are %s and still found every secret the current ones did. "+
+			"Careful though: they only work when that word sits near the secret, so this is true "+
+			"of this data, not a guarantee. A keyword taken from inside the secret itself can "+
+			"never miss.", costDelta(t.calls, r.tot.altCalls))
+	case r.tot.recallKept == r.tot.recallTotal:
+		verdict("The new keywords find everything the current ones do, but are only %s. "+
+			"Probably not worth changing.", costDelta(t.calls, r.tot.altCalls))
 	default:
-		verdict("The candidate is %s but misses %s of %s secrets. That is the trade to decide.",
+		verdict("The new keywords are %s but miss %s of %s secrets. That is the trade-off to weigh up.",
 			costDelta(t.calls, r.tot.altCalls), comma(r.tot.recallTotal-r.tot.recallKept), comma(r.tot.recallTotal))
 	}
 }
 
 func (r *report) renderRunDetails(w io.Writer) {
-	mode := "keyword only (cost)"
+	mode := "keyword matches only (how often detectors start up)"
 	if r.cfg.detect {
-		mode = "keyword + regex (cost, findings and CPU)"
+		mode = "keyword matches and searching (start-ups, findings and CPU time)"
 	}
-	decode := fmt.Sprintf("on, depth %d (matches trufflehog's default)", r.cfg.decodeDepth)
+	decode := fmt.Sprintf("on, %d levels deep (same as trufflehog's default)", r.cfg.decodeDepth)
 	if r.cfg.decodeDepth < 1 {
-		decode = "OFF -- cost here understates production by roughly a third"
+		decode = "OFF -- this makes the cost look about a third lower than it really is"
 	} else if r.cfg.decodeDepth != 5 {
-		decode = fmt.Sprintf("on, depth %d (trufflehog defaults to 5)", r.cfg.decodeDepth)
+		decode = fmt.Sprintf("on, %d levels deep (trufflehog normally uses 5)", r.cfg.decodeDepth)
 	}
 
-	section(w, "RUN DETAILS")
+	section(w, "ABOUT THIS RUN")
 	tb := newTable()
 	partial := ""
 	if r.tot.interrupted {
-		partial = " (INTERRUPTED, partial)"
+		partial = " -- STOPPED EARLY, this is only part of the data"
 	}
-	tb.row("  corpus\t%s in %s chunks, %s after decoding%s\n",
-		humanBytes(r.tot.corpusBytes), comma(r.tot.chunks), comma(r.tot.variants), partial)
-	tb.row("  prefilter saw\t%s including chunk peek overlap\n", humanBytes(r.tot.scannedBytes))
-	tb.row("  population\t%s detectors, %s distinct keywords\n",
+	tb.row("  data scanned\t%s, split into %s chunks%s\n",
+		humanBytes(r.tot.corpusBytes), comma(r.tot.chunks), partial)
+	tb.row("  text searched\t%s pieces (chunks, plus each one decoded)\n", comma(r.tot.variants))
+	tb.row("  bytes read\t%s (chunks overlap slightly, so this is a little higher)\n", humanBytes(r.tot.scannedBytes))
+	tb.row("  compared against\t%s detectors, using %s different keywords\n",
 		comma(uint64(len(r.rows))), comma(uint64(len(r.sc.kwOwners))))
-	tb.row("  elapsed\t%s at %s/s on %d workers\n",
+	tb.row("  time taken\t%s at %s/s, using %d workers\n",
 		fmtDuration(r.tot.elapsed), throughput(r.tot.corpusBytes, r.tot.elapsed), r.cfg.workers)
-	tb.row("  mode\t%s\n", mode)
+	tb.row("  what was measured\t%s\n", mode)
 	tb.row("  decoding\t%s\n", decode)
-	tb.row("  total load\t%.2fx the corpus handed to detector regexes, across %s calls\n",
+	tb.row("  total re-reading\tall detectors together re-read %.2fx the data scanned, over %s runs\n",
 		safeDiv(float64(r.totalRegex), float64(r.tot.corpusBytes)), comma(r.totalCalls))
 	if r.tot.readErrs > 0 {
-		tb.row("  warning\t%s chunks failed to read and were skipped\n", comma(r.tot.readErrs))
+		tb.row("  warning\t%s chunks could not be read and were skipped\n", comma(r.tot.readErrs))
 	}
 	tb.flush(w)
 	fmt.Fprintf(w, "\n")
@@ -519,7 +557,7 @@ func (r *report) writeCSV(prefix string) error {
 					rw.key.Type().String(), strconv.Itoa(rw.version), rw.name, strings.Join(rw.keywords, "|"),
 					strconv.FormatUint(rw.calls, 10), f(rw.callsPerMB), strconv.FormatUint(rw.regexBytes, 10),
 					f(rw.regexLoad), f(rw.wakeRate), strconv.FormatUint(rw.results, 10), f(rw.yield),
-					f(rw.msPerGB), f(rw.callsPctl), f(rw.yieldPctl), strconv.FormatUint(rw.errs, 10),
+					f(rw.msPerGB), f(rw.callsPctl), pctlCell(rw), strconv.FormatUint(rw.errs, 10),
 				})
 			}
 		}); err != nil {
@@ -539,6 +577,15 @@ func (r *report) writeCSV(prefix string) error {
 					f(safeDiv(float64(s.variantsHit), float64(r.tot.variants))), strings.Join(owners, "|")})
 			}
 		})
+}
+
+// pctlCell blanks the yield percentile for detectors that found nothing, so a zero
+// cannot mean both "unranked" and "worst finder" when these CSVs are joined.
+func pctlCell(rw row) string {
+	if rw.results == 0 {
+		return ""
+	}
+	return f(rw.yieldPctl)
 }
 
 func writeCSVFile(path string, header []string, rows func(add func([]string))) error {

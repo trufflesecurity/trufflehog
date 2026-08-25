@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -15,62 +16,93 @@ import (
 // structural problems worth fixing before anyone spends hours scanning.
 func renderStaticLint(w io.Writer, sc *scanner, dict string) {
 	rule(w, "=")
-	fmt.Fprintf(w, "  %s  --  STATIC KEYWORD LINT\n", strings.ToUpper(displayName(sc.target)))
+	fmt.Fprintf(w, "  %s  --  QUICK KEYWORD CHECK\n", strings.ToUpper(displayName(sc.target)))
 	rule(w, "=")
 	fmt.Fprintf(w, "\n  keywords: %s\n\n", quoteAll(sc.target.Keywords()))
 
 	findings := lintKeywords(sc, sc.target.Keywords(), dict)
 	if len(findings) == 0 {
-		fmt.Fprintf(w, "  No structural problems found.\n")
+		fmt.Fprintf(w, "  Nothing obviously wrong with these keywords.\n")
 	}
 	for _, f := range findings {
 		fmt.Fprintf(w, "  - %s\n", wrap(f, 72, "    "))
 	}
-	fmt.Fprintf(w, "\n  No corpus was scanned, so this says nothing about how often these\n")
-	fmt.Fprintf(w, "  keywords actually fire. For that:\n\n")
+	fmt.Fprintf(w, "\n  No data was scanned, so this says nothing about how often these keywords\n")
+	fmt.Fprintf(w, "  actually match. To measure that:\n\n")
 	fmt.Fprintf(w, "    make keywordbench CORPUS=<file> TARGET=%s\n", displayName(sc.target))
 }
 
-// lintKeywords catches the structural problems that are visible without a corpus,
-// so a new detector can be sanity-checked before anyone spends hours scanning.
+// lintKeywords catches the problems that are visible without scanning anything, so
+// a new detector can be sanity-checked before anyone spends hours on a corpus.
+// Findings that apply to several keywords are reported once, listing them together.
 func lintKeywords(sc *scanner, keywords []string, dictPath string) []string {
-	var out []string
 	median := medianKeywordLen(sc)
 	words := loadDict(dictPath)
 
+	// note collects keywords per problem, in first-seen order. Problems carry a
+	// plural form because the grouped line reads "a, b -- <problem>".
+	type problem struct{ one, many string }
+	var order []problem
+	byProblem := make(map[problem][]string)
+	note := func(p problem, kw string) {
+		if _, seen := byProblem[p]; !seen {
+			order = append(order, p)
+		}
+		byProblem[p] = append(byProblem[p], strconv.Quote(kw))
+	}
+
+	var out []string
 	seen := make(map[string]struct{}, len(keywords))
 	for _, kw := range keywords {
 		lower := strings.ToLower(strings.TrimSpace(kw))
 
 		if kw != strings.TrimSpace(kw) {
-			out = append(out, fmt.Sprintf("%q has leading or trailing whitespace, which the prefilter matches literally", kw))
+			note(problem{one: "has a space at the start or end, which is matched literally and is probably a mistake",
+				many: "have a space at the start or end, which is matched literally and is probably a mistake"}, kw)
 		}
 		if _, dup := seen[lower]; dup {
-			out = append(out, fmt.Sprintf("%q is listed twice; keywords are a union, so the duplicate does nothing", kw))
+			note(problem{one: "is listed twice. Any one keyword is enough to start the detector, so the copy does nothing",
+				many: "are listed more than once. Any one keyword is enough to start the detector, so the copies do nothing"}, kw)
 		}
 		seen[lower] = struct{}{}
 
 		if len(lower) < 5 {
-			out = append(out, fmt.Sprintf("%q is %d chars; the median keyword is %d. Short keywords match inside unrelated identifiers",
-				kw, len(lower), median))
+			note(problem{
+				one:  fmt.Sprintf("is under 5 characters long. Half of all detector keywords are %d or more, and short keywords turn up inside unrelated words", median),
+				many: fmt.Sprintf("are under 5 characters long. Half of all detector keywords are %d or more, and short keywords turn up inside unrelated words", median),
+			}, kw)
 		}
 		if _, ok := words[lower]; ok {
-			out = append(out, fmt.Sprintf("%q is an English dictionary word, so it will fire on prose as well as code", kw))
+			note(problem{one: "is an ordinary English word, so it will match normal writing as well as code",
+				many: "are ordinary English words, so they will match normal writing as well as code"}, kw)
 		}
 		if len(lower) <= 5 && (strings.HasSuffix(lower, "_") || strings.HasSuffix(lower, "-")) {
-			out = append(out, fmt.Sprintf("%q is a short fragment ending in a separator; the prefilter matches "+
-				"substrings with no word boundary, so it fires inside any identifier that contains it", kw))
+			note(problem{
+				one:  "is short and ends in a separator. The keyword check looks for this text anywhere, including in the middle of a longer word",
+				many: "are short and end in a separator. The keyword check looks for this text anywhere, including in the middle of a longer word",
+			}, kw)
 		}
+		// These two name other detectors, so they stay per-keyword.
 		if owners := sc.kwOwners[lower]; len(owners) > 1 {
-			out = append(out, fmt.Sprintf("%q is shared with %d other detector(s): %s. Every hit wakes all of them",
+			out = append(out, fmt.Sprintf("%q is also used by %d other detector(s): %s. Every match starts up all of them",
 				kw, len(owners)-1, strings.Join(uniqueOwners(owners), ", ")))
 		}
 		if hosts := containingKeywords(sc, lower); len(hosts) > 0 {
-			out = append(out, fmt.Sprintf("%q is a substring of %d other keyword(s) (%s), so it fires wherever they do, and more",
+			out = append(out, fmt.Sprintf("%q appears inside %d other keyword(s) (%s), so it matches everywhere they do, and more",
 				kw, len(hosts), strings.Join(truncate(hosts, 4), ", ")))
 		}
 	}
-	return out
+
+	grouped := make([]string, 0, len(order))
+	for _, p := range order {
+		kws := byProblem[p]
+		text := p.one
+		if len(kws) > 1 {
+			text = p.many
+		}
+		grouped = append(grouped, strings.Join(kws, ", ")+" "+text)
+	}
+	return append(grouped, out...)
 }
 
 func uniqueOwners(owners []string) []string {

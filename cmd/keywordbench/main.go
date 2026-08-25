@@ -170,9 +170,11 @@ func (a altDetector) MaxSecretSize() int64     { return a.maxSecret }
 func (a altDetector) StartOffset() int64       { return a.startOff }
 
 // displayName disambiguates the versioned detectors that share a DetectorType.
+// Every version is suffixed, v1 included: leaving v1 bare made it collide with the
+// bare-type match in findTarget, so it could never be selected at all.
 func displayName(d detectors.Detector) string {
 	name := d.Type().String()
-	if v, ok := d.(detectors.Versioner); ok && v.Version() > 1 {
+	if v, ok := d.(detectors.Versioner); ok {
 		name = fmt.Sprintf("%s.v%d", name, v.Version())
 	}
 	return name

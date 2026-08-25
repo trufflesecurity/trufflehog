@@ -116,18 +116,17 @@ func pct(v float64) string {
 	}
 }
 
-// fmtYield renders results-per-call. Below 1% the "1 in N" form is far easier to
-// reason about than a long string of zeros.
+// fmtYield says how often a run finds something, in words rather than a ratio.
 func fmtYield(yield float64, calls uint64) string {
 	switch {
 	case calls == 0:
 		return "-"
 	case yield == 0:
-		return "0 (none)"
-	case yield < 0.01:
-		return "1 in " + comma(uint64(1/yield))
+		return "never"
+	case yield >= 1:
+		return fmt.Sprintf("%.1f per run", yield)
 	default:
-		return fmt.Sprintf("%.3f", yield)
+		return "1 in " + comma(uint64(1/yield)) + " runs"
 	}
 }
 
@@ -146,9 +145,9 @@ func quoteAll(ss []string) string {
 func costDelta(current, candidate uint64) string {
 	switch {
 	case candidate == 0:
-		return "eliminates all calls"
+		return "never run at all"
 	case current == 0:
-		return "adds calls where there were none"
+		return "add runs where there were none"
 	case current >= candidate:
 		return fmt.Sprintf("%.1fx cheaper", float64(current)/float64(candidate))
 	default:
