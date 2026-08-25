@@ -249,6 +249,11 @@ func TestJobUnitDisplay(t *testing.T) {
 	}{
 		{name: "top level", path: "/job/build", want: "build"},
 		{name: "nested", path: "/job/folder1/job/sub/job/build", want: "folder1/sub/build"},
+		// A folder holding many jobs is the normal case, so the leaf name has
+		// to survive into the display string or siblings would all render the
+		// same. See TestJobUnitDisplaySiblingsDiffer.
+		{name: "sibling in same folder", path: "/job/folder1/job/first", want: "folder1/first"},
+		{name: "other sibling in same folder", path: "/job/folder1/job/second", want: "folder1/second"},
 		{name: "instance base path", path: "/jenkins/job/folder1/job/build", want: "folder1/build"},
 		{name: "job named job", path: "/job/job/job/build", want: "job/build"},
 		{name: "trailing slash", path: "/job/build/", want: "build"},
@@ -261,6 +266,29 @@ func TestJobUnitDisplay(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, JobUnit{Path: tt.path}.Display())
 		})
+	}
+}
+
+// TestJobUnitDisplaySiblingsDiffer pins the property that distinct jobs never
+// collapse to the same display string, including jobs sharing a folder.
+func TestJobUnitDisplaySiblingsDiffer(t *testing.T) {
+	t.Parallel()
+
+	paths := []string{
+		"/job/folder1/job/a",
+		"/job/folder1/job/b",
+		"/job/folder1/job/sub/job/a",
+		"/job/folder2/job/a",
+		"/job/a",
+	}
+
+	seen := make(map[string]string, len(paths))
+	for _, path := range paths {
+		display := JobUnit{Path: path}.Display()
+		if previous, ok := seen[display]; ok {
+			t.Errorf("paths %q and %q both display as %q", previous, path, display)
+		}
+		seen[display] = path
 	}
 }
 
