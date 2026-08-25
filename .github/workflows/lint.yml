@@ -22,9 +22,17 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          # NOTE: Version and args must match scripts/lint.sh
+          # NOTE: Version and args must match scripts/lint.sh. The version half is
+          # enforced by the lint-pin-consistency job below; the args half is not.
           version: v2.13.1
           args: --enable bodyclose,copyloopvar,misspell --timeout 10m
+  lint-pin-consistency:
+    name: lint-pin-consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check golangci-lint version pins
+        run: ./scripts/check_lint_pins.py
   man-page-staleness:
     name: man-page-staleness
     runs-on: ubuntu-latest
