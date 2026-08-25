@@ -32,7 +32,10 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Check golangci-lint version pins
-        run: ./scripts/check_lint_pins.py
+        # Invoked through python3, matching how scripts/test/diff_corpora_results.py
+        # is run in detector-corpora-test.yml, so the job does not depend on the
+        # file's git mode bit surviving.
+        run: python3 scripts/check_lint_pins.py
   man-page-staleness:
     name: man-page-staleness
     runs-on: ubuntu-latest
