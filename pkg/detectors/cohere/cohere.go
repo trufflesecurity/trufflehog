@@ -30,6 +30,10 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cohere", "co_api_key"}) + `\b([a-zA-Z0-9]{40})\b`)
 )
 
+// Cohere returns HTTP 498 (Invalid Token Error) for a malformed or revoked key.
+// https://docs.cohere.com/reference/errors
+const invalidTokenStatus = 498
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -97,11 +101,13 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		}
 		// Determinate: 200 with valid=true is live; valid=false is invalid.
 		return apiResp.Valid, nil
-	case http.StatusUnauthorized:
-		// Determinate failure: key is invalid/revoked. No error object.
+	case http.StatusUnauthorized, invalidTokenStatus:
+		// 401: missing/invalid/expired key.
+		// 498: Cohere Invalid Token Error (malformed or revoked).
+		// https://docs.cohere.com/reference/errors
 		return false, nil
 	default:
-		// Indeterminate: unexpected status (rate limit, 5xx, etc).
+		// Indeterminate: unexpected status (403, 429, 5xx, etc).
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -84,6 +85,58 @@ func TestCohere_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestCohere_Verify(t *testing.T) {
+	input := fmt.Sprintf("%s token = '%s'", keyword, validPattern)
+
+	tests := []struct {
+		name                string
+		s                   Scanner
+		wantVerified        bool
+		wantVerificationErr bool
+	}{
+		{
+			name:         "200 valid true",
+			s:            Scanner{client: common.ConstantResponseHttpClient(200, `{"valid":true}`)},
+			wantVerified: true,
+		},
+		{
+			name:         "200 valid false",
+			s:            Scanner{client: common.ConstantResponseHttpClient(200, `{"valid":false}`)},
+			wantVerified: false,
+		},
+		{
+			name:         "401 unauthorized",
+			s:            Scanner{client: common.ConstantResponseHttpClient(401, `{"message":"invalid api token"}`)},
+			wantVerified: false,
+		},
+		{
+			name:         "498 invalid token",
+			s:            Scanner{client: common.ConstantResponseHttpClient(498, `{"message":"invalid token"}`)},
+			wantVerified: false,
+		},
+		{
+			name:                "429 rate limit is indeterminate",
+			s:                   Scanner{client: common.ConstantResponseHttpClient(429, `{"message":"too many requests"}`)},
+			wantVerified:        false,
+			wantVerificationErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := test.s.FromData(context.Background(), true, []byte(input))
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Equal(t, test.wantVerified, results[0].Verified)
+			if test.wantVerificationErr {
+				require.Error(t, results[0].VerificationError())
+			} else {
+				require.NoError(t, results[0].VerificationError())
 			}
 		})
 	}
