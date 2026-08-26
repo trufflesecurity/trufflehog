@@ -128,8 +128,11 @@ func TestNeon_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := []cmp.Option{
+				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData", "SecretParts"),
+				cmpopts.IgnoreUnexported(detectors.Result{}),
+			}
+			if diff := cmp.Diff(got, tt.want, ignoreOpts...); diff != "" {
 				t.Errorf("Neon.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
