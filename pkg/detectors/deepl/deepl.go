@@ -19,6 +19,7 @@ type Scanner struct {
 	client *http.Client
 }
 
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 const (
@@ -44,10 +45,12 @@ var (
 	proKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"deepl"}) + `\b(` + uuidBody + `)\b`)
 )
 
+// Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
 	return []string{"deepl"}
 }
 
+// FromData will find and optionally verify DeepL API keys in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -90,7 +93,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return
 }
 
 func hasSuffixedForm(matches map[string]struct{}, uuid string) bool {
@@ -143,8 +146,8 @@ func verifyMatch(ctx context.Context, client *http.Client, key string) (bool, ma
 	if err != nil {
 		return false, nil, err
 	}
-	req.Header.Set("Authorization", "DeepL-Auth-Key "+key)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("Authorization", "DeepL-Auth-Key "+key)
+	req.Header.Add("Content-Type", "application/json")
 
 	res, err := client.Do(req)
 	if err != nil {
