@@ -18,6 +18,7 @@ type Scanner struct {
 	client *http.Client
 }
 
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 const (
@@ -34,10 +35,14 @@ var (
 	keyPat = regexp.MustCompile(`\b(napi_[a-zA-Z0-9]{32,128})\b`)
 )
 
+// Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
 	return []string{"napi_"}
 }
 
+// FromData finds and optionally verifies Neon control-plane API keys
+// (personal, organization, and project-scoped). Keys created before the
+// napi_ prefix are not detected.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -128,5 +133,5 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Neon is a serverless Postgres platform. API keys authenticate to the Neon control plane and can list projects, reveal or reset database passwords, and create or delete branches."
+	return "Neon is a serverless Postgres platform. Personal, organization, and project-scoped API keys authenticate to the Neon control plane and can list projects, reveal or reset database passwords, and create or delete branches."
 }
