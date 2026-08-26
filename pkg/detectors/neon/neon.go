@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -118,6 +119,10 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 			}
 			if payload.AccountID != "" {
 				extra["account_id"] = payload.AccountID
+				// Org and project-scoped keys use account_id values such as org-....
+				if strings.HasPrefix(payload.AccountID, "org-") {
+					extra["org_id"] = payload.AccountID
+				}
 			}
 		}
 		return true, extra, nil

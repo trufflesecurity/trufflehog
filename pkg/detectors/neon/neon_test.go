@@ -117,14 +117,15 @@ func TestNeon_Verify(t *testing.T) {
 			name: "verified organization or project-scoped key",
 			s: Scanner{client: common.ConstantResponseHttpClient(200, `{
 				"auth_method": "api_key_org",
-				"account_id": "org-example-12345678"
+				"account_id": "org-twilight-fog-87450618"
 			}`)},
 			input:        `NEON_API_KEY=` + sampleKey,
 			wantVerified: true,
 			wantExtra: map[string]string{
 				"rotation_guide": rotationGuide,
 				"auth_method":    "api_key_org",
-				"account_id":     "org-example-12345678",
+				"account_id":     "org-twilight-fog-87450618",
+				"org_id":         "org-twilight-fog-87450618",
 			},
 		},
 		{
