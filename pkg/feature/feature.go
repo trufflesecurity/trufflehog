@@ -42,12 +42,14 @@ var (
 	CloudflareApiTokenV2DetectorEnabled      atomic.Bool
 	CloudflareGlobalApiKeyV2DetectorEnabled  atomic.Bool
 	DuoDetectorEnabled                       atomic.Bool
+	FigmaV3DetectorEnabled                   atomic.Bool
 	NewRelicLicenseKeyDetectorEnabled        atomic.Bool
 	NewRelicBrowserKeyDetectorEnabled        atomic.Bool
 	NewRelicUserKeyDetectorEnabled           atomic.Bool
 	NewRelicInsightsQueryKeyDetectorEnabled  atomic.Bool
 	NewRelicMobileAppTokenDetectorEnabled    atomic.Bool
 	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
+	SolarwindsDetectorEnabled                atomic.Bool
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
 )
 

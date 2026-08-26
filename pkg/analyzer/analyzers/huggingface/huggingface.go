@@ -91,9 +91,9 @@ func bakeUnfineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analy
 	return bindings
 }
 
-// finegrained scopes are grouped by org, user or model.
-func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analyzers.Binding {
-	// this section will extract the relevant permissions for each entity and store them in a map
+// bakefineGrainedBindings resolves each model's permission from the token's
+// fine-grained scopes (grouped by org, user, or model).
+func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) ([]analyzers.Binding, []analyzers.Resource) {
 	var nameToPermissions = make(map[string]analyzers.Permission)
 	for _, permission := range tokenJSON.Auth.AccessToken.FineGrained.Scoped {
 		privs := analyzers.Permission{
@@ -115,10 +115,9 @@ func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analyze
 		}
 	}
 
-	bindings := make([]analyzers.Binding, len(allModels))
-	for idx, model := range allModels {
-
-		// Add Read Privs to All Models
+	var bindings []analyzers.Binding
+	var unbounded []analyzers.Resource
+	for _, model := range allModels {
 		modelResource := analyzers.Resource{
 			Name:               model.Name,
 			FullyQualifiedName: "huggingface.com/model/" + model.ID,
@@ -129,22 +128,27 @@ func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analyze
 		}
 
 		var perm analyzers.Permission
-		// get username/orgname for each model and apply those permissions
 		modelUsername := strings.Split(model.Name, "/")[0]
 		if permissions, ok := nameToPermissions[modelUsername]; ok {
 			perm = permissions
 		}
-		// override model permissions with repo-specific permissions
 		if permissions, ok := nameToPermissions[model.Name]; ok {
 			perm = permissions
 		}
 
-		bindings[idx] = analyzers.Binding{
+		// Models without an explicit fine-grained scope are visible to the
+		// token but have no bound permission; they belong in UnboundedResources.
+		if perm.Value == "" {
+			unbounded = append(unbounded, modelResource)
+			continue
+		}
+
+		bindings = append(bindings, analyzers.Binding{
 			Resource:   modelResource,
 			Permission: perm,
-		}
+		})
 	}
-	return bindings
+	return bindings, unbounded
 }
 
 func bakeOrganizationBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
@@ -259,7 +263,9 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result.Bindings = make([]analyzers.Binding, 0)
 
 	if info.Token.Auth.AccessToken.Type == FINEGRAINED {
-		result.Bindings = append(result.Bindings, bakefineGrainedBindings(info.Models, info.Token)...)
+		fgBindings, fgUnbounded := bakefineGrainedBindings(info.Models, info.Token)
+		result.Bindings = append(result.Bindings, fgBindings...)
+		result.UnboundedResources = append(result.UnboundedResources, fgUnbounded...)
 		result.Bindings = append(result.Bindings, bakeOrganizationBindings(info.Token)...)
 		result.Bindings = append(result.Bindings, bakeUserBindings(info.Token)...)
 	} else {

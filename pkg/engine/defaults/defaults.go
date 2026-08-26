@@ -46,7 +46,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appcues"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appfollow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appointedd"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appoptics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
@@ -99,7 +98,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
@@ -292,6 +290,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
 	figmapersonalaccesstokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
 	figmapersonalaccesstokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
+	figmapersonalaccesstokenv3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
@@ -729,6 +728,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snipcart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snykkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/solarwindsobservability"
 	sonarcloudv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v1"
 	sonarcloudv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
@@ -949,7 +949,6 @@ func buildDetectorList() []detectors.Detector {
 		&appcues.Scanner{},
 		&appfollow.Scanner{},
 		&appointedd.Scanner{},
-		&appoptics.Scanner{},
 		&appsync.Scanner{},
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
@@ -1002,7 +1001,6 @@ func buildDetectorList() []detectors.Detector {
 		&besttime.Scanner{},
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
-		&bingsubscriptionkey.Scanner{},
 		&bitbar.Scanner{},
 		&bitbucketdatacenter.Scanner{},
 		&bitbucketapppassword.Scanner{},
@@ -1200,6 +1198,7 @@ func buildDetectorList() []detectors.Detector {
 		&fibery.Scanner{},
 		&figmapersonalaccesstokenv1.Scanner{},
 		&figmapersonalaccesstokenv2.Scanner{},
+		&figmapersonalaccesstokenv3.Scanner{},
 		&fileio.Scanner{},
 		&finage.Scanner{},
 		&financialmodelingprep.Scanner{},
@@ -1652,6 +1651,7 @@ func buildDetectorList() []detectors.Detector {
 		&snipcart.Scanner{},
 		&snowflake.Scanner{},
 		&snykkey.Scanner{},
+		&solarwindsobservability.Scanner{},
 		&sonarcloudv1.Scanner{},
 		&sonarcloudv2.Scanner{},
 		&sourcegraph.Scanner{},
@@ -1834,6 +1834,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CloudinaryDetectorEnabled.Load()
 		case *gitlaboauth2.Scanner:
 			return !feature.GitLabOAuthDetectorEnabled.Load()
+		case *figmapersonalaccesstokenv3.Scanner:
+			return !feature.FigmaV3DetectorEnabled.Load()
 		case *sonarcloudv2.Scanner:
 			return !feature.SonarCloudV2DetectorEnabled.Load()
 		case *enigma.Scanner:
@@ -1890,6 +1892,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.NewRelicMobileAppTokenDetectorEnabled.Load()
 		case *microsoftteamswebhookv2.Scanner:
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
+		case *solarwindsobservability.Scanner:
+			return !feature.SolarwindsDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
 		default:
