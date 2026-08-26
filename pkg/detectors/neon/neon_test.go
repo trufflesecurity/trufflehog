@@ -47,27 +47,29 @@ func TestNeon_Pattern(t *testing.T) {
 			want: []string{sampleKey},
 		},
 		{
+			name: "finds all matches",
+			input: `
+				NEON_API_KEY=` + sampleKey + `
+				NEON_API_KEY=` + sampleKey + `X
+			`,
+			want: []string{sampleKey, sampleKey + "X"},
+		},
+		{
 			name:  "too short after prefix",
 			input: "napi_shortkey",
-			want:  nil,
+			want:  []string{},
 		},
 		{
 			name:  "invalid pattern",
 			input: `NEON_API_KEY="not-a-neon-key-abcdefghijklmnopqrstuvwxyz"`,
-			want:  nil,
+			want:  []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if test.want == nil {
-				results, err := d.FromData(context.Background(), false, []byte(test.input))
-				require.NoError(t, err)
-				require.Empty(t, results)
-				return
-			}
-			if len(matchedDetectors) == 0 {
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
 				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
@@ -75,9 +77,18 @@ func TestNeon_Pattern(t *testing.T) {
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			require.NoError(t, err)
 
+			if len(results) != len(test.want) {
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
+				return
+			}
+
 			actual := make(map[string]struct{}, len(results))
 			for _, r := range results {
-				actual[string(r.Raw)] = struct{}{}
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
 			}
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
@@ -108,9 +119,8 @@ func TestNeon_Verify(t *testing.T) {
 			input:        `NEON_API_KEY=` + sampleKey,
 			wantVerified: true,
 			wantExtra: map[string]string{
-				"rotation_guide": rotationGuide,
-				"auth_method":    "api_key_user",
-				"account_id":     "user_01h84bfr2npa81rn8h8jzz8mx4",
+				"auth_method": "api_key_user",
+				"account_id":  "user_01h84bfr2npa81rn8h8jzz8mx4",
 			},
 		},
 		{
@@ -122,10 +132,9 @@ func TestNeon_Verify(t *testing.T) {
 			input:        `NEON_API_KEY=` + sampleKey,
 			wantVerified: true,
 			wantExtra: map[string]string{
-				"rotation_guide": rotationGuide,
-				"auth_method":    "api_key_org",
-				"account_id":     "org-twilight-fog-87450618",
-				"org_id":         "org-twilight-fog-87450618",
+				"auth_method": "api_key_org",
+				"account_id":  "org-twilight-fog-87450618",
+				"org_id":      "org-twilight-fog-87450618",
 			},
 		},
 		{
@@ -134,14 +143,12 @@ func TestNeon_Verify(t *testing.T) {
 			input:               `NEON_API_KEY=` + sampleKey,
 			wantVerified:        false,
 			wantVerificationErr: true,
-			wantExtra:           map[string]string{"rotation_guide": rotationGuide},
 		},
 		{
 			name:         "invalid key",
 			s:            Scanner{client: common.ConstantResponseHttpClient(401, `{"message":"unauthorized"}`)},
 			input:        `NEON_API_KEY=` + sampleKey,
 			wantVerified: false,
-			wantExtra:    map[string]string{"rotation_guide": rotationGuide},
 		},
 		{
 			name:                "unexpected status",
@@ -149,7 +156,6 @@ func TestNeon_Verify(t *testing.T) {
 			input:               `NEON_API_KEY=` + sampleKey,
 			wantVerified:        false,
 			wantVerificationErr: true,
-			wantExtra:           map[string]string{"rotation_guide": rotationGuide},
 		},
 		{
 			name:                "timeout",
@@ -157,7 +163,6 @@ func TestNeon_Verify(t *testing.T) {
 			input:               `NEON_API_KEY=` + sampleKey,
 			wantVerified:        false,
 			wantVerificationErr: true,
-			wantExtra:           map[string]string{"rotation_guide": rotationGuide},
 		},
 	}
 

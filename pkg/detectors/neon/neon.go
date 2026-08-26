@@ -23,9 +23,8 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 const (
-	authURL       = "https://console.neon.tech/api/v2/auth"
-	rotationGuide = "https://neon.com/docs/manage/api-keys"
-	maxAuthBody   = 1 << 16
+	authURL     = "https://console.neon.tech/api/v2/auth"
+	maxAuthBody = 1 << 16
 )
 
 var (
@@ -41,9 +40,9 @@ func (s Scanner) Keywords() []string {
 	return []string{"napi_"}
 }
 
-// FromData finds and optionally verifies Neon control-plane API keys
-// (personal, organization, and project-scoped). Keys created before the
-// napi_ prefix are not detected.
+// FromData will find and optionally verify Neon control-plane API keys
+// (personal, organization, and project-scoped) in a given set of bytes.
+// Keys created before the napi_ prefix are not detected.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -57,9 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detector_typepb.DetectorType_Neon,
 			Raw:          []byte(match),
 			SecretParts:  map[string]string{"key": match},
-			ExtraData: map[string]string{
-				"rotation_guide": rotationGuide,
-			},
 		}
 
 		if verify {
@@ -71,15 +67,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, match)
-			for k, v := range extraData {
-				s1.ExtraData[k] = v
+			if len(extraData) > 0 {
+				s1.ExtraData = extraData
 			}
 		}
 
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
@@ -90,8 +86,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Accept", "application/json")
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -104,6 +100,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
+		// Determinate success: key is live. Capture identity fields when present.
 		extra := map[string]string{}
 		body, err := io.ReadAll(io.LimitReader(res.Body, maxAuthBody))
 		if err != nil {
@@ -119,7 +116,6 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 			}
 			if payload.AccountID != "" {
 				extra["account_id"] = payload.AccountID
-				// Org and project-scoped keys use account_id values such as org-....
 				if strings.HasPrefix(payload.AccountID, "org-") {
 					extra["org_id"] = payload.AccountID
 				}
@@ -127,8 +123,10 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		}
 		return true, extra, nil
 	case http.StatusUnauthorized:
+		// Determinate failure: key is invalid/revoked. No error object.
 		return false, nil, nil
 	default:
+		// Indeterminate: unexpected status (rate limit, 5xx, 403, etc).
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }

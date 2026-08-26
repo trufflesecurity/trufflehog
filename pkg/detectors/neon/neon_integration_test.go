@@ -52,23 +52,29 @@ func TestNeon_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Neon,
 					Verified:     true,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a neon secret %s within but not valid", inactiveSecret)),
+				data:   []byte(fmt.Sprintf("You can find a neon secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_Neon,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": inactiveSecret},
 				},
 			},
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
@@ -78,7 +84,9 @@ func TestNeon_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want: nil,
+			want:                nil,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, would be verified if not for timeout",
@@ -92,8 +100,10 @@ func TestNeon_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Neon,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
+			wantErr:             false,
 			wantVerificationErr: true,
 		},
 		{
@@ -108,8 +118,10 @@ func TestNeon_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Neon,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
+			wantErr:             false,
 			wantVerificationErr: true,
 		},
 	}
@@ -128,11 +140,9 @@ func TestNeon_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := []cmp.Option{
-				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData", "SecretParts"),
-				cmpopts.IgnoreUnexported(detectors.Result{}),
-			}
-			if diff := cmp.Diff(got, tt.want, ignoreOpts...); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData")
+			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("Neon.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
