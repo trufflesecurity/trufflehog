@@ -35,19 +35,11 @@ var (
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"pat_"}
 }
 
-func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return defaultClient
-}
-
-// FromData will find and optionally verify Coze secrets in a given set of bytes.
+// FromData will find and optionally verify Coze personal access tokens in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -60,12 +52,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Coze,
 			Raw:          []byte(match),
-			Redacted:     match[:8] + "...",
 			SecretParts:  map[string]string{"key": match},
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyMatch(ctx, s.getClient(), match)
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+
+			isVerified, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, match)
 		}
@@ -73,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return
 }
 
 type cozeAPIResponse struct {
@@ -107,8 +103,8 @@ func verifyAgainstBase(ctx context.Context, client *http.Client, base, token str
 	if err != nil {
 		return false, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Content-Type", "application/json")
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -129,6 +125,7 @@ func verifyAgainstBase(ctx context.Context, client *http.Client, base, token str
 
 	switch res.StatusCode {
 	case http.StatusOK:
+		// Determinate success: key is live and can list workspaces.
 		return true, nil
 	case http.StatusForbidden:
 		// Code 4101 means the token authenticated but lacks the listWorkspace permission.
@@ -138,9 +135,10 @@ func verifyAgainstBase(ctx context.Context, client *http.Client, base, token str
 		}
 		return false, fmt.Errorf("unexpected HTTP response status %d from %s", res.StatusCode, base)
 	case http.StatusUnauthorized:
-		// Code 4100: authentication is invalid for this host.
+		// Determinate failure: key is invalid for this host. No error object.
 		return false, nil
 	default:
+		// Indeterminate: unexpected status (rate limit, 5xx, etc).
 		return false, fmt.Errorf("unexpected HTTP response status %d from %s", res.StatusCode, base)
 	}
 }

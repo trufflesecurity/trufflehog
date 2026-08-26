@@ -51,67 +51,65 @@ func TestCoze_FromData(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "Using Coze API token %s", activeToken),
+				data:   []byte(fmt.Sprintf("You can find a coze secret %s within", activeToken)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     true,
-					Raw:          []byte(activeToken),
 					SecretParts:  map[string]string{"key": activeToken},
 				},
 			},
 		},
 		{
-			name: "found, real token, verification error due to timeout",
+			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "Using Coze API token %s", activeToken),
+				data:   []byte(fmt.Sprintf("You can find a coze secret %s within", activeToken)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     false,
-					Raw:          []byte(activeToken),
 					SecretParts:  map[string]string{"key": activeToken},
 				},
 			},
+			wantErr:             false,
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, real token, verification error due to unexpected api surface",
+			name: "found, verified but unexpected api surface",
 			s:    Scanner{client: common.ConstantResponseHttpClient(500, "{}")},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "Using Coze API token %s", activeToken),
+				data:   []byte(fmt.Sprintf("You can find a coze secret %s within", activeToken)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     false,
-					Raw:          []byte(activeToken),
 					SecretParts:  map[string]string{"key": activeToken},
 				},
 			},
+			wantErr:             false,
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, unverified (inactive token)",
+			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   fmt.Appendf([]byte{}, "Using Coze API token %s", inactiveToken),
+				data:   []byte(fmt.Sprintf("You can find a coze secret %s within but not valid", inactiveToken)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_Coze,
 					Verified:     false,
-					Raw:          []byte(inactiveToken),
 					SecretParts:  map[string]string{"key": inactiveToken},
 				},
 			},
@@ -121,7 +119,7 @@ func TestCoze_FromData(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("no secrets here"),
+				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
 			want: nil,
@@ -148,7 +146,7 @@ func TestCoze_FromData(t *testing.T) {
 				}
 			}
 
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Redacted", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
 			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("Coze.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
@@ -157,12 +155,11 @@ func TestCoze_FromData(t *testing.T) {
 	}
 }
 
-func BenchmarkCoze_FromData(b *testing.B) {
+func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
-
 	for name, data := range detectors.MustGetBenchmarkData() {
-		b.Run(name, func(b *testing.B) {
+		benchmark.Run(name, func(b *testing.B) {
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)

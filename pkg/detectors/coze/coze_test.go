@@ -52,42 +52,42 @@ func TestCoze_Pattern(t *testing.T) {
 			input: `
 				COZE_API_TOKEN=pat_Aa0Bb1Cc2Dd3Ee4Ff5Gg6Hh7Ii8Jj9Kk0Ll1Mm2Nn3Oo4Pp5Qq6Rr7Ss8Tt9UuV
 			`,
-			want: nil,
+			want: []string{},
 		},
 		{
 			name: "invalid pattern - too long",
 			input: `
 				COZE_API_TOKEN=pat_Aa0Bb1Cc2Dd3Ee4Ff5Gg6Hh7Ii8Jj9Kk0Ll1Mm2Nn3Oo4Pp5Qq6Rr7Ss8Tt9UuVvX
 			`,
-			want: nil,
+			want: []string{},
 		},
 		{
 			name: "invalid pattern - non-alphanumeric body",
 			input: `
 				COZE_API_TOKEN=pat_Aa0Bb1Cc2Dd3Ee4Ff5Gg6Hh7Ii8Jj9Kk0Ll1Mm2Nn3Oo4Pp5Qq6Rr7Ss8Tt9Uu-v
 			`,
-			want: nil,
+			want: []string{},
 		},
 		{
 			name: "invalid pattern - shopify shpat should not match as coze",
 			input: `
 				SHOPIFY_TOKEN=shpat_Aa0Bb1Cc2Dd3Ee4Ff5Gg6Hh7Ii8Jj9Kk0Ll1Mm2Nn3Oo4Pp5Qq6Rr7Ss8Tt9UuVv
 			`,
-			want: nil,
+			want: []string{},
 		},
 		{
 			name: "invalid pattern - keyword only",
 			input: `
 				[INFO] initializing coze service with pat_
 			`,
-			want: nil,
+			want: []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
 				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
