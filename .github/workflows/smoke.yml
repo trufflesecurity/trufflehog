@@ -3,6 +3,9 @@ name: Smoke
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
