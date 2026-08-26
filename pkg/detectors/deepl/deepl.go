@@ -169,11 +169,13 @@ func verifyMatch(ctx context.Context, client *http.Client, key string) (bool, ma
 		}
 		return true, extraData, nil
 	case quotaExceededStatus:
-		// Valid key that has exhausted its quota.
+		// Determinate success: valid key that has exhausted its quota.
 		return true, extraData, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
+		// Determinate failure: key is invalid/revoked. No error object.
 		return false, nil, nil
 	default:
+		// Indeterminate: unexpected status (rate limit, 5xx, etc).
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }

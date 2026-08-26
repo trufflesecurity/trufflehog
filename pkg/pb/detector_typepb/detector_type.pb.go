@@ -1125,7 +1125,7 @@ const (
 	DetectorType_NewRelicInsightsQueryKey       DetectorType = 1067
 	DetectorType_NewRelicMobileAppToken         DetectorType = 1068
 	DetectorType_SolarWindsObservability        DetectorType = 1069
-	DetectorType_DeepL                          DetectorType = 1070
+	DetectorType_DeepL                          DetectorType = 1074
 )
 
 // Enum value maps for DetectorType.
@@ -2197,7 +2197,7 @@ var (
 		1067: "NewRelicInsightsQueryKey",
 		1068: "NewRelicMobileAppToken",
 		1069: "SolarWindsObservability",
-		1070: "DeepL",
+		1074: "DeepL",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3266,7 +3266,7 @@ var (
 		"NewRelicInsightsQueryKey":          1067,
 		"NewRelicMobileAppToken":            1068,
 		"SolarWindsObservability":           1069,
-		"DeepL":                             1070,
+		"DeepL":                             1074,
 	}
 )
 

@@ -52,6 +52,7 @@ func TestDeepl_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_DeepL,
 					Verified:     true,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
 			wantErr:             false,
@@ -69,6 +70,7 @@ func TestDeepl_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_DeepL,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": inactiveSecret},
 				},
 			},
 			wantErr:             false,
@@ -98,6 +100,7 @@ func TestDeepl_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_DeepL,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
 			wantErr:             false,
@@ -115,6 +118,7 @@ func TestDeepl_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_DeepL,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
 			wantErr:             false,
@@ -136,8 +140,9 @@ func TestDeepl_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData")
+			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("DeepL.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -50,6 +50,7 @@ var (
 	NewRelicMobileAppTokenDetectorEnabled    atomic.Bool
 	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 	SolarwindsDetectorEnabled                atomic.Bool
+	DeepLDetectorEnabled                     atomic.Bool
 )
 
 type AtomicString struct {

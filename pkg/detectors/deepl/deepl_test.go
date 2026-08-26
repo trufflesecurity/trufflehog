@@ -89,7 +89,7 @@ func TestDeepl_Pattern(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
 				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}

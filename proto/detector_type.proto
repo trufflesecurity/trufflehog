@@ -1071,5 +1071,9 @@ enum DetectorType {
   NewRelicInsightsQueryKey = 1067;
   NewRelicMobileAppToken = 1068;
   SolarWindsObservability = 1069;
-  DeepL = 1070;
+  // 1070 is DifyDataset (trufflesecurity/trufflehog#5220).
+  // 1071 is Cohere (trufflesecurity/trufflehog#5225).
+  // 1072 is Coze (trufflesecurity/trufflehog#5226).
+  // 1073 is Neon.
+  DeepL = 1074;
 }

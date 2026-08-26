@@ -1894,6 +1894,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		case *solarwindsobservability.Scanner:
 			return !feature.SolarwindsDetectorEnabled.Load()
+		case *deepl.Scanner:
+			return !feature.DeepLDetectorEnabled.Load()
 		default:
 			return false
 		}
