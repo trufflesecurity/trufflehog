@@ -171,13 +171,36 @@ func verifyMatch(ctx context.Context, client *http.Client, key string) (bool, ma
 	case quotaExceededStatus:
 		// Determinate success: valid key that has exhausted its quota.
 		return true, extraData, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusUnauthorized:
 		// Determinate failure: key is invalid/revoked. No error object.
+		return false, nil, nil
+	case http.StatusForbidden:
+		// 403 is overloaded:
+		//   - invalid/revoked key, or a Pro key sent to the Free host
+		//   - a live *scoped* developer key missing the usage scope
+		//     https://developers.deepl.com/docs/admin/api-key-permissions
+		// Free (:fx) and admin (:adm) keys cannot be scoped, so 403 is invalid
+		// for those types. For unsuffixed Pro keys, a "Missing required scope"
+		// body means the key authenticated.
+		if keyKind(key) == "pro" && missingRequiredScope(res.Body) {
+			extraData["scoped"] = "true"
+			return true, extraData, nil
+		}
 		return false, nil, nil
 	default:
 		// Indeterminate: unexpected status (rate limit, 5xx, etc).
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+}
+
+func missingRequiredScope(body io.Reader) bool {
+	var errBody struct {
+		Detail string `json:"detail"`
+	}
+	if err := json.NewDecoder(io.LimitReader(body, 4096)).Decode(&errBody); err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(errBody.Detail), "missing required scope")
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

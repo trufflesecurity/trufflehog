@@ -188,6 +188,24 @@ func TestDeepl_Verify(t *testing.T) {
 			wantVerified: false,
 		},
 		{
+			name: "scoped pro key missing usage scope is still live",
+			s: Scanner{client: common.ConstantResponseHttpClient(403, `{
+				"message": "Forbidden",
+				"detail": "Missing required scope(s): usage:read"
+			}`)},
+			input:        `deepl_api_key = "` + proKey + `"`,
+			wantRaw:      proKey,
+			wantVerified: true,
+			wantExtra:    map[string]string{"type": "pro", "scoped": "true"},
+		},
+		{
+			name:         "free key 403 is invalid, not scoped",
+			s:            Scanner{client: common.ConstantResponseHttpClient(403, `{"message":"Forbidden","detail":"Missing required scope(s): usage:read"}`)},
+			input:        "Authorization: DeepL-Auth-Key " + freeKey,
+			wantRaw:      freeKey,
+			wantVerified: false,
+		},
+		{
 			name:                "unexpected status",
 			s:                   Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			input:               `deepl_api_key = "` + proKey + `"`,
