@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -55,23 +56,16 @@ func TestCohere_Pattern(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 

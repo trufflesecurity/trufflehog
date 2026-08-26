@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return
 }
 
 // https://docs.cohere.com/reference/check-api-key
@@ -75,8 +75,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Content-Type", "application/json")
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -95,10 +95,13 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		if err := json.NewDecoder(res.Body).Decode(&apiResp); err != nil {
 			return false, fmt.Errorf("failed to decode response: %w", err)
 		}
+		// Determinate: 200 with valid=true is live; valid=false is invalid.
 		return apiResp.Valid, nil
 	case http.StatusUnauthorized:
+		// Determinate failure: key is invalid/revoked. No error object.
 		return false, nil
 	default:
+		// Indeterminate: unexpected status (rate limit, 5xx, etc).
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }

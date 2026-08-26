@@ -62,6 +62,7 @@ func TestCohere_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Cohere,
 					Verified:     true,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
 			wantErr:             false,
@@ -79,6 +80,7 @@ func TestCohere_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Cohere,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": inactiveSecret},
 				},
 			},
 			wantErr:             false,
@@ -108,6 +110,7 @@ func TestCohere_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Cohere,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
 			wantErr:             false,
@@ -125,6 +128,7 @@ func TestCohere_FromChunk(t *testing.T) {
 				{
 					DetectorType: detector_typepb.DetectorType_Cohere,
 					Verified:     false,
+					SecretParts:  map[string]string{"key": secret},
 				},
 			},
 			wantErr:             false,
@@ -146,7 +150,7 @@ func TestCohere_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "SecretParts", "ExtraData")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
 			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("Cohere.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
