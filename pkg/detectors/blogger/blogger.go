@@ -22,8 +22,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"blogger"}) + `\b([0-9A-Za-z-]{39})\b`)
+	// Google API keys always start with "AIzaSy" (6-char prefix + 33 remaining = 39 total).
+	// The prefix regex retains "blogger" proximity to distinguish from other Google API-backed things.
+	// No trailing \b because keys can end with '-', which is not a word character.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"blogger"}) + `\b(AIzaSy[0-9A-Za-z_-]{33})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

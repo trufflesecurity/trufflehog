@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package bingsubscriptionkey
+package weightsandbiases
 
 import (
 	"context"
@@ -14,18 +14,19 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	base "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-func TestBingsubscriptionkey_FromChunk(t *testing.T) {
+func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BING_SUBSCRIPTION_KEY")
-	inactiveSecret := testSecrets.MustGetField("BING_SUBSCRIPTION_KEY_INACTIVE")
+	secret := testSecrets.MustGetField("WEIGHTSANDBIASES_V2")
+	inactiveSecret := "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"
 
 	type args struct {
 		ctx    context.Context
@@ -45,13 +46,19 @@ func TestBingsubscriptionkey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a bing subscription key %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a weightsandbiases secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_BingSubscriptionKey,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"admin":    "false",
+						"email":    "muneeb.khan@trufflesec.com",
+						"username": "muneeb-khan-222",
+						"version":  "2",
+					},
 				},
 			},
 			wantErr:             false,
@@ -62,13 +69,14 @@ func TestBingsubscriptionkey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a bing subscription key %s within but not valid", inactiveSecret)),
+				data:   []byte(fmt.Sprintf("You can find a weightsandbiases secret %s within but not valid", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_BingSubscriptionKey,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
+					ExtraData:    map[string]string{"version": "2"},
 				},
 			},
 			wantErr:             false,
@@ -79,7 +87,7 @@ func TestBingsubscriptionkey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the key within"),
+				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
 			want:                nil,
@@ -88,16 +96,17 @@ func TestBingsubscriptionkey_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			s:    Scanner{BaseScanner: base.BaseScanner{Client: common.SaneHttpClientTimeOut(1 * time.Microsecond)}},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a bing subscription key %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a weightsandbiases secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_BingSubscriptionKey,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
+					ExtraData:    map[string]string{"version": "2"},
 				},
 			},
 			wantErr:             false,
@@ -105,40 +114,45 @@ func TestBingsubscriptionkey_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
+			s:    Scanner{BaseScanner: base.BaseScanner{Client: common.ConstantResponseHttpClient(404, "")}},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a bing subscription key %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a weightsandbiases secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_BingSubscriptionKey,
+					DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 					Verified:     false,
+					ExtraData:    map[string]string{"version": "2"},
 				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Bingsubscriptionkey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("WeightsandbiasesV2.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+				if len(got[i].SecretParts) == 0 {
+					t.Fatalf("no secret parts present: \n %+v", got[i])
+				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Bingsubscriptionkey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("WeightsandbiasesV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

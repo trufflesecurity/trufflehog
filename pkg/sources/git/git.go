@@ -544,10 +544,15 @@ func isRetryableCloneError(err error) bool {
 
 // createClonePath creates the directory a repository will be cloned into and
 // returns its path. When clonePath is set (the --clone-path flag), the
-// directory is <clonePath>/trufflehog-<repo-name> with permissions 0755;
-// otherwise a fresh temporary directory (0700, per os.MkdirTemp) is created
-// in the system temp path. It is called both before the first clone attempt
-// and to replace the directory between retries.
+// directory is <clonePath>/trufflehog-<repo-name>-<random> with permissions
+// 0755; otherwise a fresh temporary directory (0700, per os.MkdirTemp) is
+// created in the system temp path. It is called both before the first clone
+// attempt and to replace the directory between retries.
+//
+// Every call returns a directory of its own. Naming it after the URL's last
+// segment alone collides for same-named repos in different groups, and for
+// the same repo cloned twice, which lets concurrent workers clone into and
+// delete each other's directories.
 func createClonePath(gitURL, clonePath string) (string, error) {
 	if clonePath == "" {
 		path, err := cleantemp.MkdirTemp()
@@ -557,9 +562,22 @@ func createClonePath(gitURL, clonePath string) (string, error) {
 		return path, nil
 	}
 
-	path := filepath.Join(clonePath, "trufflehog-"+strings.TrimSuffix(filepath.Base(gitURL), gitDirName))
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(clonePath, 0755); err != nil {
 		return "", fmt.Errorf("failed to create clone path %s: %w", clonePath, err)
+	}
+
+	// The trufflehog- prefix is what cleantemp.CleanTempDirsForLegacyJSON
+	// sweeps, so it has to survive; the repo name is kept for readability
+	// under --no-cleanup.
+	slug := strings.TrimSuffix(filepath.Base(gitURL), gitDirName)
+	path, err := os.MkdirTemp(clonePath, "trufflehog-"+slug+"-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create clone path in %s: %w", clonePath, err)
+	}
+
+	// os.MkdirTemp creates 0700; --clone-path directories are 0755.
+	if err := os.Chmod(path, 0755); err != nil {
+		return "", fmt.Errorf("failed to set permissions on clone path %s: %w", path, err)
 	}
 	return path, nil
 }
@@ -647,7 +665,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "error", err)
+		logger.V(0).Info("git clone failed", "error", err)
 		failureReason := ClassifyCloneError(output)
 		exitCode := cloneCmd.ProcessState.ExitCode()
 		metricsInstance.RecordCloneOperation(statusFailure, failureReason, exitCode)
