@@ -234,6 +234,7 @@ func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
+// TestFragmentLineOffsetUsesOriginalData covers decoded output that removes blank lines before the secret.
 func TestFragmentLineOffsetUsesOriginalData(t *testing.T) {
 	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
 	result.SetPrimarySecretValue(`token = "synthetic-secret-value-123456"`)
@@ -247,6 +248,7 @@ func TestFragmentLineOffsetUsesOriginalData(t *testing.T) {
 	assert.Equal(t, int64(5), lineOffset)
 }
 
+// TestFragmentLineOffsetFallsBackToDecodedData keeps decoded offsets for secrets created by a decoder.
 func TestFragmentLineOffsetFallsBackToDecodedData(t *testing.T) {
 	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
 	chunk := &sources.Chunk{
@@ -259,6 +261,7 @@ func TestFragmentLineOffsetFallsBackToDecodedData(t *testing.T) {
 	assert.Equal(t, int64(1), lineOffset)
 }
 
+// TestFragmentLineOffsetMapsOriginalDataOccurrence keeps duplicate ordering when decoding changes line spacing.
 func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	chunk := &sources.Chunk{
@@ -273,6 +276,7 @@ func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
+// TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence avoids a matching value discarded with an HTML attribute.
 func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	chunk := &sources.Chunk{
@@ -286,6 +290,7 @@ func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
 	assert.Equal(t, int64(1), lineOffset)
 }
 
+// TestFragmentLineOffsetUsesInvalidOriginalData preserves source lines when UTF-8 decoding replaces malformed bytes.
 func TestFragmentLineOffsetUsesInvalidOriginalData(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	originalData := append([]byte("heading\n\xff\n"), secret...)
@@ -300,6 +305,7 @@ func TestFragmentLineOffsetUsesInvalidOriginalData(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
+// TestFragmentLineOffsetUsesUTF8OriginalData preserves byte offsets across multibyte UTF-8 text.
 func TestFragmentLineOffsetUsesUTF8OriginalData(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	chunk := &sources.Chunk{
@@ -312,6 +318,7 @@ func TestFragmentLineOffsetUsesUTF8OriginalData(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
+// TestFragmentLineOffsetMapsInvalidOriginalDataDuplicates keeps duplicate ordering after UTF-8 replacement.
 func TestFragmentLineOffsetMapsInvalidOriginalDataDuplicates(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	originalData := append([]byte("\xff\n"), secret...)
@@ -327,6 +334,7 @@ func TestFragmentLineOffsetMapsInvalidOriginalDataDuplicates(t *testing.T) {
 	assert.Equal(t, int64(3), lineOffset)
 }
 
+// TestFragmentLineOffsetUsesOriginalDataIgnoreTag checks ignore tags against the mapped source line.
 func TestFragmentLineOffsetUsesOriginalDataIgnoreTag(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	chunk := &sources.Chunk{
@@ -340,6 +348,7 @@ func TestFragmentLineOffsetUsesOriginalDataIgnoreTag(t *testing.T) {
 	assert.True(t, ignored)
 }
 
+// TestFragmentLineOffsetMapsArbitraryOriginalData checks generated binary prefixes and removals.
 func TestFragmentLineOffsetMapsArbitraryOriginalData(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	rapid.Check(t, func(t *rapid.T) {
