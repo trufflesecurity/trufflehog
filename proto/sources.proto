@@ -55,6 +55,7 @@ enum SourceType {
   SOURCE_TYPE_STDIN = 40;
   SOURCE_TYPE_SLACK_CONTINUOUS = 41;
   SOURCE_TYPE_JSON_ENUMERATOR = 42;
+  SOURCE_TYPE_AWS_SECRETS_MANAGER = 43;
 }
 
 message LocalSource {
@@ -392,6 +393,11 @@ message S3 {
   repeated string roles = 7;
   repeated string ignore_buckets = 8;
   bool enable_resumption = 9 [deprecated = true];
+  // endpoint targets an S3-compatible service other than AWS S3. When set,
+  // per-bucket region discovery is skipped because it is an AWS-only API.
+  string endpoint = 10 [(validate.rules).string.uri_ref = true];
+  // region is the region used to sign requests. Defaults to us-east-1.
+  string region = 11;
 }
 
 message Slack {

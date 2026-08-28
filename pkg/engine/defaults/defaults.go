@@ -865,7 +865,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraping"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/websitepulse"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
+	weightsandbiasesv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases/v1"
+	weightsandbiasesv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wit"
@@ -1791,7 +1792,8 @@ func buildDetectorList() []detectors.Detector {
 		&webscraper.Scanner{},
 		&webscraping.Scanner{},
 		&websitepulse.Scanner{},
-		&weightsandbiases.Scanner{},
+		&weightsandbiasesv1.Scanner{},
+		&weightsandbiasesv2.Scanner{},
 		// &wepay.Scanner{},
 		&whoxy.Scanner{},
 		&wistia.Scanner{},
@@ -1896,6 +1898,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SolarwindsDetectorEnabled.Load()
 		case *resend.Scanner:
 			return !feature.ResendDetectorEnabled.Load()
+		case *weightsandbiasesv2.Scanner:
+			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
 		default:
 			return false
 		}

@@ -62,9 +62,10 @@ func TestGitHub_FromChunk(t *testing.T) {
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 						"scopes":         "notifications",
 						// "site_admin":     "false", // not present in test verifiedGhp
-						"url":      "https://github.com/truffle-sandbox",
-						"username": "truffle-sandbox",
-						"version":  "2",
+						"token_type": "Personal Access Token (classic)",
+						"url":        "https://github.com/truffle-sandbox",
+						"username":   "truffle-sandbox",
+						"version":    "2",
 					},
 				},
 			},
@@ -84,6 +85,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "Personal Access Token (classic)",
 						"version":        "2",
 					},
 				},
@@ -104,6 +106,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "OAuth Access Token",
 						"version":        "2",
 					},
 				},
@@ -124,6 +127,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "GitHub App User-to-Server Token",
 						"version":        "2",
 					},
 				},
@@ -144,6 +148,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "GitHub App Server-to-Server (installation) Token",
 						"version":        "2",
 					},
 				},
@@ -164,6 +169,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "GitHub App Refresh Token",
 						"version":        "2",
 					},
 				},
@@ -184,6 +190,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "Personal Access Token (classic)",
 						"version":        "2",
 					},
 				},

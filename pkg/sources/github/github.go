@@ -1,6 +1,8 @@
 package github
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -81,7 +83,6 @@ type Source struct {
 	commentsTimeframeDays uint32
 
 	sources.Progress
-	sources.CommonSourceUnitUnmarshaller
 
 	useAuthInUrl bool // pass credentials in the repository urls for cloning
 }
@@ -97,6 +98,13 @@ var _ sources.SourceUnit = (*GistUnit)(nil)
 type RepoUnit struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
+	// InstallationID is the GitHub App installation that owns this repo, set
+	// during scan-all-installations enumeration. Carrying it on the unit lets
+	// ChunkUnit clone with the correct installation token without re-deriving
+	// the mapping, which otherwise re-lists every installation's repos on every
+	// scanned unit (see INT-790). Zero when the source is not an installation
+	// scan or the unit predates this field.
+	InstallationID int64 `json:"installation_id,omitempty"`
 }
 
 func (r RepoUnit) SourceUnitID() (string, sources.SourceUnitKind) { return r.URL, "repo" }
@@ -109,6 +117,80 @@ type GistUnit struct {
 
 func (g GistUnit) SourceUnitID() (string, sources.SourceUnitKind) { return g.URL, "gist" }
 func (g GistUnit) Display() string                                { return g.Name }
+
+// unitEnvelope is just the JSON equivalent of apipb.SourceUnit, so we can
+// unmarshal source unit payloads.
+type unitEnvelope struct {
+	ID       string                 `json:"id"`
+	Kind     sources.SourceUnitKind `json:"kind,omitempty"`
+	Name     string                 `json:"display,omitempty"`
+	UnitData []byte                 `json:"unit_data,omitempty"`
+}
+
+func (u unitEnvelope) SourceUnitID() (string, sources.SourceUnitKind) { return u.ID, u.Kind }
+func (u unitEnvelope) Display() string                                { return u.Name }
+
+func decodeBase64(data []byte) ([]byte, error) {
+	out := make([]byte, base64.StdEncoding.DecodedLen(len(data)))
+	n, err := base64.StdEncoding.Decode(out, data)
+	return out[:n], err
+}
+
+func unmarshalSourceUnit[unitType sources.SourceUnit](data []byte) (unitType, error) {
+	u := new(unitType)
+
+	if err := json.Unmarshal(data, u); err != nil {
+		return *new(unitType), err
+	}
+
+	return *u, nil
+}
+
+func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	env, err := unmarshalSourceUnit[unitEnvelope](data)
+	if err != nil {
+		return nil, err
+	}
+
+	switch env.Kind {
+	case "": // data is a raw SourceUnit, no envelope
+		// Look for a raw RepoUnit first
+		ru, err := unmarshalSourceUnit[RepoUnit](data)
+		if err != nil {
+			return nil, err
+		}
+
+		if ru.URL != "" { // This is the test for a valid RepoUnit
+			return ru, nil
+		}
+
+		if env.ID == "" { // This is the test for a valid generic GitHub Source Unit
+			return nil, errors.New("not a github source unit")
+		}
+
+		return env, nil
+	case "repo":
+		if len(env.UnitData) > 0 {
+			decodedData, err := decodeBase64(env.UnitData)
+			if err != nil {
+				return nil, fmt.Errorf("error decoding repo unit data: %w", err)
+			}
+			return unmarshalSourceUnit[RepoUnit](decodedData)
+		}
+		return RepoUnit{Name: env.Name, URL: env.ID}, nil
+	case "gist":
+		decodedData, err := decodeBase64(env.UnitData)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding gist unit data: %w", err)
+		}
+		if len(env.UnitData) > 0 {
+			return unmarshalSourceUnit[GistUnit](decodedData)
+		}
+		return GistUnit{Name: env.Name, URL: env.ID}, nil
+	default:
+		return nil, fmt.Errorf("unrecognized source unit kind %q", env.Kind)
+	}
+}
 
 // --------------------------------------------------------------------------------
 
@@ -433,7 +515,16 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			}
 			continue
 		}
-		if err := dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url}); err != nil {
+
+		var installationID int64 = 0
+		if ac, ok := s.connector.(*appConnector); ok {
+			ac.ensureRepoInstallation(url, name)
+			installationID, _ = ac.installationIDForRepo(url)
+		}
+
+		ru := RepoUnit{Name: name, URL: url, InstallationID: installationID}
+
+		if err := dedupeReporter.UnitOk(ctx, ru); err != nil {
 			return err
 		}
 	}
@@ -2428,8 +2519,14 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	repoURL, kind := unit.SourceUnitID()
 	ctx = context.WithValue(ctx, "repo", repoURL)
 
-	if connector, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations && kind == "repo" {
-		if err := s.mapReposToInstallations(ctx, connector, []string{repoURL}); err != nil {
+	// If the unit has an installation ID, use it. Fetching it is slow,
+	// specifically it stalls large multi-org scans on rate limits (INT-790).
+
+	// [CG] This is pretty ugly; if you can clean it up please do (I failed).
+	if ac, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations && kind == "repo" {
+		if ru, ok := unit.(RepoUnit); ok && ru.InstallationID > 0 {
+			ac.setRepoInstallationForRepoName(repoURL, ru.Name, ru.InstallationID)
+		} else if err := s.mapReposToInstallations(ctx, ac, []string{repoURL}); err != nil {
 			return err
 		}
 	}

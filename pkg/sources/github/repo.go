@@ -300,14 +300,22 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
 			s.cacheRepoInfo(r)
+
+			unit := RepoUnit{Name: repoName, URL: repoURL}
 			// Repos enumerated outside installation listings (e.g. member
 			// personal repos) belong to no installation; map them to the
 			// default installation so the scan-all mapping in ChunkUnit
 			// doesn't reject repos we just enumerated.
 			if connector, ok := s.connector.(*appConnector); ok && s.conn.GetScanAllInstallations() {
 				connector.ensureRepoInstallation(repoURL, r.GetName())
+				// Record the resolved installation on the unit so ChunkUnit
+				// scans it with the correct token without re-listing every
+				// installation's repos (INT-790).
+				if installID, mapped := connector.installationIDForRepo(repoURL); mapped {
+					unit.InstallationID = installID
+				}
 			}
-			if err := reporter.UnitOk(ctx, RepoUnit{Name: repoName, URL: repoURL}); err != nil {
+			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
 

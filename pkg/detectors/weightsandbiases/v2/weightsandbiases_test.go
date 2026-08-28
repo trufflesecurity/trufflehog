@@ -1,25 +1,16 @@
-package harness
+package weightsandbiases
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validKey               = "pat.4oXWHvYFRNOGLVpFTZGGTA.68077fc826afe36865614d58.2fFEmr57WO3zPmev3jze"
-	validKeyWithUnderscore = "pat.YDfcEm2LT_OUZrFZv1WVlg.6a4f91eb79dfb04b036caf48.FrDL8MGzpMygCMzZv1Kq"
-	validKeyWithoutKeyword = `API Key Token: pat.4oXWHvYFRNOGLVpFTZGGTA.68077fc826afe36865614d58.2fFEmr57WO3zPmev3jze
-	url |https://api.harness.io/`
-	invalidKey = "pat.4oXWHvYFRNOGLVpFTZGGTA.6807c5bed9599c324f6368ce.usCT2fzvADwSoXzXc"
-	keyword    = "harness"
-)
-
-func TestHarness_Pattern(t *testing.T) {
+func TestWeightsandbiasesV2_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -28,31 +19,35 @@ func TestHarness_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validKey),
-			want:  []string{validKey},
+			name:  "typical pattern",
+			input: "WANDB_API_KEY = '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'",
+			want:  []string{"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"},
 		},
 		{
-			name:  "valid pattern with underscore in account segment",
-			input: fmt.Sprintf("%s = '%s'", keyword, validKeyWithUnderscore),
-			want:  []string{validKeyWithUnderscore},
+			name: "finds all matches",
+			input: `WANDB_API_KEY = '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'
+WANDB_API_KEY = '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'`,
+			want: []string{
+				"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",
+				"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",
+			},
 		},
 		{
-			name:  "valid pattern - no keyword",
-			input: fmt.Sprintf("token = '%s'", validKeyWithoutKeyword),
-			want:  nil,
+			name:  "invalid pattern - wrong length",
+			input: "WANDB_API_KEY = 'wandb_v1_CNskTdKUs0f1uHZ4eOECFLof6aC_4IlqrKmMuTTfwXd5n6hf8VvcOX67MNii'",
+			want:  []string{},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token = '%s'", keyword, invalidKey),
-			want:  nil,
+			name:  "does not match v1 legacy format",
+			input: "WANDB_API_KEY = 'eedf1c984f6b995ec40ecc6658356044847ffb31'",
+			want:  []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
