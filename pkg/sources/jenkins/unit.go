@@ -12,26 +12,32 @@ const SourceUnitKindJob sources.SourceUnitKind = "job"
 // name in a job URL, e.g. /job/folder1/job/build.
 const jobPathSegment = "job"
 
-// JobUnit is a single Jenkins job, identified by its path relative to the
-// Jenkins instance. Jenkins reports absolute job URLs whose host comes from the
-// instance's own root URL setting, which can differ from the endpoint being
-// scanned, so only the path is retained. Chunks does the same when it scans a
-// job, so the path is the identity the source already relies on.
-type JobUnit struct {
+// JenkinsJob is a job as listed by the Jenkins API, and is the source unit the
+// Jenkins source enumerates.
+type JenkinsJob struct {
+	Class string `json:"_class"`
+	Name  string `json:"name"`
+	Url   string `json:"url"`
+	// Path is the job's path relative to the Jenkins instance. Jenkins reports
+	// absolute job URLs whose host comes from the instance's own root URL
+	// setting, which can differ from the endpoint being scanned, so only the
+	// path is retained as the identity. Chunks does the same when it scans a
+	// job. Path is not part of the Jenkins API response; walkJobs derives it
+	// from Url, so it is empty on a value decoded straight from a listing.
 	Path string `json:"path"`
 }
 
-var _ sources.SourceUnit = JobUnit{}
+var _ sources.SourceUnit = JenkinsJob{}
 
-func (j JobUnit) SourceUnitID() (string, sources.SourceUnitKind) {
+func (j JenkinsJob) SourceUnitID() (string, sources.SourceUnitKind) {
 	return j.Path, SourceUnitKindJob
 }
 
 // Display returns the job's folder path without the "job" segments Jenkins
 // interleaves, e.g. /jenkins/job/folder1/job/build becomes folder1/build. It is
-// derived from Path rather than stored so that a unit rebuilt from its ID alone
-// still renders a name.
-func (j JobUnit) Display() string {
+// derived from Path rather than from Name so that a unit rebuilt from its ID
+// alone still renders a name.
+func (j JenkinsJob) Display() string {
 	segments := strings.Split(strings.Trim(j.Path, "/"), "/")
 
 	// Walk in pairs so that a job named "job" and any instance base path

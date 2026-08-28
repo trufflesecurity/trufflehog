@@ -200,36 +200,43 @@ func (s *Source) GetJenkinsJobs(ctx context.Context) (JenkinsJobResponse, error)
 }
 
 func (s *Source) RecursivelyGetJenkinsObjectsForPath(ctx context.Context, absolutePath string) (JenkinsJobResponse, error) {
-	jobs := JenkinsJobResponse{}
-
-	collect := func(_ context.Context, job JenkinsJob) error {
-		jobs.Jobs = append(jobs.Jobs, job)
-		return nil
-	}
-	// Returning the error aborts the whole walk, which is the fail-fast
-	// behavior callers of this method have always had.
-	failFast := func(_ context.Context, err error) error { return err }
-
-	err := s.walkJobs(ctx, absolutePath, collect, failFast)
-	return jobs, err
+	collector := new(jobCollector)
+	err := s.walkJobs(ctx, absolutePath, collector)
+	return JenkinsJobResponse{Jobs: collector.jobs}, err
 }
 
-// walkJobs traverses the Jenkins object tree beneath absolutePath, calling
-// onJob for every scannable job it finds and onErr for every error it hits.
-// Recursion continues unless onJob or onErr returns an error, which aborts the
-// walk and is returned to the caller.
-func (s *Source) walkJobs(
-	ctx context.Context,
-	absolutePath string,
-	onJob func(context.Context, JenkinsJob) error,
-	onErr func(context.Context, error) error,
-) error {
+// jobCollector is the UnitReporter the non-unit path uses to gather the walk's
+// jobs into a slice. UnitErr returns the error it is given, which aborts the
+// walk, preserving the fail-fast behavior callers of GetJenkinsJobs have always
+// had.
+type jobCollector struct {
+	jobs []JenkinsJob
+}
+
+var _ sources.UnitReporter = (*jobCollector)(nil)
+
+func (c *jobCollector) UnitOk(_ context.Context, unit sources.SourceUnit) error {
+	job, ok := unit.(JenkinsJob)
+	if !ok {
+		return fmt.Errorf("expected JenkinsJob, got %T", unit)
+	}
+	c.jobs = append(c.jobs, job)
+	return nil
+}
+
+func (c *jobCollector) UnitErr(_ context.Context, err error) error { return err }
+
+// walkJobs traverses the Jenkins object tree beneath absolutePath, reporting
+// every scannable job it finds to the UnitReporter. Recursion continues unless
+// the reporter returns an error, which aborts the walk and is returned to the
+// caller.
+func (s *Source) walkJobs(ctx context.Context, absolutePath string, reporter sources.UnitReporter) error {
 	ctx.Logger().V(3).Info("getting objects",
 		"path", absolutePath)
 
 	objects, err := s.GetJenkinsObjectsForPath(ctx, absolutePath)
 	if err != nil {
-		return onErr(ctx, errors.WrapPrefix(err, fmt.Sprintf("failed to get Jenkins objects for path %q", absolutePath), 0))
+		return reporter.UnitErr(ctx, errors.WrapPrefix(err, fmt.Sprintf("failed to get Jenkins objects for path %q", absolutePath), 0))
 	}
 	ctx.Logger().V(3).Info("got objects",
 		"path", absolutePath,
@@ -240,29 +247,43 @@ func (s *Source) walkJobs(
 			return ctx.Err()
 		}
 
-		ctx.Logger().V(3).Info("processing object",
+		ctx := context.WithValues(ctx,
 			"object_name", job.Name,
 			"object_class", job.Class,
 			"object_url", job.Url)
+		ctx.Logger().V(3).Info("processing object")
 
 		if job.Class == "com.cloudbees.hudson.plugins.folder.Folder" {
 			u, err := url.Parse(job.Url)
 			if err != nil {
-				if err := onErr(ctx, fmt.Errorf("failed to parse folder URL %q: %w", job.Url, err)); err != nil {
+				if err := reporter.UnitErr(ctx, fmt.Errorf("failed to parse folder URL %q: %w", job.Url, err)); err != nil {
 					return err
 				}
 				continue
 			}
-			if err := s.walkJobs(ctx, u.Path, onJob, onErr); err != nil {
+			if err := s.walkJobs(ctx, u.Path, reporter); err != nil {
 				return err
 			}
-		} else {
-			if job.Class == "hudson.model.FreeStyleProject" ||
-				job.Class == "org.jenkinsci.plugins.workflow.job.WorkflowJob" {
-				if err := onJob(ctx, job); err != nil {
-					return err
-				}
-			}
+			continue
+		}
+
+		if job.Class != "hudson.model.FreeStyleProject" &&
+			job.Class != "org.jenkinsci.plugins.workflow.job.WorkflowJob" {
+			continue
+		}
+
+		parsedUrl, err := url.Parse(job.Url)
+		if err != nil {
+			// Skipped rather than reported, so that Enumerate and the walk
+			// Chunks uses agree on the set of jobs. Chunks skips a job it
+			// cannot parse a URL for too.
+			ctx.Logger().Error(err, "failed to parse job URL; skipping job")
+			continue
+		}
+		job.Path = strings.TrimSuffix(parsedUrl.Path, "/")
+
+		if err := reporter.UnitOk(ctx, job); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -378,13 +399,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		s.SetProgressComplete(i, len(jobs.Jobs), fmt.Sprintf("Project: %s", project.Name), "")
 
-		parsedUrl, err := url.Parse(project.Url)
-		if err != nil {
-			ctx.Logger().Error(err, "failed to parse job URL; skipping job")
-			continue
-		}
+		// Path is derived from the job URL by the walk above.
 		projectURL := *s.url
-		projectURL.Path = parsedUrl.Path
+		projectURL.Path = project.Path
 
 		builds, err := s.GetJenkinsBuilds(ctx, projectURL.Path)
 		if err != nil {
@@ -475,58 +492,41 @@ func (s *Source) chunkBuild(
 // is reported to the UnitReporter and the rest of the walk continues.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	baseUrl := *s.url
-	return s.walkJobs(ctx, baseUrl.Path,
-		func(ctx context.Context, job JenkinsJob) error {
-			parsedUrl, err := url.Parse(job.Url)
-			if err != nil {
-				return reporter.UnitErr(ctx, fmt.Errorf("failed to parse job URL %q: %w", job.Url, err))
-			}
-			// Only the path is retained, matching how Chunks rebases a job
-			// URL onto the configured endpoint.
-			return reporter.UnitOk(ctx, JobUnit{Path: strings.TrimSuffix(parsedUrl.Path, "/")})
-		},
-		reporter.UnitErr,
-	)
+	return s.walkJobs(ctx, baseUrl.Path, reporter)
 }
 
 // UnmarshalSourceUnit implements the SourceUnitUnmarshaller interface. It
 // accepts three shapes: the persisted envelope carrying unit_data (round-trips
 // the unit exactly), the envelope without unit_data (rebuilt from id), and a
-// bare JobUnit.
+// bare JenkinsJob.
 func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
 	var envelope unitEnvelope
 	if err := json.Unmarshal(data, &envelope); err == nil && envelope.Kind == string(SourceUnitKindJob) {
 		if envelope.UnitData != "" {
 			if decoded, err := base64.StdEncoding.DecodeString(envelope.UnitData); err == nil {
-				var unit JobUnit
+				var unit JenkinsJob
 				if json.Unmarshal(decoded, &unit) == nil && unit.Path != "" {
 					return unit, nil
 				}
 			}
 		}
 		if envelope.ID != "" {
-			return JobUnit{Path: envelope.ID}, nil
+			return JenkinsJob{Path: envelope.ID}, nil
 		}
 	}
 
-	var unit JobUnit
+	var unit JenkinsJob
 	if err := json.Unmarshal(data, &unit); err != nil {
 		return nil, err
 	}
 	if unit.Path == "" {
-		return nil, errors.New("not a Jenkins JobUnit")
+		return nil, errors.New("not a Jenkins job unit")
 	}
 	return unit, nil
 }
 
 type JenkinsJobResponse struct {
 	Jobs []JenkinsJob `json:"jobs"`
-}
-
-type JenkinsJob struct {
-	Class string `json:"_class"`
-	Name  string `json:"name"`
-	Url   string `json:"url"`
 }
 
 type JenkinsBuildResponse struct {

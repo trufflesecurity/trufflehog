@@ -217,9 +217,49 @@ func TestEnumerateMatchesChunkTraversal(t *testing.T) {
 	require.Len(t, reporter.units, len(jobs.Jobs))
 	for i, job := range jobs.Jobs {
 		id, _ := reporter.units[i].SourceUnitID()
+		assert.Equal(t, job.Path, id, "unit does not match the job Chunks would scan (%q)", job.Url)
 		assert.True(t, strings.HasSuffix(job.Url, id+"/"),
-			"unit %q does not match the job URL Chunks would scan (%q)", id, job.Url)
+			"job path %q was not derived from the job URL %q", job.Path, job.Url)
 	}
+}
+
+// TestUnparseableJobURLSkippedByBothPaths pins that a job whose URL cannot be
+// parsed drops out of enumeration and out of the walk Chunks uses, rather than
+// failing either one.
+func TestUnparseableJobURLSkippedByBothPaths(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	mux.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !strings.Contains(r.URL.RawQuery, "tree=jobs") {
+			_, _ = fmt.Fprint(w, `{"jobs":[]}`)
+			return
+		}
+		// The second URL has an invalid percent escape, which url.Parse rejects.
+		_, _ = fmt.Fprintf(w, `{"jobs":[`+
+			`{"_class":"hudson.model.FreeStyleProject","name":"good","url":"%s/job/good/"},`+
+			`{"_class":"hudson.model.FreeStyleProject","name":"bad","url":"%s/job/%%zz/"}`+
+			`]}`, server.URL, server.URL)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	s := newTestSource(t, ctx, server.URL, "test-jenkins-bad-job-url")
+
+	reporter := new(testUnitReporter)
+	require.NoError(t, s.Enumerate(ctx, reporter))
+	assert.Equal(t, []string{"/job/good"}, reporter.unitIDs(t))
+	assert.Empty(t, reporter.errs)
+
+	jobs, err := s.GetJenkinsJobs(ctx)
+	require.NoError(t, err)
+	require.Len(t, jobs.Jobs, 1)
+	assert.Equal(t, "/job/good", jobs.Jobs[0].Path)
 }
 
 // TestGetJenkinsJobsStillFailsFast pins the pre-existing behavior of the walk
@@ -239,7 +279,7 @@ func TestGetJenkinsJobsStillFailsFast(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestJobUnitDisplay(t *testing.T) {
+func TestJenkinsJobDisplay(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -251,7 +291,7 @@ func TestJobUnitDisplay(t *testing.T) {
 		{name: "nested", path: "/job/folder1/job/sub/job/build", want: "folder1/sub/build"},
 		// A folder holding many jobs is the normal case, so the leaf name has
 		// to survive into the display string or siblings would all render the
-		// same. See TestJobUnitDisplaySiblingsDiffer.
+		// same. See TestJenkinsJobDisplaySiblingsDiffer.
 		{name: "sibling in same folder", path: "/job/folder1/job/first", want: "folder1/first"},
 		{name: "other sibling in same folder", path: "/job/folder1/job/second", want: "folder1/second"},
 		{name: "instance base path", path: "/jenkins/job/folder1/job/build", want: "folder1/build"},
@@ -264,14 +304,14 @@ func TestJobUnitDisplay(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, JobUnit{Path: tt.path}.Display())
+			assert.Equal(t, tt.want, JenkinsJob{Path: tt.path}.Display())
 		})
 	}
 }
 
-// TestJobUnitDisplaySiblingsDiffer pins the property that distinct jobs never
+// TestJenkinsJobDisplaySiblingsDiffer pins the property that distinct jobs never
 // collapse to the same display string, including jobs sharing a folder.
-func TestJobUnitDisplaySiblingsDiffer(t *testing.T) {
+func TestJenkinsJobDisplaySiblingsDiffer(t *testing.T) {
 	t.Parallel()
 
 	paths := []string{
@@ -284,7 +324,7 @@ func TestJobUnitDisplaySiblingsDiffer(t *testing.T) {
 
 	seen := make(map[string]string, len(paths))
 	for _, path := range paths {
-		display := JobUnit{Path: path}.Display()
+		display := JenkinsJob{Path: path}.Display()
 		if previous, ok := seen[display]; ok {
 			t.Errorf("paths %q and %q both display as %q", previous, path, display)
 		}
@@ -292,10 +332,10 @@ func TestJobUnitDisplaySiblingsDiffer(t *testing.T) {
 	}
 }
 
-func TestJobUnitSourceUnitID(t *testing.T) {
+func TestJenkinsJobSourceUnitID(t *testing.T) {
 	t.Parallel()
 
-	id, kind := JobUnit{Path: "/job/folder1/job/build"}.SourceUnitID()
+	id, kind := JenkinsJob{Path: "/job/folder1/job/build"}.SourceUnitID()
 	assert.Equal(t, "/job/folder1/job/build", id)
 	assert.Equal(t, SourceUnitKindJob, kind)
 }
@@ -305,7 +345,7 @@ func TestUnmarshalSourceUnit(t *testing.T) {
 
 	const jobPath = "/job/folder1/job/build"
 
-	unitData, err := json.Marshal(JobUnit{Path: jobPath})
+	unitData, err := json.Marshal(JenkinsJob{Path: jobPath})
 	require.NoError(t, err)
 
 	envelopeWithData, err := json.Marshal(unitEnvelope{
