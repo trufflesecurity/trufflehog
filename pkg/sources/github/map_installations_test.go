@@ -1,6 +1,7 @@
 package github
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -23,6 +24,9 @@ func newMarshalledRepoUnit(t *testing.T, su sources.SourceUnit) []byte {
 
 	unitData, err := json.Marshal(su)
 	require.NoError(t, err)
+
+	// [CG] This additional base64 encoding mimics the pipeline's behavior
+	unitData = []byte(base64.StdEncoding.EncodeToString(unitData))
 
 	out, err := json.Marshal(map[string]any{
 		"id":        id,
