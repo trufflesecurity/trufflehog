@@ -52,27 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				domainRes := fmt.Sprintf("%s-s-school", resDomainMatch)
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/collections", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("X-Auth-API-Key", resMatch)
-				req.Header.Add("X-Auth-Subdomain", domainRes)
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer func() { _ = res.Body.Close() }()
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					body := string(bodyBytes)
-
-					if strings.Contains(body, "API Access is not available") {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyThinkific(ctx, client, resDomainMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resDomainMatch, resMatch)
 			}
 
 			results = append(results, s1)
@@ -80,6 +62,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyThinkific(ctx context.Context, client *http.Client, resDomainMatch string, resMatch string) (bool, error) {
+	domainRes := fmt.Sprintf("%s-s-school", resDomainMatch)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/collections", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("X-Auth-API-Key", resMatch)
+	req.Header.Add("X-Auth-Subdomain", domainRes)
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+
+	if strings.Contains(body, "API Access is not available") {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

@@ -612,6 +612,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.SlackWebhookDetectorEnabled.Store(true)
 	feature.TefterDetectorEnabled.Store(true)
 	feature.TeletypeDetectorEnabled.Store(true)
+	feature.ThinkificDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

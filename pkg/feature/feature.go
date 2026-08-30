@@ -87,6 +87,7 @@ var (
 	SlackWebhookDetectorEnabled        atomic.Bool
 	TefterDetectorEnabled              atomic.Bool
 	TeletypeDetectorEnabled            atomic.Bool
+	ThinkificDetectorEnabled           atomic.Bool
 )
 
 type AtomicString struct {
