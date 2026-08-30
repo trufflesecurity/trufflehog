@@ -588,6 +588,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.FixerIODetectorEnabled.Store(true)
 	feature.FlickrDetectorEnabled.Store(true)
 	feature.FlightstatsDetectorEnabled.Store(true)
+	feature.FlowFluDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
