@@ -398,4 +398,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_ReallySimpleSystems: {},
 	detector_typepb.DetectorType_Semaphore:           {},
 	detector_typepb.DetectorType_SimFin:              {},
+	detector_typepb.DetectorType_SlackWebhook:        {},
 }

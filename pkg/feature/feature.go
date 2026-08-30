@@ -84,6 +84,7 @@ var (
 	ReallySimpleSystemsDetectorEnabled atomic.Bool
 	SemaphoreDetectorEnabled           atomic.Bool
 	SimFinDetectorEnabled              atomic.Bool
+	SlackWebhookDetectorEnabled        atomic.Bool
 )
 
 type AtomicString struct {

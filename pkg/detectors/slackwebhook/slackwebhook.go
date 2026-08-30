@@ -63,44 +63,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				// We don't want to actually send anything to webhooks we find. To verify them without spamming them, we
-				// send an intentionally malformed message and look for a particular expected error message.
-				payload := strings.NewReader(`intentionally malformed JSON from TruffleHog scan`)
-				req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer func() { _ = res.Body.Close() }()
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-
-					defer func() { _ = res.Body.Close() }()
-
-					switch {
-					case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
-						// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
-						// we at least know the secret is verified.
-						s1.Verified = true
-					case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
-						s1.Verified = true
-					case res.StatusCode == http.StatusBadRequest && bytes.Contains(bodyBytes, []byte("invalid_token")):
-						// Slack may return the bare error code or embed it in a longer body, hence Contains not Equal.
-						// Revoked webhook / gone workspace or channel is determinate verified=false.
-					case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden:
-						// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
-						// You might want to handle this case or log it.
-					default:
-						err = fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
-						s1.SetVerificationError(err, resMatch)
-					}
-				} else {
-					s1.SetVerificationError(err, resMatch)
-				}
+				isVerified, verificationErr := verifySlackWebhook(ctx, client, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			results = append(results, s1)
@@ -108,6 +73,47 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifySlackWebhook(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	// We don't want to actually send anything to webhooks we find. To verify them without spamming them, we
+	// send an intentionally malformed message and look for a particular expected error message.
+	payload := strings.NewReader(`intentionally malformed JSON from TruffleHog scan`)
+	req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	switch {
+	case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
+		// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
+		// we at least know the secret is verified.
+		return true, nil
+	case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
+		return true, nil
+	case res.StatusCode == http.StatusBadRequest && bytes.Contains(bodyBytes, []byte("invalid_token")):
+		// Slack may return the bare error code or embed it in a longer body, hence Contains not Equal.
+		// Revoked webhook / gone workspace or channel is determinate verified=false.
+		return false, nil
+	case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden:
+		// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
+		// You might want to handle this case or log it.
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
+	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

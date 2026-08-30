@@ -1960,6 +1960,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SemaphoreDetectorEnabled.Load()
 		case *simfin.Scanner:
 			return !feature.SimFinDetectorEnabled.Load()
+		case *slackwebhook.Scanner:
+			return !feature.SlackWebhookDetectorEnabled.Load()
 		default:
 			return false
 		}
