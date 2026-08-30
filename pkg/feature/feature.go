@@ -66,6 +66,7 @@ var (
 	FlowFluDetectorEnabled       atomic.Bool
 	FreshbooksDetectorEnabled    atomic.Bool
 	GengoDetectorEnabled         atomic.Bool
+	GoCanvasDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {

@@ -591,6 +591,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.FlowFluDetectorEnabled.Store(true)
 	feature.FreshbooksDetectorEnabled.Store(true)
 	feature.GengoDetectorEnabled.Store(true)
+	feature.GoCanvasDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

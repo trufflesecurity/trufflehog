@@ -1924,6 +1924,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.FreshbooksDetectorEnabled.Load()
 		case *gengo.Scanner:
 			return !feature.GengoDetectorEnabled.Load()
+		case *gocanvas.Scanner:
+			return !feature.GoCanvasDetectorEnabled.Load()
 		default:
 			return false
 		}

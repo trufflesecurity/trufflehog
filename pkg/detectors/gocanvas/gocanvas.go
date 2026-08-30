@@ -59,31 +59,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				payload := url.Values{}
-				payload.Add("username", emailMatch)
-
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-				res, err := client.Do(req)
-				if err == nil {
-					defer func() { _ = res.Body.Close() }()
-					body, errBody := io.ReadAll(res.Body)
-
-					if errBody == nil {
-						response := Response{}
-						if err := xml.Unmarshal(body, &response); err != nil {
-							continue
-						}
-
-						if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
-							s1.Verified = true
-						}
-					}
-				}
+				isVerified, verificationErr := verifyGoCanvas(ctx, client, emailMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, emailMatch, resMatch)
 			}
 
 			results = append(results, s1)
@@ -91,6 +69,37 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyGoCanvas(ctx context.Context, client *http.Client, emailMatch string, resMatch string) (bool, error) {
+	payload := url.Values{}
+	payload.Add("username", emailMatch)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	body, errBody := io.ReadAll(res.Body)
+
+	if errBody == nil {
+		response := Response{}
+		if err := xml.Unmarshal(body, &response); err != nil {
+			return false, err
+		}
+
+		if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 type Response struct {
