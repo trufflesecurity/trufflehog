@@ -593,6 +593,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.GengoDetectorEnabled.Store(true)
 	feature.GoCanvasDetectorEnabled.Store(true)
 	feature.HolisticDetectorEnabled.Store(true)
+	feature.HumanityDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

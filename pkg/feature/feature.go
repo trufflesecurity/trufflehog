@@ -68,6 +68,7 @@ var (
 	GengoDetectorEnabled         atomic.Bool
 	GoCanvasDetectorEnabled      atomic.Bool
 	HolisticDetectorEnabled      atomic.Bool
+	HumanityDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {

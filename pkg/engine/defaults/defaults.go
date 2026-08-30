@@ -1928,6 +1928,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.GoCanvasDetectorEnabled.Load()
 		case *holistic.Scanner:
 			return !feature.HolisticDetectorEnabled.Load()
+		case *humanity.Scanner:
+			return !feature.HumanityDetectorEnabled.Load()
 		default:
 			return false
 		}
