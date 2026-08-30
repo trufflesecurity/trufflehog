@@ -1940,6 +1940,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.LinearAPIDetectorEnabled.Load()
 		case *mailboxlayer.Scanner:
 			return !feature.MailboxlayerDetectorEnabled.Load()
+		case *metabase.Scanner:
+			return !feature.MetabaseDetectorEnabled.Load()
 		default:
 			return false
 		}

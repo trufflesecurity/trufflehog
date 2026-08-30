@@ -74,6 +74,7 @@ var (
 	IpStackDetectorEnabled       atomic.Bool
 	LinearAPIDetectorEnabled     atomic.Bool
 	MailboxlayerDetectorEnabled  atomic.Bool
+	MetabaseDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {
