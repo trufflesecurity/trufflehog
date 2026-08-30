@@ -597,6 +597,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.InfuraDetectorEnabled.Store(true)
 	feature.InstamojoDetectorEnabled.Store(true)
 	feature.IpStackDetectorEnabled.Store(true)
+	feature.LinearAPIDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

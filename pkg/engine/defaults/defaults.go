@@ -1936,6 +1936,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InstamojoDetectorEnabled.Load()
 		case *ipstack.Scanner:
 			return !feature.IpStackDetectorEnabled.Load()
+		case *linearapi.Scanner:
+			return !feature.LinearAPIDetectorEnabled.Load()
 		default:
 			return false
 		}
