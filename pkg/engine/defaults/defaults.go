@@ -1978,6 +1978,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.WalkScoreDetectorEnabled.Load()
 		case *weatherstack.Scanner:
 			return !feature.WeatherStackDetectorEnabled.Load()
+		case *webscraping.Scanner:
+			return !feature.WebscrapingDetectorEnabled.Load()
 		default:
 			return false
 		}
