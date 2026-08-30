@@ -61,30 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				payload := strings.NewReader("grant_type=client_credentials&client_id=" + resClientId + "&client_secret=" + resSecret)
-
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.instamojo.com/oauth2/token/", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				res, err := client.Do(req)
-				if err == nil {
-					defer func() { _ = res.Body.Close() }()
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					body := string(bodyBytes)
-					if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "access_token") {
-						s1.Verified = true
-					} else {
-						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-						s1.SetVerificationError(err, resSecret)
-					}
-				} else {
-					s1.SetVerificationError(err, resSecret)
-				}
+				isVerified, verificationErr := verifyInstamojo(ctx, client, resClientId, resSecret)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resClientId, resSecret)
 			}
 
 			results = append(results, s1)
@@ -92,6 +71,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyInstamojo(ctx context.Context, client *http.Client, resClientId, resSecret string) (bool, error) {
+	payload := strings.NewReader("grant_type=client_credentials&client_id=" + resClientId + "&client_secret=" + resSecret)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.instamojo.com/oauth2/token/", payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "access_token") {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

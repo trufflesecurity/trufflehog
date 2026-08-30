@@ -1932,6 +1932,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.HumanityDetectorEnabled.Load()
 		case *infura.Scanner:
 			return !feature.InfuraDetectorEnabled.Load()
+		case *instamojo.Scanner:
+			return !feature.InstamojoDetectorEnabled.Load()
 		default:
 			return false
 		}

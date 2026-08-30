@@ -70,6 +70,7 @@ var (
 	HolisticDetectorEnabled      atomic.Bool
 	HumanityDetectorEnabled      atomic.Bool
 	InfuraDetectorEnabled        atomic.Bool
+	InstamojoDetectorEnabled     atomic.Bool
 )
 
 type AtomicString struct {
