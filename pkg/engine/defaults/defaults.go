@@ -1972,6 +1972,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.TwelveDataDetectorEnabled.Load()
 		case *unifyid.Scanner:
 			return !feature.UnifyIDDetectorEnabled.Load()
+		case *uptimerobot.Scanner:
+			return !feature.UptimeRobotDetectorEnabled.Load()
 		default:
 			return false
 		}

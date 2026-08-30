@@ -404,4 +404,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Thinkific:           {},
 	detector_typepb.DetectorType_TwelveData:          {},
 	detector_typepb.DetectorType_UnifyID:             {},
+	detector_typepb.DetectorType_UptimeRobot:         {},
 }

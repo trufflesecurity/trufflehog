@@ -90,6 +90,7 @@ var (
 	ThinkificDetectorEnabled           atomic.Bool
 	TwelveDataDetectorEnabled          atomic.Bool
 	UnifyIDDetectorEnabled             atomic.Bool
+	UptimeRobotDetectorEnabled         atomic.Bool
 )
 
 type AtomicString struct {
