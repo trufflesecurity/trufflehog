@@ -387,4 +387,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Instamojo:     {},
 	detector_typepb.DetectorType_IpStack:       {},
 	detector_typepb.DetectorType_LinearAPI:     {},
+	detector_typepb.DetectorType_Mailboxlayer:  {},
 }

@@ -1938,6 +1938,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.IpStackDetectorEnabled.Load()
 		case *linearapi.Scanner:
 			return !feature.LinearAPIDetectorEnabled.Load()
+		case *mailboxlayer.Scanner:
+			return !feature.MailboxlayerDetectorEnabled.Load()
 		default:
 			return false
 		}
