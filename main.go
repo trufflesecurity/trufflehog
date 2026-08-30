@@ -583,6 +583,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.ConvierDetectorEnabled.Store(true)
 	feature.CryptoCompareDetectorEnabled.Store(true)
 	feature.DareboostDetectorEnabled.Store(true)
+	feature.DyspatchDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

@@ -58,6 +58,7 @@ var (
 	ConvierDetectorEnabled       atomic.Bool
 	CryptoCompareDetectorEnabled atomic.Bool
 	DareboostDetectorEnabled     atomic.Bool
+	DyspatchDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {

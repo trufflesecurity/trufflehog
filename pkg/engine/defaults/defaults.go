@@ -1908,6 +1908,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CryptoCompareDetectorEnabled.Load()
 		case *dareboost.Scanner:
 			return !feature.DareboostDetectorEnabled.Load()
+		case *dyspatch.Scanner:
+			return !feature.DyspatchDetectorEnabled.Load()
 		default:
 			return false
 		}

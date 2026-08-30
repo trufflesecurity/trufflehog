@@ -372,4 +372,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Convier:       {},
 	detector_typepb.DetectorType_CryptoCompare: {},
 	detector_typepb.DetectorType_Dareboost:     {},
+	detector_typepb.DetectorType_Dyspatch:      {},
 }
