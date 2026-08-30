@@ -1958,6 +1958,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ReallySimpleSystemsDetectorEnabled.Load()
 		case *semaphore.Scanner:
 			return !feature.SemaphoreDetectorEnabled.Load()
+		case *simfin.Scanner:
+			return !feature.SimFinDetectorEnabled.Load()
 		default:
 			return false
 		}

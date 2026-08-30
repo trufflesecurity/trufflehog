@@ -83,6 +83,7 @@ var (
 	RazorPayDetectorEnabled            atomic.Bool
 	ReallySimpleSystemsDetectorEnabled atomic.Bool
 	SemaphoreDetectorEnabled           atomic.Bool
+	SimFinDetectorEnabled              atomic.Bool
 )
 
 type AtomicString struct {
