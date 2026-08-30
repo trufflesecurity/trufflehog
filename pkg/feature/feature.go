@@ -77,6 +77,7 @@ var (
 	MetabaseDetectorEnabled      atomic.Bool
 	MoosendDetectorEnabled       atomic.Bool
 	MrticktockDetectorEnabled    atomic.Bool
+	OnedeskDetectorEnabled       atomic.Bool
 )
 
 type AtomicString struct {

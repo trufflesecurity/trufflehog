@@ -391,4 +391,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Metabase:      {},
 	detector_typepb.DetectorType_Moosend:       {},
 	detector_typepb.DetectorType_Mrticktock:    {},
+	detector_typepb.DetectorType_Onedesk:       {},
 }

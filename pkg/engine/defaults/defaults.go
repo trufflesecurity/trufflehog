@@ -1946,6 +1946,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MoosendDetectorEnabled.Load()
 		case *mrticktock.Scanner:
 			return !feature.MrticktockDetectorEnabled.Load()
+		case *onedesk.Scanner:
+			return !feature.OnedeskDetectorEnabled.Load()
 		default:
 			return false
 		}
