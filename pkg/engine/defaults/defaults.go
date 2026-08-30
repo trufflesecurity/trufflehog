@@ -1980,6 +1980,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.WeatherStackDetectorEnabled.Load()
 		case *webscraping.Scanner:
 			return !feature.WebscrapingDetectorEnabled.Load()
+		case *websitepulse.Scanner:
+			return !feature.WebsitepulseDetectorEnabled.Load()
 		default:
 			return false
 		}

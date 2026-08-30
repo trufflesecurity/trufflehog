@@ -408,4 +408,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_WalkScore:           {},
 	detector_typepb.DetectorType_WeatherStack:        {},
 	detector_typepb.DetectorType_Webscraping:         {},
+	detector_typepb.DetectorType_Websitepulse:        {},
 }
