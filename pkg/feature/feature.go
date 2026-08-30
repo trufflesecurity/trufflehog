@@ -99,6 +99,7 @@ var (
 	MongoDBDetectorEnabled             atomic.Bool
 	JDBCDetectorEnabled                atomic.Bool
 	PostgresDetectorEnabled            atomic.Bool
+	URIDetectorEnabled                 atomic.Bool
 )
 
 type AtomicString struct {

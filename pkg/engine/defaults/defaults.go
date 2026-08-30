@@ -1990,6 +1990,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.JDBCDetectorEnabled.Load()
 		case *postgres.Scanner:
 			return !feature.PostgresDetectorEnabled.Load()
+		case *uri.Scanner:
+			return !feature.URIDetectorEnabled.Load()
 		default:
 			return false
 		}

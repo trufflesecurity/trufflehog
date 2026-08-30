@@ -624,6 +624,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.MongoDBDetectorEnabled.Store(true)
 	feature.JDBCDetectorEnabled.Store(true)
 	feature.PostgresDetectorEnabled.Store(true)
+	feature.URIDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
