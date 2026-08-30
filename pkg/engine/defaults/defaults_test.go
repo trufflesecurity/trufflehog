@@ -378,4 +378,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Flickr:        {},
 	detector_typepb.DetectorType_Flightstats:   {},
 	detector_typepb.DetectorType_FlowFlu:       {},
+	detector_typepb.DetectorType_Freshbooks:    {},
 }

@@ -1920,6 +1920,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.FlightstatsDetectorEnabled.Load()
 		case *flowflu.Scanner:
 			return !feature.FlowFluDetectorEnabled.Load()
+		case *freshbooks.Scanner:
+			return !feature.FreshbooksDetectorEnabled.Load()
 		default:
 			return false
 		}
