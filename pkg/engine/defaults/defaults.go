@@ -1926,6 +1926,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.GengoDetectorEnabled.Load()
 		case *gocanvas.Scanner:
 			return !feature.GoCanvasDetectorEnabled.Load()
+		case *holistic.Scanner:
+			return !feature.HolisticDetectorEnabled.Load()
 		default:
 			return false
 		}

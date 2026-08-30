@@ -381,4 +381,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Freshbooks:    {},
 	detector_typepb.DetectorType_Gengo:         {},
 	detector_typepb.DetectorType_GoCanvas:      {},
+	detector_typepb.DetectorType_Holistic:      {},
 }

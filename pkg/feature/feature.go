@@ -67,6 +67,7 @@ var (
 	FreshbooksDetectorEnabled    atomic.Bool
 	GengoDetectorEnabled         atomic.Bool
 	GoCanvasDetectorEnabled      atomic.Bool
+	HolisticDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {
