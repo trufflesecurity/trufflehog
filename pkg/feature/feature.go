@@ -95,6 +95,7 @@ var (
 	WeatherStackDetectorEnabled        atomic.Bool
 	WebscrapingDetectorEnabled         atomic.Bool
 	WebsitepulseDetectorEnabled        atomic.Bool
+	WhoxyDetectorEnabled               atomic.Bool
 )
 
 type AtomicString struct {

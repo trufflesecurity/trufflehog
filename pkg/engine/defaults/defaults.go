@@ -1982,6 +1982,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.WebscrapingDetectorEnabled.Load()
 		case *websitepulse.Scanner:
 			return !feature.WebsitepulseDetectorEnabled.Load()
+		case *whoxy.Scanner:
+			return !feature.WhoxyDetectorEnabled.Load()
 		default:
 			return false
 		}
