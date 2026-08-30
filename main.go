@@ -580,6 +580,7 @@ func run(state overseer.State, logSync func() error) {
 	// INT-595: gated while verification-error reporting is rolled out.
 	feature.CexIODetectorEnabled.Store(true)
 	feature.CommoditiesDetectorEnabled.Store(true)
+	feature.ConvierDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

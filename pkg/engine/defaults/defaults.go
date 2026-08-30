@@ -1902,6 +1902,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CexIODetectorEnabled.Load()
 		case *commodities.Scanner:
 			return !feature.CommoditiesDetectorEnabled.Load()
+		case *convier.Scanner:
+			return !feature.ConvierDetectorEnabled.Load()
 		default:
 			return false
 		}
