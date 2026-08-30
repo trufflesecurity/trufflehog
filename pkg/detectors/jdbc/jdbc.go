@@ -117,7 +117,11 @@ matchLoop:
 				}
 			}
 		} else if verify {
-			continue
+			// The connection string could not be parsed, so the credential was never tested.
+			// That is an indeterminate outcome, not a rejection: we report it as unverified carrying the parse error.
+			// Dropping it here made the reported findings depend on whether verification was requested,
+			// since the unparseable match is kept when verify is false.
+			result.SetVerificationError(parseErr, jdbcConn)
 		}
 
 		results = append(results, result)
