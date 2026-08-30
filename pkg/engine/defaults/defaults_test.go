@@ -373,4 +373,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_CryptoCompare: {},
 	detector_typepb.DetectorType_Dareboost:     {},
 	detector_typepb.DetectorType_Dyspatch:      {},
+	detector_typepb.DetectorType_Etherscan:     {},
 }

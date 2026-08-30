@@ -1910,6 +1910,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.DareboostDetectorEnabled.Load()
 		case *dyspatch.Scanner:
 			return !feature.DyspatchDetectorEnabled.Load()
+		case *etherscan.Scanner:
+			return !feature.EtherscanDetectorEnabled.Load()
 		default:
 			return false
 		}
