@@ -80,6 +80,7 @@ var (
 	OnedeskDetectorEnabled       atomic.Bool
 	ParallelDotsDetectorEnabled  atomic.Bool
 	PlanyoDetectorEnabled        atomic.Bool
+	RazorPayDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {

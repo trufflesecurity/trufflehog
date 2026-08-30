@@ -605,6 +605,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.OnedeskDetectorEnabled.Store(true)
 	feature.ParallelDotsDetectorEnabled.Store(true)
 	feature.PlanyoDetectorEnabled.Store(true)
+	feature.RazorPayDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

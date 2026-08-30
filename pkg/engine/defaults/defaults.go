@@ -1952,6 +1952,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ParallelDotsDetectorEnabled.Load()
 		case *planyo.Scanner:
 			return !feature.PlanyoDetectorEnabled.Load()
+		case *razorpay.Scanner:
+			return !feature.RazorPayDetectorEnabled.Load()
 		default:
 			return false
 		}

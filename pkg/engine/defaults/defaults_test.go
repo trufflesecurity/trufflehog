@@ -394,4 +394,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Onedesk:       {},
 	detector_typepb.DetectorType_ParallelDots:  {},
 	detector_typepb.DetectorType_Planyo:        {},
+	detector_typepb.DetectorType_RazorPay:      {},
 }
