@@ -1954,6 +1954,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.PlanyoDetectorEnabled.Load()
 		case *razorpay.Scanner:
 			return !feature.RazorPayDetectorEnabled.Load()
+		case *reallysimplesystems.Scanner:
+			return !feature.ReallySimpleSystemsDetectorEnabled.Load()
 		default:
 			return false
 		}
