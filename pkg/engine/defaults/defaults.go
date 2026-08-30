@@ -1900,6 +1900,8 @@ func buildDetectorList() []detectors.Detector {
 		// INT-595: gated while verification-error reporting is rolled out.
 		case *cexio.Scanner:
 			return !feature.CexIODetectorEnabled.Load()
+		case *commodities.Scanner:
+			return !feature.CommoditiesDetectorEnabled.Load()
 		default:
 			return false
 		}
