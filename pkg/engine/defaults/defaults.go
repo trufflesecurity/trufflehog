@@ -1944,6 +1944,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MetabaseDetectorEnabled.Load()
 		case *moosend.Scanner:
 			return !feature.MoosendDetectorEnabled.Load()
+		case *mrticktock.Scanner:
+			return !feature.MrticktockDetectorEnabled.Load()
 		default:
 			return false
 		}

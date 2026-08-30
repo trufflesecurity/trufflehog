@@ -76,6 +76,7 @@ var (
 	MailboxlayerDetectorEnabled  atomic.Bool
 	MetabaseDetectorEnabled      atomic.Bool
 	MoosendDetectorEnabled       atomic.Bool
+	MrticktockDetectorEnabled    atomic.Bool
 )
 
 type AtomicString struct {
