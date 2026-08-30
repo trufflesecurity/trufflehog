@@ -1968,6 +1968,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.TeletypeDetectorEnabled.Load()
 		case *thinkific.Scanner:
 			return !feature.ThinkificDetectorEnabled.Load()
+		case *twelvedata.Scanner:
+			return !feature.TwelveDataDetectorEnabled.Load()
 		default:
 			return false
 		}

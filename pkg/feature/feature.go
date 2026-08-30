@@ -88,6 +88,7 @@ var (
 	TefterDetectorEnabled              atomic.Bool
 	TeletypeDetectorEnabled            atomic.Bool
 	ThinkificDetectorEnabled           atomic.Bool
+	TwelveDataDetectorEnabled          atomic.Bool
 )
 
 type AtomicString struct {

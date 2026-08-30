@@ -613,6 +613,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.TefterDetectorEnabled.Store(true)
 	feature.TeletypeDetectorEnabled.Store(true)
 	feature.ThinkificDetectorEnabled.Store(true)
+	feature.TwelveDataDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

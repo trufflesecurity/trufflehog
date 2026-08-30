@@ -402,4 +402,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Tefter:              {},
 	detector_typepb.DetectorType_Teletype:            {},
 	detector_typepb.DetectorType_Thinkific:           {},
+	detector_typepb.DetectorType_TwelveData:          {},
 }
