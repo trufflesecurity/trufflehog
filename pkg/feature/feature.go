@@ -92,6 +92,7 @@ var (
 	UnifyIDDetectorEnabled             atomic.Bool
 	UptimeRobotDetectorEnabled         atomic.Bool
 	WalkScoreDetectorEnabled           atomic.Bool
+	WeatherStackDetectorEnabled        atomic.Bool
 )
 
 type AtomicString struct {

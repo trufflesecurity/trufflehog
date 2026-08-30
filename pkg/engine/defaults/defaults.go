@@ -1976,6 +1976,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.UptimeRobotDetectorEnabled.Load()
 		case *walkscore.Scanner:
 			return !feature.WalkScoreDetectorEnabled.Load()
+		case *weatherstack.Scanner:
+			return !feature.WeatherStackDetectorEnabled.Load()
 		default:
 			return false
 		}
