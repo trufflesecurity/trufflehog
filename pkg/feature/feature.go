@@ -71,6 +71,7 @@ var (
 	HumanityDetectorEnabled      atomic.Bool
 	InfuraDetectorEnabled        atomic.Bool
 	InstamojoDetectorEnabled     atomic.Bool
+	IpStackDetectorEnabled       atomic.Bool
 )
 
 type AtomicString struct {

@@ -1934,6 +1934,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InfuraDetectorEnabled.Load()
 		case *instamojo.Scanner:
 			return !feature.InstamojoDetectorEnabled.Load()
+		case *ipstack.Scanner:
+			return !feature.IpStackDetectorEnabled.Load()
 		default:
 			return false
 		}
