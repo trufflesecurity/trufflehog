@@ -47,30 +47,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(`{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://mainnet.infura.io/v3/"+resMatch, payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				if strings.Contains(body, `"result"`) {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyInfura(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyInfura(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	payload := strings.NewReader(`{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://mainnet.infura.io/v3/"+resMatch, payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if strings.Contains(body, `"result"`) {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

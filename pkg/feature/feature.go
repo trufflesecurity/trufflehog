@@ -69,6 +69,7 @@ var (
 	GoCanvasDetectorEnabled      atomic.Bool
 	HolisticDetectorEnabled      atomic.Bool
 	HumanityDetectorEnabled      atomic.Bool
+	InfuraDetectorEnabled        atomic.Bool
 )
 
 type AtomicString struct {

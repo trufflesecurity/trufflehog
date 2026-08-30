@@ -1930,6 +1930,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.HolisticDetectorEnabled.Load()
 		case *humanity.Scanner:
 			return !feature.HumanityDetectorEnabled.Load()
+		case *infura.Scanner:
+			return !feature.InfuraDetectorEnabled.Load()
 		default:
 			return false
 		}

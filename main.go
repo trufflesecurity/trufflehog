@@ -594,6 +594,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.GoCanvasDetectorEnabled.Store(true)
 	feature.HolisticDetectorEnabled.Store(true)
 	feature.HumanityDetectorEnabled.Store(true)
+	feature.InfuraDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
