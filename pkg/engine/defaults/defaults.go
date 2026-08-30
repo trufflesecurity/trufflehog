@@ -1912,6 +1912,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.DyspatchDetectorEnabled.Load()
 		case *etherscan.Scanner:
 			return !feature.EtherscanDetectorEnabled.Load()
+		case *fixerio.Scanner:
+			return !feature.FixerIODetectorEnabled.Load()
 		default:
 			return false
 		}

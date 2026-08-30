@@ -585,6 +585,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.DareboostDetectorEnabled.Store(true)
 	feature.DyspatchDetectorEnabled.Store(true)
 	feature.EtherscanDetectorEnabled.Store(true)
+	feature.FixerIODetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

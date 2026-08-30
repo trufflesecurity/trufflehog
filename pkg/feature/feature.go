@@ -60,6 +60,7 @@ var (
 	DareboostDetectorEnabled     atomic.Bool
 	DyspatchDetectorEnabled      atomic.Bool
 	EtherscanDetectorEnabled     atomic.Bool
+	FixerIODetectorEnabled       atomic.Bool
 )
 
 type AtomicString struct {
