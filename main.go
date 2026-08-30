@@ -590,6 +590,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.FlightstatsDetectorEnabled.Store(true)
 	feature.FlowFluDetectorEnabled.Store(true)
 	feature.FreshbooksDetectorEnabled.Store(true)
+	feature.GengoDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

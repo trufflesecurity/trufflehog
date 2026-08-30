@@ -1922,6 +1922,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.FlowFluDetectorEnabled.Load()
 		case *freshbooks.Scanner:
 			return !feature.FreshbooksDetectorEnabled.Load()
+		case *gengo.Scanner:
+			return !feature.GengoDetectorEnabled.Load()
 		default:
 			return false
 		}

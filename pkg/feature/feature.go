@@ -65,6 +65,7 @@ var (
 	FlightstatsDetectorEnabled   atomic.Bool
 	FlowFluDetectorEnabled       atomic.Bool
 	FreshbooksDetectorEnabled    atomic.Bool
+	GengoDetectorEnabled         atomic.Bool
 )
 
 type AtomicString struct {
