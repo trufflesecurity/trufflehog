@@ -1904,6 +1904,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.CommoditiesDetectorEnabled.Load()
 		case *convier.Scanner:
 			return !feature.ConvierDetectorEnabled.Load()
+		case *cryptocompare.Scanner:
+			return !feature.CryptoCompareDetectorEnabled.Load()
 		default:
 			return false
 		}

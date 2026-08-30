@@ -47,33 +47,40 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://min-api.cryptocompare.com/data/blockchain/list?api_key="+resMatch, nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				bodyString := string(bodyBytes)
-				errCode := strings.Contains(bodyString, `"Response":"Success"`)
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if errCode {
-						s1.Verified = true
-					} else {
-						s1.Verified = false
-					}
-				}
-			}
+			isVerified, verificationErr := verifyCryptoCompare(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyCryptoCompare(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://min-api.cryptocompare.com/data/blockchain/list?api_key="+resMatch, nil)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	bodyString := string(bodyBytes)
+	errCode := strings.Contains(bodyString, `"Response":"Success"`)
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		if errCode {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

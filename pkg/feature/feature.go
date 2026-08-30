@@ -53,9 +53,10 @@ var (
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
 
 	// INT-595: gated while verification-error reporting is rolled out.
-	CexIODetectorEnabled       atomic.Bool
-	CommoditiesDetectorEnabled atomic.Bool
-	ConvierDetectorEnabled     atomic.Bool
+	CexIODetectorEnabled         atomic.Bool
+	CommoditiesDetectorEnabled   atomic.Bool
+	ConvierDetectorEnabled       atomic.Bool
+	CryptoCompareDetectorEnabled atomic.Bool
 )
 
 type AtomicString struct {

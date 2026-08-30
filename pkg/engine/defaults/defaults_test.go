@@ -367,7 +367,8 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_BuiltWith:                               {},
 
 	// INT-595: gated while verification-error reporting is rolled out.
-	detector_typepb.DetectorType_CexIO:       {},
-	detector_typepb.DetectorType_Commodities: {},
-	detector_typepb.DetectorType_Convier:     {},
+	detector_typepb.DetectorType_CexIO:         {},
+	detector_typepb.DetectorType_Commodities:   {},
+	detector_typepb.DetectorType_Convier:       {},
+	detector_typepb.DetectorType_CryptoCompare: {},
 }
