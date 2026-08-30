@@ -1896,6 +1896,10 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SolarwindsDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
+
+		// INT-595: gated while verification-error reporting is rolled out.
+		case *cexio.Scanner:
+			return !feature.CexIODetectorEnabled.Load()
 		default:
 			return false
 		}

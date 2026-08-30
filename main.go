@@ -577,6 +577,9 @@ func run(state overseer.State, logSync func() error) {
 	feature.SolarwindsDetectorEnabled.Store(true)
 	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
 
+	// INT-595: gated while verification-error reporting is rolled out.
+	feature.CexIODetectorEnabled.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error

@@ -51,6 +51,9 @@ var (
 	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 	SolarwindsDetectorEnabled                atomic.Bool
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
+
+	// INT-595: gated while verification-error reporting is rolled out.
+	CexIODetectorEnabled atomic.Bool
 )
 
 type AtomicString struct {
