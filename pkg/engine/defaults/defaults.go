@@ -1956,6 +1956,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.RazorPayDetectorEnabled.Load()
 		case *reallysimplesystems.Scanner:
 			return !feature.ReallySimpleSystemsDetectorEnabled.Load()
+		case *semaphore.Scanner:
+			return !feature.SemaphoreDetectorEnabled.Load()
 		default:
 			return false
 		}

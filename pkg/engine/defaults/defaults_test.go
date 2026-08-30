@@ -396,4 +396,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Planyo:              {},
 	detector_typepb.DetectorType_RazorPay:            {},
 	detector_typepb.DetectorType_ReallySimpleSystems: {},
+	detector_typepb.DetectorType_Semaphore:           {},
 }

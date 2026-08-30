@@ -82,6 +82,7 @@ var (
 	PlanyoDetectorEnabled              atomic.Bool
 	RazorPayDetectorEnabled            atomic.Bool
 	ReallySimpleSystemsDetectorEnabled atomic.Bool
+	SemaphoreDetectorEnabled           atomic.Bool
 )
 
 type AtomicString struct {

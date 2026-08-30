@@ -607,6 +607,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.PlanyoDetectorEnabled.Store(true)
 	feature.RazorPayDetectorEnabled.Store(true)
 	feature.ReallySimpleSystemsDetectorEnabled.Store(true)
+	feature.SemaphoreDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
