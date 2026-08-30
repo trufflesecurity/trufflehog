@@ -1948,6 +1948,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MrticktockDetectorEnabled.Load()
 		case *onedesk.Scanner:
 			return !feature.OnedeskDetectorEnabled.Load()
+		case *paralleldots.Scanner:
+			return !feature.ParallelDotsDetectorEnabled.Load()
 		default:
 			return false
 		}

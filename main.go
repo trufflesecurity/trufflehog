@@ -603,6 +603,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.MoosendDetectorEnabled.Store(true)
 	feature.MrticktockDetectorEnabled.Store(true)
 	feature.OnedeskDetectorEnabled.Store(true)
+	feature.ParallelDotsDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

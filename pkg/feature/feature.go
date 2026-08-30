@@ -78,6 +78,7 @@ var (
 	MoosendDetectorEnabled       atomic.Bool
 	MrticktockDetectorEnabled    atomic.Bool
 	OnedeskDetectorEnabled       atomic.Bool
+	ParallelDotsDetectorEnabled  atomic.Bool
 )
 
 type AtomicString struct {
