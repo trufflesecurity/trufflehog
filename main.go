@@ -616,6 +616,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.TwelveDataDetectorEnabled.Store(true)
 	feature.UnifyIDDetectorEnabled.Store(true)
 	feature.UptimeRobotDetectorEnabled.Store(true)
+	feature.WalkScoreDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

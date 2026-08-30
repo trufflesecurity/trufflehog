@@ -91,6 +91,7 @@ var (
 	TwelveDataDetectorEnabled          atomic.Bool
 	UnifyIDDetectorEnabled             atomic.Bool
 	UptimeRobotDetectorEnabled         atomic.Bool
+	WalkScoreDetectorEnabled           atomic.Bool
 )
 
 type AtomicString struct {
