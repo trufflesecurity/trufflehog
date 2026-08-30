@@ -1916,6 +1916,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.FixerIODetectorEnabled.Load()
 		case *flickr.Scanner:
 			return !feature.FlickrDetectorEnabled.Load()
+		case *flightstats.Scanner:
+			return !feature.FlightstatsDetectorEnabled.Load()
 		default:
 			return false
 		}
