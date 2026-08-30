@@ -75,6 +75,7 @@ var (
 	LinearAPIDetectorEnabled     atomic.Bool
 	MailboxlayerDetectorEnabled  atomic.Bool
 	MetabaseDetectorEnabled      atomic.Bool
+	MoosendDetectorEnabled       atomic.Bool
 )
 
 type AtomicString struct {

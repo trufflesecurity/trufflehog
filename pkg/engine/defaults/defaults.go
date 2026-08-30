@@ -1942,6 +1942,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MailboxlayerDetectorEnabled.Load()
 		case *metabase.Scanner:
 			return !feature.MetabaseDetectorEnabled.Load()
+		case *moosend.Scanner:
+			return !feature.MoosendDetectorEnabled.Load()
 		default:
 			return false
 		}

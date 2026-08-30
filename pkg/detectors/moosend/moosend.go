@@ -47,28 +47,37 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.moosend.com/v3/lists.json?apikey="+resMatch+"&format=json", nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				if strings.Contains(body, "CreatedOn") {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMoosend(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMoosend(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.moosend.com/v3/lists.json?apikey="+resMatch+"&format=json", nil)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if strings.Contains(body, "CreatedOn") {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
