@@ -412,4 +412,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Whoxy:               {},
 	detector_typepb.DetectorType_MongoDB:             {},
 	detector_typepb.DetectorType_JDBC:                {},
+	detector_typepb.DetectorType_Postgres:            {},
 }

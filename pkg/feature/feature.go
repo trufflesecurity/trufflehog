@@ -98,6 +98,7 @@ var (
 	WhoxyDetectorEnabled               atomic.Bool
 	MongoDBDetectorEnabled             atomic.Bool
 	JDBCDetectorEnabled                atomic.Bool
+	PostgresDetectorEnabled            atomic.Bool
 )
 
 type AtomicString struct {

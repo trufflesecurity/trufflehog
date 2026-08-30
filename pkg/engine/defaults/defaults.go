@@ -1988,6 +1988,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MongoDBDetectorEnabled.Load()
 		case *jdbc.Scanner:
 			return !feature.JDBCDetectorEnabled.Load()
+		case *postgres.Scanner:
+			return !feature.PostgresDetectorEnabled.Load()
 		default:
 			return false
 		}
