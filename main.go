@@ -611,6 +611,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.SimFinDetectorEnabled.Store(true)
 	feature.SlackWebhookDetectorEnabled.Store(true)
 	feature.TefterDetectorEnabled.Store(true)
+	feature.TeletypeDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

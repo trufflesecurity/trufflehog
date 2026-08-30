@@ -1964,6 +1964,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SlackWebhookDetectorEnabled.Load()
 		case *tefter.Scanner:
 			return !feature.TefterDetectorEnabled.Load()
+		case *teletype.Scanner:
+			return !feature.TeletypeDetectorEnabled.Load()
 		default:
 			return false
 		}

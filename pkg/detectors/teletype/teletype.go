@@ -47,37 +47,45 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.teletype.app/public/api/v1/messages", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-Auth-Token", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-
-				bodyString := string(bodyBytes)
-				validResponse := strings.Contains(bodyString, `"code":401`)
-
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if validResponse {
-						s1.Verified = false
-					} else {
-						s1.Verified = true
-					}
-				}
-			}
+			isVerified, verificationErr := verifyTeletype(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyTeletype(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.teletype.app/public/api/v1/messages", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-Auth-Token", resMatch)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	bodyString := string(bodyBytes)
+	validResponse := strings.Contains(bodyString, `"code":401`)
+
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		if validResponse {
+		} else {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
