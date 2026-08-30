@@ -1984,6 +1984,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.WebsitepulseDetectorEnabled.Load()
 		case *whoxy.Scanner:
 			return !feature.WhoxyDetectorEnabled.Load()
+		case *mongodb.Scanner:
+			return !feature.MongoDBDetectorEnabled.Load()
 		default:
 			return false
 		}

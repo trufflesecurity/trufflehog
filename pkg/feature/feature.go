@@ -96,6 +96,7 @@ var (
 	WebscrapingDetectorEnabled         atomic.Bool
 	WebsitepulseDetectorEnabled        atomic.Bool
 	WhoxyDetectorEnabled               atomic.Bool
+	MongoDBDetectorEnabled             atomic.Bool
 )
 
 type AtomicString struct {

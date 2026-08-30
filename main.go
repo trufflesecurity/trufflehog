@@ -621,6 +621,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.WebscrapingDetectorEnabled.Store(true)
 	feature.WebsitepulseDetectorEnabled.Store(true)
 	feature.WhoxyDetectorEnabled.Store(true)
+	feature.MongoDBDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
