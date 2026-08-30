@@ -1970,6 +1970,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ThinkificDetectorEnabled.Load()
 		case *twelvedata.Scanner:
 			return !feature.TwelveDataDetectorEnabled.Load()
+		case *unifyid.Scanner:
+			return !feature.UnifyIDDetectorEnabled.Load()
 		default:
 			return false
 		}

@@ -614,6 +614,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.TeletypeDetectorEnabled.Store(true)
 	feature.ThinkificDetectorEnabled.Store(true)
 	feature.TwelveDataDetectorEnabled.Store(true)
+	feature.UnifyIDDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

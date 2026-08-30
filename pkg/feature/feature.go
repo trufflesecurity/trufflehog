@@ -89,6 +89,7 @@ var (
 	TeletypeDetectorEnabled            atomic.Bool
 	ThinkificDetectorEnabled           atomic.Bool
 	TwelveDataDetectorEnabled          atomic.Bool
+	UnifyIDDetectorEnabled             atomic.Bool
 )
 
 type AtomicString struct {
