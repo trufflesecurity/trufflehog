@@ -1914,6 +1914,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.EtherscanDetectorEnabled.Load()
 		case *fixerio.Scanner:
 			return !feature.FixerIODetectorEnabled.Load()
+		case *flickr.Scanner:
+			return !feature.FlickrDetectorEnabled.Load()
 		default:
 			return false
 		}

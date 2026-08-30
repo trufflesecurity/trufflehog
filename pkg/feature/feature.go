@@ -61,6 +61,7 @@ var (
 	DyspatchDetectorEnabled      atomic.Bool
 	EtherscanDetectorEnabled     atomic.Bool
 	FixerIODetectorEnabled       atomic.Bool
+	FlickrDetectorEnabled        atomic.Bool
 )
 
 type AtomicString struct {

@@ -375,4 +375,5 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Dyspatch:      {},
 	detector_typepb.DetectorType_Etherscan:     {},
 	detector_typepb.DetectorType_FixerIO:       {},
+	detector_typepb.DetectorType_Flickr:        {},
 }
