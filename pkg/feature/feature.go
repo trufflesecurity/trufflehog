@@ -57,6 +57,7 @@ var (
 	CommoditiesDetectorEnabled   atomic.Bool
 	ConvierDetectorEnabled       atomic.Bool
 	CryptoCompareDetectorEnabled atomic.Bool
+	DareboostDetectorEnabled     atomic.Bool
 )
 
 type AtomicString struct {

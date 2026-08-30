@@ -47,38 +47,45 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(`{    "token": "` + resMatch + `",    "location": "Paris"}`)
-
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.dareboost.com/0.8/config", payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-
-				bodyString := string(bodyBytes)
-				validResponse := strings.Contains(bodyString, `"status":200`)
-
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if validResponse {
-						s1.Verified = true
-					} else {
-						s1.Verified = false
-					}
-				}
-			}
+			isVerified, verificationErr := verifyDareboost(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyDareboost(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	payload := strings.NewReader(`{    "token": "` + resMatch + `",    "location": "Paris"}`)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.dareboost.com/0.8/config", payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	bodyString := string(bodyBytes)
+	validResponse := strings.Contains(bodyString, `"status":200`)
+
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		if validResponse {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

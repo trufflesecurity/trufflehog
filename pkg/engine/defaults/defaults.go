@@ -1906,6 +1906,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ConvierDetectorEnabled.Load()
 		case *cryptocompare.Scanner:
 			return !feature.CryptoCompareDetectorEnabled.Load()
+		case *dareboost.Scanner:
+			return !feature.DareboostDetectorEnabled.Load()
 		default:
 			return false
 		}
