@@ -48,30 +48,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.planyo.com/rest/?method=get_site_info&api_key=%s", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/vnd.planyo+json; version=3")
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, "data") || strings.Contains(body, "Your Planyo site has expired")
-				if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyPlanyo(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyPlanyo(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.planyo.com/rest/?method=get_site_info&api_key=%s", resMatch), nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Accept", "application/vnd.planyo+json; version=3")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	validResponse := strings.Contains(body, "data") || strings.Contains(body, "Your Planyo site has expired")
+	if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

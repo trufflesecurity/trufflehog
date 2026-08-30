@@ -1950,6 +1950,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.OnedeskDetectorEnabled.Load()
 		case *paralleldots.Scanner:
 			return !feature.ParallelDotsDetectorEnabled.Load()
+		case *planyo.Scanner:
+			return !feature.PlanyoDetectorEnabled.Load()
 		default:
 			return false
 		}

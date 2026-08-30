@@ -79,6 +79,7 @@ var (
 	MrticktockDetectorEnabled    atomic.Bool
 	OnedeskDetectorEnabled       atomic.Bool
 	ParallelDotsDetectorEnabled  atomic.Bool
+	PlanyoDetectorEnabled        atomic.Bool
 )
 
 type AtomicString struct {
