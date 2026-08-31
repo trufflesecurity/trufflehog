@@ -27,7 +27,6 @@ func TestPrepGitArgs(t *testing.T) {
 
 	args := p.prepGitArgs(repopath, "", false, nil, false)
 	assert.Equal(t, []string{"-C", repopath}, args.global)
-	assert.Contains(t, args.log, "--abbrev=12")
 	assert.Contains(t, args.log, "--all")
 	assert.NotContains(t, args.log, "--diff-filter=AM")
 	assert.Equal(t, []string{"GIT_DIR=" + filepath.Join(repopath, ".git")}, args.env)

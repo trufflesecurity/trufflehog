@@ -35,6 +35,14 @@ const (
 
 	// defaultWaitDelay is the default time to wait after context cancellation before forcefully killing git processes.
 	defaultWaitDelay = 5 * time.Second
+
+	// abbrevCommit is the git sha abbreviation length to use for `git show` invocations in the lower-memory scan mode.
+	abbrevCommit = 20
+
+	// showGroupSize is the number of commits per `git show` in the lower-memory scan mode.
+	//
+	// Windows has a command length limit of 32767, so at these values we should only be using a tiny part of of that for the commit list ((abbrevCommit + 1) * showGroupSize).  We don't target any platforms with shorter limits.
+	showGroupSize = 75
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -132,6 +140,7 @@ type Parser struct {
 	waitDelay     time.Duration
 
 	useCustomContentWriter bool
+	lowMemoryScan          bool
 }
 
 type ParseState int
@@ -191,6 +200,13 @@ func (state ParseState) String() string {
 // UseCustomContentWriter sets useCustomContentWriter option.
 func UseCustomContentWriter() Option {
 	return func(parser *Parser) { parser.useCustomContentWriter = true }
+}
+
+// UseLowMemoryScan sets the scan to optimize for limited memory at the cost of speed (currently up to 9%)
+func UseLowMemoryScan() Option {
+	return func(parser *Parser) {
+		parser.lowMemoryScan = true
+	}
 }
 
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
@@ -254,16 +270,23 @@ func (c *Parser) RepoPath(
 	excludedGlobs []string,
 	isBare bool,
 ) (chan *Diff, error) {
-	const abbrevCommit = 20
-	const showGroupSize = 75
-	// Windows has a command length limit of 32767, so at these values we
-	// should only be using a tiny part of of that for the commit list
-	// ((abbrevCommit + 1) * showGroupSize).  We don't target any platforms
-	// with shorter limits.
+	args := c.prepGitArgs(source, head, abbreviatedLog, excludedGlobs, isBare)
 
-	args := c.prepGitArgs(source, abbrevCommit, head, abbreviatedLog, excludedGlobs, isBare)
+	if c.lowMemoryScan {
+		return c.repoPathLowMemory(ctx, args)
+	}
 
-	commitGroups, err := c.gatherGitLog(ctx, args, showGroupSize)
+	showCmd := exec.CommandContext(ctx,
+		"git",
+		slices.Concat(args.global, []string{"log"}, args.show, args.log, args.paths)...,
+	)
+	showCmd.Env = args.env
+
+	return c.executeCommand(ctx, showCmd, false)
+}
+
+func (c *Parser) repoPathLowMemory(ctx context.Context, args gitArgs) (chan *Diff, error) {
+	commitGroups, err := c.gatherGitLog(ctx, args)
 	if err != nil {
 		return nil, err
 	}
@@ -319,8 +342,18 @@ func (c *Parser) RepoPath(
 // on the work of linearizing history for us, then we work through the commit
 // list.  Returns a channel of groups of commit IDs, so scanning can start asap
 // even if git log is taking a bit for large repos.
-func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs, showGroupSize int) (chan []string, error) {
-	cmd := exec.CommandContext(ctx, "git", slices.Concat(args.global, []string{"log"}, args.log)...)
+func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs) (chan []string, error) {
+	cmd := exec.CommandContext(ctx,
+		"git", slices.Concat(
+			args.global, []string{"log"},
+			args.log, []string{
+				// https://git-scm.com/docs/git-log#_pretty_formats
+				"--pretty=format:%h",
+				// https://git-scm.com/docs/git-log#Documentation/git-log.txt---abbrevn
+				fmt.Sprintf("--abbrev=%d", abbrevCommit),
+			},
+			args.paths,
+		)...)
 	cmd.WaitDelay = c.waitDelay
 	cmd.Env = args.env
 
@@ -375,10 +408,6 @@ func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, ex
 		log: []string{
 			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---full-history
 			"--full-history",
-			// https://git-scm.com/docs/git-log#_pretty_formats
-			"--pretty=format:%h",
-			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---abbrevn
-			fmt.Sprintf("--abbrev=%d", abbrevCommit),
 		},
 		show: []string{
 			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---patch

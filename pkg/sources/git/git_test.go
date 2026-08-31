@@ -1523,3 +1523,49 @@ func TestGitChunk_LongLine(t *testing.T) {
 	// one chunk for the commit/file metadata, and at least one chunk for the file content
 	assert.Equal(t, 2, count, "expected two chunks from a file with a 100 KB line")
 }
+
+func TestGitLowMemoryScan(t *testing.T) {
+	feature.UseGitLowMemoryScan.Store(true)
+	t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	thisrepo := &sourcespb.Git{
+		Directories: []string{"../../../"},
+		Credential: &sourcespb.Git_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+	}
+	wantChunk := &sources.Chunk{
+		SourceType:   sourcespb.SourceType_SOURCE_TYPE_GIT,
+		SourceName:   "this repo, low memory",
+		SourceVerify: false,
+	}
+
+	s := Source{}
+	conn, err := anypb.New(thisrepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Init(ctx, "this repo, low memory", 0, 0, false, conn, 1)
+	if err != nil {
+		t.Errorf("Source.Init() error = %v", err)
+		return
+	}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		assert.NoError(t, s.Chunks(ctx, chunksCh))
+	}()
+
+	gotChunk := <-chunksCh
+	gotChunk.Data = nil
+	// Commits don't come in a deterministic order, so remove metadata comparison
+	gotChunk.SourceMetadata = nil
+	if diff := pretty.Compare(gotChunk, wantChunk); diff != "" {
+		t.Errorf("Source.Chunks() UseGitLowMemoryScan diff: (-got +want)\n%s", diff)
+		t.Errorf("Data: %s", string(gotChunk.Data))
+	}
+}
