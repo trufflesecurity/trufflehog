@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAuth0oauth_FromChunk(t *testing.T) {
@@ -57,7 +57,7 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					DetectorType: detector_typepb.DetectorType_Auth0oauth,
 					Redacted:     clientId,
 					Verified:     true,
 				},
@@ -74,7 +74,7 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					DetectorType: detector_typepb.DetectorType_Auth0oauth,
 					Redacted:     clientIdUnauthorized,
 					Verified:     true,
 				},
@@ -91,7 +91,7 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					DetectorType: detector_typepb.DetectorType_Auth0oauth,
 					Redacted:     clientId,
 					Verified:     false,
 				},
@@ -119,7 +119,7 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					DetectorType: detector_typepb.DetectorType_Auth0oauth,
 					Redacted:     clientId,
 					Verified:     false,
 				},

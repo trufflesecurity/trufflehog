@@ -1,8 +1,10 @@
 package s3
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -54,6 +56,8 @@ type Source struct {
 	errorCount    *sync.Map
 	jobPool       *errgroup.Group
 	maxObjectSize int64
+	// endpoint is the S3-compatible service to scan, or nil for AWS S3.
+	endpoint *url.URL
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -94,6 +98,12 @@ func (s *Source) Init(
 	}
 	s.conn = &conn
 
+	endpoint, err := normalizeEndpoint(conn.GetEndpoint())
+	if err != nil {
+		return err
+	}
+	s.endpoint = endpoint
+
 	s.metricsCollector = metricsInstance
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
@@ -131,6 +141,44 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 	} else {
 		s.maxObjectSize = maxObjectSize
 	}
+}
+
+// normalizeEndpoint parses the configured endpoint of an S3-compatible
+// service, returning nil for the empty endpoint that means AWS S3. A scheme is
+// assumed when one is missing, because the endpoint is user-entered and the AWS
+// SDK rejects a bare host with an error that does not say so.
+func normalizeEndpoint(endpoint string) (*url.URL, error) {
+	if endpoint == "" {
+		return nil, nil
+	}
+
+	parsed, err := url.Parse(endpoint)
+
+	// Without a scheme, the endpoint either parses as a path with no host or,
+	// when it carries a port, fails to parse at all. Retry those as URLs, but
+	// only when no scheme was given, so that a malformed one is still reported
+	// rather than buried under a second scheme.
+	if !strings.Contains(endpoint, "://") && (err != nil || parsed.Host == "") {
+		parsed, err = url.Parse("https://" + endpoint)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not parse endpoint %q: %w", endpoint, err)
+	}
+
+	if parsed.Host == "" {
+		return nil, fmt.Errorf("endpoint %q has no host; expected something like https://s3.internal.example.com", endpoint)
+	}
+
+	return parsed, nil
+}
+
+// defaultRegion returns the region used to sign requests for buckets whose own
+// region has not been discovered.
+func (s *Source) defaultRegion() string {
+	if region := s.conn.GetRegion(); region != "" {
+		return region
+	}
+	return defaultAWSRegion
 }
 
 func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Client, error) {
@@ -182,6 +230,12 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 
 	return s3.NewFromConfig(cfg, func(options *s3.Options) {
 		options.DisableLogOutputChecksumValidationSkipped = true
+		if s.endpoint != nil {
+			options.BaseEndpoint = aws.String(s.endpoint.String())
+			// S3-compatible services rarely publish the wildcard DNS that
+			// virtual-hosted addressing needs.
+			options.UsePathStyle = true
+		}
 	}), nil
 }
 
@@ -285,17 +339,21 @@ func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets
 	}
 }
 
+// scanBuckets scans the given buckets using the given role and adds the number
+// of objects it scanned to totalObjectCount. The counter is owned by Chunks and
+// shared across role passes so that the completion message reflects the whole
+// scan, not just the last role's pass.
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.Client,
 	role string,
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
+	totalObjectCount *uint64,
 ) {
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
-	var totalObjectCount uint64
 
 	checkpointer := NewCheckpointer(ctx, &s.Progress, false)
 	pos := determineResumePosition(ctx, checkpointer, bucketsToScan)
@@ -326,7 +384,7 @@ func (s *Source) scanBuckets(
 			bucketIdx,
 			len(bucketsToScan),
 			fmt.Sprintf("Bucket: %s", bucket),
-			s.Progress.EncodedResumeInfo,
+			s.EncodedResumeInfo,
 		)
 
 		var startAfter *string
@@ -340,13 +398,13 @@ func (s *Source) scanBuckets(
 		}
 
 		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
-		totalObjectCount += objectCount
+		*totalObjectCount += objectCount
 	}
 
 	s.SetProgressComplete(
 		len(bucketsToScan),
 		len(bucketsToScan),
-		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, totalObjectCount),
+		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, *totalObjectCount),
 		"",
 	)
 }
@@ -390,15 +448,19 @@ func (s *Source) scanBucket(
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
-			if role == "" {
-				ctx.Logger().Error(err, "could not list objects in bucket")
-			} else {
+			if s.listErrorsAreExpected(role) {
 				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
 				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
 				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
 				// and therefore not an error.
 				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
+			} else {
+				// This can also be a failure to assume the role itself: role credentials
+				// are resolved lazily, so the first request that needs them surfaces the
+				// STS error here rather than at client construction.
+				ctx.Logger().Error(err, "could not list objects in bucket")
 			}
+			s.metricsCollector.RecordBucketListError(bucket, role)
 			break
 		}
 		pageMetadata := pageMetadata{
@@ -419,10 +481,21 @@ func (s *Source) scanBucket(
 	return objectCount
 }
 
+// listErrorsAreExpected reports whether a failure to list a bucket's objects
+// should be suppressed rather than logged as an error. When a role is assumed
+// without an explicit bucket list, the scanner attempts every bucket in the
+// account and is expected to be denied on some of them. When buckets are
+// explicitly configured, a listing failure means a configured target is being
+// silently skipped, so it is always an error, even under an assumed role.
+func (s *Source) listErrorsAreExpected(role string) bool {
+	return role != "" && len(s.conn.GetBuckets()) == 0
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	var totalObjectCount uint64
 	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
-		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
+		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan, &totalObjectCount)
 		return nil
 	}
 
@@ -435,12 +508,18 @@ func (s *Source) getRegionalClientForBucket(
 	role string,
 	bucket string,
 ) (*s3.Client, error) {
+	// GetBucketRegion is an AWS-only API, and a custom endpoint serves every
+	// bucket itself, so there is no per-bucket region to discover.
+	if s.endpoint != nil {
+		return defaultRegionClient, nil
+	}
+
 	region, err := s3manager.GetBucketRegion(ctx, defaultRegionClient, bucket)
 	if err != nil {
 		return nil, fmt.Errorf("could not get s3 region for bucket: %s: %w", bucket, err)
 	}
 
-	if region == defaultAWSRegion {
+	if region == s.defaultRegion() {
 		return defaultRegionClient, nil
 	}
 
@@ -554,7 +633,7 @@ func (s *Source) pageChunker(
 				// It's uncertain if the body will be nil in such cases,
 				// but we'll close it if it's not.
 				if res != nil && res.Body != nil {
-					res.Body.Close()
+					_ = res.Body.Close()
 				}
 
 				nErr, ok := state.errorCount.Load(prefix)
@@ -573,7 +652,7 @@ func (s *Source) pageChunker(
 				}
 				return nil
 			}
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			email := "Unknown"
 			if obj.Owner != nil {
@@ -590,7 +669,7 @@ func (s *Source) pageChunker(
 						S3: &source_metadatapb.S3{
 							Bucket:    metadata.bucket,
 							File:      sanitizer.UTF8(*obj.Key),
-							Link:      sanitizer.UTF8(makeS3Link(metadata.bucket, metadata.client.Options().Region, *obj.Key)),
+							Link:      sanitizer.UTF8(s.objectLink(metadata.bucket, metadata.client.Options().Region, *obj.Key)),
 							Email:     sanitizer.UTF8(email),
 							Timestamp: sanitizer.UTF8(modified),
 						},
@@ -679,7 +758,7 @@ func (s *Source) visitRoles(
 	for _, role := range roles {
 		s.metricsCollector.RecordRoleScanned(role)
 
-		client, err := s.newClient(ctx, defaultAWSRegion, role)
+		client, err := s.newClient(ctx, s.defaultRegion(), role)
 		if err != nil {
 			return fmt.Errorf("could not create s3 client: %w", err)
 		}
@@ -697,12 +776,22 @@ func (s *Source) visitRoles(
 	return nil
 }
 
-// makeS3Link creates a S3 virtual-hosted–style URIs. They have the format of:
+// objectLink creates a URL for an object. AWS buckets get a
+// virtual-hosted–style URI, which has the format:
 // https://[bucket-name].s3.[region-code].amazonaws.com/[key-name]
 //
 // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/VirtualHosting.html#virtual-hosted-style-access
-func makeS3Link(bucket, region, key string) string {
-	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key)
+//
+// A custom endpoint gets a path-style link, matching how the client addresses
+// it, so the link resolves the same way the scan did.
+func (s *Source) objectLink(bucket, region, key string) string {
+	if s.endpoint == nil {
+		return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key)
+	}
+
+	link := *s.endpoint
+	link.Path = strings.TrimSuffix(link.Path, "/") + "/" + bucket + "/" + key
+	return link.String()
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation visits
@@ -740,7 +829,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 	// unitID is a combination of bucket name and role ARN
 	unitID, _ := s3unit.SourceUnitID()
-	defaultClient, err := s.newClient(ctx, defaultAWSRegion, s3unit.Role)
+	defaultClient, err := s.newClient(ctx, s.defaultRegion(), s3unit.Role)
 	if err != nil {
 		return fmt.Errorf("could not create s3 client for bucket %s and role %s: %w", s3unit.Bucket, s3unit.Role, err)
 	}
@@ -748,7 +837,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	checkpointer := NewCheckpointer(ctx, &s.Progress, true)
 
 	var startAfterPtr *string
-	startAfter := s.Progress.GetEncodedResumeInfoFor(unitID)
+	startAfter := s.GetEncodedResumeInfoFor(unitID)
 	if startAfter != "" {
 		ctx.Logger().V(3).Info(
 			"Resuming unit scan",
@@ -757,12 +846,32 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		)
 		startAfterPtr = &startAfter
 	}
-	defer s.Progress.ClearEncodedResumeInfoFor(unitID)
+	defer s.ClearEncodedResumeInfoFor(unitID)
 	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer)
 	return nil
 }
 
+// It accepts three shapes: the persisted envelope carrying unit_data
+// (round-trips the unit exactly), the envelope without unit_data (rebuilt from id),
+// and a bare S3SourceUnit.
 func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	var envelope unitEnvelope
+	if err := json.Unmarshal(data, &envelope); err == nil && envelope.Kind == string(SourceUnitKindBucket) {
+		if envelope.UnitData != "" {
+			if decoded, err := base64.StdEncoding.DecodeString(envelope.UnitData); err == nil {
+				var unit S3SourceUnit
+				if json.Unmarshal(decoded, &unit) == nil && unit.Bucket != "" {
+					return unit, nil
+				}
+			}
+		}
+		if envelope.ID != "" {
+			if role, bucket := splitS3SourceUnitID(envelope.ID); bucket != "" {
+				return S3SourceUnit{Bucket: bucket, Role: role}, nil
+			}
+		}
+	}
+
 	var unit S3SourceUnit
 	if err := json.Unmarshal(data, &unit); err != nil {
 		return nil, err

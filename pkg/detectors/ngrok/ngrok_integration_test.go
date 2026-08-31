@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestNgrok_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestNgrok_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Ngrok,
+					DetectorType: detector_typepb.DetectorType_Ngrok,
 					Verified:     true,
 				},
 			},
@@ -69,7 +69,7 @@ func TestNgrok_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Ngrok,
+					DetectorType: detector_typepb.DetectorType_Ngrok,
 					Verified:     true,
 				},
 			},
@@ -86,7 +86,7 @@ func TestNgrok_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Ngrok,
+					DetectorType: detector_typepb.DetectorType_Ngrok,
 					Verified:     false,
 				},
 			},

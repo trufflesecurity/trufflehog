@@ -126,7 +126,8 @@ func TestHashiCorpVaultAppRoleAuth_Pattern(t *testing.T) {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-
+			d.UseCloudEndpoint(true)
+			d.UseFoundEndpoints(true)
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			if err != nil {
 				t.Errorf("error = %v", err)

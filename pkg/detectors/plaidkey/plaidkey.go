@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -73,9 +73,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for id := range uniqueIds {
 			for token := range uniqueTokens {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_PlaidKey,
+					DetectorType: detector_typepb.DetectorType_PlaidKey,
 					Raw:          []byte(secret),
 					RawV2:        []byte(fmt.Sprintf(`%s:%s:%s`, secret, id, token)),
+					SecretParts: map[string]string{
+						"secret": secret,
+						"id":     id,
+						"token":  token,
+					},
 				}
 
 				if verify {
@@ -87,13 +92,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.Verified = isVerified
 					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", environment)}
 					s1.SetVerificationError(verificationErr, id, secret)
-					if s1.Verified {
-						s1.AnalysisInfo = map[string]string{
-							"secret": secret,
-							"id":     id,
-							"token":  token,
-						}
-					}
 				}
 				results = append(results, s1)
 			}
@@ -116,7 +114,7 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 	if err != nil {
 		return false, nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -128,8 +126,8 @@ func verifyMatch(ctx context.Context, client *http.Client, id string, secret str
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PlaidKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PlaidKey
 }
 
 func (s Scanner) Description() string {

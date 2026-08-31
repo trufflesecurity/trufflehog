@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestBraintreePayments_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestBraintreePayments_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
+					DetectorType: detector_typepb.DetectorType_BraintreePayments,
 					Verified:     true,
 				},
 			},
@@ -69,7 +69,7 @@ func TestBraintreePayments_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
+					DetectorType: detector_typepb.DetectorType_BraintreePayments,
 					Verified:     false,
 				},
 			},
@@ -88,7 +88,7 @@ func TestBraintreePayments_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
+					DetectorType: detector_typepb.DetectorType_BraintreePayments,
 					Verified:     false,
 				},
 			},
@@ -105,7 +105,7 @@ func TestBraintreePayments_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
+					DetectorType: detector_typepb.DetectorType_BraintreePayments,
 					Verified:     false,
 				},
 			},

@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestMyfreshworks_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Myfreshworks,
+					DetectorType: detector_typepb.DetectorType_Myfreshworks,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Myfreshworks,
+					DetectorType: detector_typepb.DetectorType_Myfreshworks,
 					Verified:     false,
 				},
 			},
@@ -83,7 +83,7 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Myfreshworks,
+					DetectorType: detector_typepb.DetectorType_Myfreshworks,
 					Verified:     false,
 				},
 			},
@@ -100,7 +100,7 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Myfreshworks,
+					DetectorType: detector_typepb.DetectorType_Myfreshworks,
 					Verified:     false,
 				},
 			},

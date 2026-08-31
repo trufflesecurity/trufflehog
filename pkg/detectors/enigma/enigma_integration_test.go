@@ -13,13 +13,13 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestEnigma_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -48,8 +48,11 @@ func TestEnigma_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Enigma,
+					DetectorType: detector_typepb.DetectorType_Enigma,
 					Verified:     true,
+					SecretParts: map[string]string{
+						"key": secret,
+					},
 				},
 			},
 			wantErr: false,
@@ -64,8 +67,11 @@ func TestEnigma_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Enigma,
+					DetectorType: detector_typepb.DetectorType_Enigma,
 					Verified:     false,
+					SecretParts: map[string]string{
+						"key": inactiveSecret,
+					},
 				},
 			},
 			wantErr: false,

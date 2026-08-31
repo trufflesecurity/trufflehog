@@ -10,12 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 const (
@@ -58,6 +60,11 @@ type Scanner struct {
 	ignorePatterns []*regexp.Regexp
 }
 
+type uriMatch struct {
+	params map[string]string
+	rawURI string
+}
+
 func New(opts ...func(*Scanner)) *Scanner {
 	scanner := &Scanner{
 		ignorePatterns: []*regexp.Regexp{},
@@ -93,12 +100,13 @@ func (s Scanner) Keywords() []string {
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	var results []detectors.Result
-	candidateParamSets := findUriMatches(data, s.ignorePatterns)
+	candidateURIs := findUriMatches(data, s.ignorePatterns)
 
-	for _, params := range candidateParamSets {
+	for _, candidateURI := range candidateURIs {
 		if common.IsDone(ctx) {
 			break
 		}
+		params := candidateURI.params
 		user, ok := params[pgUser]
 		if !ok {
 			continue
@@ -136,10 +144,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		raw := []byte(fmt.Sprintf("%s://%s:%s@%s:%s", dbType, user, password, host, port))
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Postgres,
+			DetectorType: detector_typepb.DetectorType_Postgres,
 			Raw:          raw,
 			RawV2:        raw,
+			SecretParts:  map[string]string{"connection_string": string(raw)},
 		}
+		// Set the un-normalized raw match as the primary secret value.
+		// This ensures that the engine's line-offset and ignore-tag matching logic
+		// (which searches the source document for the exact string) can locate the match,
+		// even though Raw/RawV2 are stored in a normalized form.
+		result.SetPrimarySecretValue(candidateURI.rawURI)
 
 		// We don't need to normalize the (deprecated) requiressl option into the (up-to-date) sslmode option - pq can
 		// do it for us - but we will do it anyway here so that when we later capture sslmode into ExtraData we will
@@ -161,12 +175,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				break
 			}
 
-			isVerified, verificationErr := verifyPostgres(params)
+			isVerified, verificationErr := verifyPostgres(ctx, params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
-			result.AnalysisInfo = map[string]string{
-				"connection_string": string(raw),
-			}
 		}
 
 		// We gather SSL information into ExtraData in case it's useful for later reporting.
@@ -176,6 +187,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 		result.ExtraData = map[string]string{
 			pgSslmode: sslmode,
+		}
+		if host != "" {
+			if port != "" {
+				result.ExtraData["host"] = host + ":" + port
+			} else {
+				result.ExtraData["host"] = host
+			}
+		}
+		if user != "" {
+			result.ExtraData["username"] = user
+		}
+		if dbname := params[pgDbname]; dbname != "" {
+			result.ExtraData["database"] = dbname
 		}
 
 		results = append(results, result)
@@ -188,8 +212,8 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
-func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []map[string]string {
-	var matches []map[string]string
+func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []uriMatch {
+	var matches []uriMatch
 	for _, uri := range uriPattern.FindAll(data, -1) {
 		if shouldIgnore(uri, ignorePatterns) {
 			continue
@@ -213,7 +237,10 @@ func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []map[string]s
 		}
 
 		params[pgDbType] = dbType
-		matches = append(matches, params)
+		matches = append(matches, uriMatch{
+			params: params,
+			rawURI: string(uri),
+		})
 	}
 	return matches
 }
@@ -225,6 +252,13 @@ func shouldIgnore(uri []byte, ignorePatterns []*regexp.Regexp) bool {
 		}
 	}
 	return false
+}
+
+// isNeonHost reports whether host is a Neon managed-Postgres endpoint.
+// Neon advertises SCRAM-SHA-256 with iteration count i=1; lib/pq rejects that,
+// so verification for these hosts uses pgx instead (SCAN-1020).
+func isNeonHost(host string) bool {
+	return strings.HasSuffix(strings.ToLower(host), ".neon.tech")
 }
 
 // getDeadlineInSeconds gets the deadline from the context in seconds. If there
@@ -250,7 +284,70 @@ func isErrorDatabaseNotFound(err error, dbName string) bool {
 	return strings.Contains(err.Error(), missingDbErrorText)
 }
 
-func verifyPostgres(params map[string]string) (bool, error) {
+func verifyPostgres(ctx context.Context, params map[string]string) (bool, error) {
+	// Neon (managed Postgres) advertises SCRAM-SHA-256 with iteration count i=1.
+	// lib/pq rejects iteration fields shorter than 6 chars, which traps these
+	// secrets in indeterminate reverification. pgx accepts any iterations > 0.
+	if isNeonHost(params[pgHost]) {
+		return verifyPostgresPgx(ctx, params)
+	}
+	return verifyPostgresPq(params)
+}
+
+// verifyPostgresPgx verifies credentials with jackc/pgx. Used for Neon hosts
+// where lib/pq's SCRAM client cannot complete the handshake (SCAN-1020).
+func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, error) {
+	conn, err := pgx.Connect(ctx, pgxConnString(params))
+	if err != nil {
+		return classifyPostgresVerifyError(err, params[pgDbname])
+	}
+	defer func() {
+		// Best-effort close after verification; the verify outcome is already decided.
+		if closeErr := conn.Close(ctx); closeErr != nil {
+			return
+		}
+	}()
+
+	if err := conn.Ping(ctx); err != nil {
+		return classifyPostgresVerifyError(err, params[pgDbname])
+	}
+	return true, nil
+}
+
+// pgxConnString builds a libpq-style connection string for pgx, omitting keys
+// that are detector-only (db_type) or libpq client options pgx would forward as
+// unrecognized server GUCs (requiressl). sslmode is already normalized in FromData.
+func pgxConnString(params map[string]string) string {
+	var connStr strings.Builder
+	for key, value := range params {
+		if key == pgDbType || key == pgRequiressl {
+			continue
+		}
+		fmt.Fprintf(&connStr, "%s='%s'", key, value)
+	}
+	return connStr.String()
+}
+
+func classifyPostgresVerifyError(err error, dbName string) (bool, error) {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "28P01": // invalid_password
+			return false, nil
+		case "3D000": // invalid_catalog_name — authenticated, DB missing
+			return true, nil
+		}
+	}
+	if strings.Contains(err.Error(), "password authentication failed") {
+		return false, nil
+	}
+	if isErrorDatabaseNotFound(err, dbName) {
+		return true, nil
+	}
+	return false, err
+}
+
+func verifyPostgresPq(params map[string]string) (bool, error) {
 	if sslmode := params[pgSslmode]; sslmode == pgSslmodeAllow || sslmode == pgSslmodePrefer {
 		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
 		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
@@ -280,7 +377,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	err = db.Ping()
 	switch {
@@ -294,7 +391,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 		// connections are acceptable, so now we try a connection without SSL.
 		params[pgSslmode] = pgSslmodeDisable
 		defer delete(params, pgSslmode) // We want to return with the original params map intact (for ExtraData)
-		return verifyPostgres(params)
+		return verifyPostgresPq(params)
 	case isErrorDatabaseNotFound(err, params[pgDbname]):
 		return true, nil // If we know this, we were able to authenticate
 	default:
@@ -302,8 +399,8 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Postgres
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Postgres
 }
 
 func (s Scanner) Description() string {

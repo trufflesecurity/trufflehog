@@ -7,6 +7,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -34,7 +35,7 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		// SourceName is the name of the Source.
 		SourceName string
 		// DetectorType is the type of Detector.
-		DetectorType detectorspb.DetectorType
+		DetectorType detector_typepb.DetectorType
 		// DetectorName is the string name of the DetectorType.
 		DetectorName string
 		// DetectorDescription is the description of the Detector.
@@ -54,6 +55,7 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		Redacted       string
 		ExtraData      map[string]string
 		StructuredData *detectorspb.StructuredData
+		SecretParts    map[string]string
 	}{
 		SourceMetadata:        r.SourceMetadata,
 		SourceID:              r.SourceID,
@@ -71,6 +73,7 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		Redacted:              r.Redacted,
 		ExtraData:             r.ExtraData,
 		StructuredData:        r.StructuredData,
+		SecretParts:           r.SecretParts,
 	}
 	out, err := json.Marshal(v)
 	if err != nil {

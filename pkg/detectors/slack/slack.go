@@ -9,7 +9,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
@@ -59,8 +59,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		for _, token := range tokens {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Slack,
+				DetectorType: detector_typepb.DetectorType_Slack,
 				Raw:          []byte(token),
+				SecretParts:  map[string]string{"key": token},
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
@@ -82,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					var authResponse authRes
 					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
 						err = fmt.Errorf("failed to decode auth response: %w", err)
@@ -113,9 +114,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else {
 					s1.SetVerificationError(err, token)
 				}
-				s1.AnalysisInfo = map[string]string{
-					"key": token,
-				}
 			}
 
 			results = append(results, s1)
@@ -125,8 +123,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Slack
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Slack
 }
 
 func (s Scanner) Description() string {

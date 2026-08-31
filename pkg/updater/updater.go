@@ -75,7 +75,7 @@ func (g *OSS) Fetch() (io.Reader, error) {
 	if err != nil || resp == nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNoContent {
 		return nil, errors.New("already up to date")
@@ -105,7 +105,7 @@ func (g *OSS) Fetch() (io.Reader, error) {
 		if err != nil {
 			return nil, errors.Errorf("Failed to read gzip archive: %s", err)
 		}
-		defer gzipReader.Close()
+		defer func() { _ = gzipReader.Close() }()
 		tarReader := tar.NewReader(gzipReader)
 		for {
 			header, err := tarReader.Next()

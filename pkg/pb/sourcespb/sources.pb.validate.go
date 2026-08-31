@@ -761,6 +761,47 @@ func (m *Bitbucket) validate(all bool) error {
 			}
 		}
 
+	case *Bitbucket_ApiToken:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetApiToken()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, BitbucketValidationError{
+						field:  "ApiToken",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, BitbucketValidationError{
+						field:  "ApiToken",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetApiToken()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return BitbucketValidationError{
+					field:  "ApiToken",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -2590,6 +2631,10 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for PrintLegacyJson
 
+	// no validation rules for ScanAllInstallations
+
+	// no validation rules for ExcludeArchived
+
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
 		if v == nil {
@@ -3444,6 +3489,8 @@ func (m *Huggingface) validate(all bool) error {
 
 	// no validation rules for IncludePrs
 
+	// no validation rules for SkipAllBuckets
+
 	switch v := m.Credential.(type) {
 	case *Huggingface_Token:
 		if v == nil {
@@ -4153,6 +4200,20 @@ func (m *S3) validate(all bool) error {
 	// no validation rules for MaxObjectSize
 
 	// no validation rules for EnableResumption
+
+	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+		err = S3ValidationError{
+			field:  "Endpoint",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for Region
 
 	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
@@ -5886,6 +5947,12 @@ func (m *Sharepoint) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for SiteUrl
+
+	// no validation rules for IncludeVersions
+
+	// no validation rules for IncludeComments
+
+	// no validation rules for IncludeAttachments
 
 	switch v := m.Credential.(type) {
 	case *Sharepoint_Oauth:

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSnowflake_FromChunk(t *testing.T) {
@@ -58,7 +58,7 @@ func TestSnowflake_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
+					DetectorType: detector_typepb.DetectorType_Snowflake,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"account":  accountIdentifier,
@@ -79,7 +79,7 @@ func TestSnowflake_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
+					DetectorType: detector_typepb.DetectorType_Snowflake,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"account":  accountIdentifier,
@@ -112,7 +112,7 @@ func TestSnowflake_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
+					DetectorType: detector_typepb.DetectorType_Snowflake,
 					ExtraData: map[string]string{
 						"account":  accountIdentifier,
 						"username": username,

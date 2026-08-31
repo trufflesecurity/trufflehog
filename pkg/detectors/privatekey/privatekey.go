@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 var (
@@ -65,10 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_PrivateKey,
+			DetectorType: detector_typepb.DetectorType_PrivateKey,
 			Raw:          []byte(token),
 			Redacted:     token[0:64],
 			ExtraData:    make(map[string]string),
+			SecretParts:  map[string]string{"token": token},
 		}
 
 		// set not normalized match as primary secret value so it is used to calculate line of code
@@ -80,7 +81,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.ExtraData["encrypted"] = "true"
 			parsedKey, passphrase, err = Crack([]byte(token))
 			if err != nil {
+				// The key is encrypted and the passphrase could not be
+				// recovered from the wordlist. It still represents a real
+				// exposure (offline-crackable, weak/legacy KDFs, passphrase
+				// often reused or committed nearby), so surface it as an
+				// unverified finding instead of dropping it silently.
 				s1.SetVerificationError(err, token)
+				results = append(results, s1)
 				continue
 			}
 			if passphrase != "" {
@@ -152,11 +159,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for k, v := range extraData.data {
 					s1.ExtraData[k] = v
 				}
-
-				// enabled th
-				s1.AnalysisInfo = map[string]string{
-					"token": token,
-				}
 			} else {
 				s1.ExtraData = nil
 			}
@@ -226,7 +228,7 @@ func LookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string) (*
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	results := DriftwoodResult{}
 	err = json.NewDecoder(res.Body).Decode(&results)
@@ -290,6 +292,6 @@ func (e *VerificationErrors) Add(err error) {
 	e.mutex.Unlock()
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PrivateKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PrivateKey
 }

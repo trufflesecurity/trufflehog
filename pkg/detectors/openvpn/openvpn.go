@@ -10,7 +10,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -51,9 +51,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				domainRes := strings.TrimSpace(domainMatch[1])
 
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_OpenVpn,
+					DetectorType: detector_typepb.DetectorType_OpenVpn,
 					Raw:          []byte(clientSecretRes),
-					RawV2:        []byte(clientIDRes + clientSecretRes),
+					SecretParts: map[string]string{
+						"client_id":     clientIDRes,
+						"client_secret": clientSecretRes,
+					},
+					RawV2: []byte(clientIDRes + clientSecretRes),
 				}
 
 				if verify {
@@ -77,7 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("content-type", "application/x-www-form-urlencoded")
 					res, err := client.Do(req)
 					if err == nil {
-						defer res.Body.Close()
+						defer func() { _ = res.Body.Close() }()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else if res.StatusCode == 401 {
@@ -100,8 +104,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OpenVpn
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OpenVpn
 }
 
 func (s Scanner) Description() string {

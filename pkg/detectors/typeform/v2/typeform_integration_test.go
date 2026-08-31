@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTypeform_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestTypeform_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Typeform,
+					DetectorType: detector_typepb.DetectorType_Typeform,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"Alias":    "TruffleSecurity Detectors",
@@ -73,7 +73,7 @@ func TestTypeform_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Typeform,
+					DetectorType: detector_typepb.DetectorType_Typeform,
 					Verified:     false,
 				},
 			},

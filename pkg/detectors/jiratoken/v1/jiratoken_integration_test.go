@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestJiraToken_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -73,7 +73,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -106,7 +106,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -118,7 +118,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, verified but unexpected api surface",
+			name: "found, unexpected api surface is terminal and not an error",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
@@ -127,7 +127,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -136,11 +136,14 @@ func TestJiraToken_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.s.SetCloudEndpoint(tt.s.CloudEndpoint())
+			tt.s.UseCloudEndpoint(true)
+			tt.s.UseFoundEndpoints(true)
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("JiraToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -154,7 +157,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("JiraToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
@@ -165,6 +168,9 @@ func TestJiraToken_FromChunk(t *testing.T) {
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
+	s.SetCloudEndpoint(s.CloudEndpoint())
+	s.UseCloudEndpoint(true)
+	s.UseFoundEndpoints(true)
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
 			b.ResetTimer()

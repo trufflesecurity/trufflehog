@@ -273,62 +273,6 @@ func TestRetryableHTTPClientTimeout(t *testing.T) {
 	}
 }
 
-func TestSanitizeURL(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "valid https URL",
-			input:    "https://api.example.com/v1/users",
-			expected: "https://api.example.com/v1/users",
-		},
-		{
-			name:     "URL with query parameters",
-			input:    "https://api.example.com/search?q=secret&limit=10",
-			expected: "https://api.example.com/search",
-		},
-		{
-			name:     "URL with fragment",
-			input:    "https://example.com/page#section",
-			expected: "https://example.com/page",
-		},
-		{
-			name:     "URL with user info",
-			input:    "https://user:pass@api.example.com/path",
-			expected: "https://api.example.com/path",
-		},
-		{
-			name:     "empty URL",
-			input:    "",
-			expected: "unknown",
-		},
-		{
-			name:     "invalid URL",
-			input:    "not-a-url",
-			expected: "relative_or_invalid",
-		},
-		{
-			name:     "very long path",
-			input:    "https://example.com/" + strings.Repeat("a", 150),
-			expected: "https://example.com/" + strings.Repeat("a", 99) + "...", // 99 + 1 ("/") = 100 chars
-		},
-		{
-			name:     "root path",
-			input:    "https://example.com",
-			expected: "https://example.com/",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := sanitizeURL(tc.input)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
-}
-
 func TestSaneHttpClientMetrics(t *testing.T) {
 	// Create a test server that returns different status codes
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -388,18 +332,17 @@ func TestSaneHttpClientMetrics(t *testing.T) {
 			}
 
 			// Get initial metric values
-			sanitizedURL := sanitizeURL(requestURL)
-			initialRequestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+			initialRequestsTotal := testutil.ToFloat64(httpRequestsTotal)
 
 			// Make the request
 			resp, err := client.Get(requestURL)
 
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expectedStatusCode, resp.StatusCode)
 
 			// Check that request counter was incremented
-			requestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+			requestsTotal := testutil.ToFloat64(httpRequestsTotal)
 			assert.Equal(t, initialRequestsTotal+1, requestsTotal)
 		})
 	}
@@ -455,18 +398,17 @@ func TestRetryableHttpClientMetrics(t *testing.T) {
 			}
 
 			// Get initial metric values
-			sanitizedURL := sanitizeURL(requestURL)
-			initialRequestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+			initialRequestsTotal := testutil.ToFloat64(httpRequestsTotal)
 
 			// Make the request
 			resp, err := client.Get(requestURL)
 
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expectedStatusCode, resp.StatusCode)
 
 			// Check that request counter was incremented
-			requestsTotal := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+			requestsTotal := testutil.ToFloat64(httpRequestsTotal)
 			assert.Equal(t, initialRequestsTotal+1, requestsTotal)
 		})
 	}
@@ -488,19 +430,18 @@ func TestInstrumentedTransport(t *testing.T) {
 	}
 
 	// Get initial metric value
-	sanitizedURL := sanitizeURL(server.URL)
-	initialCount := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+	initialCount := testutil.ToFloat64(httpRequestsTotal)
 
 	// Make a request
 	resp, err := client.Get(server.URL)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Verify the request was successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify metrics were recorded
-	finalCount := testutil.ToFloat64(httpRequestsTotal.WithLabelValues(sanitizedURL))
+	finalCount := testutil.ToFloat64(httpRequestsTotal)
 	assert.Equal(t, initialCount+1, finalCount)
 
 	// Note: Testing histogram metrics is complex due to the way Prometheus handles them

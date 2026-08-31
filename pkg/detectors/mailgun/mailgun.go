@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(match),
-			AnalysisInfo: map[string]string{"key": match},
+			SecretParts:  map[string]string{"key": match},
 		}
 
 		if verify {
@@ -103,7 +103,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		var domains domainResponse
 		if err := json.NewDecoder(res.Body).Decode(&domains); err != nil {
 			return false, nil, fmt.Errorf("error decoding response body: %w", err)
@@ -132,9 +133,9 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		}
 
 		return true, extraData, nil
-	} else if res.StatusCode == http.StatusUnauthorized {
+	case http.StatusUnauthorized:
 		return false, nil, nil
-	} else {
+	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
@@ -152,8 +153,8 @@ type item struct {
 	Type       string `json:"type"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Mailgun
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Mailgun
 }
 
 func (s Scanner) Description() string {

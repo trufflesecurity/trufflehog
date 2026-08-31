@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestShopifyOAuth_FromChunk(t *testing.T) {
@@ -57,7 +57,7 @@ func TestShopifyOAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ShopifyOAuth,
+					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Verified:     true,
 				},
 			},
@@ -78,7 +78,7 @@ func TestShopifyOAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ShopifyOAuth,
+					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Verified:     false,
 				},
 			},
@@ -130,7 +130,7 @@ func TestShopifyOAuth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ShopifyOAuth,
+					DetectorType: detector_typepb.DetectorType_ShopifyOAuth,
 					Verified:     false,
 				},
 			},
@@ -154,7 +154,7 @@ func TestShopifyOAuth_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "AnalysisInfo", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "SecretParts", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("ShopifyOAuth.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

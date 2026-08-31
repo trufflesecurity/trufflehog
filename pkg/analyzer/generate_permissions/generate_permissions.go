@@ -111,7 +111,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open YAML file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var data PermissionsData
 	decoder := yaml.NewDecoder(file)
@@ -135,7 +135,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create output file: %v", err)
 	}
-	defer outputFile.Close()
+	defer func() { _ = outputFile.Close() }()
 
 	err = tmpl.Execute(outputFile, data)
 	if err != nil {

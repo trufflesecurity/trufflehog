@@ -1,8 +1,21 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:base"
+  "extends": ["github>trufflesecurity/.github:renovate-config#v1.0.4"],
+  "customManagers": [
+    {
+      "description": "scripts/lint.sh pins the same golangci-lint version as .github/workflows/lint.yml",
+      "customType": "regex",
+      "managerFilePatterns": ["scripts/lint.sh"],
+      "matchStrings": ["GOLANGCI_LINT_VERSION=\"(?<currentValue>v[^\"]+)\""],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases"
+    }
   ],
-  "prConcurrentLimit": 3,
-  "prHourlyLimit": 2
+  "packageRules": [
+    {
+      "description": "Keep the workflow and script golangci-lint pins in one PR",
+      "matchDepNames": ["golangci/golangci-lint"],
+      "groupName": "golangci-lint"
+    }
+  ]
 }

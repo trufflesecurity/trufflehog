@@ -86,7 +86,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	t.Run(
 		"Adding a document to a new index creates a single index",
@@ -126,7 +126,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	t.Run(
 		"Indices have the correct document count",
@@ -349,7 +349,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 			}
 
 			docSearch := DocumentSearch{

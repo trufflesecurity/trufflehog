@@ -3,15 +3,16 @@ package paralleldots
 import (
 	"bytes"
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -42,8 +43,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ParallelDots,
+			DetectorType: detector_typepb.DetectorType_ParallelDots,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -65,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			writer.Close()
+			_ = writer.Close()
 			req, err := http.NewRequestWithContext(ctx, "POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader(payload.Bytes()))
 			if err != nil {
 				continue
@@ -73,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", writer.FormDataContentType())
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					continue
@@ -91,8 +93,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ParallelDots
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ParallelDots
 }
 
 func (s Scanner) Description() string {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -45,9 +45,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_OpenAIAdmin,
+			DetectorType: detector_typepb.DetectorType_OpenAIAdmin,
 			Redacted:     token[:11] + "..." + token[len(token)-4:],
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -59,9 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyMatch(ctx, client, token)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, token)
-			s1.AnalysisInfo = map[string]string{
-				"key": token,
-			}
 		}
 
 		results = append(results, s1)
@@ -102,8 +100,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OpenAIAdmin
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OpenAIAdmin
 }
 
 func (s Scanner) Description() string {

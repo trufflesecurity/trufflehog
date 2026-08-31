@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTwitterConsumerKey_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestTwitterConsumerKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TwitterConsumerkey,
+					DetectorType: detector_typepb.DetectorType_TwitterConsumerkey,
 					Verified:     true,
 					Raw:          []byte(key),
 					RawV2:        []byte(key + secret),
@@ -72,7 +72,7 @@ func TestTwitterConsumerKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TwitterConsumerkey,
+					DetectorType: detector_typepb.DetectorType_TwitterConsumerkey,
 					Verified:     false,
 					Raw:          []byte(inactiveKey),
 					RawV2:        []byte(inactiveKey + inactiveSecret),

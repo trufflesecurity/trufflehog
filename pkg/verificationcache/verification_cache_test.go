@@ -11,7 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type testDetector struct {
@@ -37,9 +37,9 @@ func (t *testDetector) FromData(_ context.Context, verify bool, _ []byte) ([]det
 	return results, nil
 }
 
-func (t *testDetector) Keywords() []string             { return nil }
-func (t *testDetector) Type() detectorspb.DetectorType { return -1 }
-func (t *testDetector) Description() string            { return "" }
+func (t *testDetector) Keywords() []string                 { return nil }
+func (t *testDetector) Type() detector_typepb.DetectorType { return -1 }
+func (t *testDetector) Description() string                { return "" }
 
 var _ detectors.Detector = (*testDetector)(nil)
 
@@ -254,7 +254,7 @@ func TestVerificationCache_FromData_SameRawDifferentType_CacheMiss(t *testing.T)
 
 	if assert.NoError(t, err) {
 		if assert.Len(t, res, 1) {
-			assert.Equal(t, detectorspb.DetectorType(-2), res[0].DetectorType)
+			assert.Equal(t, detector_typepb.DetectorType(-2), res[0].DetectorType)
 		}
 	}
 	assert.Len(t, cache.resultCache.Values(), 2)
@@ -275,7 +275,7 @@ func TestVerificationCache_FromData_SameRawV2DifferentType_CacheMiss(t *testing.
 
 	if assert.NoError(t, err) {
 		if assert.Len(t, res, 1) {
-			assert.Equal(t, detectorspb.DetectorType(-2), res[0].DetectorType)
+			assert.Equal(t, detector_typepb.DetectorType(-2), res[0].DetectorType)
 		}
 	}
 	assert.Len(t, cache.resultCache.Values(), 2)

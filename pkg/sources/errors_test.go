@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-var testError = fmt.Errorf("simulated failure")
+var errTest = fmt.Errorf("simulated failure")
 
 func TestNewScanErrors(t *testing.T) {
 	testCases := []struct {
@@ -86,7 +86,7 @@ func TestScanErrorsAdd(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					for j := 0; j < tc.wantErr/tc.concurrency; j++ {
-						se.Add(testError)
+						se.Add(errTest)
 					}
 					wg.Done()
 				}()
@@ -137,7 +137,7 @@ func TestScanErrorsCount(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					for j := 0; j < tc.wantErrCnt/tc.concurrency; j++ {
-						se.Add(testError)
+						se.Add(errTest)
 					}
 					wg.Done()
 				}()
@@ -153,9 +153,25 @@ func TestScanErrorsCount(t *testing.T) {
 
 func TestScanErrorsString(t *testing.T) {
 	se := NewScanErrors()
-	se.Add(testError)
-	want := `["` + testError.Error() + `"]`
+	se.Add(errTest)
+	want := `["` + errTest.Error() + `"]`
 	if got := fmt.Sprintf("%v", se); got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTargetNotFoundErrorUnwrapsThroughJobChain(t *testing.T) {
+	inner := &TargetNotFoundError{Err: fmt.Errorf("could not download file for scan: 404")}
+	// The chain a targeted scan failure travels before a consumer sees it:
+	// scanTargets wraps in TargetedScanError, the source manager wraps in
+	// Fatal, and JobProgressMetrics.FatalErrors joins the results.
+	chain := errors.Join(Fatal{&TargetedScanError{Err: inner, SecretID: 42}})
+
+	var tnf *TargetNotFoundError
+	if !errors.As(chain, &tnf) {
+		t.Fatal("TargetNotFoundError not found in wrapped chain")
+	}
+	if tnf.Error() != inner.Error() {
+		t.Fatalf("unexpected message: %q", tnf.Error())
 	}
 }

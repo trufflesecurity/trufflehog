@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestMailgun_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMailgun_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mailgun,
+					DetectorType: detector_typepb.DetectorType_Mailgun,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestMailgun_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mailgun,
+					DetectorType: detector_typepb.DetectorType_Mailgun,
 					Verified:     true,
 				},
 			},
@@ -82,7 +82,7 @@ func TestMailgun_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mailgun,
+					DetectorType: detector_typepb.DetectorType_Mailgun,
 					Verified:     false,
 				},
 			},
@@ -98,7 +98,7 @@ func TestMailgun_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Mailgun,
+					DetectorType: detector_typepb.DetectorType_Mailgun,
 					Verified:     false,
 				},
 			},
@@ -129,7 +129,7 @@ func TestMailgun_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {

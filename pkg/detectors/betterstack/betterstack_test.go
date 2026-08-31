@@ -38,7 +38,7 @@ func TestBetterStack_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				func getBetterStackToken() string{ return "ntJD0ER8QpuT0O1WqsclApO2" }
 				`,
@@ -76,7 +76,7 @@ func TestBetterStack_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				func getBetterStackToken() string{ return "DyntJD0ER8QpuT0O1WqsclApO2" }
 				`,

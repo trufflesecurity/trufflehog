@@ -382,7 +382,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	// Configure parallel gzip decompression for better performance
 	const (
@@ -394,7 +394,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	if err != nil {
 		return err
 	}
-	defer gzipReader.Close()
+	defer func() { _ = gzipReader.Close() }()
 
 	// Layers are tar archives, so we read them as tar files
 	tarReader := tar.NewReader(gzipReader)

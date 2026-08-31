@@ -17,7 +17,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAzurestorage_FromChunk(t *testing.T) {
@@ -56,7 +56,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureStorage,
+					DetectorType: detector_typepb.DetectorType_AzureStorage,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"account_name": "teststoragebytruffle",
@@ -75,7 +75,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureStorage,
+					DetectorType: detector_typepb.DetectorType_AzureStorage,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"account_name": "teststoragebytruffle",
@@ -105,7 +105,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_AzureStorage,
+					DetectorType: detector_typepb.DetectorType_AzureStorage,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"account_name": "teststoragebytruffle",
@@ -126,7 +126,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_AzureStorage,
+					DetectorType: detector_typepb.DetectorType_AzureStorage,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"account_name": "teststoragebytruffle",
@@ -147,7 +147,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureStorage,
+					DetectorType: detector_typepb.DetectorType_AzureStorage,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"account_name": "invalid",

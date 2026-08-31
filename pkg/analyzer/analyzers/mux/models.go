@@ -56,9 +56,10 @@ func (info *secretInfo) addPermission(resourceType ResourceType, permission stri
 		return
 	}
 
-	if permission == "read" {
+	switch permission {
+	case "read":
 		info.Permissions[resourceType] = Read
-	} else if permission == "write" {
+	case "write":
 		info.Permissions[resourceType] = FullAccess
 	}
 }

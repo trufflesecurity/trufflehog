@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDwolla_FromChunk(t *testing.T) {
@@ -50,11 +50,11 @@ func TestDwolla_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
+					DetectorType: detector_typepb.DetectorType_Dwolla,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
+					DetectorType: detector_typepb.DetectorType_Dwolla,
 					Verified:     true,
 				},
 			},
@@ -70,11 +70,11 @@ func TestDwolla_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
+					DetectorType: detector_typepb.DetectorType_Dwolla,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
+					DetectorType: detector_typepb.DetectorType_Dwolla,
 					Verified:     false,
 				},
 			},

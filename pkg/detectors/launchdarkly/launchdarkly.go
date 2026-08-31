@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -69,9 +69,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_LaunchDarkly,
+			DetectorType: detector_typepb.DetectorType_LaunchDarkly,
 			Raw:          []byte(resMatch),
 			ExtraData:    make(map[string]string),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -79,13 +80,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
 			s1.ExtraData = extraData
-
-			// only api keys can be analyzed
-			if strings.HasPrefix(resMatch, "api-") {
-				s1.AnalysisInfo = map[string]string{
-					"key": resMatch,
-				}
-			}
 		}
 
 		results = append(results, s1)
@@ -94,8 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_LaunchDarkly
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_LaunchDarkly
 }
 
 func (s Scanner) Description() string {

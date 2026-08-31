@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestIpinfo_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestIpinfo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IPInfo,
+					DetectorType: detector_typepb.DetectorType_IPInfo,
 					Verified:     true,
 				},
 			},
@@ -68,7 +68,7 @@ func TestIpinfo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IPInfo,
+					DetectorType: detector_typepb.DetectorType_IPInfo,
 					Verified:     false,
 				},
 			},
@@ -97,7 +97,7 @@ func TestIpinfo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IPInfo,
+					DetectorType: detector_typepb.DetectorType_IPInfo,
 					Verified:     false,
 				},
 			},
@@ -114,7 +114,7 @@ func TestIpinfo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IPInfo,
+					DetectorType: detector_typepb.DetectorType_IPInfo,
 					Verified:     false,
 				},
 			},
@@ -133,11 +133,14 @@ func TestIpinfo_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+				if len(got[i].SecretParts) == 0 {
+					t.Fatalf("no secret parts present: \n %+v", got[i])
+				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Ipinfo.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

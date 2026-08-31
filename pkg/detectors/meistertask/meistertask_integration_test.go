@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestMeistertask_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestMeistertask_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Meistertask,
+					DetectorType: detector_typepb.DetectorType_Meistertask,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestMeistertask_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Meistertask,
+					DetectorType: detector_typepb.DetectorType_Meistertask,
 					Verified:     false,
 				},
 			},

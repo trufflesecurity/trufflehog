@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	ldap "github.com/mariduv/ldap-verify"
+	ldap "github.com/trufflesecurity/ldap-verify"
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -68,8 +68,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
 			for _, password := range passwordMatches {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Raw:          []byte(strings.Join([]string{ldapURL.String(), username[1], password[1]}, "\t")),
+					SecretParts: map[string]string{
+						"url":      ldapURL.String(),
+						"username": username[1],
+						"password": password[1],
+					},
 				}
 
 				if verify {
@@ -98,8 +103,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_LDAP,
+			DetectorType: detector_typepb.DetectorType_LDAP,
 			Raw:          []byte(strings.Join([]string{ldapURL.String(), username, password}, "\t")),
+			SecretParts: map[string]string{
+				"url":      ldapURL.String(),
+				"username": username,
+				"password": password,
+			},
 		}
 
 		if verify {
@@ -173,8 +183,8 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_LDAP
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_LDAP
 }
 
 func (s Scanner) Description() string {

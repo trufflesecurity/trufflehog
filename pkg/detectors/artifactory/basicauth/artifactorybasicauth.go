@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -29,7 +29,7 @@ type basicArtifactoryCredential struct {
 
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
-	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.Detector                   = (*Scanner)(nil)
 	_ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
@@ -42,7 +42,6 @@ var (
 
 	errNoHost = errors.New("no such host")
 )
-
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -110,9 +109,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ArtifactoryBasicAuth,
+			DetectorType: detector_typepb.DetectorType_ArtifactoryBasicAuth,
 			Raw:          []byte(cred.raw),
 			RawV2:        []byte(cred.username + ":" + cred.password + "@" + cred.host),
+			SecretParts: map[string]string{
+				"domain":   cred.host,
+				"username": cred.username,
+				"password": cred.password,
+			},
 		}
 
 		if verify {
@@ -125,16 +129,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				r.SetVerificationError(vErr, cred.username, cred.password)
-			}
-
-			if isVerified {
-				if r.AnalysisInfo == nil {
-					r.AnalysisInfo = make(map[string]string)
-				}
-				r.AnalysisInfo["domain"] = cred.host
-				r.AnalysisInfo["username"] = cred.username
-				r.AnalysisInfo["password"] = cred.password
-				r.AnalysisInfo["authType"] = "basic"
 			}
 		}
 
@@ -178,23 +172,23 @@ func verifyArtifactoryBasicAuth(ctx context.Context, client *http.Client, host, 
 			return false, err
 		}
 
-        if strings.TrimSpace(string(body)) == "OK" {
-            return true, nil
-        }
+		if strings.TrimSpace(string(body)) == "OK" {
+			return true, nil
+		}
 
 		return false, nil
 	case http.StatusForbidden:
-        body, err := io.ReadAll(resp.Body)
-        if err != nil {
-            return false, err
-        }
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
 
-        // Ignore rate-limit / temporary block 403s
-        if strings.Contains(strings.ToLower(string(body)), "blocked due to recurrent request failures") {
-            return false, nil
-        }
+		// Ignore rate-limit / temporary block 403s
+		if strings.Contains(strings.ToLower(string(body)), "blocked due to recurrent request failures") {
+			return false, nil
+		}
 
-        return true, nil
+		return true, nil
 	case http.StatusUnauthorized, http.StatusFound:
 		return false, nil
 	default:
@@ -202,8 +196,8 @@ func verifyArtifactoryBasicAuth(ctx context.Context, client *http.Client, host, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ArtifactoryBasicAuth
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ArtifactoryBasicAuth
 }
 
 func (s Scanner) Description() string {

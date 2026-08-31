@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPlaidKey_FromChunk(t *testing.T) {
@@ -52,10 +52,10 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlaidKey,
+					DetectorType: detector_typepb.DetectorType_PlaidKey,
 					Verified:     true,
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", secret, id, token)),
-					AnalysisInfo: map[string]string{
+					SecretParts: map[string]string{
 						"secret": secret,
 						"id":     id,
 						"token":  token,
@@ -77,7 +77,7 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PlaidKey,
+					DetectorType: detector_typepb.DetectorType_PlaidKey,
 					Verified:     false,
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", inactiveSecret, id, token)),
 					ExtraData: map[string]string{
@@ -115,7 +115,7 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 					t.Fatalf("no raw v2 secret present: \n %+v", got[i])
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo", "ExtraData")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("PlaidKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

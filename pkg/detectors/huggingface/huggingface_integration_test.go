@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestHuggingface_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestHuggingface_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_HuggingFace,
+					DetectorType: detector_typepb.DetectorType_HuggingFace,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"Email":    "zubair.khan@trufflesec.com",
@@ -72,7 +72,7 @@ func TestHuggingface_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_HuggingFace,
+					DetectorType: detector_typepb.DetectorType_HuggingFace,
 					Verified:     false,
 				},
 			},
@@ -101,7 +101,7 @@ func TestHuggingface_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_HuggingFace,
+					DetectorType: detector_typepb.DetectorType_HuggingFace,
 					Verified:     false,
 				},
 			},
@@ -118,7 +118,7 @@ func TestHuggingface_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_HuggingFace,
+					DetectorType: detector_typepb.DetectorType_HuggingFace,
 					Verified:     false,
 				},
 			},
@@ -162,7 +162,7 @@ func TestHuggingface_FromChunk(t *testing.T) {
 
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_HuggingFace,
+					DetectorType: detector_typepb.DetectorType_HuggingFace,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"Email":    "zubair.khan@trufflesec.com",
@@ -190,7 +190,7 @@ func TestHuggingface_FromChunk(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf(" wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {

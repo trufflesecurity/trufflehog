@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFTP_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     true,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
@@ -68,7 +68,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
@@ -86,7 +86,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com.badhost",
 				},
@@ -105,7 +105,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
@@ -123,7 +123,7 @@ func TestFTP_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detector_typepb.DetectorType_FTP,
 					Verified:     false,
 					Redacted:     "ftp://abc:********@ftp.freebsd.org",
 				},

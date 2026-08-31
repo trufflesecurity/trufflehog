@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -42,8 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_FormBucket,
+			DetectorType: detector_typepb.DetectorType_FormBucket,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -55,14 +56,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				body, errBody := io.ReadAll(res.Body)
 				if errBody != nil {
 					continue
 				}
 				bodyString := string(body)
 				validResponse := strings.Contains(bodyString, `created_on`)
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if errBody == nil {
 					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 						s1.Verified = true
@@ -85,6 +86,6 @@ type Response struct {
 	Anonymous bool `json:"anonymous"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_FormBucket
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_FormBucket
 }

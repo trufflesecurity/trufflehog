@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -50,8 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resAccount := strings.TrimSpace(accountMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_FlowFlu,
+				DetectorType: detector_typepb.DetectorType_FlowFlu,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 
 			if verify {
@@ -69,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					bodyString := string(bodyBytes)
 					validResponse := strings.Contains(bodyString, `total_result`)
 
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if validResponse {
 							s1.Verified = true
@@ -87,8 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_FlowFlu
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_FlowFlu
 }
 
 func (s Scanner) Description() string {

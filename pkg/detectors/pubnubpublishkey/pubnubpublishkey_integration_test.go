@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPubNubPublishKey_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					DetectorType: detector_typepb.DetectorType_PubNubPublishKey,
 					Verified:     true,
 				},
 			},
@@ -68,7 +68,7 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					DetectorType: detector_typepb.DetectorType_PubNubPublishKey,
 					Verified:     false,
 				},
 			},
@@ -84,7 +84,7 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					DetectorType: detector_typepb.DetectorType_PubNubPublishKey,
 					Verified:     false,
 				},
 			},
@@ -101,7 +101,7 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					DetectorType: detector_typepb.DetectorType_PubNubPublishKey,
 					Verified:     false,
 				},
 			},

@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
+					DetectorType: detector_typepb.DetectorType_Auth0ManagementApiToken,
 					RawV2:        []byte(managementApiToken + domain),
 					Redacted:     domain,
 					Verified:     true,
@@ -69,7 +69,7 @@ func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
+					DetectorType: detector_typepb.DetectorType_Auth0ManagementApiToken,
 					RawV2:        []byte(inactiveManagementApiToken + domain),
 					Redacted:     domain,
 					Verified:     false,

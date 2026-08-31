@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					DetectorType: detector_typepb.DetectorType_SalesforceRefreshToken,
 					Verified:     true,
 				},
 			},
@@ -70,7 +70,7 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					DetectorType: detector_typepb.DetectorType_SalesforceRefreshToken,
 					Verified:     false,
 				},
 			},
@@ -83,18 +83,18 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				data: []byte(fmt.Sprintf(`
-				refresh_token: %s, key: %s, valid_secret: %s, 
+				refresh_token: %s, key: %s, valid_secret: %s,
 				invalid_refresh_token: 5Aep861eN26Sp9j0R5QPjh0AAAABBBBCCCCjcNqfo5kVBplkpP5tzyWXyVGAivx26AAAABBBBjYE133BBBBAAAA`,
 					refreshToken, consumerKey, consumerSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					DetectorType: detector_typepb.DetectorType_SalesforceRefreshToken,
 					Verified:     true, // The valid refresh token combination
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					DetectorType: detector_typepb.DetectorType_SalesforceRefreshToken,
 					Verified:     false, // The invalid refresh token combination
 				},
 			},
@@ -123,7 +123,7 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					DetectorType: detector_typepb.DetectorType_SalesforceRefreshToken,
 					Verified:     false,
 				},
 			},
@@ -140,7 +140,7 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					DetectorType: detector_typepb.DetectorType_SalesforceRefreshToken,
 					Verified:     false,
 				},
 			},

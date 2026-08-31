@@ -1,4 +1,8 @@
 version: 2
+before:
+  hooks:
+    - mkdir -p docs/man
+    - sh -c 'CGO_ENABLED=0 go run -ldflags "-X github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}" . --generate-man-page > docs/man/trufflehog.1'
 release:
   # GoReleaser creates the GitHub release before artifacts finish uploading.
   # scripts/install.sh queries /releases/latest to find the current version, so
@@ -31,6 +35,11 @@ builds:
     goarch:
     - amd64
     - arm64
+archives:
+  - files:
+      - LICENSE
+      - README.md
+      - docs/man/trufflehog.1
 dockers:
   - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
     dockerfile: Dockerfile.goreleaser
@@ -121,6 +130,8 @@ brews:
     homepage: "https://github.com/trufflesecurity/trufflehog"
     install: |
       bin.install "trufflehog"
+    extra_install: |
+      man1.install "docs/man/trufflehog.1"
 signs:
   - cmd: cosign
     signature: "${artifact}.sig"

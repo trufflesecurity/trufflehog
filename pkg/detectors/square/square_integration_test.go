@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSquare_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestSquare_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Square,
+					DetectorType: detector_typepb.DetectorType_Square,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestSquare_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Square,
+					DetectorType: detector_typepb.DetectorType_Square,
 					Verified:     false,
 				},
 			},
@@ -95,7 +95,7 @@ func TestSquare_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Square.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

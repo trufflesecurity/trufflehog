@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestFlatIO_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestFlatIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FlatIO,
+					DetectorType: detector_typepb.DetectorType_FlatIO,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestFlatIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FlatIO,
+					DetectorType: detector_typepb.DetectorType_FlatIO,
 					Verified:     false,
 				},
 			},

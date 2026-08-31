@@ -48,22 +48,26 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 	return analyzers.AnalyzerAnthropic
 }
 
-func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, exist := credInfo["key"]
 	if !exist {
-		return nil, errors.New("key not found in credentials info")
+		err := errors.New("key not found in credentials info")
+		ctx.Logger().Error(err, "anthropic credentials missing key")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", err,
+		)
 	}
 
-	secretInfo, err := AnalyzePermissions(a.Cfg, key)
+	secretInfo, err := AnalyzePermissions(ctx, a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
+		)
 	}
 
 	return secretInfoToAnalyzerResult(secretInfo), nil
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	info, err := AnalyzePermissions(cfg, key)
+	info, err := AnalyzePermissions(context.Background(), cfg, key)
 	if err != nil {
 		// just print the error in cli and continue as a partial success
 		color.Red("[x] Error : %s", err.Error())
@@ -86,7 +90,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	}
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*SecretInfo, error) {
 	// create a HTTP client
 	client := analyzers.NewAnalyzeClient(cfg)
 
@@ -98,15 +102,17 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	switch keyType {
 	case APIKey:
-		if err := captureAPIKeyResources(client, key, secretInfo); err != nil {
+		if err := captureAPIKeyResources(ctx, client, key, secretInfo); err != nil {
 			return nil, err
 		}
 	case AdminKey:
-		if err := captureAdminKeyResources(client, key, secretInfo); err != nil {
+		if err := captureAdminKeyResources(ctx, client, key, secretInfo); err != nil {
 			return nil, err
 		}
 	default:
-		return nil, errors.New("unsupported key type")
+		err := errors.New("unsupported key type")
+		ctx.Logger().Error(err, "unrecognized anthropic key format")
+		return nil, err
 	}
 
 	// anthropic key has full access only

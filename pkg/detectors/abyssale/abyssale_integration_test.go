@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -50,7 +50,7 @@ func TestAbyssale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Abyssale,
+					DetectorType: detector_typepb.DetectorType_Abyssale,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestAbyssale_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Abyssale,
+					DetectorType: detector_typepb.DetectorType_Abyssale,
 					Verified:     false,
 				}
 				r.SetVerificationError(context.DeadlineExceeded)
@@ -84,7 +84,7 @@ func TestAbyssale_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Abyssale,
+					DetectorType: detector_typepb.DetectorType_Abyssale,
 					Verified:     false,
 				}
 				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 500"))
@@ -102,7 +102,7 @@ func TestAbyssale_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Abyssale,
+					DetectorType: detector_typepb.DetectorType_Abyssale,
 					Verified:     false,
 				},
 			},

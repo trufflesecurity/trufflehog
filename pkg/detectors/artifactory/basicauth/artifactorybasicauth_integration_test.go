@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestArtifactory_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryBasicAuth,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryBasicAuth,
 					Verified:     true,
 				},
 			},
@@ -71,7 +71,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ArtifactoryBasicAuth,
+					DetectorType: detector_typepb.DetectorType_ArtifactoryBasicAuth,
 					Verified:     false,
 				},
 			},
@@ -121,7 +121,7 @@ func TestArtifactory_FromChunk(t *testing.T) {
 						tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Artifactory.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

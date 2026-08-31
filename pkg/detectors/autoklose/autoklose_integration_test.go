@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAutoklose_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestAutoklose_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Autoklose,
+					DetectorType: detector_typepb.DetectorType_Autoklose,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"email": "mladen.stevanovic@vanillasoft.com",
@@ -67,7 +67,7 @@ func TestAutoklose_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Autoklose,
+					DetectorType: detector_typepb.DetectorType_Autoklose,
 					Verified:     false,
 				},
 			},

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSendbird_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestSendbird_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sendbird,
+					DetectorType: detector_typepb.DetectorType_Sendbird,
 					Verified:     true,
 				},
 			},
@@ -68,7 +68,7 @@ func TestSendbird_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sendbird,
+					DetectorType: detector_typepb.DetectorType_Sendbird,
 					Verified:     false,
 				},
 			},
@@ -97,7 +97,7 @@ func TestSendbird_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sendbird,
+					DetectorType: detector_typepb.DetectorType_Sendbird,
 					Verified:     false,
 				},
 			},
@@ -114,7 +114,7 @@ func TestSendbird_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sendbird,
+					DetectorType: detector_typepb.DetectorType_Sendbird,
 					Verified:     false,
 				},
 			},
@@ -131,7 +131,7 @@ func TestSendbird_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sendbird,
+					DetectorType: detector_typepb.DetectorType_Sendbird,
 					Verified:     false,
 				},
 			},
@@ -148,7 +148,7 @@ func TestSendbird_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sendbird,
+					DetectorType: detector_typepb.DetectorType_Sendbird,
 					Verified:     false,
 				},
 			},

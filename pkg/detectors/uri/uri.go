@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -44,8 +44,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"http://", "https://"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_URI
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_URI
 }
 
 func (s Scanner) Description() string {
@@ -98,10 +98,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		rawUrlWithoutPath := rawUrl.String()
 
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_URI,
+			DetectorType: detector_typepb.DetectorType_URI,
 			Raw:          []byte(rawUrlWithoutPath),
 			RawV2:        []byte(rawUrlWithPath),
-			Redacted:     detectors.RedactURL(*parsedURL),
+			SecretParts: map[string]string{
+				"host":     parsedURL.Host,
+				"username": parsedURL.User.Username(),
+				"password": password,
+			},
+			Redacted: detectors.RedactURL(*parsedURL),
 		}
 
 		if verify {

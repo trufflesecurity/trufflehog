@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestLemonsqueezy_FromChunk(t *testing.T) {
@@ -51,7 +51,7 @@ func TestLemonsqueezy_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LemonSqueezy,
+					DetectorType: detector_typepb.DetectorType_LemonSqueezy,
 					Verified:     true,
 				},
 			},
@@ -68,7 +68,7 @@ func TestLemonsqueezy_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LemonSqueezy,
+					DetectorType: detector_typepb.DetectorType_LemonSqueezy,
 					Verified:     false,
 				},
 			},

@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSalesforceOauth2_FromData(t *testing.T) {
@@ -52,7 +52,7 @@ func TestSalesforceOauth2_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
+					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Verified:     true,
 				},
 			},
@@ -68,7 +68,7 @@ func TestSalesforceOauth2_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
+					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Verified:     false,
 				},
 			},
@@ -84,11 +84,11 @@ func TestSalesforceOauth2_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
+					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Verified:     true, // The valid secret combination
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
+					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Verified:     false, // The invalid secret combination
 				},
 			},
@@ -115,7 +115,7 @@ func TestSalesforceOauth2_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
+					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Verified:     false,
 				},
 			},
@@ -131,7 +131,7 @@ func TestSalesforceOauth2_FromData(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
+					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Verified:     false,
 				},
 			},

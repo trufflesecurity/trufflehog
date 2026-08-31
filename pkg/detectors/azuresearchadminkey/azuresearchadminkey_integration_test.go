@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAzureSearchAdminKey_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestAzureSearchAdminKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
+					DetectorType: detector_typepb.DetectorType_AzureSearchAdminKey,
 					Verified:     true,
 					RawV2:        []byte(secret + service),
 				},
@@ -70,7 +70,7 @@ func TestAzureSearchAdminKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
+					DetectorType: detector_typepb.DetectorType_AzureSearchAdminKey,
 					Verified:     false,
 					RawV2:        []byte(inactiveSecret + service),
 				},
@@ -100,7 +100,7 @@ func TestAzureSearchAdminKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
+					DetectorType: detector_typepb.DetectorType_AzureSearchAdminKey,
 					Verified:     false,
 					RawV2:        []byte(secret + service),
 				},
@@ -118,7 +118,7 @@ func TestAzureSearchAdminKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
+					DetectorType: detector_typepb.DetectorType_AzureSearchAdminKey,
 					Verified:     false,
 					RawV2:        []byte(secret + service),
 				},

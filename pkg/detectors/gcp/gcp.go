@@ -16,7 +16,7 @@ import (
 	"golang.org/x/oauth2/google"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -62,8 +62,8 @@ const startOffset = 4096
 // StartOffset returns the start offset for the secret this detector finds.
 func (Scanner) StartOffset() int64 { return startOffset }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GCP
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GCP
 }
 
 func (s Scanner) Description() string {
@@ -110,7 +110,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		credBytes, _ := json.Marshal(creds)
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_GCP,
+			DetectorType: detector_typepb.DetectorType_GCP,
 			Raw:          raw,
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
@@ -118,7 +118,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
 				"project":        creds.ProjectID,
 			},
-			AnalysisInfo: map[string]string{
+			SecretParts: map[string]string{
 				"key": string(credBytes),
 			},
 		}
@@ -149,7 +149,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if creds.Type != "" {
-			result.AnalysisInfo["type"] = creds.Type
+			result.SecretParts["type"] = creds.Type
 		}
 
 		if verify {
@@ -212,7 +212,7 @@ func findMatchingCertificateKID(ctx context.Context, certsURL, privateKeyPEM str
 		}
 
 		// Compare RSA public keys
-		if publicKey.PublicKey.N.Cmp(certPublicKey.N) == 0 && publicKey.PublicKey.E == certPublicKey.E {
+		if publicKey.N.Cmp(certPublicKey.N) == 0 && publicKey.E == certPublicKey.E {
 			return kid, nil
 		}
 	}
@@ -233,7 +233,7 @@ func fetchServiceAccountCerts(ctx context.Context, certsURL string) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, nil

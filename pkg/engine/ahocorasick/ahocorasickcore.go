@@ -8,7 +8,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // DetectorKey is used to identify a detector in the keywordsToDetectors map.
@@ -19,7 +19,7 @@ import (
 // that the AhoCorasickCore can populate passed-in maps keyed on this type
 // without exposing any of its internals to consumers.
 type DetectorKey struct {
-	detectorType       detectorspb.DetectorType
+	detectorType       detector_typepb.DetectorType
 	version            int
 	customDetectorName string
 }
@@ -36,7 +36,7 @@ func (k DetectorKey) Loggable() map[string]any {
 }
 
 // Type returns the detector type of the key.
-func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
+func (k DetectorKey) Type() detector_typepb.DetectorType { return k.detectorType }
 
 // spanCalculator is an interface that defines a method for calculating a match span
 // in the chunk data. This allows for different strategies to be used without changing the core logic.

@@ -16,7 +16,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func setupACLConfigFile(redisUser, redisPass string) (*os.File, error) {
@@ -112,7 +112,7 @@ func TestRedisIntegration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Redis,
+					DetectorType: detector_typepb.DetectorType_Redis,
 					Verified:     false,
 					Redacted:     fmt.Sprintf("redis://%s:*******@%s:%s", redisUser, host, port.Port()),
 				},
@@ -129,7 +129,7 @@ func TestRedisIntegration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Redis,
+					DetectorType: detector_typepb.DetectorType_Redis,
 					Verified:     true,
 					Redacted:     fmt.Sprintf("redis://%s:*******@%s:%s", redisUser, host, port.Port()),
 				},
@@ -147,6 +147,8 @@ func TestRedisIntegration_FromChunk(t *testing.T) {
 			}
 			for i := range got {
 				got[i].Raw = nil
+				got[i].SecretParts = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
@@ -188,7 +190,7 @@ func TestURI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Redis,
+					DetectorType: detector_typepb.DetectorType_Redis,
 					Verified:     false,
 					Redacted:     "redis://user:*******@redis.com",
 				},
@@ -206,6 +208,8 @@ func TestURI_FromChunk(t *testing.T) {
 			}
 			for i := range got {
 				got[i].Raw = nil
+				got[i].SecretParts = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

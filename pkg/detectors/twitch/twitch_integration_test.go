@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTwitch_FromChunk(t *testing.T) {
@@ -54,11 +54,11 @@ func TestTwitch_FromChunk(t *testing.T) {
 			// but only 1 of them will be verified
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     true,
 				},
 			},
@@ -74,11 +74,11 @@ func TestTwitch_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     false,
 				},
 			},
@@ -95,11 +95,11 @@ func TestTwitch_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     false,
 				},
 			},
@@ -116,11 +116,11 @@ func TestTwitch_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Twitch,
+					DetectorType: detector_typepb.DetectorType_Twitch,
 					Verified:     false,
 				},
 			},

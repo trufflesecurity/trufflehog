@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -45,8 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_PyPI,
+			DetectorType: detector_typepb.DetectorType_PyPI,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 		}
 
 		if verify {
@@ -76,10 +77,11 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	_ = writer.WriteField(":action", "file_upload")
 	_ = writer.WriteField("name", "dummy-package")
 	_ = writer.WriteField("version", "0.0.1")
+	_ = writer.WriteField("filetype", "sdist")
 	_ = writer.WriteField("content", "dummy-content")
 
 	// Close the writer to finalize the form
-	writer.Close()
+	_ = writer.Close()
 
 	// Create a new POST request to the PyPI legacy upload URL
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://upload.pypi.org/legacy/", &body)
@@ -103,7 +105,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}()
 
 	// Check for expected status codes for verification
-	if res.StatusCode == http.StatusBadRequest {
+	switch res.StatusCode {
+	case http.StatusBadRequest:
 		verified, err := common.ResponseContainsSubstring(res.Body, "Include at least one message digest.")
 		if err != nil {
 			return false, nil, err
@@ -111,7 +114,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		if verified {
 			return true, nil, nil
 		}
-	} else if res.StatusCode == http.StatusForbidden {
+	case http.StatusForbidden:
 		// If we get a 403 status, the key is invalid
 		return false, nil, nil
 	}
@@ -120,8 +123,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PyPI
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PyPI
 }
 
 func (s Scanner) Description() string {

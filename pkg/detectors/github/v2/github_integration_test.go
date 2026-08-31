@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGitHub_FromChunk(t *testing.T) {
@@ -53,7 +53,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"account_type": "User",
@@ -62,9 +62,10 @@ func TestGitHub_FromChunk(t *testing.T) {
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 						"scopes":         "notifications",
 						// "site_admin":     "false", // not present in test verifiedGhp
-						"url":      "https://github.com/truffle-sandbox",
-						"username": "truffle-sandbox",
-						"version":  "2",
+						"token_type": "Personal Access Token (classic)",
+						"url":        "https://github.com/truffle-sandbox",
+						"username":   "truffle-sandbox",
+						"version":    "2",
 					},
 				},
 			},
@@ -80,10 +81,11 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "Personal Access Token (classic)",
 						"version":        "2",
 					},
 				},
@@ -100,10 +102,11 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "OAuth Access Token",
 						"version":        "2",
 					},
 				},
@@ -120,10 +123,11 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "GitHub App User-to-Server Token",
 						"version":        "2",
 					},
 				},
@@ -140,10 +144,11 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "GitHub App Server-to-Server (installation) Token",
 						"version":        "2",
 					},
 				},
@@ -160,10 +165,11 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "GitHub App Refresh Token",
 						"version":        "2",
 					},
 				},
@@ -180,10 +186,11 @@ func TestGitHub_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Github,
+					DetectorType: detector_typepb.DetectorType_Github,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"token_type":     "Personal Access Token (classic)",
 						"version":        "2",
 					},
 				},
@@ -217,7 +224,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("GitHub.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

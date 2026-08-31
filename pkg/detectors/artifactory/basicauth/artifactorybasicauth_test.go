@@ -16,11 +16,11 @@ func TestArtifactory_Pattern(t *testing.T) {
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
 	tests := []struct {
-		name             string
-		input            string
-		want             []string
+		name  string
+		input string
+		want  []string
 	}{
-        {
+		{
 			name: "valid pattern - single valid basic auth uri",
 			input: `
 				[INFO] Sending request to the artifactory API
@@ -32,7 +32,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 				"user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io",
 			},
 		},
-        {
+		{
 			name: "valid pattern - single valid basic auth uri with no http prefix",
 			input: `
 				[INFO] artifactory request to https://test.jfrog.io/artifactory/api/ping
@@ -42,7 +42,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 				"simpleuser123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io",
 			},
 		},
-        {
+		{
 			name: "valid pattern - single valid basic auth uri with postfix",
 			input: `
 				https://user123:ATBB123abcDEF456ghiJKL789mnoPQR@test.jfrog.io?x=1
@@ -89,7 +89,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 			`,
 			want: nil,
 		},
-        {
+		{
 			name: "invalid pattern - one character subdomain",
 			input: `
 				[INFO] artifactory logs
@@ -97,7 +97,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 			`,
 			want: nil,
 		},
-        {
+		{
 			name: "invalid pattern - domain starts with -",
 			input: `
 				[INFO] artifactory logs
@@ -105,7 +105,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 			`,
 			want: nil,
 		},
-        {
+		{
 			name: "invalid pattern - domain ends with -",
 			input: `
 				[INFO] artifactory logs

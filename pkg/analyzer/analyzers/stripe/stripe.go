@@ -33,12 +33,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeStr
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentialInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -162,7 +162,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status code
 	switch {
@@ -195,7 +195,7 @@ func checkKeyType(key string) (string, error) {
 	} else if strings.HasPrefix(key, RESTRICTED_PREFIX) {
 		return RESTRICTED, nil
 	}
-	return "", errors.New("Invalid Stripe key format")
+	return "", errors.New("invalid Stripe key format")
 }
 
 func checkKeyEnv(key string) (string, error) {
@@ -226,7 +226,7 @@ func checkValidity(cfg *config.Config, key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check the response. Valid is 200 (secret/restricted) or 403 (restricted)
 	if resp.StatusCode == 200 || resp.StatusCode == 403 {
@@ -290,15 +290,17 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 
 	color.Green("[!] Valid Stripe API Key\n\n")
 
-	if info.KeyType == SECRET {
+	switch info.KeyType {
+	case SECRET:
 		color.Green("[i] Key Type: %s", info.KeyType)
-	} else if info.KeyType == RESTRICTED {
+	case RESTRICTED:
 		color.Yellow("[i] Key Type: %s", info.KeyType)
 	}
 
-	if info.KeyEnv == LIVE {
+	switch info.KeyEnv {
+	case LIVE:
 		color.Green("[i] Key Environment: %s", info.KeyEnv)
-	} else if info.KeyEnv == TEST {
+	case TEST:
 		color.Red("[i] Key Environment: %s", info.KeyEnv)
 	}
 

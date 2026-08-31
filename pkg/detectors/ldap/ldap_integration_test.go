@@ -19,7 +19,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestMain(m *testing.M) {
@@ -83,7 +83,7 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Verified:     true,
 				},
 			},
@@ -102,7 +102,7 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Verified:     false,
 				},
 			},
@@ -118,7 +118,7 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Verified:     true,
 				},
 			},
@@ -134,7 +134,7 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Verified:     true,
 				},
 			},
@@ -150,7 +150,7 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Verified:     false,
 				},
 			},
@@ -169,7 +169,7 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Verified:     false,
 				},
 			},
@@ -263,7 +263,7 @@ func TestLdap_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LDAP,
+					DetectorType: detector_typepb.DetectorType_LDAP,
 					Verified:     false,
 				},
 			},

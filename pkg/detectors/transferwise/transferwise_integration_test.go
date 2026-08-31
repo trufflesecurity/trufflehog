@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTransferwise_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestTransferwise_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Transferwise,
+					DetectorType: detector_typepb.DetectorType_Transferwise,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestTransferwise_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Transferwise,
+					DetectorType: detector_typepb.DetectorType_Transferwise,
 					Verified:     false,
 				},
 			},

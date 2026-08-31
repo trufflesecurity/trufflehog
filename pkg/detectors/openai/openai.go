@@ -12,7 +12,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
@@ -25,7 +25,14 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	// The OpenAI API can be slow to respond under load, so use a longer
+	// per-attempt timeout than the default 5s and retry transient failures
+	// (timeouts, connection errors, 429/5xx) so a single slow response does
+	// not record an indeterminate verification result.
+	defaultClient = common.RetryableHTTPClient(
+		common.WithTimeout(10*time.Second),
+		common.WithMaxRetries(2),
+	)
 
 	// The magic string T3BlbkFJ is the base64-encoded string: OpenAI
 	// Matches: legacy keys (sk-{alnum}T3BlbkFJ...), project keys (sk-proj-...),
@@ -51,9 +58,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_OpenAI,
+			DetectorType: detector_typepb.DetectorType_OpenAI,
 			Redacted:     token[:3] + "..." + token[min(len(token)-1, 47):],
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -66,7 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = verified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
-			s1.AnalysisInfo = map[string]string{"key": token}
 		}
 
 		results = append(results, s1)
@@ -120,8 +127,8 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_OpenAI
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_OpenAI
 }
 
 func (s Scanner) Description() string {

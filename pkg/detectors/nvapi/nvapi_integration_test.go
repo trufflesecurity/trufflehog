@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestNvapi_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestNvapi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NVAPI,
+					DetectorType: detector_typepb.DetectorType_NVAPI,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestNvapi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NVAPI,
+					DetectorType: detector_typepb.DetectorType_NVAPI,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,7 @@ func TestNvapi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NVAPI,
+					DetectorType: detector_typepb.DetectorType_NVAPI,
 					Verified:     false,
 				},
 			},
@@ -113,7 +113,7 @@ func TestNvapi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NVAPI,
+					DetectorType: detector_typepb.DetectorType_NVAPI,
 					Verified:     false,
 				},
 			},

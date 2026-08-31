@@ -29,12 +29,14 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeMai
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentialInfo"),
+		)
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err,
+		)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -144,7 +146,7 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 		return metadata, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
 		return metadata, err
@@ -175,7 +177,7 @@ func getDomains(cfg *config.Config, key string) (DomainsJSON, error) {
 		return domains, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := json.NewDecoder(resp.Body).Decode(&domains); err != nil {
 		return domains, err
@@ -196,7 +198,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, err
 	}
 	if metadata.AccountID == "" {
-		return nil, fmt.Errorf("Invalid Mailchimp API key")
+		return nil, fmt.Errorf("invalid Mailchimp API key")
 	}
 
 	// get sending domains

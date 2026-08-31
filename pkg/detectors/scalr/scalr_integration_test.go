@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestScalr_FromChunk(t *testing.T) {
@@ -49,11 +49,11 @@ func TestScalr_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Scalr,
+					DetectorType: detector_typepb.DetectorType_Scalr,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Scalr,
+					DetectorType: detector_typepb.DetectorType_Scalr,
 					Verified:     true,
 				},
 			},
@@ -69,11 +69,11 @@ func TestScalr_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Scalr,
+					DetectorType: detector_typepb.DetectorType_Scalr,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Scalr,
+					DetectorType: detector_typepb.DetectorType_Scalr,
 					Verified:     false,
 				},
 			},

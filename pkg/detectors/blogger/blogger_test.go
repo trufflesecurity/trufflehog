@@ -25,7 +25,7 @@ func TestBlogger_Pattern(t *testing.T) {
 			input: `
 				func main() {
 					// Create a new request with the secret as a header
-					req, err := http.NewRequest("GET", "https://api.example.com/v1/blogger/blogs?key=fnWLw7pz1tc6uCzq6qocQZIxRF6SqUaOOkLqePY", http.NoBody)
+					req, err := http.NewRequest("GET", "https://api.example.com/v1/blogger/blogs?key=AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe", http.NoBody)
 					if err != nil {
 						fmt.Println("Error creating request:", err)
 						return
@@ -34,7 +34,7 @@ func TestBlogger_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 
 					// Check response status
 					if resp.StatusCode == http.StatusOK {
@@ -44,28 +44,35 @@ func TestBlogger_Pattern(t *testing.T) {
 					}
 				}
 				`,
-			want: []string{"fnWLw7pz1tc6uCzq6qocQZIxRF6SqUaOOkLqePY"},
+			want: []string{"AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe"},
 		},
 		{
 			name: "valid pattern - xml",
 			input: `
 				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
-  					<scope>GLOBAL</scope>
-  					<id>{blogger}</id>
-  					<secret>{blogger AQAAABAAA mtkwpygpNROxOgLZCnEvl7gNme1IuFiQm9oxPzJ}</secret>
-  					<description>configuration for production</description>
+					<scope>GLOBAL</scope>
+					<id>{blogger}</id>
+					<secret>{blogger AIzaSyCjkL9m2nOp4qRsTuVwXyZ0a1B2c3D4e5F}</secret>
+					<description>configuration for production</description>
 					<creationDate>2023-05-18T14:32:10Z</creationDate>
-  					<owner>jenkins-admin</owner>
+					<owner>jenkins-admin</owner>
 				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
 			`,
-			want: []string{"mtkwpygpNROxOgLZCnEvl7gNme1IuFiQm9oxPzJ"},
+			want: []string{"AIzaSyCjkL9m2nOp4qRsTuVwXyZ0a1B2c3D4e5F"},
 		},
 		{
-			name: "invalid pattern",
+			name: "false positive - java class name (CSM-2238)",
+			input: `
+				EJBLogger.logfinderReturnedMultipleValuesLoggable("@finderMethodName");
+			`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern - wrong prefix",
 			input: `
 				func main() {
 					// Create a new request with the secret as a header
-					req, err := http.NewRequest("GET", "https://api.example.com/v1/blogger/blogs?key=fnWL(w7pz1t)6uCz-q6qocQZIxRF6S/UqePY", http.NoBody)
+					req, err := http.NewRequest("GET", "https://api.example.com/v1/blogger/blogs?key=fnWLw7pz1tc6uCzq6qocQZIxRF6SqUaOOkLqePY", http.NoBody)
 					if err != nil {
 						fmt.Println("Error creating request:", err)
 						return
@@ -74,13 +81,26 @@ func TestBlogger_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 
 					// Check response status
 					if resp.StatusCode == http.StatusOK {
 						fmt.Println("Request successful!")
 					} else {
 						fmt.Println("Request failed with status:", resp.Status)
+					}
+				}
+				`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern - special characters",
+			input: `
+				func main() {
+					req, err := http.NewRequest("GET", "https://api.example.com/v1/blogger/blogs?key=AIzaSy(w7pz1t)6uCz-q6qocQZIxRF6S/UqePY", http.NoBody)
+					if err != nil {
+						fmt.Println("Error creating request:", err)
+						return
 					}
 				}
 				`,

@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestAzure_FromChunk(t *testing.T) {
@@ -55,7 +55,7 @@ func TestAzure_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azure,
+					DetectorType: detector_typepb.DetectorType_Azure,
 					Redacted:     id,
 					Verified:     true,
 				},
@@ -76,7 +76,7 @@ func TestAzure_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azure,
+					DetectorType: detector_typepb.DetectorType_Azure,
 					Redacted:     id,
 					Verified:     false,
 				},

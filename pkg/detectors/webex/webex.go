@@ -3,17 +3,18 @@ package webex
 import (
 	"context"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -44,8 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			id := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Webex,
+				DetectorType: detector_typepb.DetectorType_Webex,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 
 			if verify {
@@ -59,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					body, err := io.ReadAll(res.Body)
-					res.Body.Close()
+					_ = res.Body.Close()
 					if err == nil {
 						var message struct {
 							Message string `json:"message"`
@@ -82,8 +84,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Webex
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Webex
 }
 
 func (s Scanner) Description() string {

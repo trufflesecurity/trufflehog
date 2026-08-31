@@ -150,10 +150,12 @@ func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string,
 	}
 	s.wg.Add(1)
 	go func() {
-		// Call Finish after the semaphore has been released.
+		// Call Finish after the semaphore has been released, and release
+		// the WaitGroup only after Finish's hooks have run: Wait() closes
+		// the hooks, so it must not return while a hook can still fire.
+		defer s.wg.Done()
 		defer progress.Finish()
 		defer sem.Release(1)
-		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
 			"source_manager_worker_id", common.RandomID(5),
 		)
@@ -198,9 +200,11 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 
 	s.wg.Add(1)
 	go func() {
-		// Call Finish after the semaphore has been released.
-		defer progress.Finish()
+		// Release the WaitGroup only after Finish's hooks have run: Wait()
+		// closes the hooks, so it must not return while a hook can still
+		// fire.
 		defer s.wg.Done()
+		defer progress.Finish()
 		ctx := context.WithValues(ctx,
 			"source_manager_worker_id", common.RandomID(5),
 		)
@@ -240,10 +244,12 @@ func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Sour
 	}
 	s.wg.Add(1)
 	go func() {
-		// Call Finish after the semaphore has been released.
+		// Call Finish after the semaphore has been released, and release
+		// the WaitGroup only after Finish's hooks have run: Wait() closes
+		// the hooks, so it must not return while a hook can still fire.
+		defer s.wg.Done()
 		defer progress.Finish()
 		defer s.sem.Release(1)
-		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
 			"source_manager_worker_id", common.RandomID(5),
 		)
@@ -408,7 +414,7 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 		ctx.Logger().Info("running source", "with_units", true)
 		return s.enumerateWithUnits(ctx, enumChunker, report, reporter)
 	}
-	return fmt.Errorf("Enumeration not supported or configured for source: %s", source.Type().String())
+	return fmt.Errorf("enumeration not supported or configured for source: %s", source.Type().String())
 }
 
 // scan runs a scan against a single SourceUnit as its only job. This method

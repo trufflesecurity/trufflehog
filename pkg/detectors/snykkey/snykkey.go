@@ -12,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -79,7 +80,8 @@ func (s Scanner) doVerification(ctx context.Context, token string) (bool, map[st
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		userDetails := userDetailsResponse{}
 		err := json.NewDecoder(res.Body).Decode(&userDetails)
 		if err != nil {
@@ -102,10 +104,10 @@ func (s Scanner) doVerification(ctx context.Context, token string) (bool, map[st
 			extraData["Organizations"] = strings.Join(orgs, ",")
 		}
 		return true, extraData, nil
-	} else if res.StatusCode == http.StatusUnauthorized {
+	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
-	} else {
+	default:
 		err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		return false, nil, err
 	}
@@ -122,8 +124,8 @@ type organization struct {
 	Name string `json:"name"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SnykKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SnykKey
 }
 
 func (s Scanner) Description() string {

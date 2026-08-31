@@ -29,12 +29,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSla
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentialInfo"))
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -141,7 +141,7 @@ func getSlackOAuthScopes(cfg *config.Config, key string) (scopes string, userDat
 	if err != nil {
 		return scopes, userData, err
 	}
-	defer resp.Body.Close() // Close the response body when the function returns
+	defer func() { _ = resp.Body.Close() }() // Close the response body when the function returns
 
 	// print body
 	body, err := io.ReadAll(resp.Body)
