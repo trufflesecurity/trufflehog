@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyParallelDots(ctx, client, resMatch)
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyParallelDots(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
 	payload := &bytes.Buffer{}
 	writer := multipart.NewWriter(payload)
 	fw, err := writer.CreateFormField("api_key")

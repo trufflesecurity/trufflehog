@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyTefter(ctx, client, resMatch)
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyTefter(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://www.tefter.io/api/bookmarks?url=google.com", nil)
 	if err != nil {
 		return false, err
@@ -70,13 +70,16 @@ func verifyTefter(ctx context.Context, client *http.Client, resMatch string) (bo
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		return false, err
 	}
 	validResponse := json.Valid(bodyBytes)
 
-	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 		return true, nil
 	}

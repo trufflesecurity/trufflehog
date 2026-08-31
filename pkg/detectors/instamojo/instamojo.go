@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				isVerified, verificationErr := verifyInstamojo(ctx, client, resClientId, resSecret)
+				isVerified, verificationErr := verifyMatch(ctx, client, resClientId, resSecret)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resClientId, resSecret)
 			}
@@ -73,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyInstamojo(ctx context.Context, client *http.Client, resClientId, resSecret string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resClientId, resSecret string) (bool, error) {
 	payload := strings.NewReader("grant_type=client_credentials&client_id=" + resClientId + "&client_secret=" + resSecret)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.instamojo.com/oauth2/token/", payload)

@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyTeletype(ctx, client, resMatch)
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyTeletype(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.teletype.app/public/api/v1/messages", nil)
 	if err != nil {
 		return false, err
@@ -69,6 +69,10 @@ func verifyTeletype(ctx context.Context, client *http.Client, resMatch string) (
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		return false, err
@@ -77,10 +81,8 @@ func verifyTeletype(ctx context.Context, client *http.Client, resMatch string) (
 	bodyString := string(bodyBytes)
 	validResponse := strings.Contains(bodyString, `"code":401`)
 
-	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		if validResponse {
-		} else {
+		if !validResponse {
 			return true, nil
 		}
 	}

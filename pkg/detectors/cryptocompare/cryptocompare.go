@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyCryptoCompare(ctx, client, resMatch)
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyCryptoCompare(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://min-api.cryptocompare.com/data/blockchain/list?api_key="+resMatch, nil)
 	if err != nil {
 		return false, err
@@ -67,13 +67,16 @@ func verifyCryptoCompare(ctx context.Context, client *http.Client, resMatch stri
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		return false, err
 	}
 	bodyString := string(bodyBytes)
 	errCode := strings.Contains(bodyString, `"Response":"Success"`)
-	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		if errCode {
 			return true, nil

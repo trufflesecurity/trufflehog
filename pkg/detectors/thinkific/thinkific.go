@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyThinkific(ctx, client, resDomainMatch, resMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, resDomainMatch, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resDomainMatch, resMatch)
 			}
@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyThinkific(ctx context.Context, client *http.Client, resDomainMatch string, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resDomainMatch string, resMatch string) (bool, error) {
 	domainRes := fmt.Sprintf("%s-s-school", resDomainMatch)
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/collections", nil)
 	if err != nil {

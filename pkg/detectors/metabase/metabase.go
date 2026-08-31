@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyMetabase(ctx, client, u, resMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, u, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resMatch)
 			}
@@ -78,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyMetabase(ctx context.Context, client *http.Client, u *url.URL, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, u *url.URL, resMatch string) (bool, error) {
 	u.Path = "/api/user/current"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

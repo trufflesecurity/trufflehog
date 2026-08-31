@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyOnedesk(ctx, client, emailMatch, resPword)
+				isVerified, verificationErr := verifyMatch(ctx, client, emailMatch, resPword)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, emailMatch, resPword)
 			}
@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyOnedesk(ctx context.Context, client *http.Client, emailMatch string, resPword string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, emailMatch string, resPword string) (bool, error) {
 	payload := strings.NewReader(fmt.Sprintf(`{"email": "%s", "password": "%s"}`, emailMatch, resPword))
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://app.onedesk.com/rest/2.0/login/loginUser", payload)
 	if err != nil {

@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyGengo(ctx, client, resSecretMatch, resMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, resSecretMatch, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resSecretMatch, resMatch)
 			}
@@ -78,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyGengo(ctx context.Context, client *http.Client, resSecretMatch string, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resSecretMatch string, resMatch string) (bool, error) {
 
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	signature := getGengoSignature(timestamp, resSecretMatch)
@@ -93,17 +93,18 @@ func verifyGengo(ctx context.Context, client *http.Client, resSecretMatch string
 		return false, err
 	}
 	defer func() { _ = res.Body.Close() }()
-	body, errBody := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
 
-	if errBody == nil {
-		var response Response
-		if err := json.Unmarshal(body, &response); err != nil {
-			return false, err
-		}
+	var response Response
+	if err := json.Unmarshal(body, &response); err != nil {
+		return false, err
+	}
 
-		if res.StatusCode >= 200 && res.StatusCode < 300 && response.OpStat == "ok" {
-			return true, nil
-		}
+	if res.StatusCode >= 200 && res.StatusCode < 300 && response.OpStat == "ok" {
+		return true, nil
 	}
 
 	return false, nil

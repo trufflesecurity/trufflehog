@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, verificationErr := verifySlackWebhook(ctx, client, resMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resMatch)
 			}
@@ -75,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifySlackWebhook(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
 	// We don't want to actually send anything to webhooks we find. To verify them without spamming them, we
 	// send an intentionally malformed message and look for a particular expected error message.
 	payload := strings.NewReader(`intentionally malformed JSON from TruffleHog scan`)

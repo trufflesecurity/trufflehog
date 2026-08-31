@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					isVerified, verificationErr := verifyCexIO(ctx, client, resSecretMatch, resKeyMatch, resUserIdMatch)
+					isVerified, verificationErr := verifyMatch(ctx, client, resSecretMatch, resKeyMatch, resUserIdMatch)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resSecretMatch, resKeyMatch, resUserIdMatch)
 				}
@@ -84,7 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyCexIO(ctx context.Context, client *http.Client, resSecretMatch string, resKeyMatch string, resUserIdMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resSecretMatch string, resKeyMatch string, resUserIdMatch string) (bool, error) {
 
 	timestamp := strconv.FormatInt(time.Now().Unix()*1000, 10)
 

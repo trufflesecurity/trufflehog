@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				SecretParts:  map[string]string{"key": resMatch},
 			}
 			if verify {
-				isVerified, verificationErr := verifyWebsitepulse(ctx, client, resIdMatch, resMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, resIdMatch, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resIdMatch, resMatch)
 			}
@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyWebsitepulse(ctx context.Context, client *http.Client, resIdMatch string, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resIdMatch string, resMatch string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.websitepulse.com/textserver.php?method=GetContacts&username=%s&key=%s", resIdMatch, resMatch), nil)
 	if err != nil {
 		return false, err

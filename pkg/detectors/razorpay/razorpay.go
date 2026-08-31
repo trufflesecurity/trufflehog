@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyRazorPay(ctx, client, key, secret)
+				isVerified, verificationErr := verifyMatch(ctx, client, key, secret)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, key, secret)
 			}
@@ -70,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyRazorPay(ctx context.Context, client *http.Client, key, secret string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, key, secret string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.razorpay.com/v1/items?count=1", nil)
 	if err != nil {
 		return false, err

@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyGoCanvas(ctx, client, emailMatch, resMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, emailMatch, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, emailMatch, resMatch)
 			}
@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyGoCanvas(ctx context.Context, client *http.Client, emailMatch string, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, emailMatch string, resMatch string) (bool, error) {
 	payload := url.Values{}
 	payload.Add("username", emailMatch)
 
@@ -86,17 +86,18 @@ func verifyGoCanvas(ctx context.Context, client *http.Client, emailMatch string,
 		return false, err
 	}
 	defer func() { _ = res.Body.Close() }()
-	body, errBody := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
 
-	if errBody == nil {
-		response := Response{}
-		if err := xml.Unmarshal(body, &response); err != nil {
-			return false, err
-		}
+	response := Response{}
+	if err := xml.Unmarshal(body, &response); err != nil {
+		return false, err
+	}
 
-		if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
-			return true, nil
-		}
+	if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
+		return true, nil
 	}
 
 	return false, nil

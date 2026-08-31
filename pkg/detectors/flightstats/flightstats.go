@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyFlightstats(ctx, client, resId, resMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, resId, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resId, resMatch)
 			}
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyFlightstats(ctx context.Context, client *http.Client, resId string, resMatch string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resId string, resMatch string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.flightstats.com/flex/aircraft/rest/v1/json/availableFields?appId=%s&appKey=%s", resId, resMatch), nil)
 	if err != nil {
 		return false, err

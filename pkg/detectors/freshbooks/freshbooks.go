@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyFreshbooks(ctx, client, resMatch, resURI)
+				isVerified, verificationErr := verifyMatch(ctx, client, resMatch, resURI)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resMatch, resURI)
 			}
@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyFreshbooks(ctx context.Context, client *http.Client, resMatch string, resURI string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string, resURI string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf(`https://auth.freshbooks.com/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code`, resMatch, resURI), nil)
 	if err != nil {
 		return false, err

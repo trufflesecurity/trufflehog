@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyMrticktock(ctx, client, emailMatch, resPassword)
+				isVerified, verificationErr := verifyMatch(ctx, client, emailMatch, resPassword)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, emailMatch, resPassword)
 			}
@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyMrticktock(ctx context.Context, client *http.Client, emailMatch string, resPassword string) (bool, error) {
+func verifyMatch(ctx context.Context, client *http.Client, emailMatch string, resPassword string) (bool, error) {
 	payload := strings.NewReader(fmt.Sprintf(`email=%s&password=%s`, emailMatch, resPassword))
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://mrticktock.com/app/api/is_timer_active", payload)
 	if err != nil {
