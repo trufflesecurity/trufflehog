@@ -12,12 +12,15 @@ import (
 )
 
 var (
-	validPattern         = "2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"
-	validPatternAlt      = "3GuTI5JXfaLtYILkc6N0xopP2V0_89zkDfefiuMv6Hk1z6oYi"
-	invalidPattern       = "2WIRSIHOQyHSVklZnoz2k6bT?dH_0E7z0Ta9QEyR1fZvQ0KU9"
-	invalidIDPattern     = "ak_3GuTI5JXfaLtYILkc6N0xopP2V0"
-	invalidSuffixPattern = "3GuTI5JXfaLtYILkc6N0xopP2V0_a9zkDfefiuMv6Hk1z6oYi"
-	keyword              = "ngrok"
+	validPattern    = "2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"
+	validPatternAlt = "3GuTI5JXfaLtYILkc6N0xopP2V0_89zkDfefiuMv6Hk1z6oYi"
+	// Authtokens exist in the wild with letter-leading and 20-char suffixes
+	// (confirmed live against the ngrok API), so both must be detected.
+	validPatternLetterSuffix = "3GuTI5JXfaLtYILkc6N0xopP2V0_a9zkDfefiuMv6Hk1z6oYi"
+	validPatternShortSuffix  = "4HvUJ6KYgbMuZJMld7O1yqqQ3W1_b8ylEgfgjvNw7Il2z7pZ"
+	invalidPattern           = "2WIRSIHOQyHSVklZnoz2k6bT?dH_0E7z0Ta9QEyR1fZvQ0KU9"
+	invalidIDPattern         = "ak_3GuTI5JXfaLtYILkc6N0xopP2V0"
+	keyword                  = "ngrok"
 )
 
 func TestNgrok_Pattern(t *testing.T) {
@@ -44,6 +47,16 @@ func TestNgrok_Pattern(t *testing.T) {
 			want:  []string{"2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"},
 		},
 		{
+			name:  "valid pattern - authtoken suffix not starting with digit",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPatternLetterSuffix),
+			want:  []string{validPatternLetterSuffix},
+		},
+		{
+			name:  "valid pattern - authtoken with 20 char suffix",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPatternShortSuffix),
+			want:  []string{validPatternShortSuffix},
+		},
+		{
 			name:  "valid pattern - key out of prefix range",
 			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
 			want:  []string{},
@@ -56,11 +69,6 @@ func TestNgrok_Pattern(t *testing.T) {
 		{
 			name:  "invalid pattern - api key resource id not bearer token",
 			input: fmt.Sprintf("%s api_key = '%s'", keyword, invalidIDPattern),
-			want:  []string{},
-		},
-		{
-			name:  "invalid pattern - suffix does not start with digit",
-			input: fmt.Sprintf("%s token = '%s'", keyword, invalidSuffixPattern),
 			want:  []string{},
 		},
 	}
