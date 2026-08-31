@@ -18,12 +18,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.26"
+          go-version: "1.27"
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           # NOTE: Version and args must match scripts/lint.sh
-          version: v2.12.2
+          version: v2.13.1
           args: --enable bodyclose,copyloopvar,misspell --timeout 10m
   man-page-staleness:
     name: man-page-staleness
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.26"
+          go-version: "1.27"
       - name: Regenerate man page
         run: make man
       - name: Check for staleness
@@ -59,6 +59,6 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.26"
+          go-version: "1.27"
       - name: Run checksecretparts
         run: go run ./hack/checksecretparts -fail ./pkg/detectors
