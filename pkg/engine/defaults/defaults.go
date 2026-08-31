@@ -387,6 +387,7 @@ import (
 	hubspot_apikey_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humanity"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humioingesttoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hunter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hybiscus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hypertrack"
@@ -1299,6 +1300,7 @@ func buildDetectorList() []detectors.Detector {
 		&hubspot_apikey_v2.Scanner{},
 		&huggingface.Scanner{},
 		&humanity.Scanner{},
+		&humioingesttoken.Scanner{},
 		&hunter.Scanner{},
 		&hybiscus.Scanner{},
 		&hypertrack.Scanner{},
@@ -1896,6 +1898,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SolarwindsDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
+		case *humioingesttoken.Scanner:
+			return !feature.HumioIngestTokenDetectorEnabled.Load()
 		default:
 			return false
 		}
