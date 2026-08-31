@@ -24,7 +24,6 @@ type basicArtifactoryCredential struct {
 	username string
 	password string
 	host     string
-	raw      string
 }
 
 var (
@@ -99,7 +98,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			username: username,
 			password: password,
 			host:     host,
-			raw:      username + ":" + password + "@" + host,
 		}
 	}
 
@@ -108,9 +106,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
+		// Raw carries only the password, the secret itself; RawV2 adds the
+		// username and host so the same password leaked for different
+		// accounts or instances dedupes as distinct results.
 		r := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_ArtifactoryBasicAuth,
-			Raw:          []byte(cred.raw),
+			Raw:          []byte(cred.password),
 			RawV2:        []byte(cred.username + ":" + cred.password + "@" + cred.host),
 			SecretParts: map[string]string{
 				"domain":   cred.host,
