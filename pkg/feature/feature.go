@@ -96,10 +96,6 @@ var (
 	WebscrapingDetectorEnabled         atomic.Bool
 	WebsitepulseDetectorEnabled        atomic.Bool
 	WhoxyDetectorEnabled               atomic.Bool
-	MongoDBDetectorEnabled             atomic.Bool
-	JDBCDetectorEnabled                atomic.Bool
-	PostgresDetectorEnabled            atomic.Bool
-	URIDetectorEnabled                 atomic.Bool
 )
 
 type AtomicString struct {
