@@ -14,10 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "0de23adb-2093-4866-8daa-f11fe12149dd"
-	invalidPattern = "0de23adb?2093-4866-8daa-f11fe12149dd"
-)
+var validPattern = "0de23adb-2093-4866-8daa-f11fe12149dd"
 
 func TestHumioIngestToken_Pattern(t *testing.T) {
 	d := Scanner{}
