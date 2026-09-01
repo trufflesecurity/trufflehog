@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -126,7 +127,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // deleted repo) so both count as verified. Only 401 means the token is
 // completely unknown.
 func verifyIngestToken(ctx context.Context, client *http.Client, baseURL, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/v1/ingest/hec", bytes.NewBufferString(`{"event":""}`))
+	endpoint, err := url.JoinPath(baseURL, "/api/v1/ingest/hec")
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBufferString(`{"event":""}`))
 	if err != nil {
 		return false, err
 	}
