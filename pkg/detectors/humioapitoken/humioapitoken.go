@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -134,7 +135,11 @@ func humioTokenType(token string) string {
 // blocked by an IP filter, so it still counts as verified. 401 means the
 // token is unknown or expired.
 func verifyAPIToken(ctx context.Context, client *http.Client, baseURL, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/api/v1/health-json", nil)
+	endpoint, err := url.JoinPath(baseURL, "/api/v1/health-json")
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
 	}
