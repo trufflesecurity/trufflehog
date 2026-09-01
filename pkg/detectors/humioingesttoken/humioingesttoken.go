@@ -1,7 +1,6 @@
 package humioingesttoken
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -113,25 +112,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// verifyIngestToken sends a minimal HEC event to check token validity.
+// verifyIngestToken posts intentionally invalid JSON to the structured ingest
+// endpoint to check whether the token is recognized without writing data.
 //
 // Ingest tokens are write-only — LogScale provides no read or validation
-// endpoint that accepts them (the docs state: "ingest tokens can only be used
+// endpoint that accepts them. The docs state: "ingest tokens can only be used
 // to ingest data; you cannot use them to query LogScale, log in, or read any
-// data"). This means every verification creates a log entry in the customer's
-// repository. The event body is an empty string to minimize noise, but scans
-// with many matches will produce that many entries.
+// data." Sending valid data would create a log entry in the customer's
+// repository on every verification, so we exploit the auth-before-parse
+// ordering: if the token is valid the server rejects the malformed body with
+// 400, and if the token is invalid it rejects with 401 or 403 — all before
+// any data is committed.
 //
-// Response semantics: 200 means fully valid. 403 or 422 still signal a
-// recognized token (blocked by IP filter / permissions, or pointing at a
-// deleted repo) so both count as verified. Only 401 means the token is
-// completely unknown.
+// Response semantics per the LogScale Ingest API docs:
+//   - 400:          token valid, payload malformed → verified (no data written)
+//   - 401 or 403:   "authorization token is incorrect" → not verified
+//   - 429:          rate limited → transient, return error for retry
+//   - 5xx:          server error → transient, return error for retry
+//   - other 4xx:    unexpected → not verified, no error
 func verifyIngestToken(ctx context.Context, client *http.Client, baseURL, token string) (bool, error) {
-	endpoint, err := url.JoinPath(baseURL, "/api/v1/ingest/hec")
+	endpoint, err := url.JoinPath(baseURL, "/api/v1/ingest/humio-structured")
 	if err != nil {
 		return false, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBufferString(`{"event":""}`))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader("invalid"))
 	if err != nil {
 		return false, err
 	}
@@ -149,16 +153,21 @@ func verifyIngestToken(ctx context.Context, client *http.Client, baseURL, token 
 
 	switch res.StatusCode {
 	case http.StatusOK:
+		// Server accepted the token and (unexpectedly) the payload.
 		return true, nil
-	case http.StatusForbidden:
-		// Token was recognized but blocked (IP filter, permission change).
+	case http.StatusBadRequest:
+		// Token was accepted, server tried to parse the body and rejected it.
 		return true, nil
-	case http.StatusUnprocessableEntity:
-		// Token accepted but the repository can't be resolved (deleted repo).
-		return true, nil
-	case http.StatusUnauthorized:
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
+	case http.StatusTooManyRequests:
+		return false, fmt.Errorf("rate limited (HTTP %d)", res.StatusCode)
 	default:
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		if res.StatusCode >= 500 {
+			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		}
+		// Any other 4xx (404, 405, 422, etc.) is ambiguous — treat as
+		// definitively unverified rather than a transient failure.
+		return false, nil
 	}
 }

@@ -118,9 +118,9 @@ func TestHumioIngestToken_Pattern(t *testing.T) {
 	}
 }
 
-// Exercise the verification logic against a mock HEC server. Each HTTP status
-// code maps to a specific verified/error outcome — 403 and 422 both count as
-// verified because they indicate the server recognized the token.
+// Exercise the verification logic against a mock structured-ingest server.
+// The detector sends intentionally invalid JSON; the status code alone
+// determines the outcome per the LogScale Ingest API response table.
 func TestHumioIngestToken_Verification(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -128,11 +128,15 @@ func TestHumioIngestToken_Verification(t *testing.T) {
 		wantVerified bool
 		wantErr      bool
 	}{
-		{"200 - valid token", http.StatusOK, true, false},
-		{"401 - unknown token", http.StatusUnauthorized, false, false},
-		{"403 - recognized but blocked", http.StatusForbidden, true, false},
-		{"422 - deleted repo", http.StatusUnprocessableEntity, true, false},
+		{"200 - token valid, payload accepted", http.StatusOK, true, false},
+		{"400 - token valid, payload rejected", http.StatusBadRequest, true, false},
+		{"401 - token incorrect", http.StatusUnauthorized, false, false},
+		{"403 - token incorrect", http.StatusForbidden, false, false},
+		{"429 - rate limited", http.StatusTooManyRequests, false, true},
+		{"404 - unexpected, unverified", http.StatusNotFound, false, false},
+		{"422 - unexpected, unverified", http.StatusUnprocessableEntity, false, false},
 		{"500 - server error", http.StatusInternalServerError, false, true},
+		{"503 - server unavailable", http.StatusServiceUnavailable, false, true},
 	}
 
 	for _, tt := range tests {
@@ -169,9 +173,9 @@ func TestHumioIngestToken_Verification(t *testing.T) {
 	}
 }
 
-// Verify that a clean 401 from the wrong region does not erase a transient
-// error from an earlier endpoint. The verification error should survive so
-// consumers know the result is uncertain, not definitively "not valid."
+// A 500 from one endpoint followed by a 401 from another should preserve the
+// transient error. The 401 means "not recognized here" — it shouldn't erase
+// the uncertainty from the earlier failure.
 func TestHumioIngestToken_Verification_ErrorPreservedAcross401(t *testing.T) {
 	ts500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -201,6 +205,40 @@ func TestHumioIngestToken_Verification_ErrorPreservedAcross401(t *testing.T) {
 	}
 	if r.VerificationError() == nil {
 		t.Error("expected verification error to be preserved after 401 from another endpoint, got nil")
+	}
+}
+
+// A 500 from the first endpoint followed by a 400 (verified) from the second
+// should clear the transient error and mark the result as verified.
+func TestHumioIngestToken_Verification_ErrorClearedOnSuccess(t *testing.T) {
+	ts500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts500.Close()
+
+	ts400 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer ts400.Close()
+
+	s := Scanner{}
+	_ = s.SetConfiguredEndpoints(ts500.URL, ts400.URL)
+
+	input := fmt.Sprintf("humio_token = '%s'", validPattern)
+	results, err := s.FromData(context.Background(), true, []byte(input))
+	if err != nil {
+		t.Fatalf("FromData error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	r := results[0]
+	if !r.Verified {
+		t.Error("expected Verified = true")
+	}
+	if r.VerificationError() != nil {
+		t.Errorf("expected no verification error, got: %v", r.VerificationError())
 	}
 }
 
