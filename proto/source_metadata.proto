@@ -397,6 +397,26 @@ message JSONEnumerator {
   string metadata = 1;
 }
 
+message Httpx {
+  // url is the request URL the body was returned from.
+  string url = 1;
+  string final_url = 2;
+  string input = 3;
+  string host = 4;
+  string path = 5;
+  string method = 6;
+  string scheme = 7;
+  int32 status_code = 8;
+  string content_type = 9;
+  string timestamp = 10;
+  // file is the httpx JSONL file the record came from.
+  string file = 11;
+  // line is the 1-based record number within that file.
+  int64 line = 12;
+  // body_field is which field the content came from: "body" or "headless_body".
+  string body_field = 13;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -436,5 +456,6 @@ message MetaData {
     SlackContinuous slackContinuous = 35;
     JSONEnumerator jsonEnumerator = 36;
     AWSSecretsManager awsSecretsManager = 37;
+    Httpx httpx = 38;
   }
 }

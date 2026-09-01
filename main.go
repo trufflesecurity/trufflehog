@@ -285,6 +285,12 @@ var (
 	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
 	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
 
+	httpxScan                = cli.Command("httpx", "Find credentials in HTTP response bodies captured by httpx (JSONL).")
+	httpxPaths               = httpxScan.Arg("path", "Path to httpx JSONL file to scan. Repeatable. Use '-' for stdin. Gzipped files are detected automatically.").Strings()
+	httpxBase64Body          = httpxScan.Flag("base64-body", "Response bodies are base64-encoded (httpx -irrb/--include-response-base64).").Bool()
+	httpxIncludeHeadlessBody = httpxScan.Flag("include-headless-body", "Also scan the headless_body field captured by httpx headless mode.").Bool()
+	httpxMaxRecordBytes      = httpxScan.Flag("max-record-bytes", "Skip JSONL records larger than this many bytes.").Default("67108864").Int64()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
@@ -1236,6 +1242,22 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
 		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
+	case httpxScan.FullCommand():
+		if len(*httpxPaths) == 0 {
+			return scanMetrics, fmt.Errorf("must provide at least one httpx JSONL path")
+		}
+		cfg := sources.HttpxConfig{
+			Paths:               *httpxPaths,
+			Base64Body:          *httpxBase64Body,
+			IncludeHeadlessBody: *httpxIncludeHeadlessBody,
+			MaxRecordBytes:      *httpxMaxRecordBytes,
+			Concurrency:         *concurrency,
+		}
+		if ref, err := eng.ScanHttpx(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan httpx input: %v", err)
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
