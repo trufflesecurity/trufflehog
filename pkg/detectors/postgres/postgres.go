@@ -168,16 +168,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		if verify {
 			// pq appears to ignore the context deadline, so we copy any timeout that's been set into the connection
 			// parameters themselves.
-			if timeout, ok := getDeadlineInSeconds(ctx); ok && timeout > 0 {
-				params[pgConnectTimeout] = strconv.Itoa(timeout)
-			} else if ok && timeout <= 0 {
-				// Deadline in the context has already exceeded.
-				break
-			}
+			timeout, hasDeadline := getDeadlineInSeconds(ctx)
+			if hasDeadline && timeout <= 0 {
+				// The deadline has already passed, so this credential cannot be tested. Report it as indeterminate
+				// rather than abandoning this candidate and every remaining one. The IsDone check at the top of the
+				// loop ends the scan on the next iteration.
+				result.SetVerificationError(context.DeadlineExceeded, password)
+			} else {
+				if hasDeadline {
+					params[pgConnectTimeout] = strconv.Itoa(timeout)
+				}
 
-			isVerified, verificationErr := verifyPostgres(ctx, params)
-			result.Verified = isVerified
-			result.SetVerificationError(verificationErr, password)
+				isVerified, verificationErr := verifyPostgres(ctx, params)
+				result.Verified = isVerified
+				result.SetVerificationError(verificationErr, password)
+			}
 		}
 
 		// We gather SSL information into ExtraData in case it's useful for later reporting.

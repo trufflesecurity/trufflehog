@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	type mongoMatch struct {
-		password string
+		password  string
 		parsedURL *url.URL
 	}
 	uniqueMatches := make(map[string]mongoMatch)
@@ -102,8 +102,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		r := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_MongoDB,
 			Raw:          []byte(connStr),
-			ExtraData:   extraData,
-			SecretParts: map[string]string{"key": connStr},
+			ExtraData:    extraData,
+			SecretParts:  map[string]string{"key": connStr},
 		}
 
 		if verify {
@@ -114,10 +114,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, vErr := verifyUri(ctx, connStr, timeout)
 			r.Verified = isVerified
-			if isErrDeterminate(vErr) {
-				continue
+			// An auth error means the server tested the credential and rejected it. That is a determinate result,
+			// so it is reported as unverified with no verification error attached. Anything else,
+			// a timeout, an unreachable host, a malformed connection string is indeterminate and keeps its
+			// error so the credential is retried on a later scan.
+			if !isErrDeterminate(vErr) {
+				r.SetVerificationError(vErr, m.password)
 			}
-			r.SetVerificationError(vErr, m.password)
 		}
 		results = append(results, r)
 	}
