@@ -2,7 +2,7 @@ package common
 
 import (
 	"os"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"testing"
 )
 
@@ -15,54 +15,54 @@ func TestFilterBasic(t *testing.T) {
 	tests := map[string]filterTest{
 		"IncludePassed": {
 			filter: Filter{
-				include: &FilterRuleSet{*regexp.MustCompile("test")},
+				include: &FilterRuleSet{regexp.MustCompile("test")},
 			},
 			pattern: "teststring",
 			pass:    true,
 		},
 		"IncludeFiltered": {
 			filter: Filter{
-				include: &FilterRuleSet{*regexp.MustCompile("nomatch")},
+				include: &FilterRuleSet{regexp.MustCompile("nomatch")},
 			},
 			pattern: "teststring",
 			pass:    false,
 		},
 		"ExcludePassed": {
 			filter: Filter{
-				include: &FilterRuleSet{*regexp.MustCompile("")},
-				exclude: &FilterRuleSet{*regexp.MustCompile("nomatch")},
+				include: &FilterRuleSet{regexp.MustCompile("")},
+				exclude: &FilterRuleSet{regexp.MustCompile("nomatch")},
 			},
 			pattern: "teststring",
 			pass:    true,
 		},
 		"ExcludeFiltered": {
 			filter: Filter{
-				include: &FilterRuleSet{*regexp.MustCompile("")},
-				exclude: &FilterRuleSet{*regexp.MustCompile("test")},
+				include: &FilterRuleSet{regexp.MustCompile("")},
+				exclude: &FilterRuleSet{regexp.MustCompile("test")},
 			},
 			pattern: "teststring",
 			pass:    false,
 		},
 		"IncludeExcludeDifferentPass": {
 			filter: Filter{
-				include: &FilterRuleSet{*regexp.MustCompile("test")},
-				exclude: &FilterRuleSet{*regexp.MustCompile("nomatch")},
+				include: &FilterRuleSet{regexp.MustCompile("test")},
+				exclude: &FilterRuleSet{regexp.MustCompile("nomatch")},
 			},
 			pattern: "teststring",
 			pass:    true,
 		},
 		"IncludeExcludeDifferentFiltered": {
 			filter: Filter{
-				include: &FilterRuleSet{*regexp.MustCompile("nomatch")},
-				exclude: &FilterRuleSet{*regexp.MustCompile("test")},
+				include: &FilterRuleSet{regexp.MustCompile("nomatch")},
+				exclude: &FilterRuleSet{regexp.MustCompile("test")},
 			},
 			pattern: "teststring",
 			pass:    false,
 		},
 		"IncludeExcludeSameFiltered": {
 			filter: Filter{
-				include: &FilterRuleSet{*regexp.MustCompile("test")},
-				exclude: &FilterRuleSet{*regexp.MustCompile("test")},
+				include: &FilterRuleSet{regexp.MustCompile("test")},
+				exclude: &FilterRuleSet{regexp.MustCompile("test")},
 			},
 			pattern: "teststring",
 			pass:    false,

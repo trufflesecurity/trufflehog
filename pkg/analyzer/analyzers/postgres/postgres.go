@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/fatih/color"

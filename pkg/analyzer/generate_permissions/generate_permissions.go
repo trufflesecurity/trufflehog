@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"text/template"
 

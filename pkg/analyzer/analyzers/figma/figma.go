@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/fatih/color"
