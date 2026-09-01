@@ -8,7 +8,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"slices"
 	"strings"
 

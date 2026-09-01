@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strconv"
 	"strings"
 

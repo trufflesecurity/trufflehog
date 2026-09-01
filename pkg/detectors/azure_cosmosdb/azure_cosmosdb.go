@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"time"
 

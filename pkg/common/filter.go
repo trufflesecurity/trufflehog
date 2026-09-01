@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -14,7 +14,7 @@ type Filter struct {
 	exclude *FilterRuleSet
 }
 
-type FilterRuleSet []regexp.Regexp
+type FilterRuleSet []*regexp.Regexp
 
 // FilterEmpty returns a Filter that always passes.
 func FilterEmpty() *Filter {
@@ -39,7 +39,7 @@ func FilterFromFiles(includeFilterPath, excludeFilterPath string) (*Filter, erro
 
 	// If no includeFilterPath is provided, every pattern should pass the include rules.
 	if includeFilterPath == "" {
-		includeRules = &FilterRuleSet{*regexp.MustCompile("")}
+		includeRules = &FilterRuleSet{regexp.MustCompile("")}
 	}
 
 	filter := &Filter{
@@ -87,7 +87,7 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 		if err != nil {
 			return nil, fmt.Errorf("can not compile regular expression: %s", line)
 		}
-		rules = append(rules, *pattern)
+		rules = append(rules, pattern)
 	}
 	return &rules, nil
 }

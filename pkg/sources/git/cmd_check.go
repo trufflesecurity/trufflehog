@@ -3,7 +3,7 @@ package git
 import (
 	"fmt"
 	"os/exec"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strconv"
 	"strings"
 

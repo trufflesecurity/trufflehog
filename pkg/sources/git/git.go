@@ -11,7 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"runtime"
 	"strings"
 	"sync/atomic"

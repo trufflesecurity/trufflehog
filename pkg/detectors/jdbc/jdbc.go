@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"time"
 
@@ -16,12 +16,12 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
-	ignorePatterns []regexp.Regexp
+	ignorePatterns []*regexp.Regexp
 }
 
 func New(opts ...func(*Scanner)) *Scanner {
 	scanner := &Scanner{
-		ignorePatterns: []regexp.Regexp{},
+		ignorePatterns: []*regexp.Regexp{},
 	}
 	for _, opt := range opts {
 		opt(scanner)
@@ -32,13 +32,13 @@ func New(opts ...func(*Scanner)) *Scanner {
 
 func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 	return func(s *Scanner) {
-		var ignorePatterns []regexp.Regexp
+		var ignorePatterns []*regexp.Regexp
 		for _, ignoreString := range ignoreStrings {
 			ignorePattern, err := regexp.Compile(ignoreString)
 			if err != nil {
 				panic(fmt.Sprintf("%s is not a valid regex, error received: %v", ignoreString, err))
 			}
-			ignorePatterns = append(ignorePatterns, *ignorePattern)
+			ignorePatterns = append(ignorePatterns, ignorePattern)
 		}
 
 		s.ignorePatterns = ignorePatterns

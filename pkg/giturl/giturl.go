@@ -3,7 +3,7 @@ package giturl
 import (
 	"net/url"
 	"path/filepath"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strconv"
 	"strings"
 

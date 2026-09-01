@@ -3,7 +3,7 @@ package handlers
 import (
 	"io"
 	"net/http"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"testing"
 
