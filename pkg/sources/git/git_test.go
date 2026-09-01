@@ -76,14 +76,36 @@ error: 7457 bytes of body are still expected
 fetch-pack: unexpected disconnect while reading sideband packet
 fatal: early EOF
 fatal: fetch-pack: invalid index-pack output`,
+		// Bare 403/429 during clone matches GitHub/GitLab secondary rate
+		// limiting (no accompanying auth/permission message).
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, fatal: unable to access 'https://github.com/org/repo.git/': The requested URL returned error: 403",
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, The requested URL returned error: 429",
+		// Normal clone progress ("remote: Counting objects...") must not be
+		// mistaken for a denial explanation when a later 403 is just throttling.
+		`could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: Enumerating objects: 100, done.
+remote: Counting objects: 100% (100/100), done.
+fatal: unable to access 'https://github.com/org/repo.git/': The requested URL returned error: 403`,
 	}
 	for _, msg := range retryable {
 		assert.True(t, isRetryableCloneError(errors.New(msg)), "expected retryable: %q", msg)
 	}
 
 	notRetryable := []string{
-		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: The requested URL returned error: 403",
-		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, The requested URL returned error: 429",
+		// An explicit permission-denial message, as opposed to a bare 403.
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: You are not allowed to download code from this project.",
+		// The explicit denial message must win even when the combined clone
+		// output also contains a literal "403" elsewhere.
+		"could not clone repo: https://gitlab.com/org/repo.git, error executing git clone: exit status 128, fatal: unable to access 'https://gitlab.com/org/repo.git/': The requested URL returned error: 403\nremote: You are not allowed to download code from this project.",
+		// GitHub's explicit permission-denial message, which also co-occurs
+		// with a literal "403" in the combined clone output.
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: Permission to org/repo.git denied to user.\nfatal: unable to access 'https://github.com/org/repo.git/': The requested URL returned error: 403",
+		// GitHub Apps/fine-grained-token variant: "Write access ... not
+		// granted", also co-occurring with a literal 403.
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: Write access to repository not granted.\nfatal: unable to access 'https://github.com/org/repo.git/': The requested URL returned error: 403",
+		// SAML SSO enforcement: an unrecognized "remote:" explanation
+		// co-occurring with a 403, which the classifier must treat as a
+		// permanent failure without needing this exact wording enumerated.
+		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, remote: The organization has enabled or enforced SAML SSO.\nfatal: unable to access 'https://github.com/org/repo.git/': The requested URL returned error: 403",
 		"git clone timed out (after 1h0m0s)",
 		"could not clone repo: https://github.com/org/repo.git, error executing git clone: exit status 128, fatal: repository 'https://github.com/org/repo.git/' not found",
 	}

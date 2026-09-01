@@ -105,13 +105,26 @@ func ClassifyCloneError(errMsg string) string {
 		strings.Contains(errMsg, "redirect:") && strings.Contains(errMsg, "users/sign_in"):
 		return cloneFailureAuth
 
-	case strings.Contains(errMsg, "The requested URL returned error: 429") ||
-		strings.Contains(errMsg, "remote: Retry later"):
-		return cloneFailureRateLimit
-
-	case strings.Contains(errMsg, "The requested URL returned error: 403") ||
-		strings.Contains(errMsg, "remote: You are not allowed to download code from this project"):
+	// Checked before the generic 403/429 case below: when the git backend
+	// itself explains a 403/429 with a "remote:" line, that's a permanent
+	// failure (permission denial, SAML SSO enforcement, org policy, etc.),
+	// not throttling — the backend only sends an explanatory message once
+	// the request has been evaluated, whereas secondary-rate-limit responses
+	// are either a bare 403/429 with no remote explanation or one of the
+	// small, stable set of known throttling messages. Matching on "any
+	// unrecognized remote: explanation" avoids having to enumerate every
+	// provider's denial wording, which changes per provider and per feature
+	// (SSO, fine-grained tokens, GitHub Apps, ...).
+	case isRemotePermissionDenial(errMsg):
 		return cloneFailurePermission
+
+	case strings.Contains(errMsg, "The requested URL returned error: 429") ||
+		strings.Contains(errMsg, "The requested URL returned error: 403") ||
+		strings.Contains(errMsg, "remote: Retry later"):
+		// A bare "403" during clone (no accompanying auth/permission message)
+		// matches GitHub/GitLab secondary rate limiting and abuse-detection
+		// responses, which are documented to return either 403 or 429.
+		return cloneFailureRateLimit
 
 	case strings.Contains(errMsg, "RPC failed") ||
 		strings.Contains(errMsg, "unexpected disconnect") ||
@@ -127,4 +140,64 @@ func ClassifyCloneError(errMsg string) string {
 	default:
 		return cloneFailureOther
 	}
+}
+
+// knownRateLimitRemoteMessages are the (small, stable) set of ways GitHub and
+// GitLab phrase an actual throttling response in a "remote:" line. Any other
+// "remote:" explanation accompanying a 403/429 is treated as a permanent
+// failure rather than added here, since provider denial wording (permission,
+// SSO, org policy, ...) varies far more than throttling wording does.
+var knownRateLimitRemoteMessages = []string{
+	"retry later",
+	"secondary rate limit",
+	"rate limit exceeded",
+	"abuse detection",
+}
+
+// knownBenignRemoteProgressMessages are the small, standardized set of
+// progress lines git-upload-pack prints to "remote:" during a normal clone
+// (e.g. "remote: Counting objects: 100% (5/5), done."). These can appear
+// ahead of an unrelated 403/429 or network failure, so they must not be
+// mistaken for a denial explanation.
+var knownBenignRemoteProgressMessages = []string{
+	"enumerating objects",
+	"counting objects",
+	"compressing objects",
+	"writing objects",
+	"resolving deltas",
+	"total ",
+}
+
+// knownBenignRemoteMessages is the combined set of "remote:" line contents
+// that must NOT be treated as a permission denial: known throttling messages
+// and known clone-progress output.
+var knownBenignRemoteMessages = append(append([]string{}, knownRateLimitRemoteMessages...), knownBenignRemoteProgressMessages...)
+
+// isRemotePermissionDenial reports whether errMsg contains a server-side
+// "remote:" line explaining a 403/429 as something other than throttling or
+// normal clone progress output, as opposed to a bare curl-level 403/429 with
+// no explanation (or an explicit rate-limit message), which may just be
+// transient rate limiting.
+func isRemotePermissionDenial(errMsg string) bool {
+	if !strings.Contains(errMsg, "403") && !strings.Contains(errMsg, "429") {
+		return false
+	}
+	for _, line := range strings.Split(errMsg, "\n") {
+		idx := strings.Index(line, "remote:")
+		if idx == -1 {
+			continue
+		}
+		remoteMsg := strings.ToLower(line[idx:])
+		benign := false
+		for _, marker := range knownBenignRemoteMessages {
+			if strings.Contains(remoteMsg, marker) {
+				benign = true
+				break
+			}
+		}
+		if !benign {
+			return true
+		}
+	}
+	return false
 }
