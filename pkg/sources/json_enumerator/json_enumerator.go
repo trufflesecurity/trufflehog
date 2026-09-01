@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"unicode/utf8"
 
 	"google.golang.org/protobuf/proto"
@@ -35,6 +36,7 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.SourceUnitEnumChunker = (*Source)(nil)
 
 func (s *Source) Type() sourcespb.SourceType { return SourceType }
 func (s *Source) SourceID() sources.SourceID { return s.sourceId }
@@ -73,11 +75,31 @@ func (s *Source) Chunks(
 			return nil
 		}
 		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path), "")
-		if err := s.chunkJSONEnumerator(ctx, path, chunksChan); err != nil {
+		if err := s.chunkJSONEnumerator(ctx, path, sources.ChanReporter{Ch: chunksChan}); err != nil {
 			ctx.Logger().Error(err, "error scanning JSON enumerator", "path", path)
 		}
 	}
 
+	return nil
+}
+
+// Enumerate implements the SourceUnitEnumerator interface, reporting each
+// configured path as its own unit so paths can be chunked concurrently.
+func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+	for _, path := range s.paths {
+		if err := reporter.UnitOk(ctx, sources.CommonSourceUnit{ID: path}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ChunkUnit implements the SourceUnitChunker interface.
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	path, _ := unit.SourceUnitID()
+	if err := s.chunkJSONEnumerator(ctx, path, reporter); err != nil {
+		return reporter.ChunkErr(ctx, err)
+	}
 	return nil
 }
 
@@ -142,12 +164,10 @@ func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 func (s *Source) chunkJSONEnumeratorReader(
 	ctx context.Context,
 	input io.Reader,
-	chunksChan chan *sources.Chunk,
+	reporter sources.ChunkReporter,
 ) error {
 	decoder := json.NewDecoder(input)
 	var entry jsonEntry
-
-	reporter := sources.ChanReporter{Ch: chunksChan}
 
 	for {
 		if err := decoder.Decode(&entry); err != nil {
@@ -190,7 +210,7 @@ func (s *Source) chunkJSONEnumeratorReader(
 func (s *Source) chunkJSONEnumerator(
 	ctx context.Context,
 	path string,
-	chunksChan chan *sources.Chunk,
+	reporter sources.ChunkReporter,
 ) error {
 	ctx.Logger().V(3).Info("chunking JSON enumerator", "path", path)
 
@@ -200,5 +220,5 @@ func (s *Source) chunkJSONEnumerator(
 	}
 	defer func() { _ = enumeratorFile.Close() }()
 
-	return s.chunkJSONEnumeratorReader(ctx, enumeratorFile, chunksChan)
+	return s.chunkJSONEnumeratorReader(ctx, enumeratorFile, reporter)
 }
