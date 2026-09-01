@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -27,14 +28,25 @@ func TestHumioIngestToken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - humio keyword",
-			input: fmt.Sprintf("humio_ingest_token = '%s'", validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern - env file with humio prefix",
+			input: `
+				# Log shipper credentials
+				HUMIO_INGEST_TOKEN=0de23adb-2093-4866-8daa-f11fe12149dd
+				HUMIO_BASE_URL=https://cloud.us.humio.com
+				LOG_LEVEL=info`,
+			want: []string{validPattern},
 		},
 		{
-			name:  "valid pattern - logscale keyword",
-			input: fmt.Sprintf("logscale_ingest_token = '%s'", validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern - logscale keyword in docker compose",
+			input: `
+				services:
+				  log-shipper:
+				    image: fluent/fluent-bit:latest
+				    environment:
+				      - LOGSCALE_INGEST_TOKEN=0de23adb-2093-4866-8daa-f11fe12149dd
+				      - LOGSCALE_HOST=https://cloud.us.humio.com
+				    restart: always`,
+			want: []string{validPattern},
 		},
 		{
 			name:  "valid pattern - ignore duplicate",
@@ -42,24 +54,34 @@ func TestHumioIngestToken_Pattern(t *testing.T) {
 			want:  []string{validPattern},
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("humio keyword is not close to the real key in the data\n = '%s'", validPattern),
-			want:  []string{},
+			name: "keyword too far from token - PrefixRegex rejects",
+			input: `
+				# humio keyword is not close to the real key in the data
+				# lots of intervening text that pushes the token out of PrefixRegex range
+				some_other_setting = "foo"
+				ingest_token = "0de23adb-2093-4866-8daa-f11fe12149dd"`,
+			want: []string{},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("humio = '%s'", invalidPattern),
-			want:  []string{},
+			name: "invalid pattern - question mark instead of hyphen",
+			input: `
+				[humio]
+				ingest_token = "0de23adb?2093-4866-8daa-f11fe12149dd"`,
+			want: []string{},
 		},
 		{
-			name:  "low entropy placeholder UUID rejected",
-			input: "humio_token = '11111111-1111-1111-1111-111111111111'",
-			want:  []string{},
+			name: "low entropy placeholder UUID rejected",
+			input: `
+				# humio default config - replace with real token
+				HUMIO_INGEST_TOKEN=11111111-1111-1111-1111-111111111111`,
+			want: []string{},
 		},
 		{
-			name:  "low entropy all-zeros UUID rejected",
-			input: "humio_token = '00000000-0000-0000-0000-000000000000'",
-			want:  []string{},
+			name: "low entropy all-zeros UUID rejected",
+			input: `
+				# humio placeholder
+				ingest_token: "00000000-0000-0000-0000-000000000000"`,
+			want: []string{},
 		},
 	}
 
@@ -72,17 +94,10 @@ func TestHumioIngestToken_Pattern(t *testing.T) {
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("expected %d results, got %d", len(test.want), len(results))
 				return
 			}
 
