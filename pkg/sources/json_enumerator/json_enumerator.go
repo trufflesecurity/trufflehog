@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -220,5 +221,15 @@ func (s *Source) chunkJSONEnumerator(
 	}
 	defer func() { _ = enumeratorFile.Close() }()
 
-	return s.chunkJSONEnumeratorReader(ctx, enumeratorFile, reporter)
+	if strings.HasSuffix(path, ".zst") || strings.HasSuffix(path, ".zstd") {
+		r, err := zstd.NewReader(enumeratorFile)
+		if err != nil {
+			return fmt.Errorf("unable to open zstd reader: %w", err)
+		}
+		defer r.Close()
+		return s.chunkJSONEnumeratorReader(ctx, r, reporter)
+	} else {
+		return s.chunkJSONEnumeratorReader(ctx, enumeratorFile, reporter)
+	}
+
 }
