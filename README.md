@@ -597,7 +597,7 @@ The regex detectors can be used with any subcommand, while the sources defined
 in configuration are only for the `multi-scan` subcommand.
 
 The configuration format for sources can be found on Truffle Security's
-[source configuration documentation page](https://docs.trufflesecurity.com/scan-data-for-secrets).
+[source configuration documentation page](https://trufflesecurity.com/docs/connect-sources).
 
 Example GitHub source configuration and [options reference](https://docs.trufflesecurity.com/github#Fvm1I):
 
