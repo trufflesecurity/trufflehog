@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -90,6 +93,59 @@ func TestSqlServer_Pattern(t *testing.T) {
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
+		})
+	}
+}
+
+func TestSqlServer_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+		wantDatabase string
+	}{
+		{
+			name:         "server with explicit port",
+			data:         `Server=localhost;Port=1433;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;`,
+			wantHost:     "localhost:1433",
+			wantUsername: "sa",
+			wantDatabase: "master",
+		},
+		{
+			name:         "server without port",
+			data:         `Server=dbhost;Initial Catalog=mydb;User ID=admin;Password=secret123;`,
+			wantHost:     "dbhost",
+			wantUsername: "admin",
+			wantDatabase: "mydb",
+		},
+		{
+			name:         "xml style parameters",
+			data:         `SERVER=server_name;DATABASE=testdb;user=username;password=badpassword;encrypt=true;`,
+			wantHost:     "server_name",
+			wantUsername: "username",
+			wantDatabase: "testdb",
+		},
+		{
+			name:         "no database specified",
+			data:         `Server=localhost;Port=1433;User ID=sa;Password=123;`,
+			wantHost:     "localhost:1433",
+			wantUsername: "sa",
+			wantDatabase: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			require.NoError(t, err)
+			require.NotEmpty(t, results, "expected at least one result")
+
+			r := results[0]
+			assert.Equal(t, tt.wantHost, r.ExtraData["host"])
+			assert.Equal(t, tt.wantUsername, r.ExtraData["username"])
+			assert.Equal(t, tt.wantDatabase, r.ExtraData["database"])
 		})
 	}
 }
