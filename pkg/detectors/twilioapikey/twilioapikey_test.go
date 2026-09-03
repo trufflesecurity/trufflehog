@@ -2,11 +2,15 @@ package twilioapikey
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -100,5 +104,80 @@ func TestTwilioAPIKey_SecretRedacted(t *testing.T) {
 
 	if results[0].Redacted != validSecret[:5]+"..." {
 		t.Errorf("expected redacted secret to be '%s', got '%s'", validSecret[:5]+"...", results[0].Redacted)
+	}
+}
+type errorTransport struct{ err error }
+
+func (t errorTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, t.err }
+
+func TestTwilioAPIKey_VerificationDeterminacy(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+
+	tests := []struct {
+		name                string
+		client              *http.Client
+		wantVerified        bool
+		wantVerificationErr bool
+	}{
+		{
+			name:                "authenticated rejection is determinate",
+			client:              common.ConstantResponseHttpClient(http.StatusUnauthorized, ""),
+			wantVerified:        false,
+			wantVerificationErr: false,
+		},
+		{
+			name:                "success is determinate",
+			client:              common.ConstantResponseHttpClient(http.StatusOK, `{"services":[{"friendly_name":"n","sid":"s","account_sid":"a"}]}`),
+			wantVerified:        true,
+			wantVerificationErr: false,
+		},
+		{
+			name:                "rate limit is indeterminate",
+			client:              common.ConstantResponseHttpClient(http.StatusTooManyRequests, ""),
+			wantVerified:        false,
+			wantVerificationErr: true,
+		},
+		{
+			name:                "connection reset is indeterminate",
+			client:              &http.Client{Transport: errorTransport{err: errors.New("read: connection reset by peer")}},
+			wantVerified:        false,
+			wantVerificationErr: true,
+		},
+		{
+			name:                "timeout is indeterminate",
+			client:              &http.Client{Transport: errorTransport{err: context.DeadlineExceeded}},
+			wantVerified:        false,
+			wantVerificationErr: true,
+		},
+		{
+			name:                "server error is indeterminate",
+			client:              common.ConstantResponseHttpClient(http.StatusInternalServerError, "{}"),
+			wantVerified:        false,
+			wantVerificationErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := Scanner{client: test.client}.FromData(context.Background(), true, data)
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+
+			got := results[0]
+			if got.Verified != test.wantVerified {
+				t.Errorf("Verified = %v, want %v", got.Verified, test.wantVerified)
+			}
+			if (got.VerificationError() != nil) != test.wantVerificationErr {
+				t.Errorf("VerificationError() = %v, want error presence %v",
+					got.VerificationError(), test.wantVerificationErr)
+			}
+			if e := got.VerificationError(); e != nil && strings.Contains(e.Error(), validSecret) {
+				t.Errorf("verification error leaks the credential: %v", e)
+			}
+		})
 	}
 }
