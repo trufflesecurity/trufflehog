@@ -1,7 +1,6 @@
 package github
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -130,12 +129,6 @@ type unitEnvelope struct {
 func (u unitEnvelope) SourceUnitID() (string, sources.SourceUnitKind) { return u.ID, u.Kind }
 func (u unitEnvelope) Display() string                                { return u.Name }
 
-func decodeBase64(data []byte) ([]byte, error) {
-	out := make([]byte, base64.StdEncoding.DecodedLen(len(data)))
-	n, err := base64.StdEncoding.Decode(out, data)
-	return out[:n], err
-}
-
 func unmarshalSourceUnit[unitType sources.SourceUnit](data []byte) (unitType, error) {
 	u := new(unitType)
 
@@ -171,20 +164,12 @@ func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
 		return env, nil
 	case "repo":
 		if len(env.UnitData) > 0 {
-			decodedData, err := decodeBase64(env.UnitData)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding repo unit data: %w", err)
-			}
-			return unmarshalSourceUnit[RepoUnit](decodedData)
+			return unmarshalSourceUnit[RepoUnit](env.UnitData)
 		}
 		return RepoUnit{Name: env.Name, URL: env.ID}, nil
 	case "gist":
-		decodedData, err := decodeBase64(env.UnitData)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding gist unit data: %w", err)
-		}
 		if len(env.UnitData) > 0 {
-			return unmarshalSourceUnit[GistUnit](decodedData)
+			return unmarshalSourceUnit[GistUnit](env.UnitData)
 		}
 		return GistUnit{Name: env.Name, URL: env.ID}, nil
 	default:
