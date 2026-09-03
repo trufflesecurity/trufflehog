@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"regexp" // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"strings"
 	"time"
 
