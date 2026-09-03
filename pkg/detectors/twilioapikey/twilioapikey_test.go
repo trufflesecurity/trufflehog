@@ -106,6 +106,7 @@ func TestTwilioAPIKey_SecretRedacted(t *testing.T) {
 		t.Errorf("expected redacted secret to be '%s', got '%s'", validSecret[:5]+"...", results[0].Redacted)
 	}
 }
+
 type errorTransport struct{ err error }
 
 func (t errorTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, t.err }
