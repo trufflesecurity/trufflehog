@@ -5,8 +5,8 @@ package privatekey
 import (
 	"errors"
 	"fmt"
-	"os"
 	regexp "github.com/wasilibs/go-re2"
+	"os"
 	"strings"
 	"sync"
 	"time"

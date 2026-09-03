@@ -1,8 +1,8 @@
 package common
 
 import (
-	"os"
 	regexp "github.com/wasilibs/go-re2"
+	"os"
 	"testing"
 )
 

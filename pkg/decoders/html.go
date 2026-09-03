@@ -2,8 +2,8 @@ package decoders
 
 import (
 	"bytes"
-	"net/url"
 	regexp "github.com/wasilibs/go-re2"
+	"net/url"
 	"strings"
 
 	"golang.org/x/net/html"

@@ -1,9 +1,9 @@
 package giturl
 
 import (
+	regexp "github.com/wasilibs/go-re2"
 	"net/url"
 	"path/filepath"
-	regexp "github.com/wasilibs/go-re2"
 	"strconv"
 	"strings"
 

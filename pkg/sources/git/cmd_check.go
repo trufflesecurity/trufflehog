@@ -2,8 +2,8 @@ package git
 
 import (
 	"fmt"
-	"os/exec"
 	regexp "github.com/wasilibs/go-re2"
+	"os/exec"
 	"strconv"
 	"strings"
 

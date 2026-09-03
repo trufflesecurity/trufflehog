@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"log"
 	"os"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"text/template"
 
