@@ -88,8 +88,16 @@ func (s *Source) Chunks(
 // configured path as its own unit so paths can be chunked concurrently.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		if err := reporter.UnitOk(ctx, sources.CommonSourceUnit{ID: path}); err != nil {
-			return err
+		f, err := os.Open(path)
+		if err != nil {
+			if err := reporter.UnitErr(ctx, err); err != nil {
+				return err
+			}
+		} else {
+			_ = f.Close()
+			if err := reporter.UnitOk(ctx, sources.CommonSourceUnit{ID: path}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
