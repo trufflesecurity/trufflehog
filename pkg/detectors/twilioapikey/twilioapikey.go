@@ -67,6 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for apiKey := range uniqueAPIKeys {
 		for secret := range uniqueSecrets {
 			s1 := detectors.Result{
+				// TODO: We need to use the correct DetectorType here; detectorspb.DetectorType_TwilioApiKey
 				DetectorType: detector_typepb.DetectorType_Twilio,
 				Raw:          []byte(apiKey),
 				RawV2:        []byte(apiKey + secret),
