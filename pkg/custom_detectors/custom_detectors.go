@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"maps"
 	"net/http"
+	"regexp" // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"slices"
 	"strings"
 
