@@ -23,7 +23,7 @@ jobs:
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           # NOTE: Version and args must match scripts/lint.sh
-          version: v2.13.1
+          version: v2.13.2
           args: --enable bodyclose,copyloopvar,misspell --timeout 10m
   man-page-staleness:
     name: man-page-staleness
