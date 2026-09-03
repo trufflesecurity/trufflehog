@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"testing"
 

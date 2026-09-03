@@ -3,8 +3,8 @@ package v2
 import (
 	"context"
 	"errors"
-	"net/http"
 	regexp "github.com/wasilibs/go-re2"
+	"net/http"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"

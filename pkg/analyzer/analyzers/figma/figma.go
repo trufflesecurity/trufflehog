@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"os"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/fatih/color"

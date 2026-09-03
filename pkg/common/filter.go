@@ -3,8 +3,8 @@ package common
 import (
 	"bufio"
 	"fmt"
-	"os"
 	regexp "github.com/wasilibs/go-re2"
+	"os"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
