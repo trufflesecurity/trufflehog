@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# NOTE: Version and args must match .github/workflows/lint.yml
+# NOTE: Version and args must match .github/workflows/lint.yml. The version half is
+# enforced by scripts/check_lint_pins.py in CI; the args half is not. Renovate bumps
+# this assignment via a custom manager, which matches it by regex — see
+# .github/renovate.json before reshaping the line.
 GOLANGCI_LINT_VERSION="v2.13.1"
 
 LINT_ARGS="--enable bodyclose,copyloopvar,misspell --timeout 10m"
