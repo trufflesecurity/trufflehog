@@ -3,11 +3,13 @@ package gitparse
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,14 @@ const (
 
 	// defaultWaitDelay is the default time to wait after context cancellation before forcefully killing git processes.
 	defaultWaitDelay = 5 * time.Second
+
+	// abbrevCommit is the git sha abbreviation length to use for `git show` invocations in the lower-memory scan mode.
+	abbrevCommit = 20
+
+	// showGroupSize is the number of commits per `git show` in the lower-memory scan mode.
+	//
+	// Windows has a command length limit of 32767, so at these values we should only be using a tiny part of of that for the commit list ((abbrevCommit + 1) * showGroupSize).  We don't target any platforms with shorter limits.
+	showGroupSize = 75
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -130,6 +140,7 @@ type Parser struct {
 	waitDelay     time.Duration
 
 	useCustomContentWriter bool
+	lowMemoryScan          bool
 }
 
 type ParseState int
@@ -191,6 +202,13 @@ func UseCustomContentWriter() Option {
 	return func(parser *Parser) { parser.useCustomContentWriter = true }
 }
 
+// UseLowMemoryScan sets the scan to optimize for limited memory at the cost of speed (currently up to 9%)
+func UseLowMemoryScan() Option {
+	return func(parser *Parser) {
+		parser.lowMemoryScan = true
+	}
+}
+
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
 func WithMaxDiffSize(maxDiffSize int64) Option {
@@ -233,8 +251,17 @@ func NewParser(options ...Option) *Parser {
 	return parser
 }
 
+type gitArgs struct {
+	env    []string
+	global []string
+	log    []string
+	show   []string
+	paths  []string
+}
+
 // RepoPath parses the output of the `git log` command for the `source` path.
-// The Diff chan will return diffs in the order they are parsed from the log.
+// The Diff chan will return diffs in the order they are parsed from the log,
+// though the diffs are generated using `git show` in groups.
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
@@ -242,51 +269,195 @@ func (c *Parser) RepoPath(
 	abbreviatedLog bool,
 	excludedGlobs []string,
 	isBare bool,
-	additionalArgs ...string,
 ) (chan *Diff, error) {
-	args := []string{
-		"-C", source,
-		"log",
-		"--patch", // https://git-scm.com/docs/git-log#Documentation/git-log.txt---patch
-		"--full-history",
-		"--date=iso-strict",
-		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
-		"--notes",         // https://git-scm.com/docs/git-log#Documentation/git-log.txt---notesltrefgt
-	}
-	if abbreviatedLog {
-		args = append(args, "--diff-filter=AM")
-	}
-	if head != "" {
-		args = append(args, head)
-	} else {
-		args = append(args, "--all")
-	}
-	args = append(args, additionalArgs...) // These need to come before --
-	for _, glob := range excludedGlobs {
-		args = append(args, "--", ".", ":(exclude)"+glob)
+	args := c.prepGitArgs(source, head, abbreviatedLog, excludedGlobs, isBare)
+
+	if c.lowMemoryScan {
+		return c.repoPathLowMemory(ctx, args)
 	}
 
-	cmd := exec.CommandContext(ctx, "git", args...)
-	absPath, err := filepath.Abs(source)
-	if err == nil {
-		if !isBare {
-			cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
-		} else {
-			cmd.Env = append(cmd.Env,
-				"GIT_DIR="+absPath,
+	showCmd := exec.CommandContext(ctx,
+		"git",
+		slices.Concat(args.global, []string{"log"}, args.show, args.log, args.paths)...,
+	)
+	showCmd.Env = args.env
+
+	return c.executeCommand(ctx, showCmd, false)
+}
+
+func (c *Parser) repoPathLowMemory(ctx context.Context, args gitArgs) (chan *Diff, error) {
+	commitGroups, err := c.gatherGitLog(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+
+	// c.executeCommand returns a channel that is later closed by a
+	// different goroutine after the command finishes, but we're not
+	// running a single command anymore. we'll use a channel of channels to
+	// reduce back to one channel we return to our caller.  Unbuffered so
+	// we have at most one git show running and one git show draining.
+	diffGroups := make(chan chan *Diff)
+	go func() {
+		defer common.RecoverWithExit(ctx)
+		defer close(diffGroups)
+
+		for group := range commitGroups {
+			if common.IsDone(ctx) {
+				return
+			}
+
+			showCmd := exec.CommandContext(ctx,
+				"git",
+				slices.Concat(args.global, []string{"show"}, args.show, group, args.paths)...,
 			)
-			// We need those variables to handle incoming commits
-			// while using trufflehog in pre-receive hooks
-			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
-				cmd.Env = append(cmd.Env, "GIT_OBJECT_DIRECTORY="+dir)
+			showCmd.Env = args.env
+
+			diffGroup, err := c.executeCommand(ctx, showCmd, false)
+			if err != nil {
+				ctx.Logger().Error(err, "Error executing git show for commit group.")
+				return
 			}
-			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
-				cmd.Env = append(cmd.Env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+			diffGroups <- diffGroup
+		}
+	}()
+
+	// and this is the single channel we're responsible for returning and
+	// closing.
+	diffChan := make(chan *Diff)
+	go func() {
+		defer common.RecoverWithExit(ctx)
+		defer close(diffChan)
+
+		for groupdiffs := range diffGroups {
+			for diff := range groupdiffs {
+				diffChan <- diff
 			}
+		}
+	}()
+
+	return diffChan, nil
+}
+
+// Ask git for a list of all relevant commit hashes but only hashes.  Git takes
+// on the work of linearizing history for us, then we work through the commit
+// list.  Returns a channel of groups of commit IDs, so scanning can start asap
+// even if git log is taking a bit for large repos.
+func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs) (chan []string, error) {
+	cmd := exec.CommandContext(ctx,
+		"git", slices.Concat(
+			args.global, []string{"log"},
+			args.log, []string{
+				// https://git-scm.com/docs/git-log#_pretty_formats
+				"--pretty=format:%h",
+				// https://git-scm.com/docs/git-log#Documentation/git-log.txt---abbrevn
+				fmt.Sprintf("--abbrev=%d", abbrevCommit),
+			},
+			args.paths,
+		)...)
+	cmd.WaitDelay = c.waitDelay
+	cmd.Env = args.env
+
+	stdOut, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute git log: %w", err)
+	}
+
+	commitGroups := make(chan []string)
+	go func() {
+		defer close(commitGroups)
+		defer func() {
+			err := cmd.Wait()
+			if err != nil {
+				ctx.Logger().Error(err, "git log exited with error", "stderr", cmd.Stderr)
+			}
+		}()
+
+		s := bufio.NewScanner(stdOut)
+		commitGroup := make([]string, 0, showGroupSize)
+
+		for s.Scan() && !common.IsDone(ctx) {
+			commitGroup = append(commitGroup, s.Text())
+
+			if len(commitGroup) == showGroupSize {
+				commitGroups <- commitGroup
+				commitGroup = make([]string, 0, showGroupSize)
+			}
+		}
+		if len(commitGroup) != 0 && !common.IsDone(ctx) {
+			commitGroups <- commitGroup
+		}
+
+		if err := s.Err(); err != nil {
+			ctx.Logger().Error(err, "error reading git log")
+		}
+	}()
+
+	return commitGroups, nil
+}
+
+func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) gitArgs {
+	args := gitArgs{
+		global: []string{
+			"-C", source,
+		},
+		log: []string{
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---full-history
+			"--full-history",
+		},
+		show: []string{
+			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---patch
+			"--patch",
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---dateformat
+			"--date=iso-strict",
+			// https://git-scm.com/docs/git-show#_pretty_formats
+			"--pretty=fuller",
+			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---notesref
+			"--notes",
+		},
+		paths: []string{},
+	}
+
+	if abbreviatedLog {
+		// https://git-scm.com/docs/git-show#Documentation/git-show.txt---diff-filterACDMRTUXB
+		args.log = append(args.log, "--diff-filter=AM")
+		args.show = append(args.show, "--diff-filter=AM")
+	}
+
+	// Keep head or all last, before the --, not required but sensible
+	// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
+	args.log = append(args.log, cmp.Or(head, "--all"))
+
+	// And then potentially add -- to args here
+	if len(excludedGlobs) != 0 {
+		args.paths = []string{"--", "."}
+		for _, glob := range excludedGlobs {
+			// This is not directly doc'd but added in git 1.9.0 and found in pathspec.c
+			args.paths = append(args.paths, ":(exclude)"+glob)
 		}
 	}
 
-	return c.executeCommand(ctx, cmd, false, c.waitDelay)
+	absPath, err := filepath.Abs(source)
+	if err == nil {
+		if !isBare {
+			args.env = append(args.env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+		} else {
+			args.env = append(args.env, "GIT_DIR="+absPath)
+			// We need those variables to handle incoming commits
+			// while using trufflehog in pre-receive hooks
+			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
+				args.env = append(args.env, "GIT_OBJECT_DIRECTORY="+dir)
+			}
+			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
+				args.env = append(args.env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+			}
+		}
+	}
+	return args
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
@@ -301,29 +472,29 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 		cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 	}
 
-	return c.executeCommand(ctx, cmd, true, c.waitDelay)
+	return c.executeCommand(ctx, cmd, true)
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
 // waitDelay specifies how long to wait after context cancellation before forcefully killing the process.
-func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool, waitDelay time.Duration) (chan *Diff, error) {
+func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan *Diff, error) {
 	diffChan := make(chan *Diff, 64)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
-		return diffChan, err
+		return nil, err
 	}
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
-		return diffChan, err
+		return nil, err
 	}
 
 	// Set WaitDelay to allow the command additional time to exit after context cancellation
-	cmd.WaitDelay = waitDelay
+	cmd.WaitDelay = c.waitDelay
 
 	err = cmd.Start()
 	if err != nil {
-		return diffChan, err
+		return nil, err
 	}
 
 	go func() {
@@ -355,7 +526,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 
 		totalLogSize int
 	)
-	var latestState = Initial
+	latestState := Initial
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
 		opts = append(opts, withCustomContentWriter(bufferwriter.New()))
