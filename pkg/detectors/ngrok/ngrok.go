@@ -38,7 +38,13 @@ const (
 )
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b(2[a-zA-Z0-9]{26}_\d[a-zA-Z0-9]{20})\b`)
+	// ngrok API keys and authtokens are {prefix}_{suffix}, both alphanumeric with
+	// no fixed leading character. The prefix is 27 chars. Suffixes are usually 21
+	// chars with a leading digit, but real authtokens verified against the ngrok
+	// API (via ERR_NGROK_206) have been observed with 20-char and letter-leading
+	// suffixes, so the pattern must accept 20-21 chars starting with any
+	// alphanumeric character.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b([a-zA-Z0-9]{27}_[a-zA-Z0-9]{20,21})\b`)
 )
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
