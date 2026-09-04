@@ -1896,6 +1896,94 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SolarwindsDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
+
+		// INT-595: gated while verification-error reporting is rolled out.
+		case *cexio.Scanner:
+			return !feature.CexIODetectorEnabled.Load()
+		case *commodities.Scanner:
+			return !feature.CommoditiesDetectorEnabled.Load()
+		case *convier.Scanner:
+			return !feature.ConvierDetectorEnabled.Load()
+		case *cryptocompare.Scanner:
+			return !feature.CryptoCompareDetectorEnabled.Load()
+		case *dareboost.Scanner:
+			return !feature.DareboostDetectorEnabled.Load()
+		case *dyspatch.Scanner:
+			return !feature.DyspatchDetectorEnabled.Load()
+		case *etherscan.Scanner:
+			return !feature.EtherscanDetectorEnabled.Load()
+		case *fixerio.Scanner:
+			return !feature.FixerIODetectorEnabled.Load()
+		case *flickr.Scanner:
+			return !feature.FlickrDetectorEnabled.Load()
+		case *flightstats.Scanner:
+			return !feature.FlightstatsDetectorEnabled.Load()
+		case *flowflu.Scanner:
+			return !feature.FlowFluDetectorEnabled.Load()
+		case *freshbooks.Scanner:
+			return !feature.FreshbooksDetectorEnabled.Load()
+		case *gengo.Scanner:
+			return !feature.GengoDetectorEnabled.Load()
+		case *gocanvas.Scanner:
+			return !feature.GoCanvasDetectorEnabled.Load()
+		case *holistic.Scanner:
+			return !feature.HolisticDetectorEnabled.Load()
+		case *humanity.Scanner:
+			return !feature.HumanityDetectorEnabled.Load()
+		case *infura.Scanner:
+			return !feature.InfuraDetectorEnabled.Load()
+		case *instamojo.Scanner:
+			return !feature.InstamojoDetectorEnabled.Load()
+		case *ipstack.Scanner:
+			return !feature.IpStackDetectorEnabled.Load()
+		case *linearapi.Scanner:
+			return !feature.LinearAPIDetectorEnabled.Load()
+		case *mailboxlayer.Scanner:
+			return !feature.MailboxlayerDetectorEnabled.Load()
+		case *metabase.Scanner:
+			return !feature.MetabaseDetectorEnabled.Load()
+		case *moosend.Scanner:
+			return !feature.MoosendDetectorEnabled.Load()
+		case *mrticktock.Scanner:
+			return !feature.MrticktockDetectorEnabled.Load()
+		case *onedesk.Scanner:
+			return !feature.OnedeskDetectorEnabled.Load()
+		case *paralleldots.Scanner:
+			return !feature.ParallelDotsDetectorEnabled.Load()
+		case *planyo.Scanner:
+			return !feature.PlanyoDetectorEnabled.Load()
+		case *razorpay.Scanner:
+			return !feature.RazorPayDetectorEnabled.Load()
+		case *reallysimplesystems.Scanner:
+			return !feature.ReallySimpleSystemsDetectorEnabled.Load()
+		case *semaphore.Scanner:
+			return !feature.SemaphoreDetectorEnabled.Load()
+		case *simfin.Scanner:
+			return !feature.SimFinDetectorEnabled.Load()
+		case *slackwebhook.Scanner:
+			return !feature.SlackWebhookDetectorEnabled.Load()
+		case *tefter.Scanner:
+			return !feature.TefterDetectorEnabled.Load()
+		case *teletype.Scanner:
+			return !feature.TeletypeDetectorEnabled.Load()
+		case *thinkific.Scanner:
+			return !feature.ThinkificDetectorEnabled.Load()
+		case *twelvedata.Scanner:
+			return !feature.TwelveDataDetectorEnabled.Load()
+		case *unifyid.Scanner:
+			return !feature.UnifyIDDetectorEnabled.Load()
+		case *uptimerobot.Scanner:
+			return !feature.UptimeRobotDetectorEnabled.Load()
+		case *walkscore.Scanner:
+			return !feature.WalkScoreDetectorEnabled.Load()
+		case *weatherstack.Scanner:
+			return !feature.WeatherStackDetectorEnabled.Load()
+		case *webscraping.Scanner:
+			return !feature.WebscrapingDetectorEnabled.Load()
+		case *websitepulse.Scanner:
+			return !feature.WebsitepulseDetectorEnabled.Load()
+		case *whoxy.Scanner:
+			return !feature.WhoxyDetectorEnabled.Load()
 		default:
 			return false
 		}
