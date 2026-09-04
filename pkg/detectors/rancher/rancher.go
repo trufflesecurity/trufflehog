@@ -17,9 +17,11 @@ var (
 	// Match known Rancher/Cattle variable names followed by the token value.
 	// (?i:...) scopes case-insensitivity to the variable name only; the capture
 	// group stays case-sensitive because Rancher tokens are lowercase alphanumeric.
+	// The optional quote after the name covers quoted JSON keys
+	// (e.g. `"CATTLE_TOKEN": "<token>"`).
 	keyPat = regexp.MustCompile(
 		`(?i:CATTLE_TOKEN|RANCHER_TOKEN|CATTLE_BOOTSTRAP_PASSWORD|RANCHER_API_TOKEN|RANCHER_SECRET_KEY)` +
-			`\s*[=:]\s*["']?([a-z0-9]{54,64}\b)["']?`)
+			`["']?\s*[=:]\s*["']?([a-z0-9]{54,64}\b)["']?`)
 )
 
 func (s Scanner) Keywords() []string {
