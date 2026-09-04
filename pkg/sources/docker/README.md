@@ -281,19 +281,6 @@ docker login my-registry.io
 trufflehog docker --image my-registry.io/private-app:v1.0.0
 ```
 
-## Testing Results
-
-| Test Case | Status | Command/Configuration | Registry URL | Notes |
-|-----------|--------|----------------------|--------------|-------|
-| Scan remote image on DockerHub | ✅ Success | `--image <image_name>` | https://hub.docker.com/ | Public images work without authentication |
-| Scan specific tag of image on DockerHub | ✅ Success | `--image <image_name>:<tag_name>` | https://hub.docker.com/ | Tag specification working correctly |
-| Scan all images under namespace | In Progress | `--namespace <namespace>` | DockerHub, Quay, GHCR | Automatically discovers all public images |
-| Scan remote image on Quay.io | ✅ Success | `--image quay.io/prometheus/prometheus` | https://quay.io/search | Public Quay.io registry supported |
-| Scan multiple images | ✅ Success | `--image <image_name> --image <image_name>` | Multiple registries | Sequential scanning of multiple images |
-| Scan remote image on DockerHub with token | ✅ Success | `--token <token>`(Generate token using username and password) | https://hub.docker.com/ | Authenticated scanning for private repos |
-| Scan private image on Quay | ⏸️ Halted | N/A | https://quay.io/ | RedHat requires paid account for private repos |
-| Scan private image on GHCR | ✅ Success | `--image ghcr.io/<image_name>` | https://github.com/packages | GitHub Container Registry |
-
 ## Troubleshooting
 
 ### Common Issues
@@ -315,3 +302,8 @@ trufflehog docker --image my-registry.io/private-app:v1.0.0
 
 **Issue**: Files not being scanned
 **Solution**: Check exclude patterns and file size limits. Verify files are under 50MB.
+
+---
+
+**Issue**: Cannot scan private image on Quay.io
+**Note**: Quay.io requires a paid account to access private repositories. (Not supported yet)
