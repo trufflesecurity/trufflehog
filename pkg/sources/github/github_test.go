@@ -382,7 +382,8 @@ func TestAppConnector_EnterpriseBaseURL(t *testing.T) {
 			PrivateKey:     privateKey,
 			InstallationId: "1337",
 			AppId:          "4141",
-		})
+		},
+		false)
 	require.NoError(t, err)
 
 	appConn, ok := connector.(*appConnector)
@@ -409,6 +410,40 @@ func TestAppConnector_EnterpriseBaseURL(t *testing.T) {
 	require.True(t, appsBaseURLField.IsValid(), "AppsTransport should have a BaseURL field")
 	assert.Equal(t, enterpriseEndpoint, appsBaseURLField.String(),
 		"AppsTransport.BaseURL should be set to enterprise endpoint")
+}
+
+// TestValidate_ScanAllInstallationsWithoutDefaultInstallation covers the
+// scanAllInstallations-without-githubApp.installationId case: there is no
+// default installation token to call RateLimit with (see
+// appConnector.HasDefaultInstallation), so Validate must fall back to
+// checking App credentials via the app-level (JWT) client instead of
+// erroring against a non-existent installation ID 0.
+func TestValidate_ScanAllInstallationsWithoutDefaultInstallation(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/app/installations").
+		Reply(200).
+		JSON([]map[string]any{})
+	gock.New("https://api.github.com").
+		Get("^/app$").
+		Reply(200).
+		JSON(map[string]any{"id": 4141})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint:             "https://api.github.com",
+		ScanAllInstallations: true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey: createPrivateKey(),
+				AppId:      "4141",
+			},
+		}})
+
+	errs := s.Validate(context.Background())
+	assert.Empty(t, errs)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
 }
 
 func TestAddOrgsByUser(t *testing.T) {
