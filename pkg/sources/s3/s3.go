@@ -342,7 +342,8 @@ func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets
 // scanBuckets scans the given buckets using the given role and adds the number
 // of objects it scanned to totalObjectCount. The counter is owned by Chunks and
 // shared across role passes so that the completion message reflects the whole
-// scan, not just the last role's pass.
+// scan, not just the last role's pass. Unexpected listing failures (a named
+// bucket the identity cannot list) are returned so the job is fatal.
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.Client,
@@ -350,7 +351,7 @@ func (s *Source) scanBuckets(
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
 	totalObjectCount *uint64,
-) {
+) error {
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
@@ -397,7 +398,10 @@ func (s *Source) scanBuckets(
 			)
 		}
 
-		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
+		objectCount, err := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
+		if err != nil {
+			return err
+		}
 		*totalObjectCount += objectCount
 	}
 
@@ -407,6 +411,8 @@ func (s *Source) scanBuckets(
 		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, *totalObjectCount),
 		"",
 	)
+
+	return nil
 }
 
 func (s *Source) scanBucket(
@@ -417,22 +423,29 @@ func (s *Source) scanBucket(
 	reporter sources.ChunkReporter,
 	startAfter *string,
 	checkpointer *Checkpointer,
-) uint64 {
+) (uint64, error) {
 	s.metricsCollector.RecordBucketForRole(role)
 
 	ctx = context.WithValue(ctx, "bucket", bucket)
 
 	if common.IsDone(ctx) {
 		ctx.Logger().Error(ctx.Err(), "context done, while scanning bucket")
-		return 0
+		return 0, ctx.Err()
 	}
 
 	ctx.Logger().V(3).Info("Scanning bucket")
 
 	regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
 	if err != nil {
-		ctx.Logger().Error(err, "could not get regional client for bucket")
-		return 0
+		// Same expected-vs-fatal split as listing: role enumeration walks every
+		// bucket in the account and will fail region lookup on many of them.
+		if s.listErrorsAreExpected(role) {
+			ctx.Logger().V(3).Info("could not get regional client for bucket", "err", err)
+			return 0, nil
+		}
+		// The returned error is the job-level report (unhealthy scan). This is
+		// customer access failure, so it is not logged at Error.
+		return 0, fmt.Errorf("could not get regional client for bucket %q: %w", bucket, err)
 	}
 
 	errorCount := sync.Map{}
@@ -448,20 +461,21 @@ func (s *Source) scanBucket(
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
+			s.metricsCollector.RecordBucketListError(bucket, role)
 			if s.listErrorsAreExpected(role) {
 				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
 				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
 				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
 				// and therefore not an error.
 				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
-			} else {
-				// This can also be a failure to assume the role itself: role credentials
-				// are resolved lazily, so the first request that needs them surfaces the
-				// STS error here rather than at client construction.
-				ctx.Logger().Error(err, "could not list objects in bucket")
+				return objectCount, nil
 			}
-			s.metricsCollector.RecordBucketListError(bucket, role)
-			break
+			// This can also be a failure to assume the role itself: role credentials
+			// are resolved lazily, so the first request that needs them surfaces the
+			// STS error here rather than at client construction.
+			// Returning the error marks the job fatal so a configured bucket the
+			// identity cannot list is not reported as a successful empty scan.
+			return objectCount, fmt.Errorf("could not list objects in bucket %q: %w", bucket, err)
 		}
 		pageMetadata := pageMetadata{
 			bucket:     bucket,
@@ -478,15 +492,15 @@ func (s *Source) scanBucket(
 
 		pageNumber++
 	}
-	return objectCount
+	return objectCount, nil
 }
 
 // listErrorsAreExpected reports whether a failure to list a bucket's objects
-// should be suppressed rather than logged as an error. When a role is assumed
+// should be suppressed rather than treated as fatal. When a role is assumed
 // without an explicit bucket list, the scanner attempts every bucket in the
 // account and is expected to be denied on some of them. When buckets are
-// explicitly configured, a listing failure means a configured target is being
-// silently skipped, so it is always an error, even under an assumed role.
+// explicitly configured, a listing failure is returned so the job is fatal,
+// even under an assumed role.
 func (s *Source) listErrorsAreExpected(role string) bool {
 	return role != "" && len(s.conn.GetBuckets()) == 0
 }
@@ -495,8 +509,7 @@ func (s *Source) listErrorsAreExpected(role string) bool {
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	var totalObjectCount uint64
 	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
-		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan, &totalObjectCount)
-		return nil
+		return s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan, &totalObjectCount)
 	}
 
 	return s.visitRoles(ctx, visitor)
@@ -821,6 +834,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 // ChunkUnit implements SourceUnitChunker interface. This implementation scans
 // the given S3 bucket source unit and emits chunks for each object found.
 // It supports sub-unit resumption by utilizing the checkpointer to track progress.
+// Listing failures for a configured bucket are returned so the job is fatal.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 
 	s3unit, ok := unit.(S3SourceUnit)
@@ -847,8 +861,8 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		startAfterPtr = &startAfter
 	}
 	defer s.ClearEncodedResumeInfoFor(unitID)
-	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer)
-	return nil
+	_, err = s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer)
+	return err
 }
 
 // It accepts three shapes: the persisted envelope carrying unit_data

@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -104,10 +106,67 @@ func TestSource_ScanBucketsReportsCumulativeObjectCount(t *testing.T) {
 	// objects. The pass below scans no buckets, so the completion message must
 	// still report the cumulative total rather than resetting to zero.
 	totalObjectCount := uint64(3)
-	s.scanBuckets(context.Background(), nil, "", nil, make(chan *sources.Chunk, 1), &totalObjectCount)
+	require.NoError(t, s.scanBuckets(context.Background(), nil, "", nil, make(chan *sources.Chunk, 1), &totalObjectCount))
 
 	assert.Equal(t, uint64(3), totalObjectCount)
 	assert.Contains(t, s.Message, "3 objects scanned")
+}
+
+// accessDeniedListServer stands in for S3 and always returns ListObjectsV2 AccessDenied.
+// Used to reproduce a configured bucket the identity cannot list, without AWS.
+func accessDeniedListServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = fmt.Fprint(w, `<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`)
+	}))
+}
+
+func TestChunkUnitReturnsErrorWhenConfiguredBucketListIsDenied(t *testing.T) {
+	srv := accessDeniedListServer()
+	t.Cleanup(srv.Close)
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   srv.URL,
+		Buckets:    []string{"private-bucket"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	err = s.ChunkUnit(context.Background(), S3SourceUnit{Bucket: "private-bucket"}, sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `could not list objects in bucket "private-bucket"`)
+}
+
+func TestScanBucketSwallowsExpectedRoleEnumerationDenials(t *testing.T) {
+	srv := accessDeniedListServer()
+	t.Cleanup(srv.Close)
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   srv.URL,
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	client, err := s.newClient(context.Background(), s.defaultRegion(), "")
+	require.NoError(t, err)
+
+	_, err = s.scanBucket(
+		context.Background(),
+		client,
+		"arn:aws:iam::123456789012:role/some-role",
+		"denied-bucket",
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)},
+		nil,
+		NewCheckpointer(context.Background(), &s.Progress, false),
+	)
+	require.NoError(t, err)
 }
 
 func TestSource_Chunks(t *testing.T) {
