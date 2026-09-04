@@ -492,6 +492,20 @@ type JSONEnumeratorConfig struct {
 	Paths []string
 }
 
+// HttpxConfig defines the configuration for an httpx JSONL source.
+type HttpxConfig struct {
+	// Paths is the list of httpx JSONL files to scan. "-" reads from stdin.
+	Paths []string
+	// Base64Body indicates response bodies are base64-encoded (httpx -irrb).
+	Base64Body bool
+	// IncludeHeadlessBody additionally scans the headless_body field.
+	IncludeHeadlessBody bool
+	// MaxRecordBytes caps the size of a single JSONL record. Zero uses the default.
+	MaxRecordBytes int64
+	// Concurrency is the number of records processed in parallel. Zero uses NumCPU.
+	Concurrency int
+}
+
 // Progress is used to update job completion progress across sources.
 type Progress struct {
 	mut sync.Mutex

@@ -56,6 +56,7 @@ enum SourceType {
   SOURCE_TYPE_SLACK_CONTINUOUS = 41;
   SOURCE_TYPE_JSON_ENUMERATOR = 42;
   SOURCE_TYPE_AWS_SECRETS_MANAGER = 43;
+  SOURCE_TYPE_HTTPX = 44;
 }
 
 message LocalSource {
@@ -569,4 +570,18 @@ message SlackContinuous {
 
 message JSONEnumerator {
   repeated string paths = 1;
+}
+
+// Httpx configures a scan of ProjectDiscovery httpx JSONL output. Only the
+// response body fields of each record are scanned.
+message Httpx {
+  // paths are the httpx JSONL files to scan. "-" reads from stdin.
+  repeated string paths = 1;
+  // base64_body indicates bodies are base64-encoded (httpx -irrb).
+  bool base64_body = 2;
+  // include_headless_body additionally scans the headless_body field.
+  bool include_headless_body = 3;
+  // max_record_bytes caps the size of a single JSONL record; larger records are
+  // skipped. Zero means use the source default.
+  int64 max_record_bytes = 4;
 }

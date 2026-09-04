@@ -4464,6 +4464,130 @@ var _ interface {
 	ErrorName() string
 } = JSONEnumeratorValidationError{}
 
+// Validate checks the field values on Httpx with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Httpx) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Httpx with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in HttpxMultiError, or nil if none found.
+func (m *Httpx) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Httpx) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Url
+
+	// no validation rules for FinalUrl
+
+	// no validation rules for Input
+
+	// no validation rules for Host
+
+	// no validation rules for Path
+
+	// no validation rules for Method
+
+	// no validation rules for Scheme
+
+	// no validation rules for StatusCode
+
+	// no validation rules for ContentType
+
+	// no validation rules for Timestamp
+
+	// no validation rules for File
+
+	// no validation rules for Line
+
+	// no validation rules for BodyField
+
+	if len(errors) > 0 {
+		return HttpxMultiError(errors)
+	}
+
+	return nil
+}
+
+// HttpxMultiError is an error wrapping multiple validation errors returned by
+// Httpx.ValidateAll() if the designated constraints aren't met.
+type HttpxMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m HttpxMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m HttpxMultiError) AllErrors() []error { return m }
+
+// HttpxValidationError is the validation error returned by Httpx.Validate if
+// the designated constraints aren't met.
+type HttpxValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e HttpxValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e HttpxValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e HttpxValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e HttpxValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e HttpxValidationError) ErrorName() string { return "HttpxValidationError" }
+
+// Error satisfies the builtin error interface
+func (e HttpxValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sHttpx.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = HttpxValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = HttpxValidationError{}
+
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -5998,6 +6122,47 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "AwsSecretsManager",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Httpx:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetHttpx()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Httpx",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Httpx",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetHttpx()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Httpx",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
