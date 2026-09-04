@@ -39,8 +39,18 @@ RANCHER_API_TOKEN=` + validToken,
 			want: []string{validToken},
 		},
 		{
-			name: "quoted value",
+			name:  "quoted value",
 			input: `CATTLE_BOOTSTRAP_PASSWORD="` + validToken + `"`,
+			want:  []string{validToken},
+		},
+		{
+			name:  "json object - quoted key",
+			input: `{"CATTLE_TOKEN": "` + validToken + `"}`,
+			want:  []string{validToken},
+		},
+		{
+			name:  "json object - quoted key, no space",
+			input: `{"RANCHER_TOKEN":"` + validToken + `"}`,
 			want:  []string{validToken},
 		},
 		{
