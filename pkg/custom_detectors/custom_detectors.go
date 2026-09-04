@@ -8,7 +8,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
-	"regexp"
+	"regexp" // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"slices"
 	"strings"
 

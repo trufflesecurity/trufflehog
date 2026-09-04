@@ -724,8 +724,8 @@ github.com/testcontainers/testcontainers-go/modules/mysql v0.42.0 h1:Yhv1k7vDpyz
 github.com/testcontainers/testcontainers-go/modules/mysql v0.42.0/go.mod h1:Z7SCTuiZlghAdRjkv3Ir0iXJKC2T2avbtxLR0DRe+ng=
 github.com/testcontainers/testcontainers-go/modules/postgres v0.42.1-0.20260423004847-9fc0246c3859 h1:FQ0GtddzRvW5JpBtYSlhHuZDuIJ8ftjfeZfVDcqdCmU=
 github.com/testcontainers/testcontainers-go/modules/postgres v0.42.1-0.20260423004847-9fc0246c3859/go.mod h1:wbXmKjW6MkKFaRP6YWwVR9ZDeq1tReh0wdWeutuDv+o=
-github.com/tetratelabs/wazero v1.9.0 h1:IcZ56OuxrtaEz8UYNRHBrUa9bYeX9oVY93KspZZBf/I=
-github.com/tetratelabs/wazero v1.9.0/go.mod h1:TSbcXCfFP0L2FGkRPxHphadXPjo1T6W+CseNNY7EkjM=
+github.com/tetratelabs/wazero v1.12.0 h1:DuWcpNu/FzgEXgGBDp8J1Spc+CWOvvtvVyjKlaZopYU=
+github.com/tetratelabs/wazero v1.12.0/go.mod h1:LvKtzl2RqO4gyF27BiXU+nKAjcV8f38U+kP/q2vgxh0=
 github.com/therootcompany/xz v1.0.1 h1:CmOtsn1CbtmyYiusbfmhmkpAAETj0wBIH6kCYaX+xzw=
 github.com/therootcompany/xz v1.0.1/go.mod h1:3K3UH1yCKgBneZYhuQUvJ9HPD19UEXEI0BWbMn8qNMY=
 github.com/tklauser/go-sysconf v0.4.0 h1:7H0uAN+7RkwWRaxhYXDLqa5V3LPrJeV8wmD9dRUgPQU=
@@ -747,10 +747,10 @@ github.com/valyala/fastjson v1.6.4 h1:uAUNq9Z6ymTgGhcm0UynUAB6tlbakBrz6CQFax3BXV
 github.com/valyala/fastjson v1.6.4/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
 github.com/vbatts/tar-split v0.12.1 h1:CqKoORW7BUWBe7UL/iqTVvkTBOF8UvOMKOIZykxnnbo=
 github.com/vbatts/tar-split v0.12.1/go.mod h1:eF6B6i6ftWQcDqEn3/iGFRFRo8cBIMSJVOpnNdfTMFA=
-github.com/wasilibs/go-re2 v1.9.0 h1:kjAd8qbNvV4Ve2Uf+zrpTCrDHtqH4dlsRXktywo73JQ=
-github.com/wasilibs/go-re2 v1.9.0/go.mod h1:0sRtscWgpUdNA137bmr1IUgrRX0Su4dcn9AEe61y+yI=
-github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52 h1:OvLBa8SqJnZ6P+mjlzc2K7PM22rRUPE1x32G9DTPrC4=
-github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52/go.mod h1:jMeV4Vpbi8osrE/pKUxRZkVaA0EX7NZN0A9/oRzgpgY=
+github.com/wasilibs/go-re2 v1.12.0 h1:sq3A6ZOqT90HYY25MD5/cG8Xv6uT2AhmPgBfkCfhp10=
+github.com/wasilibs/go-re2 v1.12.0/go.mod h1:2W+7GrrdO4NHv7ITHz8Yy3a1IxzjZCk8JR5zgTprxZs=
+github.com/wasilibs/wazero-helpers v0.0.0-20250123031827-cd30c44769bb h1:gQ+ZV4wJke/EBKYciZ2MshEouEHFuinB85dY3f5s1q8=
+github.com/wasilibs/wazero-helpers v0.0.0-20250123031827-cd30c44769bb/go.mod h1:jMeV4Vpbi8osrE/pKUxRZkVaA0EX7NZN0A9/oRzgpgY=
 github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=
 github.com/xanzy/ssh-agent v0.3.3/go.mod h1:6dzNDKs0J9rVPHPhaGCukekBHKqfl+L3KghI1Bc68Uw=
 github.com/xdg-go/pbkdf2 v1.0.0 h1:Su7DPu48wXMwC3bs7MCNG+z4FhcyEuz5dlvchbq0B0c=
