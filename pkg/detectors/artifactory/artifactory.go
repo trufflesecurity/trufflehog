@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -77,11 +78,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueTokens {
 		for url := range uniqueUrls {
-			if invalidHosts.Exists(url) {
-				delete(uniqueUrls, url)
-				continue
-			}
-
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 				Raw:          []byte(token),
@@ -93,15 +89,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyArtifactory(ctx, s.getClient(), url, token)
-				s1.Verified = isVerified
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(url, struct{}{})
-						continue
-					}
+				if invalidHosts.Exists(url) {
+					// An earlier candidate already proved this host does not resolve, so the lookup is
+					// skipped. The finding is still reported: dropping it here would make the reported
+					// secrets depend on whether verification was requested, and on the order in which
+					// candidates happened to be processed.
+					s1.SetVerificationError(errNoHost, token)
+				} else {
+					isVerified, verificationErr := verifyArtifactory(ctx, s.getClient(), url, token)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						var dnsErr *net.DNSError
+						if errors.As(verificationErr, &dnsErr) && dnsErr.IsNotFound {
+							invalidHosts.Set(url, struct{}{})
+						}
 
-					s1.SetVerificationError(verificationErr, token)
+						s1.SetVerificationError(verificationErr, token)
+					}
 				}
 			}
 
@@ -123,11 +127,6 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 
 	resp, err := client.Do(req)
 	if err != nil {
-		// lookup foo.jfrog.io: no such host
-		if strings.Contains(err.Error(), "no such host") {
-			return false, errNoHost
-		}
-
 		return false, err
 	}
 
