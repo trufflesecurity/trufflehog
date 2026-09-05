@@ -2,6 +2,9 @@ package v2
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -9,6 +12,67 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
+
+// stubTransport returns a canned response without touching the network.
+type stubTransport struct {
+	statusCode int
+	body       string
+}
+
+func (t *stubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: t.statusCode,
+		Body:       io.NopCloser(strings.NewReader(t.body)),
+		Header:     make(http.Header),
+	}, nil
+}
+
+func TestVerifyToken(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		want       bool
+	}{
+		{
+			name:       "ok",
+			statusCode: http.StatusOK,
+			body:       `{"status":"ok"}`,
+			want:       true,
+		},
+		{
+			name:       "unauthorized",
+			statusCode: http.StatusUnauthorized,
+			body:       `{"status":"error","message":"Authentication credentials not found."}`,
+			want:       false,
+		},
+		{
+			name:       "forbidden api json error means valid token",
+			statusCode: http.StatusForbidden,
+			body:       `{"status":"error","message":"The token is valid but lacks permission.","correlationId":"abc123"}`,
+			want:       true,
+		},
+		{
+			name:       "forbidden waf block page is not verified",
+			statusCode: http.StatusForbidden,
+			body:       "<html><body>You have been blocked.</body></html>",
+			want:       false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := &http.Client{Transport: &stubTransport{statusCode: test.statusCode, body: test.body}}
+			got, err := verifyToken(context.Background(), client, "pat-na1-deadbeef-0000-1111-2222-333344445555")
+			if err != nil {
+				t.Fatalf("verifyToken() error = %v", err)
+			}
+			if got != test.want {
+				t.Errorf("verifyToken() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
 
 func TestHubspotV2_Pattern(t *testing.T) {
 	d := Scanner{}
