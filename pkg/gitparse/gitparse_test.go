@@ -713,6 +713,7 @@ func TestBinaryPathParse(t *testing.T) {
 	cases := map[string]string{
 		"Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ\n":                                                                                         "",
 		"Binary files /dev/null and b/plugin.sig differ\n":                                                                                                                   "plugin.sig",
+		"Binary files /dev/null and b/plugin.sig differ":                                                                                                                     "plugin.sig",
 		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n":                                                                                                " Lunch and Learn - HCDiag.pdf",
 		"Binary files /dev/null and \"b/assets/retailers/ON-ikony-Platforma-ecom \\342\\200\\224 kopia.png\" differ\n":                                                       "assets/retailers/ON-ikony-Platforma-ecom — kopia.png",
 		"Binary files /dev/null and \"b/\\346\\267\\261\\345\\272\\246\\345\\255\\246\\344\\271\\240500\\351\\227\\256-Tan-00\\347\\233\\256\\345\\275\\225.docx\" differ\n": "深度学习500问-Tan-00目录.docx",
@@ -725,6 +726,19 @@ func TestBinaryPathParse(t *testing.T) {
 		}
 		if filename != expected {
 			t.Errorf("Expected: %s, Got: %s", expected, filename)
+		}
+	}
+}
+
+func TestBinaryPathParseMalformedLine(t *testing.T) {
+	cases := []string{
+		"Binary files /dev/null and b/\n",
+		`Binary files /dev/null and "b/` + "\n",
+	}
+
+	for _, line := range cases {
+		if path, ok := pathFromBinaryLine([]byte(line)); ok {
+			t.Errorf("Expected malformed line to be rejected, got path %q", path)
 		}
 	}
 }
