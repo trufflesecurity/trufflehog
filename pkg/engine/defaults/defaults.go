@@ -258,6 +258,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/duply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dwolla"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dynalist"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dynatrace"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dyspatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eagleeyenetworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/easyinsight"
@@ -1166,6 +1167,7 @@ func buildDetectorList() []detectors.Detector {
 		&duply.Scanner{},
 		&dwolla.Scanner{},
 		&dynalist.Scanner{},
+		&dynatrace.Scanner{},
 		&dyspatch.Scanner{},
 		&eagleeyenetworks.Scanner{},
 		&easyinsight.Scanner{},
