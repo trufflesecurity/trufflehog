@@ -351,7 +351,6 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_Uproc:                                   {},
 	detector_typepb.DetectorType_Veevavault:                              {},
 	detector_typepb.DetectorType_Vonage:                                  {},
-	detector_typepb.DetectorType_Wakatime:                                {},
 	detector_typepb.DetectorType_Webengage:                               {},
 	detector_typepb.DetectorType_WeChatAppKey:                            {},
 	detector_typepb.DetectorType_Woopra:                                  {},
