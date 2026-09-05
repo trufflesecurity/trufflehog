@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	gitconfig "github.com/go-git/go-git/v5/plumbing/format/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v67/github"
 	"golang.org/x/oauth2"
@@ -378,6 +379,17 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		return fmt.Errorf("directory does not exist: %s", gitDir)
 	}
 
+	isReftable, err := isReftableRepo(gitDir)
+	if err != nil {
+		return reporter.ChunkErr(ctx, fmt.Errorf("failed to inspect git repository format: %w", err))
+	}
+	if isReftable {
+		if err := s.git.ScanRepoPath(ctx, gitDir, s.scanOptions, reporter); err != nil {
+			return reporter.ChunkErr(ctx, fmt.Errorf("failed to scan reftable git repository %q: %w", gitDir, err))
+		}
+		return nil
+	}
+
 	repo, err := RepoFromPath(gitDir)
 	if err != nil {
 		return reporter.ChunkErr(ctx, err)
@@ -415,6 +427,85 @@ func RepoFromPath(path string) (*git.Repository, error) {
 		options.EnableDotGitCommonDir = true
 	}
 	return git.PlainOpenWithOptions(path, options)
+}
+
+func isReftableRepo(repoPath string) (bool, error) {
+	refStorage, err := localRefStorage(repoPath)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(refStorage, "reftable"), nil
+}
+
+func localRefStorage(repoPath string) (string, error) {
+	configPaths, err := localGitConfigPaths(repoPath)
+	if err != nil {
+		return "", err
+	}
+
+	for _, configPath := range configPaths {
+		file, err := os.Open(configPath)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to open git config %q: %w", configPath, err)
+		}
+
+		cfg := gitconfig.New()
+		if err := gitconfig.NewDecoder(file).Decode(cfg); err != nil {
+			_ = file.Close()
+			return "", fmt.Errorf("failed to parse git config %q: %w", configPath, err)
+		}
+		_ = file.Close()
+
+		if refStorage := strings.TrimSpace(cfg.Section("extensions").Option("refstorage")); refStorage != "" {
+			return refStorage, nil
+		}
+	}
+	return "", nil
+}
+
+func localGitConfigPaths(repoPath string) ([]string, error) {
+	gitPath := filepath.Join(repoPath, gitDirName)
+	info, err := os.Stat(gitPath)
+	switch {
+	case err == nil && info.IsDir():
+		return appendCommonGitConfigPath([]string{filepath.Join(gitPath, "config")}, gitPath), nil
+	case err == nil:
+		gitDir, err := resolveGitDir(repoPath)
+		if err != nil {
+			return nil, err
+		}
+		return appendCommonGitConfigPath([]string{filepath.Join(gitDir, "config")}, gitDir), nil
+	case os.IsNotExist(err):
+		return []string{filepath.Join(repoPath, "config")}, nil
+	default:
+		return nil, fmt.Errorf("failed to stat .git: %w", err)
+	}
+}
+
+func appendCommonGitConfigPath(paths []string, gitDir string) []string {
+	commondirData, err := os.ReadFile(filepath.Join(gitDir, "commondir"))
+	if err != nil {
+		return paths
+	}
+
+	commondir := strings.TrimSpace(string(commondirData))
+	if commondir == "" {
+		return paths
+	}
+	if !filepath.IsAbs(commondir) {
+		commondir = filepath.Join(gitDir, commondir)
+	}
+
+	configPath := filepath.Join(filepath.Clean(commondir), "config")
+	for _, path := range paths {
+		if path == configPath {
+			return paths
+		}
+	}
+	return append(paths, configPath)
 }
 
 func CleanOnError(err *error, path string) {
@@ -841,8 +932,10 @@ func getGitDir(path string) string {
 }
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	// Get the remote URL for reporting (may be empty)
-	remoteURL := GetSafeRemoteURL(repo, "origin")
+	return s.scanCommits(ctx, path, scanOptions, GetSafeRemoteURL(repo, "origin"), reporter)
+}
+
+func (s *Git) scanCommits(ctx context.Context, path string, scanOptions *ScanOptions, remoteURL string, reporter sources.ChunkReporter) error {
 	var repoCtx context.Context
 
 	if ctx.Value("repo") == nil {
@@ -1164,9 +1257,10 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 
 // ScanStaged chunks staged changes.
 func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	// Get the URL metadata for reporting (may be empty).
-	urlMetadata := GetSafeRemoteURL(repo, "origin")
+	return s.scanStaged(ctx, path, scanOptions, GetSafeRemoteURL(repo, "origin"), reporter)
+}
 
+func (s *Git) scanStaged(ctx context.Context, path string, scanOptions *ScanOptions, urlMetadata string, reporter sources.ChunkReporter) error {
 	diffChan, err := s.parser.Staged(ctx, path)
 	if err != nil {
 		return err
@@ -1316,19 +1410,36 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := normalizeConfig(scanOptions, repo); err != nil {
 		return err
 	}
+	return s.scanRepoPath(ctx, repoPath, scanOptions, GetSafeRemoteURL(repo, "origin"), reporter)
+}
+
+func (s *Git) ScanRepoPath(ctx context.Context, repoPath string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
+	if scanOptions == nil {
+		scanOptions = NewScanOptions()
+	}
+	if err := validateGitRepoPath(ctx, repoPath); err != nil {
+		return err
+	}
+	if err := normalizeConfigFromPath(ctx, scanOptions, repoPath); err != nil {
+		return err
+	}
+	return s.scanRepoPath(ctx, repoPath, scanOptions, GetSafeRemoteURLFromPath(ctx, repoPath, "origin"), reporter)
+}
+
+func (s *Git) scanRepoPath(ctx context.Context, repoPath string, scanOptions *ScanOptions, remoteURL string, reporter sources.ChunkReporter) error {
 	start := time.Now().Unix()
 
 	// Reset the repo-specific commit counter
 	atomic.StoreUint64(&s.repoCommitsScanned, 0)
 
-	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, reporter); err != nil {
+	if err := s.scanCommits(ctx, repoPath, scanOptions, remoteURL, reporter); err != nil {
 		// Record that we've failed to scan this repo
 		s.metrics.RecordRepoScanned(statusFailure)
 		return err
 	}
 	// Skip staged scanning for mirror/bare clones
 	if !isRepoBare(repoPath) {
-		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter); err != nil {
+		if err := s.scanStaged(ctx, repoPath, scanOptions, remoteURL, reporter); err != nil {
 			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 		}
 	}
@@ -1341,12 +1452,10 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	// To make this duration logging useful, we need to log the remote as well.
 	// Other sources may have included this info to the context, in which case we don't need to add it again.
 	if ctx.Value("repo") == nil {
-		remotes, _ := repo.Remotes()
-		repoURL := "Could not get remote for repo"
-		if len(remotes) != 0 {
-			repoURL = GetSafeRemoteURL(repo, remotes[0].Config().Name)
+		if remoteURL == "" {
+			remoteURL = "Could not get remote for repo"
 		}
-		logger = logger.WithValues("repo", repoURL)
+		logger = logger.WithValues("repo", remoteURL)
 	}
 
 	scanTime := time.Now().Unix() - start
@@ -1396,6 +1505,33 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 	return nil
 }
 
+func normalizeConfigFromPath(ctx context.Context, scanOptions *ScanOptions, repoPath string) error {
+	baseHash, hasBase, err := resolveAndSetCommitFromPath(ctx, repoPath, &scanOptions.BaseHash)
+	if err != nil {
+		return err
+	}
+
+	headHash, hasHead, err := resolveAndSetCommitFromPath(ctx, repoPath, &scanOptions.HeadHash)
+	if err != nil {
+		return err
+	}
+
+	if !hasBase || !hasHead {
+		return nil
+	}
+
+	mergeBase, err := runGitOutput(ctx, repoPath, "merge-base", headHash, baseHash)
+	if err != nil {
+		return fmt.Errorf("unable to resolve merge base: %w", err)
+	}
+	if mergeBase == "" {
+		return fmt.Errorf("unable to resolve merge base: no merge base found")
+	}
+
+	scanOptions.BaseHash = firstLine(mergeBase)
+	return nil
+}
+
 // resolveAndSetCommit resolves a Git reference to a commit object and updates the reference if it was not a direct hash.
 // Returns the commit object and any error encountered.
 func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, error) {
@@ -1424,6 +1560,27 @@ func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, err
 	return commit, nil
 }
 
+func resolveAndSetCommitFromPath(ctx context.Context, repoPath string, ref *string) (string, bool, error) {
+	if ref == nil {
+		return "", false, fmt.Errorf("ref must be non-nil")
+	}
+	if len(*ref) == 0 {
+		return "", false, nil
+	}
+
+	originalRef := *ref
+	resolvedRef, err := resolveHashFromPath(ctx, repoPath, originalRef)
+	if err != nil {
+		return "", false, fmt.Errorf("unable to resolve ref: %w", err)
+	}
+
+	if originalRef != resolvedRef {
+		*ref = resolvedRef
+	}
+
+	return resolvedRef, true, nil
+}
+
 func resolveHash(repo *git.Repository, ref string) (string, error) {
 	if plumbing.IsHash(ref) {
 		return ref, nil
@@ -1434,6 +1591,55 @@ func resolveHash(repo *git.Repository, ref string) (string, error) {
 		return "", err
 	}
 	return resolved.String(), nil
+}
+
+func resolveHashFromPath(ctx context.Context, repoPath string, ref string) (string, error) {
+	prefixes := []string{""}
+	if !plumbing.IsHash(ref) {
+		prefixes = []string{
+			"",
+			"refs/heads/",
+			"refs/remotes/origin/",
+		}
+	}
+
+	for _, prefix := range prefixes {
+		out, err := runGitOutput(ctx, repoPath, "rev-parse", "--verify", prefix+ref+"^{commit}")
+		if err == nil {
+			return firstLine(out), nil
+		}
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+	}
+
+	return "", fmt.Errorf("no base refs succeeded for base: %q", ref)
+}
+
+func validateGitRepoPath(ctx context.Context, repoPath string) error {
+	if _, err := runGitOutput(ctx, repoPath, "rev-parse", "--git-dir"); err != nil {
+		return fmt.Errorf("unable to open git repository with system git: %w", err)
+	}
+	return nil
+}
+
+func runGitOutput(ctx context.Context, repoPath string, args ...string) (string, error) {
+	cmdArgs := append([]string{"-C", repoPath}, args...)
+	cmd := exec.CommandContext(ctx, "git", cmdArgs...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git %s failed: %w: %s", strings.Join(cmdArgs, " "), err, strings.TrimSpace(stderr.String()))
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func firstLine(s string) string {
+	if line, _, found := strings.Cut(s, "\n"); found {
+		return strings.TrimSpace(line)
+	}
+	return strings.TrimSpace(s)
 }
 
 // stripPassword removes username:password contents from URLs. The first return value is the cleaned URL and the second
@@ -1677,6 +1883,43 @@ func GetSafeRemoteURL(repo *git.Repository, preferred string) string {
 	}
 	// URLs is guaranteed to be non-empty
 	safeURL, _, err := stripPassword(remote.Config().URLs[0])
+	if err != nil {
+		return ""
+	}
+	return safeURL
+}
+
+func GetSafeRemoteURLFromPath(ctx context.Context, repoPath string, preferred string) string {
+	if preferred != "" {
+		if remoteURL, err := runGitOutput(ctx, repoPath, "remote", "get-url", preferred); err == nil {
+			if safeURL := safeRemoteURL(remoteURL); safeURL != "" {
+				return safeURL
+			}
+		}
+	}
+
+	remotes, err := runGitOutput(ctx, repoPath, "remote")
+	if err != nil {
+		return ""
+	}
+	for _, remote := range strings.Split(remotes, "\n") {
+		remote = strings.TrimSpace(remote)
+		if remote == "" {
+			continue
+		}
+		remoteURL, err := runGitOutput(ctx, repoPath, "remote", "get-url", remote)
+		if err != nil {
+			continue
+		}
+		if safeURL := safeRemoteURL(remoteURL); safeURL != "" {
+			return safeURL
+		}
+	}
+	return ""
+}
+
+func safeRemoteURL(remoteURL string) string {
+	safeURL, _, err := stripPassword(strings.TrimSpace(remoteURL))
 	if err != nil {
 		return ""
 	}
