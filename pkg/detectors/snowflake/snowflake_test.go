@@ -17,8 +17,12 @@ func TestSnowflake_Pattern(t *testing.T) {
 	validAccount := "tuacoip-zt74995"
 	validPrivateLinkAccount := "tuacoip-zt74995.privatelink"
 	validSingleCharacterAccount := "tuacoip-z"
+	validDigitOrgAccount := "ABC1234-EXAMPLE"                   // org segment contains digits; missed by the old [a-zA-Z]{7} pattern
+	validRegionQualifiedAccount := "xy12345-prod.us-east-1"     // region/cloud suffix contains dots; truncated by the old account body
+	fullHostAccount := "tuacoip-zt74995.snowflakecomputing.com" // account stored as the full login host
+	fullHostAccountIdentifier := "tuacoip-zt74995"              // verifyMatch re-appends the suffix, so it must be reported stripped
 	validUsername := gofakeit.Username()
-	invalidUsername := "Spencer@5091.com" // special characters not allowed
+	specialCharUsername := "super!user@corp" // '!' and '@' are valid Snowflake login-name characters
 
 	validPassword := common.GenerateRandomPassword(true, true, true, false, 10)
 	invalidPassword := "!12" // invalid length
@@ -52,8 +56,41 @@ func TestSnowflake_Pattern(t *testing.T) {
 			},
 		},
 		{
-			name:  "Snowflake Credentials - Invalid Username & Password",
-			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, invalidUsername, invalidPassword),
+			name:  "Snowflake Credentials - Account with digits in org segment",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validDigitOrgAccount, validUsername, validPassword),
+			want: [][]string{
+				{validDigitOrgAccount, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Snowflake Credentials - Region-qualified account",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validRegionQualifiedAccount, validUsername, validPassword),
+			want: [][]string{
+				{validRegionQualifiedAccount, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Snowflake Credentials - Account stored as full host",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", fullHostAccount, validUsername, validPassword),
+			want: [][]string{
+				{fullHostAccountIdentifier, validUsername, validPassword},
+			},
+		},
+		{
+			name:  "Snowflake Credentials - Username with ! and @",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, specialCharUsername, validPassword),
+			want: [][]string{
+				{validAccount, specialCharUsername, validPassword},
+			},
+		},
+		{
+			// The password `!12` is below the minimum capture length, so no
+			// credential is emitted. `UsernameRegexCheck` is a deliberately broad
+			// pre-filter (it can cross-match neighbouring fields), so rejection
+			// here is driven by the password, not the username; the name reflects
+			// that rather than claiming username validation.
+			name:  "Snowflake Credentials - Password too short is rejected",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, validUsername, invalidPassword),
 			want:  [][]string{},
 		},
 	}
