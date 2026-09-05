@@ -21,7 +21,7 @@ type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
-func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
+func (Scanner) CloudEndpoints() []string { return []string{"https://gitlab.com"} }
 
 var (
 	// Ensure the Scanner satisfies the interfaces at compile time.
@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for clientId := range uniqueIdMatches {
 	secretLoop:
 		for clientSecret := range uniqueSecretMatches {
-			for _, endpoint := range s.Endpoints() {
+			for _, endpoint := range s.Endpoints(nil) {
 				s1 := detectors.Result{
 					DetectorType: s.Type(),
 					Raw:          []byte(clientSecret),

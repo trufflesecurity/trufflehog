@@ -13,8 +13,8 @@ import (
 
 func TestGitlabOauth_Pattern(t *testing.T) {
 	d := Scanner{}
-	d.SetCloudEndpoint("https://gitlab.com")
-	d.UseCloudEndpoint(true)
+	d.SetCloudEndpoints("https://gitlab.com")
+	d.UseCloudEndpoints(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
 		name  string
