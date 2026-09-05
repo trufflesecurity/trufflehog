@@ -23,8 +23,12 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = detectors.DetectorHttpClientWithLocalAddresses
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b([a-zA-Z0-9-]{36})\b`)
+	// Metabase session tokens are 36-character alphanumeric strings (mixed
+	// case + digits) that do not contain hyphens. Including hyphens in the
+	// character class caused false positives on URL slugs such as
+	// "-journal-deduplication-id-to-voucher", which happen to be 36 chars and
+	// appear near the "metabase" keyword and a URL. See issue #4633.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b([a-zA-Z0-9]{36})\b`)
 
 	baseURL = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b(https?:\/\/[-a-zA-Z0-9@:%._\+~#=]{7,256})\b`)
 )
