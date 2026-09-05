@@ -45,6 +45,11 @@ func TestGitLab_Pattern(t *testing.T) {
 			input: "GITLAB_TOKEN=ABc123456789dEFghIJK",
 			want:  []string{"ABc123456789dEFghIJKhttps://gitlab.com"},
 		},
+		{
+			name:  "prefixless dotted PAT from older self-hosted GitLab (issue #4880)",
+			input: `gitlab_token ="ThisIsNotAValidTokenAtAllNoWayXx.01.a1b2c3d4e"`,
+			want:  []string{"ThisIsNotAValidTokenAtAllNoWayXx.01.a1b2c3d4ehttps://gitlab.com"},
+		},
 	}
 
 	for _, test := range tests {
