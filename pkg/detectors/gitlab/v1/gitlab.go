@@ -35,6 +35,11 @@ func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 var (
 	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
+	// uuidPat matches a full UUID (8-4-4-4-12 hex) or the trailing tail of one
+	// (the 4-4-4-12 / 4-4-12 / 4-12 segments that a 20-22 char capture window can
+	// slice out of "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"). GitLab webhook event
+	// IDs are sent in headers like x-gitlab-event-uuid and are not API tokens.
+	uuidPat = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4,12}|[0-9a-fA-F]{4}-[0-9a-fA-F]{8,12}`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
 )
@@ -76,6 +81,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		// to avoid false positives
 		if detectors.StringShannonEntropy(resMatch) < 3.6 {
+			continue
+		}
+
+		// reject UUID-shaped candidates (e.g. GitLab webhook x-gitlab-event-uuid
+		// values) and full UUIDs whose 20-22 char tail slides into the capture
+		// window. Real v1 tokens are opaque alnum strings, never UUID fragments.
+		if uuidPat.MatchString(resMatch) {
 			continue
 		}
 
