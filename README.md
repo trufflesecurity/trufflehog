@@ -678,6 +678,12 @@ Unlike the prefix flags, `--include-extension` and `--exclude-extension` cannot 
 
 Extension matching is case insensitive, so `--exclude-extension=zip` also skips `BACKUP.ZIP`. An object whose key has no extension at all, such as `Makefile`, matches no entry: it is skipped when `--include-extension` is set, and kept when only `--exclude-extension` is set.
 
+Two things to watch when using `--include-extension`. A dotfile counts as all extension, so `.env` has the extension `env` and any include list that leaves out `env` will skip every `.env` file in the bucket. Since `.env` files are a common place for secrets to sit, add `--include-extension=env` unless you mean to skip them. And only the last extension counts, so `backup.tar.gz` has the extension `gz`: `--exclude-extension=tar.gz` matches nothing, while `--exclude-extension=gz` works.
+
+These flags also apply to object keys only, not to files inside an archive. `--exclude-extension=mp4` skips `clip.mp4` sitting in the bucket, but not a `clip.mp4` packed inside `media.zip`. Excluding `zip` skips the archive entirely.
+
+Filtering happens after TruffleHog lists a bucket, so it cuts the cost of downloading objects but not the cost of listing them. A bucket is still paginated in full even when a prefix covers a small part of it.
+
 Prefixes and extensions are applied together. An object has to pass both to be scanned, so the command below scans `src/main.tf` but skips both `src/bundle.zip` and `docs/guide.tf`:
 
 ```bash

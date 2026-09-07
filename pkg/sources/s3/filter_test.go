@@ -109,6 +109,9 @@ func TestObjectFilter_EntriesAreTrimmed(t *testing.T) {
 	extFilter := newTestObjectFilter(t, nil, nil, nil, []string{" zip "})
 	assert.False(t, extFilter.shouldInclude("build/artifact.zip"))
 
+	dotPadded := newTestObjectFilter(t, nil, nil, nil, []string{". zip"})
+	assert.False(t, dotPadded.shouldInclude("build/artifact.zip"))
+
 	whitespaceOnly := newTestObjectFilter(t, nil, []string{"   "}, nil, nil)
 	assert.True(t, whitespaceOnly.shouldInclude("any/key.txt"))
 }

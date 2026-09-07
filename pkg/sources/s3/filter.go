@@ -3,6 +3,7 @@ package s3
 import (
 	"errors"
 	"path"
+	"slices"
 	"strings"
 )
 
@@ -88,8 +89,35 @@ func (f *objectFilter) passesExtensions(key string) bool {
 	return included
 }
 
+// normalizeExtension trims either side of the dot, so that a padded configured
+// value cannot silently match nothing. It runs on configured values and on the
+// extension read from a key alike, keeping both sides of a comparison normalized
+// the same way.
 func normalizeExtension(ext string) string {
-	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(ext), "."))
+	return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(ext), ".")))
+}
+
+// isConfigured reports whether any filtering is in effect.
+func (f *objectFilter) isConfigured() bool {
+	if f == nil {
+		return false
+	}
+	return len(f.includePrefixes) > 0 || len(f.excludePrefixes) > 0 ||
+		len(f.includeExtensions) > 0 || len(f.excludeExtensions) > 0
+}
+
+// sortedExtensions returns a set as a sorted slice, so that logging it is stable
+// across runs rather than following Go's random map order.
+func sortedExtensions(set map[string]struct{}) []string {
+	if len(set) == 0 {
+		return nil
+	}
+	exts := make([]string, 0, len(set))
+	for ext := range set {
+		exts = append(exts, ext)
+	}
+	slices.Sort(exts)
+	return exts
 }
 
 func extensionSet(exts []string) map[string]struct{} {
