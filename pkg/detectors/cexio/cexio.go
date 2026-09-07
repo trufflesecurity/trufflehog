@@ -71,41 +71,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-
-					timestamp := strconv.FormatInt(time.Now().Unix()*1000, 10)
-
-					signature := getCexIOPassphrase(resSecretMatch, resKeyMatch, timestamp, resUserIdMatch)
-
-					payload := url.Values{}
-					payload.Add("key", resKeyMatch)
-					payload.Add("signature", signature)
-					payload.Add("nonce", timestamp)
-
-					req, err := http.NewRequestWithContext(ctx, "POST", "https://cex.io/api/balance/", strings.NewReader(payload.Encode()))
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-					res, err := client.Do(req)
-					if err == nil {
-						defer func() { _ = res.Body.Close() }()
-
-						body, err := io.ReadAll(res.Body)
-						if err != nil {
-							continue
-						}
-						bodyString := string(body)
-						validResponse := strings.Contains(bodyString, `timestamp`)
-
-						var responseObject Response
-						if err := json.Unmarshal(body, &responseObject); err != nil {
-							continue
-						}
-
-						if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
-							s1.Verified = true
-						}
-					}
+					isVerified, verificationErr := verifyMatch(ctx, client, resSecretMatch, resKeyMatch, resUserIdMatch)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr, resSecretMatch, resKeyMatch, resUserIdMatch)
 				}
 
 				results = append(results, s1)
@@ -114,6 +82,47 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resSecretMatch string, resKeyMatch string, resUserIdMatch string) (bool, error) {
+
+	timestamp := strconv.FormatInt(time.Now().Unix()*1000, 10)
+
+	signature := getCexIOPassphrase(resSecretMatch, resKeyMatch, timestamp, resUserIdMatch)
+
+	payload := url.Values{}
+	payload.Add("key", resKeyMatch)
+	payload.Add("signature", signature)
+	payload.Add("nonce", timestamp)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://cex.io/api/balance/", strings.NewReader(payload.Encode()))
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	bodyString := string(body)
+	validResponse := strings.Contains(bodyString, `timestamp`)
+
+	var responseObject Response
+	if err := json.Unmarshal(body, &responseObject); err != nil {
+		return false, err
+	}
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 type Response struct {

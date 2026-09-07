@@ -51,6 +51,51 @@ var (
 	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 	SolarwindsDetectorEnabled                atomic.Bool
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
+
+	// INT-595: gated while verification-error reporting is rolled out.
+	CexIODetectorEnabled               atomic.Bool
+	CommoditiesDetectorEnabled         atomic.Bool
+	ConvierDetectorEnabled             atomic.Bool
+	CryptoCompareDetectorEnabled       atomic.Bool
+	DareboostDetectorEnabled           atomic.Bool
+	DyspatchDetectorEnabled            atomic.Bool
+	EtherscanDetectorEnabled           atomic.Bool
+	FixerIODetectorEnabled             atomic.Bool
+	FlickrDetectorEnabled              atomic.Bool
+	FlightstatsDetectorEnabled         atomic.Bool
+	FlowFluDetectorEnabled             atomic.Bool
+	FreshbooksDetectorEnabled          atomic.Bool
+	GengoDetectorEnabled               atomic.Bool
+	GoCanvasDetectorEnabled            atomic.Bool
+	HolisticDetectorEnabled            atomic.Bool
+	HumanityDetectorEnabled            atomic.Bool
+	InfuraDetectorEnabled              atomic.Bool
+	InstamojoDetectorEnabled           atomic.Bool
+	IpStackDetectorEnabled             atomic.Bool
+	LinearAPIDetectorEnabled           atomic.Bool
+	MailboxlayerDetectorEnabled        atomic.Bool
+	MetabaseDetectorEnabled            atomic.Bool
+	MoosendDetectorEnabled             atomic.Bool
+	MrticktockDetectorEnabled          atomic.Bool
+	OnedeskDetectorEnabled             atomic.Bool
+	ParallelDotsDetectorEnabled        atomic.Bool
+	PlanyoDetectorEnabled              atomic.Bool
+	RazorPayDetectorEnabled            atomic.Bool
+	ReallySimpleSystemsDetectorEnabled atomic.Bool
+	SemaphoreDetectorEnabled           atomic.Bool
+	SimFinDetectorEnabled              atomic.Bool
+	SlackWebhookDetectorEnabled        atomic.Bool
+	TefterDetectorEnabled              atomic.Bool
+	TeletypeDetectorEnabled            atomic.Bool
+	ThinkificDetectorEnabled           atomic.Bool
+	TwelveDataDetectorEnabled          atomic.Bool
+	UnifyIDDetectorEnabled             atomic.Bool
+	UptimeRobotDetectorEnabled         atomic.Bool
+	WalkScoreDetectorEnabled           atomic.Bool
+	WeatherStackDetectorEnabled        atomic.Bool
+	WebscrapingDetectorEnabled         atomic.Bool
+	WebsitepulseDetectorEnabled        atomic.Bool
+	WhoxyDetectorEnabled               atomic.Bool
 )
 
 type AtomicString struct {
