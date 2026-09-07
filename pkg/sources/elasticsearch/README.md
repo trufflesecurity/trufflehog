@@ -29,9 +29,9 @@ Elasticsearch is a search and analytics engine that stores data as documents ins
 - **Multiple Authentication Methods**: Username and password, API key, or service token
 - **Index Filtering**: Limit scanning to indices matching a pattern
 - **Document Filtering**: Limit scanning to documents matching a query, or created after a timestamp
-- **Concurrent Processing**: Documents are scanned in parallel across a configurable number of workers
+- **Concurrent Processing**: Documents are scanned in parallel across a number of workers
 - **Continuous Scanning**: Optionally keep scanning a live cluster and pick up new documents as they arrive
-- **Duplicate Avoidance**: Tracks the newest document timestamp per index so already seen documents are not scanned again on the next run
+- **Duplicate Avoidance**: Tracks the newest document timestamp per index so already seen documents are not scanned again on the next run. This tracking is kept in memory only, not in a database, so it only lasts for the current run (or the current best effort scan loop). Restarting TruffleHog loses this state, so use `--since-timestamp` again to avoid rescanning old documents.
 
 ## Configuration
 
@@ -228,11 +228,6 @@ trufflehog elasticsearch --nodes https://localhost:9200 --best-effort-scan
 
 **Issue**: No documents are scanned even though the cluster has data
 **Solution**: Check the index pattern matches real index names, and that the query JSON or since timestamp filter is not excluding every document.
-
----
-
-**Issue**: Scanning is slow on a large cluster
-**Solution**: Increase the number of workers used for concurrency, or narrow the index pattern and query to scan fewer documents at a time.
 
 ---
 
