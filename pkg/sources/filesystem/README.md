@@ -35,20 +35,22 @@ This source scans paths on the machine running TruffleHog. A path can point to a
 
 ### Scanning Paths
 
-**YAML Configuration:**
-```yaml
-sources:
-  - type: filesystem
-    name: local-scan
-    filesystem:
-      paths:
-        - /var/log
-        - /home/user/project/config.yaml
-```
-
 **CLI Usage:**
 ```bash
 trufflehog filesystem /var/log /home/user/project/config.yaml
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Filesystem
+    paths:
+    - /var/log
+    - /home/user/project/config.yaml
+  name: local-scan
+  type: SOURCE_TYPE_FILESYSTEM
+  verify: true
 ```
 
 You can also pass directories using the `--directory` flag, which can be repeated:
@@ -61,20 +63,22 @@ trufflehog filesystem --directory /var/log --directory /etc
 
 By default, symlinks are not followed. Set a maximum depth to allow TruffleHog to follow them.
 
-**YAML Configuration:**
-```yaml
-sources:
-  - type: filesystem
-    name: local-scan
-    filesystem:
-      paths:
-        - /home/user/project
-      max_symlink_depth: 5
-```
-
 **CLI Usage:**
 ```bash
 trufflehog filesystem /home/user/project --max-symlink-depth 5
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Filesystem
+    paths:
+    - /home/user/project
+    max_symlink_depth: 5
+  name: local-scan
+  type: SOURCE_TYPE_FILESYSTEM
+  verify: true
 ```
 
 The highest depth allowed is 40. Setting a higher number will cause the scan to fail with an error at startup.
@@ -84,33 +88,37 @@ The highest depth allowed is 40. Setting a higher number will cause the scan to 
 **YAML Configuration:**
 ```yaml
 sources:
-  - type: filesystem
-    name: local-scan
-    filesystem:
-      paths:
-        - /home/user/project
-      skip_binaries: true
+- connection:
+    '@type': type.googleapis.com/sources.Filesystem
+    paths:
+    - /home/user/project
+    skip_binaries: true
+  name: local-scan
+  type: SOURCE_TYPE_FILESYSTEM
+  verify: true
 ```
 
 ### Path Filtering
 
 Use plain text files with one pattern per line to include or exclude files from a scan.
 
-**YAML Configuration:**
-```yaml
-sources:
-  - type: filesystem
-    name: local-scan
-    filesystem:
-      paths:
-        - /home/user/project
-      include_paths_file: /home/user/include-patterns.txt
-      exclude_paths_file: /home/user/exclude-patterns.txt
-```
-
 **CLI Usage:**
 ```bash
 trufflehog filesystem /home/user/project --include-paths /home/user/include-patterns.txt --exclude-paths /home/user/exclude-patterns.txt
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Filesystem
+    paths:
+    - /home/user/project
+    include_paths_file: /home/user/include-patterns.txt
+    exclude_paths_file: /home/user/exclude-patterns.txt
+  name: local-scan
+  type: SOURCE_TYPE_FILESYSTEM
+  verify: true
 ```
 
 ## How Scanning Works
@@ -169,12 +177,14 @@ trufflehog filesystem /home/user/project --max-symlink-depth 10
 
 ```yaml
 sources:
-  - type: filesystem
-    name: local-scan
-    filesystem:
-      paths:
-        - /home/user/project
-      skip_binaries: true
+- connection:
+    '@type': type.googleapis.com/sources.Filesystem
+    paths:
+    - /home/user/project
+    skip_binaries: true
+  name: local-scan
+  type: SOURCE_TYPE_FILESYSTEM
+  verify: true
 ```
 
 ## Troubleshooting
