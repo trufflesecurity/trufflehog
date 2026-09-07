@@ -37,15 +37,6 @@ CircleCI is a continuous integration and delivery (CI/CD) platform that automate
 
 CircleCI only supports token-based authentication.
 
-**YAML Configuration:**
-```yaml
-sources:
-  - type: circleci
-    name: circleci-scan
-    circleci:
-      token: "cci_xxxxxxxxxxxxxxxxxxxx"
-```
-
 **CLI Usage:**
 ```bash
 trufflehog circleci --token cci_xxxxxxxxxxxxxxxxxxxx
@@ -57,6 +48,22 @@ The token can also be provided via the `CIRCLECI_TOKEN` environment variable:
 export CIRCLECI_TOKEN=cci_xxxxxxxxxxxxxxxxxxxx
 trufflehog circleci
 ```
+
+**YAML Configuration:**
+
+This is the correct shape for a CircleCI entry in a `--config` file:
+
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.CircleCI
+    token: "cci_xxxxxxxxxxxxxxxxxxxx"
+  name: circleci-scan
+  type: SOURCE_TYPE_CIRCLECI
+  verify: true
+```
+
+Note: as of this writing, `pkg/config/config.go` does not have a case for `SOURCE_TYPE_CIRCLECI` in its source loader, so a config file entry like the one above will fail to load with `got unexpected source type`. Use the CLI flags or environment variable above until that is added.
 
 ## How Scanning Works
 
