@@ -640,6 +640,52 @@ Multiple roles can be passed as separate arguments. The following command will a
 trufflehog s3 --role-arn=<iam-role-arn-1> --role-arn=<iam-role-arn-2>
 ```
 
+### Narrowing a scan to specific objects
+
+Large buckets often hold data that is never worth scanning, such as archives, media, and build artifacts. Two sets of flags keep those objects out of a scan. Both are matched against the object key before the object is downloaded, so a skipped object costs no GET request.
+
+Scan only the objects under one or more key prefixes:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-prefix=infra/ --include-prefix=services/
+```
+
+Skip the objects under a key prefix:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --exclude-prefix=projects/archived/
+```
+
+Both prefix flags can be used together to scan a subtree while leaving one part of it out. An object that matches an exclude prefix is always skipped, even if it also matches an include prefix:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-prefix=src/ --exclude-prefix=src/vendor/
+```
+
+Prefixes are matched literally, not as globs, and they are not confined to a path boundary. `--include-prefix=log` matches both `logs/app.txt` and `logs-archive/app.txt`.
+
+File extensions are filtered separately. Write them without a leading dot:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --exclude-extension=zip --exclude-extension=mp4
+```
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-extension=tf --include-extension=yaml
+```
+
+Unlike the prefix flags, `--include-extension` and `--exclude-extension` cannot be combined, because naming the extensions to scan already excludes every other one. Using both fails at startup.
+
+Extension matching is case insensitive, so `--exclude-extension=zip` also skips `BACKUP.ZIP`. An object whose key has no extension at all, such as `Makefile`, matches no entry: it is skipped when `--include-extension` is set, and kept when only `--exclude-extension` is set.
+
+Prefixes and extensions are applied together. An object has to pass both to be scanned, so the command below scans `src/main.tf` but skips both `src/bundle.zip` and `docs/guide.tf`:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-prefix=src/ --exclude-extension=zip
+```
+
+These flags narrow the objects within a bucket. To narrow which buckets are scanned, use `--bucket` or `--ignore-bucket`, which unlike the prefix flags cannot be used together.
+
 Exit Codes:
 
 - 0: No errors and no results were found.
