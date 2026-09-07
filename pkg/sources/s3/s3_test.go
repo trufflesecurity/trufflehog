@@ -514,16 +514,17 @@ func TestSource_PageChunker_FilteredObjectsAdvanceCheckpoint(t *testing.T) {
 
 	// Every object is filtered, so pageChunker never reaches GetObject and needs
 	// no client.
-	var scanned uint64
+	var scanned, filtered uint64
 	s.pageChunker(
 		ctx,
 		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
-		processingState{errorCount: &sync.Map{}, objectCount: &scanned},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
 		sources.ChanReporter{Ch: make(chan *sources.Chunk, objectCount)},
 		checkpointer,
 	)
 
 	assert.Zero(t, scanned)
+	assert.EqualValues(t, objectCount, filtered)
 
 	resumeInfo, err := checkpointer.ResumePoint(ctx)
 	require.NoError(t, err)

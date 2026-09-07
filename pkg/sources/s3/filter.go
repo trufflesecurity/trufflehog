@@ -26,18 +26,22 @@ type objectFilter struct {
 }
 
 // newObjectFilter builds a filter from the configured lists. Extensions may be
-// written with or without a leading dot and in any case. Blank entries are dropped,
-// since an empty prefix would match every key.
+// written with or without a leading dot and in any case. Entries are trimmed and
+// blank ones dropped, since a padded entry would match nothing and an empty prefix
+// would match every key.
 func newObjectFilter(includePrefixes, excludePrefixes, includeExtensions, excludeExtensions []string) (*objectFilter, error) {
-	if len(includeExtensions) > 0 && len(excludeExtensions) > 0 {
+	// Compare the built sets rather than the raw slices, so that a list holding
+	// nothing but blanks does not count as populated.
+	include, exclude := extensionSet(includeExtensions), extensionSet(excludeExtensions)
+	if len(include) > 0 && len(exclude) > 0 {
 		return nil, errors.New("either an extension include list or an extension exclude list can be specified, but not both")
 	}
 
 	return &objectFilter{
-		includePrefixes:   nonBlank(includePrefixes),
-		excludePrefixes:   nonBlank(excludePrefixes),
-		includeExtensions: extensionSet(includeExtensions),
-		excludeExtensions: extensionSet(excludeExtensions),
+		includePrefixes:   cleanPrefixes(includePrefixes),
+		excludePrefixes:   cleanPrefixes(excludePrefixes),
+		includeExtensions: include,
+		excludeExtensions: exclude,
 	}, nil
 }
 
@@ -85,7 +89,7 @@ func (f *objectFilter) passesExtensions(key string) bool {
 }
 
 func normalizeExtension(ext string) string {
-	return strings.ToLower(strings.TrimPrefix(ext, "."))
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(ext), "."))
 }
 
 func extensionSet(exts []string) map[string]struct{} {
@@ -104,14 +108,14 @@ func extensionSet(exts []string) map[string]struct{} {
 	return set
 }
 
-func nonBlank(values []string) []string {
+func cleanPrefixes(values []string) []string {
 	if len(values) == 0 {
 		return nil
 	}
 	kept := make([]string, 0, len(values))
 	for _, value := range values {
-		if value != "" {
-			kept = append(kept, value)
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			kept = append(kept, trimmed)
 		}
 	}
 	if len(kept) == 0 {

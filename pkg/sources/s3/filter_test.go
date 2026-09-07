@@ -89,3 +89,26 @@ func TestObjectFilter_BlankEntriesIgnored(t *testing.T) {
 
 	assert.True(t, filter.shouldInclude("any/key.zip"))
 }
+
+// A list holding only blanks is not a populated list, so it cannot conflict with
+// the opposite list.
+func TestObjectFilter_BlankExtensionListIsNotAConflict(t *testing.T) {
+	filter := newTestObjectFilter(t, nil, nil, []string{""}, []string{"zip"})
+
+	assert.False(t, filter.shouldInclude("build/artifact.zip"))
+	assert.True(t, filter.shouldInclude("infra/main.tf"))
+}
+
+// Padded entries reach the filter from config files and shell arguments. Without
+// trimming they match nothing, so an exclusion the user configured would silently
+// do nothing.
+func TestObjectFilter_EntriesAreTrimmed(t *testing.T) {
+	prefixFilter := newTestObjectFilter(t, nil, []string{"archive/\r"}, nil, nil)
+	assert.False(t, prefixFilter.shouldInclude("archive/a.txt"))
+
+	extFilter := newTestObjectFilter(t, nil, nil, nil, []string{" zip "})
+	assert.False(t, extFilter.shouldInclude("build/artifact.zip"))
+
+	whitespaceOnly := newTestObjectFilter(t, nil, []string{"   "}, nil, nil)
+	assert.True(t, whitespaceOnly.shouldInclude("any/key.txt"))
+}

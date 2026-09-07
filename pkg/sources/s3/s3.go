@@ -298,8 +298,9 @@ type pageMetadata struct {
 
 // processingState tracks the state of concurrent S3 object processing.
 type processingState struct {
-	errorCount  *sync.Map // Thread-safe map tracking errors per prefix
-	objectCount *uint64   // Total number of objects processed
+	errorCount    *sync.Map // Thread-safe map tracking errors per prefix
+	objectCount   *uint64   // Total number of objects processed
+	filteredCount *uint64   // Total number of objects excluded by the object filter
 }
 
 // resumePosition tracks where to restart scanning S3 buckets and objects after an interruption.
@@ -457,7 +458,7 @@ func (s *Source) scanBucket(
 
 	pageNumber := 1
 	paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
-	var objectCount uint64
+	var objectCount, filteredCount uint64
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -484,13 +485,21 @@ func (s *Source) scanBucket(
 			page:       output,
 		}
 		processingState := processingState{
-			errorCount:  &errorCount,
-			objectCount: &objectCount,
+			errorCount:    &errorCount,
+			objectCount:   &objectCount,
+			filteredCount: &filteredCount,
 		}
 		s.pageChunker(ctx, pageMetadata, processingState, reporter, checkpointer)
 
 		pageNumber++
 	}
+
+	// A filter that excludes everything otherwise looks exactly like a clean scan
+	// of an empty bucket, so say so rather than finishing silently.
+	if objectCount == 0 && filteredCount > 0 {
+		ctx.Logger().Info("Scanned no objects in bucket", "excluded_by_object_filter", filteredCount)
+	}
+
 	return objectCount
 }
 
@@ -562,6 +571,7 @@ func (s *Source) pageChunker(
 
 		// Skip objects excluded by the configured prefixes or extensions.
 		if !s.objectFilter.shouldInclude(*obj.Key) {
+			atomic.AddUint64(state.filteredCount, 1)
 			octx.Logger().V(5).Info("Skipping filtered object")
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "object_filter", float64(*obj.Size))
 			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
