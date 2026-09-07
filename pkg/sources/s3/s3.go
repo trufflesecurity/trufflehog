@@ -58,6 +58,8 @@ type Source struct {
 	maxObjectSize int64
 	// endpoint is the S3-compatible service to scan, or nil for AWS S3.
 	endpoint *url.URL
+	// objectFilter is never nil after Init.
+	objectFilter *objectFilter
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -111,6 +113,17 @@ func (s *Source) Init(
 	if len(conn.GetBuckets()) > 0 && len(conn.GetIgnoreBuckets()) > 0 {
 		return errors.New("either a bucket include list or a bucket ignore list can be specified, but not both")
 	}
+
+	filter, err := newObjectFilter(
+		conn.GetIncludePrefixes(),
+		conn.GetExcludePrefixes(),
+		conn.GetIncludeExtensions(),
+		conn.GetExcludeExtensions(),
+	)
+	if err != nil {
+		return err
+	}
+	s.objectFilter = filter
 
 	return nil
 }
@@ -545,6 +558,16 @@ func (s *Source) pageChunker(
 		octx := context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
 		if common.IsDone(octx) {
 			return
+		}
+
+		// Skip objects excluded by the configured prefixes or extensions.
+		if !s.objectFilter.shouldInclude(*obj.Key) {
+			octx.Logger().V(5).Info("Skipping filtered object")
+			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "object_filter", float64(*obj.Size))
+			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
+				octx.Logger().Error(err, "could not update progress for filtered object")
+			}
+			continue
 		}
 
 		// Skip GLACIER and GLACIER_IR objects.
