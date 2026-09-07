@@ -51,6 +51,7 @@ var (
 	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 	SolarwindsDetectorEnabled                atomic.Bool
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
+	HumioIngestTokenDetectorEnabled          atomic.Bool
 )
 
 type AtomicString struct {
