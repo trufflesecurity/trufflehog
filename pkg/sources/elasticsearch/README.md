@@ -37,88 +37,102 @@ Elasticsearch is a search and analytics engine that stores data as documents ins
 
 ### Connecting to a Cluster
 
+**CLI Usage:**
+
 You can connect using node addresses:
 
-```yaml
-sources:
-  - type: elasticsearch
-    name: es-scan
-    elasticsearch:
-      nodes:
-        - "https://localhost:9200"
-```
-
-Or using an Elastic Cloud ID:
-
-```yaml
-sources:
-  - type: elasticsearch
-    name: es-cloud-scan
-    elasticsearch:
-      cloud_id: "my-deployment:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=="
-```
-
-**CLI Usage:**
 ```bash
 trufflehog elasticsearch --nodes https://localhost:9200
 ```
 
-### Authentication Methods
+Or using an Elastic Cloud ID:
 
-#### 1. Username and Password
+```bash
+trufflehog elasticsearch --cloud-id "my-deployment:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=="
+```
+
+**YAML Configuration:**
+
+This is the correct shape for an Elasticsearch entry in a `--config` file:
 
 ```yaml
 sources:
-  - type: elasticsearch
-    name: es-scan
-    elasticsearch:
-      nodes:
-        - "https://localhost:9200"
-      username: elastic
-      password: mypassword
+- connection:
+    '@type': type.googleapis.com/sources.Elasticsearch
+    nodes:
+    - "https://localhost:9200"
+  name: es-scan
+  type: SOURCE_TYPE_ELASTICSEARCH
+  verify: true
 ```
+
+Note: as of this writing, `pkg/config/config.go` does not have a case for `SOURCE_TYPE_ELASTICSEARCH` in its source loader, so a config file entry like the one above will fail to load with `got unexpected source type`. Use the CLI flags or environment variables below until that is added.
+
+### Authentication Methods
+
+#### 1. Username and Password
 
 **CLI Usage:**
 ```bash
 trufflehog elasticsearch --nodes https://localhost:9200 --username elastic --password mypassword
 ```
 
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Elasticsearch
+    nodes:
+    - "https://localhost:9200"
+    username: elastic
+    password: mypassword
+  name: es-scan
+  type: SOURCE_TYPE_ELASTICSEARCH
+  verify: true
+```
+
 ---
 
 #### 2. API Key
-
-```yaml
-sources:
-  - type: elasticsearch
-    name: es-scan
-    elasticsearch:
-      nodes:
-        - "https://localhost:9200"
-      api_key: "xxxxxxxxxxxxxxxxxxxxxxxx"
-```
 
 **CLI Usage:**
 ```bash
 trufflehog elasticsearch --nodes https://localhost:9200 --api-key xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Elasticsearch
+    nodes:
+    - "https://localhost:9200"
+    api_key: "xxxxxxxxxxxxxxxxxxxxxxxx"
+  name: es-scan
+  type: SOURCE_TYPE_ELASTICSEARCH
+  verify: true
+```
+
 ---
 
 #### 3. Service Token
 
-```yaml
-sources:
-  - type: elasticsearch
-    name: es-scan
-    elasticsearch:
-      nodes:
-        - "https://localhost:9200"
-      service_token: "AAEAAWVsYXN0aWMv..."
-```
-
 **CLI Usage:**
 ```bash
 trufflehog elasticsearch --nodes https://localhost:9200 --service-token AAEAAWVsYXN0aWMv...
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Elasticsearch
+    nodes:
+    - "https://localhost:9200"
+    service_token: "AAEAAWVsYXN0aWMv..."
+  name: es-scan
+  type: SOURCE_TYPE_ELASTICSEARCH
+  verify: true
 ```
 
 Environment variables are also supported for every value above: `ELASTICSEARCH_NODES`, `ELASTICSEARCH_USERNAME`, `ELASTICSEARCH_PASSWORD`, `ELASTICSEARCH_CLOUD_ID`, `ELASTICSEARCH_API_KEY`, and `ELASTICSEARCH_SERVICE_TOKEN`.
