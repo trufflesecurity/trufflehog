@@ -39,7 +39,23 @@ Four flags, all repeatable, all matched against the object key before the object
 
 Prefixes are literal, so `--include-prefix=log` matches `logs/app.txt` and `logs-archive/app.txt` alike.
 
-The two kinds are combined with AND: an object has to pass both to be scanned. A key with no extension, like `Makefile`, matches no extension entry, so `--include-extension` skips it and `--exclude-extension` keeps it.
+The two kinds are combined with AND: an object has to pass both to be scanned. Entries are trimmed, and blank ones are ignored.
+
+Filtering happens after listing, so it saves `GetObject` requests but not `ListObjectsV2` requests. A bucket is still paginated in full even when a prefix covers a small part of it. Pushing prefixes into `ListObjectsV2Input.Prefix` would cut that too, and has not been done.
+
+Three edge cases worth knowing:
+
+- Only the last extension counts. `path.Ext("backup.tar.gz")` is `.gz`, so `--exclude-extension=tar.gz` never matches, while `--exclude-extension=gz` does.
+- A key with no extension, like `Makefile`, matches no extension entry, so `--include-extension` skips it and `--exclude-extension` keeps it.
+- A dotfile is treated as all extension. `.env` has extension `env`, so `--exclude-extension=env` skips it, and any `--include-extension` list that omits `env` skips it too. That is easy to do by accident, and `.env` files are a common source of secrets.
+
+Filters apply to object keys only, not to files inside an archive. `--exclude-extension=mp4` skips `clip.mp4` in the bucket but not a `clip.mp4` packed inside `media.zip`, since archive contents are filtered by the shared deny list instead. Excluding `zip` avoids expanding the archive at all.
+
+Prefixes are matched with `strings.HasPrefix`, so an exclude prefix naming one key also excludes anything that key is a prefix of: `--exclude-prefix=foo/bar.txt` excludes `foo/bar.txt.bak` as well. There is no exact-key match.
+
+The same prefixes and extensions apply to every bucket in a scan. There is no way to scope a prefix to one bucket.
+
+If a filter excludes every object in a bucket, the scan logs `Scanned no objects in bucket` with the count, so a mistyped prefix does not look like a clean scan of an empty bucket.
 
 ## Objects skipped regardless of configuration
 
