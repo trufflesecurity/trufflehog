@@ -140,7 +140,7 @@ func TestSqlServer_ExtraData(t *testing.T) {
 			s := Scanner{}
 			results, err := s.FromData(context.Background(), false, []byte(tt.data))
 			require.NoError(t, err)
-			require.NotEmpty(t, results, "expected at least one result")
+			require.NotEmpty(t, results, "expected at least 1 result")
 
 			r := results[0]
 			assert.Equal(t, tt.wantHost, r.ExtraData["host"])
