@@ -21,9 +21,10 @@ type objectFilter struct {
 	includePrefixes []string
 	excludePrefixes []string
 
-	// Keyed by lowercase extension without a leading dot. At most one is populated.
-	includeExtensions map[string]struct{}
-	excludeExtensions map[string]struct{}
+	// Lowercase extensions without a leading dot, sorted and deduplicated. At most
+	// one is populated.
+	includeExtensions []string
+	excludeExtensions []string
 }
 
 // newObjectFilter builds a filter from the configured lists. Extensions may be
@@ -31,16 +32,16 @@ type objectFilter struct {
 // blank ones dropped, since a padded entry would match nothing and an empty prefix
 // would match every key.
 func newObjectFilter(includePrefixes, excludePrefixes, includeExtensions, excludeExtensions []string) (*objectFilter, error) {
-	// Compare the built sets rather than the raw slices, so that a list holding
+	// Compare the cleaned lists rather than the raw ones, so that a list holding
 	// nothing but blanks does not count as populated.
-	include, exclude := extensionSet(includeExtensions), extensionSet(excludeExtensions)
+	include, exclude := cleanExtensions(includeExtensions), cleanExtensions(excludeExtensions)
 	if len(include) > 0 && len(exclude) > 0 {
 		return nil, errors.New("either an extension include list or an extension exclude list can be specified, but not both")
 	}
 
 	return &objectFilter{
-		includePrefixes:   cleanPrefixes(includePrefixes),
-		excludePrefixes:   cleanPrefixes(excludePrefixes),
+		includePrefixes:   cleanEntries(includePrefixes, strings.TrimSpace),
+		excludePrefixes:   cleanEntries(excludePrefixes, strings.TrimSpace),
 		includeExtensions: include,
 		excludeExtensions: exclude,
 	}, nil
@@ -82,19 +83,9 @@ func (f *objectFilter) passesExtensions(key string) bool {
 	// the host OS uses.
 	ext := normalizeExtension(path.Ext(key))
 	if len(f.excludeExtensions) > 0 {
-		_, excluded := f.excludeExtensions[ext]
-		return !excluded
+		return !slices.Contains(f.excludeExtensions, ext)
 	}
-	_, included := f.includeExtensions[ext]
-	return included
-}
-
-// normalizeExtension trims either side of the dot, so that a padded configured
-// value cannot silently match nothing. It runs on configured values and on the
-// extension read from a key alike, keeping both sides of a comparison normalized
-// the same way.
-func normalizeExtension(ext string) string {
-	return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(ext), ".")))
+	return slices.Contains(f.includeExtensions, ext)
 }
 
 // isConfigured reports whether any filtering is in effect.
@@ -106,44 +97,32 @@ func (f *objectFilter) isConfigured() bool {
 		len(f.includeExtensions) > 0 || len(f.excludeExtensions) > 0
 }
 
-// sortedExtensions returns a set as a sorted slice, so that logging it is stable
-// across runs rather than following Go's random map order.
-func sortedExtensions(set map[string]struct{}) []string {
-	if len(set) == 0 {
-		return nil
-	}
-	exts := make([]string, 0, len(set))
-	for ext := range set {
-		exts = append(exts, ext)
-	}
+// normalizeExtension trims either side of the dot, so that a padded configured
+// value cannot silently match nothing. It runs on configured values and on the
+// extension read from a key alike, keeping both sides of a comparison normalized
+// the same way.
+func normalizeExtension(ext string) string {
+	return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(ext), ".")))
+}
+
+// cleanExtensions normalizes configured extensions and sorts them, so that logging
+// the effective filter is stable rather than following the order they were given.
+func cleanExtensions(values []string) []string {
+	exts := cleanEntries(values, normalizeExtension)
 	slices.Sort(exts)
-	return exts
+	return slices.Compact(exts)
 }
 
-func extensionSet(exts []string) map[string]struct{} {
-	if len(exts) == 0 {
-		return nil
-	}
-	set := make(map[string]struct{}, len(exts))
-	for _, ext := range exts {
-		if normalized := normalizeExtension(ext); normalized != "" {
-			set[normalized] = struct{}{}
-		}
-	}
-	if len(set) == 0 {
-		return nil
-	}
-	return set
-}
-
-func cleanPrefixes(values []string) []string {
+// cleanEntries normalizes each entry and drops the ones that come out empty,
+// returning nil when nothing is left.
+func cleanEntries(values []string, normalize func(string) string) []string {
 	if len(values) == 0 {
 		return nil
 	}
 	kept := make([]string, 0, len(values))
 	for _, value := range values {
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			kept = append(kept, trimmed)
+		if normalized := normalize(value); normalized != "" {
+			kept = append(kept, normalized)
 		}
 	}
 	if len(kept) == 0 {

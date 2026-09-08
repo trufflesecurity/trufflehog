@@ -129,8 +129,8 @@ func (s *Source) Init(
 		ctx.Logger().V(1).Info("Object filter configured",
 			"include_prefixes", filter.includePrefixes,
 			"exclude_prefixes", filter.excludePrefixes,
-			"include_extensions", sortedExtensions(filter.includeExtensions),
-			"exclude_extensions", sortedExtensions(filter.excludeExtensions))
+			"include_extensions", filter.includeExtensions,
+			"exclude_extensions", filter.excludeExtensions)
 	}
 
 	return nil
@@ -505,11 +505,7 @@ func (s *Source) scanBucket(
 	// A filter that excludes everything otherwise looks exactly like a clean scan
 	// of an empty bucket, so say so rather than finishing silently.
 	if objectCount == 0 && filteredCount > 0 {
-		if len(s.conn.GetBuckets()) > 0 {
-			ctx.Logger().Info("Scanned no objects in bucket", "excluded_by_object_filter", filteredCount)
-		} else {
-			ctx.Logger().V(3).Info("Scanned no objects in bucket", "excluded_by_object_filter", filteredCount)
-		}
+		ctx.Logger().Info("Scanned no objects in bucket", "excluded_by_object_filter", filteredCount)
 	}
 
 	return objectCount
