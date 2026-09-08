@@ -69,7 +69,20 @@ func TestIsNonPublicIP(t *testing.T) {
 		{"64:ff9b::a00:1", true},    // NAT64 of 10.0.0.1
 		{"2002:0a00:0001::1", true}, // 6to4 of 10.0.0.1
 		{"::0a00:0001", true},       // IPv4-compatible ::10.0.0.1
+		{"::ffff:0:a00:1", true},    // SIIT IPv4-translated ::ffff:0:10.0.0.1
+		{"2001::a00:1", true},       // Teredo (embeds v4 addresses)
 		{"2001:db8::1", true},       // documentation
+
+		// NAT64 well-known prefix classifies the EMBEDDED v4: DNS64-synthesized
+		// addresses of public IPv4-only endpoints must stay reachable in
+		// IPv6-only networks, while internal embeddings stay blocked.
+		{"64:ff9b::808:808", false},  // NAT64 of 8.8.8.8
+		{"64:ff9b::a9fe:a9fe", true}, // NAT64 of 169.254.169.254
+		{"64:ff9b:1::a00:1", true},   // RFC8215 local-use prefix stays blanket-blocked
+
+		// Deprecated IPv6 site-local, still internal scope on legacy gear.
+		{"fec0::1", true},
+		{"feff::1", true},
 	}
 
 	for _, c := range cases {

@@ -101,18 +101,34 @@ var extraBlockedCIDRs = mustParseCIDRs(
 	"203.0.113.0/24",  // TEST-NET-3
 	"240.0.0.0/4",     // RFC1112 class E reserved (also covers 255.255.255.255 broadcast)
 	// IPv6 embeddings of an IPv4 address that To4() does NOT normalize; without
-	// these, an internal v4 target can be smuggled in as an IPv6 literal.
-	"::/96",          // RFC4291 IPv4-compatible IPv6 (:: and ::1 are caught earlier)
-	"64:ff9b::/96",   // RFC6052 NAT64 well-known prefix
-	"64:ff9b:1::/48", // RFC8215 NAT64 local-use prefix
-	"2002::/16",      // RFC3056 6to4
+	// these, an internal v4 target can be smuggled in as an IPv6 literal. The
+	// NAT64 well-known prefix is NOT here: DNS64 legitimately synthesizes it for
+	// public IPv4-only endpoints, so IsNonPublicIP extracts and classifies the
+	// embedded v4 instead (see nat64WellKnownPrefix). The mechanisms below are
+	// deprecated or operator-local, so there is no availability reason to allow
+	// any of them and they are blocked outright.
+	"::/96",           // RFC4291 IPv4-compatible IPv6, deprecated (:: and ::1 are caught earlier)
+	"::ffff:0:0:0/96", // RFC2765 SIIT "IPv4-translated"; To4() only normalizes ::ffff:0:0/96
+	"64:ff9b:1::/48",  // RFC8215 NAT64 local-use prefix; embedded position varies per operator
+	"2002::/16",       // RFC3056 6to4, deprecated
+	"2001::/32",       // RFC4380 Teredo; embeds v4 server/client addresses
+	// IPv6 ranges with internal or non-routable scope.
+	"fec0::/10", // RFC3879 site-local, deprecated but still routed as internal scope by legacy gear
 	// IPv6 special-use parity with the v4 test/doc ranges above.
 	"2001:db8::/32", // RFC3849 documentation
 	"100::/64",      // RFC6666 discard-only
 	// Note: IPv4-mapped IPv6 (e.g. ::ffff:169.254.169.254) is handled by the
-	// To4() normalization in IsNonPublicIP, not by a CIDR here — a
+	// To4() normalization in IsNonPublicIP, not by a CIDR here, because a
 	// ::ffff:0:0/96 entry would match every IPv4 address.
 )
+
+// nat64WellKnownPrefix is the RFC6052 NAT64 well-known prefix 64:ff9b::/96.
+// Unlike the deprecated embeddings in extraBlockedCIDRs, DNS64 resolvers
+// synthesize these addresses for ordinary public IPv4-only endpoints, so
+// blanket-blocking the prefix would break every guarded dial to an IPv4-only
+// host in an IPv6-only (DNS64/NAT64) network. Instead the embedded IPv4 in
+// the low 32 bits is extracted and classified on its own.
+var nat64WellKnownPrefix = mustParseCIDRs("64:ff9b::/96")[0]
 
 // IsNonPublicIP reports whether an IP must not be dialed by a guarded client:
 // loopback, link-local (incl. cloud metadata), private (RFC1918/RFC4193),
@@ -125,6 +141,11 @@ func IsNonPublicIP(ip net.IP) bool {
 	// Normalize IPv4-in-IPv6 so the v4 classification methods apply.
 	if v4 := ip.To4(); v4 != nil {
 		ip = v4
+	} else if ip16 := ip.To16(); ip16 != nil && nat64WellKnownPrefix.Contains(ip16) {
+		// NAT64 well-known prefix: classify the embedded IPv4 (low 32 bits) so
+		// DNS64-synthesized addresses of public endpoints stay reachable while
+		// embeddings of internal targets are still blocked.
+		ip = net.IPv4(ip16[12], ip16[13], ip16[14], ip16[15]).To4()
 	}
 
 	if ip.IsLoopback() || // 127.0.0.0/8, ::1
