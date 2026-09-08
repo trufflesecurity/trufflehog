@@ -3630,6 +3630,153 @@ func (x *JSONEnumerator) GetMetadata() string {
 	return ""
 }
 
+type Httpx struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// url is the request URL the body was returned from.
+	Url         string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	FinalUrl    string `protobuf:"bytes,2,opt,name=final_url,json=finalUrl,proto3" json:"final_url,omitempty"`
+	Input       string `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	Host        string `protobuf:"bytes,4,opt,name=host,proto3" json:"host,omitempty"`
+	Path        string `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
+	Method      string `protobuf:"bytes,6,opt,name=method,proto3" json:"method,omitempty"`
+	Scheme      string `protobuf:"bytes,7,opt,name=scheme,proto3" json:"scheme,omitempty"`
+	StatusCode  int32  `protobuf:"varint,8,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	ContentType string `protobuf:"bytes,9,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Timestamp   string `protobuf:"bytes,10,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	// file is the httpx JSONL file the record came from.
+	File string `protobuf:"bytes,11,opt,name=file,proto3" json:"file,omitempty"`
+	// line is the 1-based record number within that file.
+	Line int64 `protobuf:"varint,12,opt,name=line,proto3" json:"line,omitempty"`
+	// body_field is which field the content came from: "body" or "headless_body".
+	BodyField string `protobuf:"bytes,13,opt,name=body_field,json=bodyField,proto3" json:"body_field,omitempty"`
+}
+
+func (x *Httpx) Reset() {
+	*x = Httpx{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_source_metadata_proto_msgTypes[38]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Httpx) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Httpx) ProtoMessage() {}
+
+func (x *Httpx) ProtoReflect() protoreflect.Message {
+	mi := &file_source_metadata_proto_msgTypes[38]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Httpx.ProtoReflect.Descriptor instead.
+func (*Httpx) Descriptor() ([]byte, []int) {
+	return file_source_metadata_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *Httpx) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *Httpx) GetFinalUrl() string {
+	if x != nil {
+		return x.FinalUrl
+	}
+	return ""
+}
+
+func (x *Httpx) GetInput() string {
+	if x != nil {
+		return x.Input
+	}
+	return ""
+}
+
+func (x *Httpx) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *Httpx) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *Httpx) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *Httpx) GetScheme() string {
+	if x != nil {
+		return x.Scheme
+	}
+	return ""
+}
+
+func (x *Httpx) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *Httpx) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *Httpx) GetTimestamp() string {
+	if x != nil {
+		return x.Timestamp
+	}
+	return ""
+}
+
+func (x *Httpx) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
+func (x *Httpx) GetLine() int64 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+func (x *Httpx) GetBodyField() string {
+	if x != nil {
+		return x.BodyField
+	}
+	return ""
+}
+
 type MetaData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -3674,13 +3821,14 @@ type MetaData struct {
 	//	*MetaData_SlackContinuous
 	//	*MetaData_JsonEnumerator
 	//	*MetaData_AwsSecretsManager
+	//	*MetaData_Httpx
 	Data isMetaData_Data `protobuf_oneof:"data"`
 }
 
 func (x *MetaData) Reset() {
 	*x = MetaData{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[38]
+		mi := &file_source_metadata_proto_msgTypes[39]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3693,7 +3841,7 @@ func (x *MetaData) String() string {
 func (*MetaData) ProtoMessage() {}
 
 func (x *MetaData) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[38]
+	mi := &file_source_metadata_proto_msgTypes[39]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3706,7 +3854,7 @@ func (x *MetaData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetaData.ProtoReflect.Descriptor instead.
 func (*MetaData) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{38}
+	return file_source_metadata_proto_rawDescGZIP(), []int{39}
 }
 
 func (m *MetaData) GetData() isMetaData_Data {
@@ -3975,6 +4123,13 @@ func (x *MetaData) GetAwsSecretsManager() *AWSSecretsManager {
 	return nil
 }
 
+func (x *MetaData) GetHttpx() *Httpx {
+	if x, ok := x.GetData().(*MetaData_Httpx); ok {
+		return x.Httpx
+	}
+	return nil
+}
+
 type isMetaData_Data interface {
 	isMetaData_Data()
 }
@@ -4127,6 +4282,10 @@ type MetaData_AwsSecretsManager struct {
 	AwsSecretsManager *AWSSecretsManager `protobuf:"bytes,37,opt,name=awsSecretsManager,proto3,oneof"`
 }
 
+type MetaData_Httpx struct {
+	Httpx *Httpx `protobuf:"bytes,38,opt,name=httpx,proto3,oneof"`
+}
+
 func (*MetaData_Azure) isMetaData_Data() {}
 
 func (*MetaData_Bitbucket) isMetaData_Data() {}
@@ -4200,6 +4359,8 @@ func (*MetaData_SlackContinuous) isMetaData_Data() {}
 func (*MetaData_JsonEnumerator) isMetaData_Data() {}
 
 func (*MetaData_AwsSecretsManager) isMetaData_Data() {}
+
+func (*MetaData_Httpx) isMetaData_Data() {}
 
 var File_source_metadata_proto protoreflect.FileDescriptor
 
@@ -4669,7 +4830,28 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x64, 0x22, 0x2c, 0x0a, 0x0e, 0x4a, 0x53, 0x4f, 0x4e, 0x45, 0x6e, 0x75, 0x6d, 0x65, 0x72, 0x61,
 	0x74, 0x6f, 0x72, 0x12, 0x1a, 0x0a, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x22,
-	0x93, 0x10, 0x0a, 0x08, 0x4d, 0x65, 0x74, 0x61, 0x44, 0x61, 0x74, 0x61, 0x12, 0x2e, 0x0a, 0x05,
+	0xcd, 0x02, 0x0a, 0x05, 0x48, 0x74, 0x74, 0x70, 0x78, 0x12, 0x10, 0x0a, 0x03, 0x75, 0x72, 0x6c,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x75, 0x72, 0x6c, 0x12, 0x1b, 0x0a, 0x09, 0x66,
+	0x69, 0x6e, 0x61, 0x6c, 0x5f, 0x75, 0x72, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08,
+	0x66, 0x69, 0x6e, 0x61, 0x6c, 0x55, 0x72, 0x6c, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x70, 0x75,
+	0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x69, 0x6e, 0x70, 0x75, 0x74, 0x12, 0x12,
+	0x0a, 0x04, 0x68, 0x6f, 0x73, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x68, 0x6f,
+	0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74, 0x68, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x12, 0x16, 0x0a, 0x06, 0x6d, 0x65, 0x74, 0x68, 0x6f, 0x64,
+	0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x6d, 0x65, 0x74, 0x68, 0x6f, 0x64, 0x12, 0x16,
+	0x0a, 0x06, 0x73, 0x63, 0x68, 0x65, 0x6d, 0x65, 0x18, 0x07, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06,
+	0x73, 0x63, 0x68, 0x65, 0x6d, 0x65, 0x12, 0x1f, 0x0a, 0x0b, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73,
+	0x5f, 0x63, 0x6f, 0x64, 0x65, 0x18, 0x08, 0x20, 0x01, 0x28, 0x05, 0x52, 0x0a, 0x73, 0x74, 0x61,
+	0x74, 0x75, 0x73, 0x43, 0x6f, 0x64, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6e, 0x74, 0x65,
+	0x6e, 0x74, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x09, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x63,
+	0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x54, 0x79, 0x70, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x74, 0x69,
+	0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x74,
+	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x12, 0x12, 0x0a, 0x04, 0x66, 0x69, 0x6c, 0x65,
+	0x18, 0x0b, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x66, 0x69, 0x6c, 0x65, 0x12, 0x12, 0x0a, 0x04,
+	0x6c, 0x69, 0x6e, 0x65, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x6c, 0x69, 0x6e, 0x65,
+	0x12, 0x1d, 0x0a, 0x0a, 0x62, 0x6f, 0x64, 0x79, 0x5f, 0x66, 0x69, 0x65, 0x6c, 0x64, 0x18, 0x0d,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x62, 0x6f, 0x64, 0x79, 0x46, 0x69, 0x65, 0x6c, 0x64, 0x22,
+	0xc3, 0x10, 0x0a, 0x08, 0x4d, 0x65, 0x74, 0x61, 0x44, 0x61, 0x74, 0x61, 0x12, 0x2e, 0x0a, 0x05,
 	0x61, 0x7a, 0x75, 0x72, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x73, 0x6f,
 	0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x41, 0x7a,
 	0x75, 0x72, 0x65, 0x48, 0x00, 0x52, 0x05, 0x61, 0x7a, 0x75, 0x72, 0x65, 0x12, 0x3a, 0x0a, 0x09,
@@ -4797,7 +4979,10 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x20, 0x01, 0x28, 0x0b, 0x32, 0x22, 0x2e, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65,
 	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x41, 0x57, 0x53, 0x53, 0x65, 0x63, 0x72, 0x65, 0x74,
 	0x73, 0x4d, 0x61, 0x6e, 0x61, 0x67, 0x65, 0x72, 0x48, 0x00, 0x52, 0x11, 0x61, 0x77, 0x73, 0x53,
-	0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x4d, 0x61, 0x6e, 0x61, 0x67, 0x65, 0x72, 0x42, 0x06, 0x0a,
+	0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x4d, 0x61, 0x6e, 0x61, 0x67, 0x65, 0x72, 0x12, 0x2e, 0x0a,
+	0x05, 0x68, 0x74, 0x74, 0x70, 0x78, 0x18, 0x26, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x73,
+	0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x48,
+	0x74, 0x74, 0x70, 0x78, 0x48, 0x00, 0x52, 0x05, 0x68, 0x74, 0x74, 0x70, 0x78, 0x42, 0x06, 0x0a,
 	0x04, 0x64, 0x61, 0x74, 0x61, 0x2a, 0x3e, 0x0a, 0x0a, 0x56, 0x69, 0x73, 0x69, 0x62, 0x69, 0x6c,
 	0x69, 0x74, 0x79, 0x12, 0x0a, 0x0a, 0x06, 0x70, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x10, 0x00, 0x12,
 	0x0b, 0x0a, 0x07, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x10, 0x01, 0x12, 0x0a, 0x0a, 0x06,
@@ -4851,7 +5036,7 @@ func file_source_metadata_proto_rawDescGZIP() []byte {
 }
 
 var file_source_metadata_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_source_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_source_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_source_metadata_proto_goTypes = []interface{}{
 	(Visibility)(0),               // 0: source_metadata.Visibility
 	(PostmanLocationType)(0),      // 1: source_metadata.PostmanLocationType
@@ -4893,8 +5078,9 @@ var file_source_metadata_proto_goTypes = []interface{}{
 	(*Stdin)(nil),                 // 37: source_metadata.Stdin
 	(*SlackContinuous)(nil),       // 38: source_metadata.SlackContinuous
 	(*JSONEnumerator)(nil),        // 39: source_metadata.JSONEnumerator
-	(*MetaData)(nil),              // 40: source_metadata.MetaData
-	(*timestamppb.Timestamp)(nil), // 41: google.protobuf.Timestamp
+	(*Httpx)(nil),                 // 40: source_metadata.Httpx
+	(*MetaData)(nil),              // 41: source_metadata.MetaData
+	(*timestamppb.Timestamp)(nil), // 42: google.protobuf.Timestamp
 }
 var file_source_metadata_proto_depIdxs = []int32{
 	0,  // 0: source_metadata.Github.visibility:type_name -> source_metadata.Visibility
@@ -4905,7 +5091,7 @@ var file_source_metadata_proto_depIdxs = []int32{
 	19, // 5: source_metadata.Forager.pypi:type_name -> source_metadata.PyPi
 	0,  // 6: source_metadata.AzureRepos.visibility:type_name -> source_metadata.Visibility
 	1,  // 7: source_metadata.Postman.location_type:type_name -> source_metadata.PostmanLocationType
-	41, // 8: source_metadata.Vector.timestamp:type_name -> google.protobuf.Timestamp
+	42, // 8: source_metadata.Vector.timestamp:type_name -> google.protobuf.Timestamp
 	33, // 9: source_metadata.Webhook.vector:type_name -> source_metadata.Vector
 	0,  // 10: source_metadata.SlackContinuous.visibility:type_name -> source_metadata.Visibility
 	3,  // 11: source_metadata.MetaData.azure:type_name -> source_metadata.Azure
@@ -4945,11 +5131,12 @@ var file_source_metadata_proto_depIdxs = []int32{
 	38, // 45: source_metadata.MetaData.slackContinuous:type_name -> source_metadata.SlackContinuous
 	39, // 46: source_metadata.MetaData.jsonEnumerator:type_name -> source_metadata.JSONEnumerator
 	2,  // 47: source_metadata.MetaData.awsSecretsManager:type_name -> source_metadata.AWSSecretsManager
-	48, // [48:48] is the sub-list for method output_type
-	48, // [48:48] is the sub-list for method input_type
-	48, // [48:48] is the sub-list for extension type_name
-	48, // [48:48] is the sub-list for extension extendee
-	0,  // [0:48] is the sub-list for field type_name
+	40, // 48: source_metadata.MetaData.httpx:type_name -> source_metadata.Httpx
+	49, // [49:49] is the sub-list for method output_type
+	49, // [49:49] is the sub-list for method input_type
+	49, // [49:49] is the sub-list for extension type_name
+	49, // [49:49] is the sub-list for extension extendee
+	0,  // [0:49] is the sub-list for field type_name
 }
 
 func init() { file_source_metadata_proto_init() }
@@ -5415,6 +5602,18 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[38].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Httpx); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_source_metadata_proto_msgTypes[39].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MetaData); i {
 			case 0:
 				return &v.state
@@ -5435,7 +5634,7 @@ func file_source_metadata_proto_init() {
 	file_source_metadata_proto_msgTypes[32].OneofWrappers = []interface{}{
 		(*Webhook_Vector)(nil),
 	}
-	file_source_metadata_proto_msgTypes[38].OneofWrappers = []interface{}{
+	file_source_metadata_proto_msgTypes[39].OneofWrappers = []interface{}{
 		(*MetaData_Azure)(nil),
 		(*MetaData_Bitbucket)(nil),
 		(*MetaData_Circleci)(nil),
@@ -5473,6 +5672,7 @@ func file_source_metadata_proto_init() {
 		(*MetaData_SlackContinuous)(nil),
 		(*MetaData_JsonEnumerator)(nil),
 		(*MetaData_AwsSecretsManager)(nil),
+		(*MetaData_Httpx)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -5480,7 +5680,7 @@ func file_source_metadata_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_source_metadata_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   39,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
