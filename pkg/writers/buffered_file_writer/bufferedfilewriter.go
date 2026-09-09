@@ -238,7 +238,6 @@ func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
 		if err != nil && !errors.Is(err, io.EOF) {
 			return totalBytesRead, err
 		}
-
 		if n > 0 {
 			written, err := w.Write(buf[:n])
 			if err != nil {
