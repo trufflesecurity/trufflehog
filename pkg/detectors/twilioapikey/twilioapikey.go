@@ -101,7 +101,7 @@ func (s Scanner) Description() string {
 func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret string) (map[string]string, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
 	if err != nil {
-		return nil, false, nil
+		return nil, false, err
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -110,7 +110,7 @@ func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret
 
 	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_TwilioApiKey, apiKey+secret, req)
 	if err != nil {
-		return nil, false, nil
+		return nil, false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
