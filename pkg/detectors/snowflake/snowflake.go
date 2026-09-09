@@ -26,11 +26,16 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	// accountIdentifierPat matches Snowflake account identifiers in the format: XXXXXXX-XXXXX
-	// Example: ABC1234-EXAMPLE
-	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z-_]{1,255}(.privatelink)?)\b`)
-	// usernameExclusionPat defines characters that should not be present in usernames
-	usernameExclusionPat = `!@#$%^&*{}:<>,.;?()/\+=\s\n`
+	// accountIdentifierPat matches Snowflake account identifiers in the org-account
+	// form "<orgname>-<account_name>". The org segment is alphanumeric and variable
+	// length (the documented example below contains digits), and the account segment
+	// may carry region/cloud or PrivateLink suffixes that contain dots.
+	// Examples: ABC1234-EXAMPLE, tuacoip-zt74995.privatelink, xy12345-prod.us-east-1
+	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z][a-zA-Z0-9]{0,254}-[0-9a-zA-Z._-]{1,255})\b`)
+	// usernameExclusionPat defines characters that should not be present in usernames.
+	// '!' and '@' are permitted: Snowflake login names may legitimately contain them
+	// (e.g. SSO/email-style logins).
+	usernameExclusionPat = `#$%^&*{}:<>,.;?()/\+=\s\n`
 )
 
 const (
@@ -93,7 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	// Find all unique account identifiers
 	uniqueAccountMatches := make(map[string]struct{})
 	for _, match := range accountIdentifierPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueAccountMatches[strings.TrimSpace(match[1])] = struct{}{}
+		uniqueAccountMatches[normalizeAccount(match[1])] = struct{}{}
 	}
 
 	if len(uniqueAccountMatches) == 0 {
@@ -143,6 +148,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 	return results, nil
+}
+
+// normalizeAccount trims whitespace and a trailing ".snowflakecomputing.com"
+// host suffix from a matched account. A credential store may record the account
+// as the full login host (e.g. "tuacoip-zt74995.snowflakecomputing.com"), and
+// since the account body now admits dots the pattern captures that suffix.
+// verifyMatch re-appends ".snowflakecomputing.com" when building the URL, so a
+// captured suffix would produce a double-suffixed, unverifiable host. Hostnames
+// are case-insensitive, so the suffix is matched without regard to case. A
+// ".privatelink" segment is left intact — it is part of the account host.
+func normalizeAccount(account string) string {
+	account = strings.TrimSpace(account)
+	const hostSuffix = ".snowflakecomputing.com"
+	if strings.HasSuffix(strings.ToLower(account), hostSuffix) {
+		account = account[:len(account)-len(hostSuffix)]
+	}
+	return account
 }
 
 // verifyMatch attempts to verify a Snowflake credential by making a login request.
