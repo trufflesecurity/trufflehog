@@ -179,6 +179,11 @@ var (
 	s3ScanEndpoint      = s3Scan.Flag("endpoint", "Endpoint of an S3-compatible service to scan instead of AWS S3. (eg. https://s3.internal.example.com)").String()
 	s3ScanRegion        = s3Scan.Flag("region", "Region used to sign requests. Defaults to us-east-1.").String()
 
+	s3ScanIncludePrefixes   = s3Scan.Flag("include-prefix", "Only scan objects whose key starts with this prefix. You can repeat this flag.").Strings()
+	s3ScanExcludePrefixes   = s3Scan.Flag("exclude-prefix", "Skip objects whose key starts with this prefix. You can repeat this flag. Takes precedence over --include-prefix.").Strings()
+	s3ScanIncludeExtensions = s3Scan.Flag("include-extension", "Only scan objects with this file extension, written without a leading dot (eg. tf). You can repeat this flag. Incompatible with --exclude-extension.").Strings()
+	s3ScanExcludeExtensions = s3Scan.Flag("exclude-extension", "Skip objects with this file extension, written without a leading dot (eg. zip). You can repeat this flag. Incompatible with --include-extension.").Strings()
+
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
 	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
 	gcsCloudEnv       = gcsScan.Flag("cloud-environment", "Use Application Default Credentials, IAM credentials to authenticate.").Bool()
@@ -1022,16 +1027,20 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
-			Key:           *s3ScanKey,
-			Secret:        *s3ScanSecret,
-			SessionToken:  *s3ScanSessionToken,
-			Buckets:       *s3ScanBuckets,
-			IgnoreBuckets: *s3ScanIgnoreBuckets,
-			Roles:         *s3ScanRoleArns,
-			CloudCred:     *s3ScanCloudEnv,
-			MaxObjectSize: int64(*s3ScanMaxObjectSize),
-			Endpoint:      *s3ScanEndpoint,
-			Region:        *s3ScanRegion,
+			Key:               *s3ScanKey,
+			Secret:            *s3ScanSecret,
+			SessionToken:      *s3ScanSessionToken,
+			Buckets:           *s3ScanBuckets,
+			IgnoreBuckets:     *s3ScanIgnoreBuckets,
+			Roles:             *s3ScanRoleArns,
+			CloudCred:         *s3ScanCloudEnv,
+			MaxObjectSize:     int64(*s3ScanMaxObjectSize),
+			Endpoint:          *s3ScanEndpoint,
+			Region:            *s3ScanRegion,
+			IncludePrefixes:   *s3ScanIncludePrefixes,
+			ExcludePrefixes:   *s3ScanExcludePrefixes,
+			IncludeExtensions: *s3ScanIncludeExtensions,
+			ExcludeExtensions: *s3ScanExcludeExtensions,
 		}
 		if ref, err := eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)

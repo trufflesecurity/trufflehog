@@ -335,6 +335,18 @@ Endpoint of an S3-compatible service to scan instead of AWS S3. (eg. https://s3.
 .TP
 \fB--region=REGION\fR
 Region used to sign requests. Defaults to us-east-1.
+.TP
+\fB--include-prefix=INCLUDE-PREFIX\fR
+Only scan objects whose key starts with this prefix. You can repeat this flag.
+.TP
+\fB--exclude-prefix=EXCLUDE-PREFIX\fR
+Skip objects whose key starts with this prefix. You can repeat this flag. Takes precedence over --include-prefix.
+.TP
+\fB--include-extension=INCLUDE-EXTENSION\fR
+Only scan objects with this file extension, written without a leading dot (eg. tf). You can repeat this flag. Incompatible with --exclude-extension.
+.TP
+\fB--exclude-extension=EXCLUDE-EXTENSION\fR
+Skip objects with this file extension, written without a leading dot (eg. zip). You can repeat this flag. Incompatible with --include-extension.
 .SS
 \fBgcs [<flags>]\fR
 Find credentials in GCS buckets.
