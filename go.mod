@@ -97,7 +97,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.1-0.20260423004847-9fc0246c3859
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
-	github.com/trufflesecurity/ldap-verify v0.0.0-20260824144701-aa52b4613a85
+	github.com/trufflesecurity/ldap-verify v0.0.0-20260904185219-2c6f03d2c594
 	github.com/wasilibs/go-re2 v1.12.0
 	github.com/xo/dburl v0.23.8
 	gitlab.com/gitlab-org/api/client-go v1.12.0

@@ -734,8 +734,8 @@ github.com/tklauser/numcpus v0.12.0 h1:NR85qdvHA9pFse3x3weVZ0r0ST8R6l5RHbZrlRaqo
 github.com/tklauser/numcpus v0.12.0/go.mod h1:ABHeXzJnr/qqwguhClkZKT1/8VABcYrsyUiUGobwWJg=
 github.com/trufflesecurity/disk-buffer-reader v0.2.1 h1:K9nNpX3xeWT2E6YRjlcc1X5c1NjgV9JS5T9aw2FjA8Q=
 github.com/trufflesecurity/disk-buffer-reader v0.2.1/go.mod h1:uYwTCdxzV0o+qaeBMxflOsq4eu2WjrE46qGR2e80O9Y=
-github.com/trufflesecurity/ldap-verify v0.0.0-20260824144701-aa52b4613a85 h1:q/R6mqRs1l/A/5pGTMG7bf+lIP9j8C06xcwcl+r/kkI=
-github.com/trufflesecurity/ldap-verify v0.0.0-20260824144701-aa52b4613a85/go.mod h1:HAlNn3YFAr/3fgyPu/sLh+w6wYuabX39zvmj/02ARx8=
+github.com/trufflesecurity/ldap-verify v0.0.0-20260904185219-2c6f03d2c594 h1:nHRzziy8bH/lIokNny8fwK64pRKMr59bmOMvLp9QNOM=
+github.com/trufflesecurity/ldap-verify v0.0.0-20260904185219-2c6f03d2c594/go.mod h1:HAlNn3YFAr/3fgyPu/sLh+w6wYuabX39zvmj/02ARx8=
 github.com/trufflesecurity/overseer v1.2.8 h1:VXlWPiwYaQmwNxY2W1rVulEAG9O6iF1S0LX3wionWYM=
 github.com/trufflesecurity/overseer v1.2.8/go.mod h1:Dt6Y9LFpM+C/3rRWpy4//4iS5qrbb0pL3XvZqMd4zhg=
 github.com/trufflesecurity/touchfile v0.1.1 h1:Snhd5VEa8Cxd+D60nvLEj2kVeb1omY2tWwnhDhjTqdo=
