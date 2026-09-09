@@ -65,6 +65,7 @@ var (
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	noIgnoreTag                = cli.Flag("no-ignore-tag", "Do not suppress results on lines containing a 'trufflehog:ignore' comment.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
 	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
@@ -654,6 +655,7 @@ func run(state overseer.State, logSync func() error) {
 		VerifierEndpoints:        *verifiers,
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
+		NoIgnoreTag:              *noIgnoreTag,
 		FilterEntropy:            *filterEntropy,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,

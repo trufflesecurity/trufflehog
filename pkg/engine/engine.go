@@ -123,7 +123,10 @@ type Config struct {
 	FilterEntropy float64
 	// FilterUnverified sets the filterUnverified flag on the engine. If set to
 	// true, the engine will only return the first unverified result for a chunk for a detector.
-	FilterUnverified      bool
+	FilterUnverified bool
+	// NoIgnoreTag, when true, disables the default behavior of dropping results
+	// whose line contains a "trufflehog:ignore" comment.
+	NoIgnoreTag           bool
 	ShouldScanEntireChunk bool
 
 	Dispatcher ResultsDispatcher
@@ -184,6 +187,9 @@ type Engine struct {
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
 	filterUnverified bool
+	// noIgnoreTag disables suppression of results on lines containing the
+	// "trufflehog:ignore" comment tag.
+	noIgnoreTag bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
 	filterEntropy           float64
 	notifyVerifiedResults   bool
@@ -253,6 +259,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
+		noIgnoreTag:                         cfg.NoIgnoreTag,
 		filterEntropy:                       cfg.FilterEntropy,
 		printAvgDetectorTime:                cfg.PrintAvgDetectorTime,
 		retainFalsePositives:                cfg.LogFilteredUnverified,
@@ -1290,7 +1297,7 @@ func (e *Engine) processResult(
 		}
 		chunk = copyChunk
 	}
-	if ignoreLinePresent {
+	if ignoreLinePresent && !e.noIgnoreTag {
 		resultsDropped.WithLabelValues("process_result", "ignore_line_tag", res.DetectorType.String()).Inc()
 		return
 	}
