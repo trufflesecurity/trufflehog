@@ -1,42 +1,30 @@
 package filesystem
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type fsModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetFields() fsModel {
-	path := textinputs.InputConfig{
-		Label:       "Path",
-		Key:         "path",
-		Required:    true,
-		Help:        "Files and directories to scan. Separate by space if multiple.",
-		Placeholder: "path/to/file.txt path/to/another/dir",
+// Definition returns the filesystem source configuration.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "filesystem",
+		Title:       "Filesystem",
+		Description: "Scan your filesystem by selecting what directories to scan.",
+		Tier:        sources.TierOSS,
+		Command:     "filesystem",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "path",
+				Label:       "Path",
+				Help:        "Files and directories to scan. Separate by space if multiple.",
+				Kind:        form.KindText,
+				Placeholder: "path/to/file.txt path/to/another/dir",
+				Emit:        form.EmitPositional,
+				Validators:  []form.Validate{form.Required()},
+			},
+		},
 	}
-
-	return fsModel{textinputs.New([]textinputs.InputConfig{path})}
-}
-
-func (m fsModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "filesystem")
-
-	inputs := m.GetInputs()
-	command = append(command, inputs["path"].Value)
-
-	return strings.Join(command, " ")
-}
-
-func (m fsModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-
-	keys := []string{"path"}
-	return common.SummarizeSource(keys, inputs, labels)
 }
