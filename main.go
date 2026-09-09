@@ -580,6 +580,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.NewRelicMobileAppTokenDetectorEnabled.Store(true)
 	feature.MSTeamsWebhookV2DetectorEnabled.Store(true)
 	feature.SolarwindsDetectorEnabled.Store(true)
+	feature.ResendDetectorEnabled.Store(true)
 	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
 	feature.HumioAPITokenDetectorEnabled.Store(true)
 

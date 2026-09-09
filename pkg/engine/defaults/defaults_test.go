@@ -152,6 +152,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_NewRelicMobileAppToken:    {},
 	detector_typepb.DetectorType_SolarWindsObservability:   {},
 	detector_typepb.DetectorType_HumioAPIToken:             {},
+	detector_typepb.DetectorType_Resend:                    {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
