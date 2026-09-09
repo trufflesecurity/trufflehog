@@ -1,0 +1,11 @@
+version: "2"
+linters:
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        no-stdlib-regexp:
+          deny:
+            - pkg: "regexp$"
+              desc: "use wasilibs/go-re2 unless necessary"
