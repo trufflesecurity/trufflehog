@@ -882,24 +882,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ClonePath:           *gitClonePath,
 			NoCleanup:           *gitNoCleanup,
 			PrintLegacyJSON:     *jsonLegacy,
-			TrustLocalGitConfig: *gitTrustLocalGitConfig,
-		}
-
-		// detect if trufflehog is running git source as a pre-commit hook
-		if isPreCommitHook() {
-			ctx.Logger().Info("Running as a pre-commit hook, overriding default flags for hook context")
-
-			// Override git configuration for pre-commit hook context
-			gitCfg.TrustLocalGitConfig = true
-			gitCfg.BaseRef = "HEAD" // Only scan staged changes
-
-			// Override result filters for pre-commit hook context
-			// In hook mode, we only want to show verified secrets and unknown findings
-			*results = "verified,unknown"
-
-			// Override failure behavior for pre-commit hook context
-			// In hook mode, we want to fail the commit if any secrets are found
-			*fail = true
+			TrustLocalGitConfig: *gitTrustLocalGitConfig || isPreCommitHook(),
 		}
 
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
