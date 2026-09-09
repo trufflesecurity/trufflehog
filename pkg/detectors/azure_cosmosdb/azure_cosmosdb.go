@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -74,11 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueKeyMatches {
 		for accountUrl := range uniqueAccountMatches {
-			if invalidHosts.Exists(accountUrl) {
-				delete(uniqueAccountMatches, accountUrl)
-				continue
-			}
-
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_AzureCosmosDBKeyIdentifiable,
 				Raw:          []byte(key),
@@ -90,30 +86,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				ExtraData: map[string]string{},
 			}
 
+			// The database type follows from the account URL alone, so it is recorded for every
+			// finding rather than only for the ones that reach a verification request.
+			if strings.Contains(accountUrl, ".documents.azure.com") {
+				s1.ExtraData["DB Type"] = "Document"
+			} else if strings.Contains(accountUrl, ".table.cosmos.azure.com") {
+				s1.ExtraData["DB Type"] = "Table"
+			}
+
 			if verify {
-				var verified bool
-				var verificationErr error
+				if invalidHosts.Exists(accountUrl) {
+					// An earlier candidate already proved this host does not resolve, so the lookup is
+					// skipped. The finding is still reported: dropping it here would make the reported
+					// secrets depend on whether verification was requested, and on the order in which
+					// candidates happened to be processed.
+					s1.SetVerificationError(errNoHost)
+				} else {
+					var verified bool
+					var verificationErr error
 
-				client := s.getClient()
+					client := s.getClient()
 
-				// perform verification based on db type
-				if strings.Contains(accountUrl, ".documents.azure.com") {
-					verified, verificationErr = verifyCosmosDocumentDB(client, accountUrl, key)
-					s1.ExtraData["DB Type"] = "Document"
-
-				} else if strings.Contains(accountUrl, ".table.cosmos.azure.com") {
-					verified, verificationErr = verifyCosmosTableDB(client, accountUrl, key)
-					s1.ExtraData["DB Type"] = "Table"
-				}
-
-				s1.Verified = verified
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(accountUrl, struct{}{})
-						continue
+					// perform verification based on db type
+					if strings.Contains(accountUrl, ".documents.azure.com") {
+						verified, verificationErr = verifyCosmosDocumentDB(client, accountUrl, key)
+					} else if strings.Contains(accountUrl, ".table.cosmos.azure.com") {
+						verified, verificationErr = verifyCosmosTableDB(client, accountUrl, key)
 					}
 
-					s1.SetVerificationError(verificationErr)
+					s1.Verified = verified
+					if verificationErr != nil {
+						var dnsErr *net.DNSError
+						if errors.As(verificationErr, &dnsErr) && dnsErr.IsNotFound {
+							invalidHosts.Set(accountUrl, struct{}{})
+						}
+
+						s1.SetVerificationError(verificationErr)
+					}
 				}
 			}
 
@@ -148,11 +157,6 @@ func verifyCosmosDocumentDB(client *http.Client, accountUrl, key string) (bool, 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		// lookup foo.documents.azure.com: no such host
-		if strings.Contains(err.Error(), "no such host") {
-			return false, errNoHost
-		}
-
 		return false, err
 	}
 	defer func() {
