@@ -11,6 +11,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
 [![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
+[![inspect.software](https://raw.githubusercontent.com/inspect-software/badges/main/v1/t/trufflesecurity/trufflehog.svg)](https://inspect.software/software/trufflesecurity/trufflehog)
 
 </div>
 
