@@ -5,6 +5,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -142,6 +143,10 @@ func fetchBearerToken(ctx context.Context, client *http.Client, key, secret stri
 		}
 		return token.AccessToken, nil
 	default:
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 1024))
+		if len(body) > 0 {
+			return "", fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, strings.TrimSpace(string(body)))
+		}
 		return "", fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
