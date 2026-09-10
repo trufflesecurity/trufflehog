@@ -394,6 +394,35 @@ func (m *VerifierConfig) validate(all bool) error {
 
 	// no validation rules for Unsafe
 
+	if all {
+		switch v := interface{}(m.GetAuth()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, VerifierConfigValidationError{
+					field:  "Auth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, VerifierConfigValidationError{
+					field:  "Auth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAuth()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return VerifierConfigValidationError{
+				field:  "Auth",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return VerifierConfigMultiError(errors)
 	}
@@ -471,6 +500,260 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = VerifierConfigValidationError{}
+
+// Validate checks the field values on VerifierAuth with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *VerifierAuth) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on VerifierAuth with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in VerifierAuthMultiError, or
+// nil if none found.
+func (m *VerifierAuth) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *VerifierAuth) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TokenEndpoint
+
+	switch v := m.GrantConfig.(type) {
+	case *VerifierAuth_Ropc:
+		if v == nil {
+			err := VerifierAuthValidationError{
+				field:  "GrantConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetRopc()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, VerifierAuthValidationError{
+						field:  "Ropc",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, VerifierAuthValidationError{
+						field:  "Ropc",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetRopc()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return VerifierAuthValidationError{
+					field:  "Ropc",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return VerifierAuthMultiError(errors)
+	}
+
+	return nil
+}
+
+// VerifierAuthMultiError is an error wrapping multiple validation errors
+// returned by VerifierAuth.ValidateAll() if the designated constraints aren't met.
+type VerifierAuthMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m VerifierAuthMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m VerifierAuthMultiError) AllErrors() []error { return m }
+
+// VerifierAuthValidationError is the validation error returned by
+// VerifierAuth.Validate if the designated constraints aren't met.
+type VerifierAuthValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e VerifierAuthValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e VerifierAuthValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e VerifierAuthValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e VerifierAuthValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e VerifierAuthValidationError) ErrorName() string { return "VerifierAuthValidationError" }
+
+// Error satisfies the builtin error interface
+func (e VerifierAuthValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sVerifierAuth.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = VerifierAuthValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = VerifierAuthValidationError{}
+
+// Validate checks the field values on ROPCConfig with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ROPCConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ROPCConfig with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ROPCConfigMultiError, or
+// nil if none found.
+func (m *ROPCConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ROPCConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Username
+
+	// no validation rules for Password
+
+	// no validation rules for ClientId
+
+	// no validation rules for ClientSecret
+
+	if len(errors) > 0 {
+		return ROPCConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// ROPCConfigMultiError is an error wrapping multiple validation errors
+// returned by ROPCConfig.ValidateAll() if the designated constraints aren't met.
+type ROPCConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ROPCConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ROPCConfigMultiError) AllErrors() []error { return m }
+
+// ROPCConfigValidationError is the validation error returned by
+// ROPCConfig.Validate if the designated constraints aren't met.
+type ROPCConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ROPCConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ROPCConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ROPCConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ROPCConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ROPCConfigValidationError) ErrorName() string { return "ROPCConfigValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ROPCConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sROPCConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ROPCConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ROPCConfigValidationError{}
 
 // Validate checks the field values on ValidationConfig with the rules defined
 // in the proto definition for this message. If any rules are violated, the
