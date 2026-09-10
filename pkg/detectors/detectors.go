@@ -375,3 +375,10 @@ func withDedupKey(ctx context.Context, detType detector_typepb.DetectorType, cre
 func DoWithDedup(client *http.Client, detType detector_typepb.DetectorType, credential string, req *http.Request) (*http.Response, error) {
 	return client.Do(req.WithContext(withDedupKey(req.Context(), detType, credential)))
 }
+
+// ResultVerifier is an optional interface that a detector can implement to verify a single
+// previously-extracted result independently of the chunk it came from, which lets the
+// verification cache verify only cache misses instead of re-verifying an entire chunk.
+type ResultVerifier interface {
+	VerifyResult(ctx context.Context, result *Result)
+}
