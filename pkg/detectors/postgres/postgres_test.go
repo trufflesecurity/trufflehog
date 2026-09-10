@@ -253,3 +253,36 @@ func TestPostgres_RawVsPrimarySecret(t *testing.T) {
 	assert.Equal(t, expectedRaw, string(res.RawV2))
 	assert.Equal(t, input, res.GetPrimarySecretValue())
 }
+
+// TestVerifyConnString_FiltersNonConnectionParams verifies that ORM query-string
+// arguments which are not libpq connection keywords are dropped from the verification
+// connection string.
+func TestVerifyConnString_FiltersNonConnectionParams(t *testing.T) {
+	uri := `postgresql://u:p@h:5432/db?sslmode=require&schema=public&connection_limit=5&pool_timeout=10&socket_timeout=30&pgbouncer=true&sslidentity=/tmp/i.p12&connect_timeout=7`
+
+	matches := findUriMatches([]byte(uri), nil)
+	require.Len(t, matches, 1)
+	got := pgxConnString(matches[0].params)
+
+
+	for _, key := range []string{pgUser, pgPassword, pgHost, pgPort, pgDbname, pgSslmode, pgConnectTimeout} {
+		assert.Containsf(t, got, key+"=", "expected connection param %q to be preserved", key)
+	}
+	for _, key := range []string{pgDbType, "schema", "connection_limit", "pool_timeout", "socket_timeout", "pgbouncer", "sslidentity"} {
+		assert.NotContainsf(t, got, key+"=", "expected non-connection param %q to be filtered out", key)
+	}
+	for _, mangled := range []string{"limit=", "identity="} {
+		assert.NotContainsf(t, got, mangled, "found truncated key fragment %q — connStrPartPattern lost the underscore", mangled)
+	}
+}
+
+func TestIsNonConnectionParam(t *testing.T) {
+	// ORM arguments that are not libpq keywords.
+	for _, key := range []string{"schema", "connection_limit", "pool_timeout", "socket_timeout", "pgbouncer", "sslidentity"} {
+		assert.Truef(t, isNonConnectionParam(key), "%q should be treated as a non-connection param", key)
+	}
+	// Real libpq keywords that ORMs also use — must not be filtered.
+	for _, key := range []string{pgConnectTimeout, pgSslmode, "sslcert", pgUser, pgPassword, pgHost, pgPort, pgDbname} {
+		assert.Falsef(t, isNonConnectionParam(key), "%q is a real connection parameter and must not be filtered", key)
+	}
+}

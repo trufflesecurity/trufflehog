@@ -38,6 +38,24 @@ const (
 	pgDbType         = "db_type"
 )
 
+// nonConnectionParams are query-string arguments that ORMs append to
+// Postgres connection URIs but that are not libpq connection keywords. lib/pq and pgx
+// forward any key they don't recognize to the server as a startup runtime parameter,
+// which the server rejects with 42704. Exluding them prevents this
+var nonConnectionParams = map[string]struct{}{
+	"schema":           {}, // Prisma: search_path selector
+	"connection_limit": {}, // Prisma: client-side pool size
+	"pool_timeout":     {}, // Prisma: pool-acquisition wait
+	"socket_timeout":   {}, // Prisma: per-query timeout
+	"pgbouncer":        {}, // Prisma: PgBouncer compatibility mode
+	"sslidentity":      {}, // Prisma: PKCS12 certificate path
+}
+
+func isNonConnectionParam(key string) bool {
+	_, ok := nonConnectionParams[key]
+	return ok
+}
+
 // This detector currently only finds Postgres connection string URIs
 // (https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) When it finds one, it uses
 // pq.ParseURI to normalize this into space-separated key-value pair Postgres connection string, and then uses a regular
@@ -49,9 +67,9 @@ const (
 // Multi-host connection string URIs are currently not supported because pq.ParseURI doesn't parse them correctly. If we
 // happen to run into a case where this matters we can address it then.
 var (
-	_                  detectors.Detector = (*Scanner)(nil)
-	uriPattern                            = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
-	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
+	_          detectors.Detector = (*Scanner)(nil)
+	uriPattern                    = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
+	connStrPartPattern = regexp.MustCompile(`([[:alpha:]_]+)='(.+?)' ?`)
 )
 
 type Scanner struct {
@@ -320,7 +338,7 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 func pgxConnString(params map[string]string) string {
 	var connStr strings.Builder
 	for key, value := range params {
-		if key == pgDbType || key == pgRequiressl {
+		if key == pgDbType || key == pgRequiressl || isNonConnectionParam(key) {
 			continue
 		}
 		fmt.Fprintf(&connStr, "%s='%s'", key, value)
@@ -370,6 +388,9 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 
 	var connStr string
 	for key, value := range params {
+		if isNonConnectionParam(key) {
+			continue
+		}
 		connStr += fmt.Sprintf("%s='%s'", key, value)
 	}
 
