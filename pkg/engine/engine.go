@@ -126,6 +126,10 @@ type Config struct {
 	FilterUnverified      bool
 	ShouldScanEntireChunk bool
 
+	// NoIgnore disables the "trufflehog:ignore" tag. If set to true, results are
+	// reported even when the line they were found on carries the tag.
+	NoIgnore bool
+
 	Dispatcher ResultsDispatcher
 
 	// SourceManager orchestrates source enumeration and concurrent chunk production.
@@ -195,6 +199,8 @@ type Engine struct {
 	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
 	// If this flag is set to true, the engine will scan the entire chunk.
 	scanEntireChunk bool
+	// noIgnore disables the "trufflehog:ignore" tag, so tagged lines are still reported.
+	noIgnore bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	AhoCorasickCore *ahocorasick.Core
@@ -259,6 +265,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		verificationOverlap:                 cfg.VerificationOverlap,
 		sourceManager:                       cfg.SourceManager,
 		scanEntireChunk:                     cfg.ShouldScanEntireChunk,
+		noIgnore:                            cfg.NoIgnore,
 		detectorVerificationOverrides:       cfg.DetectorVerificationOverrides,
 		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
@@ -1265,7 +1272,8 @@ func (e *Engine) filterResults(
 }
 
 // processResult generates a detectors.ResultWithMetadata from the provided chunk and result and puts it on the results
-// channel, unless the result exists on a line with an ignore tag, in which case no result is generated.
+// channel, unless the result exists on a line with an ignore tag and --no-ignore is not passed, in which case
+// no result is generated.
 func (e *Engine) processResult(
 	ctx context.Context,
 	res detectors.Result,
@@ -1290,7 +1298,7 @@ func (e *Engine) processResult(
 		}
 		chunk = copyChunk
 	}
-	if ignoreLinePresent {
+	if ignoreLinePresent && !e.noIgnore {
 		resultsDropped.WithLabelValues("process_result", "ignore_line_tag", res.DetectorType.String()).Inc()
 		return
 	}

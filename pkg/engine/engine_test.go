@@ -723,6 +723,39 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 	assert.Empty(t, e.results)
 }
 
+func TestProcessResult_IgnoreLinePresentWithNoIgnore_ResultGenerated(t *testing.T) {
+	// Arrange: Create an engine that does not honor ignore tags
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1), noIgnore: true}
+
+	// Arrange: Create a Chunk
+	chunk := sources.Chunk{
+		Data: []byte("swordfish trufflehog:ignore"),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Git{
+				Git: &source_metadatapb.Git{
+					Line: 1,
+				},
+			},
+		},
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		Raw:      []byte("swordfish"),
+		Verified: true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+
+	// Assert that the result was reported anyway, with its line number still set
+	require.Len(t, e.results, 1)
+	r := <-e.results
+	assert.Equal(t, []byte("swordfish"), r.Raw)
+	assert.Equal(t, int64(1), r.SourceMetadata.GetGit().GetLine())
+}
+
 func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
