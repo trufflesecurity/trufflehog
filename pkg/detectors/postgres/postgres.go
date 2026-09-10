@@ -67,9 +67,9 @@ func isNonConnectionParam(key string) bool {
 // Multi-host connection string URIs are currently not supported because pq.ParseURI doesn't parse them correctly. If we
 // happen to run into a case where this matters we can address it then.
 var (
-	_                  detectors.Detector = (*Scanner)(nil)
-	uriPattern                            = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
-	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
+	_          detectors.Detector = (*Scanner)(nil)
+	uriPattern                    = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
+	connStrPartPattern = regexp.MustCompile(`([[:alpha:]_]+)='(.+?)' ?`)
 )
 
 type Scanner struct {
