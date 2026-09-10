@@ -14,10 +14,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -1410,24 +1412,23 @@ func effectiveSecret(r *detectors.Result) string {
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
 	secretBytes := []byte(effectiveSecret(result))
 
-	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
-	// pre-assigned (for duplicate secrets), use it directly to find the correct
-	// occurrence instead of always matching the first one.
-	var offset int
+	offset := bytes.Index(chunk.Data, secretBytes)
 	if result.HasChunkOffset() {
 		offset = int(result.ChunkOffset())
-	} else {
-		offset = bytes.Index(chunk.Data, secretBytes)
-		if offset == -1 {
-			return 0, false
-		}
+	} else if offset == -1 {
+		return 0, false
 	}
 
-	lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
+	data := chunk.Data
+	if originalOffset := sourceOffset(chunk.OriginalData, chunk.Data, offset, len(secretBytes)); originalOffset >= 0 {
+		data, offset = chunk.OriginalData, originalOffset
+	}
+
+	lineNumber := int64(bytes.Count(data[:offset], []byte("\n")))
 	result.SetPrimarySecretLine(lineNumber)
 
 	// If the line containing the secret has the ignore tag, we should ignore the result.
-	after := chunk.Data[offset+len(secretBytes):]
+	after := data[offset+len(secretBytes):]
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
 		endLine = len(after)
@@ -1436,6 +1437,42 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		return lineNumber, true
 	}
 	return lineNumber, false
+}
+
+func sourceOffset(originalData, data []byte, offset, length int) int {
+	if originalData == nil || offset < 0 || offset+length > len(data) {
+		return -1
+	}
+	if bytes.Equal(originalData, data) {
+		return offset
+	}
+
+	var originalOffset, dataOffset int
+	for _, diff := range diffmatchpatch.New().DiffMainRunes(bytesAsRunes(originalData), bytesAsRunes(data), true) {
+		diffLength := utf8.RuneCountInString(diff.Text)
+		switch diff.Type {
+		case diffmatchpatch.DiffDelete:
+			originalOffset += diffLength
+		case diffmatchpatch.DiffInsert:
+			dataOffset += diffLength
+		case diffmatchpatch.DiffEqual:
+			if offset >= dataOffset && offset+length <= dataOffset+diffLength {
+				return originalOffset + offset - dataOffset
+			}
+			originalOffset += diffLength
+			dataOffset += diffLength
+		}
+	}
+	return -1
+}
+
+// Map each source byte to one rune so invalid UTF-8 survives diffing.
+func bytesAsRunes(data []byte) []rune {
+	runes := make([]rune, len(data))
+	for i, value := range data {
+		runes[i] = rune(value)
+	}
+	return runes
 }
 
 // AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same
