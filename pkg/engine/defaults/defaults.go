@@ -429,6 +429,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/klaviyo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/klipfolio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/knapsackpro"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kong"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kontent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kraken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
@@ -1345,6 +1346,7 @@ func buildDetectorList() []detectors.Detector {
 		&klaviyo.Scanner{},
 		&klipfolio.Scanner{},
 		&knapsackpro.Scanner{},
+		&kong.Scanner{},
 		&kontent.Scanner{},
 		&kraken.Scanner{},
 		&kucoin.Scanner{},
@@ -1904,6 +1906,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ResendDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
+		case *kong.Scanner:
+			return !feature.KongDetectorEnabled.Load()
 		default:
 			return false
 		}

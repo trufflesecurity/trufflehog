@@ -302,6 +302,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_KalturaSession:                          {},
 	detector_typepb.DetectorType_Keygen:                                  {},
 	detector_typepb.DetectorType_KiteConnect:                             {},
+	detector_typepb.DetectorType_Kong:                                    {},
 	detector_typepb.DetectorType_KubeConfig:                              {},
 	detector_typepb.DetectorType_LinkedIn:                                {},
 	detector_typepb.DetectorType_Linode:                                  {},
