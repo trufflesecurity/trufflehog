@@ -62,6 +62,9 @@ Only output first unverified result per chunk per detector if there are more tha
 \fB--filter-entropy=FILTER-ENTROPY\fR
 Filter unverified results with Shannon entropy. Start with 3.0.
 .TP
+\fB--no-ignore\fR
+Report results even if the line has a 'trufflehog:ignore' comment.
+.TP
 \fB--max-decode-depth=5\fR
 Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).
 .TP
