@@ -31,6 +31,31 @@ message VerifierConfig {
   repeated string headers = 3;
   repeated string successRanges = 4;
   repeated string rotatedRanges = 5;
+  // Optional OAuth2 auth for the verification endpoint. When set, the
+  // scanner acquires a bearer token before making the verification call.
+  VerifierAuth auth = 6;
+}
+
+// VerifierAuth configures OAuth2 token acquisition for a verification
+// endpoint. The grant type is determined by which oneof field is set.
+message VerifierAuth {
+  string token_endpoint = 1;
+  oneof grant_config {
+    ROPCConfig ropc = 2;
+    // Future grant types:
+    // ClientCredentialsConfig client_credentials = 3;
+  }
+}
+
+// ROPCConfig holds credentials for the Resource Owner Password
+// Credentials grant (RFC 6749 Section 4.3). Deprecated by RFC 9700
+// but still used in enterprise environments with trusted server-side
+// clients (e.g. self-hosted scanners).
+message ROPCConfig {
+  string username = 1;
+  string password = 2;
+  string client_id = 3;
+  string client_secret = 4;
 }
 
 message ValidationConfig {

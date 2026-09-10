@@ -5,12 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -25,11 +29,138 @@ import (
 // for poorly defined regexps.
 const maxTotalMatches = 100
 
+// ─── OAuth2 token acquisition ────────────────────────────────────────
+
+// TokenSource abstracts OAuth2 token acquisition. Each grant type
+// implements this interface with its own credential exchange and
+// caching logic.
+type TokenSource interface {
+	// Token returns a valid access token, refreshing it if necessary.
+	Token(ctx context.Context) (string, error)
+}
+
+// tokenExpiryDelta is subtracted from the token's expiry time to
+// avoid race conditions where the token expires between the check
+// and the HTTP request.
+const tokenExpiryDelta = 10 * time.Second
+
+// ropcTokenSource implements TokenSource for the Resource Owner
+// Password Credentials grant (RFC 6749 Section 4.3). It caches the
+// current token and only contacts the token endpoint when the cached
+// token is missing or about to expire.
+type ropcTokenSource struct {
+	tokenEndpoint string
+	username      string
+	password      string
+	clientID      string
+	clientSecret  string
+
+	mu    sync.Mutex
+	token string
+	expiry time.Time
+}
+
+// newROPCTokenSource builds a token source from the proto config.
+func newROPCTokenSource(auth *custom_detectorspb.VerifierAuth, ropc *custom_detectorspb.ROPCConfig) *ropcTokenSource {
+	return &ropcTokenSource{
+		tokenEndpoint: auth.GetTokenEndpoint(),
+		username:      ropc.GetUsername(),
+		password:      ropc.GetPassword(),
+		clientID:      ropc.GetClientId(),
+		clientSecret:  ropc.GetClientSecret(),
+	}
+}
+
+// ropcTokenResponse is the standard OAuth2 token response body
+// (RFC 6749 Section 5.1).
+type ropcTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
+func (s *ropcTokenSource) Token(ctx context.Context) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Return the cached token if it's still valid.
+	if s.token != "" && time.Now().Before(s.expiry) {
+		return s.token, nil
+	}
+
+	// POST form-encoded ROPC body per RFC 6749 Section 4.3.2.
+	form := url.Values{
+		"grant_type":    {"password"},
+		"username":      {s.username},
+		"password":      {s.password},
+		"client_id":     {s.clientID},
+		"client_secret": {s.clientSecret},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", s.tokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("building ROPC token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("ROPC token request to %s: %w", s.tokenEndpoint, err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("ROPC token endpoint returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp ropcTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", fmt.Errorf("decoding ROPC token response: %w", err)
+	}
+
+	s.token = tokenResp.AccessToken
+	// Cache with a safety margin so we don't send an about-to-expire token.
+	s.expiry = time.Now().Add(time.Duration(tokenResp.ExpiresIn)*time.Second - tokenExpiryDelta)
+
+	return s.token, nil
+}
+
+// customDetectorVerifier binds a VerifierConfig to an optional
+// TokenSource. This avoids parallel slices and ensures the auth
+// config can never get out of sync with its verifier.
+type customDetectorVerifier struct {
+	config      *custom_detectorspb.VerifierConfig
+	tokenSource TokenSource // nil when no auth is configured
+}
+
+// buildTokenSource creates the appropriate TokenSource for a
+// VerifierConfig's auth block, or returns nil if no auth is set.
+func buildTokenSource(auth *custom_detectorspb.VerifierAuth) TokenSource {
+	if auth == nil {
+		return nil
+	}
+	switch cfg := auth.GetGrantConfig().(type) {
+	case *custom_detectorspb.VerifierAuth_Ropc:
+		return newROPCTokenSource(auth, cfg.Ropc)
+	default:
+		return nil
+	}
+}
+
+// ─── Custom detector ─────────────────────────────────────────────────
+
 // CustomRegexWebhook is a CustomRegex with webhook validation that is
 // guaranteed to be valid (assuming the data is not changed after
 // initialization).
 type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
+	// verifiers pairs each VerifierConfig with its optional token source.
+	// Built once in NewWebhookCustomRegex; used in createResults.
+	verifiers []customDetectorVerifier
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -76,8 +207,21 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	// Ensure primary regex name is set.
 	ensurePrimaryRegexNameSet(pb)
 
+	// Build the verifier slice, pairing each VerifierConfig with its
+	// token source (nil when auth isn't configured).
+	verifiers := make([]customDetectorVerifier, 0, len(pb.GetVerify()))
+	for _, vc := range pb.GetVerify() {
+		verifiers = append(verifiers, customDetectorVerifier{
+			config:      vc,
+			tokenSource: buildTokenSource(vc.GetAuth()),
+		})
+	}
+
 	// TODO: Copy only necessary data out of pb.
-	return &CustomRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{
+		CustomRegex: pb,
+		verifiers:   verifiers,
+	}, nil
 }
 
 var httpClient = common.SaneHttpClient()
@@ -288,16 +432,16 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		rangesInEffect bool
 	)
 
-	// Try each config until we get a definitive answer.
-	for _, verifyConfig := range c.GetVerify() {
+	// Try each verifier until we get a definitive answer.
+	for _, v := range c.verifiers {
 		if common.IsDone(ctx) {
 			return ctx.Err()
 		}
-		req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
+		req, err := http.NewRequestWithContext(ctx, "POST", v.config.GetEndpoint(), bytes.NewReader(jsonBody))
 		if err != nil {
 			continue
 		}
-		for _, header := range verifyConfig.GetHeaders() {
+		for _, header := range v.config.GetHeaders() {
 			key, value, found := strings.Cut(header, ":")
 			if !found {
 				continue
@@ -307,6 +451,18 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		if req.Header.Get("Content-Type") == "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
+
+		// If this verifier has OAuth2 auth, acquire a bearer token
+		// and attach it to the request.
+		if v.tokenSource != nil {
+			token, err := v.tokenSource.Token(ctx)
+			if err != nil {
+				// Token acquisition failed — skip this verifier.
+				continue
+			}
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			continue
@@ -316,8 +472,8 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			_ = resp.Body.Close()
 		}()
 
-		successRanges := verifyConfig.GetSuccessRanges()
-		rotatedRanges := verifyConfig.GetRotatedRanges()
+		successRanges := v.config.GetSuccessRanges()
+		rotatedRanges := v.config.GetRotatedRanges()
 
 		if len(successRanges) == 0 && len(rotatedRanges) == 0 {
 			// Backward compat: no ranges configured, use legacy behavior.
