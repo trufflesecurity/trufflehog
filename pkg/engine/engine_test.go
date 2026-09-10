@@ -723,9 +723,9 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 	assert.Empty(t, e.results)
 }
 
-func TestProcessResult_IgnoreLinePresentWithNoIgnore_ResultGenerated(t *testing.T) {
+func TestProcessResult_IgnoreLinePresentWithNoIgnoreTag_ResultGenerated(t *testing.T) {
 	// Arrange: Create an engine that does not honor ignore tags
-	e := Engine{results: make(chan detectors.ResultWithMetadata, 1), noIgnore: true}
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1), noIgnoreTag: true}
 
 	// Arrange: Create a Chunk
 	chunk := sources.Chunk{

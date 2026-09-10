@@ -407,7 +407,7 @@ aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
 - Is there an easy way to ignore specific secrets?
   - If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets.
 - Can I find secrets with `trufflehog:ignore` included?
-  - Pass `--no-ignore` to report results even when their line carries a `trufflehog:ignore` comment. This is useful for reviewing previously accepted findings.
+  - Pass `--no-ignore-tag` to report results even when their line carries a `trufflehog:ignore` comment. This is useful for reviewing previously accepted findings.
 
 # :newspaper: What's new in v3?
 
