@@ -439,6 +439,26 @@ func GitURLParse(gitURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
+// trimFileURIDriveSlash strips the leading slash from the Windows drive-letter
+// form of an RFC 8089 file URI path.
+//
+// url.URL.Path for "file:///C:/repo" is "/C:/repo". Windows does not consider
+// that absolute, so filepath.Abs joins it onto the working directory and
+// produces "C:\C:\repo", and the clone then fails on a path that does not
+// exist. Dropping the slash yields "C:/repo", which Abs leaves alone.
+//
+// Anything not in that form is returned unchanged, so the caller can apply this
+// to every path on Windows without inspecting it first.
+func trimFileURIDriveSlash(rawPath string) string {
+	if len(rawPath) < 3 || rawPath[0] != '/' || rawPath[2] != ':' {
+		return rawPath
+	}
+	if c := rawPath[1]; (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
+		return rawPath
+	}
+	return rawPath[1:]
+}
+
 // normalizeFileURI converts relative file URIs to absolute paths.
 // This ensures that file:// URIs work correctly with git clone operations.
 func normalizeFileURI(uri *url.URL) (*url.URL, error) {
@@ -457,6 +477,10 @@ func normalizeFileURI(uri *url.URL) (*url.URL, error) {
 	} else {
 		// Handle cases like file:///absolute/path
 		rawPath = uri.Path
+	}
+
+	if runtime.GOOS == "windows" {
+		rawPath = trimFileURIDriveSlash(rawPath)
 	}
 
 	absPath, err := filepath.Abs(rawPath)
