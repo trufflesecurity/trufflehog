@@ -24,7 +24,8 @@ var (
 	client = detectors.DetectorHttpClientWithLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b([a-zA-Z0-9-]{36})\b`)
+	// Metabase session tokens are UUIDs (see src/metabase/session/models/session.clj: (str (random-uuid))).
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\b`)
 
 	baseURL = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b(https?:\/\/[-a-zA-Z0-9@:%._\+~#=]{7,256})\b`)
 )
