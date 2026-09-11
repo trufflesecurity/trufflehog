@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -179,7 +180,7 @@ func TestClassifyPostgresVerifyError(t *testing.T) {
 	tests := []struct {
 		name         string
 		err          error
-		dbName       string
+		params       map[string]string
 		wantVerified bool
 		wantErr      bool
 	}{
@@ -192,7 +193,19 @@ func TestClassifyPostgresVerifyError(t *testing.T) {
 		{
 			name:         "missing database code",
 			err:          &pgconn.PgError{Code: "3D000", Message: `database "app" does not exist`},
-			dbName:       "app",
+			params:       map[string]string{pgDbname: "app"},
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database code needs no parameters",
+			err:          &pgconn.PgError{Code: "3D000", Message: "la base de données n'existe pas"},
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database code from lib/pq",
+			err:          &pq.Error{Code: "3D000", Message: `database "app" does not exist`},
 			wantVerified: true,
 			wantErr:      false,
 		},
@@ -203,8 +216,30 @@ func TestClassifyPostgresVerifyError(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name:         "missing database by message",
+			name:         "missing database by message names the given database",
+			err:          errors.New(`database "app" does not exist`),
+			params:       map[string]string{pgDbname: "app"},
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database by message names the user when no database is given",
+			err:          errors.New(`database "svc_reports" does not exist`),
+			params:       map[string]string{pgUser: "svc_reports"},
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "missing database by message for a database nobody asked for",
 			err:          errors.New(`database "postgres" does not exist`),
+			params:       map[string]string{pgUser: "svc_reports"},
+			wantVerified: false,
+			wantErr:      true,
+		},
+		{
+			name:         "proxy relays the failure without a sqlstate",
+			err:          errors.New(`server login has been failing, cached error: database "svc_reports" does not exist`),
+			params:       map[string]string{pgUser: "svc_reports"},
 			wantVerified: true,
 			wantErr:      false,
 		},
@@ -219,7 +254,7 @@ func TestClassifyPostgresVerifyError(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			verified, err := classifyPostgresVerifyError(tc.err, tc.dbName)
+			verified, err := classifyPostgresVerifyError(tc.err, tc.params)
 			assert.Equal(t, tc.wantVerified, verified)
 			if tc.wantErr {
 				assert.Error(t, err)
