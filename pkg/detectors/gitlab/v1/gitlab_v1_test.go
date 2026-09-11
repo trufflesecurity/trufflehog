@@ -45,6 +45,16 @@ func TestGitLab_Pattern(t *testing.T) {
 			input: "GITLAB_TOKEN=ABc123456789dEFghIJK",
 			want:  []string{"ABc123456789dEFghIJKhttps://gitlab.com"},
 		},
+		{
+			// Regression test for https://github.com/trufflesecurity/trufflehog/issues/4756
+			// ARG variable names that appear after GITLAB_* args in a Dockerfile must not be
+			// flagged as secrets because they contain no digits (KeyIsRandom check).
+			name: "no false positive for Dockerfile ARG variable name after GITLAB_ACCESS_TOKEN",
+			input: `ARG GITLAB_ACCESS_TOKEN_TYPE=Private-Token
+ARG GITLAB_ACCESS_TOKEN
+ARG MAVEN_SETTINGS_PROFILE=test`,
+			want: []string{},
+		},
 	}
 
 	for _, test := range tests {

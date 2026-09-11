@@ -79,6 +79,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
+		// real tokens are random and always contain at least one digit;
+		// variable names like MAVEN_SETTINGS_PROFILE have no digits and
+		// are a common source of false positives when they appear within
+		// 40 characters of a "gitlab" keyword on a preceding line.
+		if !detectors.KeyIsRandom(resMatch) {
+			continue
+		}
+
 		for _, endpoint := range s.Endpoints() {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Gitlab,
