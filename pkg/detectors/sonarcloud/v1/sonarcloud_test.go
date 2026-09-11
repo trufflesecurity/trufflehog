@@ -50,6 +50,22 @@ func TestSonarCloud_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s token = '@%s'", keyword, validPattern),
 			want:  []string{},
 		},
+		{
+			// Regression test for issue #5000: dependabot PR bodies contain
+			// "github.com/<org>/<repo>/commit/<40-char-sha>" URLs whose SHA-1
+			// hashes otherwise look exactly like a SonarCloud token and are
+			// preceded by the "sonar" keyword within the prefix window.
+			name:  "github commit sha is not a sonar token",
+			input: "Updates sonarsource/sonarqube-scan-action. See https://github.com/SonarSource/sonarqube-scan-action/commit/56568530eddcb15ab65e7880af318fba5b859e2e for details.",
+			want:  []string{},
+		},
+		{
+			// Same family of FP: a bare "commit/<sha>" path with the keyword
+			// elsewhere in the window must also be rejected.
+			name:  "commit path without host is not a sonar token",
+			input: "sonar scanner bumped, see commit/7006c4492b2e0ee0f816d36501671557c97f5995 in the upstream repo",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
