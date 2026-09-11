@@ -45,6 +45,21 @@ func TestGitLab_Pattern(t *testing.T) {
 			input: "GITLAB_TOKEN=ABc123456789dEFghIJK",
 			want:  []string{"ABc123456789dEFghIJKhttps://gitlab.com"},
 		},
+		{
+			name: "uuid webhook header is not detected",
+			input: `{
+  "x-gitlab-event": "Push Hook",
+  "x-gitlab-event-uuid": "c3e2f2b7-a945-4c58-924b-38d8186e200a"
+}`,
+			want: []string{},
+		},
+		{
+			name: "hyphenated identifier near gitlab keyword is not detected",
+			input: `{
+  "gitlab": "a1b2-c3d4-e5f6a7b8c9d0"
+}`,
+			want: []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -62,11 +77,17 @@ func TestGitLab_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
+				if len(test.want) == 0 {
+					t.Errorf("expected no results, received %d", len(results))
+				} else if len(results) == 0 {
 					t.Errorf("did not receive result")
 				} else {
 					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			if len(test.want) == 0 {
 				return
 			}
 
