@@ -211,7 +211,7 @@ func (h *HttpStatusTest) RunTest(headers map[string]string) error {
 	}
 
 	// Create new HTTP request
-	client := &http.Client{}
+	client := &http.Client{Transport: baseTransport()}
 	req, err := http.NewRequest(h.Method, h.URL, data)
 	if err != nil {
 		return err
