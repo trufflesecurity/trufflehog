@@ -268,6 +268,29 @@ SNU5XYXA3T1h5Zk9cblBQcE5Gb1BUWGd2M3FDcW5sTEhyR3pNPVxuLS0tLS1FTkQgUFJJVkFURSBLRVk
 	}
 }
 
+func Test_ValidateAuthRealm(t *testing.T) {
+	tests := map[string]bool{
+		"https://auth.docker.io/token": true,
+		"https://ghcr.io/token":        true,
+		"http://169.254.169.254/":      false,
+		"http://127.0.0.1/token":       false,
+		"http://10.0.0.5/token":        false,
+		"http://localhost/token":       false,
+		"http://metadata.google.internal/": false,
+		"ftp://auth.docker.io/token":   false,
+		"://no-host":                   false,
+	}
+	for realm, wantOK := range tests {
+		err := validateAuthRealm(realm)
+		if wantOK && err != nil {
+			t.Errorf("realm %q: unexpected error: %v", realm, err)
+		}
+		if !wantOK && err == nil {
+			t.Errorf("realm %q: expected error", realm)
+		}
+	}
+}
+
 func Test_ParseAuthenticateHeader(t *testing.T) {
 	tests := map[string]map[string]string{
 		`Bearer realm="https://auth.docker.io/token",service="registry.docker.io"`: {
