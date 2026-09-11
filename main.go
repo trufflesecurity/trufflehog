@@ -91,6 +91,7 @@ var (
 	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
 	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
 	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	gitLowMemoryScan         = cli.Flag("git-low-memory-scan", "Reduce memory use for git scanning.").Hidden().Bool()
 	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()
@@ -178,6 +179,11 @@ var (
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
 	s3ScanEndpoint      = s3Scan.Flag("endpoint", "Endpoint of an S3-compatible service to scan instead of AWS S3. (eg. https://s3.internal.example.com)").String()
 	s3ScanRegion        = s3Scan.Flag("region", "Region used to sign requests. Defaults to us-east-1.").String()
+
+	s3ScanIncludePrefixes   = s3Scan.Flag("include-prefix", "Only scan objects whose key starts with this prefix. You can repeat this flag.").Strings()
+	s3ScanExcludePrefixes   = s3Scan.Flag("exclude-prefix", "Skip objects whose key starts with this prefix. You can repeat this flag. Takes precedence over --include-prefix.").Strings()
+	s3ScanIncludeExtensions = s3Scan.Flag("include-extension", "Only scan objects with this file extension, written without a leading dot (eg. tf). You can repeat this flag. Incompatible with --exclude-extension.").Strings()
+	s3ScanExcludeExtensions = s3Scan.Flag("exclude-extension", "Skip objects with this file extension, written without a leading dot (eg. zip). You can repeat this flag. Incompatible with --include-extension.").Strings()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
 	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
@@ -513,6 +519,10 @@ func run(state overseer.State, logSync func() error) {
 		feature.GitCloneTimeoutDuration.Store(int64(*gitCloneTimeout))
 	}
 
+	if *gitLowMemoryScan {
+		feature.UseGitLowMemoryScan.Store(true)
+	}
+
 	if *skipAdditionalRefs {
 		feature.SkipAdditionalRefs.Store(true)
 	}
@@ -575,7 +585,9 @@ func run(state overseer.State, logSync func() error) {
 	feature.NewRelicMobileAppTokenDetectorEnabled.Store(true)
 	feature.MSTeamsWebhookV2DetectorEnabled.Store(true)
 	feature.SolarwindsDetectorEnabled.Store(true)
+	feature.ResendDetectorEnabled.Store(true)
 	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
+	feature.HumioAPITokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -1021,16 +1033,20 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
-			Key:           *s3ScanKey,
-			Secret:        *s3ScanSecret,
-			SessionToken:  *s3ScanSessionToken,
-			Buckets:       *s3ScanBuckets,
-			IgnoreBuckets: *s3ScanIgnoreBuckets,
-			Roles:         *s3ScanRoleArns,
-			CloudCred:     *s3ScanCloudEnv,
-			MaxObjectSize: int64(*s3ScanMaxObjectSize),
-			Endpoint:      *s3ScanEndpoint,
-			Region:        *s3ScanRegion,
+			Key:               *s3ScanKey,
+			Secret:            *s3ScanSecret,
+			SessionToken:      *s3ScanSessionToken,
+			Buckets:           *s3ScanBuckets,
+			IgnoreBuckets:     *s3ScanIgnoreBuckets,
+			Roles:             *s3ScanRoleArns,
+			CloudCred:         *s3ScanCloudEnv,
+			MaxObjectSize:     int64(*s3ScanMaxObjectSize),
+			Endpoint:          *s3ScanEndpoint,
+			Region:            *s3ScanRegion,
+			IncludePrefixes:   *s3ScanIncludePrefixes,
+			ExcludePrefixes:   *s3ScanExcludePrefixes,
+			IncludeExtensions: *s3ScanIncludeExtensions,
+			ExcludeExtensions: *s3ScanExcludeExtensions,
 		}
 		if ref, err := eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)

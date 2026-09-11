@@ -2,7 +2,7 @@ package custom_detectors
 
 import (
 	"fmt"
-	"regexp"
+	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"strconv"
 	"strings"
 )

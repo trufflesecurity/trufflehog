@@ -54,6 +54,11 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 		connection.Roles = c.Roles
 	}
 
+	connection.IncludePrefixes = c.IncludePrefixes
+	connection.ExcludePrefixes = c.ExcludePrefixes
+	connection.IncludeExtensions = c.IncludeExtensions
+	connection.ExcludeExtensions = c.ExcludeExtensions
+
 	connection.Endpoint = c.Endpoint
 	connection.Region = c.Region
 

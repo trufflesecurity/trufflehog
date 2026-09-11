@@ -6,12 +6,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -127,11 +127,12 @@ type Config struct {
 // NewGit creates a new Git instance with the provided configuration. The Git instance is used to interact with
 // Git repositories.
 func NewGit(config *Config) *Git {
-	var parser *gitparse.Parser
+	parserOpts := []gitparse.Option{}
 	if config.UseCustomContentWriter {
-		parser = gitparse.NewParser(gitparse.UseCustomContentWriter())
-	} else {
-		parser = gitparse.NewParser()
+		parserOpts = append(parserOpts, gitparse.UseCustomContentWriter())
+	}
+	if feature.UseGitLowMemoryScan.Load() {
+		parserOpts = append(parserOpts, gitparse.UseLowMemoryScan())
 	}
 
 	return &Git{
@@ -145,7 +146,7 @@ func NewGit(config *Config) *Git {
 		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
-		parser:             parser,
+		parser:             gitparse.NewParser(parserOpts...),
 	}
 }
 

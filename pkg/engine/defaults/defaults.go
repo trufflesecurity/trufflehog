@@ -387,6 +387,7 @@ import (
 	hubspot_apikey_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humanity"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humioapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hunter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hybiscus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hypertrack"
@@ -644,6 +645,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replicate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/resend"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rev"
@@ -1299,6 +1301,7 @@ func buildDetectorList() []detectors.Detector {
 		&hubspot_apikey_v2.Scanner{},
 		&huggingface.Scanner{},
 		&humanity.Scanner{},
+		&humioapitoken.Scanner{},
 		&hunter.Scanner{},
 		&hybiscus.Scanner{},
 		&hypertrack.Scanner{},
@@ -1565,6 +1568,7 @@ func buildDetectorList() []detectors.Detector {
 		&replicate.Scanner{},
 		&replyio.Scanner{},
 		&requestfinance.Scanner{},
+		&resend.Scanner{},
 		// &restpack.Scanner{},
 		&restpackhtmltopdfapi.Scanner{},
 		&restpackscreenshotapi.Scanner{},
@@ -1894,6 +1898,10 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.MSTeamsWebhookV2DetectorEnabled.Load()
 		case *solarwindsobservability.Scanner:
 			return !feature.SolarwindsDetectorEnabled.Load()
+		case *humioapitoken.Scanner:
+			return !feature.HumioAPITokenDetectorEnabled.Load()
+		case *resend.Scanner:
+			return !feature.ResendDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
 		default:

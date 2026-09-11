@@ -1,7 +1,7 @@
 package common
 
 import (
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -95,7 +95,7 @@ func TestPasswordRegexCheck(t *testing.T) {
 	passwordRegexPat := PasswordRegexCheck(passwordPattern)
 
 	expectedRegexPattern := regexp.MustCompile(passwordRegex)
-	assert.Equal(t, passwordRegexPat.compiledRegex, expectedRegexPattern)
+	assert.Equal(t, expectedRegexPattern.String(), passwordRegexPat.compiledRegex.String())
 
 	testString := `password = "johnsmith123$!"
                    password='johnsmith123$!'
