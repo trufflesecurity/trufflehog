@@ -142,7 +142,7 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.s.UseCloudEndpoint(true)
+			tt.s.UseCloudEndpoints(true)
 			tt.s.UseFoundEndpoints(true)
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -177,7 +177,7 @@ func TestHashiCorpVaultAuth_WithCustomEndpoint(t *testing.T) {
 	secretId := testSecrets.MustGetField("HASHICORPVAULTAUTH_SECRET_ID")
 	vaultUrl := testSecrets.MustGetField("HASHICORPVAULTAUTH_URL")
 	s := Scanner{}
-	s.UseCloudEndpoint(true)
+	s.UseCloudEndpoints(true)
 	s.UseFoundEndpoints(true)
 	s.SetConfiguredEndpoints(vaultUrl)
 	data := fmt.Appendf(nil, "hashicorp config:\nrole_id: %s\nsecret_id: %s", roleId, secretId)

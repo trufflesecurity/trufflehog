@@ -86,7 +86,7 @@ func TestVaultToken_FromData_Integration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			scanner := Scanner{}
 			scanner.UseFoundEndpoints(true)
-			scanner.UseCloudEndpoint(true)
+			scanner.UseCloudEndpoints(true)
 			results, err := scanner.FromData(ctx, tt.verify, []byte(tt.input))
 			require.NoError(t, err)
 

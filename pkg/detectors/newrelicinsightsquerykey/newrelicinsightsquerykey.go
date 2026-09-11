@@ -17,18 +17,45 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 
 	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.CloudProvider      = (*Scanner)(nil)
+)
 
 var (
 	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(`\b(NRIQ-[a-zA-Z0-9-_]{25})`)
 	accountIDPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"relic", "account", "id"}) + `\b(\d{4,10})\b`)
 )
+
+// Cloud endpoints here are hosts, not full URLs - the account ID (discovered
+// per match, not fixed) is appended to build the actual request URL.
+const (
+	usHost = "https://insights-api.newrelic.com"
+	euHost = "https://insights-api.eu.newrelic.com"
+)
+
+func (Scanner) CloudEndpoints() []string { return []string{usHost, euHost} }
+
+// regionForHost labels the well-known US/EU cloud hosts. A user-configured
+// or found host has no known region, so it's left blank.
+func regionForHost(host string) string {
+	switch host {
+	case usHost:
+		return "us"
+	case euHost:
+		return "eu"
+	default:
+		return ""
+	}
+}
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
@@ -79,8 +106,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, extraData, verificationErr := s.verify(ctx, keyResMatch, accountIDResMatch)
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
-				if extraData != nil {
-					s1.SecretParts["region"] = extraData["region"]
+				if region, ok := extraData["region"]; ok {
+					s1.SecretParts["region"] = region
 				}
 				s1.SetVerificationError(verificationErr)
 			}
@@ -97,27 +124,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // It checks both the US and EU endpoints before returning an error.
 // Account ID is required to verify as the API endpoint is account-specific.
 func (s Scanner) verify(ctx context.Context, key string, accountID string) (bool, map[string]string, error) {
-	regionUrls := map[string]string{
-		"us": fmt.Sprintf("https://insights-api.newrelic.com/v1/accounts/%s/query?nrql=SELECT%%201", accountID),
-		"eu": fmt.Sprintf("https://insights-api.eu.newrelic.com/v1/accounts/%s/query?nrql=SELECT%%201", accountID),
-	}
-	errs := make([]error, 0, len(regionUrls))
-	for region, regionUrl := range regionUrls {
-		verified, err := s.verifyRegion(ctx, key, regionUrl)
+	hosts := s.Endpoints(nil)
+	errs := make([]error, 0, len(hosts))
+	for _, host := range hosts {
+		endpoint := fmt.Sprintf("%s/v1/accounts/%s/query?nrql=SELECT%%201", host, accountID)
+		verified, err := s.verifyEndpoint(ctx, key, endpoint)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("error verifying region %s: %w", region, err))
+			errs = append(errs, fmt.Errorf("error verifying host %s: %w", host, err))
 			continue
 		}
 		if verified {
-			return true, map[string]string{"region": region}, nil
+			extraData := map[string]string{}
+			if region := regionForHost(host); region != "" {
+				extraData["region"] = region
+			}
+			return true, extraData, nil
 		}
 	}
 	return false, nil, errors.Join(errs...)
 }
 
-func (s Scanner) verifyRegion(ctx context.Context, key, regionUrl string) (bool, error) {
+func (s Scanner) verifyEndpoint(ctx context.Context, key, endpoint string) (bool, error) {
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, regionUrl, http.NoBody)
+		ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		return false, fmt.Errorf("error constructing request: %w", err)
 	}

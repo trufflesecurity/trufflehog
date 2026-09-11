@@ -24,7 +24,7 @@ var (
 	_ detectors.EndpointCustomizer = (*Scanner)(nil)
 )
 
-func (Scanner) CloudEndpoint() string { return "" }
+func (Scanner) CloudEndpoints() []string { return nil }
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses

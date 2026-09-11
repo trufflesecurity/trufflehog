@@ -1483,9 +1483,11 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	}
 
 	for _, det := range e.detectors {
-		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
+		if endpoints, ok := det.(interface {
+			Endpoints([]string, ...string) []string
+		}); ok {
 			id := config.GetDetectorID(det)
-			if len(endpoints.Endpoints()) == 0 {
+			if len(endpoints.Endpoints(nil)) == 0 {
 				if _, ok := noCloudEndpointDetectors[det.Type()]; !ok {
 					t.Fatalf("detector %q Endpoints() is empty", id.String())
 				}

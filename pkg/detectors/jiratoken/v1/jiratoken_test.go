@@ -26,8 +26,8 @@ var (
 
 func TestJiraToken_Pattern(t *testing.T) {
 	d := Scanner{}
-	d.SetCloudEndpoint(d.CloudEndpoint())
-	d.UseCloudEndpoint(true)
+	d.SetCloudEndpoints(d.CloudEndpoints()...)
+	d.UseCloudEndpoints(true)
 	d.UseFoundEndpoints(true)
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {

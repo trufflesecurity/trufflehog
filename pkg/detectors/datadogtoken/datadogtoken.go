@@ -26,7 +26,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
 
-func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
+func (Scanner) CloudEndpoints() []string { return []string{"https://api.datadoghq.com"} }
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -141,7 +141,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				for _, baseURL := range s.Endpoints(endpoints...) {
+				for _, baseURL := range s.Endpoints(endpoints) {
 					res, isVerified, verificationErr := verifyMatch(ctx, client, resApiMatch, resAppMatch, baseURL)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, resApiMatch, resAppMatch)

@@ -18,15 +18,40 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.CloudProvider      = (*Scanner)(nil)
+)
 
 var (
 	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(`\b(NRBR-[0-9a-f]{19})\b`)
 )
+
+const (
+	usEndpoint = "https://bam.nr-data.net/1/"
+	euEndpoint = "https://bam.eu01.nr-data.net/1/"
+)
+
+func (Scanner) CloudEndpoints() []string { return []string{usEndpoint, euEndpoint} }
+
+// regionForEndpoint labels the well-known US/EU cloud endpoints. A
+// user-configured or found endpoint has no known region, so it's left blank.
+func regionForEndpoint(endpoint string) string {
+	switch endpoint {
+	case usEndpoint:
+		return "us"
+	case euEndpoint:
+		return "eu"
+	default:
+		return ""
+	}
+}
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
@@ -84,26 +109,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // A 400 Bad Request response indicates that the key is valid but the request is malformed (because we are not sending the expected payload)
 // A 403 Forbidden response indicates that the key is invalid or revoked
 func (s Scanner) verify(ctx context.Context, key string) (bool, map[string]string, error) {
-	regionUrls := map[string]string{
-		"us": "https://bam.nr-data.net/1/",
-		"eu": "https://bam.eu01.nr-data.net/1/",
-	}
-	errs := make([]error, 0, len(regionUrls))
-	for region, regionUrl := range regionUrls {
-		verified, err := s.verifyRegion(ctx, key, regionUrl)
+	endpoints := s.Endpoints(nil)
+	errs := make([]error, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		verified, err := s.verifyEndpoint(ctx, key, endpoint)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("error verifying region %s: %w", region, err))
+			errs = append(errs, fmt.Errorf("error verifying endpoint %s: %w", endpoint, err))
 			continue
 		}
 		if verified {
-			return true, map[string]string{"region": region}, nil
+			extraData := map[string]string{}
+			if region := regionForEndpoint(endpoint); region != "" {
+				extraData["region"] = region
+			}
+			return true, extraData, nil
 		}
 	}
 	return false, nil, errors.Join(errs...)
 }
 
-func (s Scanner) verifyRegion(ctx context.Context, key string, regionUrl string) (bool, error) {
-	fullUrl, err := url.JoinPath(regionUrl, key)
+func (s Scanner) verifyEndpoint(ctx context.Context, key string, endpoint string) (bool, error) {
+	fullUrl, err := url.JoinPath(endpoint, key)
 	if err != nil {
 		return false, fmt.Errorf("error constructing URL: %w", err)
 	}
