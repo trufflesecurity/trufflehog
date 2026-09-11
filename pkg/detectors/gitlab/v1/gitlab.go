@@ -34,7 +34,16 @@ func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
+	// keyPat matches a `gitlab` keyword within 40 characters of the captured
+	// secret, but restricts the gap to the same physical line. The shared
+	// `detectors.PrefixRegex` allows `(?:.|[\n\r]){0,40}?`, which let the
+	// keyword and an unrelated token on a later line be matched together
+	// (e.g. a Dockerfile's `ARG GITLAB_ACCESS_TOKEN` on one line and
+	// `ARG MAVEN_SETTINGS_PROFILE` on the next produced a false positive on
+	// `MAVEN_SETTINGS_PROFILE`). Using `[^\n\r]{0,40}?` keeps the keyword and
+	// the candidate secret on the same line without weakening any real
+	// single-line match. See trufflesecurity/trufflehog#4756.
+	keyPat = regexp.MustCompile(`(?i:gitlab)[^\n\r]{0,40}?\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
 )
