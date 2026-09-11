@@ -5,14 +5,15 @@ on:
     tags:
       - v*
 
-permissions:
-  contents: write
-  packages: write
-  id-token: write
-
 jobs:
   Release:
     runs-on: ubuntu-latest
+    # Scoped to the job that publishes: contents (release + assets),
+    # packages (GHCR), id-token (cosign keyless signing).
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
@@ -87,6 +88,9 @@ jobs:
   mark-latest:
     needs: Release
     runs-on: ubuntu-latest
+    # Only needs to edit the release to flag it latest.
+    permissions:
+      contents: write
     steps:
       - name: Mark release as latest
         run: gh release edit "$TAG" --latest
