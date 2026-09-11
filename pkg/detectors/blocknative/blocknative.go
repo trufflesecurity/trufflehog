@@ -2,8 +2,6 @@ package blocknative
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -67,32 +65,9 @@ func (s Scanner) Description() string {
 	return "Blocknative is a platform that provides real-time blockchain transaction monitoring and notification services. Blocknative API keys can be used to access and interact with these services."
 }
 
-// docs: https://docs.blocknative.com/gas-prediction/gas-platform#api-endpoint
+// docs: API decommissioned on June 19, 2026.
 func verifyBlocknative(ctx context.Context, client *http.Client, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.blocknative.com/gasprices/blockprices", nil)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Add("Authorization", key)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return false, err
-	}
-
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	// Right now the blocknative API logic is broken and return 200 for invalid key as well
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusUnauthorized, http.StatusTooManyRequests:
-		return false, nil
-	default:
-		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
+	// The Blocknative gas estimation API was shut down on June 19, 2026.
+	// We no longer attempt to verify these credentials as the issuer endpoint is dead.
+	return false, nil
 }
