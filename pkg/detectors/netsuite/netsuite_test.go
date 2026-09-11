@@ -12,39 +12,50 @@ import (
 )
 
 var (
-	validConsumerKey      = "3WaMEd0KQtHSU7b24HEd79RZzSpMOfMdMUpIaXjq83DbNHVosCVrEVDxKiEQzT15"
+	// Realistic NetSuite OAuth 1.0 TBA credentials.
+	// All credential components are 64-char alphanumeric strings, matching [a-zA-Z0-9]{64}.
+	validConsumerKey    = "3WaMEd0KQtHSU7b24HEd79RZzSpMOfMdMUpIaXjq83DbNHVosCVrEVDxKiEQzT15"
+	validConsumerSecret = "5BZ70LfNshsJkDya1XaD8bMqtPWlOa2o1yKCk0H2DxnjtoaJKIcAw75GdI6zRaRD"
+	validTokenKey       = "KeYcG56ViFDleXPFJuEQ5CAGSJn7o2WDa5iGvLIvVBqZj5rMkaWFmzkp4bveJa74"
+	validTokenSecret    = "GGQUdyYOGDfDImJWCz4Kufk2GevaIDuVv83kIa9zCRuXIDLB4oh2eVDVPmsaSai2"
+	// NetSuite account IDs: alphanumeric + underscore/hyphen, 6-15 chars.
+	// TSTDRV prefix is a common NetSuite sandbox convention.
+	validAccountID = "TSTDRV_1234"
+
+	// Invalid variants: contain '?' which is not in [a-zA-Z0-9].
 	invalidConsumerKey    = "3Wa?Ed0KQtHSU7b24HEd79RZzSpMOfMdMUpIaXjq83DbNHVosCVrEVDxKiEQzT15"
-	validConsumerSecret   = "5BZ70LfNshsJkDya1XaD8bMqtPWlOa2o1yKCk0H2DxnjtoaJKIcAw75GdI6zRaRD"
 	invalidConsumerSecret = "5BZ70LfNshsJkDya?XaD8bMqtPWlOa2o1yKCk0H2DxnjtoaJKIcAw75GdI6zRaRD"
-	validTokenKey         = "KeYcG56ViFDleXPFJuEQ5CAGSJn7o2WDa5iGvLIvVBqZj5rMkaWFmzkp4bveJa74"
 	invalidTokenKey       = "KeYcG56ViFDleXPFJuEQ5CAGSJn7o2WD?5iGvLIvVBqZj5rMkaWFmzkp4bveJa74"
-	validTokenSecret      = "GGQUdyYOGDfDImJWCz4Kufk2GevaIDuVv83kIa9zCRuXIDLB4oh2eVDVPmsaSai2"
 	invalidTokenSecret    = "GGQUdyYOGDfDImJWCz4Kufk2Ge?aIDuVv83kIa9zCRuXIDLB4oh2eVDVPmsaSai2"
-	validAccountID        = "x1L2_BXo"
 	invalidAccountID      = "x1L2?BXo"
-	keyword               = "netsuite"
-	inputFormat           = `%s id - '%s'
+
+	keyword = "netsuite"
+	// Format that keeps each credential close to its label keyword, matching
+	// how PrefixRegex works (keyword within 40 chars of the capture group).
+	inputFormat = `%s id - '%s'
 consumer - '%s' consumer - '%s'
 token - '%s' token - '%s'`
-	outputPair1 = validConsumerKey + validConsumerSecret
-	outputPair2 = validConsumerSecret + validConsumerKey
 )
 
 func TestNetsuite_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
+	outputPair1 := validConsumerKey + validConsumerSecret
+	outputPair2 := validConsumerSecret + validConsumerKey
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword netsuite",
+			name:  "valid pattern - NetSuite TBA credentials",
 			input: fmt.Sprintf(inputFormat, keyword, validAccountID, validConsumerKey, validConsumerSecret, validTokenKey, validTokenSecret),
 			want:  []string{outputPair1, outputPair2, outputPair1, outputPair2},
 		},
 		{
-			name:  "invalid pattern",
+			name:  "invalid pattern - bad characters in credentials",
 			input: fmt.Sprintf(inputFormat, keyword, invalidAccountID, invalidConsumerKey, invalidConsumerSecret, invalidTokenKey, invalidTokenSecret),
 			want:  []string{},
 		},
