@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
@@ -137,13 +138,14 @@ func TestCustomDetectorsParsing(t *testing.T) {
 
 func TestFromData_InvalidRegEx(t *testing.T) {
 	c := &CustomRegexWebhook{
-		&custom_detectorspb.CustomRegex{
+		CustomRegex: &custom_detectorspb.CustomRegex{
 			Name:     "Internal bi tool",
 			Keywords: []string{"secret_v1_", "pat_v2_"},
 			Regex: map[string]string{
 				"test": "!!?(?:?)[a-zA-Z0-9]{32}", // invalid regex
 			},
 		},
+		httpClient: common.SaneHttpClient(),
 	}
 
 	_, err := c.FromData(context.Background(), false, []byte("test"))
@@ -832,12 +834,12 @@ func TestVerificationWithConfigurableRanges(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		serverStatus      int
-		successRanges     []string
-		rotatedRanges     []string
-		wantVerified      bool
-		wantVerifyErr     bool
+		name          string
+		serverStatus  int
+		successRanges []string
+		rotatedRanges []string
+		wantVerified  bool
+		wantVerifyErr bool
 	}{
 		{
 			name:          "backward compat: no ranges, 200 -> verified",

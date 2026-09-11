@@ -30,6 +30,7 @@ const maxTotalMatches = 100
 // initialization).
 type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
+	httpClient *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -77,10 +78,11 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	ensurePrimaryRegexNameSet(pb)
 
 	// TODO: Copy only necessary data out of pb.
-	return &CustomRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{
+		CustomRegex: pb,
+		httpClient:  common.SaneHttpClient(),
+	}, nil
 }
-
-var httpClient = common.SaneHttpClient()
 
 func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -307,7 +309,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		if req.Header.Get("Content-Type") == "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
-		resp, err := httpClient.Do(req)
+		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			continue
 		}
