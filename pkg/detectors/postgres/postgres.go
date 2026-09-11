@@ -275,13 +275,31 @@ func getDeadlineInSeconds(ctx context.Context) (int, bool) {
 	return int(duration.Seconds()), true
 }
 
-func isErrorDatabaseNotFound(err error, dbName string) bool {
-	if dbName == "" {
-		dbName = "postgres"
-	}
-	missingDbErrorText := fmt.Sprintf("database \"%s\" does not exist", dbName)
+// The server looks the database up only after authenticating, so this confirms the credentials.
+const invalidCatalogName = "3D000"
 
-	return strings.Contains(err.Error(), missingDbErrorText)
+// Message text is only a fallback, for proxies that relay a failure without a SQLSTATE; the server
+// translates messages per lc_messages. Postgres substitutes the user name, not "postgres", when a
+// connection string names no database (src/backend/tcop/backend_startup.c).
+func isErrorDatabaseNotFound(err error, params map[string]string) bool {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && pqErr.Code == invalidCatalogName {
+		return true
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == invalidCatalogName {
+		return true
+	}
+
+	dbName := params[pgDbname]
+	if dbName == "" {
+		dbName = params[pgUser]
+	}
+	if dbName == "" {
+		return false
+	}
+
+	return strings.Contains(err.Error(), fmt.Sprintf("database %q does not exist", dbName))
 }
 
 func verifyPostgres(ctx context.Context, params map[string]string) (bool, error) {
@@ -299,7 +317,7 @@ func verifyPostgres(ctx context.Context, params map[string]string) (bool, error)
 func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, error) {
 	conn, err := pgx.Connect(ctx, pgxConnString(params))
 	if err != nil {
-		return classifyPostgresVerifyError(err, params[pgDbname])
+		return classifyPostgresVerifyError(err, params)
 	}
 	defer func() {
 		// Best-effort close after verification; the verify outcome is already decided.
@@ -309,7 +327,7 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 	}()
 
 	if err := conn.Ping(ctx); err != nil {
-		return classifyPostgresVerifyError(err, params[pgDbname])
+		return classifyPostgresVerifyError(err, params)
 	}
 	return true, nil
 }
@@ -328,7 +346,7 @@ func pgxConnString(params map[string]string) string {
 	return connStr.String()
 }
 
-func classifyPostgresVerifyError(err error, dbName string) (bool, error) {
+func classifyPostgresVerifyError(err error, params map[string]string) (bool, error) {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
@@ -341,7 +359,7 @@ func classifyPostgresVerifyError(err error, dbName string) (bool, error) {
 	if strings.Contains(err.Error(), "password authentication failed") {
 		return false, nil
 	}
-	if isErrorDatabaseNotFound(err, dbName) {
+	if isErrorDatabaseNotFound(err, params) {
 		return true, nil
 	}
 	return false, err
@@ -392,7 +410,7 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 		params[pgSslmode] = pgSslmodeDisable
 		defer delete(params, pgSslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgresPq(params)
-	case isErrorDatabaseNotFound(err, params[pgDbname]):
+	case isErrorDatabaseNotFound(err, params):
 		return true, nil // If we know this, we were able to authenticate
 	default:
 		return false, err
