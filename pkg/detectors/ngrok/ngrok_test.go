@@ -12,9 +12,15 @@ import (
 )
 
 var (
-	validPattern   = "2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"
-	invalidPattern = "2WIRSIHOQyHSVklZnoz2k6bT?dH_0E7z0Ta9QEyR1fZvQ0KU9"
-	keyword        = "ngrok"
+	validPattern    = "2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"
+	validPatternAlt = "3GuTI5JXfaLtYILkc6N0xopP2V0_89zkDfefiuMv6Hk1z6oYi"
+	// Authtokens exist in the wild with letter-leading and 20-char suffixes
+	// (confirmed live against the ngrok API), so both must be detected.
+	validPatternLetterSuffix = "3GuTI5JXfaLtYILkc6N0xopP2V0_a9zkDfefiuMv6Hk1z6oYi"
+	validPatternShortSuffix  = "4HvUJ6KYgbMuZJMld7O1yqqQ3W1_b8ylEgfgjvNw7Il2z7pZ"
+	invalidPattern           = "2WIRSIHOQyHSVklZnoz2k6bT?dH_0E7z0Ta9QEyR1fZvQ0KU9"
+	invalidIDPattern         = "ak_3GuTI5JXfaLtYILkc6N0xopP2V0"
+	keyword                  = "ngrok"
 )
 
 func TestNgrok_Pattern(t *testing.T) {
@@ -31,9 +37,24 @@ func TestNgrok_Pattern(t *testing.T) {
 			want:  []string{"2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"},
 		},
 		{
+			name:  "valid pattern - api key not starting with 2",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPatternAlt),
+			want:  []string{validPatternAlt},
+		},
+		{
 			name:  "valid pattern - ignore duplicate",
 			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
 			want:  []string{"2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"},
+		},
+		{
+			name:  "valid pattern - authtoken suffix not starting with digit",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPatternLetterSuffix),
+			want:  []string{validPatternLetterSuffix},
+		},
+		{
+			name:  "valid pattern - authtoken with 20 char suffix",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPatternShortSuffix),
+			want:  []string{validPatternShortSuffix},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
@@ -43,6 +64,11 @@ func TestNgrok_Pattern(t *testing.T) {
 		{
 			name:  "invalid pattern",
 			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - api key resource id not bearer token",
+			input: fmt.Sprintf("%s api_key = '%s'", keyword, invalidIDPattern),
 			want:  []string{},
 		},
 	}
