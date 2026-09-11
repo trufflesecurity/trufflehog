@@ -403,8 +403,12 @@ func (s *Source) scanBuckets(
 	}
 
 	// Collected rather than returned immediately so one bad bucket does not cut
-	// the pass short.
-	var bucketErrs []error
+	// the pass short; the first failure also anchors resumption if the pass is
+	// interrupted before those buckets get a retry.
+	var (
+		bucketErrs        []error
+		firstFailedBucket string
+	)
 
 	bucketsToScanCount := len(bucketsToScan)
 	for bucketIdx := pos.index; bucketIdx < bucketsToScanCount; bucketIdx++ {
@@ -433,12 +437,21 @@ func (s *Source) scanBuckets(
 		*totalObjectCount += objectCount
 		if err != nil {
 			if isContextCancellation(err) {
-				// Return before the completion call below so resume info survives
-				// and the next run picks up here instead of at the first bucket.
 				ctx.Logger().V(3).Info("bucket scan interrupted", "bucket", bucket, "err", err)
+				// Returns before the completion call below so resume info survives,
+				// rewound to the earliest failure first: resuming past a bucket that
+				// still needs another attempt drops it from the scan entirely.
+				if firstFailedBucket != "" {
+					if rewindErr := checkpointer.ResumeFrom(firstFailedBucket, role); rewindErr != nil {
+						ctx.Logger().Error(rewindErr, "could not rewind resume point to failed bucket", "bucket", firstFailedBucket)
+					}
+				}
 				return errors.Join(bucketErrs...)
 			}
 			bucketErrs = append(bucketErrs, err)
+			if firstFailedBucket == "" {
+				firstFailedBucket = bucket
+			}
 			continue
 		}
 	}
@@ -479,6 +492,12 @@ func (s *Source) scanBucket(
 
 	regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
 	if err != nil {
+		// Checked ahead of the split below: a cancellation says nothing about the
+		// bucket, so classifying it as an expected denial would report an
+		// interrupted bucket as a finished one.
+		if isContextCancellation(err) {
+			return 0, err
+		}
 		// Same expected-vs-fatal split as listing below: enumeration walks every
 		// bucket and will fail region lookup on many of them.
 		if s.listErrorsAreExpected() {
@@ -501,6 +520,11 @@ func (s *Source) scanBucket(
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
+			// Checked before the expected-vs-fatal split for the same reason as the
+			// region lookup above.
+			if isContextCancellation(err) {
+				return objectCount, err
+			}
 			s.metricsCollector.RecordBucketListError(bucket, role)
 			if s.listErrorsAreExpected() {
 				// Scanning without naming buckets is supported, and the identity is

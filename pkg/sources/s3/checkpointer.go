@@ -139,6 +139,18 @@ func (p *Checkpointer) Complete(_ context.Context, message string) error {
 	return nil
 }
 
+// ResumeFrom pins the resume point at the start of the given bucket, discarding
+// any finer-grained progress. An interrupted pass uses this so resumption cannot
+// skip past a bucket that still needs another attempt. Only meaningful for a
+// bucket-sequence checkpointer; on a unit scan there is no sequence to rewind and
+// this would clear the unit's resume point instead.
+func (p *Checkpointer) ResumeFrom(bucket, role string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.updateCheckpoint(bucket, role, "")
+}
+
 // UpdateObjectCompletion records successfully processed objects within the current page
 // and maintains fine-grained resumption checkpoints. It uses a conservative tracking
 // strategy that ensures no objects are missed by only checkpointing consecutively
