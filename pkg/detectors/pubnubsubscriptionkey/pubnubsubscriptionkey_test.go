@@ -3,6 +3,8 @@ package pubnubsubscriptionkey
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -77,5 +79,57 @@ func TestPubNubSubscriptionKey_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+// TestVerifyKey_AppContextDisabledBodies confirms that a valid subscription
+// key whose PubNub App Context feature is disabled is still reported as
+// verified. PubNub renamed "Objects" to "App Context", so a 403 may carry
+// either message — both must be treated as "key is valid, feature off".
+// Regression test for https://github.com/trufflesecurity/trufflehog/issues/5099.
+func TestVerifyKey_AppContextDisabledBodies(t *testing.T) {
+	bodies := []string{
+		"Objects not enabled for this subscriber key.",
+		"App Context is not enabled for this subscribe key.",
+	}
+	for _, body := range bodies {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(body))
+		}))
+		defer ts.Close()
+
+		prev := verifyURL
+		verifyURL = ts.URL + "/v2/objects/%s/uuids"
+		defer func() { verifyURL = prev }()
+
+		got, err := verifyKey(context.Background(), ts.Client(), "sub-c-sy4te40h-w1oc-zpyq-zlrw-w6ehv0y0y78c")
+		if err != nil {
+			t.Fatalf("body %q: unexpected error: %v", body, err)
+		}
+		if !got {
+			t.Errorf("body %q: expected key to be verified, got false", body)
+		}
+	}
+}
+
+// TestVerifyKey_UnauthorizedIsUnverified confirms a 401 is still treated as
+// an unverified key after the App Context handling change.
+func TestVerifyKey_UnauthorizedIsUnverified(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	prev := verifyURL
+	verifyURL = ts.URL + "/v2/objects/%s/uuids"
+	defer func() { verifyURL = prev }()
+
+	got, err := verifyKey(context.Background(), ts.Client(), "sub-c-sy4te40h-w1oc-zpyq-zlrw-w6ehv0y0y78c")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got {
+		t.Errorf("expected 401 to be unverified, got true")
 	}
 }
