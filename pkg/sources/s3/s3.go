@@ -1,6 +1,7 @@
 package s3
 
 import (
+	stdctx "context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -365,6 +366,9 @@ func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets
 // of objects it scanned to totalObjectCount. The counter is owned by Chunks and
 // shared across role passes so that the completion message reflects the whole
 // scan, not just the last role's pass.
+//
+// Every bucket is attempted even if earlier ones fail, so one unreachable bucket
+// cannot hide findings in the rest. Failures are returned together.
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.Client,
@@ -372,7 +376,7 @@ func (s *Source) scanBuckets(
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
 	totalObjectCount *uint64,
-) {
+) error {
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
@@ -398,6 +402,14 @@ func (s *Source) scanBuckets(
 		)
 	}
 
+	// Collected rather than returned immediately so one bad bucket does not cut
+	// the pass short; the first failure also anchors resumption if the pass is
+	// interrupted before those buckets get a retry.
+	var (
+		bucketErrs        []error
+		firstFailedBucket string
+	)
+
 	bucketsToScanCount := len(bucketsToScan)
 	for bucketIdx := pos.index; bucketIdx < bucketsToScanCount; bucketIdx++ {
 		bucket := bucketsToScan[bucketIdx]
@@ -419,16 +431,41 @@ func (s *Source) scanBuckets(
 			)
 		}
 
-		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
+		objectCount, err := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
+		// Added even on failure: a bucket that stopped part way still scanned what
+		// it reports.
 		*totalObjectCount += objectCount
+		if err != nil {
+			if isContextCancellation(err) {
+				ctx.Logger().V(3).Info("bucket scan interrupted", "bucket", bucket, "err", err)
+				// Returns before the completion call below so resume info survives,
+				// rewound to the earliest failure first: resuming past a bucket that
+				// still needs another attempt drops it from the scan entirely.
+				if firstFailedBucket != "" {
+					if rewindErr := checkpointer.ResumeFrom(firstFailedBucket, role); rewindErr != nil {
+						ctx.Logger().Error(rewindErr, "could not rewind resume point to failed bucket", "bucket", firstFailedBucket)
+					}
+				}
+				return errors.Join(bucketErrs...)
+			}
+			bucketErrs = append(bucketErrs, err)
+			if firstFailedBucket == "" {
+				firstFailedBucket = bucket
+			}
+			continue
+		}
 	}
 
+	// Resume info is cleared even when buckets failed: the checkpointer already
+	// advanced past them, so keeping it would make the retry skip them.
 	s.SetProgressComplete(
 		len(bucketsToScan),
 		len(bucketsToScan),
 		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, *totalObjectCount),
 		"",
 	)
+
+	return errors.Join(bucketErrs...)
 }
 
 func (s *Source) scanBucket(
@@ -439,22 +476,35 @@ func (s *Source) scanBucket(
 	reporter sources.ChunkReporter,
 	startAfter *string,
 	checkpointer *Checkpointer,
-) uint64 {
+) (uint64, error) {
 	s.metricsCollector.RecordBucketForRole(role)
 
 	ctx = context.WithValue(ctx, "bucket", bucket)
 
 	if common.IsDone(ctx) {
-		ctx.Logger().Error(ctx.Err(), "context done, while scanning bucket")
-		return 0
+		// Returned so callers can tell an interrupted bucket from a finished one;
+		// Chunks and ChunkUnit turn it back into a clean stop.
+		ctx.Logger().V(3).Info("context done, stopping bucket scan", "err", ctx.Err())
+		return 0, ctx.Err()
 	}
 
 	ctx.Logger().V(3).Info("Scanning bucket")
 
 	regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
 	if err != nil {
-		ctx.Logger().Error(err, "could not get regional client for bucket")
-		return 0
+		// Checked ahead of the split below: a cancellation says nothing about the
+		// bucket, so classifying it as an expected denial would report an
+		// interrupted bucket as a finished one.
+		if isContextCancellation(err) {
+			return 0, err
+		}
+		// Same expected-vs-fatal split as listing below: enumeration walks every
+		// bucket and will fail region lookup on many of them.
+		if s.listErrorsAreExpected() {
+			ctx.Logger().V(3).Info("skipping enumerated bucket: could not resolve its region", "err", err)
+			return 0, nil
+		}
+		return 0, fmt.Errorf("could not resolve region for configured bucket %q: %w", bucket, err)
 	}
 
 	errorCount := sync.Map{}
@@ -470,20 +520,21 @@ func (s *Source) scanBucket(
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
-			if s.listErrorsAreExpected(role) {
-				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
-				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
-				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
-				// and therefore not an error.
-				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
-			} else {
-				// This can also be a failure to assume the role itself: role credentials
-				// are resolved lazily, so the first request that needs them surfaces the
-				// STS error here rather than at client construction.
-				ctx.Logger().Error(err, "could not list objects in bucket")
+			// Checked before the expected-vs-fatal split for the same reason as the
+			// region lookup above.
+			if isContextCancellation(err) {
+				return objectCount, err
 			}
 			s.metricsCollector.RecordBucketListError(bucket, role)
-			break
+			if s.listErrorsAreExpected() {
+				// Scanning without naming buckets is supported, and the identity is
+				// expected to be denied on some of what it enumerates.
+				ctx.Logger().V(3).Info("skipping enumerated bucket: could not list objects", "err", err)
+				return objectCount, nil
+			}
+			// Returned so a named bucket that cannot be listed fails the scan rather
+			// than passing as an empty one. May also be a lazily resolved STS failure.
+			return objectCount, fmt.Errorf("could not list objects in configured bucket %q: %w", bucket, err)
 		}
 		pageMetadata := pageMetadata{
 			bucket:     bucket,
@@ -508,28 +559,51 @@ func (s *Source) scanBucket(
 		ctx.Logger().Info("Scanned no objects in bucket", "excluded_by_object_filter", filteredCount)
 	}
 
-	return objectCount
+	return objectCount, nil
 }
 
-// listErrorsAreExpected reports whether a failure to list a bucket's objects
-// should be suppressed rather than logged as an error. When a role is assumed
-// without an explicit bucket list, the scanner attempts every bucket in the
-// account and is expected to be denied on some of them. When buckets are
-// explicitly configured, a listing failure means a configured target is being
-// silently skipped, so it is always an error, even under an assumed role.
-func (s *Source) listErrorsAreExpected(role string) bool {
-	return role != "" && len(s.conn.GetBuckets()) == 0
+// listErrorsAreExpected reports whether failing to list a bucket should be
+// suppressed. Denials are routine when buckets come from enumeration, but a
+// bucket the user named is a target they expect to reach.
+func (s *Source) listErrorsAreExpected() bool {
+	return len(s.conn.GetBuckets()) == 0
 }
 
-// Chunks emits chunks of bytes over a channel.
+// isContextCancellation reports whether err is the scan being stopped rather than
+// a target failing. Unwraps, so a cancellation wrapped by the AWS SDK still matches.
+func isContextCancellation(err error) bool {
+	return errors.Is(err, stdctx.Canceled) || errors.Is(err, stdctx.DeadlineExceeded)
+}
+
+// Chunks emits chunks of bytes over a channel. Failures to reach a named bucket
+// are returned; an interrupted scan is not a failure and returns nil.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	var totalObjectCount uint64
+
+	// visitRoles stops at the first visitor error, so failures are recorded here
+	// instead: a bucket one role cannot reach is often reachable under a later one.
+	var roleErrs []error
 	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
-		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan, &totalObjectCount)
+		// Without this the remaining roles would each set up a client only to find
+		// the context already done.
+		if common.IsDone(c) {
+			return c.Err()
+		}
+
+		if err := s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan, &totalObjectCount); err != nil {
+			roleErrs = append(roleErrs, err)
+		}
+
 		return nil
 	}
 
-	return s.visitRoles(ctx, visitor)
+	// Role setup and bucket discovery can also fail from cancellation, so the
+	// filter belongs here rather than only around scanBuckets.
+	if err := s.visitRoles(ctx, visitor); err != nil && !isContextCancellation(err) {
+		return err
+	}
+
+	return errors.Join(roleErrs...)
 }
 
 func (s *Source) getRegionalClientForBucket(
@@ -573,8 +647,10 @@ func (s *Source) pageChunker(
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 	for objIdx, obj := range metadata.page.Contents {
 		octx := context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
+		// the pool must drain before returning so an in flight
+		// worker cannot move the checkpoint after the caller rewinds resume state.
 		if common.IsDone(octx) {
-			return
+			break
 		}
 
 		// Skip objects excluded by the configured prefixes or extensions.
@@ -663,10 +739,10 @@ func (s *Source) pageChunker(
 			})
 			if err != nil {
 				if strings.Contains(err.Error(), "AccessDenied") {
-					octx.Logger().Error(err, "could not get S3 object; access denied")
+					octx.Logger().Info("could not get S3 object; access denied", "err", err)
 					s.metricsCollector.RecordObjectSkipped(metadata.bucket, "access_denied", float64(*obj.Size))
 				} else {
-					octx.Logger().Error(err, "could not get S3 object")
+					octx.Logger().Info("could not get S3 object", "err", err)
 					s.metricsCollector.RecordObjectError(metadata.bucket)
 				}
 				// According to the documentation for GetObjectWithContext,
@@ -862,8 +938,21 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 // ChunkUnit implements SourceUnitChunker interface. This implementation scans
 // the given S3 bucket source unit and emits chunks for each object found.
 // It supports sub-unit resumption by utilizing the checkpointer to track progress.
+// Listing failures for a named bucket are returned; resume info is kept unless
+// the unit scanned to completion.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	// Filtered at this single exit because cancellation can surface from client
+	// setup as well as from the scan itself.
+	if err := s.chunkUnit(ctx, unit, reporter); err != nil && !isContextCancellation(err) {
+		return err
+	}
 
+	return nil
+}
+
+// chunkUnit scans one bucket unit, clearing resume info only on a complete scan so
+// that any failure lets a retry continue from the last checkpoint.
+func (s *Source) chunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	s3unit, ok := unit.(S3SourceUnit)
 	if !ok {
 		return fmt.Errorf("expected *S3SourceUnit, got %T", unit)
@@ -887,8 +976,12 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		)
 		startAfterPtr = &startAfter
 	}
-	defer s.ClearEncodedResumeInfoFor(unitID)
-	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer)
+	if _, err = s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer); err != nil {
+		return err
+	}
+
+	s.ClearEncodedResumeInfoFor(unitID)
+
 	return nil
 }
 

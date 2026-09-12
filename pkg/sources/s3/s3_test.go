@@ -4,8 +4,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"slices"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,30 +48,22 @@ func TestSource_Init_IncludeAndIgnoreBucketsError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestSource_ListErrorsAreExpected pins down that the origin of the bucket list,
+// not the presence of a role, decides whether a listing denial is fatal.
 func TestSource_ListErrorsAreExpected(t *testing.T) {
+	// Only the bucket list matters here. That an assumed role does not change the
+	// answer is covered behaviorally by TestScanBucketSwallowsEnumerationDenials.
 	tests := []struct {
 		name    string
-		role    string
 		buckets []string
 		want    bool
 	}{
 		{
-			name: "no role, no explicit buckets",
-			want: false,
-		},
-		{
-			name:    "no role, explicit buckets",
-			buckets: []string{"bucket-a"},
-			want:    false,
-		},
-		{
-			name: "role without explicit buckets, denials are expected",
-			role: "arn:aws:iam::123456789012:role/some-role",
+			name: "buckets discovered from credentials, denials are expected",
 			want: true,
 		},
 		{
-			name:    "role with explicit buckets, denials are errors",
-			role:    "arn:aws:iam::123456789012:role/some-role",
+			name:    "explicit buckets, denials are errors",
 			buckets: []string{"bucket-a"},
 			want:    false,
 		},
@@ -82,14 +79,13 @@ func TestSource_ListErrorsAreExpected(t *testing.T) {
 					},
 				},
 				Buckets: tt.buckets,
-				Roles:   []string{tt.role},
 			})
 			require.NoError(t, err)
 
 			s := Source{}
 			require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
 
-			assert.Equal(t, tt.want, s.listErrorsAreExpected(tt.role))
+			assert.Equal(t, tt.want, s.listErrorsAreExpected())
 		})
 	}
 }
@@ -107,10 +103,564 @@ func TestSource_ScanBucketsReportsCumulativeObjectCount(t *testing.T) {
 	// objects. The pass below scans no buckets, so the completion message must
 	// still report the cumulative total rather than resetting to zero.
 	totalObjectCount := uint64(3)
-	s.scanBuckets(context.Background(), nil, "", nil, make(chan *sources.Chunk, 1), &totalObjectCount)
+	require.NoError(t, s.scanBuckets(context.Background(), nil, "", nil, make(chan *sources.Chunk, 1), &totalObjectCount))
 
 	assert.Equal(t, uint64(3), totalObjectCount)
 	assert.Contains(t, s.Message, "3 objects scanned")
+}
+
+// listObjectsServer stands in for S3 without needing AWS. It denies the named
+// buckets and records which were asked for, so tests can prove a scan kept going
+// after a failure. Custom endpoints use path-style addressing, so the bucket
+// arrives as the first URL path segment.
+type listObjectsServer struct {
+	*httptest.Server
+
+	// inventory is returned by ListBuckets, driving the discovery path. Set it
+	// before issuing requests; the handler reads it unlocked.
+	inventory []string
+
+	// onRequest runs while a listing request is in flight, letting a test cancel
+	// the scan mid-call rather than before it starts. Set it before issuing
+	// requests; the handler reads it unlocked.
+	onRequest func(bucket string)
+
+	mu        sync.Mutex
+	requested []string
+}
+
+func newListObjectsServer(t *testing.T, deniedBuckets ...string) *listObjectsServer {
+	t.Helper()
+
+	denied := make(map[string]struct{}, len(deniedBuckets))
+	for _, bucket := range deniedBuckets {
+		denied[bucket] = struct{}{}
+	}
+
+	srv := &listObjectsServer{}
+	srv.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bucket := strings.Trim(r.URL.Path, "/")
+		w.Header().Set("Content-Type", "application/xml")
+
+		// A request to the service root is ListBuckets: the discovery call the
+		// scanner makes when no buckets are configured.
+		if bucket == "" {
+			var entries strings.Builder
+			for _, name := range srv.inventory {
+				fmt.Fprintf(&entries, `<Bucket><Name>%s</Name><CreationDate>2026-01-01T00:00:00.000Z</CreationDate></Bucket>`, name)
+			}
+			_, _ = fmt.Fprintf(
+				w,
+				`<?xml version="1.0" encoding="UTF-8"?><ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">`+
+					`<Owner><ID>fake</ID><DisplayName>fake</DisplayName></Owner><Buckets>%s</Buckets></ListAllMyBucketsResult>`,
+				entries.String(),
+			)
+			return
+		}
+
+		srv.mu.Lock()
+		srv.requested = append(srv.requested, bucket)
+		srv.mu.Unlock()
+
+		if srv.onRequest != nil {
+			srv.onRequest(bucket)
+		}
+
+		if _, isDenied := denied[bucket]; isDenied {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprint(w, `<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`)
+			return
+		}
+		_, _ = fmt.Fprintf(
+			w,
+			`<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">`+
+				`<Name>%s</Name><KeyCount>0</KeyCount><IsTruncated>false</IsTruncated></ListBucketResult>`,
+			bucket,
+		)
+	}))
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+// requestedBuckets returns the buckets the scanner tried to list, in order.
+func (l *listObjectsServer) requestedBuckets() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Clone(l.requested)
+}
+
+// newTestSource builds an initialized Source pointed at srv. An empty buckets
+// list means the source discovers buckets from credentials, which is what makes
+// listing denials expected rather than fatal.
+func newTestSource(t *testing.T, srv *listObjectsServer, buckets ...string) *Source {
+	t.Helper()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   srv.URL,
+		Buckets:    buckets,
+	})
+	require.NoError(t, err)
+
+	s := &Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	return s
+}
+
+func TestChunkUnitReturnsErrorWhenConfiguredBucketListIsDenied(t *testing.T) {
+	srv := newListObjectsServer(t, "private-bucket")
+	s := newTestSource(t, srv, "private-bucket")
+
+	err := s.ChunkUnit(context.Background(), S3SourceUnit{Bucket: "private-bucket"}, sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `could not list objects in configured bucket "private-bucket"`)
+}
+
+// TestScanBucketSwallowsEnumerationDenials covers buckets that came from
+// enumeration: denials are expected there, with or without a role in play.
+func TestScanBucketSwallowsEnumerationDenials(t *testing.T) {
+	for _, role := range []string{"", "arn:aws:iam::123456789012:role/some-role"} {
+		name := "no role"
+		if role != "" {
+			name = "assumed role"
+		}
+
+		t.Run(name, func(t *testing.T) {
+			srv := newListObjectsServer(t, "denied-bucket")
+			s := newTestSource(t, srv)
+
+			client, err := s.newClient(context.Background(), s.defaultRegion(), "")
+			require.NoError(t, err)
+
+			_, err = s.scanBucket(
+				context.Background(),
+				client,
+				role,
+				"denied-bucket",
+				sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)},
+				nil,
+				NewCheckpointer(context.Background(), &s.Progress, false),
+			)
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestScanBucketsAttemptsEveryBucketAndConsolidatesErrors is the regression test
+// for stopping the whole pass on the first bad bucket: the buckets after a failure
+// must still be scanned, and every failure must appear in the returned error.
+func TestScanBucketsAttemptsEveryBucketAndConsolidatesErrors(t *testing.T) {
+	buckets := []string{"denied-one", "allowed", "denied-two"}
+
+	srv := newListObjectsServer(t, "denied-one", "denied-two")
+	s := newTestSource(t, srv, buckets...)
+
+	client, err := s.newClient(context.Background(), s.defaultRegion(), "")
+	require.NoError(t, err)
+
+	var totalObjectCount uint64
+	err = s.scanBuckets(
+		context.Background(),
+		client,
+		"",
+		buckets,
+		make(chan *sources.Chunk, 1),
+		&totalObjectCount,
+	)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `could not list objects in configured bucket "denied-one"`)
+	assert.ErrorContains(t, err, `could not list objects in configured bucket "denied-two"`)
+	assert.Equal(t, buckets, srv.requestedBuckets(), "every configured bucket should be attempted")
+
+	// The pass reached the end of the list, so resume info is cleared on purpose:
+	// the checkpointer has moved past the failed buckets, and keeping it would make
+	// the retry skip them.
+	assert.Empty(t, s.EncodedResumeInfo)
+	assert.Contains(t, s.Message, "Completed scanning source")
+}
+
+// TestChunksReportsConfiguredBucketFailures checks that collecting failures inside
+// the visitor still surfaces them from Chunks, and that the buckets after a failure
+// are scanned rather than skipped.
+func TestChunksReportsConfiguredBucketFailures(t *testing.T) {
+	srv := newListObjectsServer(t, "denied-one")
+	s := newTestSource(t, srv, "denied-one", "allowed")
+
+	err := s.Chunks(context.Background(), make(chan *sources.Chunk, 4))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `could not list objects in configured bucket "denied-one"`)
+	// getBucketsToScan sorts the configured list so an interrupted scan resumes in a
+	// stable order, which puts "allowed" first regardless of how it was configured.
+	assert.Equal(t, []string{"allowed", "denied-one"}, srv.requestedBuckets())
+}
+
+// TestVisitRolesStopsAtFirstError documents the constraint that makes Chunks
+// collect its per-role failures instead of returning them: one visitor error
+// abandons every remaining role.
+func TestVisitRolesStopsAtFirstError(t *testing.T) {
+	roles := []string{
+		"arn:aws:iam::123456789012:role/role-a",
+		"arn:aws:iam::123456789012:role/role-b",
+	}
+
+	srv := newListObjectsServer(t)
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   srv.URL,
+		Buckets:    []string{"bucket-a"},
+		Roles:      roles,
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	var visited []string
+	recordVisit := func(roleArn string) { visited = append(visited, roleArn) }
+
+	err = s.visitRoles(context.Background(), func(_ context.Context, _ *awss3.Client, roleArn string, _ []string) error {
+		recordVisit(roleArn)
+		return fmt.Errorf("bucket unreachable under %s", roleArn)
+	})
+	require.Error(t, err)
+	assert.Equal(t, roles[:1], visited, "an error from the visitor skips the remaining roles")
+
+	// The visitor Chunks installs swallows bucket failures for exactly this reason.
+	visited = nil
+	require.NoError(t, s.visitRoles(context.Background(), func(_ context.Context, _ *awss3.Client, roleArn string, _ []string) error {
+		recordVisit(roleArn)
+		return nil
+	}))
+	assert.Equal(t, roles, visited)
+}
+
+// TestChunksTreatsCancellationAsCleanStop guards the reviewer's rule that a
+// context error must not make the scan unhealthy.
+func TestChunksTreatsCancellationAsCleanStop(t *testing.T) {
+	srv := newListObjectsServer(t)
+	s := newTestSource(t, srv, "bucket-a")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	assert.NoError(t, s.Chunks(ctx, make(chan *sources.Chunk, 1)))
+}
+
+// TestChunkUnitResumeInfoLifecycle pins the rule that only a completed unit scan
+// clears its resume info; a failed or interrupted one must be able to pick up
+// where it stopped instead of starting the bucket over.
+func TestChunkUnitResumeInfoLifecycle(t *testing.T) {
+	const resumeKey = "objects/last-scanned-key"
+
+	t.Run("failure keeps resume info", func(t *testing.T) {
+		srv := newListObjectsServer(t, "private-bucket")
+		s := newTestSource(t, srv, "private-bucket")
+
+		unit := S3SourceUnit{Bucket: "private-bucket"}
+		unitID, _ := unit.SourceUnitID()
+		s.SetEncodedResumeInfoFor(unitID, resumeKey)
+
+		err := s.ChunkUnit(context.Background(), unit, sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)})
+		require.Error(t, err)
+		assert.Equal(t, resumeKey, s.GetEncodedResumeInfoFor(unitID))
+	})
+
+	t.Run("cancellation keeps resume info and is not an error", func(t *testing.T) {
+		srv := newListObjectsServer(t)
+		s := newTestSource(t, srv, "bucket-a")
+
+		unit := S3SourceUnit{Bucket: "bucket-a"}
+		unitID, _ := unit.SourceUnitID()
+		s.SetEncodedResumeInfoFor(unitID, resumeKey)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		require.NoError(t, s.ChunkUnit(ctx, unit, sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)}))
+		assert.Equal(t, resumeKey, s.GetEncodedResumeInfoFor(unitID))
+	})
+
+	t.Run("completion clears resume info", func(t *testing.T) {
+		srv := newListObjectsServer(t)
+		s := newTestSource(t, srv, "bucket-a")
+
+		unit := S3SourceUnit{Bucket: "bucket-a"}
+		unitID, _ := unit.SourceUnitID()
+		s.SetEncodedResumeInfoFor(unitID, resumeKey)
+
+		require.NoError(t, s.ChunkUnit(context.Background(), unit, sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)}))
+		assert.Empty(t, s.GetEncodedResumeInfoFor(unitID))
+	})
+}
+
+// TestChunksDiscoveredBucketDenialsAreHealthy drives discovery end to end: with
+// no buckets named, a denial on one the scanner found itself must be skipped
+// rather than failing the scan.
+func TestChunksDiscoveredBucketDenialsAreHealthy(t *testing.T) {
+	srv := newListObjectsServer(t, "denied-bucket")
+	srv.inventory = []string{"denied-bucket", "ok-bucket"}
+	s := newTestSource(t, srv) // no configured buckets: discovery mode
+
+	require.NoError(t, s.Chunks(context.Background(), make(chan *sources.Chunk, 4)))
+	assert.Equal(t, []string{"denied-bucket", "ok-bucket"}, srv.requestedBuckets(),
+		"the denied bucket must be skipped, not abort discovery scanning")
+}
+
+// cancelWhileListing makes the server cancel the scan as a listing request
+// arrives, so the error surfaces from inside the AWS SDK instead of from the
+// check at the top of scanBucket. The pause gives the client time to notice the
+// cancellation rather than reading a complete response first.
+func cancelWhileListing(srv *listObjectsServer, target string, cancel context.CancelFunc) {
+	srv.onRequest = func(bucket string) {
+		if target != "" && bucket != target {
+			return
+		}
+		cancel()
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// TestChunkUnitDiscoveryCancellationKeepsResumeInfo covers cancellation arriving
+// while a discovered bucket is being listed. Denials are expected on that path,
+// so without a cancellation check first the interrupted bucket looks like a
+// completed one and loses the checkpoint it had already written.
+func TestChunkUnitDiscoveryCancellationKeepsResumeInfo(t *testing.T) {
+	const resumeKey = "objects/last-scanned-key"
+
+	srv := newListObjectsServer(t)
+	s := newTestSource(t, srv) // no configured buckets: discovery mode
+
+	unit := S3SourceUnit{Bucket: "bucket-a"}
+	unitID, _ := unit.SourceUnitID()
+	s.SetEncodedResumeInfoFor(unitID, resumeKey)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cancelWhileListing(srv, "", cancel)
+
+	// Cancellation is still a clean stop, but the unit did not finish, so its
+	// resume point has to survive.
+	require.NoError(t, s.ChunkUnit(ctx, unit, sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)}))
+	assert.Equal(t, resumeKey, s.GetEncodedResumeInfoFor(unitID))
+}
+
+// TestScanBucketsInterruptRewindsResumeToFirstFailure guards the seam between
+// collecting bucket failures and stopping early. The first bucket is denied, the
+// second checkpoints an object and is then interrupted; without a rewind the
+// checkpoint points at the second bucket, so the retry starts past the denied one
+// and it silently drops out of the scan.
+func TestScanBucketsInterruptRewindsResumeToFirstFailure(t *testing.T) {
+	const (
+		deniedBucket      = "a-denied"
+		interruptedBucket = "b-interrupted"
+	)
+	buckets := []string{deniedBucket, interruptedBucket, "c-unreached"}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	page1 := `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">` +
+		`<Name>` + interruptedBucket + `</Name><KeyCount>1</KeyCount><IsTruncated>true</IsTruncated>` +
+		`<NextContinuationToken>page-2-token</NextContinuationToken>` +
+		`<Contents><Key>obj-b.txt</Key><Size>12</Size>` +
+		`<LastModified>2026-01-01T00:00:00.000Z</LastModified></Contents></ListBucketResult>`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+
+		if path == interruptedBucket+"/obj-b.txt" {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = fmt.Fprint(w, "hello secret")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/xml")
+		if path == deniedBucket {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprint(w, `<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`)
+			return
+		}
+
+		// Page one checkpoints obj-b.txt; the follow-up page is where the scan is
+		// interrupted, so the checkpoint is already sitting on the second bucket.
+		if r.URL.Query().Get("continuation-token") == "page-2-token" {
+			cancel()
+			time.Sleep(50 * time.Millisecond)
+			return
+		}
+		if path == interruptedBucket {
+			_, _ = fmt.Fprint(w, page1)
+			return
+		}
+		_, _ = fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>`+
+			`<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">`+
+			`<Name>%s</Name><KeyCount>0</KeyCount><IsTruncated>false</IsTruncated></ListBucketResult>`, path)
+	}))
+	t.Cleanup(srv.Close)
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   srv.URL,
+		Buckets:    buckets,
+	})
+	require.NoError(t, err)
+
+	s := &Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	client, err := s.newClient(context.Background(), s.defaultRegion(), "")
+	require.NoError(t, err)
+
+	var totalObjectCount uint64
+	err = s.scanBuckets(ctx, client, "", buckets, make(chan *sources.Chunk, 8), &totalObjectCount)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `could not list objects in configured bucket "a-denied"`)
+	assert.Contains(t, s.EncodedResumeInfo, deniedBucket,
+		"resume must rewind to the failed bucket so the retry attempts it again")
+	assert.NotContains(t, s.EncodedResumeInfo, interruptedBucket,
+		"resume must not start past a bucket that still needs another attempt")
+}
+
+// pausingCollector parks directory-skip recordings until the test releases them.
+// The collector is the one seam inside an object worker that a cancelled context
+// cannot unblock, so it stands in for a worker mid-HandleFile.
+type pausingCollector struct {
+	metricsCollector
+	entered chan struct{}
+	release chan struct{}
+	drained atomic.Int32
+}
+
+func (p *pausingCollector) RecordObjectSkipped(string, string, float64) {
+	p.entered <- struct{}{}
+	<-p.release
+	p.drained.Add(1)
+}
+
+// TestPageChunkerDrainsWorkersOnCancellation pins the invariant the resume
+// rewind depends on: pageChunker must not return while object workers are still
+// running, or a straggler's checkpoint write could land after scanBuckets has
+// rewound resume state to an earlier failed bucket.
+func TestPageChunkerDrainsWorkersOnCancellation(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}})
+	require.NoError(t, err)
+
+	s := &Source{}
+	// Two worker slots so both blocking objects are in flight when the scan is
+	// cancelled between spawns.
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 2))
+
+	collector := &pausingCollector{
+		metricsCollector: s.metricsCollector,
+		entered:          make(chan struct{}, 4),
+		release:          make(chan struct{}, 4),
+	}
+	s.metricsCollector = collector
+
+	// Directory keys route each worker straight to the collector without touching
+	// the network, keeping the test free of S3 stubs.
+	var contents []s3types.Object
+	for _, key := range []string{"w0/", "w1/", "w2/", "w3/"} {
+		contents = append(contents, s3types.Object{Key: aws.String(key), Size: aws.Int64(1)})
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var objectCount, filteredCount uint64
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.pageChunker(
+			ctx,
+			pageMetadata{bucket: "bucket", pageNumber: 1, page: &awss3.ListObjectsV2Output{Contents: contents}},
+			processingState{errorCount: &sync.Map{}, objectCount: &objectCount, filteredCount: &filteredCount},
+			sources.ChanReporter{Ch: make(chan *sources.Chunk, 4)},
+			NewCheckpointer(ctx, &s.Progress, false),
+		)
+	}()
+
+	// Both slots are parked in the collector; cancel mid-page, then free one so
+	// the loop reaches its context check with the other worker still in flight.
+	<-collector.entered
+	<-collector.entered
+	cancel()
+	collector.release <- struct{}{}
+
+	select {
+	case <-done:
+		t.Fatal("pageChunker returned while a worker was still in flight")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(collector.release)
+	<-done
+	assert.EqualValues(t, 2, collector.drained.Load(),
+		"every in-flight worker must finish before pageChunker returns")
+}
+
+// TestChunkUnitMidBucketFailureKeepsCheckpointedResume exercises the real
+// checkpointer rather than a pre-seeded resume value: page one is scanned, page
+// two is denied, and the checkpoint must survive so a retry does not start over.
+func TestChunkUnitMidBucketFailureKeepsCheckpointedResume(t *testing.T) {
+	const bucket = "resume-bucket"
+
+	page1 := `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">` +
+		`<Name>` + bucket + `</Name><KeyCount>2</KeyCount><IsTruncated>true</IsTruncated>` +
+		`<NextContinuationToken>page-2-token</NextContinuationToken>` +
+		`<Contents><Key>obj-a.txt</Key><Size>12</Size><LastModified>2026-01-01T00:00:00.000Z</LastModified></Contents>` +
+		`<Contents><Key>obj-b.txt</Key><Size>12</Size><LastModified>2026-01-01T00:00:00.000Z</LastModified></Contents>` +
+		`</ListBucketResult>`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+
+		// GetObject: path-style requests for object bodies scanned from page one.
+		if strings.HasPrefix(path, bucket+"/") {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = fmt.Fprint(w, "hello secret")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/xml")
+		if r.URL.Query().Get("continuation-token") == "page-2-token" {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprint(w, `<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`)
+			return
+		}
+		_, _ = fmt.Fprint(w, page1)
+	}))
+	t.Cleanup(srv.Close)
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   srv.URL,
+		Buckets:    []string{bucket},
+	})
+	require.NoError(t, err)
+
+	s := &Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	unit := S3SourceUnit{Bucket: bucket}
+	unitID, _ := unit.SourceUnitID()
+
+	// The chunk channel must hold everything page one produces, since nothing
+	// drains it while ChunkUnit runs.
+	err = s.ChunkUnit(context.Background(), unit, sources.ChanReporter{Ch: make(chan *sources.Chunk, 16)})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `could not list objects in configured bucket "resume-bucket"`)
+
+	// pageChunker waits for page one's objects before page two is requested, so
+	// the checkpoint deterministically points at the last page-one key.
+	assert.Equal(t, "obj-b.txt", s.GetEncodedResumeInfoFor(unitID),
+		"checkpoint written during page one must survive the page-two failure")
 }
 
 func TestSource_Chunks(t *testing.T) {
