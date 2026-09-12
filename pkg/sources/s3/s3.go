@@ -647,8 +647,10 @@ func (s *Source) pageChunker(
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 	for objIdx, obj := range metadata.page.Contents {
 		octx := context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
+		// break, not return: the pool must drain before returning so an in-flight
+		// worker cannot move the checkpoint after the caller rewinds resume state.
 		if common.IsDone(octx) {
-			return
+			break
 		}
 
 		// Skip objects excluded by the configured prefixes or extensions.

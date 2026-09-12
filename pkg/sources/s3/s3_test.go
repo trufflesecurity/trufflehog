@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -523,6 +524,84 @@ func TestScanBucketsInterruptRewindsResumeToFirstFailure(t *testing.T) {
 		"resume must rewind to the failed bucket so the retry attempts it again")
 	assert.NotContains(t, s.EncodedResumeInfo, interruptedBucket,
 		"resume must not start past a bucket that still needs another attempt")
+}
+
+// pausingCollector parks directory-skip recordings until the test releases them.
+// The collector is the one seam inside an object worker that a cancelled context
+// cannot unblock, so it stands in for a worker mid-HandleFile.
+type pausingCollector struct {
+	metricsCollector
+	entered chan struct{}
+	release chan struct{}
+	drained atomic.Int32
+}
+
+func (p *pausingCollector) RecordObjectSkipped(string, string, float64) {
+	p.entered <- struct{}{}
+	<-p.release
+	p.drained.Add(1)
+}
+
+// TestPageChunkerDrainsWorkersOnCancellation pins the invariant the resume
+// rewind depends on: pageChunker must not return while object workers are still
+// running, or a straggler's checkpoint write could land after scanBuckets has
+// rewound resume state to an earlier failed bucket.
+func TestPageChunkerDrainsWorkersOnCancellation(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}})
+	require.NoError(t, err)
+
+	s := &Source{}
+	// Two worker slots so both blocking objects are in flight when the scan is
+	// cancelled between spawns.
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 2))
+
+	collector := &pausingCollector{
+		metricsCollector: s.metricsCollector,
+		entered:          make(chan struct{}, 4),
+		release:          make(chan struct{}, 4),
+	}
+	s.metricsCollector = collector
+
+	// Directory keys route each worker straight to the collector without touching
+	// the network, keeping the test free of S3 stubs.
+	var contents []s3types.Object
+	for _, key := range []string{"w0/", "w1/", "w2/", "w3/"} {
+		contents = append(contents, s3types.Object{Key: aws.String(key), Size: aws.Int64(1)})
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var objectCount, filteredCount uint64
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.pageChunker(
+			ctx,
+			pageMetadata{bucket: "bucket", pageNumber: 1, page: &awss3.ListObjectsV2Output{Contents: contents}},
+			processingState{errorCount: &sync.Map{}, objectCount: &objectCount, filteredCount: &filteredCount},
+			sources.ChanReporter{Ch: make(chan *sources.Chunk, 4)},
+			NewCheckpointer(ctx, &s.Progress, false),
+		)
+	}()
+
+	// Both slots are parked in the collector; cancel mid-page, then free one so
+	// the loop reaches its context check with the other worker still in flight.
+	<-collector.entered
+	<-collector.entered
+	cancel()
+	collector.release <- struct{}{}
+
+	select {
+	case <-done:
+		t.Fatal("pageChunker returned while a worker was still in flight")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(collector.release)
+	<-done
+	assert.EqualValues(t, 2, collector.drained.Load(),
+		"every in-flight worker must finish before pageChunker returns")
 }
 
 // TestChunkUnitMidBucketFailureKeepsCheckpointedResume exercises the real
