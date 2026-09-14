@@ -59,6 +59,9 @@ Allow verification of similar credentials across detectors
 \fB--filter-unverified\fR
 Only output first unverified result per chunk per detector if there are more than one results.
 .TP
+\fB--no-ignore-tag\fR
+Do not suppress results on lines containing a 'trufflehog:ignore' comment.
+.TP
 \fB--filter-entropy=FILTER-ENTROPY\fR
 Filter unverified results with Shannon entropy. Start with 3.0.
 .TP

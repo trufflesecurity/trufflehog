@@ -65,6 +65,7 @@ var (
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	noIgnoreTag                = cli.Flag("no-ignore-tag", "Do not suppress results on lines containing a 'trufflehog:ignore' comment.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	noIgnoreTag                = cli.Flag("no-ignore-tag", "Report results even if the line has a 'trufflehog:ignore' comment.").Bool()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
@@ -660,6 +661,7 @@ func run(state overseer.State, logSync func() error) {
 		VerifierEndpoints:        *verifiers,
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
+		NoIgnoreTag:              *noIgnoreTag,
 		FilterEntropy:            *filterEntropy,
 		NoIgnoreTag:              *noIgnoreTag,
 		VerificationOverlap:      *allowVerificationOverlap,
