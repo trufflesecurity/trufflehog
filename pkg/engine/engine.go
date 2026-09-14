@@ -110,6 +110,12 @@ type Config struct {
 	ExcludeDetectors              string
 	CustomVerifiersOnly           bool
 	VerifierEndpoints             map[string]string
+	// VerifierAuth holds OAuth2 token sources for custom verifiers,
+	// keyed by detector name (matching VerifierEndpoints keys). When
+	// a detector has a matching entry here, its token source is set
+	// on the detector's EndpointSetter so the engine can perform
+	// OAuth2-authenticated verification via the OAuthVerifier interface.
+	VerifierAuth map[config.DetectorID]detectors.TokenSource
 
 	// Verify determines whether the scanner will verify candidate secrets.
 	Verify bool
@@ -317,6 +323,14 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 
 			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
+			}
+
+			// If the custom verifier has OAuth2 auth configured, attach
+			// the token source to the detector. The scan loop checks
+			// OAuthVerifier to route verification through OAuth2.
+			// feature fm-oauth2: custom verifier OAuth2 verification
+			if ts, hasAuth := getWithDetectorID(d, cfg.VerifierAuth); hasAuth {
+				customizer.SetTokenSource(ts)
 			}
 
 			return true
@@ -1163,12 +1177,32 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
-		results, err := e.verificationCache.FromData(
-			ctx,
-			data.detector.Detector,
-			data.verify,
-			data.chunk.SecretID != 0,
-			matchBytes)
+
+		// When the detector has OAuth2 auth on its custom verifier,
+		// bypass the built-in verification path entirely: detect only,
+		// then verify each result via OAuth2-authenticated POST.
+		// feature fm-oauth2: custom verifier OAuth2 verification
+		var results []detectors.Result
+		var err error
+		if oauthV, ok := data.detector.Detector.(detectors.OAuthVerifier); ok && oauthV.HasTokenSource() {
+			results, err = data.detector.FromData(ctx, false, matchBytes)
+			if err == nil && data.verify && len(results) > 0 {
+				for i := range results {
+					verified, verifyErr := OAuthVerify(
+						ctx, nil, oauthV.GetTokenSource(), oauthV.Endpoints(), &results[i])
+					results[i].Verified = verified
+					results[i].SetVerificationError(verifyErr, string(results[i].Raw))
+				}
+			}
+		} else {
+			results, err = e.verificationCache.FromData(
+				ctx,
+				data.detector.Detector,
+				data.verify,
+				data.chunk.SecretID != 0,
+				matchBytes)
+		}
+
 		t.Stop()
 		cancel()
 		if err != nil {

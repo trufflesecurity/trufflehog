@@ -31,14 +31,6 @@ const maxTotalMatches = 100
 
 // ─── OAuth2 token acquisition ────────────────────────────────────────
 
-// TokenSource abstracts OAuth2 token acquisition. Each grant type
-// implements this interface with its own credential exchange and
-// caching logic.
-type TokenSource interface {
-	// Token returns a valid access token, refreshing it if necessary.
-	Token(ctx context.Context) (string, error)
-}
-
 // tokenExpiryDelta is subtracted from the token's expiry time to
 // avoid race conditions where the token expires between the check
 // and the HTTP request.
@@ -134,12 +126,14 @@ func (s *ropcTokenSource) Token(ctx context.Context) (string, error) {
 // config can never get out of sync with its verifier.
 type customDetectorVerifier struct {
 	config      *custom_detectorspb.VerifierConfig
-	tokenSource TokenSource // nil when no auth is configured
+	tokenSource detectors.TokenSource // nil when no auth is configured
 }
 
-// buildTokenSource creates the appropriate TokenSource for a
+// BuildTokenSource creates the appropriate TokenSource for a
 // VerifierConfig's auth block, or returns nil if no auth is set.
-func buildTokenSource(auth *custom_detectorspb.VerifierAuth) TokenSource {
+// Exported so the enterprise pipeline can build token sources from
+// proto config without duplicating grant-type logic.
+func BuildTokenSource(auth *custom_detectorspb.VerifierAuth) detectors.TokenSource {
 	if auth == nil {
 		return nil
 	}
@@ -213,7 +207,7 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	for _, vc := range pb.GetVerify() {
 		verifiers = append(verifiers, customDetectorVerifier{
 			config:      vc,
-			tokenSource: buildTokenSource(vc.GetAuth()),
+			tokenSource: BuildTokenSource(vc.GetAuth()),
 		})
 	}
 

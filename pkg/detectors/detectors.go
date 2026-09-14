@@ -90,6 +90,27 @@ type EndpointCustomizer interface {
 	SetCloudEndpoint(string)
 	UseCloudEndpoint(bool)
 	UseFoundEndpoints(bool)
+	SetTokenSource(TokenSource)
+}
+
+// TokenSource abstracts OAuth2 token acquisition. Each grant type
+// implements this interface with its own credential exchange and
+// caching logic. Used by custom detector inline verification and by
+// the engine's OAuth2 custom verifier path.
+type TokenSource interface {
+	// Token returns a valid access token, refreshing it if necessary.
+	Token(ctx context.Context) (string, error)
+}
+
+// OAuthVerifier is satisfied by any detector whose EndpointSetter has
+// an OAuth2 token source configured. The engine checks this interface
+// in the scan loop: when present and active, verification is routed
+// through an OAuth2-authenticated POST instead of the detector's
+// built-in verification logic.
+type OAuthVerifier interface {
+	HasTokenSource() bool
+	GetTokenSource() TokenSource
+	Endpoints(foundEndpoints ...string) []string
 }
 
 type CloudProvider interface {
