@@ -122,12 +122,12 @@ func TestFindEndpoints(t *testing.T) {
 	urlPat := GetURLPat([]string{"jira", "atlassian"})
 
 	// identity resolver: returns exactly what it receives (simulates UseFoundEndpoints only)
-	identity := func(urls ...string) []string { return urls }
+	identity := func(urls []string, _ ...string) []string { return urls }
 
 	tests := []struct {
 		name    string
 		data    string
-		resolve func(...string) []string
+		resolve func([]string, ...string) []string
 		want    []string
 	}{
 		{
@@ -169,7 +169,7 @@ func TestFindEndpoints(t *testing.T) {
 		{
 			name: "resolve can inject configured endpoints not in data",
 			data: "no urls here but jira keyword present",
-			resolve: func(urls ...string) []string {
+			resolve: func(urls []string, _ ...string) []string {
 				return append(urls, "https://configured.jira.com")
 			},
 			want: []string{"https://configured.jira.com"},
@@ -177,7 +177,7 @@ func TestFindEndpoints(t *testing.T) {
 		{
 			name: "resolve can filter out URLs",
 			data: "jira url: https://jira.corp.com",
-			resolve: func(urls ...string) []string {
+			resolve: func(urls []string, _ ...string) []string {
 				return []string{} // simulate UseFoundEndpoints(false) with no configured endpoint
 			},
 			want: []string{},

@@ -44,8 +44,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"sumo", "accessId", "accessKey"}
 }
 
-// Default US API endpoint.
-func (Scanner) CloudEndpoint() string { return "api.sumologic.com" }
+// defaultCloudEndpoint is the US API endpoint, used when no region-specific
+// endpoint is found in the scanned content.
+const defaultCloudEndpoint = "api.sumologic.com"
+
+func (Scanner) CloudEndpoints() []string { return []string{defaultCloudEndpoint} }
 
 // FromData will find and optionally verify SumoLogicKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -59,13 +62,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
 		keyMatches[match[1]] = struct{}{}
 	}
-	endpointMatches := make(map[string]struct{})
+
+	uniqueFoundEndpoints := make(map[string]struct{})
 	for _, match := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		endpointMatches[match[0]] = struct{}{}
+		uniqueFoundEndpoints[match[0]] = struct{}{}
 	}
-	if len(endpointMatches) == 0 {
-		endpointMatches[s.CloudEndpoint()] = struct{}{}
+	foundEndpoints := make([]string, 0, len(uniqueFoundEndpoints))
+	for e := range uniqueFoundEndpoints {
+		foundEndpoints = append(foundEndpoints, e)
 	}
+
+	// Honors configured/cloud/found endpoint toggles and --verifier-endpoint,
+	// same as every other EndpointCustomizer detector.
+	endpoints := s.Endpoints(foundEndpoints)
 
 	for accessKey := range keyMatches {
 		var (
@@ -77,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for id := range idMatches {
 			accessId = id
 
-			for e := range endpointMatches {
+			for _, e := range endpoints {
 				apiEndpoint = e
 
 				if verify {
@@ -99,10 +108,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if len(idMatches) != 1 {
 				accessId = ""
 			}
-			if len(endpointMatches) != 1 || apiEndpoint == s.CloudEndpoint() {
-				apiEndpoint = ""
-			}
-			r = createResult(accessId, accessKey, apiEndpoint, false, nil)
+			r = createResult(accessId, accessKey, confidentEndpoint(endpoints), false, nil)
 		}
 		results = append(results, *r)
 	}
@@ -110,8 +116,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+// confidentEndpoint returns the single endpoint tried that isn't the
+// synthetic default cloud fallback, or "" if there's zero or more than one.
+// Endpoints() unions the cloud default with any found/configured endpoint,
+// so its length alone can't signal confidence - a lone found regional host
+// (e.g. "api.us2.sumologic.com") plus the always-present cloud default would
+// otherwise look like two candidates instead of one confident match.
+func confidentEndpoint(endpoints []string) string {
+	var confident string
+	count := 0
+	for _, e := range endpoints {
+		if e != defaultCloudEndpoint {
+			count++
+			confident = e
+		}
+	}
+	if count != 1 {
+		return ""
+	}
+	return confident
+}
+
 func verifyMatch(ctx context.Context, client *http.Client, endpoint string, id string, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v1/users", endpoint), nil)
+	// endpoint may be a bare host (cloud/found, e.g. "api.sumologic.com") or a
+	// full URL (configured via --verifier-endpoint, e.g. "https://host.com") -
+	// normalize to a bare host so it isn't double-prefixed below.
+	host := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://"), "/")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v1/users", host), nil)
 	if err != nil {
 		return false, err
 	}

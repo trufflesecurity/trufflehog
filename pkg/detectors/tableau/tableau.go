@@ -27,7 +27,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
-func (Scanner) CloudEndpoint() string { return "" }
+func (Scanner) CloudEndpoints() []string { return nil }
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	var uniqueEndpoints = make(map[string]struct{})
 
 	// Add endpoints to the list
-	for _, endpoint := range s.Endpoints(foundURLs...) {
+	for _, endpoint := range s.Endpoints(foundURLs) {
 		// Remove https:// prefix if present since we add it during verification
 		endpoint = strings.TrimPrefix(endpoint, "https://")
 		uniqueEndpoints[endpoint] = struct{}{}

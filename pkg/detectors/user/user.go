@@ -35,7 +35,7 @@ var (
 	errNoHost    = errors.New("no such host")
 )
 
-func (Scanner) CloudEndpoint() string { return "" }
+func (Scanner) CloudEndpoints() []string { return nil }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	// Merge found endpoints with any user-configured endpoints.
 	// Callers must call UseFoundEndpoints(true) to include endpoints extracted from data.
-	for _, endpoint := range s.Endpoints(foundURLs...) {
+	for _, endpoint := range s.Endpoints(foundURLs) {
 		endpoint = strings.TrimPrefix(endpoint, "https://")
 		uniqueURLs[endpoint] = struct{}{}
 	}
