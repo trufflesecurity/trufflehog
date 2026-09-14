@@ -1,11 +1,14 @@
 package docker
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
 
 func TestDocker_Pattern(t *testing.T) {
@@ -297,5 +300,104 @@ func Test_ParseAuthenticateHeader(t *testing.T) {
 		if diff := cmp.Diff(expected, actual); diff != "" {
 			t.Errorf("%s diff: (-want +got)\n%s", input, diff)
 		}
+	}
+}
+
+func Test_VerifyMatch(t *testing.T) {
+	// base64 of "user:pass"
+	const basicAuth = "dXNlcjpwYXNz"
+
+	// bearerChallenge points the token realm back at the test server so the follow-up
+	// request stays in-process.
+	bearerChallenge := func(host string) string {
+		return `Bearer realm="http://` + host + `/token",service="registry"`
+	}
+
+	tests := []struct {
+		name         string
+		handler      http.HandlerFunc
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name: "harbor rejects basic auth",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Www-Authenticate", `Basic realm="harbor"`)
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name: "unauthorized without a challenge",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name: "unsupported scheme is still indeterminate",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Www-Authenticate", `Digest realm="registry"`)
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      true,
+		},
+		{
+			name: "bearer token exchange rejects credentials",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/token" {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				w.Header().Set("Www-Authenticate", bearerChallenge(r.Host))
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name: "bearer token exchange accepts credentials",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/token" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.Header().Set("Www-Authenticate", bearerChallenge(r.Host))
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name: "registry accepts basic auth",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{}`))
+			},
+			wantVerified: true,
+			wantErr:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(tc.handler)
+			defer server.Close()
+
+			verified, err := verifyMatch(context.Background(), server.Client(), server.URL, "user", basicAuth)
+
+			if tc.wantErr && err == nil {
+				t.Errorf("expected a verification error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("expected no verification error, got %v", err)
+			}
+			if verified != tc.wantVerified {
+				t.Errorf("verified = %v, want %v", verified, tc.wantVerified)
+			}
+		})
 	}
 }
