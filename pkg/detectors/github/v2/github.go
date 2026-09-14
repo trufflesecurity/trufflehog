@@ -22,11 +22,16 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 func (s Scanner) Version() int {
 	return 2
 }
 func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
+
+// MaxSecretSize overrides the engine's default 512-byte keyword window so complete
+// GitHub App installation tokens are passed to FromData.
+func (Scanner) MaxSecretSize() int64 { return 4096 }
 
 var (
 	// Oauth token
@@ -34,7 +39,9 @@ var (
 	// Token type list:
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
 	// https://github.blog/changelog/2022-10-18-introducing-fine-grained-personal-access-tokens/
-	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
+	// GitHub App installation tokens use the ghs_APPID_JWT format:
+	// https://github.blog/changelog/2026-04-24-notice-about-upcoming-new-format-for-github-app-installation-tokens/
+	keyPat = regexp.MustCompile(`\b(ghs_[0-9]+_eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]+|(?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255}\b)`)
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
