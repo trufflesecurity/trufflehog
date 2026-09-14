@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} golang:bullseye as builder
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
 
 WORKDIR /build
 COPY . . 
