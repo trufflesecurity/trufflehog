@@ -10,7 +10,9 @@ type MetricsReporter interface {
 	// smaller than the cache hit count due to cache hit "wasting"; see AddResultCacheHitsWasted for more information.
 	AddCredentialVerificationsSaved(count int)
 
-	// AddFromDataVerifyTimeSpent records wall time spent in calls to detector.FromData with verify=true.
+	// AddFromDataVerifyTimeSpent records wall time spent verifying credentials remotely, either in a call to
+	// detector.FromData with verify=true or, for detectors that implement detectors.ResultVerifier, in the
+	// per-result verification of cache misses.
 	AddFromDataVerifyTimeSpent(wallTime time.Duration)
 
 	// AddResultCacheHits records result cache hits. Not all cache hits result in elided remote verification requests
