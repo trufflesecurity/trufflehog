@@ -276,14 +276,29 @@ func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
-// A value occurring in both discarded markup and emitted text is ambiguous, so
-// mapping bails rather than guessing which source occurrence the decoder kept.
-func TestFragmentLineOffsetKeepsDecodedLineForRemovedOccurrence(t *testing.T) {
+// The same value can occur in discarded markup and emitted text, so surrounding
+// text has to identify which source occurrence the decoder kept.
+func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	chunk := &sources.Chunk{
 		Data: []byte("heading\nsynthetic-secret-value-123456"),
 		OriginalData: []byte("<div class=\"synthetic-secret-value-123456\">\n" +
 			"<p>heading</p>\n<p>synthetic-secret-value-123456</p>"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// A dropped occurrence can sit after the surviving one, so a later source match is
+// not automatically the right one.
+func TestFragmentLineOffsetSkipsLaterRemovedOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("heading\nsynthetic-secret-value-123456\ntrailer"),
+		OriginalData: []byte("<p>heading</p>\n<p>synthetic-secret-value-123456</p>\n" +
+			"<div class=\"synthetic-secret-value-123456\">trailer</div>"),
 	}
 
 	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
@@ -347,6 +362,58 @@ func TestFragmentLineOffsetUsesOriginalDataIgnoreTag(t *testing.T) {
 	_, ignored := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
 
 	assert.True(t, ignored)
+}
+
+func buildDroppedSpanChunk(t *rapid.T, secret []byte, decoys bool) (*sources.Chunk, int) {
+	spans := rapid.IntRange(1, 8).Draw(t, "spans")
+	target := rapid.IntRange(0, spans-1).Draw(t, "target")
+
+	var original, decoded []byte
+	var secretOffset int
+	for i := range spans {
+		span := fmt.Appendf(nil, "<p id=%d>word%d\n</p>\n", i, i)
+		dropped := i != target && rapid.Bool().Draw(t, fmt.Sprintf("dropped%d", i))
+		if i == target {
+			secretOffset = len(original) + len(span)
+		}
+		if i == target || (decoys && dropped && rapid.Bool().Draw(t, fmt.Sprintf("decoy%d", i))) {
+			span = append(append(span, secret...), '\n')
+		}
+		original = append(original, span...)
+		if !dropped {
+			decoded = append(decoded, span...)
+		}
+	}
+	return &sources.Chunk{Data: decoded, OriginalData: original}, secretOffset
+}
+
+// Decoders drop whole spans, and the value they keep still has to land on its own
+// source line however much text went missing around it.
+func TestFragmentLineOffsetMapsDroppedSourceSpans(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		chunk, secretOffset := buildDroppedSpanChunk(t, secret, false)
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		assert.Equal(t, int64(bytes.Count(chunk.OriginalData[:secretOffset], []byte{'\n'})), lineOffset)
+	})
+}
+
+// When a dropped span holds the same value as a kept one the copies are only
+// distinguishable by their surroundings, so the exact line is best-effort. What is
+// not negotiable is that the reported line holds the value in the source.
+func TestFragmentLineOffsetReportsLineHoldingSecret(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		chunk, _ := buildDroppedSpanChunk(t, secret, true)
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		lines := bytes.Split(chunk.OriginalData, []byte{'\n'})
+		require.Less(t, int(lineOffset), len(lines))
+		assert.Contains(t, string(lines[lineOffset]), string(secret))
+	})
 }
 
 // Generated binary prefixes exercise byte values without requiring valid UTF-8.
@@ -2306,7 +2373,7 @@ func BenchmarkFragmentLineOffset_Diffed_Large(b *testing.B) {
 	benchmarkSourceMapping(b, 64*1024, true)
 }
 
-func setupUnmappedSourceBench(size int) (*sources.Chunk, *detectors.Result) {
+func setupAmbiguousSourceBench(size int) (*sources.Chunk, *detectors.Result) {
 	secret := []byte("synthetic-secret-value-123456")
 	original := []byte("<div class=\"synthetic-secret-value-123456\">\n")
 	var decoded []byte
@@ -2322,9 +2389,10 @@ func setupUnmappedSourceBench(size int) (*sources.Chunk, *detectors.Result) {
 	return &sources.Chunk{Data: decoded, OriginalData: original}, &detectors.Result{Raw: secret}
 }
 
-// The same value occurs in both discarded markup and emitted text.
-func BenchmarkFragmentLineOffset_Unmapped_DefaultChunkSize(b *testing.B) {
-	chunk, result := setupUnmappedSourceBench(sources.DefaultChunkSize)
+// The same value occurs in both discarded markup and emitted text, so the source
+// occurrence has to be picked by its surroundings.
+func BenchmarkFragmentLineOffset_Ambiguous_DefaultChunkSize(b *testing.B) {
+	chunk, result := setupAmbiguousSourceBench(sources.DefaultChunkSize)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -1,0 +1,36 @@
+# 2026/09/15 11:21:16.779722 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw spans: 6
+# 2026/09/15 11:21:16.779726 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw target: 2
+# 2026/09/15 11:21:16.779726 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped0: true
+# 2026/09/15 11:21:16.779727 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw decoy0: false
+# 2026/09/15 11:21:16.779728 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped1: false
+# 2026/09/15 11:21:16.779728 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped3: true
+# 2026/09/15 11:21:16.779729 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw decoy3: true
+# 2026/09/15 11:21:16.779729 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped4: false
+# 2026/09/15 11:21:16.779729 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped5: false
+# 2026/09/15 11:21:16.779745 [TestFragmentLineOffsetMapsDroppedSourceSpans] 
+# 	Error Trace:	/Users/bgabor8/git/github/trufflehog-html-line-fix/pkg/engine/engine_test.go:395
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:371
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:380
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:205
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:120
+# 	            				/Users/bgabor8/git/github/trufflehog-html-line-fix/pkg/engine/engine_test.go:371
+# 	            				/opt/homebrew/Cellar/go/1.27.1/libexec/src/runtime/asm_arm64.s:1039
+# 	Error:      	Not equal: 
+# 	            	expected: 6
+# 	            	actual  : 9
+# 	Test:       	TestFragmentLineOffsetMapsDroppedSourceSpans
+# 
+v0.4.8#12137445727721400101
+0x15fc1dd49740f8
+0xa609d6ee46f7d
+0x5
+0x6efb6d61cda6a
+0xd4099437d56b8
+0x2
+0x1
+0x0
+0x0
+0x1
+0x1
+0x0
+0x0
