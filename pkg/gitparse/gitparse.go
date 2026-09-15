@@ -429,6 +429,8 @@ func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, ex
 		show: []string{
 			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---patch
 			"--patch",
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt-first-parent
+			"--diff-merges=first-parent",
 			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---dateformat
 			"--date=iso-strict",
 			// https://git-scm.com/docs/git-show#_pretty_formats
