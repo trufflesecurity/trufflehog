@@ -38,6 +38,11 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.27"
+          # Do not restore a shared build/module cache into the job that
+          # produces the released binaries: a cache entry poisoned by any
+          # other workflow (keyed on the same go.sum) would flow into the
+          # published artifacts. Release builds from a clean cache.
+          cache: false
       - name: Cosign install
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
       - name: Install UPX
