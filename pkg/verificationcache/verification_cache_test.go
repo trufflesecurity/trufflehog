@@ -23,7 +23,16 @@ func (t *testDetector) FromData(_ context.Context, verify bool, _ []byte) ([]det
 	t.fromDataCallCount = t.fromDataCallCount + 1
 	var results []detectors.Result
 	for _, r := range t.results {
-		copy := detectors.Result{Redacted: r.Redacted, Raw: r.Raw, RawV2: r.RawV2, DetectorType: r.DetectorType}
+		copy := detectors.Result{
+			Redacted:     r.Redacted,
+			Raw:          r.Raw,
+			RawV2:        r.RawV2,
+			DetectorType: r.DetectorType,
+			SecretParts:  r.SecretParts,
+		}
+		if v := r.GetPrimarySecretValue(); v != "" {
+			copy.SetPrimarySecretValue(v)
+		}
 		if verify {
 			copy.CopyVerificationInfo(&r)
 		}
@@ -279,4 +288,33 @@ func TestVerificationCache_FromData_SameRawV2DifferentType_CacheMiss(t *testing.
 		}
 	}
 	assert.Len(t, cache.resultCache.Values(), 2)
+}
+
+func TestVerificationCache_FromData_DoesNotCacheSecretMaterial(t *testing.T) {
+	result := detectors.Result{
+		Redacted:    "hello",
+		Raw:         []byte("hello"),
+		RawV2:       []byte("helloV2"),
+		Verified:    true,
+		SecretParts: map[string]string{"key": "hello"},
+	}
+	result.SetPrimarySecretValue("hello")
+	detector := testDetector{results: []detectors.Result{result}}
+	cache := New(simple.NewCache[detectors.Result](), nil)
+
+	results, err := cache.FromData(logContext.Background(), &detector, true, false, nil)
+	require.NoError(t, err)
+
+	require.Len(t, results, 1)
+	assert.Equal(t, []byte("hello"), results[0].Raw)
+	assert.Equal(t, []byte("helloV2"), results[0].RawV2)
+	assert.Equal(t, map[string]string{"key": "hello"}, results[0].SecretParts)
+	assert.Equal(t, "hello", results[0].GetPrimarySecretValue())
+
+	cached := cache.resultCache.Values()
+	require.Len(t, cached, 1)
+	assert.Nil(t, cached[0].Raw)
+	assert.Nil(t, cached[0].RawV2)
+	assert.Nil(t, cached[0].SecretParts)
+	assert.Empty(t, cached[0].GetPrimarySecretValue())
 }

@@ -125,8 +125,7 @@ func (v *VerificationCache) FromData(
 
 		copyForCaching := r
 		// Do not persist raw secret values in a long-lived cache
-		copyForCaching.Raw = nil
-		copyForCaching.RawV2 = nil
+		copyForCaching.ClearSecrets()
 		v.resultCache.Set(string(cacheKey), copyForCaching)
 	}
 
