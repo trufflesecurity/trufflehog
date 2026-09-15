@@ -14,12 +14,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode/utf8"
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -1420,11 +1418,17 @@ func effectiveSecret(r *detectors.Result) string {
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
 	secretBytes := []byte(effectiveSecret(result))
 
-	offset := bytes.Index(chunk.Data, secretBytes)
+	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
+	// pre-assigned (for duplicate secrets), use it directly to find the correct
+	// occurrence instead of always matching the first one.
+	var offset int
 	if result.HasChunkOffset() {
 		offset = int(result.ChunkOffset())
-	} else if offset == -1 {
-		return 0, false
+	} else {
+		offset = bytes.Index(chunk.Data, secretBytes)
+		if offset == -1 {
+			return 0, false
+		}
 	}
 
 	data := chunk.Data
@@ -1447,40 +1451,45 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	return lineNumber, false
 }
 
+// sourceOffset maps an offset in decoded data back onto the pre-decode buffer,
+// returning -1 when the detected value has no counterpart in the source.
 func sourceOffset(originalData, data []byte, offset, length int) int {
-	if originalData == nil || offset < 0 || offset+length > len(data) {
+	if len(originalData) == 0 || length == 0 || offset < 0 || offset+length > len(data) {
 		return -1
 	}
 	if bytes.Equal(originalData, data) {
 		return offset
 	}
 
-	var originalOffset, dataOffset int
-	for _, diff := range diffmatchpatch.New().DiffMainRunes(bytesAsRunes(originalData), bytesAsRunes(data), true) {
-		diffLength := utf8.RuneCountInString(diff.Text)
-		switch diff.Type {
-		case diffmatchpatch.DiffDelete:
-			originalOffset += diffLength
-		case diffmatchpatch.DiffInsert:
-			dataOffset += diffLength
-		case diffmatchpatch.DiffEqual:
-			if offset >= dataOffset && offset+length <= dataOffset+diffLength {
-				return originalOffset + offset - dataOffset
-			}
-			originalOffset += diffLength
-			dataOffset += diffLength
-		}
+	secret := data[offset : offset+length]
+	preceding := bytes.Count(data[:offset], secret)
+	sourceIndex, sourceCount := nthOccurrence(originalData, secret, preceding)
+	// Decoders emit the occurrences they keep in source order, so an unchanged
+	// occurrence count makes the nth decoded match the nth source match. When the
+	// counts disagree the decoder dropped or merged occurrences and nothing cheap
+	// can tell which source occurrence survived, so leave the caller on decoded data.
+	if sourceCount != preceding+bytes.Count(data[offset:], secret) {
+		return -1
 	}
-	return -1
+	return sourceIndex
 }
 
-// Map each source byte to one rune so invalid UTF-8 survives diffing.
-func bytesAsRunes(data []byte) []rune {
-	runes := make([]rune, len(data))
-	for i, value := range data {
-		runes[i] = rune(value)
+// nthOccurrence returns the offset of the nth zero-indexed non-overlapping
+// occurrence of sep in data along with the total occurrence count. The offset is
+// -1 when data holds fewer than n+1 occurrences.
+func nthOccurrence(data, sep []byte, n int) (int, int) {
+	index, count, start := -1, 0, 0
+	for {
+		next := bytes.Index(data[start:], sep)
+		if next == -1 {
+			return index, count
+		}
+		if count == n {
+			index = start + next
+		}
+		count++
+		start += next + len(sep)
 	}
-	return runes
 }
 
 // AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same

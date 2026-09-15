@@ -276,13 +276,14 @@ func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
 	assert.Equal(t, int64(2), lineOffset)
 }
 
-// The same value can occur in discarded markup and emitted text.
-func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
+// A value occurring in both discarded markup and emitted text is ambiguous, so
+// mapping bails rather than guessing which source occurrence the decoder kept.
+func TestFragmentLineOffsetKeepsDecodedLineForRemovedOccurrence(t *testing.T) {
 	secret := []byte("synthetic-secret-value-123456")
 	chunk := &sources.Chunk{
 		Data: []byte("heading\nsynthetic-secret-value-123456"),
-		OriginalData: []byte("<div class=\"synthetic-secret-value-123456\">heading</div>\n" +
-			"<p>synthetic-secret-value-123456</p>"),
+		OriginalData: []byte("<div class=\"synthetic-secret-value-123456\">\n" +
+			"<p>heading</p>\n<p>synthetic-secret-value-123456</p>"),
 	}
 
 	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
