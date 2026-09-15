@@ -92,6 +92,9 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	case http.StatusOK:
 		// If the endpoint returns useful information, we can return it as a map.
 		return true, extraData, nil
+	case http.StatusForbidden:
+		// The secret is determinately not verified (nothing to do)
+		return true, nil, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
