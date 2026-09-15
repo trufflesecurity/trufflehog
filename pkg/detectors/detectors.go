@@ -11,6 +11,8 @@ import (
 	"strings"
 	"unicode"
 
+	"golang.org/x/oauth2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -90,17 +92,14 @@ type EndpointCustomizer interface {
 	SetCloudEndpoint(string)
 	UseCloudEndpoint(bool)
 	UseFoundEndpoints(bool)
-	SetTokenSource(TokenSource)
+	SetOAuth2TokenSource(OAuth2TokenSource)
 }
 
-// TokenSource abstracts OAuth2 token acquisition. Each grant type
-// implements this interface with its own credential exchange and
-// caching logic. Used by custom detector inline verification and by
-// the engine's OAuth2 custom verifier path.
-type TokenSource interface {
-	// Token returns a valid access token, refreshing it if necessary.
-	Token(ctx context.Context) (string, error)
-}
+// OAuth2TokenSource is the standard oauth2 token source interface,
+// named here to make the OAuth2 scope explicit. Other auth mechanisms
+// (API key rotation, mTLS, etc.) would define their own interfaces
+// rather than being shoehorned into this one.
+type OAuth2TokenSource = oauth2.TokenSource
 
 // OAuthVerifier is satisfied by any detector whose EndpointSetter has
 // an OAuth2 token source configured. The engine checks this interface
@@ -108,8 +107,8 @@ type TokenSource interface {
 // through an OAuth2-authenticated POST instead of the detector's
 // built-in verification logic.
 type OAuthVerifier interface {
-	HasTokenSource() bool
-	GetTokenSource() TokenSource
+	HasOAuth2() bool
+	OAuth2TokenSource() OAuth2TokenSource
 	Endpoints(foundEndpoints ...string) []string
 }
 

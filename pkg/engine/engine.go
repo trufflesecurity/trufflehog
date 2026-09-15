@@ -115,7 +115,7 @@ type Config struct {
 	// a detector has a matching entry here, its token source is set
 	// on the detector's EndpointSetter so the engine can perform
 	// OAuth2-authenticated verification via the OAuthVerifier interface.
-	VerifierAuth map[config.DetectorID]detectors.TokenSource
+	VerifierAuth map[config.DetectorID]detectors.OAuth2TokenSource
 
 	// Verify determines whether the scanner will verify candidate secrets.
 	Verify bool
@@ -330,7 +330,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 			// OAuthVerifier to route verification through OAuth2.
 			// feature fm-oauth2: custom verifier OAuth2 verification
 			if ts, hasAuth := getWithDetectorID(d, cfg.VerifierAuth); hasAuth {
-				customizer.SetTokenSource(ts)
+				customizer.SetOAuth2TokenSource(ts)
 			}
 
 			return true
@@ -1184,12 +1184,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		// feature fm-oauth2: custom verifier OAuth2 verification
 		var results []detectors.Result
 		var err error
-		if oauthV, ok := data.detector.Detector.(detectors.OAuthVerifier); ok && oauthV.HasTokenSource() {
+		if oauthV, ok := data.detector.Detector.(detectors.OAuthVerifier); ok && oauthV.HasOAuth2() {
 			results, err = data.detector.FromData(ctx, false, matchBytes)
 			if err == nil && data.verify && len(results) > 0 {
 				for i := range results {
 					verified, verifyErr := OAuthVerify(
-						ctx, nil, oauthV.GetTokenSource(), oauthV.Endpoints(), &results[i])
+						ctx, nil, oauthV.OAuth2TokenSource(), oauthV.Endpoints(), &results[i])
 					results[i].Verified = verified
 					results[i].SetVerificationError(verifyErr, string(results[i].Raw))
 				}

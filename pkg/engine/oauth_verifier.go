@@ -1,7 +1,8 @@
 // oauth_verifier.go provides the standalone OAuth2 verification function
 // used by the engine scan loop when a detector has a custom verifier with
-// OAuth2 auth configured. The function acquires a Bearer token and POSTs
-// the detected credential to the custom verifier endpoint.
+// OAuth2 auth configured. The function builds an authenticated HTTP client
+// via oauth2.NewClient and POSTs the detected credential to the custom
+// verifier endpoint.
 //
 // This file contains only HTTP/verification logic. Configuration state
 // (token source, endpoints) lives on EndpointSetter; orchestration lives
@@ -18,6 +19,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"golang.org/x/oauth2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -40,29 +43,34 @@ type oauthVerifyResponse struct {
 	Verified bool `json:"verified"`
 }
 
-var defaultOAuthHTTPClient = common.SaneHttpClient()
+var defaultOAuthBaseClient = common.SaneHttpClient()
 
-// OAuthVerify acquires a Bearer token from the given TokenSource and
-// POSTs the credential to each endpoint until one returns a definitive
-// answer. Response protocol:
+// OAuthVerify builds an OAuth2-authenticated HTTP client and POSTs
+// the credential to each endpoint until one returns a definitive
+// answer. The token source handles caching and refresh via
+// oauth2.ReuseTokenSource; the client adds the Bearer header
+// transparently via oauth2.Transport. Response protocol:
 //
 //	200 {"verified": true}   — credential is valid
 //	200 {"verified": false}  — credential checked, not valid
 //	401                      — token rejected, stop immediately
 //	other                    — transient/unexpected, try next endpoint
-func OAuthVerify(ctx context.Context, client *http.Client, ts detectors.TokenSource, endpoints []string, result *detectors.Result) (bool, error) {
+func OAuthVerify(ctx context.Context, baseClient *http.Client, ts detectors.OAuth2TokenSource, endpoints []string, result *detectors.Result) (bool, error) {
 	if len(endpoints) == 0 {
 		return false, fmt.Errorf("no verification endpoints configured")
 	}
 
-	if client == nil {
-		client = defaultOAuthHTTPClient
+	if baseClient == nil {
+		baseClient = defaultOAuthBaseClient
 	}
 
-	token, err := ts.Token(ctx)
-	if err != nil {
-		return false, fmt.Errorf("acquiring OAuth2 token for verification: %w", err)
-	}
+	// Build an authenticated client. oauth2.NewClient wraps the base
+	// client's transport with oauth2.Transport, which calls
+	// ts.Token() per request and sets the Authorization header.
+	client := oauth2.NewClient(
+		context.WithValue(ctx, oauth2.HTTPClient, baseClient),
+		ts,
+	)
 
 	reqBody := oauthVerifyRequest{
 		DetectorType: result.DetectorType.String(),
@@ -76,19 +84,16 @@ func OAuthVerify(ctx context.Context, client *http.Client, ts detectors.TokenSou
 
 	// Try each endpoint until we get a definitive answer.
 	var lastErr error
-	var retried bool
 	for _, endpoint := range endpoints {
 		if common.IsDone(ctx) {
 			return false, ctx.Err()
 		}
 
-	retryWithNewToken:
 		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(bodyBytes))
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := client.Do(req)
@@ -108,16 +113,6 @@ func OAuthVerify(ctx context.Context, client *http.Client, ts detectors.TokenSou
 			}
 			return parsed.Verified, nil
 		case http.StatusUnauthorized:
-			// Token may have expired. Re-acquire once and retry
-			// the same endpoint if we get a different token.
-			if !retried {
-				retried = true
-				newToken, err := ts.Token(ctx)
-				if err == nil && newToken != token {
-					token = newToken
-					goto retryWithNewToken
-				}
-			}
 			return false, fmt.Errorf("OAuth2 token rejected by verifier (401)")
 		default:
 			lastErr = fmt.Errorf("verifier returned HTTP %d: %s", resp.StatusCode, string(respBody))

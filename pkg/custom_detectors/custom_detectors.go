@@ -5,17 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"maps"
 	"net/http"
-	"net/url"
 	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"slices"
 	"strings"
-	"sync"
-	"time"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -31,122 +28,64 @@ const maxTotalMatches = 100
 
 // ─── OAuth2 token acquisition ────────────────────────────────────────
 
-// tokenExpiryDelta is subtracted from the token's expiry time to
-// avoid race conditions where the token expires between the check
-// and the HTTP request.
-const tokenExpiryDelta = 10 * time.Second
-
-// ropcTokenSource implements TokenSource for the Resource Owner
-// Password Credentials grant (RFC 6749 Section 4.3). It caches the
-// current token and only contacts the token endpoint when the cached
-// token is missing or about to expire.
+// ropcTokenSource implements oauth2.TokenSource for the Resource Owner
+// Password Credentials grant (RFC 6749 Section 4.3). Caching and
+// expiry are handled by oauth2.ReuseTokenSource; this type only
+// performs the token exchange.
 type ropcTokenSource struct {
-	tokenEndpoint string
-	username      string
-	password      string
-	clientID      string
-	clientSecret  string
-	scope         string
-
-	mu     sync.Mutex
-	token  string
-	expiry time.Time
+	conf     *oauth2.Config
+	username string
+	password string
+	// httpCtx carries the HTTP client for TLS and timeout settings
+	// via the oauth2.HTTPClient context key. Stored at construction
+	// time so PasswordCredentialsToken uses our SaneHttpClient.
+	httpCtx context.Context
 }
 
-// newROPCTokenSource builds a token source from the proto config.
-func newROPCTokenSource(auth *custom_detectorspb.VerifierAuth, ropc *custom_detectorspb.ROPCConfig) *ropcTokenSource {
-	return &ropcTokenSource{
-		tokenEndpoint: auth.GetTokenEndpoint(),
-		username:      ropc.GetUsername(),
-		password:      ropc.GetPassword(),
-		clientID:      ropc.GetClientId(),
-		clientSecret:  ropc.GetClientSecret(),
-		scope:         ropc.GetScope(),
-	}
+func (s *ropcTokenSource) Token() (*oauth2.Token, error) {
+	return s.conf.PasswordCredentialsToken(s.httpCtx, s.username, s.password)
 }
 
-// ropcTokenResponse is the standard OAuth2 token response body
-// (RFC 6749 Section 5.1).
-type ropcTokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
-}
-
-func (s *ropcTokenSource) Token(ctx context.Context) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Return the cached token if it's still valid.
-	if s.token != "" && time.Now().Before(s.expiry) {
-		return s.token, nil
+// newROPCTokenSource builds an oauth2.TokenSource for the ROPC grant,
+// wrapped in ReuseTokenSource for automatic caching with a 10-second
+// expiry buffer.
+func newROPCTokenSource(auth *custom_detectorspb.VerifierAuth, ropc *custom_detectorspb.ROPCConfig) oauth2.TokenSource {
+	conf := &oauth2.Config{
+		ClientID:     ropc.GetClientId(),
+		ClientSecret: ropc.GetClientSecret(),
+		Endpoint: oauth2.Endpoint{
+			TokenURL:  auth.GetTokenEndpoint(),
+			AuthStyle: oauth2.AuthStyleInParams,
+		},
 	}
-
-	// POST form-encoded ROPC body per RFC 6749 Section 4.3.2.
-	// Only username, password, and grant_type are required.
-	// client_id and client_secret are conditional: included only when
-	// configured, supporting both public clients (no secret) and
-	// servers that use HTTP Basic auth for client authentication.
-	form := url.Values{
-		"grant_type": {"password"},
-		"username":   {s.username},
-		"password":   {s.password},
+	if scope := ropc.GetScope(); scope != "" {
+		conf.Scopes = strings.Split(scope, " ")
 	}
-	if s.clientID != "" {
-		form.Set("client_id", s.clientID)
+	// Inject SaneHttpClient so the token endpoint request uses our
+	// TLS configuration and timeout settings.
+	httpCtx := context.WithValue(context.Background(), oauth2.HTTPClient, httpClient)
+	base := &ropcTokenSource{
+		conf:     conf,
+		username: ropc.GetUsername(),
+		password: ropc.GetPassword(),
+		httpCtx:  httpCtx,
 	}
-	if s.clientSecret != "" {
-		form.Set("client_secret", s.clientSecret)
-	}
-	if s.scope != "" {
-		form.Set("scope", s.scope)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", s.tokenEndpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		return "", fmt.Errorf("building ROPC token request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("ROPC token request to %s: %w", s.tokenEndpoint, err)
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ROPC token endpoint returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var tokenResp ropcTokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return "", fmt.Errorf("decoding ROPC token response: %w", err)
-	}
-
-	s.token = tokenResp.AccessToken
-	// Cache with a safety margin so we don't send an about-to-expire token.
-	s.expiry = time.Now().Add(time.Duration(tokenResp.ExpiresIn)*time.Second - tokenExpiryDelta)
-
-	return s.token, nil
+	return oauth2.ReuseTokenSource(nil, base)
 }
 
 // customDetectorVerifier binds a VerifierConfig to an optional
-// TokenSource. This avoids parallel slices and ensures the auth
+// OAuth2TokenSource. This avoids parallel slices and ensures the auth
 // config can never get out of sync with its verifier.
 type customDetectorVerifier struct {
 	config      *custom_detectorspb.VerifierConfig
-	tokenSource detectors.TokenSource // nil when no auth is configured
+	tokenSource detectors.OAuth2TokenSource // nil when no auth is configured
 }
 
-// BuildTokenSource creates the appropriate TokenSource for a
+// BuildTokenSource creates the appropriate OAuth2TokenSource for a
 // VerifierConfig's auth block, or returns nil if no auth is set.
 // Exported so the enterprise pipeline can build token sources from
 // proto config without duplicating grant-type logic.
-func BuildTokenSource(auth *custom_detectorspb.VerifierAuth) detectors.TokenSource {
+func BuildTokenSource(auth *custom_detectorspb.VerifierAuth) detectors.OAuth2TokenSource {
 	if auth == nil {
 		return nil
 	}
@@ -459,18 +398,17 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			req.Header.Set("Content-Type", "application/json")
 		}
 
-		// If this verifier has OAuth2 auth, acquire a bearer token
-		// and attach it to the request.
+		// If this verifier has OAuth2 auth, build an authenticated client
+		// that transparently adds the Bearer token to each request.
+		client := httpClient
 		if v.tokenSource != nil {
-			token, err := v.tokenSource.Token(ctx)
-			if err != nil {
-				// Token acquisition failed — skip this verifier.
-				continue
-			}
-			req.Header.Set("Authorization", "Bearer "+token)
+			client = oauth2.NewClient(
+				context.WithValue(ctx, oauth2.HTTPClient, httpClient),
+				v.tokenSource,
+			)
 		}
 
-		resp, err := httpClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			continue
 		}
