@@ -181,6 +181,14 @@ func (r *Result) GetPrimarySecretValue() string {
 	return r.primarySecret.Value
 }
 
+// ClearPrimarySecret zeros the primary secret value and line number.
+func (r *Result) ClearPrimarySecret() {
+	r.primarySecret = struct {
+		Value string
+		Line  int64
+	}{}
+}
+
 // SetChunkOffset records the byte position of this result's secret within the chunk data.
 func (r *Result) SetChunkOffset(offset int64) {
 	r.chunkOffset = offset
