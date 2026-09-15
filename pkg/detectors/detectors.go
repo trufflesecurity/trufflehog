@@ -181,8 +181,11 @@ func (r *Result) GetPrimarySecretValue() string {
 	return r.primarySecret.Value
 }
 
-// ClearPrimarySecret zeros the primary secret value and line number.
-func (r *Result) ClearPrimarySecret() {
+// ClearSecrets removes fields that may contain raw secret material.
+func (r *Result) ClearSecrets() {
+	r.Raw = nil
+	r.RawV2 = nil
+	r.SecretParts = nil
 	r.primarySecret = struct {
 		Value string
 		Line  int64
