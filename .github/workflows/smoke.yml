@@ -3,9 +3,13 @@ name: Smoke
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -13,14 +17,17 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.27"
+      - name: Build
+        run: go build -o "$RUNNER_TEMP/trufflehog" .
       - name: Smoke
+        timeout-minutes: 10
         run: |
           set -e
-          go run . git https://github.com/dustin-decker/secretsandstuff.git > /dev/null
-          go run . github --repo https://github.com/dustin-decker/secretsandstuff.git > /dev/null
+          "$RUNNER_TEMP/trufflehog" git https://github.com/dustin-decker/secretsandstuff.git > /dev/null
+          "$RUNNER_TEMP/trufflehog" github --repo https://github.com/dustin-decker/secretsandstuff.git > /dev/null
   zombies:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -28,12 +35,17 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.27"
+      - name: Build
+        run: go build -o "$RUNNER_TEMP/trufflehog" .
+      # The timeout covers only the scans, not the build, so a cold Go cache
+      # cannot eat into the budget that detects the #3379 deadlock.
       - name: Run trufflehog
+        timeout-minutes: 5
         run: |
           set -e
-          go run . git --no-verification file://. > /dev/null
+          "$RUNNER_TEMP/trufflehog" git --no-verification file://. > /dev/null
           # This case previously had a deadlock issue and left zombies after trufflehog exited #3379
-          go run . git --no-verification https://github.com/git-test-fixtures/binary.git > /dev/null
+          "$RUNNER_TEMP/trufflehog" git --no-verification https://github.com/git-test-fixtures/binary.git > /dev/null
       - name: Check for running git processes and zombies
         run: |
           if pgrep -x "git" > /dev/null
