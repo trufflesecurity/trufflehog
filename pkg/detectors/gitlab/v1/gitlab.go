@@ -34,7 +34,13 @@ func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
+	// keyPat matches the legacy unprefixed 20-22 char PATs.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
+	// dottedKeyPat matches the newer dotted PAT format emitted by some
+	// self-hosted GitLab instances that adopted the dotted token structure
+	// before adding the `glpat-` prefix (see issue #4880). The body/suffix
+	// shape mirrors the prefixed v3 pattern; only the prefix is absent here.
+	dottedKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{26,299}\.[0-9a-z]{2}\.[a-z0-9]{9})\b`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
 )
@@ -65,50 +71,62 @@ func (s Scanner) Description() string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	// Track matches already emitted so the legacy and dotted patterns can't
+	// double-report the same secret (the dotted body can also contain a
+	// 20-22 char prefix substring).
+	seen := make(map[string]struct{})
 
-		// ignore v2 detectors which have a prefix of `glpat-`
-		if strings.Contains(match[0], "glpat-") {
-			continue
-		}
+	for _, pat := range []*regexp.Regexp{keyPat, dottedKeyPat} {
+		matches := pat.FindAllStringSubmatch(dataStr, -1)
+		for _, match := range matches {
+			resMatch := strings.TrimSpace(match[1])
 
-		// to avoid false positives
-		if detectors.StringShannonEntropy(resMatch) < 3.6 {
-			continue
-		}
-
-		for _, endpoint := range s.Endpoints() {
-			s1 := detectors.Result{
-				DetectorType: detector_typepb.DetectorType_Gitlab,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + endpoint),
-				ExtraData: map[string]string{
-					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
-					"version":        fmt.Sprintf("%d", s.Version()),
-				},
-				SecretParts: map[string]string{
-					"key":  resMatch,
-					"host": endpoint,
-				},
+			// ignore v2/v3 detectors which have a prefix of `glpat-`
+			if strings.Contains(match[0], "glpat-") {
+				continue
 			}
 
-			if verify {
-				isVerified, extraData, verificationErr := VerifyGitlab(ctx, s.getClient(), endpoint, resMatch)
-				s1.Verified = isVerified
-				maps.Copy(s1.ExtraData, extraData)
+			// to avoid false positives
+			if detectors.StringShannonEntropy(resMatch) < 3.6 {
+				continue
+			}
 
-				s1.SetVerificationError(verificationErr)
+			if _, ok := seen[resMatch]; ok {
+				continue
+			}
+			seen[resMatch] = struct{}{}
 
-				// for verified keys break out of the endpoint loop to continue to next secret
-				if s1.Verified {
-					results = append(results, s1)
-					break
+			for _, endpoint := range s.Endpoints() {
+				s1 := detectors.Result{
+					DetectorType: detector_typepb.DetectorType_Gitlab,
+					Raw:          []byte(resMatch),
+					RawV2:        []byte(resMatch + endpoint),
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        fmt.Sprintf("%d", s.Version()),
+					},
+					SecretParts: map[string]string{
+						"key":  resMatch,
+						"host": endpoint,
+					},
 				}
-			}
 
-			results = append(results, s1)
+				if verify {
+					isVerified, extraData, verificationErr := VerifyGitlab(ctx, s.getClient(), endpoint, resMatch)
+					s1.Verified = isVerified
+					maps.Copy(s1.ExtraData, extraData)
+
+					s1.SetVerificationError(verificationErr)
+
+					// for verified keys break out of the endpoint loop to continue to next secret
+					if s1.Verified {
+						results = append(results, s1)
+						break
+					}
+				}
+
+				results = append(results, s1)
+			}
 		}
 	}
 
