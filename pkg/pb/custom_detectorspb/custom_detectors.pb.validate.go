@@ -678,6 +678,8 @@ func (m *ROPCConfig) validate(all bool) error {
 
 	// no validation rules for ClientSecret
 
+	// no validation rules for Scope
+
 	if len(errors) > 0 {
 		return ROPCConfigMultiError(errors)
 	}

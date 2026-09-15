@@ -56,6 +56,10 @@ message ROPCConfig {
   string password = 2;
   string client_id = 3;
   string client_secret = 4;
+  // Optional OAuth2 scope(s) to request, space-delimited per RFC 6749
+  // Section 3.3. Some IdPs require a scope to issue tokens with the
+  // correct audience or permissions.
+  string scope = 5;
 }
 
 message ValidationConfig {

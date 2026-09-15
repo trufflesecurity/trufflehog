@@ -46,9 +46,10 @@ type ropcTokenSource struct {
 	password      string
 	clientID      string
 	clientSecret  string
+	scope         string
 
-	mu    sync.Mutex
-	token string
+	mu     sync.Mutex
+	token  string
 	expiry time.Time
 }
 
@@ -60,6 +61,7 @@ func newROPCTokenSource(auth *custom_detectorspb.VerifierAuth, ropc *custom_dete
 		password:      ropc.GetPassword(),
 		clientID:      ropc.GetClientId(),
 		clientSecret:  ropc.GetClientSecret(),
+		scope:         ropc.GetScope(),
 	}
 }
 
@@ -81,12 +83,23 @@ func (s *ropcTokenSource) Token(ctx context.Context) (string, error) {
 	}
 
 	// POST form-encoded ROPC body per RFC 6749 Section 4.3.2.
+	// Only username, password, and grant_type are required.
+	// client_id and client_secret are conditional: included only when
+	// configured, supporting both public clients (no secret) and
+	// servers that use HTTP Basic auth for client authentication.
 	form := url.Values{
-		"grant_type":    {"password"},
-		"username":      {s.username},
-		"password":      {s.password},
-		"client_id":     {s.clientID},
-		"client_secret": {s.clientSecret},
+		"grant_type": {"password"},
+		"username":   {s.username},
+		"password":   {s.password},
+	}
+	if s.clientID != "" {
+		form.Set("client_id", s.clientID)
+	}
+	if s.clientSecret != "" {
+		form.Set("client_secret", s.clientSecret)
+	}
+	if s.scope != "" {
+		form.Set("scope", s.scope)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", s.tokenEndpoint, strings.NewReader(form.Encode()))
