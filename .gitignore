@@ -3,6 +3,9 @@ dist
 .env
 *.test
 
+# rapid property test failure recordings, for local reproduction only
+testdata/rapid/
+
 # binary
 trufflehog
 tmp/go-test.json
