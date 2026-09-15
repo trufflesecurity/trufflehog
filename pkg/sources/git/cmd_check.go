@@ -10,8 +10,11 @@ import (
 	"github.com/go-errors/errors"
 )
 
-// Extract the version string using a regex to find the version numbers
-var regex = regexp.MustCompile(`\d+\.\d+\.\d+`)
+// Extract the version string using a regex to find the major and minor numbers.
+// Only the major and minor components are needed for the version check, and some
+// builds report a non-numeric patch component (for example "2.52.gaea8cc3"), so
+// matching the full "x.y.z" form here would fail to find a match for them.
+var regex = regexp.MustCompile(`\d+\.\d+`)
 
 // CmdCheck checks if git is installed and meets 2.20.0<=x<3.0.0 version requirements.
 func CmdCheck() error {
@@ -25,8 +28,17 @@ func CmdCheck() error {
 		return fmt.Errorf("failed to check git version: %w", err)
 	}
 
-	versionStr := regex.FindString(string(out))
+	return checkGitVersion(string(out))
+}
+
+// checkGitVersion verifies that the output of `git --version` reports a version
+// in the range 2.20.0 <= x < 3.0.0.
+func checkGitVersion(version string) error {
+	versionStr := regex.FindString(version)
 	versionParts := strings.Split(versionStr, ".")
+	if len(versionParts) < 2 {
+		return fmt.Errorf("could not parse git version from %q", strings.TrimSpace(version))
+	}
 
 	// Parse version numbers
 	major, _ := strconv.Atoi(versionParts[0])
