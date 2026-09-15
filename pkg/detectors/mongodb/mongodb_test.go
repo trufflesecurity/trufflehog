@@ -144,6 +144,17 @@ func TestMongoDB_Pattern(t *testing.T) {
 			data:        `mongodb://prisma:risima@srv1.bu2lt.mongodb.net:27017,srv2.bu2lt.mongodb.net:27017,srv3.bu2lt.mongodb.net:27017/test?retryWrites=true&w=majority`,
 			shouldMatch: true,
 		},
+		{
+			name:        "password_starting_with_x",
+			data:        `mongodb://myDBReader:xK9mP2vL8qZ@mongodb0.example.com:27017`,
+			shouldMatch: true,
+		},
+		{
+			name:        "password_ending_with_asterisk",
+			data:        `mongodb://myDBReader:pass123*@mongodb0.example.com:27017`,
+			shouldMatch: true,
+			match:       `mongodb://myDBReader:pass123%2A@mongodb0.example.com:27017`,
+		},
 		// TODO: These fail because the Go driver doesn't explicitly support `authMechanism=DEFAULT`[1].
 		// However, this seems like a valid option[2] and I'm going to try to get that behaviour changed.
 		//
