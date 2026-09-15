@@ -2216,3 +2216,84 @@ func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
 		})
 	}
 }
+
+func setupSourceMappingBench(size int, decode bool) (*sources.Chunk, *detectors.Result) {
+	secret := []byte("synthetic-secret-value-123456")
+	var original, decoded []byte
+	for i := 0; len(original) < size; i++ {
+		original = append(original, fmt.Sprintf("<p class=\"row\">line%d</p>\n", i)...)
+		decoded = append(decoded, fmt.Sprintf("line%d\n", i)...)
+	}
+	original = append(original, "<p>"...)
+	original = append(original, secret...)
+	original = append(original, "</p>\n"...)
+	decoded = append(decoded, secret...)
+	decoded = append(decoded, '\n')
+	if !decode {
+		decoded = original
+	}
+	return &sources.Chunk{Data: decoded, OriginalData: original}, &detectors.Result{Raw: secret}
+}
+
+func benchmarkSourceMapping(b *testing.B, size int, decode bool) {
+	chunk, result := setupSourceMappingBench(size, decode)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
+	}
+}
+
+func BenchmarkFragmentLineOffset_Identical_Small(b *testing.B) {
+	benchmarkSourceMapping(b, 64, false)
+}
+
+func BenchmarkFragmentLineOffset_Identical_DefaultChunkSize(b *testing.B) {
+	benchmarkSourceMapping(b, sources.DefaultChunkSize, false)
+}
+
+func BenchmarkFragmentLineOffset_Identical_Large(b *testing.B) {
+	benchmarkSourceMapping(b, 64*1024, false)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_Small(b *testing.B) {
+	benchmarkSourceMapping(b, 64, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_DefaultChunkSize(b *testing.B) {
+	benchmarkSourceMapping(b, sources.DefaultChunkSize, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_MaxRealisticChunk(b *testing.B) {
+	benchmarkSourceMapping(b, sources.TotalChunkSize, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_Large(b *testing.B) {
+	benchmarkSourceMapping(b, 64*1024, true)
+}
+
+func setupUnmappedSourceBench(size int) (*sources.Chunk, *detectors.Result) {
+	secret := []byte("synthetic-secret-value-123456")
+	original := []byte("<div class=\"synthetic-secret-value-123456\">\n")
+	var decoded []byte
+	for i := 0; len(original) < size; i++ {
+		original = append(original, fmt.Sprintf("<p class=\"row\">line%d</p>\n", i)...)
+		decoded = append(decoded, fmt.Sprintf("line%d\n", i)...)
+	}
+	original = append(original, "<p>"...)
+	original = append(original, secret...)
+	original = append(original, "</p>\n"...)
+	decoded = append(decoded, secret...)
+	decoded = append(decoded, '\n')
+	return &sources.Chunk{Data: decoded, OriginalData: original}, &detectors.Result{Raw: secret}
+}
+
+// The same value occurs in both discarded markup and emitted text.
+func BenchmarkFragmentLineOffset_Unmapped_DefaultChunkSize(b *testing.B) {
+	chunk, result := setupUnmappedSourceBench(sources.DefaultChunkSize)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
+	}
+}
