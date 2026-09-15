@@ -1,0 +1,42 @@
+# 2026/09/15 11:19:25.443244 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw spans: 8
+# 2026/09/15 11:19:25.443247 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw target: 3
+# 2026/09/15 11:19:25.443249 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped0: false
+# 2026/09/15 11:19:25.443250 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped1: false
+# 2026/09/15 11:19:25.443250 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped2: false
+# 2026/09/15 11:19:25.443251 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped4: true
+# 2026/09/15 11:19:25.443252 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw decoy4: false
+# 2026/09/15 11:19:25.443252 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped5: true
+# 2026/09/15 11:19:25.443252 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw decoy5: true
+# 2026/09/15 11:19:25.443254 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped6: true
+# 2026/09/15 11:19:25.443254 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw decoy6: false
+# 2026/09/15 11:19:25.443254 [TestFragmentLineOffsetMapsDroppedSourceSpans] [rapid] draw dropped7: false
+# 2026/09/15 11:19:25.443268 [TestFragmentLineOffsetMapsDroppedSourceSpans] 
+# 	Error Trace:	/Users/bgabor8/git/github/trufflehog-html-line-fix/pkg/engine/engine_test.go:395
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:371
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:380
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:205
+# 	            				/Users/bgabor8/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:120
+# 	            				/Users/bgabor8/git/github/trufflehog-html-line-fix/pkg/engine/engine_test.go:371
+# 	            				/opt/homebrew/Cellar/go/1.27.1/libexec/src/runtime/asm_arm64.s:1039
+# 	Error:      	Not equal: 
+# 	            	expected: 8
+# 	            	actual  : 13
+# 	Test:       	TestFragmentLineOffsetMapsDroppedSourceSpans
+# 
+v0.4.8#9767452668697668275
+0x1e2851b15cf2d0
+0x749618382ffbb
+0x7
+0xeecd956d5d053
+0x1a08dc4a3e96ed
+0x3
+0x0
+0x0
+0x0
+0x1
+0x0
+0x1
+0x1
+0x1
+0x0
+0x0
