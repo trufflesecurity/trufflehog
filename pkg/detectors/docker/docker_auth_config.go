@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/go-logr/logr"
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
@@ -127,7 +127,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				client := s.client
 				if client == nil {
-					client = common.SaneHttpClient()
+					// Match other detectors: block private/link-local dials and do not follow redirects.
+					client = detectors.DetectorHttpClientWithNoLocalAddresses
 				}
 
 				isVerified, verificationErr := verifyMatch(logCtx, client, registry, username, b64encoded)
@@ -199,6 +200,9 @@ func verifyMatch(ctx logContext.Context, client *http.Client, registry string, u
 		realm := authParams["realm"]
 		if realm == "" {
 			return false, fmt.Errorf("unexpected empty realm for WWW-Authenticate header: %s", h)
+		}
+		if err := validateAuthRealm(realm); err != nil {
+			return false, err
 		}
 
 		authReq, err := http.NewRequestWithContext(ctx, http.MethodGet, realm, nil)
@@ -293,6 +297,35 @@ end:
 		logger.Error(fmt.Errorf("base64-encoded auth does not match source"), "failed to parse auths JSON")
 	}
 	return username, password, basicAuth
+}
+
+// validateAuthRealm rejects clearly unsafe WWW-Authenticate realm URLs before
+// we attach Basic credentials and follow them. Dial-time private IP blocking is
+// also enforced by DetectorHttpClientWithNoLocalAddresses.
+func validateAuthRealm(realm string) error {
+	u, err := url.Parse(realm)
+	if err != nil {
+		return fmt.Errorf("invalid auth realm URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported auth realm scheme %q", u.Scheme)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("auth realm missing host")
+	}
+	lower := strings.ToLower(host)
+	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") ||
+		lower == "metadata.google.internal" || lower == "metadata.internal" || lower == "metadata" {
+		return fmt.Errorf("auth realm host is not allowed: %s", host)
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+			ip.IsPrivate() || ip.IsUnspecified() {
+			return fmt.Errorf("auth realm host is a local/private IP: %s", host)
+		}
+	}
+	return nil
 }
 
 // This is an ad-hoc implementation and not RFC compliant.
