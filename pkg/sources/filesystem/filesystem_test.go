@@ -761,6 +761,29 @@ func TestComparePathsForResume(t *testing.T) {
 	}
 }
 
+func TestInit_MaxSymlinkDepthWithinLimit(t *testing.T) {
+	ctx := trContext.Background()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{MaxSymlinkDepth: defaultMaxSymlinkDepth})
+	require.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(ctx, "test max symlink depth within limit", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+	assert.Equal(t, defaultMaxSymlinkDepth, s.maxSymlinkDepth)
+}
+
+func TestInit_MaxSymlinkDepthExceedsLimit(t *testing.T) {
+	ctx := trContext.Background()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{MaxSymlinkDepth: defaultMaxSymlinkDepth + 1})
+	require.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(ctx, "test max symlink depth exceeds limit", 0, 0, true, conn, 1)
+	assert.Error(t, err)
+}
+
 func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 	ctx := trContext.Background()
 
