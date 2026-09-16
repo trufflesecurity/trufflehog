@@ -16,17 +16,30 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 // Composio issues three key types, all a fixed prefix followed by URL-safe
 // nanoid characters. oak_ and uak_ contain "ak_", so every pattern requires a
-// non-alphabet character (or start of input) before the prefix, and a
-// non-alphabet character (or end of input) after the key.
+// non-alphabet character (or start of input) before the prefix. The trailing
+// boundary is checked in code rather than in the pattern: a consuming trailing
+// group would swallow the single delimiter between two adjacent keys and drop
+// the second one.
 type keyPattern struct {
 	keyType string
 	re      *regexp.Regexp
 }
 
 var keyPatterns = []keyPattern{
-	{keyType: "project", re: regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(ak_[A-Za-z0-9_-]{20})(?:[^A-Za-z0-9_-]|$)`)},
-	{keyType: "org", re: regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(oak_[A-Za-z0-9_-]{20})(?:[^A-Za-z0-9_-]|$)`)},
-	{keyType: "user", re: regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(uak_[A-Za-z0-9_-]{43})(?:[^A-Za-z0-9_-]|$)`)},
+	{keyType: "project", re: regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(ak_[A-Za-z0-9_-]{20})`)},
+	{keyType: "org", re: regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(oak_[A-Za-z0-9_-]{20})`)},
+	{keyType: "user", re: regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(uak_[A-Za-z0-9_-]{43})`)},
+}
+
+// isKeyAlphabet reports whether b can appear inside a Composio key.
+func isKeyAlphabet(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '_' || b == '-'
+}
+
+// endsAtBoundary reports whether the key ending at end is followed by end of
+// input or a character that cannot be part of a key.
+func endsAtBoundary(data string, end int) bool {
+	return end >= len(data) || !isKeyAlphabet(data[end])
 }
 
 // Keywords are used for efficiently pre-filtering chunks. "ak_" is a substring
@@ -42,8 +55,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	seen := make(map[string]struct{})
 	for _, pattern := range keyPatterns {
-		for _, match := range pattern.re.FindAllStringSubmatch(dataStr, -1) {
-			token := match[1]
+		for _, loc := range pattern.re.FindAllStringSubmatchIndex(dataStr, -1) {
+			start, end := loc[2], loc[3]
+			if !endsAtBoundary(dataStr, end) {
+				continue
+			}
+			token := dataStr[start:end]
 			if _, dup := seen[token]; dup {
 				continue
 			}

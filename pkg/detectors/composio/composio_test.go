@@ -32,6 +32,8 @@ func TestComposio_Pattern(t *testing.T) {
 		{name: "org key is reported once, not also as a project key", input: fmt.Sprintf("COMPOSIO_ORG_KEY=%s", orgKey), want: []string{orgKey}},
 		{name: "user key is reported once, not also as a project key", input: fmt.Sprintf("x-user-api-key: %s", userKey), want: []string{userKey}},
 		{name: "duplicates collapse", input: fmt.Sprintf("%s %s", projectKey, projectKey), want: []string{projectKey}},
+		{name: "two keys separated by a single comma are both reported", input: fmt.Sprintf("%s,%s", projectKey, projectKeyDashEnd), want: []string{projectKey, projectKeyDashEnd}},
+		{name: "key glued to a following alphabet character is not a key", input: fmt.Sprintf("%sZ", projectKey), want: []string{}},
 		{name: "wrong length", input: "COMPOSIO_API_KEY=ak_jI60uPF6adMkCuBFESj", want: []string{}},
 		{name: "placeholder", input: "COMPOSIO_API_KEY=ak_test", want: []string{}},
 	}
