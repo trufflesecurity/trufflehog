@@ -48,13 +48,16 @@ const githubHTTPTimeoutSeconds = 60
 
 func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp, scanAllInstallations bool) (Connector, error) {
 	var installationID int64
+	var err error
+
 	if app.InstallationId != "" {
-		var err error
 		installationID, err = strconv.ParseInt(app.InstallationId, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse app installation ID %q: %w", app.InstallationId, err)
 		}
-	} else if !scanAllInstallations {
+	}
+
+	if installationID == 0 && !scanAllInstallations {
 		return nil, fmt.Errorf("githubApp.installationId is required unless scanAllInstallations is set")
 	}
 
@@ -166,6 +169,10 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 
 // installationIDForRepo returns the mapped installation ID for repoURL. When no
 // mapping exists, it falls back to the configured installation and returns false.
+//
+// Note: Because ensureRepoInstallation also stores values in this map with
+// c.installationID, the second return value here is NOT indicative of using
+// the fallback.
 func (c *appConnector) installationIDForRepo(repoURL string) (int64, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
