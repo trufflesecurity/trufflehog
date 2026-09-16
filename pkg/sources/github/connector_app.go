@@ -154,17 +154,17 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 		return "", nil, fmt.Errorf("no GitHub App installation resolved for repo %q; set githubApp.installationId to a fallback installation to scan repos outside installation listings (e.g. member repos with scanUsers) together with scanAllInstallations", repoURL)
 	}
 
-	// TODO: Check rate limit for this call.
-	token, _, err := c.installationClient.Apps.CreateInstallationToken(
-		ctx,
-		installID,
-		&github.InstallationTokenOptions{},
-	)
+	clients, err := c.clientsForInstallation(installID)
+	if err != nil {
+		return "", nil, fmt.Errorf("could not prepare github clients for installation %d: %w", installID, err)
+	}
+
+	token, err := clients.transport.Token(ctx)
 	if err != nil {
 		return "", nil, fmt.Errorf("could not create installation token for installation %d: %w", installID, err)
 	}
 
-	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "", "x-access-token", true, args...)
+	return git.CloneRepoUsingToken(ctx, token, repoURL, "", "x-access-token", true, args...)
 }
 
 // installationIDForRepo returns the mapped installation ID for repoURL. When no
