@@ -181,6 +181,17 @@ func (r *Result) GetPrimarySecretValue() string {
 	return r.primarySecret.Value
 }
 
+// ClearSecrets removes fields that may contain raw secret material.
+func (r *Result) ClearSecrets() {
+	r.Raw = nil
+	r.RawV2 = nil
+	r.SecretParts = nil
+	r.primarySecret = struct {
+		Value string
+		Line  int64
+	}{}
+}
+
 // SetChunkOffset records the byte position of this result's secret within the chunk data.
 func (r *Result) SetChunkOffset(offset int64) {
 	r.chunkOffset = offset
