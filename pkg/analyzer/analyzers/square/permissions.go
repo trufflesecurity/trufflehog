@@ -27,6 +27,7 @@ const (
     DisputesWrite Permission = iota
     DisputesRead Permission = iota
     EmployeesRead Permission = iota
+    EmployeesWrite Permission = iota
     GiftcardsRead Permission = iota
     GiftcardsWrite Permission = iota
     InventoryWrite Permission = iota
@@ -50,6 +51,8 @@ const (
     OnlineStoreSnippetsRead Permission = iota
     SubscriptionsWrite Permission = iota
     SubscriptionsRead Permission = iota
+    VendorRead Permission = iota
+    VendorWrite Permission = iota
 )
 
 var (
@@ -74,6 +77,7 @@ var (
         DisputesWrite: "disputes_write",
         DisputesRead: "disputes_read",
         EmployeesRead: "employees_read",
+        EmployeesWrite: "employees_write",
         GiftcardsRead: "giftcards_read",
         GiftcardsWrite: "giftcards_write",
         InventoryWrite: "inventory_write",
@@ -97,6 +101,8 @@ var (
         OnlineStoreSnippetsRead: "online_store_snippets_read",
         SubscriptionsWrite: "subscriptions_write",
         SubscriptionsRead: "subscriptions_read",
+        VendorRead: "vendor_read",
+        VendorWrite: "vendor_write",
     }
 
     StringToPermission = map[string]Permission{
@@ -120,6 +126,7 @@ var (
         "disputes_write": DisputesWrite,
         "disputes_read": DisputesRead,
         "employees_read": EmployeesRead,
+        "employees_write": EmployeesWrite,
         "giftcards_read": GiftcardsRead,
         "giftcards_write": GiftcardsWrite,
         "inventory_write": InventoryWrite,
@@ -143,6 +150,8 @@ var (
         "online_store_snippets_read": OnlineStoreSnippetsRead,
         "subscriptions_write": SubscriptionsWrite,
         "subscriptions_read": SubscriptionsRead,
+        "vendor_read": VendorRead,
+        "vendor_write": VendorWrite,
     }
 
     PermissionIDs = map[Permission]int{
@@ -166,29 +175,32 @@ var (
         DisputesWrite: 18,
         DisputesRead: 19,
         EmployeesRead: 20,
-        GiftcardsRead: 21,
-        GiftcardsWrite: 22,
-        InventoryWrite: 23,
-        InventoryRead: 24,
-        InvoicesWrite: 25,
-        InvoicesRead: 26,
-        TimecardsSettingsWrite: 27,
-        TimecardsWrite: 28,
-        TimecardsSettingsRead: 29,
-        TimecardsRead: 30,
-        MerchantProfileWrite: 31,
-        MerchantProfileRead: 32,
-        LoyaltyRead: 33,
-        LoyaltyWrite: 34,
-        PaymentsWriteInPerson: 35,
-        PaymentsWriteSharedOnfile: 36,
-        PaymentsWriteAdditionalRecipients: 37,
-        PayoutsRead: 38,
-        OnlineStoreSiteRead: 39,
-        OnlineStoreSnippetsWrite: 40,
-        OnlineStoreSnippetsRead: 41,
-        SubscriptionsWrite: 42,
-        SubscriptionsRead: 43,
+        EmployeesWrite: 21,
+        GiftcardsRead: 22,
+        GiftcardsWrite: 23,
+        InventoryWrite: 24,
+        InventoryRead: 25,
+        InvoicesWrite: 26,
+        InvoicesRead: 27,
+        TimecardsSettingsWrite: 28,
+        TimecardsWrite: 29,
+        TimecardsSettingsRead: 30,
+        TimecardsRead: 31,
+        MerchantProfileWrite: 32,
+        MerchantProfileRead: 33,
+        LoyaltyRead: 34,
+        LoyaltyWrite: 35,
+        PaymentsWriteInPerson: 36,
+        PaymentsWriteSharedOnfile: 37,
+        PaymentsWriteAdditionalRecipients: 38,
+        PayoutsRead: 39,
+        OnlineStoreSiteRead: 40,
+        OnlineStoreSnippetsWrite: 41,
+        OnlineStoreSnippetsRead: 42,
+        SubscriptionsWrite: 43,
+        SubscriptionsRead: 44,
+        VendorRead: 45,
+        VendorWrite: 46,
     }
 
     IdToPermission = map[int]Permission{
@@ -212,29 +224,32 @@ var (
         18: DisputesWrite,
         19: DisputesRead,
         20: EmployeesRead,
-        21: GiftcardsRead,
-        22: GiftcardsWrite,
-        23: InventoryWrite,
-        24: InventoryRead,
-        25: InvoicesWrite,
-        26: InvoicesRead,
-        27: TimecardsSettingsWrite,
-        28: TimecardsWrite,
-        29: TimecardsSettingsRead,
-        30: TimecardsRead,
-        31: MerchantProfileWrite,
-        32: MerchantProfileRead,
-        33: LoyaltyRead,
-        34: LoyaltyWrite,
-        35: PaymentsWriteInPerson,
-        36: PaymentsWriteSharedOnfile,
-        37: PaymentsWriteAdditionalRecipients,
-        38: PayoutsRead,
-        39: OnlineStoreSiteRead,
-        40: OnlineStoreSnippetsWrite,
-        41: OnlineStoreSnippetsRead,
-        42: SubscriptionsWrite,
-        43: SubscriptionsRead,
+        21: EmployeesWrite,
+        22: GiftcardsRead,
+        23: GiftcardsWrite,
+        24: InventoryWrite,
+        25: InventoryRead,
+        26: InvoicesWrite,
+        27: InvoicesRead,
+        28: TimecardsSettingsWrite,
+        29: TimecardsWrite,
+        30: TimecardsSettingsRead,
+        31: TimecardsRead,
+        32: MerchantProfileWrite,
+        33: MerchantProfileRead,
+        34: LoyaltyRead,
+        35: LoyaltyWrite,
+        36: PaymentsWriteInPerson,
+        37: PaymentsWriteSharedOnfile,
+        38: PaymentsWriteAdditionalRecipients,
+        39: PayoutsRead,
+        40: OnlineStoreSiteRead,
+        41: OnlineStoreSnippetsWrite,
+        42: OnlineStoreSnippetsRead,
+        43: SubscriptionsWrite,
+        44: SubscriptionsRead,
+        45: VendorRead,
+        46: VendorWrite,
     }
 )
 
