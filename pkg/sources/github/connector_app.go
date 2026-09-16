@@ -3,6 +3,7 @@ package github
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,17 +155,17 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 		return "", nil, fmt.Errorf("no GitHub App installation resolved for repo %q; set githubApp.installationId to a fallback installation to scan repos outside installation listings (e.g. member repos with scanUsers) together with scanAllInstallations", repoURL)
 	}
 
-	// TODO: Check rate limit for this call.
-	token, _, err := c.installationClient.Apps.CreateInstallationToken(
-		ctx,
-		installID,
-		&github.InstallationTokenOptions{},
-	)
+	clients, err := c.clientsForInstallation(installID)
+	if err != nil {
+		return "", nil, fmt.Errorf("could not prepare github clients for installation %d: %w", installID, err)
+	}
+
+	token, err := clients.transport.Token(ctx)
 	if err != nil {
 		return "", nil, fmt.Errorf("could not create installation token for installation %d: %w", installID, err)
 	}
 
-	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "", "x-access-token", true, args...)
+	return git.CloneRepoUsingToken(ctx, token, repoURL, "", "x-access-token", true, args...)
 }
 
 // installationIDForRepo returns the mapped installation ID for repoURL. When no
@@ -343,22 +344,42 @@ func newAppsTransport(apiEndpoint string, appID int64, privateKey []byte) (*ghin
 	if err != nil {
 		return nil, err
 	}
-	appsTransport.BaseURL = baseURL
+	appsTransport.BaseURL = strings.TrimRight(baseURL, "/")
 	return appsTransport, nil
 }
 
-// appsBaseURL returns the BaseURL that ghinstallation transports should use for
-// token exchange/refresh. For GHE.com it resolves to the api.* subdomain with
-// the trailing slash trimmed; for github.com and GHES it is the endpoint as-is.
+// appsBaseURL returns the BaseURL that ghinstallation transports should use
+// for token exchange/refresh. For GHE.com it resolves to the api.* subdomain;
+// for what is likely GHES, it ensures /api/v3 is used; and for anything else
+// including github.com it is the endpoint as-is.
 func appsBaseURL(apiEndpoint string) (string, error) {
 	if isGHECloud(apiEndpoint) {
 		normalizedURL, err := normalizeGHECloudAPIEndpoint(apiEndpoint)
 		if err != nil {
 			return "", fmt.Errorf("could not normalize GHE.com endpoint: %w", err)
 		}
-		return strings.TrimRight(normalizedURL, "/"), nil
+		return normalizedURL, nil
 	}
-	return apiEndpoint, nil
+
+	u, err := url.Parse(apiEndpoint)
+	if err != nil {
+		return "", fmt.Errorf("malformed endpoint url: %w", err)
+	}
+	h := u.Hostname()
+
+	if !strings.HasSuffix(u.Path, "/") {
+		u.Path += "/"
+	}
+
+	// If we're not dealing with github.com or GHE, then maybe GHES, which
+	// needs /api/v3 for ghinstallation find the right place
+	if !strings.HasPrefix(h, "api.") && !strings.Contains(h, ".api.") {
+		if !strings.HasSuffix(u.Path, "/api/v3/") {
+			u.Path += "api/v3/"
+		}
+	}
+
+	return u.String(), nil
 }
 
 func newGitHubClientWithTransport(apiEndpoint string, transport http.RoundTripper) (*github.Client, error) {

@@ -435,3 +435,25 @@ func TestAddMembersByOrgWithClient(t *testing.T) {
 	assert.Contains(t, s.memberCache, "bob")
 	assert.Contains(t, s.memberCache, "charlie")
 }
+
+func TestAppsBaseURL(t *testing.T) {
+	u, err := appsBaseURL("https://foo.ghe.com/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.foo.ghe.com/", u)
+
+	u, err = appsBaseURL("https://ghes.intranet/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://ghes.intranet/api/v3/", u)
+
+	u, err = appsBaseURL("https://ghes.intranet/api/v3/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://ghes.intranet/api/v3/", u)
+
+	u, err = appsBaseURL("https://api.github.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.github.com/", u)
+
+	u, err = appsBaseURL("https://api.github.com/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.github.com/", u)
+}
