@@ -396,6 +396,9 @@ func TestVerificationCache_FromData_ResultVerifier_AllCacheHits(t *testing.T) {
 	wantResults[1].SetVerificationError(errors.New("test verification error"))
 	assert.ElementsMatch(t, wantResults, results)
 	assert.ElementsMatch(t, cacheData, cache.resultCache.Values())
+	// A fully cached chunk makes no remote calls, so no verify time may be recorded,
+	// matching the all-or-nothing path's early return on full cache coverage.
+	assert.Equal(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
 	assert.Equal(t, int32(2), metrics.CredentialVerificationsSaved.Load())
 	assert.Equal(t, int32(2), metrics.ResultCacheHits.Load())
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
