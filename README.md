@@ -406,6 +406,8 @@ aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
   - A verified result means TruffleHog confirmed the credential is valid by testing it against the service's API. For private keys, we've confirmed the key can be used live for SSH or SSL authentication. Check out our Driftwood blog post to learn more [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 - Is there an easy way to ignore specific secrets?
   - If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets.
+- Can I find secrets with `trufflehog:ignore` included?
+  - Pass `--no-ignore-tag` to report results even when their line carries a `trufflehog:ignore` comment. This is useful for reviewing previously accepted findings.
 
 # :newspaper: What's new in v3?
 
