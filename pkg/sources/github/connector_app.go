@@ -39,6 +39,7 @@ type appConnector struct {
 type appInstallationClients struct {
 	apiClient     *github.Client
 	graphqlClient *githubv4.Client
+	transport     *ghinstallation.Transport
 }
 
 var _ Connector = (*appConnector)(nil)
@@ -85,13 +86,10 @@ func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb
 	// possible with scanAllInstallations), installations are discovered and
 	// clients created lazily per-repo, so there is no default client to
 	// validate up front.
-	if installationID != 0 {
-		if _, err := connector.APIClientForInstallation(installationID); err != nil {
-			return nil, fmt.Errorf("could not create API client for configured installation: %w", err)
-		}
-
-		if _, err := connector.graphqlClientForInstallation(ctx, installationID); err != nil {
-			return nil, fmt.Errorf("error creating GraphQL client: %w", err)
+	if connector.HasDefaultInstallation() {
+		_, err := connector.clientsForInstallation(installationID)
+		if err != nil {
+			return nil, fmt.Errorf("could not create clients for configured installation: %w", err)
 		}
 	}
 
@@ -133,35 +131,12 @@ func (c *appConnector) GraphQLClientForRepo(ctx context.Context, repoURL string)
 }
 
 func (c *appConnector) graphqlClientForInstallation(ctx context.Context, installID int64) (*githubv4.Client, error) {
-	c.mu.RLock()
-	if clients := c.clientsByInstallationID[installID]; clients != nil && clients.graphqlClient != nil {
-		client := clients.graphqlClient
-		c.mu.RUnlock()
-		return client, nil
-	}
-	c.mu.RUnlock()
-
-	apiClient, err := c.APIClientForInstallation(installID)
-	if err != nil {
-		return nil, err
-	}
-	client, err := createGraphqlClient(ctx, apiClient.Client(), c.apiEndpoint)
+	clients, err := c.clientsForInstallation(installID)
 	if err != nil {
 		return nil, err
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	clients := c.clientsForInstallationLocked(installID)
-	if clients.graphqlClient != nil {
-		return clients.graphqlClient, nil
-	}
-	if clients.apiClient == nil {
-		clients.apiClient = apiClient
-	}
-	clients.graphqlClient = client
-	return client, nil
+	return clients.graphqlClient, nil
 }
 
 func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
@@ -180,7 +155,8 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 	token, _, err := c.installationClient.Apps.CreateInstallationToken(
 		ctx,
 		installID,
-		&github.InstallationTokenOptions{})
+		&github.InstallationTokenOptions{},
+	)
 	if err != nil {
 		return "", nil, fmt.Errorf("could not create installation token for installation %d: %w", installID, err)
 	}
@@ -271,40 +247,52 @@ func (c *appConnector) InstallationClient() *github.Client {
 // orgs — each org's API calls must use that org's installation token to get
 // proper IP allowlist bypass and permission scoping.
 func (c *appConnector) APIClientForInstallation(installationID int64) (*github.Client, error) {
-	c.mu.RLock()
-	if clients := c.clientsByInstallationID[installationID]; clients != nil && clients.apiClient != nil {
-		client := clients.apiClient
-		c.mu.RUnlock()
-		return client, nil
-	}
-	c.mu.RUnlock()
-
-	client, err := c.createAPIClientForInstallation(installationID)
+	clients, err := c.clientsForInstallation(installationID)
 	if err != nil {
 		return nil, err
 	}
 
+	return clients.apiClient, nil
+}
+
+func (c *appConnector) clientsForInstallation(installationID int64) (*appInstallationClients, error) {
+	c.mu.RLock()
+	clients, ok := c.clientsByInstallationID[installationID]
+	c.mu.RUnlock()
+	if ok {
+		return clients, nil
+	}
+
+	clients, err := c.clientsForInstallationLocked(installationID)
+	if err != nil {
+		return nil, err
+	}
+
+	return clients, nil
+}
+
+func (c *appConnector) clientsForInstallationLocked(installationID int64) (*appInstallationClients, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	clients := c.clientsForInstallationLocked(installationID)
-	if clients.apiClient != nil {
-		return clients.apiClient, nil
+	if clients, ok := c.clientsByInstallationID[installationID]; ok {
+		return clients, nil
 	}
-	clients.apiClient = client
-	return client, nil
+
+	clients, err := c.createAPIClientsForInstallation(installationID)
+	if err != nil {
+		return nil, err
+	}
+
+	c.clientsByInstallationID[installationID] = clients
+
+	return clients, nil
 }
 
-func (c *appConnector) clientsForInstallationLocked(installationID int64) *appInstallationClients {
-	clients := c.clientsByInstallationID[installationID]
-	if clients == nil {
-		clients = &appInstallationClients{}
-		c.clientsByInstallationID[installationID] = clients
-	}
-	return clients
-}
-
-func (c *appConnector) createAPIClientForInstallation(installationID int64) (*github.Client, error) {
+// createAPIClientsForInstallation creates both types of clients at once and
+// saves along with the transport in an appInstallationClients, so those
+// structs are never in a partially-filled state.
+func (c *appConnector) createAPIClientsForInstallation(installationID int64) (*appInstallationClients, error) {
 	appsTransport, err := newAppsTransport(c.apiEndpoint, c.appID, c.appPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not create app transport for installation %d: %w", installationID, err)
@@ -315,11 +303,22 @@ func (c *appConnector) createAPIClientForInstallation(installationID int64) (*gi
 	// with the raw endpoint here or GHE.com token refresh would 401.
 	transport := ghinstallation.NewFromAppsTransport(appsTransport, installationID)
 
-	client, err := newGitHubClientWithTransport(c.apiEndpoint, transport)
+	apiClient, err := newGitHubClientWithTransport(c.apiEndpoint, transport)
 	if err != nil {
 		return nil, fmt.Errorf("could not create API client for installation %d: %w", installationID, err)
 	}
-	return client, nil
+
+	// the only thing this uses context for is a level 2 log line...
+	gqlClient, err := createGraphqlClient(context.Background(), apiClient.Client(), c.apiEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	return &appInstallationClients{
+		apiClient:     apiClient,
+		graphqlClient: gqlClient,
+		transport:     transport,
+	}, nil
 }
 
 func newAppsTransport(apiEndpoint string, appID int64, privateKey []byte) (*ghinstallation.AppsTransport, error) {
