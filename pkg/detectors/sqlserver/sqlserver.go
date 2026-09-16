@@ -91,6 +91,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Redacted: detectors.RedactURL(*paramsUnsafe.URL()),
 		}
 
+		// msdsn leaves Port zero when the connection string omits it, so only
+		// qualify the host when a port was actually specified.
+		extraData := make(map[string]string)
+		if paramsUnsafe.Host != "" {
+			if paramsUnsafe.Port > 0 {
+				extraData["host"] = net.JoinHostPort(paramsUnsafe.Host, strconv.FormatUint(paramsUnsafe.Port, 10))
+			} else {
+				extraData["host"] = paramsUnsafe.Host
+			}
+		}
+		if paramsUnsafe.User != "" {
+			extraData["username"] = paramsUnsafe.User
+		}
+		if paramsUnsafe.Database != "" {
+			extraData["database"] = paramsUnsafe.Database
+		}
+		if len(extraData) > 0 {
+			s1.ExtraData = extraData
+		}
+
 		if verify {
 			isVerified, err := ping(ctx, paramsUnsafe)
 
