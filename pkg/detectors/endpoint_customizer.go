@@ -57,7 +57,18 @@ func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
 // SetOAuth2TokenSource configures an OAuth2 token source for this
 // detector's custom verifier. When set, the engine uses OAuthVerifier-based
 // verification instead of the detector's built-in verification logic.
-func (e *EndpointSetter) SetOAuth2TokenSource(ts OAuth2TokenSource) { e.oauth2Source = ts }
+//
+// Setting a non-nil token source disables cloud and found endpoints as
+// a safety measure: OAuth2-authenticated requests carry a Bearer token
+// and must only go to explicitly configured verification endpoints,
+// never to native cloud APIs where the token could leak.
+func (e *EndpointSetter) SetOAuth2TokenSource(ts OAuth2TokenSource) {
+	e.oauth2Source = ts
+	if ts != nil {
+		e.useCloudEndpoint = false
+		e.useFoundEndpoints = false
+	}
+}
 
 // HasOAuth2 reports whether OAuth2 auth is configured for this
 // detector's custom verifier endpoint.

@@ -82,8 +82,8 @@ func OAuthVerify(
 
 	outcome := custom_detectors.VerifyCredential(ctx, baseClient, endpoints, result.Raw, vars)
 
-	if !outcome.Definitive && outcome.RangesInEffect {
-		return false, fmt.Errorf("all verification endpoints exhausted; no status code matched configured ranges")
+	if outcome.Attempted && !outcome.Definitive {
+		return false, fmt.Errorf("verification attempted but no endpoint gave a definitive answer")
 	}
 	return outcome.Verified, nil
 }

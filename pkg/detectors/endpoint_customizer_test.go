@@ -88,6 +88,27 @@ func TestEndpointSetter_OAuth2(t *testing.T) {
 	})
 }
 
+func TestEndpointSetter_OAuth2_DisablesCloudAndFound(t *testing.T) {
+	t.Parallel()
+
+	var s EndpointSetter
+	s.useCloudEndpoint = true
+	s.cloudEndpoint = "https://api.example.com"
+	s.useFoundEndpoints = true
+
+	// Before setting OAuth2, cloud and found endpoints are included.
+	assert.NoError(t, s.SetConfiguredEndpoints("https://verify.example.com"))
+	assert.Equal(t, []string{"https://verify.example.com", "https://api.example.com", "https://found.example.com"},
+		s.Endpoints("https://found.example.com"))
+
+	// Setting a token source disables cloud and found endpoints to
+	// prevent credential leakage to native cloud APIs.
+	s.SetOAuth2TokenSource(&fakeTokenSource{})
+	assert.Equal(t, []string{"https://verify.example.com"}, s.Endpoints("https://found.example.com"))
+	assert.False(t, s.useCloudEndpoint)
+	assert.False(t, s.useFoundEndpoints)
+}
+
 // fakeTokenSource satisfies oauth2.TokenSource for tests.
 type fakeTokenSource struct{}
 

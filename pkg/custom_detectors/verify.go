@@ -10,6 +10,7 @@ package custom_detectors
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -46,6 +47,12 @@ type VerifyOutcome struct {
 	// answer (verified or not). False means no endpoint matched any
 	// configured range — the caller should treat this as an error.
 	Definitive bool
+	// Attempted is true when at least one endpoint was tried. When
+	// Attempted is true but Definitive is false, verification was
+	// configured but every endpoint failed (transport error, token
+	// acquisition failure, etc.). Callers should surface this as a
+	// verification error rather than silently reporting "unverified."
+	Attempted bool
 	// RangesInEffect is true when at least one endpoint had
 	// successRanges or rotatedRanges configured. When true and
 	// Definitive is false, it means a range-based endpoint failed
@@ -100,6 +107,8 @@ func VerifyCredential(
 			return outcome
 		}
 
+		outcome.Attempted = true
+
 		// Per-endpoint context enrichment: if this endpoint has an
 		// OAuth2 token source carrying a trace, set it on the context
 		// so all downstream log messages inherit the correlation ID.
@@ -143,6 +152,11 @@ func VerifyCredential(
 		}
 
 		// Apply customer-defined headers, then default Content-Type.
+		// When no explicit Content-Type is set, unmarshal the body to
+		// distinguish structured JSON (objects/arrays) from raw values.
+		// Bare primitives like quoted strings or numbers are technically
+		// valid JSON but not what verification endpoints expect as a
+		// JSON payload, so they get text/plain.
 		for _, h := range ep.Headers {
 			key, value, found := strings.Cut(h, ":")
 			if !found {
@@ -151,7 +165,17 @@ func VerifyCredential(
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
 		}
 		if req.Header.Get("Content-Type") == "" {
-			req.Header.Set("Content-Type", "application/json")
+			var structured interface{}
+			if json.Unmarshal(body, &structured) == nil {
+				switch structured.(type) {
+				case map[string]interface{}, []interface{}:
+					req.Header.Set("Content-Type", "application/json")
+				default:
+					req.Header.Set("Content-Type", "text/plain")
+				}
+			} else {
+				req.Header.Set("Content-Type", "text/plain")
+			}
 		}
 
 		// If this endpoint has OAuth2 auth, wrap the base client with
@@ -237,9 +261,10 @@ func VerifyCredential(
 	// lifecycle (token acquisition → verify → result) is visible.
 	if traced && lastCtx != nil {
 		logger := lastCtx.Logger()
-		if rangesInEffect && !outcome.Definitive {
-			logger.Error(nil, "OAuth2 verification inconclusive; no status range matched",
+		if outcome.Attempted && !outcome.Definitive {
+			logger.Error(nil, "OAuth2 verification inconclusive; no endpoint gave a definitive answer",
 				"status_code", outcome.StatusCode,
+				"ranges_in_effect", rangesInEffect,
 			)
 		} else if outcome.Verified {
 			logger.Info("OAuth2 verification succeeded",

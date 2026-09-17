@@ -9,6 +9,7 @@ import (
 	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
@@ -24,6 +25,12 @@ import (
 // permutating each regex match to protect the scanner from doing too much work
 // for poorly defined regexps.
 const maxTotalMatches = 100
+
+// defaultTokenLifetime is applied when the IdP omits expires_in from
+// the token response. Five minutes is conservative enough to avoid
+// sending stale tokens during long scans while keeping token endpoint
+// traffic reasonable.
+const defaultTokenLifetime = 5 * time.Minute
 
 // ─── OAuth2 token acquisition ────────────────────────────────────────
 
@@ -61,10 +68,23 @@ func (s *ropcTokenSource) Token() (*oauth2.Token, error) {
 		)
 		return nil, err
 	}
+
+	// RFC 6749 marks expires_in as "RECOMMENDED", not required. When
+	// the IdP omits it, oauth2 leaves Expiry as zero — which
+	// ReuseTokenSource treats as "never expired," caching the token
+	// for the lifetime of the process. Force a conservative default
+	// so stale tokens get refreshed during long scans.
+	if tok.Expiry.IsZero() {
+		tok.Expiry = time.Now().Add(defaultTokenLifetime)
+		logger.Info("IdP did not return expires_in; using default token lifetime",
+			"default_lifetime", defaultTokenLifetime,
+		)
+	}
+
 	logger.Info("ROPC token acquired successfully",
 		"token_endpoint", s.conf.Endpoint.TokenURL,
 		"token_type", tok.TokenType,
-		"expires_in", tok.Expiry,
+		"expires_at", tok.Expiry,
 	)
 	return tok, nil
 }
@@ -523,9 +543,10 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	if outcome.RespBody != "" {
 		result.ExtraData["response"] = outcome.RespBody
 	}
-	if !outcome.Definitive && outcome.RangesInEffect {
-		// At least one endpoint used ranges but none matched.
-		result.SetVerificationError(errors.New("verification response status code did not match any configured successRanges or rotatedRanges"))
+	if outcome.Attempted && !outcome.Definitive {
+		// Verification was configured but no endpoint gave a conclusive
+		// answer — either all transports failed or no range matched.
+		result.SetVerificationError(errors.New("verification attempted but no endpoint gave a definitive answer"))
 	}
 
 	select {

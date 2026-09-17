@@ -309,3 +309,100 @@ func TestOAuthVerify_CustomHeaders(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, verified)
 }
+
+// ─── Transport failure tests (Attempted field) ──────────────────────
+
+func TestOAuthVerify_AllEndpointsFail_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	// Point at a listener that immediately closes connections.
+	// Every endpoint fails at the transport level, so Attempted is
+	// true but Definitive is false — OAuthVerify should return an error.
+	ts := &staticTokenSource{token: "test-token"}
+	configs := cfgs("http://127.0.0.1:1")
+	verified, err := OAuthVerify(context.Background(), nil, ts, configs, testResult())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no endpoint gave a definitive answer")
+	assert.False(t, verified)
+}
+
+// ─── Content-Type sniff tests ───────────────────────────────────────
+
+func TestOAuthVerify_DefaultBody_ContentTypePlainText(t *testing.T) {
+	t.Parallel()
+
+	// Without a body template, raw secret bytes are sent. When the
+	// raw secret isn't valid JSON, Content-Type defaults to text/plain.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "text/plain", r.Header.Get("Content-Type"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	ts := &staticTokenSource{token: "test-token"}
+	verified, err := OAuthVerify(context.Background(), nil, ts, cfgs(srv.URL), testResult())
+	require.NoError(t, err)
+	assert.True(t, verified)
+}
+
+func TestOAuthVerify_TemplateBody_ContentTypeJSON(t *testing.T) {
+	t.Parallel()
+
+	// With a body template, ResolveRequestBody produces JSON.
+	// Content-Type should default to application/json.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	ts := &staticTokenSource{token: "test-token"}
+	configs := []OAuthVerifyConfig{{
+		Endpoint:    srv.URL,
+		RequestBody: map[string]string{"secret": "$secret"},
+	}}
+	verified, err := OAuthVerify(context.Background(), nil, ts, configs, testResult())
+	require.NoError(t, err)
+	assert.True(t, verified)
+}
+
+func TestOAuthVerify_ExplicitContentType_Honored(t *testing.T) {
+	t.Parallel()
+
+	// An explicit Content-Type header takes priority over the sniff.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "application/xml", r.Header.Get("Content-Type"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	ts := &staticTokenSource{token: "test-token"}
+	configs := []OAuthVerifyConfig{{
+		Endpoint: srv.URL,
+		Headers:  []string{"Content-Type: application/xml"},
+	}}
+	verified, err := OAuthVerify(context.Background(), nil, ts, configs, testResult())
+	require.NoError(t, err)
+	assert.True(t, verified)
+}
+
+func TestOAuthVerify_JSONPrimitive_ContentTypePlainText(t *testing.T) {
+	t.Parallel()
+
+	// A raw secret that is a valid JSON primitive (e.g. a quoted
+	// string) should still get text/plain, not application/json.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "text/plain", r.Header.Get("Content-Type"))
+		body, _ := io.ReadAll(r.Body)
+		assert.Equal(t, `"some-api-key"`, string(body))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	ts := &staticTokenSource{token: "test-token"}
+	r := testResult()
+	r.Raw = []byte(`"some-api-key"`)
+	verified, err := OAuthVerify(context.Background(), nil, ts, cfgs(srv.URL), r)
+	require.NoError(t, err)
+	assert.True(t, verified)
+}

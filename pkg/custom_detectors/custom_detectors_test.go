@@ -3,10 +3,12 @@ package custom_detectors
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -1043,6 +1045,44 @@ func TestBuildTokenSource_ROPC(t *testing.T) {
 	traced, ok := ts.(*detectors.TracedTokenSource)
 	assert.True(t, ok, "expected *detectors.TracedTokenSource, got %T", ts)
 	assert.NotEmpty(t, traced.Trace, "trace ID should be set")
+}
+
+func TestROPCTokenSource_DefaultExpiryWhenIdPOmitsIt(t *testing.T) {
+	t.Parallel()
+
+	// Simulate an IdP that returns a token without expires_in.
+	// The ropcTokenSource should set a default expiry so
+	// ReuseTokenSource doesn't cache it forever.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Token response with no expires_in field.
+		_, _ = fmt.Fprint(w, `{"access_token":"tok123","token_type":"Bearer"}`)
+	}))
+	defer srv.Close()
+
+	auth := &custom_detectorspb.VerifierAuth{
+		AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{
+			Oauth2: &custom_detectorspb.OAuth2Config{
+				TokenEndpoint: srv.URL,
+				GrantConfig: &custom_detectorspb.OAuth2Config_Ropc{
+					Ropc: &custom_detectorspb.ROPCConfig{
+						Username:     "user",
+						Password:     "pass",
+						ClientId:     "c",
+						ClientSecret: "s",
+					},
+				},
+			},
+		},
+	}
+	ts, err := BuildTokenSource(auth)
+	require.NoError(t, err)
+
+	tok, err := ts.Token()
+	require.NoError(t, err)
+	assert.Equal(t, "tok123", tok.AccessToken)
+	assert.False(t, tok.Expiry.IsZero(), "expiry should be set even when IdP omits expires_in")
+	assert.WithinDuration(t, time.Now().Add(defaultTokenLifetime), tok.Expiry, 30*time.Second)
 }
 
 // ─── Auth validation in NewWebhookCustomRegex ────────────────────────
