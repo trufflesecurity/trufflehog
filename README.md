@@ -178,6 +178,35 @@ Replace `{version}` with the downloaded files version
 Alternatively, if you are using the installation script, pass `-v` option to perform signature verification.
 This requires Cosign binary to be installed prior to running the installation script.
 
+# :keyboard: Shell completion
+
+TruffleHog can generate tab-completion scripts for `bash` and `zsh`. Completion
+covers subcommands (e.g. `git`, `github`, `s3`), flags, and value hints for
+flags with a fixed set of options (e.g. `--results`, `--protocol`, `--format`).
+
+### Bash
+
+```bash
+# Try it out in the current shell:
+source <(trufflehog --completion-script-bash)
+
+# Or install it persistently:
+trufflehog --completion-script-bash > /etc/bash_completion.d/trufflehog
+```
+
+### Zsh
+
+```zsh
+# Try it out in the current shell:
+source <(trufflehog --completion-script-zsh)
+
+# Or install it persistently to a directory on your $fpath, e.g.:
+trufflehog --completion-script-zsh > "${fpath[1]}/_trufflehog"
+```
+
+After installing persistently, restart your shell (or re-run `compinit` on zsh)
+to pick up the completions.
+
 # :rocket: Quick Start
 
 ## 1: Scan a repo for only verified secrets
