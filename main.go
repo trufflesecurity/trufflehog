@@ -587,6 +587,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.MSTeamsWebhookV2DetectorEnabled.Store(true)
 	feature.SolarwindsDetectorEnabled.Store(true)
 	feature.ResendDetectorEnabled.Store(true)
+	feature.ComposioDetectorEnabled.Store(true)
 	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
 	feature.HumioAPITokenDetectorEnabled.Store(true)
 
