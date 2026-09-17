@@ -742,7 +742,7 @@ enum DetectorType {
   NiceHash = 738; // Not yet implemented
   CexIO = 739;
   Klipfolio = 740;
-  Dynatrace = 741; // Not yet implemented
+  Dynatrace = 741;
   MollieAPIKey = 742; // Not yet implemented
   MollieAccessToken = 743; // Not yet implemented
   BasisTheory = 744; // Not yet implemented
