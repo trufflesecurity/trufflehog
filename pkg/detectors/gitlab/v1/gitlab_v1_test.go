@@ -45,6 +45,21 @@ func TestGitLab_Pattern(t *testing.T) {
 			input: "GITLAB_TOKEN=ABc123456789dEFghIJK",
 			want:  []string{"ABc123456789dEFghIJKhttps://gitlab.com"},
 		},
+		{
+			name: "webhook event UUID is not flagged (x-gitlab-event-uuid)",
+			input: `{
+  "x-gitlab-event": "Push Hook",
+  "x-gitlab-event-uuid": "c3e2f2b7-a945-4c58-924b-38d8186e200a",
+  "body": "gitlab payload"
+}`,
+			want: nil,
+		},
+		{
+			name: "hyphenated hex string near gitlab keyword is not flagged",
+			// 23-char candidate "a1b2-c3d4-e5f6a7b8c9d0" is a UUID fragment, not a token.
+			input: `{"gitlab": "a1b2-c3d4-e5f6a7b8c9d0"}`,
+			want:  nil,
+		},
 	}
 
 	for _, test := range tests {
