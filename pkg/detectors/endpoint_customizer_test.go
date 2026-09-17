@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/oauth2"
 )
 
 func TestEmbeddedEndpointSetter(t *testing.T) {
@@ -58,3 +59,29 @@ func TestEmbeddedEndpointSetter(t *testing.T) {
 	})
 
 }
+
+// TestEndpointSetter_OAuth2_DisablesCloudAndFound verifies the credential-
+// leakage guard: when an OAuth2 token source is configured, cloud and found
+// endpoints are automatically disabled so Bearer tokens only travel to the
+// explicitly configured verification endpoints.
+func TestEndpointSetter_OAuth2_DisablesCloudAndFound(t *testing.T) {
+	var s EndpointSetter
+	s.useCloudEndpoint = true
+	s.useFoundEndpoints = true
+
+	// Setting a non-nil token source must disable both flags.
+	s.SetOAuth2TokenSource(staticTokenSource{tok: &oauth2.Token{AccessToken: "test"}})
+	assert.False(t, s.useCloudEndpoint, "useCloudEndpoint should be disabled after setting OAuth2 source")
+	assert.False(t, s.useFoundEndpoints, "useFoundEndpoints should be disabled after setting OAuth2 source")
+
+	// Setting nil restores nothing (flags stay as-is); callers must
+	// re-enable explicitly.
+	s.SetOAuth2TokenSource(nil)
+	assert.False(t, s.useCloudEndpoint, "useCloudEndpoint should remain false after nil source")
+	assert.False(t, s.useFoundEndpoints, "useFoundEndpoints should remain false after nil source")
+}
+
+// staticTokenSource is a trivial OAuth2TokenSource for tests.
+type staticTokenSource struct{ tok *oauth2.Token }
+
+func (s staticTokenSource) Token() (*oauth2.Token, error) { return s.tok, nil }

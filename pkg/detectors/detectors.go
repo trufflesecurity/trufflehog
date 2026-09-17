@@ -11,6 +11,9 @@ import (
 	"strings"
 	"unicode"
 
+	"golang.org/x/oauth2"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -90,6 +93,42 @@ type EndpointCustomizer interface {
 	SetCloudEndpoint(string)
 	UseCloudEndpoint(bool)
 	UseFoundEndpoints(bool)
+	SetOAuth2TokenSource(OAuth2TokenSource)
+}
+
+// OAuth2TokenSource is the standard oauth2 token source interface,
+// named here to make the OAuth2 scope explicit. Other auth mechanisms
+// (API key rotation, mTLS, etc.) would define their own interfaces
+// rather than being shoehorned into this one.
+type OAuth2TokenSource = oauth2.TokenSource
+
+// TracedTokenSource wraps an OAuth2TokenSource with a correlation ID
+// generated at construction time. Verification call sites extract the
+// trace via type assertion and call EnrichContext to set it on their
+// request context. All downstream log messages then inherit it
+// automatically.
+type TracedTokenSource struct {
+	oauth2.TokenSource
+	Trace string
+}
+
+// EnrichContext sets oauth2_trace on the given context so every
+// downstream logger inherits the correlation ID. Call this once at the
+// verification entry point; the trace then flows through token
+// acquisition and HTTP calls without further reference.
+func (ts *TracedTokenSource) EnrichContext(ctx logContext.Context) logContext.Context {
+	return logContext.WithValue(ctx, "oauth2_trace", ts.Trace)
+}
+
+// OAuthVerifier is satisfied by any detector whose EndpointSetter has
+// an OAuth2 token source configured. The engine checks this interface
+// in the scan loop: when present and active, verification is routed
+// through an OAuth2-authenticated POST instead of the detector's
+// built-in verification logic.
+type OAuthVerifier interface {
+	HasOAuth2() bool
+	OAuth2TokenSource() OAuth2TokenSource
+	Endpoints(foundEndpoints ...string) []string
 }
 
 type CloudProvider interface {
