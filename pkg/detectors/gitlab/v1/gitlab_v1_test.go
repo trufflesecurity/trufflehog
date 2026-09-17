@@ -45,6 +45,17 @@ func TestGitLab_Pattern(t *testing.T) {
 			input: "GITLAB_TOKEN=ABc123456789dEFghIJK",
 			want:  []string{"ABc123456789dEFghIJKhttps://gitlab.com"},
 		},
+		{
+			name: "false positive - gitlab keyword and unrelated token on different lines (Dockerfile)",
+			// Regression test for #4756: a Dockerfile with `ARG GITLAB_ACCESS_TOKEN`
+			// on one line and `ARG MAVEN_SETTINGS_PROFILE=test` on the next line
+			// used to produce a false positive on `MAVEN_SETTINGS_PROFILE` because
+			// the shared PrefixRegex allowed the keyword-to-secret gap to span
+			// newlines. The candidate is 21 chars and passes the entropy gate, so
+			// without the same-line restriction this would incorrectly match.
+			input: "FROM scratch\nARG GITLAB_ACCESS_TOKEN_TYPE=Private-Token\nARG GITLAB_ACCESS_TOKEN\nARG MAVEN_SETTINGS_PROFILE=test_profile_value\n",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
