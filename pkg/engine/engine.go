@@ -110,6 +110,16 @@ type Config struct {
 	ExcludeDetectors              string
 	CustomVerifiersOnly           bool
 	VerifierEndpoints             map[string]string
+	// VerifierAuth holds OAuth2 token sources for custom verifiers,
+	// keyed by detector name (matching VerifierEndpoints keys). When
+	// a detector has a matching entry here, its token source is set
+	// on the detector's EndpointSetter so the engine can perform
+	// OAuth2-authenticated verification via the OAuthVerifier interface.
+	VerifierAuth map[config.DetectorID]detectors.OAuth2TokenSource
+
+	// NoIgnoreTag disables the "trufflehog:ignore" tag. If set to true, results are
+	// reported even when the line they were found on carries the tag.
+	NoIgnoreTag bool
 
 	// Verify determines whether the scanner will verify candidate secrets.
 	Verify bool
@@ -125,10 +135,6 @@ type Config struct {
 	// true, the engine will only return the first unverified result for a chunk for a detector.
 	FilterUnverified      bool
 	ShouldScanEntireChunk bool
-
-	// NoIgnoreTag disables the "trufflehog:ignore" tag. If set to true, results are
-	// reported even when the line they were found on carries the tag.
-	NoIgnoreTag bool
 
 	Dispatcher ResultsDispatcher
 
@@ -324,6 +330,13 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 
 			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
+			}
+
+			// If the custom verifier has OAuth2 auth configured, attach
+			// the token source to the detector. The scan loop checks
+			// OAuthVerifier to route verification through OAuth2.
+			if ts, hasAuth := getWithDetectorID(d, cfg.VerifierAuth); hasAuth {
+				customizer.SetOAuth2TokenSource(ts)
 			}
 
 			return true
@@ -1170,12 +1183,51 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
-		results, err := e.verificationCache.FromData(
-			ctx,
-			data.detector.Detector,
-			data.verify,
-			data.chunk.SecretID != 0,
-			matchBytes)
+
+		// When the detector has OAuth2 auth on its custom verifier,
+		// bypass the built-in verification path entirely: detect only,
+		// then verify each result via OAuth2-authenticated POST. This
+		// intentionally skips verificationCache — the built-in cache
+		// wraps FromData with verify=true, which would run the
+		// detector's unauthenticated verification. The OAuth path
+		// replaces that with its own authenticated verification loop.
+		// Token caching is handled separately by oauth2.ReuseTokenSource.
+		var results []detectors.Result
+		var err error
+		if oauthV, ok := data.detector.Detector.(detectors.OAuthVerifier); ok && oauthV.HasOAuth2() {
+			// Extract the trace from the token source and set it on
+			// the context once. All downstream logs inherit it.
+			oauthCtx := ctx
+			if ts, ok := oauthV.OAuth2TokenSource().(*detectors.TracedTokenSource); ok {
+				oauthCtx = ts.EnrichContext(ctx)
+			}
+			oauthCtx.Logger().Info("using OAuth2 verification path")
+			results, err = data.detector.FromData(ctx, false, matchBytes)
+			if err == nil && data.verify && len(results) > 0 {
+				// Build VerifyEndpoints from the detector's endpoint
+				// list. Callers can populate headers, ranges, and
+				// body templates on the config; until then, endpoints
+				// use the default (200 = verified).
+				configs := make([]OAuthVerifyConfig, len(oauthV.Endpoints()))
+				for i, ep := range oauthV.Endpoints() {
+					configs[i] = OAuthVerifyConfig{Endpoint: ep}
+				}
+				for i := range results {
+					verified, verifyErr := OAuthVerify(
+						oauthCtx, nil, oauthV.OAuth2TokenSource(), configs, &results[i])
+					results[i].Verified = verified
+					results[i].SetVerificationError(verifyErr, string(results[i].Raw))
+				}
+			}
+		} else {
+			results, err = e.verificationCache.FromData(
+				ctx,
+				data.detector.Detector,
+				data.verify,
+				data.chunk.SecretID != 0,
+				matchBytes)
+		}
+
 		t.Stop()
 		cancel()
 		if err != nil {
