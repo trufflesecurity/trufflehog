@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	var uniqueUrls = make(map[string]struct{})
-	for _, endpoint := range s.Endpoints(endpoints...) {
+	for _, endpoint := range s.Endpoints(endpoints) {
 		uniqueUrls[endpoint] = struct{}{}
 	}
 	// create combination results that can be verified

@@ -162,9 +162,9 @@ func TestArtifactoryReferenceToken_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Configure endpoint customizer based on test case
 			d.UseFoundEndpoints(test.useFoundEndpoint)
-			d.UseCloudEndpoint(test.useCloudEndpoint)
+			d.UseCloudEndpoints(test.useCloudEndpoint)
 			if test.useCloudEndpoint && test.cloudEndpoint != "" {
-				d.SetCloudEndpoint(test.cloudEndpoint)
+				d.SetCloudEndpoints(test.cloudEndpoint)
 			}
 
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
@@ -213,7 +213,7 @@ func TestArtifactoryreferencetoken_Endpoint_Contains_CustomEndpoint(t *testing.T
 	if err != nil {
 		t.Fatal("Error in setting configured endpoint")
 	}
-	configuredEndpoints := s.Endpoints()
+	configuredEndpoints := s.Endpoints(nil)
 	if len(configuredEndpoints) == 0 {
 		t.Fatal("No Confiured endpoint found")
 	}

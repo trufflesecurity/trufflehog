@@ -150,10 +150,10 @@ func TestArtifactory_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// this detector uses endpoint customizer interface so we need to enable them based on test case
 			d.UseFoundEndpoints(test.useFoundEndpoint)
-			d.UseCloudEndpoint(test.useCloudEndpoint)
+			d.UseCloudEndpoints(test.useCloudEndpoint)
 			// if the test case provides cloud endpoint, then use it
 			if test.useCloudEndpoint && test.cloudEndpoint != "" {
-				d.SetCloudEndpoint(test.cloudEndpoint)
+				d.SetCloudEndpoints(test.cloudEndpoint)
 			}
 
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
@@ -199,7 +199,7 @@ func TestArtifactory_Endpoint_Contains_CustomEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error in setting configured endpoint")
 	}
-	configuredEndpoints := s.Endpoints()
+	configuredEndpoints := s.Endpoints(nil)
 	if len(configuredEndpoints) == 0 {
 		t.Fatal("No Confiured endpoint found")
 	}

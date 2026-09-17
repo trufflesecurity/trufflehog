@@ -40,7 +40,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"hvs.", "vault"}
 }
 
-func (Scanner) CloudEndpoint() string { return "" }
+func (Scanner) CloudEndpoints() []string { return nil }
 
 func (s Scanner) Description() string {
 	return "HashiCorp Vault is a secrets management service. Vault tokens (periodic, service, and admin) can be used to access and manage stored secrets and resources."
@@ -77,7 +77,7 @@ func (s Scanner) FromData(
 	}
 
 	for token := range uniqueTokens {
-		for _, endpoint := range s.Endpoints(endpoints...) {
+		for _, endpoint := range s.Endpoints(endpoints) {
 			result := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_HashiCorpVaultToken,
 				Raw:          []byte(token),
