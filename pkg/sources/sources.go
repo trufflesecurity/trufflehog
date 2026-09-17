@@ -561,6 +561,18 @@ func (p *Progress) SetProgressOngoing(message string, encodedResumeInfo string) 
 	p.SectionsRemaining = 0
 }
 
+// SetProgressPercent reports fine-grained progress without touching EncodedResumeInfo, 
+// for sources that track resumption separately (sub-unit resumption via SetEncodedResumeInfoFor).
+func (p *Progress) SetProgressPercent(percent int64, completed, remaining int32, message string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+
+	p.PercentComplete = percent
+	p.SectionsCompleted = completed
+	p.SectionsRemaining = remaining
+	p.Message = message
+}
+
 // GetProgress gets job completion percentage for metrics reporting.
 func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
