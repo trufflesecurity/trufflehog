@@ -47,6 +47,9 @@ func New(resultCache ResultCache, metrics MetricsReporter) *VerificationCache {
 // returned result. If there is a cache hit for each result, these cached values are all returned. Otherwise, the
 // detector's FromData method is called again, but with verify=true, and the results are stored in the cache and then
 // returned.
+//
+// Detectors that implement detectors.ResultVerifier are handled by verifyCacheMisses instead, which verifies only the
+// results that missed the cache rather than re-running the detector over the whole chunk.
 func (v *VerificationCache) FromData(
 	ctx context.Context,
 	detector detectors.Detector,
@@ -76,6 +79,11 @@ func (v *VerificationCache) FromData(
 			return withoutRemoteVerification, nil
 		}
 
+		// avoiding re-running verification for every result in the chunk.
+		// only if a detector implements detectors.ResultVerifier
+		if resultVerifier, ok := detector.(detectors.ResultVerifier); ok {
+			return v.verifyCacheMisses(ctx, resultVerifier, withoutRemoteVerification)
+		}
 		isEverythingCached := true
 		var cacheHitsInCurrentChunk int
 		for i, r := range withoutRemoteVerification {
@@ -125,12 +133,60 @@ func (v *VerificationCache) FromData(
 
 		copyForCaching := r
 		// Do not persist raw secret values in a long-lived cache
-		copyForCaching.Raw = nil
-		copyForCaching.RawV2 = nil
+		copyForCaching.ClearSecrets()
 		v.resultCache.Set(string(cacheKey), copyForCaching)
 	}
 
 	return withRemoteVerification, nil
+}
+
+// verifyCacheMisses serves the results whose verification status is already cached and
+// remotely verifies only the misses.
+func (v *VerificationCache) verifyCacheMisses(
+	ctx context.Context,
+	detector detectors.ResultVerifier,
+	results []detectors.Result,
+) ([]detectors.Result, error) {
+	// Only remote verification counts toward verify time; a fully cached chunk records
+	// nothing, matching the all-or-nothing path's early return on full cache coverage.
+	var timeSpentVerifying time.Duration
+	defer func() {
+		if timeSpentVerifying > 0 {
+			v.metrics.AddFromDataVerifyTimeSpent(timeSpentVerifying)
+		}
+	}()
+	verifyResult := func(i int) {
+		verifyStart := time.Now()
+		detector.VerifyResult(ctx, &results[i])
+		timeSpentVerifying += time.Since(verifyStart)
+	}
+
+	for i := range results {
+		cacheKey, err := v.getResultCacheKey(results[i])
+		if err != nil {
+			ctx.Logger().Error(err, "error getting result cache key for verification caching",
+				"operation", "read")
+			// Fail open: a result we cannot key still deserves verification, matching the
+			// all-or-nothing path, where a key error falls through to FromData(verify=true).
+			verifyResult(i)
+			continue
+		}
+		if cacheHit, ok := v.resultCache.Get(string(cacheKey)); ok {
+			results[i].CopyVerificationInfo(&cacheHit)
+			results[i].VerificationFromCache = true
+			v.metrics.AddResultCacheHits(1)
+			v.metrics.AddCredentialVerificationsSaved(1)
+			continue
+		}
+		v.metrics.AddResultCacheMisses(1)
+		verifyResult(i)
+		copyForCaching := results[i]
+		// Do not persist raw secret values in a long-lived cache
+		copyForCaching.ClearSecrets()
+		v.resultCache.Set(string(cacheKey), copyForCaching)
+	}
+
+	return results, nil
 }
 
 func (v *VerificationCache) getResultCacheKey(result detectors.Result) ([]byte, error) {
