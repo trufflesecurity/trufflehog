@@ -93,7 +93,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		// If the endpoint returns useful information, we can return it as a map.
 		return true, extraData, nil
 	case http.StatusForbidden:
-		// The secret is determinately not verified (nothing to do)
+		// 403 indicates lack of permission, but valid token
 		return true, nil, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
