@@ -65,12 +65,8 @@ func TestPrepGitArgs(t *testing.T) {
 	// Revision args follow the flags; the exclusion belongs with the revisions.
 	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "headsha"))
 
-	// Diff scan with a base but no head: the exclusion composes with --all,
-	// which the two-dot form base..head cannot express.
-	args = p.prepGitArgs(repopath, "", "basesha", nil, false)
-	assert.Contains(t, args.log, "--all")
-	assert.Contains(t, args.log, "^basesha")
-	assert.NotContains(t, args.log, "--diff-filter=AM")
+	// A base with no head is not a range this layer defines; git.ScanRepo
+	// resolves the head to HEAD before calling RepoPath (see normalizeConfig).
 
 	// test env passthrough used for pre-receive
 	t.Setenv("GIT_OBJECT_DIRECTORY", "foo")

@@ -268,7 +268,9 @@ type gitArgs struct {
 // base), which is the diff-scan contract behind `--since-commit`. The range is
 // computed by git itself so that it is independent of commit dates and merge
 // topology. An empty base means a full-history scan of head (or of --all when
-// head is also empty).
+// head is also empty). Callers supplying a base must also supply a head;
+// git.ScanRepo fills in HEAD for a missing one so that ^base is never paired
+// with --all, which would walk every ref not reachable from base.
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
@@ -459,7 +461,9 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 	// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
 	args.log = append(args.log, cmp.Or(head, "--all"))
 
-	// `^base head` is base..head, and unlike the two-dot form it composes with --all.
+	// `head ^base` is base..head. Keeping the two revisions as separate args
+	// means head is always the positive end of the range and the base is
+	// never spliced into a string git has to parse.
 	// https://git-scm.com/docs/gitrevisions#_specifying_ranges
 	if base != "" {
 		args.log = append(args.log, "^"+base)

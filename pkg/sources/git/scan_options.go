@@ -7,7 +7,7 @@ import (
 
 type ScanOptions struct {
 	Filter       *common.Filter
-	BaseHash     string
+	BaseHash     string // When scanning a git.Log, this is the oldest/first commit.
 	HeadHash     string
 	MaxDepth     int64
 	Bare         bool
