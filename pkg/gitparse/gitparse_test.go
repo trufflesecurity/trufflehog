@@ -3,6 +3,7 @@ package gitparse
 import (
 	"bytes"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -65,8 +66,22 @@ func TestPrepGitArgs(t *testing.T) {
 	// Revision args follow the flags; the exclusion belongs with the revisions.
 	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "headsha"))
 
-	// A base with no head is not a range this layer defines; git.ScanRepo
-	// resolves the head to HEAD before calling RepoPath (see normalizeConfig).
+	// A range with excludes: the pathspec separator must land after both
+	// revisions or git reads the exclusion as a path.
+	args = p.prepGitArgs(repopath, "headsha", "basesha", []string{"bloated.dat"}, false)
+	full := slices.Concat(args.log, args.paths)
+	assert.Greater(t, indexOf(full, "--"), indexOf(full, "^basesha"))
+
+	// A base with no head is base..HEAD: the checked-out commit is the positive
+	// end, never --all. This is the pre-commit hook shape and `--since-commit X`
+	// without `--branch`, and it must not go through normalizeConfig's merge
+	// base, which cannot walk a shallow clone.
+	args = p.prepGitArgs(repopath, "", "basesha", nil, false)
+	assert.Contains(t, args.log, "HEAD")
+	assert.Contains(t, args.log, "^basesha")
+	assert.NotContains(t, args.log, "--all")
+	assert.NotContains(t, args.log, "--diff-filter=AM")
+	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "HEAD"))
 
 	// test env passthrough used for pre-receive
 	t.Setenv("GIT_OBJECT_DIRECTORY", "foo")

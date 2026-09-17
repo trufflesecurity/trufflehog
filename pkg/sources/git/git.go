@@ -1034,6 +1034,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			return err
 		}
 	}
+
+	if scanOptions.BaseHash != "" && depth == 0 {
+		logger.V(1).Info("no commits in range", logValues...)
+	}
 	return nil
 }
 
@@ -1366,12 +1370,6 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 // If either commit cannot be resolved, it returns early.
 // If both are resolved, it finds and sets the merge base in scanOptions.
 func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
-	// A base with no head is a diff scan up to the checked-out commit, so the head
-	// is filled in as HEAD before anything is resolved.
-	if scanOptions.BaseHash != "" && scanOptions.HeadHash == "" {
-		scanOptions.HeadHash = "HEAD"
-	}
-
 	baseCommit, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
 	if err != nil {
 		return err

@@ -3,7 +3,6 @@ package gitparse
 import (
 	"bufio"
 	"bytes"
-	"cmp"
 	"fmt"
 	"io"
 	"os"
@@ -268,9 +267,8 @@ type gitArgs struct {
 // base), which is the diff-scan contract behind `--since-commit`. The range is
 // computed by git itself so that it is independent of commit dates and merge
 // topology. An empty base means a full-history scan of head (or of --all when
-// head is also empty). Callers supplying a base must also supply a head;
-// git.ScanRepo fills in HEAD for a missing one so that ^base is never paired
-// with --all, which would walk every ref not reachable from base.
+// head is also empty). An empty head with a non-empty base means base..HEAD,
+// the checked-out commit; ^base is never paired with --all.
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
@@ -457,9 +455,20 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 		args.show = append(args.show, "--diff-filter=AM")
 	}
 
-	// Keep head or all last, before the --, not required but sensible
+	// The positive end of the walk, kept last before the -- (not required but
+	// sensible). A base with no head is a diff scan up to the checked-out
+	// commit: the pre-commit hook and `--since-commit X` without `--branch`.
+	// Defaulting to --all there would walk every ref not reachable from base,
+	// which is not a diff of the change being made.
 	// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
-	args.log = append(args.log, cmp.Or(head, "--all"))
+	switch {
+	case head != "":
+		args.log = append(args.log, head)
+	case base != "":
+		args.log = append(args.log, "HEAD")
+	default:
+		args.log = append(args.log, "--all")
+	}
 
 	// `head ^base` is base..head. Keeping the two revisions as separate args
 	// means head is always the positive end of the range and the base is
