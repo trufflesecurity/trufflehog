@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/oauth2"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestEmbeddedEndpointSetter(t *testing.T) {
@@ -57,4 +60,71 @@ func TestEmbeddedEndpointSetter(t *testing.T) {
 		assert.Equal(t, []string{"foo", "bar"}, s.Endpoints())
 	})
 
+}
+
+// ─── OAuth2 token source on EndpointSetter ───────────────────────────
+
+func TestEndpointSetter_OAuth2(t *testing.T) {
+	t.Parallel()
+
+	var s EndpointSetter
+
+	t.Run("HasOAuth2 is false by default", func(t *testing.T) {
+		assert.False(t, s.HasOAuth2())
+		assert.Nil(t, s.OAuth2TokenSource())
+	})
+
+	t.Run("SetOAuth2TokenSource and HasOAuth2", func(t *testing.T) {
+		fakeTS := &fakeTokenSource{}
+		s.SetOAuth2TokenSource(fakeTS)
+		assert.True(t, s.HasOAuth2())
+		assert.Equal(t, fakeTS, s.OAuth2TokenSource())
+	})
+
+	t.Run("SetOAuth2TokenSource nil clears it", func(t *testing.T) {
+		s.SetOAuth2TokenSource(nil)
+		assert.False(t, s.HasOAuth2())
+		assert.Nil(t, s.OAuth2TokenSource())
+	})
+}
+
+// fakeTokenSource satisfies oauth2.TokenSource for tests.
+type fakeTokenSource struct{}
+
+func (f *fakeTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{AccessToken: "fake"}, nil
+}
+
+// ─── TracedTokenSource ───────────────────────────────────────────────
+
+func TestTracedTokenSource_EnrichContext(t *testing.T) {
+	t.Parallel()
+
+	ts := &TracedTokenSource{
+		TokenSource: &fakeTokenSource{},
+		Trace:       "abc123",
+	}
+
+	ctx := ts.EnrichContext(logContext.Background())
+
+	// The trace should appear as a structured log field. Extract it
+	// by logging and checking the logger's key-value pairs.
+	// Since logContext.WithValue uses the structured logger's key store,
+	// the simplest verification is a round-trip through the context.
+	got := ctx.Value("oauth2_trace")
+	assert.Equal(t, "abc123", got)
+}
+
+func TestTracedTokenSource_DelegatesToken(t *testing.T) {
+	t.Parallel()
+
+	inner := &fakeTokenSource{}
+	ts := &TracedTokenSource{
+		TokenSource: inner,
+		Trace:       "trace1",
+	}
+
+	tok, err := ts.Token()
+	assert.NoError(t, err)
+	assert.Equal(t, "fake", tok.AccessToken)
 }

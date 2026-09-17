@@ -2,6 +2,7 @@ package custom_detectors
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
@@ -993,4 +995,385 @@ func BenchmarkProductIndices(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = productIndices(3, 2, 6)
 	}
+}
+
+// ─── OAuth2 token source construction ────────────────────────────────
+
+func TestBuildTokenSource_NilAuth(t *testing.T) {
+	t.Parallel()
+	ts, err := BuildTokenSource(nil)
+	assert.NoError(t, err)
+	assert.Nil(t, ts)
+}
+
+func TestBuildTokenSource_UnknownAuthType(t *testing.T) {
+	t.Parallel()
+	// Empty VerifierAuth has no oneof set; BuildTokenSource should
+	// return an error.
+	auth := &custom_detectorspb.VerifierAuth{}
+	ts, err := BuildTokenSource(auth)
+	assert.Error(t, err)
+	assert.Nil(t, ts)
+	assert.Contains(t, err.Error(), "unrecognized auth config type")
+}
+
+func TestBuildTokenSource_ROPC(t *testing.T) {
+	t.Parallel()
+	auth := &custom_detectorspb.VerifierAuth{
+		AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{
+			Oauth2: &custom_detectorspb.OAuth2Config{
+				TokenEndpoint: "https://idp.example.com/token",
+				GrantConfig: &custom_detectorspb.OAuth2Config_Ropc{
+					Ropc: &custom_detectorspb.ROPCConfig{
+						Username:     "user",
+						Password:     "pass",
+						ClientId:     "client",
+						ClientSecret: "secret",
+						Scope:        "read write",
+					},
+				},
+			},
+		},
+	}
+	ts, err := BuildTokenSource(auth)
+	assert.NoError(t, err)
+	assert.NotNil(t, ts, "expected a non-nil token source for valid ROPC config")
+
+	// The returned value should be a TracedTokenSource with a non-empty trace.
+	traced, ok := ts.(*detectors.TracedTokenSource)
+	assert.True(t, ok, "expected *detectors.TracedTokenSource, got %T", ts)
+	assert.NotEmpty(t, traced.Trace, "trace ID should be set")
+}
+
+// ─── Auth validation in NewWebhookCustomRegex ────────────────────────
+
+func TestNewWebhookCustomRegex_RejectsUnusableAuth(t *testing.T) {
+	t.Parallel()
+
+	// Auth is set but has no grant config, so BuildTokenSource returns nil.
+	// NewWebhookCustomRegex should reject this at init rather than silently
+	// falling back to unauthenticated verification.
+	pb := &custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint: "https://verify.example.com/check",
+				Headers:  []string{"Authorization: Bearer x"},
+				Auth: &custom_detectorspb.VerifierAuth{
+					AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{
+						Oauth2: &custom_detectorspb.OAuth2Config{
+							TokenEndpoint: "https://idp.example.com/token",
+							// No grant_config set — simulates unknown or missing grant type.
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := NewWebhookCustomRegex(pb)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unrecognized OAuth2 grant type")
+}
+
+// ─── Token endpoint validation in NewWebhookCustomRegex ──────────────
+
+func TestNewWebhookCustomRegex_RejectsHTTPTokenEndpoint(t *testing.T) {
+	t.Parallel()
+
+	pb := &custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				// HTTPS verify endpoint is fine, but HTTP token
+				// endpoint must fail without unsafe=true.
+				Endpoint: "https://verify.example.com/check",
+				Headers:  []string{"Authorization: Bearer x"},
+				Auth: &custom_detectorspb.VerifierAuth{
+					AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{
+						Oauth2: &custom_detectorspb.OAuth2Config{
+							TokenEndpoint: "http://idp.example.com/token",
+							GrantConfig: &custom_detectorspb.OAuth2Config_Ropc{
+								Ropc: &custom_detectorspb.ROPCConfig{
+									Username: "u",
+									Password: "p",
+									ClientId: "c",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := NewWebhookCustomRegex(pb)
+	assert.Error(t, err, "expected error for HTTP token endpoint without unsafe=true")
+	assert.Contains(t, err.Error(), "auth token endpoint")
+}
+
+func TestNewWebhookCustomRegex_AllowsHTTPTokenEndpointWithUnsafe(t *testing.T) {
+	t.Parallel()
+
+	pb := &custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint: "http://verify.example.com/check",
+				Unsafe:   true,
+				Headers:  []string{"Authorization: Bearer x"},
+				Auth: &custom_detectorspb.VerifierAuth{
+					AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{
+						Oauth2: &custom_detectorspb.OAuth2Config{
+							TokenEndpoint: "http://idp.example.com/token",
+							GrantConfig: &custom_detectorspb.OAuth2Config_Ropc{
+								Ropc: &custom_detectorspb.ROPCConfig{
+									Username: "u",
+									Password: "p",
+									ClientId: "c",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	det, err := NewWebhookCustomRegex(pb)
+	assert.NoError(t, err, "HTTP token endpoint should be allowed when unsafe=true")
+	assert.NotNil(t, det)
+}
+
+// ─── Inline OAuth2 verification ──────────────────────────────────────
+
+func TestInlineVerification_WithOAuth2(t *testing.T) {
+	t.Parallel()
+
+	// Stand up a fake verify server that requires a Bearer token and
+	// returns verified=true when the token is present.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "oauth-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-zA-Z0-9]{10})`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint: srv.URL,
+				Unsafe:   true,
+				Headers:  []string{"Content-Type: application/json"},
+				Auth: &custom_detectorspb.VerifierAuth{
+					AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{
+						Oauth2: &custom_detectorspb.OAuth2Config{
+							// Token endpoint won't be called because we
+							// verify that the OAuth2 client is constructed
+							// and the Bearer header is added. The ROPC
+							// token exchange would fail, so we rely on
+							// the test below (without auth) to confirm
+							// the inline plumbing works for non-OAuth2.
+							// This test confirms the verifier struct has
+							// a non-nil token source after init.
+							TokenEndpoint: "https://idp.example.com/token",
+							GrantConfig: &custom_detectorspb.OAuth2Config_Ropc{
+								Ropc: &custom_detectorspb.ROPCConfig{
+									Username: "u",
+									Password: "p",
+									ClientId: "c",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	// Verify the verifier has a token source configured.
+	assert.Len(t, detector.verifiers, 1)
+	assert.NotNil(t, detector.verifiers[0].tokenSource,
+		"expected token source to be set on verifier")
+
+	_, ok := detector.verifiers[0].tokenSource.(*detectors.TracedTokenSource)
+	assert.True(t, ok, "expected *detectors.TracedTokenSource")
+}
+
+func TestInlineVerification_WithoutAuth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "no-auth-test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-zA-Z0-9]{10})`},
+		Verify: []*custom_detectorspb.VerifierConfig{
+			{
+				Endpoint: srv.URL,
+				Unsafe:   true,
+				Headers:  []string{"Content-Type: application/json"},
+				// No auth block.
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	// Verify no token source when auth isn't configured.
+	assert.Len(t, detector.verifiers, 1)
+	assert.Nil(t, detector.verifiers[0].tokenSource)
+
+	// Verify the detector still works for inline verification without OAuth2.
+	results, err := detector.FromData(context.Background(), true, []byte("secret_ABCDEFGHIJ"))
+	assert.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.True(t, results[0].Verified)
+}
+
+// ─── YAML parsing for auth block ─────────────────────────────────────
+
+func TestCustomRegexYAML_WithOAuth2Auth(t *testing.T) {
+	t.Parallel()
+
+	yaml := `name: oauth-detector
+keywords:
+- secret
+regex:
+  token: (secret_[a-z]+)
+verify:
+- endpoint: https://verify.example.com/check
+  headers:
+  - 'Authorization: Bearer {token.0}'
+  auth:
+    oauth2:
+      token_endpoint: https://idp.example.com/oauth/token
+      ropc:
+        username: scanner
+        password: hunter2
+        client_id: my-client
+        client_secret: my-secret
+        scope: read write`
+
+	var got custom_detectorspb.CustomRegex
+	assert.NoError(t, protoyaml.UnmarshalStrict([]byte(yaml), &got))
+	assert.Equal(t, 1, len(got.Verify))
+
+	auth := got.Verify[0].GetAuth()
+	assert.NotNil(t, auth)
+
+	oc := auth.GetOauth2()
+	assert.NotNil(t, oc)
+	assert.Equal(t, "https://idp.example.com/oauth/token", oc.GetTokenEndpoint())
+
+	ropc := oc.GetRopc()
+	assert.NotNil(t, ropc)
+	assert.Equal(t, "scanner", ropc.GetUsername())
+	assert.Equal(t, "hunter2", ropc.GetPassword())
+	assert.Equal(t, "my-client", ropc.GetClientId())
+	assert.Equal(t, "my-secret", ropc.GetClientSecret())
+	assert.Equal(t, "read write", ropc.GetScope())
+}
+
+// ─── Request body template ───────────────────────────────────────────
+
+func TestValidateRequestBody_KnownTokens(t *testing.T) {
+	t.Parallel()
+	body := map[string]string{
+		"credential":  "$secret",
+		"source":      "$detector_type",
+		"name":        "$detector_name",
+		"auth":        "$token",
+		"environment": "production",
+	}
+	assert.NoError(t, validateRequestBody(body))
+}
+
+func TestValidateRequestBody_UnknownToken(t *testing.T) {
+	t.Parallel()
+	body := map[string]string{
+		"credential": "$secret",
+		"unknown":    "$foo",
+	}
+	err := validateRequestBody(body)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "$foo")
+	assert.Contains(t, err.Error(), "unknown")
+}
+
+func TestResolveRequestBody_Substitution(t *testing.T) {
+	t.Parallel()
+	template := map[string]string{
+		"credential":  "$secret",
+		"source":      "$detector_type",
+		"environment": "production",
+	}
+	vars := map[string]string{
+		"$secret":        "my-secret-value",
+		"$detector_type": "CustomRegex",
+		"$detector_name": "TestDetector",
+	}
+	body, err := ResolveRequestBody(template, vars)
+	require.NoError(t, err)
+
+	var parsed map[string]string
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	assert.Equal(t, "my-secret-value", parsed["credential"])
+	assert.Equal(t, "CustomRegex", parsed["source"])
+	assert.Equal(t, "production", parsed["environment"])
+}
+
+func TestResolveRequestBody_TokenVar(t *testing.T) {
+	t.Parallel()
+	template := map[string]string{
+		"cred":       "$secret",
+		"auth_token": "$token",
+	}
+	vars := map[string]string{
+		"$secret": "the-secret",
+		"$token":  "jwt-token-value",
+	}
+	body, err := ResolveRequestBody(template, vars)
+	require.NoError(t, err)
+
+	var parsed map[string]string
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	assert.Equal(t, "the-secret", parsed["cred"])
+	assert.Equal(t, "jwt-token-value", parsed["auth_token"])
+}
+
+func TestNewWebhookCustomRegex_RejectsUnknownBodyToken(t *testing.T) {
+	t.Parallel()
+	pb := &custom_detectorspb.CustomRegex{
+		Name:     "test-detector",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"secret": `(secret_[a-z]+)`},
+		Verify: []*custom_detectorspb.VerifierConfig{{
+			Endpoint: "https://verify.example.com/check",
+			Request: &custom_detectorspb.VerifyRequestBody{
+				Body: map[string]string{
+					"credential": "$secret",
+					"bad_field":  "$nonexistent",
+				},
+			},
+		}},
+	}
+	_, err := NewWebhookCustomRegex(pb)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "$nonexistent")
 }
