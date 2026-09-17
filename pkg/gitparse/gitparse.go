@@ -262,15 +262,22 @@ type gitArgs struct {
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log,
 // though the diffs are generated using `git show` in groups.
+//
+// head and base are commit hashes or refs. When base is non-empty the log is
+// restricted to the range base..head (commits reachable from head but not from
+// base), which is the diff-scan contract behind `--since-commit`. The range is
+// computed by git itself so that it is independent of commit dates and merge
+// topology. An empty base means a full-history scan of head (or of --all when
+// head is also empty).
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
 	head string,
-	abbreviatedLog bool,
+	base string,
 	excludedGlobs []string,
 	isBare bool,
 ) (chan *Diff, error) {
-	args := c.prepGitArgs(source, head, abbreviatedLog, excludedGlobs, isBare)
+	args := c.prepGitArgs(source, head, base, excludedGlobs, isBare)
 
 	if c.lowMemoryScan {
 		return c.repoPathLowMemory(ctx, args)
@@ -417,7 +424,10 @@ func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs) (chan []string,
 	return commitGroups, nil
 }
 
-func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) gitArgs {
+func (c *Parser) prepGitArgs(source string, head string, base string, excludedGlobs []string, isBare bool) gitArgs {
+	// Full-history scans skip deletions; a diff scan must report every change in the range.
+	abbreviatedLog := base == ""
+
 	args := gitArgs{
 		global: []string{
 			"-C", source,
@@ -449,7 +459,12 @@ func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, ex
 	// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
 	args.log = append(args.log, cmp.Or(head, "--all"))
 
-	// And then potentially add -- to args here
+	// `^base head` is base..head, and unlike the two-dot form it composes with --all.
+	// https://git-scm.com/docs/gitrevisions#_specifying_ranges
+	if base != "" {
+		args.log = append(args.log, "^"+base)
+	}
+
 	if len(excludedGlobs) != 0 {
 		args.paths = []string{"--", "."}
 		for _, glob := range excludedGlobs {

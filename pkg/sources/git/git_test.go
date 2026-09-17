@@ -1591,3 +1591,227 @@ func TestGitLowMemoryScan(t *testing.T) {
 		t.Errorf("Data: %s", string(gotChunk.Data))
 	}
 }
+
+// Planted secrets for the base..head fixture. Unverifiable on purpose; the
+// scan runs with verification off and we only assert they were chunked.
+const (
+	fixtureAWSKey      = "AKIAXYZDQCEN4B6JSJQI"
+	fixtureGitHubToken = "ghp_a1B2c3D4e5F6g7H8i9J0kLmNoPqRsTuVwXyZ"
+)
+
+// mergedBaseFixture is a repository whose feature branch merged its base in,
+// the shape reported in INT-1054 / CSM-2357:
+//
+//	F: feature work after merge      <- head
+//	M: merge main into feature
+//	|\
+//	| C: newer base work             <- base (and the merge-base of main/feature)
+//	| B: base work
+//	E: more feature work             <- GitHub token
+//	D: feature work                  <- AWS key
+//	|/
+//	A: common ancestor
+//
+// git log C..F is F M E D. With the customer's dates (D, E older than C) the
+// pre-fix scanner stopped at C and never reached E or D.
+type mergedBaseFixture struct {
+	path string
+	sha  map[string]string // commit letter -> full hash
+}
+
+// buildMergedBaseFixture creates the repository above with pinned committer
+// dates so the ordering `git log` produces is deterministic. When
+// branchNewerThanBase is true the topology is identical but D and E carry
+// dates after C, which is the case the pre-fix code happened to get right;
+// the fix must produce the same commit set either way. withUnreachableBase
+// adds G on main after the merge, so that a base of G is not an ancestor of
+// head, the shape GitHub Actions produce via pull_request.base.sha.
+func buildMergedBaseFixture(t *testing.T, branchNewerThanBase, withUnreachableBase bool) mergedBaseFixture {
+	t.Helper()
+	f := mergedBaseFixture{path: setupTestRepo(t, "merged-base"), sha: map[string]string{}}
+	git := func(args ...string) {
+		t.Helper()
+		out, err := exec.Command("git", append([]string{"-C", f.path}, args...)...).CombinedOutput()
+		assert.NoError(t, err, "git %v: %s", args, out)
+	}
+	appendFile := func(name string, lines ...string) {
+		t.Helper()
+		fh, err := os.OpenFile(filepath.Join(f.path, name), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		assert.NoError(t, err)
+		_, err = fh.WriteString(strings.Join(lines, "\n") + "\n")
+		assert.NoError(t, err)
+		assert.NoError(t, fh.Close())
+		git("add", name)
+	}
+	// commit pins both dates so hashes and log ordering are reproducible.
+	commit := func(letter, date, msg string) {
+		t.Helper()
+		cmd := exec.Command("git", "-C", f.path, "commit", "-q", "-m", msg)
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_DATE="+date, "GIT_COMMITTER_DATE="+date)
+		out, err := cmd.CombinedOutput()
+		assert.NoError(t, err, "commit %s: %s", letter, out)
+		sha, err := exec.Command("git", "-C", f.path, "rev-parse", "HEAD").Output()
+		assert.NoError(t, err)
+		f.sha[letter] = strings.TrimSpace(string(sha))
+	}
+
+	// Customer dates: branch work predates the base work it later merges in.
+	dates := map[string]string{
+		"A": "2026-01-01T00:00:00Z",
+		"D": "2026-01-02T00:00:00Z", "E": "2026-01-03T00:00:00Z",
+		"B": "2026-01-04T00:00:00Z", "C": "2026-01-05T00:00:00Z",
+		"M": "2026-01-06T00:00:00Z", "F": "2026-01-07T00:00:00Z", "G": "2026-01-08T00:00:00Z",
+	}
+	if branchNewerThanBase {
+		dates["B"], dates["C"] = "2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z"
+		dates["D"], dates["E"] = "2026-01-04T00:00:00Z", "2026-01-05T00:00:00Z"
+	}
+
+	git("switch", "-q", "-c", "main")
+	appendFile("README.md", "A")
+	commit("A", dates["A"], "A: common ancestor")
+
+	git("switch", "-q", "-c", "feature")
+	appendFile("feature.txt", "D",
+		"aws_access_key_id = "+fixtureAWSKey,
+		"aws_secret_access_key = Tg0pz8Jii8hkLx4+PnUisM8GmKs3a2DK+9qz/lie")
+	commit("D", dates["D"], "D: feature work")
+	appendFile("feature.txt", "E", "github_token = "+fixtureGitHubToken)
+	commit("E", dates["E"], "E: more feature work")
+
+	git("switch", "-q", "main")
+	appendFile("base.txt", "B")
+	commit("B", dates["B"], "B: base work")
+	appendFile("base.txt", "C")
+	commit("C", dates["C"], "C: newer base work")
+
+	git("switch", "-q", "feature")
+	{
+		cmd := exec.Command("git", "-C", f.path, "merge", "-q", "--no-ff", "main", "-m", "M: merge main into feature")
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_DATE="+dates["M"], "GIT_COMMITTER_DATE="+dates["M"])
+		out, err := cmd.CombinedOutput()
+		assert.NoError(t, err, "merge: %s", out)
+		sha, err := exec.Command("git", "-C", f.path, "rev-parse", "HEAD").Output()
+		assert.NoError(t, err)
+		f.sha["M"] = strings.TrimSpace(string(sha))
+	}
+	appendFile("feature.txt", "F", "github_token = "+fixtureGitHubToken)
+	commit("F", dates["F"], "F: feature work after merge")
+
+	if withUnreachableBase {
+		git("switch", "-q", "main")
+		appendFile("base.txt", "G")
+		commit("G", dates["G"], "G: base work after the merge")
+		git("switch", "-q", "feature")
+	}
+	return f
+}
+
+// scanFixtureCommits runs Git.ScanRepo over the fixture with the given
+// base/head and returns the set of commit hashes that produced chunks plus the
+// concatenated chunk data, so callers can assert both coverage and content.
+func scanFixtureCommits(t *testing.T, f mergedBaseFixture, base, head string) (map[string]bool, string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Open through the package's own wrapper so the test takes the same
+	// path real callers do (bare detection, .git discovery).
+	repo, err := RepoFromPath(f.path)
+	assert.NoError(t, err)
+
+	g := NewGit(&Config{
+		SourceName:  "merged-base fixture",
+		SourceType:  sourcespb.SourceType_SOURCE_TYPE_GIT,
+		Concurrency: 1,
+		SourceMetadataFunc: func(info SourceMetadataInfo) *source_metadatapb.MetaData {
+			return &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{Git: &source_metadatapb.Git{Commit: info.Commit, File: info.File}},
+			}
+		},
+	})
+
+	chunksCh := make(chan *sources.Chunk, 64)
+	scanErr := make(chan error, 1)
+	go func() {
+		defer close(chunksCh)
+		scanErr <- g.ScanRepo(ctx, repo, f.path, NewScanOptions(ScanOptionBaseHash(base), ScanOptionHeadCommit(head)), sources.ChanReporter{Ch: chunksCh})
+	}()
+
+	got := map[string]bool{}
+	var data strings.Builder
+	for c := range chunksCh {
+		got[c.SourceMetadata.GetGit().GetCommit()] = true
+		data.Write(c.Data)
+	}
+	assert.NoError(t, <-scanErr)
+	return got, data.String()
+}
+
+// TestScanRepo_BaseMergedIntoHead is the regression test for INT-1054: a
+// diff scan must cover exactly `git log base..head` regardless of commit
+// dates or whether base is reachable from head.
+func TestScanRepo_BaseMergedIntoHead(t *testing.T) {
+	// Every commit on the feature side of the range, i.e. git log C..F.
+	wantScanned := []string{"F", "M", "E", "D"}
+	// The merged-in base work and the common ancestor must never be scanned.
+	wantSkipped := []string{"A", "B", "C"}
+
+	cases := []struct {
+		name                string
+		branchNewerThanBase bool
+		unreachableBase     bool
+		base                string // commit letter passed as --since-commit
+	}{
+		{
+			// The customer's reproducer: base is the main tip that was merged in,
+			// and the branch commits predate it.
+			name: "base is the merged-in main tip and older branch commits are skipped",
+			base: "C",
+		},
+		{
+			// GitHub Action pull_request path: base.sha has moved past the merge,
+			// so normalizeConfig resolves it to the merge-base C. Must match case 1.
+			name:            "base is unreachable from head",
+			unreachableBase: true,
+			base:            "G",
+		},
+		{
+			// Same topology, dates flipped: pins that the result is a function of
+			// the graph, not of committer dates.
+			name:                "branch commits newer than the merged-in base tip",
+			branchNewerThanBase: true,
+			base:                "C",
+		},
+	}
+
+	// Both parser strategies build their `git log` from the same args, so both
+	// must agree.
+	for _, lowMemory := range []bool{false, true} {
+		mode := "default"
+		if lowMemory {
+			mode = "low-memory"
+		}
+		t.Run(mode, func(t *testing.T) {
+			feature.UseGitLowMemoryScan.Store(lowMemory)
+			t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
+
+			for _, tc := range cases {
+				t.Run(tc.name, func(t *testing.T) {
+					f := buildMergedBaseFixture(t, tc.branchNewerThanBase, tc.unreachableBase)
+					got, data := scanFixtureCommits(t, f, f.sha[tc.base], f.sha["F"])
+
+					for _, letter := range wantScanned {
+						assert.True(t, got[f.sha[letter]], "commit %s (%s) should have been scanned; got %v", letter, f.sha[letter][:7], got)
+					}
+					for _, letter := range wantSkipped {
+						assert.False(t, got[f.sha[letter]], "commit %s (%s) is reachable from base and must not be scanned", letter, f.sha[letter][:7])
+					}
+					// The secrets live in D and E, the commits the pre-fix code dropped.
+					assert.Contains(t, data, fixtureAWSKey, "AWS key from commit D missing from scanned data")
+					assert.Contains(t, data, fixtureGitHubToken, "GitHub token from commit E/F missing from scanned data")
+				})
+			}
+		})
+	}
+}
