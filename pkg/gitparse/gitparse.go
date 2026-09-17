@@ -3,7 +3,6 @@ package gitparse
 import (
 	"bufio"
 	"bytes"
-	"cmp"
 	"fmt"
 	"io"
 	"os"
@@ -262,15 +261,23 @@ type gitArgs struct {
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log,
 // though the diffs are generated using `git show` in groups.
+//
+// head and base are commit hashes or refs. When base is non-empty the log is
+// restricted to the range base..head (commits reachable from head but not from
+// base), which is the diff-scan contract behind `--since-commit`. The range is
+// computed by git itself so that it is independent of commit dates and merge
+// topology. An empty base means a full-history scan of head (or of --all when
+// head is also empty). An empty head with a non-empty base means base..HEAD,
+// the checked-out commit; ^base is never paired with --all.
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
 	head string,
-	abbreviatedLog bool,
+	base string,
 	excludedGlobs []string,
 	isBare bool,
 ) (chan *Diff, error) {
-	args := c.prepGitArgs(source, head, abbreviatedLog, excludedGlobs, isBare)
+	args := c.prepGitArgs(source, head, base, excludedGlobs, isBare)
 
 	if c.lowMemoryScan {
 		return c.repoPathLowMemory(ctx, args)
@@ -417,7 +424,10 @@ func (c *Parser) gatherGitLog(ctx context.Context, args gitArgs) (chan []string,
 	return commitGroups, nil
 }
 
-func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) gitArgs {
+func (c *Parser) prepGitArgs(source string, head string, base string, excludedGlobs []string, isBare bool) gitArgs {
+	// Full-history scans skip deletions; a diff scan must report every change in the range.
+	abbreviatedLog := base == ""
+
 	args := gitArgs{
 		global: []string{
 			"-C", source,
@@ -445,11 +455,29 @@ func (c *Parser) prepGitArgs(source string, head string, abbreviatedLog bool, ex
 		args.show = append(args.show, "--diff-filter=AM")
 	}
 
-	// Keep head or all last, before the --, not required but sensible
+	// The positive end of the walk, kept last before the -- (not required but
+	// sensible). A base with no head is a diff scan up to the checked-out
+	// commit: the pre-commit hook and `--since-commit X` without `--branch`.
+	// Defaulting to --all there would walk every ref not reachable from base,
+	// which is not a diff of the change being made.
 	// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
-	args.log = append(args.log, cmp.Or(head, "--all"))
+	switch {
+	case head != "":
+		args.log = append(args.log, head)
+	case base != "":
+		args.log = append(args.log, "HEAD")
+	default:
+		args.log = append(args.log, "--all")
+	}
 
-	// And then potentially add -- to args here
+	// `head ^base` is base..head. Keeping the two revisions as separate args
+	// means head is always the positive end of the range and the base is
+	// never spliced into a string git has to parse.
+	// https://git-scm.com/docs/gitrevisions#_specifying_ranges
+	if base != "" {
+		args.log = append(args.log, "^"+base)
+	}
+
 	if len(excludedGlobs) != 0 {
 		args.paths = []string{"--", "."}
 		for _, glob := range excludedGlobs {
