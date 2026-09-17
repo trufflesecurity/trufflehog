@@ -137,7 +137,7 @@ func TestCustomDetectorsParsing(t *testing.T) {
 
 func TestFromData_InvalidRegEx(t *testing.T) {
 	c := &CustomRegexWebhook{
-		&custom_detectorspb.CustomRegex{
+		CustomRegex: &custom_detectorspb.CustomRegex{
 			Name:     "Internal bi tool",
 			Keywords: []string{"secret_v1_", "pat_v2_"},
 			Regex: map[string]string{
@@ -832,12 +832,12 @@ func TestVerificationWithConfigurableRanges(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		serverStatus      int
-		successRanges     []string
-		rotatedRanges     []string
-		wantVerified      bool
-		wantVerifyErr     bool
+		name          string
+		serverStatus  int
+		successRanges []string
+		rotatedRanges []string
+		wantVerified  bool
+		wantVerifyErr bool
 	}{
 		{
 			name:          "backward compat: no ranges, 200 -> verified",
