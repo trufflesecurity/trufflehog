@@ -1,0 +1,178 @@
+//go:build detectors
+// +build detectors
+
+package composio
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+)
+
+// newTestScanner mirrors what DefaultDetectors() does at startup: without the
+// cloud endpoint, Endpoints() is empty and verification never runs.
+func newTestScanner(client *http.Client) Scanner {
+	s := Scanner{client: client}
+	s.SetCloudEndpoint((Scanner{}).CloudEndpoint())
+	s.UseCloudEndpoint(true)
+	return s
+}
+
+func TestComposio_FromChunk(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("COMPOSIO_PROJECT_KEY")
+	inactiveSecret := testSecrets.MustGetField("COMPOSIO_PROJECT_KEY_INACTIVE")
+
+	unverifiedExtra := map[string]string{
+		"key_type":       "project",
+		"rotation_guide": rotationGuide,
+	}
+	verifiedExtra := map[string]string{
+		"key_type":       "project",
+		"rotation_guide": rotationGuide,
+		"endpoint":       (Scanner{}).CloudEndpoint(),
+	}
+
+	type args struct {
+		ctx    context.Context
+		data   []byte
+		verify bool
+	}
+	tests := []struct {
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
+	}{
+		{
+			name: "found, verified",
+			s:    newTestScanner(nil),
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("COMPOSIO_API_KEY=%s", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_Composio,
+					Verified:     true,
+					ExtraData:    verifiedExtra,
+				},
+			},
+		},
+		{
+			name: "found, unverified",
+			s:    newTestScanner(nil),
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("COMPOSIO_API_KEY=%s", inactiveSecret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_Composio,
+					Verified:     false,
+					ExtraData:    unverifiedExtra,
+				},
+			},
+		},
+		{
+			name: "not found",
+			s:    newTestScanner(nil),
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want: nil,
+		},
+		{
+			name: "found, would be verified if not for timeout",
+			s:    newTestScanner(common.SaneHttpClientTimeOut(1 * time.Microsecond)),
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("COMPOSIO_API_KEY=%s", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_Composio,
+					Verified:     false,
+					ExtraData:    unverifiedExtra,
+				},
+			},
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, verified but unexpected api surface",
+			s:    newTestScanner(common.ConstantResponseHttpClient(404, "")),
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("COMPOSIO_API_KEY=%s", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_Composio,
+					Verified:     false,
+					ExtraData:    unverifiedExtra,
+				},
+			},
+			wantVerificationErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Composio.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Errorf("Composio.FromData() error = %v, wantVerificationErr %v", got[i].VerificationError(), tt.wantVerificationErr)
+				}
+			}
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
+			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
+				t.Errorf("Composio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+func BenchmarkFromData(benchmark *testing.B) {
+	ctx := context.Background()
+	s := Scanner{}
+	for name, data := range detectors.MustGetBenchmarkData() {
+		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				_, err := s.FromData(ctx, false, data)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
