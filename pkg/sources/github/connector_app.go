@@ -47,7 +47,7 @@ var _ Connector = (*appConnector)(nil)
 
 const githubHTTPTimeoutSeconds = 60
 
-func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp, scanAllInstallations bool) (Connector, error) {
+func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp, scanAllInstallations bool) (Connector, error) {
 	var installationID int64
 	var err error
 
@@ -131,10 +131,10 @@ func (c *appConnector) APIClientForRepo(repoURL string) (*github.Client, error) 
 
 func (c *appConnector) GraphQLClientForRepo(ctx context.Context, repoURL string) (*githubv4.Client, error) {
 	installID, _ := c.installationIDForRepo(repoURL)
-	return c.graphqlClientForInstallation(ctx, installID)
+	return c.graphqlClientForInstallation(installID)
 }
 
-func (c *appConnector) graphqlClientForInstallation(ctx context.Context, installID int64) (*githubv4.Client, error) {
+func (c *appConnector) graphqlClientForInstallation(installID int64) (*githubv4.Client, error) {
 	clients, err := c.clientsForInstallation(installID)
 	if err != nil {
 		return nil, err
@@ -239,7 +239,7 @@ func (c *appConnector) setRepoInstallationForWiki(repoURL string, installationID
 // installation, lazily creating it if needed. See APIClient for why this
 // cannot simply return nil when no default installation is configured.
 func (c *appConnector) GraphQLClient() *githubv4.Client {
-	client, err := c.graphqlClientForInstallation(context.Background(), c.installationID)
+	client, err := c.graphqlClientForInstallation(c.installationID)
 	if err != nil {
 		return nil
 	}
