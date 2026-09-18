@@ -665,10 +665,10 @@ func TestSource_ChunkUnit_ReportsPercent(t *testing.T) {
 	require.Len(t, reporter.Units, 1)
 	require.NoError(t, s.ChunkUnit(ctx, reporter.Units[0], &reporter))
 
-	require.Eventually(t, func() bool { return s.progress.listingsInFlight.Load() == 0 }, 5*time.Second, 10*time.Millisecond)
-	assert.False(t, s.progress.countFailed.Load())
-	assert.Positive(t, s.progress.objectsTotal.Load())
-	assert.Equal(t, s.progress.objectsTotal.Load(), s.progress.objectsDone.Load())
+	require.Eventually(t, func() bool { return s.objectProgress.listingsInFlight.Load() == 0 }, 5*time.Second, 10*time.Millisecond)
+	assert.False(t, s.objectProgress.countFailed.Load())
+	assert.Positive(t, s.objectProgress.objectsTotal.Load())
+	assert.Equal(t, s.objectProgress.objectsTotal.Load(), s.objectProgress.objectsDone.Load())
 	assert.EqualValues(t, 99, s.GetProgress().PercentComplete)
 
 	unitID, _ := reporter.Units[0].SourceUnitID()

@@ -5,30 +5,47 @@ import (
 
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSource_CountsTowardProgress(t *testing.T) {
-	s := Source{maxObjectSize: 1024}
-	size := int64(512)
-	oversize := int64(2048)
+	filter, err := newObjectFilter(nil, []string{"archive/"}, nil, nil)
+	require.NoError(t, err)
+	s := Source{maxObjectSize: 1024, objectFilter: filter}
+
+	key, filteredKey := "keep/obj.txt", "archive/obj.txt"
+	size, oversize := int64(512), int64(2048)
 
 	tests := []struct {
 		name string
 		obj  s3types.Object
 		want bool
 	}{
-		{name: "standard object", obj: s3types.Object{Size: &size}, want: true},
-		{name: "at the size limit", obj: s3types.Object{Size: &s.maxObjectSize}, want: true},
-		{name: "over the size limit", obj: s3types.Object{Size: &oversize}, want: false},
+		{name: "standard object", obj: s3types.Object{Key: &key, Size: &size}, want: true},
+		{name: "at the size limit", obj: s3types.Object{Key: &key, Size: &s.maxObjectSize}, want: true},
+		{name: "over the size limit", obj: s3types.Object{Key: &key, Size: &oversize}, want: false},
 		{
 			name: "glacier",
-			obj:  s3types.Object{Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
 			want: false,
 		},
 		{
 			name: "glacier instant retrieval",
-			obj:  s3types.Object{Size: &size, StorageClass: s3types.ObjectStorageClassGlacierIr},
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacierIr},
 			want: false,
+		},
+		// pageChunker counts a filtered object as done before it looks at storage class or size, so the
+		// total has to include it too.
+		{name: "filtered", obj: s3types.Object{Key: &filteredKey, Size: &size}, want: true},
+		{
+			name: "filtered and over the size limit",
+			obj:  s3types.Object{Key: &filteredKey, Size: &oversize},
+			want: true,
+		},
+		{
+			name: "filtered and glacier",
+			obj:  s3types.Object{Key: &filteredKey, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+			want: true,
 		},
 	}
 
@@ -104,17 +121,17 @@ func TestScanProgress_Percent(t *testing.T) {
 }
 
 func TestSource_PublishProgressAfterCountPass(t *testing.T) {
-	s := Source{progress: &scanProgress{}}
-	s.progress.listingsInFlight.Add(1)
-	s.progress.addTotal(4, 4000)
-	s.progress.addDone(2, 2000)
+	s := Source{objectProgress: &scanProgress{}}
+	s.objectProgress.listingsInFlight.Add(1)
+	s.objectProgress.addTotal(4, 4000)
+	s.objectProgress.addDone(2, 2000)
 
 	// A publish while the count is still running cannot know the total yet.
 	s.publishProgress()
 	assert.Zero(t, s.GetProgress().PercentComplete)
 
 	// The count pass publishes once it has finished, so the bar does not wait for the next object.
-	s.progress.listingsInFlight.Add(-1)
+	s.objectProgress.listingsInFlight.Add(-1)
 	s.publishProgress()
 	assert.EqualValues(t, 50, s.GetProgress().PercentComplete)
 }
