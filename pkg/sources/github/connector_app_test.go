@@ -148,7 +148,7 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 	}))
 	defer server.Close()
 
-	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey:     string(privKey),
 		InstallationId: "4242",
 		AppId:          "12345",
@@ -184,7 +184,7 @@ func TestNewAppConnectorInstallationIDOptionalWithScanAllInstallations(t *testin
 	defer server.Close()
 
 	// scanAllInstallations=true with no installationId configured should succeed.
-	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey: string(privKey),
 		AppId:      "12345",
 	}, true)
@@ -192,7 +192,7 @@ func TestNewAppConnectorInstallationIDOptionalWithScanAllInstallations(t *testin
 	require.NotNil(t, connector)
 
 	// Without scanAllInstallations, installationId is still required.
-	_, err = NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	_, err = NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey: string(privKey),
 		AppId:      "12345",
 	}, false)
@@ -215,7 +215,7 @@ func TestAPIClientAndGraphQLClientNonNilWithoutDefaultInstallation(t *testing.T)
 	}))
 	defer server.Close()
 
-	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey: string(privKey),
 		AppId:      "12345",
 	}, true)
