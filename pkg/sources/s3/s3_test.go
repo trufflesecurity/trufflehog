@@ -573,6 +573,36 @@ func TestSource_PageChunker_UnitScanCountsSkippedObjectsAsDone(t *testing.T) {
 	assert.Equal(t, *page.Contents[objectCount-1].Key, s.GetEncodedResumeInfoFor("test-bucket"))
 }
 
+func TestSource_PageChunker_UnitScanLeavesUncountedObjectsOutOfProgress(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}, MaxObjectSize: 1024})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+
+	glacierKey, oversizeKey := "cold.txt", "huge.txt"
+	size, oversize := int64(512), int64(4096)
+	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{
+		{Key: &glacierKey, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+		{Key: &oversizeKey, Size: &oversize},
+	}}
+
+	// Neither object is downloaded, so pageChunker needs no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, len(page.Contents))},
+		NewCheckpointer(ctx, &s.Progress, true),
+	)
+
+	assert.Zero(t, s.progress.objectsDone.Load())
+	assert.Zero(t, s.progress.bytesDone.Load())
+}
+
 func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
 	ctx := context.Background()
 

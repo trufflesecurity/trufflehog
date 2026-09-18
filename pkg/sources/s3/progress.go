@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -56,7 +57,12 @@ func (p *scanProgress) percent() int64 {
 // The caller must increment listingsInFlight before starting it,
 // so that percent never divides by a total that is still being counted.
 func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket string, startAfter *string) {
-	defer s.progress.listingsInFlight.Add(-1)
+	// Publish after the decrement, because percent reports nothing while a count is in flight. Without it
+	// the bar stays at 0 until the next object finishes, which for large objects is minutes.
+	defer func() {
+		s.progress.listingsInFlight.Add(-1)
+		s.publishProgress()
+	}()
 
 	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: &bucket})
 	for paginator.HasMorePages() {
@@ -73,6 +79,9 @@ func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket stri
 
 		var objects, bytes, doneObjects, doneBytes uint64
 		for _, obj := range page.Contents {
+			if !s.countsTowardProgress(obj) {
+				continue
+			}
 			size := uint64(max(*obj.Size, 0))
 			objects++
 			bytes += size
@@ -84,7 +93,16 @@ func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket stri
 		s.progress.addTotal(objects, bytes)
 		s.progress.addDone(doneObjects, doneBytes)
 	}
-	s.publishProgress()
+}
+
+// countsTowardProgress reports whether an object belongs in the progress ratio. Objects this scan will
+// never download are left out of both the total and the done count, so that the percent tracks the bytes
+// actually fetched rather than jumping whenever a skipped object goes by.
+func (s *Source) countsTowardProgress(obj s3types.Object) bool {
+	if obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr {
+		return false
+	}
+	return *obj.Size <= s.maxObjectSize
 }
 
 // objectDone records that an object has been scanned or skipped.
