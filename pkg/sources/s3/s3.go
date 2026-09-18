@@ -580,8 +580,8 @@ func (s *Source) pageChunker(
 	checkpointer *Checkpointer,
 ) {
 	checkpointer.Reset() // Reset the checkpointer for each PAGE
-	// The legacy scan reports progress per bucket through SetProgressComplete,
-	// which the per-object percent would overwrite.
+	// The legacy scan reports progress per bucket through SetProgressComplete, which the per-object
+	// percent would overwrite. Objects countsTowardProgress excludes are skipped above without a call.
 	objectDone := func(int64) {}
 	if checkpointer.isUnitScan {
 		objectDone = s.objectDone
@@ -612,7 +612,6 @@ func (s *Source) pageChunker(
 			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				octx.Logger().Error(err, "could not update progress for glacier object")
 			}
-			objectDone(*obj.Size)
 			continue
 		}
 
@@ -623,7 +622,6 @@ func (s *Source) pageChunker(
 			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				octx.Logger().Error(err, "could not update progress for large file")
 			}
-			objectDone(*obj.Size)
 			continue
 		}
 
