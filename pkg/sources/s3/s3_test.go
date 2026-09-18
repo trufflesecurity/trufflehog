@@ -552,7 +552,7 @@ func TestSource_PageChunker_UnitScanCountsSkippedObjectsAsDone(t *testing.T) {
 		size := int64(objectSize)
 		page.Contents[i] = s3types.Object{Key: &key, Size: &size}
 	}
-	s.progress.addTotal(objectCount, objectCount*objectSize)
+	s.objectProgress.addTotal(objectCount, objectCount*objectSize)
 
 	// Every object is filtered, so pageChunker never reaches GetObject and needs no client.
 	var scanned, filtered uint64
@@ -564,8 +564,8 @@ func TestSource_PageChunker_UnitScanCountsSkippedObjectsAsDone(t *testing.T) {
 		NewCheckpointer(ctx, &s.Progress, true),
 	)
 
-	assert.EqualValues(t, objectCount, s.progress.objectsDone.Load())
-	assert.EqualValues(t, objectCount*objectSize, s.progress.bytesDone.Load())
+	assert.EqualValues(t, objectCount, s.objectProgress.objectsDone.Load())
+	assert.EqualValues(t, objectCount*objectSize, s.objectProgress.bytesDone.Load())
 	assert.EqualValues(t, 99, s.GetProgress().PercentComplete)
 	assert.EqualValues(t, objectCount, s.GetProgress().SectionsCompleted)
 	// Filtered objects advance the checkpoint to the last key of the page, and the percent update
@@ -599,8 +599,8 @@ func TestSource_PageChunker_UnitScanLeavesUncountedObjectsOutOfProgress(t *testi
 		NewCheckpointer(ctx, &s.Progress, true),
 	)
 
-	assert.Zero(t, s.progress.objectsDone.Load())
-	assert.Zero(t, s.progress.bytesDone.Load())
+	assert.Zero(t, s.objectProgress.objectsDone.Load())
+	assert.Zero(t, s.objectProgress.bytesDone.Load())
 }
 
 func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
@@ -628,7 +628,7 @@ func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
 		NewCheckpointer(ctx, &s.Progress, false),
 	)
 
-	assert.Zero(t, s.progress.objectsDone.Load())
+	assert.Zero(t, s.objectProgress.objectsDone.Load())
 	assert.EqualValues(t, 1, s.GetProgress().SectionsRemaining)
 	assert.Equal(t, "Bucket: test-bucket", s.GetProgress().Message)
 }

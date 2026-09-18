@@ -60,7 +60,7 @@ func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket stri
 	// Publish after the decrement, because percent reports nothing while a count is in flight. Without it
 	// the bar stays at 0 until the next object finishes, which for large objects is minutes.
 	defer func() {
-		s.progress.listingsInFlight.Add(-1)
+		s.objectProgress.listingsInFlight.Add(-1)
 		s.publishProgress()
 	}()
 
@@ -72,7 +72,7 @@ func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket stri
 			if ctx.Err() != nil {
 				return
 			}
-			s.progress.countFailed.Store(true)
+			s.objectProgress.countFailed.Store(true)
 			ctx.Logger().V(2).Info("could not count objects for progress", "bucket", bucket, "err", err)
 			return
 		}
@@ -90,15 +90,22 @@ func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket stri
 				doneBytes += size
 			}
 		}
-		s.progress.addTotal(objects, bytes)
-		s.progress.addDone(doneObjects, doneBytes)
+		s.objectProgress.addTotal(objects, bytes)
+		s.objectProgress.addDone(doneObjects, doneBytes)
 	}
 }
 
 // countsTowardProgress reports whether an object belongs in the progress ratio. Objects this scan will
 // never download are left out of both the total and the done count, so that the percent tracks the bytes
 // actually fetched rather than jumping whenever a skipped object goes by.
+//
+// The order of the tests mirrors pageChunker, which checks the object filter before anything else and
+// counts what the filter skips as done. A filtered object therefore belongs in the total as well,
+// whatever its storage class or size, or the done count would climb past a total it was never in.
 func (s *Source) countsTowardProgress(obj s3types.Object) bool {
+	if !s.objectFilter.shouldInclude(*obj.Key) {
+		return true
+	}
 	if obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr {
 		return false
 	}
@@ -107,15 +114,15 @@ func (s *Source) countsTowardProgress(obj s3types.Object) bool {
 
 // objectDone records that an object has been scanned or skipped.
 func (s *Source) objectDone(size int64) {
-	s.progress.addDone(1, uint64(max(size, 0)))
+	s.objectProgress.addDone(1, uint64(max(size, 0)))
 	s.publishProgress()
 }
 
 func (s *Source) publishProgress() {
 	s.SetProgressPercent(
-		s.progress.percent(),
-		clampInt32(s.progress.objectsDone.Load()),
-		clampInt32(s.progress.objectsTotal.Load()),
+		s.objectProgress.percent(),
+		clampInt32(s.objectProgress.objectsDone.Load()),
+		clampInt32(s.objectProgress.objectsTotal.Load()),
 		progressMessage,
 	)
 }

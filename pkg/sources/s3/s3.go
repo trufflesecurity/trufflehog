@@ -60,8 +60,8 @@ type Source struct {
 	endpoint *url.URL
 	// objectFilter is never nil after Init.
 	objectFilter *objectFilter
-	// progress is never nil after Init.
-	progress *scanProgress
+	// objectProgress is never nil after Init.
+	objectProgress *scanProgress
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -93,7 +93,7 @@ func (s *Source) Init(
 	s.verify = verify
 	s.concurrency = concurrency
 	s.errorCount = &sync.Map{}
-	s.progress = &scanProgress{}
+	s.objectProgress = &scanProgress{}
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
@@ -463,7 +463,7 @@ func (s *Source) scanBucket(
 	if checkpointer.isUnitScan {
 		countCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		s.progress.listingsInFlight.Add(1)
+		s.objectProgress.listingsInFlight.Add(1)
 		go s.countBucket(countCtx, regionalClient, bucket, startAfter)
 	}
 
