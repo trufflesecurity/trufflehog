@@ -531,3 +531,104 @@ func TestSource_PageChunker_FilteredObjectsAdvanceCheckpoint(t *testing.T) {
 	assert.Equal(t, "test-bucket", resumeInfo.CurrentBucket)
 	assert.Equal(t, *page.Contents[objectCount-1].Key, resumeInfo.StartAfter)
 }
+
+func TestSource_PageChunker_UnitScanCountsSkippedObjectsAsDone(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+	s.SetEncodedResumeInfoFor("test-bucket", "earlier-key")
+
+	const objectCount, objectSize = 10, 1024
+	page := &awss3.ListObjectsV2Output{Contents: make([]s3types.Object, objectCount)}
+	for i := range objectCount {
+		key := fmt.Sprintf("archive/key-%02d.txt", i)
+		size := int64(objectSize)
+		page.Contents[i] = s3types.Object{Key: &key, Size: &size}
+	}
+	s.objectProgress.addTotal(objectCount, objectCount*objectSize)
+
+	// Every object is filtered, so pageChunker never reaches GetObject and needs no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, objectCount)},
+		NewCheckpointer(ctx, &s.Progress, true),
+	)
+
+	assert.EqualValues(t, objectCount, s.objectProgress.objectsDone.Load())
+	assert.EqualValues(t, objectCount*objectSize, s.objectProgress.bytesDone.Load())
+	assert.EqualValues(t, 99, s.GetProgress().PercentComplete)
+	assert.EqualValues(t, objectCount, s.GetProgress().SectionsCompleted)
+	// Filtered objects advance the checkpoint to the last key of the page, and the percent update
+	// must not disturb the per-unit resume map.
+	assert.Equal(t, *page.Contents[objectCount-1].Key, s.GetEncodedResumeInfoFor("test-bucket"))
+}
+
+func TestSource_PageChunker_UnitScanLeavesUncountedObjectsOutOfProgress(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}, MaxObjectSize: 1024})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+
+	glacierKey, oversizeKey := "cold.txt", "huge.txt"
+	size, oversize := int64(512), int64(4096)
+	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{
+		{Key: &glacierKey, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+		{Key: &oversizeKey, Size: &oversize},
+	}}
+
+	// Neither object is downloaded, so pageChunker needs no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, len(page.Contents))},
+		NewCheckpointer(ctx, &s.Progress, true),
+	)
+
+	assert.Zero(t, s.objectProgress.objectsDone.Load())
+	assert.Zero(t, s.objectProgress.bytesDone.Load())
+}
+
+func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+	s.SetProgressComplete(0, 1, "Bucket: test-bucket", "")
+
+	key, size := "archive/key.txt", int64(1024)
+	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{{Key: &key, Size: &size}}}
+
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)},
+		NewCheckpointer(ctx, &s.Progress, false),
+	)
+
+	assert.Zero(t, s.objectProgress.objectsDone.Load())
+	assert.EqualValues(t, 1, s.GetProgress().SectionsRemaining)
+	assert.Equal(t, "Bucket: test-bucket", s.GetProgress().Message)
+}

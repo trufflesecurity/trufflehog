@@ -60,6 +60,8 @@ type Source struct {
 	endpoint *url.URL
 	// objectFilter is never nil after Init.
 	objectFilter *objectFilter
+	// objectProgress is never nil after Init.
+	objectProgress *scanProgress
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -91,6 +93,7 @@ func (s *Source) Init(
 	s.verify = verify
 	s.concurrency = concurrency
 	s.errorCount = &sync.Map{}
+	s.objectProgress = &scanProgress{}
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
@@ -457,6 +460,13 @@ func (s *Source) scanBucket(
 		return 0
 	}
 
+	if checkpointer.isUnitScan {
+		countCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		s.objectProgress.listingsInFlight.Add(1)
+		go s.countBucket(countCtx, regionalClient, bucket, startAfter)
+	}
+
 	errorCount := sync.Map{}
 
 	input := &s3.ListObjectsV2Input{Bucket: &bucket}
@@ -570,6 +580,12 @@ func (s *Source) pageChunker(
 	checkpointer *Checkpointer,
 ) {
 	checkpointer.Reset() // Reset the checkpointer for each PAGE
+	// The legacy scan reports progress per bucket through SetProgressComplete, which the per-object
+	// percent would overwrite. Objects countsTowardProgress excludes are skipped above without a call.
+	objectDone := func(int64) {}
+	if checkpointer.isUnitScan {
+		objectDone = s.objectDone
+	}
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 	for objIdx, obj := range metadata.page.Contents {
 		octx := context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
@@ -585,6 +601,7 @@ func (s *Source) pageChunker(
 			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				octx.Logger().Error(err, "could not update progress for filtered object")
 			}
+			objectDone(*obj.Size)
 			continue
 		}
 
@@ -615,6 +632,7 @@ func (s *Source) pageChunker(
 			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				octx.Logger().Error(err, "could not update progress for empty file")
 			}
+			objectDone(*obj.Size)
 			continue
 		}
 
@@ -625,6 +643,7 @@ func (s *Source) pageChunker(
 			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
 				octx.Logger().Error(err, "could not update progress for incompatible file")
 			}
+			objectDone(*obj.Size)
 			continue
 		}
 
@@ -633,6 +652,7 @@ func (s *Source) pageChunker(
 			if common.IsDone(octx) {
 				return octx.Err()
 			}
+			defer objectDone(*obj.Size)
 
 			if strings.HasSuffix(*obj.Key, "/") {
 				octx.Logger().V(5).Info("Skipping directory")
