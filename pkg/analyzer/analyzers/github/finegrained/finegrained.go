@@ -441,8 +441,7 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 		switch resp.StatusCode {
 		case 403:
 			return ContentsRead, nil
-		case 200:
-			log.Fatal("This should never happen. We are creating a file with an invalid payload.")
+		case 200, 201:
 			return ContentsWrite, nil
 		case 400, 422:
 			return ContentsWrite, nil
@@ -464,8 +463,8 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 		switch resp.StatusCode {
 		case 403:
 			return NoAccess, nil
-		case 200:
-			return Invalid, fmt.Errorf("unexpected 200 OK from GitHub when testing contents write permission with invalid payload")
+		case 200, 201:
+			return ContentsWrite, nil
 		case 400, 422:
 			return ContentsWrite, nil
 		default:
@@ -1510,18 +1509,15 @@ func PrintFineGrainedToken(cfg *config.Config, info *common.SecretInfo) {
 
 		// Print out the access map
 		perms, ok := info.RepoAccessMap.([]Permission)
-		if !ok {
-			return // Cannot print permissions if type assertion fails
+		if ok {
+			printFineGrainedPermissions(perms, cfg.ShowAll, true)
 		}
-		printFineGrainedPermissions(perms, cfg.ShowAll, true)
 	}
 
 	perms, ok := info.UserAccessMap.([]Permission)
-	if !ok {
-		return // Cannot print permissions if type assertion fails
+	if ok {
+		printFineGrainedPermissions(perms, cfg.ShowAll, false)
 	}
-
-	printFineGrainedPermissions(perms, cfg.ShowAll, false)
 	common.PrintGists(info.Gists, cfg.ShowAll)
 }
 
