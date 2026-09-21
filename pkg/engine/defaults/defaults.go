@@ -156,6 +156,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clarifai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clearbit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clickhelp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clickhouse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clicksendsms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clickuppersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cliengo"
@@ -1063,6 +1064,7 @@ func buildDetectorList() []detectors.Detector {
 		&clarifai.Scanner{},
 		&clearbit.Scanner{},
 		&clickhelp.Scanner{},
+		&clickhouse.Scanner{},
 		&clicksendsms.Scanner{},
 		&clickuppersonaltoken.Scanner{},
 		&cliengo.Scanner{},
