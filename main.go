@@ -899,7 +899,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 
 			// Override git configuration for pre-commit hook context
 			gitCfg.TrustLocalGitConfig = true
-			gitCfg.BaseRef = "HEAD" // Only scan staged changes
+			// Only scan staged changes. Both ends are HEAD so the commit range is
+			// HEAD..HEAD, which is empty; a base with no head would instead walk
+			// every ref not reachable from HEAD (see gitparse.Parser.RepoPath).
+			gitCfg.BaseRef = "HEAD"
+			gitCfg.HeadRef = "HEAD"
 
 			// Override result filters for pre-commit hook context
 			// In hook mode, we only want to show verified secrets and unknown findings

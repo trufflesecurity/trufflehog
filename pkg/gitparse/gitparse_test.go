@@ -72,16 +72,16 @@ func TestPrepGitArgs(t *testing.T) {
 	full := slices.Concat(args.log, args.paths)
 	assert.Greater(t, indexOf(full, "--"), indexOf(full, "^basesha"))
 
-	// A base with no head is base..HEAD: the checked-out commit is the positive
-	// end, never --all. This is the pre-commit hook shape and `--since-commit X`
-	// without `--branch`, and it must not go through normalizeConfig's merge
-	// base, which cannot walk a shallow clone.
+	// A base with no head is `--all ^base`: everything since the base on any
+	// ref, which is what `--since-commit X` without `--branch` covers. The
+	// parser must not invent a head here; narrowing to HEAD would silently
+	// drop commits that live only on other branches.
 	args = p.prepGitArgs(repopath, "", "basesha", nil, false)
-	assert.Contains(t, args.log, "HEAD")
+	assert.Contains(t, args.log, "--all")
 	assert.Contains(t, args.log, "^basesha")
-	assert.NotContains(t, args.log, "--all")
+	assert.NotContains(t, args.log, "HEAD")
 	assert.NotContains(t, args.log, "--diff-filter=AM")
-	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "HEAD"))
+	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "--all"))
 
 	// test env passthrough used for pre-receive
 	t.Setenv("GIT_OBJECT_DIRECTORY", "foo")

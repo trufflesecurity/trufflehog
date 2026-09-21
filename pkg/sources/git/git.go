@@ -1035,8 +1035,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 	}
 
+	// empty base..head range exits successfully
 	if scanOptions.BaseHash != "" && depth == 0 {
-		logger.V(1).Info("no commits in range", logValues...)
+		logger.Info("no commits in range", logValues...)
 	}
 	return nil
 }

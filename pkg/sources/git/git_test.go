@@ -1830,11 +1830,11 @@ func TestScanRepo_BaseMergedIntoHead(t *testing.T) {
 
 // TestNormalizeConfig_BaseWithoutHead pins what normalizeConfig does and does
 // not do with a base and no head: it resolves the base to a hash and leaves the
-// head empty. The parser supplies HEAD as the positive end of the range (see
-// gitparse.Parser.RepoPath). normalizeConfig must not resolve HEAD itself,
-// because that would route the base-only shape through MergeBase, which
-// go-git cannot compute across the graft of a shallow clone, including the
-// --shallow-since clone prepareRepoSinceCommit makes for exactly this shape.
+// head empty. The parser then walks --all ^base (see gitparse.Parser.RepoPath).
+// normalizeConfig must not invent a head, because that would route the
+// base-only shape through MergeBase, which go-git cannot compute across the
+// graft of a shallow clone, including the --shallow-since clone
+// prepareRepoSinceCommit makes for exactly this shape.
 func TestNormalizeConfig_BaseWithoutHead(t *testing.T) {
 	// main: A; feature: A -> B, checked out.
 	path := setupTestRepo(t, "base-without-head")
@@ -1856,15 +1856,17 @@ func TestNormalizeConfig_BaseWithoutHead(t *testing.T) {
 	}{
 		{
 			// The base is resolved to a hash; the head stays empty and no merge
-			// base is computed. The parser turns this into main..HEAD.
+			// base is computed. The parser turns this into --all ^main.
 			name: "base ref and no head leaves head empty",
 			base: "main", wantBase: shaA, wantHead: "",
 		},
 		{
-			// The pre-commit invocation: base HEAD, no head. The parser produces
-			// HEAD..HEAD, an empty range, and only staged changes remain to scan.
-			name: "base HEAD and no head leaves head empty",
-			base: "HEAD", wantBase: shaB, wantHead: "",
+			// The pre-commit hook passes HEAD as both ends (main.go). Both
+			// resolve to the same hash and MergeBase short-circuits without
+			// walking history, so the empty HEAD..HEAD range is safe on a
+			// shallow local clone too.
+			name: "base HEAD and head HEAD resolve to the same commit",
+			base: "HEAD", head: "HEAD", wantBase: shaB, wantHead: shaB,
 		},
 		{
 			// Full-history scans set neither end and must stay that way; an
@@ -1887,25 +1889,41 @@ func TestNormalizeConfig_BaseWithoutHead(t *testing.T) {
 	}
 }
 
-// TestScanRepo_BaseWithoutHead runs the base-without-head shape end to end on
-// the merged-base fixture. The repository gets a decoy branch with its own
-// planted secret that is not reachable from the checked-out feature branch;
-// if the implicit head ever degrades to --all, the decoy shows up in the scan.
+// TestScanRepo_BaseWithoutHead runs the base-without-head shape end to end.
+// `--since-commit X` with no `--branch` covers every commit since X on any
+// ref (`git log --all ^X`), not just the checked-out branch: users scanning a
+// mirror or a remote URL rely on that to catch secrets on side branches. The
+// merged-base fixture gets an extra branch with its own planted secret that is
+// not reachable from the checked-out feature branch; a base-only scan must
+// find it, and the pre-commit hook, which passes HEAD as both ends, must not.
 func TestScanRepo_BaseWithoutHead(t *testing.T) {
 	const (
-		decoySecret  = "ghp_DecoyBranchTokenThatMustNotBeScanned00"
+		sideSecret   = "ghp_SideBranchTokenThatBaseOnlyMustCatch000"
 		stagedSecret = "ghp_StagedTokenThatPreCommitMustStillCatch0"
 	)
 
-	// Fixture ends checked out on feature at F. Add the decoy off the common
-	// ancestor and come back to feature so HEAD is F.
+	// Fixture ends checked out on feature at F. Add the side branch off the
+	// common ancestor and come back to feature so HEAD is F.
 	build := func(t *testing.T) mergedBaseFixture {
 		f := buildMergedBaseFixture(t, false, false)
-		runGit(t, f.path, "switch", "-q", "-c", "decoy", f.sha["A"])
-		addTestFileAndCommit(t, f.path, "decoy.txt", "github_token = "+decoySecret+"\n")
+		runGit(t, f.path, "switch", "-q", "-c", "side", f.sha["A"])
+		addTestFileAndCommit(t, f.path, "side.txt", "github_token = "+sideSecret+"\n")
 		f.sha["X"] = gitRevParse(t, f.path, "HEAD")
 		runGit(t, f.path, "switch", "-q", "feature")
 		return f
+	}
+
+	// assertAllSinceC checks the --all ^C set: everything on feature after the
+	// merge base plus the side branch, never the base's own history.
+	assertAllSinceC := func(t *testing.T, f mergedBaseFixture, got map[string]bool, data string) {
+		t.Helper()
+		for _, letter := range []string{"F", "M", "E", "D", "X"} {
+			assert.True(t, got[f.sha[letter]], "commit %s should have been scanned; got %v", letter, got)
+		}
+		for _, letter := range []string{"A", "B", "C"} {
+			assert.False(t, got[f.sha[letter]], "commit %s is reachable from C and must not be scanned", letter)
+		}
+		assert.Contains(t, data, sideSecret, "a base-only scan must cover branches other than the checked-out one")
 	}
 
 	for _, lowMemory := range []bool{false, true} {
@@ -1917,26 +1935,79 @@ func TestScanRepo_BaseWithoutHead(t *testing.T) {
 			feature.UseGitLowMemoryScan.Store(lowMemory)
 			t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
 
-			t.Run("base only scans base..HEAD", func(t *testing.T) {
+			t.Run("base only scans every ref since base", func(t *testing.T) {
 				f := build(t)
 				got, data := scanFixtureCommits(t, f, f.sha["C"], "")
+				assertAllSinceC(t, f, got, data)
+			})
 
-				// Same set as an explicit head of F: git log C..F.
+			t.Run("explicit head narrows to one branch", func(t *testing.T) {
+				f := build(t)
+				got, data := scanFixtureCommits(t, f, f.sha["C"], f.sha["F"])
+
+				// git log C..F: the side branch is not reachable from F.
 				for _, letter := range []string{"F", "M", "E", "D"} {
 					assert.True(t, got[f.sha[letter]], "commit %s should have been scanned; got %v", letter, got)
 				}
 				for _, letter := range []string{"A", "B", "C", "X"} {
-					assert.False(t, got[f.sha[letter]], "commit %s is outside C..HEAD and must not be scanned", letter)
+					assert.False(t, got[f.sha[letter]], "commit %s is outside C..F and must not be scanned", letter)
 				}
-				assert.NotContains(t, data, decoySecret, "a commit on an unrelated branch leaked into the scan")
+				assert.NotContains(t, data, sideSecret)
 			})
 
+			// The history from the PR review, where the old --all walk that
+			// stopped at the base happened to cover the side branch:
+			//
+			//	      o1 - o2         other
+			//	     /
+			//	a - b - c             main   <- HEAD
+			//
+			// --since-commit a with no --branch must still scan o1 and o2.
+			t.Run("commits only on other branches are scanned", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				path := setupTestRepo(t, "cross-ref")
+				sha := map[string]string{}
+				commit := func(name string) {
+					addTestFileAndCommit(t, path, name+".txt", name+"\n")
+					sha[name] = gitRevParse(t, path, "HEAD")
+				}
+				commit("a")
+				runGit(t, path, "branch", "-M", "main")
+				runGit(t, path, "switch", "-q", "-c", "other")
+				commit("o1")
+				commit("o2")
+				runGit(t, path, "switch", "-q", "main")
+				commit("b")
+				commit("c")
+
+				got, _, err := scanRepoRange(ctx, t, path, sha["a"], "")
+				assert.NoError(t, err)
+				for _, name := range []string{"b", "c", "o1", "o2"} {
+					assert.True(t, got[sha[name]], "commit %s should have been scanned; got %v", name, got)
+				}
+				assert.False(t, got[sha["a"]], "the base is excluded from its own range")
+
+				// With --branch main the same base covers main only.
+				got, _, err = scanRepoRange(ctx, t, path, sha["a"], "main")
+				assert.NoError(t, err)
+				for _, name := range []string{"b", "c"} {
+					assert.True(t, got[sha[name]], "commit %s should have been scanned; got %v", name, got)
+				}
+				for _, name := range []string{"a", "o1", "o2"} {
+					assert.False(t, got[sha[name]], "commit %s is outside a..main and must not be scanned", name)
+				}
+			})
+
+			// main.go's pre-commit override sets both ends to HEAD, so the
+			// commit range is empty and only staged changes are scanned.
 			t.Run("pre-commit shape scans only staged changes", func(t *testing.T) {
 				f := build(t)
 				assert.NoError(t, os.WriteFile(filepath.Join(f.path, "staged.txt"), []byte("github_token = "+stagedSecret+"\n"), 0o644))
 				runGit(t, f.path, "add", "staged.txt")
 
-				got, data := scanFixtureCommits(t, f, "HEAD", "")
+				got, data := scanFixtureCommits(t, f, "HEAD", "HEAD")
 
 				// HEAD..HEAD is empty, so no commit in the repository may produce
 				// chunks. Staged chunks carry no commit hash and are asserted on
@@ -1945,14 +2016,13 @@ func TestScanRepo_BaseWithoutHead(t *testing.T) {
 					assert.False(t, got[sha], "commit %s was scanned but HEAD..HEAD is empty; got %v", letter, got)
 				}
 				assert.Contains(t, data, stagedSecret, "staged changes must still be scanned")
-				assert.NotContains(t, data, decoySecret, "a commit on an unrelated branch leaked into the scan")
+				assert.NotContains(t, data, sideSecret, "a commit on another branch leaked into the hook scan")
 			})
 
 			// Remote URLs are cloned with --mirror, so production base-only scans
-			// run against a bare repository where the parser's HEAD has to
-			// resolve through GIT_DIR rather than a checkout. A mirror's HEAD
-			// follows the origin's checked-out branch, here feature at F.
-			t.Run("bare mirror clone scans base..HEAD", func(t *testing.T) {
+			// run against a bare repository and every ref the mirror carries is
+			// in scope.
+			t.Run("bare mirror clone scans every ref since base", func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 
@@ -1960,18 +2030,10 @@ func TestScanRepo_BaseWithoutHead(t *testing.T) {
 				mirror := filepath.Join(t.TempDir(), "mirror.git")
 				runGit(t, "", "clone", "-q", "--mirror", "file://"+f.path, mirror)
 				assert.True(t, isRepoBare(mirror), "fixture is not bare")
-				assert.Equal(t, f.sha["F"], gitRevParse(t, mirror, "HEAD"), "mirror HEAD should be the origin's checked-out commit")
 
 				got, data, err := scanRepoRange(ctx, t, mirror, f.sha["C"], "")
 				assert.NoError(t, err)
-
-				for _, letter := range []string{"F", "M", "E", "D"} {
-					assert.True(t, got[f.sha[letter]], "commit %s should have been scanned; got %v", letter, got)
-				}
-				for _, letter := range []string{"A", "B", "C", "X"} {
-					assert.False(t, got[f.sha[letter]], "commit %s is outside C..HEAD and must not be scanned", letter)
-				}
-				assert.NotContains(t, data, decoySecret, "a commit on an unrelated branch leaked into the scan")
+				assertAllSinceC(t, f, got, data)
 			})
 		})
 	}
@@ -1980,9 +2042,9 @@ func TestScanRepo_BaseWithoutHead(t *testing.T) {
 // TestScanRepo_SwappedRangeEnds pins the behavior when the base is a descendant
 // of the head, e.g. a CI job that passes its arguments in the wrong order. The
 // range base..head is empty, so nothing is scanned and the scan succeeds; it
-// must not widen to anything else. ScanCommits logs the empty range at V(1) so
-// the case is diagnosable without failing the pre-commit hook, whose
-// HEAD..HEAD range is empty by design.
+// must not widen to anything else. ScanCommits logs the empty range at Info so
+// the case is visible at the default log level without failing the pre-commit
+// hook, whose HEAD..HEAD range is empty by design.
 func TestScanRepo_SwappedRangeEnds(t *testing.T) {
 	f := buildMergedBaseFixture(t, false, false)
 
@@ -2147,15 +2209,16 @@ func TestScanRepo_ShallowClone(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 
-				// Same clone, no head: normalizeConfig must not resolve HEAD and
-				// run MergeBase, or the --shallow-since path would fail exactly
-				// where it used to work.
+				// Same clone, no head: normalizeConfig must not invent a head
+				// and run MergeBase, or the --shallow-since path would fail
+				// exactly where it used to work. git walks --all ^base, and the
+				// clone's only ref is the tip.
 				shallow, head, base := graftAtBase(t)
 
 				got, _, err := scanRepoRange(ctx, t, shallow, base, "")
 
 				assert.NoError(t, err)
-				assert.True(t, got[head], "the one commit in base..HEAD should have been scanned; got %v", got)
+				assert.True(t, got[head], "the one commit since base should have been scanned; got %v", got)
 				assert.False(t, got[base], "the base is excluded from its own range")
 			})
 

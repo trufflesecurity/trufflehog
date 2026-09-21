@@ -267,8 +267,10 @@ type gitArgs struct {
 // base), which is the diff-scan contract behind `--since-commit`. The range is
 // computed by git itself so that it is independent of commit dates and merge
 // topology. An empty base means a full-history scan of head (or of --all when
-// head is also empty). An empty head with a non-empty base means base..HEAD,
-// the checked-out commit; ^base is never paired with --all.
+// head is also empty). An empty head with a non-empty base means every commit
+// reachable from any ref but not from base (`--all ^base`), which is what
+// `--since-commit X` without `--branch` has always covered; callers that want
+// a single-branch diff pass the head explicitly.
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
@@ -456,16 +458,14 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 	}
 
 	// The positive end of the walk, kept last before the -- (not required but
-	// sensible). A base with no head is a diff scan up to the checked-out
-	// commit: the pre-commit hook and `--since-commit X` without `--branch`.
-	// Defaulting to --all there would walk every ref not reachable from base,
-	// which is not a diff of the change being made.
+	// sensible). With no head every ref is walked, so a base-only scan is
+	// `--all ^base`: everything since base on any branch, not just the checked
+	// out one. The pre-commit hook wants the empty HEAD..HEAD range and passes
+	// HEAD as both ends itself (see the isPreCommitHook override in main.go).
 	// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
 	switch {
 	case head != "":
 		args.log = append(args.log, head)
-	case base != "":
-		args.log = append(args.log, "HEAD")
 	default:
 		args.log = append(args.log, "--all")
 	}
@@ -478,6 +478,7 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 		args.log = append(args.log, "^"+base)
 	}
 
+	// Pathspecs live in their own slice so `--` always trails every revision.
 	if len(excludedGlobs) != 0 {
 		args.paths = []string{"--", "."}
 		for _, glob := range excludedGlobs {
