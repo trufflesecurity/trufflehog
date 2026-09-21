@@ -146,7 +146,7 @@ func joinPermissions(perms []Permission) string {
 	for _, perm := range perms {
 		permStr, err := perm.ToString()
 		if err != nil {
-			panic(err)
+			permStr = fmt.Sprintf("unknown_permission_%d", perm)
 		}
 		permStrings = append(permStrings, permStr)
 	}
@@ -156,7 +156,7 @@ func joinPermissions(perms []Permission) string {
 func scopeFormatter(scope Permission, checked bool, indentation int) (string, string) {
 	scopeStr, err := scope.ToString()
 	if err != nil {
-		panic(err)
+		scopeStr = fmt.Sprintf("unknown_permission_%d", scope)
 	}
 	if indentation != 0 {
 		scopeStr = strings.Repeat("  ", indentation) + scopeStr
@@ -199,7 +199,7 @@ func printClassicGHPermissions(scopes map[Permission]bool, showAll bool) {
 
 						scopeStr, err := scope.ToString()
 						if err != nil {
-							panic(err)
+							scopeStr = fmt.Sprintf("unknown_permission_%d", scope)
 						}
 						t.AppendRow([]any{scopeStr, "----"})
 					}
