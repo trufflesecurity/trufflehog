@@ -666,7 +666,7 @@ func TestSource_ChunkUnit_ReportsPercent(t *testing.T) {
 	require.NoError(t, s.ChunkUnit(ctx, reporter.Units[0], &reporter))
 
 	require.Eventually(t, func() bool { return s.objectProgress.listingsInFlight.Load() == 0 }, 5*time.Second, 10*time.Millisecond)
-	assert.False(t, s.objectProgress.countFailed.Load())
+	assert.False(t, s.objectProgress.countIncomplete.Load())
 	assert.Positive(t, s.objectProgress.objectsTotal.Load())
 	assert.Equal(t, s.objectProgress.objectsTotal.Load(), s.objectProgress.objectsDone.Load())
 	assert.EqualValues(t, 99, s.GetProgress().PercentComplete)

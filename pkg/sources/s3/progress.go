@@ -22,9 +22,9 @@ type scanProgress struct {
 	// Percent is unknown while it is non-zero.
 	listingsInFlight atomic.Int32
 
-	// countFailed is set when a count pass could not list its whole bucket,
-	// leaving the totals too low to divide by.
-	countFailed atomic.Bool
+	// countIncomplete is set when a count pass ended before listing its whole bucket, whether it failed
+	// or was cancelled, leaving totals too low to divide by.
+	countIncomplete atomic.Bool
 }
 
 func (p *scanProgress) addDone(objects, bytes uint64) {
@@ -39,7 +39,7 @@ func (p *scanProgress) addTotal(objects, bytes uint64) {
 
 // percent returns the share of bytes done, capped at 99 because only the unit finishing makes a job complete.
 func (p *scanProgress) percent() int64 {
-	if p.listingsInFlight.Load() > 0 || p.countFailed.Load() {
+	if p.listingsInFlight.Load() > 0 || p.countIncomplete.Load() {
 		return 0
 	}
 
@@ -57,9 +57,14 @@ func (p *scanProgress) percent() int64 {
 // The caller must increment listingsInFlight before starting it,
 // so that percent never divides by a total that is still being counted.
 func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket string, startAfter *string) {
+	var counted bool
+
 	// Publish after the decrement, because percent reports nothing while a count is in flight. Without it
 	// the bar stays at 0 until the next object finishes, which for large objects is minutes.
 	defer func() {
+		if !counted {
+			s.objectProgress.countIncomplete.Store(true)
+		}
 		s.objectProgress.listingsInFlight.Add(-1)
 		s.publishProgress()
 	}()
@@ -68,12 +73,11 @@ func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket stri
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			// Cancellation means the scan ended first, which is not a count failure.
-			if ctx.Err() != nil {
-				return
+			// Cancellation means the scan ended first, so the pages already counted stay unusable rather
+			// than becoming a total the rest of the scan divides by.
+			if ctx.Err() == nil {
+				ctx.Logger().V(2).Info("could not count objects for progress", "bucket", bucket, "err", err)
 			}
-			s.objectProgress.countFailed.Store(true)
-			ctx.Logger().V(2).Info("could not count objects for progress", "bucket", bucket, "err", err)
 			return
 		}
 
@@ -93,6 +97,7 @@ func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket stri
 		s.objectProgress.addTotal(objects, bytes)
 		s.objectProgress.addDone(doneObjects, doneBytes)
 	}
+	counted = true
 }
 
 // countsTowardProgress reports whether an object belongs in the progress ratio. Objects this scan will

@@ -77,9 +77,9 @@ func TestScanProgress_Percent(t *testing.T) {
 			wantValue: 0,
 		},
 		{
-			name: "count failed",
+			name: "count incomplete",
 			setup: func(p *scanProgress) {
-				p.countFailed.Store(true)
+				p.countIncomplete.Store(true)
 				p.addTotal(10, 1000)
 				p.addDone(5, 500)
 			},
@@ -134,4 +134,17 @@ func TestSource_PublishProgressAfterCountPass(t *testing.T) {
 	s.objectProgress.listingsInFlight.Add(-1)
 	s.publishProgress()
 	assert.EqualValues(t, 50, s.GetProgress().PercentComplete)
+}
+
+func TestSource_CountBucketCancelledLeavesTotalsUnusable(t *testing.T) {
+	s := Source{objectProgress: &scanProgress{}}
+	s.objectProgress.listingsInFlight.Add(1)
+
+	// A cancelled pass has counted part of the bucket, which is not a total anything may divide by.
+	s.objectProgress.addTotal(1, 1000)
+	s.objectProgress.addDone(4, 4000)
+	s.objectProgress.countIncomplete.Store(true)
+	s.objectProgress.listingsInFlight.Add(-1)
+
+	assert.Zero(t, s.objectProgress.percent())
 }
