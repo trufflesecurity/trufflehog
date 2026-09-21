@@ -49,9 +49,14 @@ var (
 	// ClickHouse Cloud speaks HTTPS rather than the native protocol, so its
 	// credentials show up as ordinary basic-auth URLs. The domain is what makes
 	// this unambiguous - a bare https:// URL with credentials is not a
-	// ClickHouse finding.
-	cloudPat = regexp.MustCompile(`\bhttps://([^\s:/@]{0,64}):([^\s:/@]{3,100})@([-\w.]+\.clickhouse\.cloud(?::\d{1,5})?)`)
+	// ClickHouse finding. The host is captured whole and the domain checked in
+	// code rather than pinned in the pattern, so that a longer hostname which
+	// merely contains the domain (foo.clickhouse.cloud.example.com) is rejected
+	// instead of being truncated to something we would then send a credential to.
+	cloudPat = regexp.MustCompile(`\bhttps://([^\s:/@]{0,64}):([^\s:/@]{3,100})@([-\w.]+(?::\d{1,5})?)`)
 )
+
+const cloudDomain = ".clickhouse.cloud"
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
@@ -66,7 +71,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	seen := make(map[string]struct{})
 
 	for _, m := range append(keyPat.FindAllStringSubmatch(dataStr, -1), cloudPat.FindAllStringSubmatch(dataStr, -1)...) {
-		user, password, hostPort := m[1], m[2], m[3]
+		hostPort := m[3]
+		isCloud := strings.HasPrefix(m[0], "https://")
+
+		// Only ClickHouse Cloud hostnames are a ClickHouse finding in the HTTPS
+		// form; any other host with basic-auth credentials belongs to something else.
+		if isCloud && !isCloudHost(hostPort) {
+			continue
+		}
+
+		// Userinfo in a URL is percent-encoded, so a password containing @, : or /
+		// arrives here escaped. Sending the escaped form as the credential makes a
+		// working password look invalid, so decode before using it anywhere.
+		user, password := unescape(m[1]), unescape(m[2])
 		if user == "" {
 			user = defaultUser
 		}
@@ -82,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			database = strings.TrimPrefix(m[4], "/")
 		}
 
-		secure := strings.HasPrefix(m[0], "clickhouses://") || strings.HasPrefix(m[0], "https://")
+		secure := isCloud || strings.HasPrefix(m[0], "clickhouses://")
 
 		// One result per distinct credential, not per occurrence.
 		if _, ok := seen[user+"\x00"+password+"\x00"+hostPort]; ok {
@@ -94,7 +111,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			DetectorType: detector_typepb.DetectorType_ClickHouse,
 			Raw:          []byte(password),
 			RawV2:        []byte(hostPort + user + password),
-			Redacted:     strings.ReplaceAll(m[0], password, "*******"),
+			// Redact the password as it was written, which may be the escaped form.
+			Redacted: strings.ReplaceAll(m[0], m[2], "*******"),
 			SecretParts: map[string]string{
 				"host":     hostPort,
 				"username": user,
@@ -123,6 +141,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	}
 
 	return results, nil
+}
+
+// unescape decodes percent-encoding from a URL userinfo field, leaving the value
+// alone when it isn't validly encoded so that a password containing a bare % is
+// still reported as written.
+func unescape(s string) string {
+	decoded, err := url.PathUnescape(s)
+	if err != nil {
+		return s
+	}
+	return decoded
+}
+
+// isCloudHost reports whether a host belongs to ClickHouse Cloud, matching on the
+// domain rather than a substring so that a lookalike host is not accepted.
+func isCloudHost(hostPort string) bool {
+	host := hostPort
+	if h, _, err := net.SplitHostPort(hostPort); err == nil {
+		host = h
+	}
+	return strings.HasSuffix(strings.ToLower(host), cloudDomain)
 }
 
 // httpEndpoint maps a connection string's host onto ClickHouse's HTTP interface.
@@ -178,6 +217,15 @@ func verifyClickHouse(ctx context.Context, client *http.Client, hostPort string,
 		_ = res.Body.Close()
 	}()
 
+	// The host comes from the connection string and an unrecognised port is used
+	// as given, so the responder is not necessarily ClickHouse. Every ClickHouse
+	// reply, success or auth failure, carries X-ClickHouse-* headers; without one
+	// we cannot read anything into the status, so the result stays indeterminate
+	// rather than verifying a credential against some unrelated web server.
+	if !isClickHouseResponse(res.Header) {
+		return false, fmt.Errorf("response from %s is not ClickHouse (status %d)", endpoint, res.StatusCode)
+	}
+
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
@@ -188,6 +236,15 @@ func verifyClickHouse(ctx context.Context, client *http.Client, hostPort string,
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+}
+
+func isClickHouseResponse(h http.Header) bool {
+	for name := range h {
+		if strings.HasPrefix(http.CanonicalHeaderKey(name), "X-Clickhouse-") {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

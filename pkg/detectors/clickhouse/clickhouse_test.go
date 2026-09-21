@@ -50,6 +50,16 @@ func TestClickHouse_Pattern(t *testing.T) {
 			want:  []string{"abc123.us-central1.gcp.clickhouse.cloud:8443" + "analytics" + "s3cr3tpassword"},
 		},
 		{
+			name:  "valid pattern - percent-encoded password is decoded",
+			input: "dsn = 'clickhouse://analytics:p%40ssw0rd%21x@ch.example.com:9000'",
+			want:  []string{"ch.example.com:9000" + "analytics" + "p@ssw0rd!x"},
+		},
+		{
+			name:  "valid pattern - percent-encoded user is decoded",
+			input: "dsn = 'clickhouse://team%2Fanalytics:s3cr3tpassword@ch.example.com:9000'",
+			want:  []string{"ch.example.com:9000" + "team/analytics" + "s3cr3tpassword"},
+		},
+		{
 			name:  "valid pattern - ignore duplicate",
 			input: "a = 'clickhouse://analytics:s3cr3tpassword@ch.example.com:9000' b = 'clickhouse://analytics:s3cr3tpassword@ch.example.com:9000'",
 			want:  []string{"ch.example.com:9000" + "analytics" + "s3cr3tpassword"},
@@ -72,6 +82,13 @@ func TestClickHouse_Pattern(t *testing.T) {
 		{
 			name:  "invalid pattern - https url that is not clickhouse cloud",
 			input: fmt.Sprintf("%s is configured at https://analytics:s3cr3tpassword@example.com:8443", keyword),
+			want:  []string{},
+		},
+		{
+			// The domain has to end the host, or the credential would be sent to
+			// a Cloud hostname that is not the one it belongs to.
+			name:  "invalid pattern - clickhouse cloud lookalike host",
+			input: "url = 'https://analytics:s3cr3tpassword@foo.clickhouse.cloud.example.com:8443'",
 			want:  []string{},
 		},
 		{
@@ -157,14 +174,20 @@ func TestClickHouse_Verify(t *testing.T) {
 	tests := []struct {
 		name         string
 		status       int
+		isClickHouse bool
 		wantVerified bool
 		wantErr      bool
 	}{
-		{"valid credential", http.StatusOK, true, false},
-		{"authentication failed", http.StatusForbidden, false, false},
-		{"unauthorized", http.StatusUnauthorized, false, false},
-		{"server error is indeterminate", http.StatusInternalServerError, false, true},
-		{"gateway error is indeterminate", http.StatusBadGateway, false, true},
+		{"valid credential", http.StatusOK, true, true, false},
+		{"authentication failed", http.StatusForbidden, true, false, false},
+		{"unauthorized", http.StatusUnauthorized, true, false, false},
+		{"server error is indeterminate", http.StatusInternalServerError, true, false, true},
+		{"gateway error is indeterminate", http.StatusBadGateway, true, false, true},
+		// The host comes from the connection string, so the responder may be
+		// something else entirely. Without ClickHouse's own headers a 200 must
+		// not verify, and a 403 must not read as a rejected credential.
+		{"200 from a non-ClickHouse server does not verify", http.StatusOK, false, false, true},
+		{"403 from a non-ClickHouse server is indeterminate", http.StatusForbidden, false, false, true},
 	}
 
 	for _, test := range tests {
@@ -174,6 +197,11 @@ func TestClickHouse_Verify(t *testing.T) {
 				gotUser = r.Header.Get("X-ClickHouse-User")
 				gotKey = r.Header.Get("X-ClickHouse-Key")
 				gotQuery = r.URL.Query().Get("query")
+				if test.isClickHouse {
+					// Every ClickHouse reply carries these, including auth failures.
+					w.Header().Set("X-ClickHouse-Summary", `{"read_rows":"1"}`)
+					w.Header().Set("X-ClickHouse-Server-Display-Name", "test")
+				}
 				w.WriteHeader(test.status)
 			}))
 			defer srv.Close()
