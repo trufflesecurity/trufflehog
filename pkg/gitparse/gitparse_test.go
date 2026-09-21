@@ -36,8 +36,10 @@ func TestPrepGitArgs(t *testing.T) {
 	// head
 	assert.Contains(t, args.log, "branchname")
 	assert.NotContains(t, args.log, "--all")
-	// abbreviatedLog
-	assert.Contains(t, args.log, "--diff-filter=AM")
+	// abbreviatedLog. Only show carries the diff filter: args.log holds the options
+	// that choose commits and is what the lower-memory scan gives to `git rev-list`,
+	// which rejects diff options.
+	assert.NotContains(t, args.log, "--diff-filter=AM")
 	assert.Contains(t, args.show, "--diff-filter=AM")
 	// excludedGlobs
 	assert.Contains(t, args.paths, "--")
