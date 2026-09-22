@@ -1022,6 +1022,9 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	for chunk := range e.verificationOverlapChunksChan {
 		sourceTypeStr := chunk.chunk.SourceType.String()
 		chunksEnteredStage.WithLabelValues("verification_overlap", sourceTypeStr).Inc()
+		// Occurrence index shared by every result of this chunk, so each secret's
+		// occurrence scan runs once, not once per result.
+		idx := newChunkOccurrenceIndex()
 		for _, detector := range chunk.detectors {
 			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
 			detectorNameStr := detector.Key.Type().String()
@@ -1088,6 +1091,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 							chunk.decoder,
 							detector.Description(),
 							isFalsePositive,
+							idx,
 						)
 
 						// Remove the detector key from the list of detector keys with results.
@@ -1154,6 +1158,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	chunksEnteredStage.WithLabelValues("detect", sourceTypeStr).Inc()
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
+
+	// Occurrence index for this chunk's results, built lazily on the first batch
+	// that produces results.
+	var idx *chunkOccurrenceIndex
 
 	var matchCount int
 	// To reduce the overhead of regex calls in the detector,
@@ -1223,8 +1231,13 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 		AssignDuplicateLineOffsets(&data.chunk, results)
 
+		// The occurrence index is shared by every result of this chunk so each
+		// secret's occurrence scan runs once, not once per result.
+		if len(results) > 0 && idx == nil {
+			idx = newChunkOccurrenceIndex()
+		}
 		for _, res := range results {
-			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Description(), isFalsePositive)
+			e.processResult(ctx, res, data.chunk, data.decoder, data.detector.Description(), isFalsePositive, idx)
 		}
 	}
 
@@ -1281,6 +1294,7 @@ func (e *Engine) processResult(
 	decoderType detectorspb.DecoderType,
 	detectorDescription string,
 	isFalsePositive func(detectors.Result) (bool, string),
+	idx *chunkOccurrenceIndex,
 ) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(chunk.SourceType) {
@@ -1290,7 +1304,7 @@ func (e *Engine) processResult(
 			copyChunk.SourceMetadata = copyMetaData
 		}
 		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
-		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+		ignoreLinePresent = setResultLineNumber(&copyChunk, &res, fragStart, mdLine, idx)
 		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
 			ctx.Logger().Error(err, "error setting link")
 			resultsDropped.WithLabelValues("process_result", "update_link_error", res.DetectorType.String()).Inc()
@@ -1416,6 +1430,14 @@ func effectiveSecret(r *detectors.Result) string {
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
+	return fragmentLineOffset(chunk, result, nil)
+}
+
+// fragmentLineOffset is FragmentLineOffset with an optional per-chunk occurrence
+// index. Callers processing many results for one chunk pass an index so the
+// decoded and original buffers are scanned once per secret instead of once per
+// result.
+func fragmentLineOffset(chunk *sources.Chunk, result *detectors.Result, idx *chunkOccurrenceIndex) (int64, bool) {
 	secretBytes := []byte(effectiveSecret(result))
 
 	// Locate the byte offset of the secret in chunk.Data. If a chunk offset was
@@ -1432,7 +1454,7 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	}
 
 	data := chunk.Data
-	if originalOffset := sourceOffset(chunk.OriginalData, chunk.Data, offset, len(secretBytes)); originalOffset >= 0 {
+	if originalOffset := sourceMappedOffset(chunk, offset, len(secretBytes), idx); originalOffset >= 0 {
 		data, offset = chunk.OriginalData, originalOffset
 	}
 
@@ -1451,48 +1473,97 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	return lineNumber, false
 }
 
-// sourceOffset maps an offset in decoded data back onto the pre-decode buffer,
-// returning -1 when the detected value has no counterpart in the source.
-func sourceOffset(originalData, data []byte, offset, length int) int {
+// chunkOccurrenceIndex caches the byte offsets of every distinct secret within one
+// chunk's decoded and original buffers. Mapping each result with an index scans
+// each buffer once per secret instead of once per result. An index belongs to a
+// single chunk's result batch and is used by one goroutine.
+type chunkOccurrenceIndex struct {
+	bySecret map[string]*secretOccurrences
+}
+
+// secretOccurrences holds the byte offsets of a secret's non-overlapping
+// occurrences in a chunk's decoded and original buffers.
+type secretOccurrences struct {
+	decoded  []int
+	original []int
+}
+
+func newChunkOccurrenceIndex() *chunkOccurrenceIndex {
+	return &chunkOccurrenceIndex{bySecret: make(map[string]*secretOccurrences)}
+}
+
+// get returns the occurrence offsets of secret within the decoded and original
+// buffers, scanning each buffer at most once across calls. The returned
+// occurrence lists must not be modified.
+func (idx *chunkOccurrenceIndex) get(originalData, data, secret []byte) *secretOccurrences {
+	if occ, ok := idx.bySecret[string(secret)]; ok {
+		return occ
+	}
+	occ := &secretOccurrences{
+		decoded:  occurrenceOffsets(data, secret),
+		original: occurrenceOffsets(originalData, secret),
+	}
+	idx.bySecret[string(secret)] = occ
+	return occ
+}
+
+// occurrenceOffsets returns the byte offsets of every non-overlapping occurrence
+// of sep in data.
+func occurrenceOffsets(data, sep []byte) []int {
+	var offsets []int
+	for start := 0; ; {
+		next := bytes.Index(data[start:], sep)
+		if next == -1 {
+			return offsets
+		}
+		offsets = append(offsets, start+next)
+		start += next + len(sep)
+	}
+}
+
+// sourceMappedOffset maps an offset in decoded data back onto the pre-decode
+// buffer, returning -1 when the detected value has no counterpart in the source.
+func sourceMappedOffset(chunk *sources.Chunk, offset, length int, idx *chunkOccurrenceIndex) int {
+	originalData, data := chunk.OriginalData, chunk.Data
 	if len(originalData) == 0 || length == 0 || offset < 0 || offset+length > len(data) {
 		return -1
 	}
-	if bytes.Equal(originalData, data) {
+	// Same backing array means no decoder transformed the data, so the offset
+	// already refers to the source.
+	if len(originalData) == len(data) && &originalData[0] == &data[0] {
 		return offset
 	}
 
 	secret := data[offset : offset+length]
-	preceding := bytes.Count(data[:offset], secret)
-	sourceIndex, sourceCount := nthOccurrence(originalData, secret, preceding)
-	if sourceCount == 0 {
+	var occ *secretOccurrences
+	if idx != nil {
+		occ = idx.get(originalData, data, secret)
+	} else {
+		occ = &secretOccurrences{
+			decoded:  occurrenceOffsets(data, secret),
+			original: occurrenceOffsets(originalData, secret),
+		}
+	}
+	return mapSourceOffset(occ, originalData, data, offset, length)
+}
+
+// mapSourceOffset picks the source occurrence the decoded offset maps onto.
+func mapSourceOffset(occ *secretOccurrences, originalData, data []byte, offset, length int) int {
+	if len(occ.original) == 0 {
 		return -1
 	}
+	// How many kept occurrences precede this match. Counting occurrences that end
+	// at or before the offset matches bytes.Count(data[:offset], secret) and holds
+	// for pre-assigned chunk offsets too.
+	preceding, _ := slices.BinarySearch(occ.decoded, offset-length+1)
 	// Decoders emit the occurrences they keep in source order, so an unchanged
 	// occurrence count makes the nth decoded match the nth source match.
-	if sourceCount == preceding+bytes.Count(data[offset:], secret) {
-		return sourceIndex
+	if len(occ.original) == len(occ.decoded) && preceding < len(occ.original) {
+		return occ.original[preceding]
 	}
 	// Decoding dropped or merged occurrences, so order alone no longer identifies
 	// the match and the surrounding text has to break the tie.
-	return bestAlignedOccurrence(originalData, data, offset, length)
-}
-
-// nthOccurrence returns the offset of the nth zero-indexed non-overlapping
-// occurrence of sep in data along with the total occurrence count. The offset is
-// -1 when data holds fewer than n+1 occurrences.
-func nthOccurrence(data, sep []byte, n int) (int, int) {
-	index, count, start := -1, 0, 0
-	for {
-		next := bytes.Index(data[start:], sep)
-		if next == -1 {
-			return index, count
-		}
-		if count == n {
-			index = start + next
-		}
-		count++
-		start += next + len(sep)
-	}
+	return bestAlignedOccurrence(occ.original, originalData, data, offset, length)
 }
 
 // alignedContextBytes bounds the neighbourhood each candidate source occurrence is
@@ -1504,30 +1575,33 @@ const alignedContextBytes = 1024
 // neighbourhood best survives into the decoded neighbourhood. No rule is exact here:
 // when a decoder drops one copy of a value and keeps another, the copies are only
 // distinguishable by the text around them.
-func bestAlignedOccurrence(originalData, data []byte, offset, length int) int {
-	secret := data[offset : offset+length]
+func bestAlignedOccurrence(originalOcc []int, originalData, data []byte, offset, length int) int {
+	decodedBefore := lastBytes(data[:offset], alignedContextBytes)
+	decodedAfter := firstBytes(data[offset+length:], alignedContextBytes)
+	maxScore := len(decodedBefore) + len(decodedAfter)
 	best, bestScore := -1, -1
-	for start := 0; ; {
-		next := bytes.Index(originalData[start:], secret)
-		if next == -1 {
-			return best
-		}
-		candidate := start + next
-		if score := alignmentScore(originalData, data, candidate, offset, length); score > bestScore {
+	for _, candidate := range originalOcc {
+		score := alignmentScore(
+			lastBytes(originalData[:candidate], alignedContextBytes),
+			firstBytes(originalData[candidate+length:], alignedContextBytes),
+			decodedBefore, decodedAfter,
+		)
+		if score > bestScore {
 			best, bestScore = candidate, score
+			// No other occurrence can beat a perfect score, so stop early.
+			if score == maxScore {
+				break
+			}
 		}
-		start = candidate + length
 	}
+	return best
 }
 
 // alignmentScore measures how much of the decoded neighbourhood still reads, in
-// order, out of the source around a candidate. Decoders interleave removals with the
-// text they keep, so the source side is allowed gaps that the decoded side is not.
-func alignmentScore(originalData, data []byte, candidate, offset, length int) int {
-	sourceBefore := lastBytes(originalData[:candidate], alignedContextBytes)
-	decodedBefore := lastBytes(data[:offset], alignedContextBytes)
-	sourceAfter := firstBytes(originalData[candidate+length:], alignedContextBytes)
-	decodedAfter := firstBytes(data[offset+length:], alignedContextBytes)
+// order, out of the source around a candidate occurrence. Decoders interleave removals
+// with the text they keep, so the source side is allowed gaps that the decoded side
+// is not.
+func alignmentScore(sourceBefore, sourceAfter, decodedBefore, decodedAfter []byte) int {
 	return matchBackward(sourceBefore, decodedBefore) + matchForward(sourceAfter, decodedAfter)
 }
 
@@ -1658,7 +1732,11 @@ func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
 
 // SetResultLineNumber sets the line number in the provided result.
 func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) bool {
-	offset, skip := FragmentLineOffset(chunk, result)
+	return setResultLineNumber(chunk, result, fragStart, mdLine, nil)
+}
+
+func setResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64, idx *chunkOccurrenceIndex) bool {
+	offset, skip := fragmentLineOffset(chunk, result, idx)
 	*mdLine = fragStart + offset
 	return skip
 }
