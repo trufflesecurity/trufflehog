@@ -129,9 +129,14 @@ func VerifyCredential(
 				epVars[k] = v
 			}
 			if ep.TokenSource != nil {
-				if tok, err := ep.TokenSource.Token(); err == nil {
-					epVars["$token"] = tok.AccessToken
+				tok, err := ep.TokenSource.Token()
+				if err != nil {
+					logger.Error(err, "failed to acquire token for body template",
+						"endpoint", ep.URL,
+					)
+					continue
 				}
+				epVars["$token"] = tok.AccessToken
 			}
 			resolved, err := ResolveRequestBody(ep.Body, epVars)
 			if err != nil {
