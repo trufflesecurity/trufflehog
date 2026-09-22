@@ -40,28 +40,28 @@ func collectDiffs(t *testing.T, diffChan chan *Diff) []string {
 func TestLowMemoryScanMatchesSingleProcess(t *testing.T) {
 	repo := testRepoRoot(t)
 
-	// abbreviatedLog is the caller's BaseHash == "", so both values are real
-	// configurations and they take different paths through git. With it on, git drops
-	// commits whose diffs are all filtered away; with it off, those commits stay.
+	// abbreviatedLog is the caller's BaseHash == "". Only the empty base runs here:
+	// the checkout may be shallow, so the real history has no reliable base commit.
+	// Diff scans with a base go through the lower-memory path in the pkg/sources/git
+	// range tests, which build their own fixtures.
 	//
 	// The group sizes go down to 1 on purpose. Every group ends a stream, and a commit
 	// with no diffs used to be dropped when it landed at the end of one, so a size of 1
 	// puts every commit in that spot at once. Before cleanupParse learned to finish off
 	// the last commit, this repository lost 84 diffs at size 1 and 1 at size 75.
 	for _, tc := range []struct {
-		name        string
-		abbreviated bool
+		name string
+		base string
 	}{
-		{"abbreviated", true},
-		{"full", false},
+		{"abbreviated", ""},
 	} {
-		abbreviated, name := tc.abbreviated, tc.name
+		base, name := tc.base, tc.name
 
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
 
 			single := NewParser()
-			singleChan, err := single.RepoPath(ctx, repo, "", abbreviated, nil, false)
+			singleChan, err := single.RepoPath(ctx, repo, "", base, nil, false)
 			if err != nil {
 				t.Fatalf("single-process RepoPath: %v", err)
 			}
@@ -76,7 +76,7 @@ func TestLowMemoryScanMatchesSingleProcess(t *testing.T) {
 				low := NewParser(UseLowMemoryScan())
 				low.groupSize = groupSize
 
-				lowChan, err := low.RepoPath(ctx, repo, "", abbreviated, nil, false)
+				lowChan, err := low.RepoPath(ctx, repo, "", base, nil, false)
 				if err != nil {
 					t.Fatalf("group size %d: RepoPath: %v", groupSize, err)
 				}
@@ -105,7 +105,7 @@ func TestLowMemoryScanExcludedGlobs(t *testing.T) {
 	globs := []string{"*.go"}
 
 	single := NewParser()
-	singleChan, err := single.RepoPath(ctx, repo, "", true, globs, false)
+	singleChan, err := single.RepoPath(ctx, repo, "", "", globs, false)
 	if err != nil {
 		t.Fatalf("single-process RepoPath: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestLowMemoryScanExcludedGlobs(t *testing.T) {
 
 	low := NewParser(UseLowMemoryScan())
 	low.groupSize = 13
-	lowChan, err := low.RepoPath(ctx, repo, "", true, globs, false)
+	lowChan, err := low.RepoPath(ctx, repo, "", "", globs, false)
 	if err != nil {
 		t.Fatalf("low-memory RepoPath: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestLowMemoryScanUnknownHead(t *testing.T) {
 	repo := testRepoRoot(t)
 
 	parser := NewParser(UseLowMemoryScan())
-	if _, err := parser.RepoPath(context.Background(), repo, "no-such-ref-exists", true, nil, false); err == nil {
+	if _, err := parser.RepoPath(context.Background(), repo, "no-such-ref-exists", "", nil, false); err == nil {
 		t.Fatal("expected an error for an unknown head, got nil")
 	}
 }
@@ -149,7 +149,7 @@ func TestLowMemoryScanEmptyRepo(t *testing.T) {
 	runTestGit(t, dir, "init", "-q")
 
 	parser := NewParser(UseLowMemoryScan())
-	diffChan, err := parser.RepoPath(context.Background(), dir, "", true, nil, false)
+	diffChan, err := parser.RepoPath(context.Background(), dir, "", "", nil, false)
 	if err != nil {
 		t.Fatalf("RepoPath on an empty repo: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestLowMemoryScanAbandonedByConsumer(t *testing.T) {
 	parser := NewParser(UseLowMemoryScan())
 	parser.groupSize = 2
 
-	diffChan, err := parser.RepoPath(ctx, repo, "", true, nil, false)
+	diffChan, err := parser.RepoPath(ctx, repo, "", "", nil, false)
 	if err != nil {
 		t.Fatalf("RepoPath: %v", err)
 	}
@@ -229,6 +229,18 @@ func runTestGit(tb testing.TB, dir string, args ...string) {
 	}
 }
 
+func testGitOutput(tb testing.TB, dir string, args ...string) string {
+	tb.Helper()
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		tb.Fatalf("git %s: %v", strings.Join(args, " "), err)
+	}
+	return string(out)
+}
+
 // TestTrailingCommitWithoutDiffsIsReported pins down the rule that a commit is finished
 // off at the end of a stream, not only when the next commit line arrives.
 //
@@ -255,11 +267,13 @@ func TestTrailingCommitWithoutDiffsIsReported(t *testing.T) {
 	runTestGit(t, dir, "commit", "-q", "--allow-empty", "-m", "empty commit worth scanning")
 
 	// Group size 1 puts the empty commit at the end of its own stream, which is exactly
-	// where it used to be lost.
+	// where it used to be lost. A real base keeps the scan unabbreviated; without one
+	// the diff filter would drop the empty commit for an unrelated reason.
 	parser := NewParser(UseLowMemoryScan())
 	parser.groupSize = 1
+	base := strings.TrimSpace(testGitOutput(t, dir, "rev-parse", "HEAD~1"))
 
-	diffChan, err := parser.RepoPath(context.Background(), dir, "", false, nil, false)
+	diffChan, err := parser.RepoPath(context.Background(), dir, "", base, nil, false)
 	if err != nil {
 		t.Fatalf("RepoPath: %v", err)
 	}
