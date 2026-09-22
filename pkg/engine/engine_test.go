@@ -948,7 +948,7 @@ func TestProcessResult_IgnoreLinePresentWithNoIgnoreTag_ResultGenerated(t *testi
 	}
 
 	// Act
-	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil, nil)
 
 	// Assert that the result was reported anyway, with its line number still set
 	require.Len(t, e.results, 1)
