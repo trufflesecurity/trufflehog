@@ -406,3 +406,38 @@ func TestOAuthVerify_JSONPrimitive_ContentTypePlainText(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, verified)
 }
+
+// ─── Token acquisition failure tests ────────────────────────────────
+
+// failingTokenSource always returns an error, simulating an unreachable
+// IdP or bad credentials.
+type failingTokenSource struct{}
+
+func (f *failingTokenSource) Token() (*oauth2.Token, error) {
+	return nil, assert.AnError
+}
+
+func TestOAuthVerify_TokenFailure_SkipsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	// When the body template uses $token and token acquisition fails,
+	// the endpoint should be skipped entirely — no request sent.
+	var called bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	ts := &failingTokenSource{}
+	configs := []OAuthVerifyConfig{{
+		Endpoint:      srv.URL,
+		SuccessRanges: []string{"200"},
+		RequestBody:   map[string]string{"cred": "$secret", "auth_token": "$token"},
+	}}
+	verified, err := OAuthVerify(context.Background(), nil, ts, configs, testResult())
+	// Single endpoint skipped → Attempted but not Definitive → error.
+	assert.Error(t, err)
+	assert.False(t, verified)
+	assert.False(t, called, "endpoint should not be contacted when token acquisition fails")
+}
