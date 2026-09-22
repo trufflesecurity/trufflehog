@@ -15,8 +15,9 @@ type MetricsReporter interface {
 	AddCredentialVerificationsSaved(count int)
 
 	// AddFromDataVerifyTimeSpent records wall time spent verifying credentials remotely, either in a call to
-	// detector.FromData with verify=true or, for detectors that implement detectors.ResultVerifier, in the
-	// per-result verification of cache misses.
+	// detector.FromData with verify=true or, for detectors that implement detectors.ResultVerifier, in a single
+	// VerifyResult call for a cache miss. The ResultVerifier path reports once per call, so implementations should
+	// not truncate each report to a coarse unit or short calls will be undercounted.
 	AddFromDataVerifyTimeSpent(wallTime time.Duration)
 
 	// AddResultCacheHits records result cache hits. Not all cache hits result in elided remote verification requests
@@ -36,11 +37,13 @@ type MetricsReporter interface {
 // DetectorMetricsReporter is an optional interface that a MetricsReporter can additionally implement to receive
 // verification timing attributed to the detector that incurred it. Implementations must be thread-safe.
 //
-// What one sample covers depends on the detector. For a detectors.ResultVerifier, a sample is a single remote
-// VerifyResult call. For any other detector, a sample is a whole FromData(verify=true) pass over a chunk, including
-// its regex pass. A given detector always takes the same path, so its samples stay comparable to its own baseline;
-// a detector that starts implementing detectors.ResultVerifier shifts its distribution, which resets that baseline
-// rather than signaling a provider change.
+// What one sample covers depends on the path taken. When the result cache is consulted, a detectors.ResultVerifier
+// records one sample per remote VerifyResult call on a cache miss. Every other case records one sample per whole
+// FromData(verify=true) pass, including its regex pass: detectors that do not implement detectors.ResultVerifier,
+// targeted rescans (forceCacheUpdate), and a VerificationCache with no result cache. The last two apply to
+// ResultVerifier detectors too, so one such detector can produce whole-pass samples that cover many remote calls
+// alongside its per-call samples. A detector that starts implementing detectors.ResultVerifier shifts its
+// distribution, which resets its baseline rather than signaling a provider change.
 type DetectorMetricsReporter interface {
 	// AddDetectorVerifyTimeSpent records wall time spent verifying credentials remotely for one detector. It is not
 	// called for results served from the cache.

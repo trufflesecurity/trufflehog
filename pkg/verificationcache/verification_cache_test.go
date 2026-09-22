@@ -799,9 +799,8 @@ func TestVerificationCache_FromData_PerDetectorTiming_ResultVerifierAllCacheHits
 }
 
 // One sample per remote call is what makes the histogram readable as provider latency: a chunk with
-// several misses must not collapse into a single fat observation. The aggregate counter keeps its
-// existing shape of one accumulated report per chunk, because it truncates to whole milliseconds and
-// would lose time if it were reported per call.
+// several misses must not collapse into a single fat observation. The aggregate counter follows the
+// same per-call cadence, so both views agree on what one verification is.
 func TestVerificationCache_FromData_PerDetectorTiming_ResultVerifierSamplesPerRemoteCall(t *testing.T) {
 	detector := testResultVerifier{testDetector: testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
@@ -815,7 +814,7 @@ func TestVerificationCache_FromData_PerDetectorTiming_ResultVerifierSamplesPerRe
 	require.NoError(t, err)
 	require.Equal(t, 2, detector.verifyResultCallCount)
 	assertSampleTypes(t, &metrics, detector.Type(), detector.Type())
-	assert.Equal(t, 1, metrics.aggregateReportCount())
+	assert.Equal(t, 2, metrics.aggregateReportCount())
 }
 
 func TestVerificationCache_FromData_PerDetectorTiming_AttributesToOwnDetectorType(t *testing.T) {

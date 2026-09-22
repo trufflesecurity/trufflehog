@@ -48,9 +48,9 @@ func (v *VerificationCache) recordVerifyTime(detectorType detector_typepb.Detect
 	v.recordDetectorVerifyTime(detectorType, wallTime)
 }
 
-// recordDetectorVerifyTime reports one remote verification pass to the per-detector view only, for callers that report
-// the aggregate on their own schedule. verifyCacheMisses needs this because it keeps reporting the aggregate once per
-// chunk while attributing each individual VerifyResult call to the detector.
+// recordVerifyTime reports one remote verification to both metric views: the cross-detector aggregate and, when the
+// reporter opted in, the per-detector histogram. A verification is either one FromData(verify=true) pass or, for
+// detectors.ResultVerifier cache misses, one VerifyResult call.
 func (v *VerificationCache) recordDetectorVerifyTime(detectorType detector_typepb.DetectorType, wallTime time.Duration) {
 	if v.detectorMetrics != nil {
 		v.detectorMetrics.AddDetectorVerifyTimeSpent(detectorType, wallTime)
@@ -169,20 +169,12 @@ func (v *VerificationCache) verifyCacheMisses(
 	detectorType detector_typepb.DetectorType,
 	results []detectors.Result,
 ) ([]detectors.Result, error) {
-	// Only remote verification counts toward verify time; a fully cached chunk records
-	// nothing, matching the all-or-nothing path's early return on full cache coverage.
-	var timeSpentVerifying time.Duration
-	defer func() {
-		if timeSpentVerifying > 0 {
-			v.metrics.AddFromDataVerifyTimeSpent(timeSpentVerifying)
-		}
-	}()
+	// Only remote verification is timed, cache hits never reach verifyResult, so a fully cached chunk records nothing.
 	verifyResult := func(i int) {
 		verifyStart := time.Now()
 		detector.VerifyResult(ctx, &results[i])
 		elapsed := time.Since(verifyStart)
-		v.recordDetectorVerifyTime(detectorType, elapsed)
-		timeSpentVerifying += elapsed
+		v.recordVerifyTime(detectorType, elapsed)
 	}
 
 	for i := range results {
