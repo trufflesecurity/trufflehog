@@ -3,6 +3,7 @@ package gitparse
 import (
 	"bytes"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -25,36 +26,94 @@ func TestPrepGitArgs(t *testing.T) {
 
 	p := Parser{}
 
-	args := p.prepGitArgs(repopath, "", false, nil, false)
+	// Full history of everything: no head, no base.
+	args := p.prepGitArgs(repopath, "", "", nil, false)
 	assert.Equal(t, []string{"-C", repopath}, args.global)
 	assert.Contains(t, args.log, "--all")
+	// A full-history scan skips deletions; a diff scan must not. The filter is a
+	// diff option, so it lives in show and never reaches rev-list via args.log.
 	assert.NotContains(t, args.log, "--diff-filter=AM")
+	assert.Contains(t, args.show, "--diff-filter=AM")
+	assertNoRangeExclusion(t, args.log)
 	assert.Equal(t, []string{"GIT_DIR=" + filepath.Join(repopath, ".git")}, args.env)
 	assert.Empty(t, args.paths)
 
-	args = p.prepGitArgs(repopath, "branchname", true, []string{"some/file.txt", "bloated.dat"}, true)
+	// Full history of one branch, with excludes, in a bare repo.
+	args = p.prepGitArgs(repopath, "branchname", "", []string{"some/file.txt", "bloated.dat"}, true)
 	// head
 	assert.Contains(t, args.log, "branchname")
 	assert.NotContains(t, args.log, "--all")
-	// abbreviatedLog
-	assert.Contains(t, args.log, "--diff-filter=AM")
+	// abbreviatedLog is implied by the empty base. Only show carries the diff
+	// filter: args.log holds the options that choose commits and is what the
+	// lower-memory scan gives to `git rev-list`, which rejects diff options.
+	assert.NotContains(t, args.log, "--diff-filter=AM")
 	assert.Contains(t, args.show, "--diff-filter=AM")
+	assertNoRangeExclusion(t, args.log)
 	// excludedGlobs
 	assert.Contains(t, args.paths, "--")
 	assert.Contains(t, args.paths, ":(exclude)bloated.dat")
 	// isBare
 	assert.Equal(t, []string{"GIT_DIR=" + repopath}, args.env)
 
+	// Diff scan base..head: git must receive the exclusion itself so the range
+	// does not depend on commit-date ordering (INT-1054).
+	args = p.prepGitArgs(repopath, "headsha", "basesha", nil, false)
+	assert.Contains(t, args.log, "headsha")
+	assert.Contains(t, args.log, "^basesha")
+	assert.NotContains(t, args.log, "--all")
+	assert.NotContains(t, args.log, "--diff-filter=AM")
+	// git show is run per explicit hash in the low-memory path and must never
+	// be handed a range.
+	assert.NotContains(t, args.show, "--diff-filter=AM")
+	assert.NotContains(t, args.show, "^basesha")
+	// Revision args follow the flags; the exclusion belongs with the revisions.
+	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "headsha"))
+
+	// A range with excludes: the pathspec separator must land after both
+	// revisions or git reads the exclusion as a path.
+	args = p.prepGitArgs(repopath, "headsha", "basesha", []string{"bloated.dat"}, false)
+	full := slices.Concat(args.log, args.paths)
+	assert.Greater(t, indexOf(full, "--"), indexOf(full, "^basesha"))
+
+	// A base with no head is `--all ^base`: everything since the base on any
+	// ref, which is what `--since-commit X` without `--branch` covers. The
+	// parser must not invent a head here; narrowing to HEAD would silently
+	// drop commits that live only on other branches.
+	args = p.prepGitArgs(repopath, "", "basesha", nil, false)
+	assert.Contains(t, args.log, "--all")
+	assert.Contains(t, args.log, "^basesha")
+	assert.NotContains(t, args.log, "HEAD")
+	assert.NotContains(t, args.log, "--diff-filter=AM")
+	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "--all"))
+
 	// test env passthrough used for pre-receive
 	t.Setenv("GIT_OBJECT_DIRECTORY", "foo")
 	t.Setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", "bar")
 
-	args = p.prepGitArgs(repopath, "", false, nil, true)
+	args = p.prepGitArgs(repopath, "", "", nil, true)
 	assert.Equal(t, []string{
 		"GIT_DIR=" + repopath,
 		"GIT_OBJECT_DIRECTORY=foo",
 		"GIT_ALTERNATE_OBJECT_DIRECTORIES=bar",
 	}, args.env)
+}
+
+// assertNoRangeExclusion fails if any revision argument excludes commits
+// (a leading "^"), which must only happen for diff scans with a base.
+func assertNoRangeExclusion(t *testing.T, logArgs []string) {
+	t.Helper()
+	for _, a := range logArgs {
+		assert.False(t, strings.HasPrefix(a, "^"), "unexpected range exclusion %q in %v", a, logArgs)
+	}
+}
+
+func indexOf(args []string, want string) int {
+	for i, a := range args {
+		if a == want {
+			return i
+		}
+	}
+	return -1
 }
 
 type testCaseLine struct {
