@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/postgresurl"
 )
 
 const (
@@ -68,17 +70,18 @@ func isNonConnectionParam(key string) bool {
 
 // Multi-host connection string URIs are currently not supported because pq.ParseURI doesn't parse them correctly. If we
 // happen to run into a case where this matters we can address it then.
-var (
-	_                  detectors.Detector = (*Scanner)(nil)
-	uriPattern                            = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
-	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]_]+)='(.+?)' ?`)
-)
+var uriPattern = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
 	ignorePatterns []*regexp.Regexp
 }
+
+var (
+	_ detectors.Detector                   = (*Scanner)(nil)
+	_ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+)
 
 type uriMatch struct {
 	params map[string]string
@@ -112,11 +115,6 @@ func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 		s.ignorePatterns = ignorePatterns
 	}
 }
-
-var (
-	_ detectors.Detector                   = (*Scanner)(nil)
-	_ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
-)
 
 func (s Scanner) Keywords() []string {
 	return []string{"postgres"}
@@ -249,15 +247,9 @@ func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []uriMatch {
 		}
 		dbType := string(dbTypeMatch[1])
 
-		connStr, err := pq.ParseURL(string(uri))
+		params, err := postgresurl.Parse(string(uri))
 		if err != nil {
 			continue
-		}
-
-		parts := connStrPartPattern.FindAllStringSubmatch(connStr, -1)
-		params := make(map[string]string, len(parts))
-		for _, part := range parts {
-			params[part[1]] = part[2]
 		}
 
 		params[pgDbType] = dbType
@@ -331,14 +323,15 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 // that are detector-only (db_type) or libpq client options pgx would forward as
 // unrecognized server GUCs (requiressl). sslmode is already normalized in FromData.
 func pgxConnString(params map[string]string) string {
-	var connStr strings.Builder
-	for key, value := range params {
+	params = maps.Clone(params)
+
+	for key := range params {
 		if key == pgDbType || key == pgRequiressl || isNonConnectionParam(key) {
-			continue
+			delete(params, key)
 		}
-		fmt.Fprintf(&connStr, "%s='%s'", key, value)
 	}
-	return connStr.String()
+
+	return postgresurl.ParamsToConnStr(params)
 }
 
 func classifyPostgresVerifyError(err error, params map[string]string) (bool, error) {
@@ -389,35 +382,27 @@ func isErrorDatabaseNotFound(err error, params map[string]string) bool {
 }
 
 func verifyPostgresPq(params map[string]string) (bool, error) {
-	if sslmode := params[pgSslmode]; sslmode == pgSslmodeAllow || sslmode == pgSslmodePrefer {
-		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
-		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
-		delete(params, pgSslmode)
+	params = maps.Clone(params)
 
-		// We still want to save the original sslmode in ExtraData, so we'll re-add it before returning.
-		defer func() {
-			params[pgSslmode] = sslmode
-		}()
+	if params[pgSslmode] == pgSslmodeAllow || params[pgSslmode] == pgSslmodePrefer {
+		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just
+		// ignore it. This will trigger the same logic that is run if no sslmode is set at
+		// all (which mimics 'prefer', which is the default).
+		delete(params, pgSslmode)
 	}
 
-	// db_type is not a valid configuration parameter, so we remove it before connecting.
-	dbType := params[pgDbType]
+	// db_type is not a valid configuration parameter, so we remove it before connecting. This
+	// key is added for internal use.
 	delete(params, pgDbType)
 
-	// we re-add it before returning to preserve in ExtraData
-	defer func() {
-		params[pgDbType] = dbType
-	}()
-
-	var connStr string
-	for key, value := range params {
+	// now prune any parameters from third parties that may not be recognized by pq
+	for key := range params {
 		if isNonConnectionParam(key) {
-			continue
+			delete(params, key)
 		}
-		connStr += fmt.Sprintf("%s='%s'", key, value)
 	}
 
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", postgresurl.ParamsToConnStr(params))
 	if err != nil {
 		return false, err
 	}
@@ -436,7 +421,6 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
 		// connections are acceptable, so now we try a connection without SSL.
 		params[pgSslmode] = pgSslmodeDisable
-		defer delete(params, pgSslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgresPq(params)
 	default:
 		return false, err
