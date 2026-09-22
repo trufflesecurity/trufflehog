@@ -189,6 +189,83 @@ func (v *VerificationCache) verifyCacheMisses(
 	return results, nil
 }
 
+// VerifyFunc is a callback that performs verification on a single result.
+// The function receives the result by pointer and must set Verified and,
+// optionally, the verification error directly on it. This decouples the
+// cache's check-and-store logic from any particular verification strategy.
+type VerifyFunc func(ctx context.Context, result *detectors.Result)
+
+// VerifyWith checks the cache for each result and calls verifyFn only for
+// cache misses. This lets callers with custom verification logic (e.g.,
+// OAuth2-authenticated endpoints) share the same result cache as the
+// standard FromData path. The cache key is identical — hash(Raw + RawV2 +
+// DetectorType) — so results verified through either path are fungible.
+//
+// Results are modified in place: cache hits get their verification status
+// copied from the cached entry, and cache misses are verified via verifyFn
+// and then stored.
+func (v *VerificationCache) VerifyWith(
+	ctx context.Context,
+	results []detectors.Result,
+	verifyFn VerifyFunc,
+) {
+	// No cache configured — verify everything directly. This mirrors
+	// FromData's passthrough behavior when resultCache is nil.
+	if v.resultCache == nil {
+		var timeSpentVerifying time.Duration
+		defer func() {
+			if timeSpentVerifying > 0 {
+				v.metrics.AddFromDataVerifyTimeSpent(timeSpentVerifying)
+			}
+		}()
+		for i := range results {
+			start := time.Now()
+			verifyFn(ctx, &results[i])
+			timeSpentVerifying += time.Since(start)
+		}
+		return
+	}
+
+	var timeSpentVerifying time.Duration
+	defer func() {
+		if timeSpentVerifying > 0 {
+			v.metrics.AddFromDataVerifyTimeSpent(timeSpentVerifying)
+		}
+	}()
+
+	for i := range results {
+		cacheKey, err := v.getResultCacheKey(results[i])
+		if err != nil {
+			ctx.Logger().Error(err, "error getting result cache key for verification caching",
+				"operation", "read")
+			// Fail open: a result we cannot key still deserves verification,
+			// matching verifyCacheMisses where a key error falls through.
+			start := time.Now()
+			verifyFn(ctx, &results[i])
+			timeSpentVerifying += time.Since(start)
+			continue
+		}
+		if cacheHit, ok := v.resultCache.Get(string(cacheKey)); ok {
+			results[i].CopyVerificationInfo(&cacheHit)
+			results[i].VerificationFromCache = true
+			v.metrics.AddResultCacheHits(1)
+			v.metrics.AddCredentialVerificationsSaved(1)
+			continue
+		}
+		v.metrics.AddResultCacheMisses(1)
+
+		start := time.Now()
+		verifyFn(ctx, &results[i])
+		timeSpentVerifying += time.Since(start)
+
+		// Store the result without raw secret material — this cache
+		// outlives any single chunk, so credentials must not linger.
+		copyForCaching := results[i]
+		copyForCaching.ClearSecrets()
+		v.resultCache.Set(string(cacheKey), copyForCaching)
+	}
+}
+
 func (v *VerificationCache) getResultCacheKey(result detectors.Result) ([]byte, error) {
 	v.hashMu.Lock()
 	defer v.hashMu.Unlock()

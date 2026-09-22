@@ -573,3 +573,235 @@ func TestVerificationCache_FromData_DoesNotCacheSecretMaterial(t *testing.T) {
 	assert.Nil(t, cached[0].SecretParts)
 	assert.Empty(t, cached[0].GetPrimarySecretValue())
 }
+
+// VerifyWith tests exercise the callback-based verification path used by
+// external verification strategies (e.g. OAuth2). The cache behavior mirrors
+// verifyCacheMisses: per-result lookup, verify on miss, store after verify.
+
+func TestVerificationCache_VerifyWith_NilCache(t *testing.T) {
+	// Without a result cache, VerifyWith should call verifyFn for every
+	// result and still record the time spent verifying.
+	metrics := InMemoryMetrics{}
+	cache := New(nil, &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: -1},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), DetectorType: -1},
+	}
+
+	var callCount int
+	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+		callCount++
+		r.Verified = true
+		time.Sleep(2 * time.Millisecond)
+	})
+
+	assert.Equal(t, 2, callCount)
+	assert.True(t, results[0].Verified)
+	assert.True(t, results[1].Verified)
+	assert.Less(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+	// No cache means no cache metrics.
+	assert.Equal(t, int32(0), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
+}
+
+func TestVerificationCache_VerifyWith_AllCacheMisses(t *testing.T) {
+	// Empty cache: every result triggers verifyFn and gets stored.
+	metrics := InMemoryMetrics{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: -1},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), DetectorType: -1},
+	}
+
+	var callCount int
+	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+		callCount++
+		r.Verified = true
+		time.Sleep(2 * time.Millisecond)
+	})
+
+	assert.Equal(t, 2, callCount)
+	assert.True(t, results[0].Verified)
+	assert.True(t, results[1].Verified)
+	assert.False(t, results[0].VerificationFromCache)
+	assert.False(t, results[1].VerificationFromCache)
+	// Both results should be cached now, without raw secret material.
+	cached := cache.resultCache.Values()
+	assert.Len(t, cached, 2)
+	for _, c := range cached {
+		assert.Nil(t, c.Raw)
+		assert.Nil(t, c.RawV2)
+	}
+	assert.Less(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(2), metrics.ResultCacheMisses.Load())
+	assert.Equal(t, int32(0), metrics.CredentialVerificationsSaved.Load())
+}
+
+func TestVerificationCache_VerifyWith_AllCacheHits(t *testing.T) {
+	// Pre-populate the cache so every result is a hit. The verifyFn
+	// should never be called, and results get their status from cache.
+	metrics := InMemoryMetrics{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: -1},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), DetectorType: -1},
+	}
+	// Cache entries say "verified" even though the results above start unverified.
+	cache.resultCache.Set(getResultCacheKey(t, cache, results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+	cache.resultCache.Set(getResultCacheKey(t, cache, results[1]),
+		detectors.Result{Redacted: "world", Verified: true})
+
+	var callCount int
+	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, _ *detectors.Result) {
+		callCount++
+	})
+
+	assert.Equal(t, 0, callCount)
+	assert.True(t, results[0].Verified)
+	assert.True(t, results[1].Verified)
+	assert.True(t, results[0].VerificationFromCache)
+	assert.True(t, results[1].VerificationFromCache)
+	assert.Equal(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+	assert.Equal(t, int32(2), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
+	assert.Equal(t, int32(2), metrics.CredentialVerificationsSaved.Load())
+}
+
+func TestVerificationCache_VerifyWith_PartialCacheHit(t *testing.T) {
+	// First result is cached, second is not. Only the second should
+	// trigger verifyFn.
+	metrics := InMemoryMetrics{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: -1},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), DetectorType: -1},
+	}
+	cache.resultCache.Set(getResultCacheKey(t, cache, results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+
+	var verifiedRedacted []string
+	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+		verifiedRedacted = append(verifiedRedacted, r.Redacted)
+		r.Verified = false
+		r.SetVerificationError(errors.New("endpoint unreachable"), r.Redacted)
+		time.Sleep(2 * time.Millisecond)
+	})
+
+	// First result: from cache, verified=true.
+	assert.True(t, results[0].Verified)
+	assert.True(t, results[0].VerificationFromCache)
+	assert.Nil(t, results[0].VerificationError())
+	// Second result: from verifyFn, verified=false with error.
+	assert.False(t, results[1].Verified)
+	assert.False(t, results[1].VerificationFromCache)
+	assert.NotNil(t, results[1].VerificationError())
+	assert.Equal(t, []string{"world"}, verifiedRedacted)
+	assert.Less(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+	assert.Equal(t, int32(1), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(1), metrics.ResultCacheMisses.Load())
+	assert.Equal(t, int32(1), metrics.CredentialVerificationsSaved.Load())
+}
+
+func TestVerificationCache_VerifyWith_DuplicateResults(t *testing.T) {
+	// Same secret appears twice (simulating two chunks). The first
+	// occurrence should trigger verifyFn; the second should be a cache
+	// hit from the first's store.
+	metrics := InMemoryMetrics{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: -1},
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: -1},
+	}
+
+	var callCount int
+	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+		callCount++
+		r.Verified = true
+		time.Sleep(2 * time.Millisecond)
+	})
+
+	assert.Equal(t, 1, callCount)
+	assert.True(t, results[0].Verified)
+	assert.False(t, results[0].VerificationFromCache)
+	assert.True(t, results[1].Verified)
+	assert.True(t, results[1].VerificationFromCache)
+	assert.Len(t, cache.resultCache.Values(), 1)
+	assert.Equal(t, int32(1), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(1), metrics.ResultCacheMisses.Load())
+	assert.Equal(t, int32(1), metrics.CredentialVerificationsSaved.Load())
+}
+
+func TestVerificationCache_VerifyWith_DoesNotCacheSecretMaterial(t *testing.T) {
+	// Verify that raw secrets and secret parts are cleared before caching,
+	// matching the behavior of FromData and verifyCacheMisses.
+	cache := New(simple.NewCache[detectors.Result](), nil)
+	result := detectors.Result{
+		Redacted:     "hello",
+		Raw:          []byte("hello"),
+		RawV2:        []byte("helloV2"),
+		DetectorType: -1,
+		SecretParts:  map[string]string{"key": "hello"},
+	}
+	result.SetPrimarySecretValue("hello")
+	results := []detectors.Result{result}
+
+	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+		r.Verified = true
+	})
+
+	// The caller's result retains its raw material.
+	assert.Equal(t, []byte("hello"), results[0].Raw)
+	assert.Equal(t, []byte("helloV2"), results[0].RawV2)
+	assert.Equal(t, map[string]string{"key": "hello"}, results[0].SecretParts)
+	assert.Equal(t, "hello", results[0].GetPrimarySecretValue())
+	// The cached copy must not retain secret material.
+	cached := cache.resultCache.Values()
+	require.Len(t, cached, 1)
+	assert.Nil(t, cached[0].Raw)
+	assert.Nil(t, cached[0].RawV2)
+	assert.Nil(t, cached[0].SecretParts)
+	assert.Empty(t, cached[0].GetPrimarySecretValue())
+}
+
+func TestVerificationCache_VerifyWith_CacheSharedWithFromData(t *testing.T) {
+	// A result verified through VerifyWith should be a cache hit when
+	// later encountered through the standard FromData path, and vice
+	// versa. This proves both paths share the same key space.
+	metrics := InMemoryMetrics{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+
+	// Step 1: Verify via VerifyWith (the OAuth path).
+	oauthResults := []detectors.Result{
+		{Redacted: "shared-secret", Raw: []byte("shared-secret"), RawV2: []byte("v2"), DetectorType: -1},
+	}
+	cache.VerifyWith(logContext.Background(), oauthResults, func(_ logContext.Context, r *detectors.Result) {
+		r.Verified = true
+	})
+	assert.Equal(t, int32(1), metrics.ResultCacheMisses.Load())
+
+	// Step 2: The same secret comes through FromData on a different chunk.
+	// The detector returns the result unverified; the cache should supply
+	// the verified status from step 1.
+	detector := testResultVerifier{testDetector: testDetector{results: []detectors.Result{
+		{Redacted: "shared-secret", Raw: []byte("shared-secret"), RawV2: []byte("v2"), DetectorType: -1,
+			Verified: true},
+	}}}
+	fromDataResults, err := cache.FromData(
+		logContext.Background(),
+		&detector,
+		true,
+		false,
+		nil)
+
+	require.NoError(t, err)
+	require.Len(t, fromDataResults, 1)
+	assert.True(t, fromDataResults[0].Verified)
+	assert.True(t, fromDataResults[0].VerificationFromCache)
+	// The detector's VerifyResult should never have been called — cache hit.
+	assert.Equal(t, 0, detector.verifyResultCallCount)
+	// 1 miss from VerifyWith (step 1), 1 hit from FromData (step 2).
+	assert.Equal(t, int32(1), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(1), metrics.ResultCacheMisses.Load())
+}
