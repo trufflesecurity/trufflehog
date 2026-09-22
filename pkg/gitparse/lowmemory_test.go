@@ -40,29 +40,20 @@ func collectDiffs(t *testing.T, diffChan chan *Diff) []string {
 func TestLowMemoryScanMatchesSingleProcess(t *testing.T) {
 	repo := testRepoRoot(t)
 
-	// abbreviatedLog is the caller's BaseHash == "", so both an empty and a real base
-	// are real configurations and they take different paths through git. With no
-	// base, git drops commits whose diffs are all filtered away; with a base, those
-	// commits stay and the `^base` exclusion has to reach rev-list intact.
+	// abbreviatedLog is the caller's BaseHash == "". Only the empty base runs here:
+	// the checkout may be shallow, so the real history has no reliable base commit.
+	// Diff scans with a base go through the lower-memory path in the pkg/sources/git
+	// range tests, which build their own fixtures.
 	//
 	// The group sizes go down to 1 on purpose. Every group ends a stream, and a commit
 	// with no diffs used to be dropped when it landed at the end of one, so a size of 1
 	// puts every commit in that spot at once. Before cleanupParse learned to finish off
 	// the last commit, this repository lost 84 diffs at size 1 and 1 at size 75.
-	// The oldest root is a base that still leaves nearly the whole history in range,
-	// so the diff-scan case crosses as many group boundaries as the full one.
-	roots := strings.Fields(testGitOutput(t, repo, "rev-list", "--max-parents=0", "HEAD"))
-	if len(roots) == 0 {
-		t.Fatal("no root commit found")
-	}
-	rootBase := roots[len(roots)-1]
-
 	for _, tc := range []struct {
 		name string
 		base string
 	}{
 		{"abbreviated", ""},
-		{"range", rootBase},
 	} {
 		base, name := tc.base, tc.name
 
