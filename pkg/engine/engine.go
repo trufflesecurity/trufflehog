@@ -1185,13 +1185,11 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		})
 
 		// When the detector has OAuth2 auth on its custom verifier,
-		// bypass the built-in verification path entirely: detect only,
-		// then verify each result via OAuth2-authenticated POST. This
-		// intentionally skips verificationCache — the built-in cache
-		// wraps FromData with verify=true, which would run the
-		// detector's unauthenticated verification. The OAuth path
-		// replaces that with its own authenticated verification loop.
-		// Token caching is handled separately by oauth2.ReuseTokenSource.
+		// detect without verification and then verify each result
+		// through the OAuth2-authenticated path. VerifyWith feeds
+		// results through the same verification cache as the standard
+		// FromData path, so duplicate secrets across chunks only
+		// trigger one remote verification call.
 		var results []detectors.Result
 		var err error
 		if oauthV, ok := data.detector.Detector.(detectors.OAuthVerifier); ok && oauthV.HasOAuth2() {
@@ -1212,12 +1210,11 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 				for i, ep := range oauthV.Endpoints() {
 					configs[i] = OAuthVerifyConfig{Endpoint: ep}
 				}
-				for i := range results {
-					verified, verifyErr := OAuthVerify(
-						oauthCtx, nil, oauthV.OAuth2TokenSource(), configs, &results[i])
-					results[i].Verified = verified
-					results[i].SetVerificationError(verifyErr, string(results[i].Raw))
-				}
+				e.verificationCache.VerifyWith(oauthCtx, results, func(vCtx context.Context, r *detectors.Result) {
+					verified, verifyErr := OAuthVerify(vCtx, nil, oauthV.OAuth2TokenSource(), configs, r)
+					r.Verified = verified
+					r.SetVerificationError(verifyErr, string(r.Raw))
+				})
 			}
 		} else {
 			results, err = e.verificationCache.FromData(
