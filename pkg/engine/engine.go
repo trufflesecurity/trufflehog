@@ -5,7 +5,6 @@ package engine
 
 import (
 	"bytes"
-	"crypto/md5"
 	"errors"
 	"fmt"
 	"runtime"
@@ -369,7 +368,8 @@ func (e *Engine) setDefaults(ctx context.Context) {
 
 	if e.detectorWorkerMultiplier < 1 {
 		// bound by net i/o so it's higher than other workers
-		e.detectorWorkerMultiplier = 8
+		// e.detectorWorkerMultiplier = 8
+		e.detectorWorkerMultiplier = e.concurrency
 	}
 
 	if e.notificationWorkerMultiplier < 1 {
@@ -1315,6 +1315,19 @@ func (e *Engine) processResult(
 	e.results <- secret
 }
 
+func (e *Engine) NewNotifierWorker(ctx context.Context) {
+	for result := range e.ResultsChan() {
+		atomic.AddUint32(&e.numFoundResults, 1)
+		if result.Verified {
+			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
+		} else {
+			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
+		}
+
+		_ = e.dispatcher.Dispatch(ctx, result)
+	}
+}
+
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
 		startTime := time.Now()
@@ -1357,15 +1370,18 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// This deduplication only applies to results that are *not*
 		// from reverification, since we are expected to see the same
 		// result from reverification and want to Dispatch it below.
-		if result.SecretID == 0 {
-			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
-			key := string(h[:])
-			if _, ok := e.dedupeCache.Get(key); ok {
-				resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
-				continue
+
+		/*
+			if result.SecretID == 0 {
+				h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
+				key := string(h[:])
+				if _, ok := e.dedupeCache.Get(key); ok {
+					resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
+					continue
+				}
+				e.dedupeCache.Add(key, struct{}{})
 			}
-			e.dedupeCache.Add(key, struct{}{})
-		}
+		*/
 
 		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
