@@ -1,6 +1,10 @@
 package verificationcache
 
-import "time"
+import (
+	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+)
 
 // MetricsReporter is an interface used by a verification cache to report various metrics related to its operation.
 // Implementations must be thread-safe.
@@ -27,4 +31,13 @@ type MetricsReporter interface {
 	// that are not cached. When this happens, the detector's FromData method must be called anyway, so the cache hit
 	// doesn't save any remote requests.
 	AddResultCacheHitsWasted(count int)
+}
+
+// DetectorMetricsReporter is an optional interface that a MetricsReporter can additionally implement to receive
+// verification timing attributed to the detector that incurred it. Implementations must be thread-safe.
+type DetectorMetricsReporter interface {
+	// AddFromDataVerifyTimeSpent records wall time spent verifying credentials remotely, either in a call to
+	// detector.FromData with verify=true or, for detectors that implement detectors.ResultVerifier, in the
+	// per-result verification of cache misses.
+	AddDetectorVerifyTimeSpent(detectorType detector_typepb.DetectorType, wallTime time.Duration)
 }
