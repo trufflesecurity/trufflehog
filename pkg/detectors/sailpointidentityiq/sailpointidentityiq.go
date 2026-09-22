@@ -22,16 +22,20 @@ var (
 	_ detectors.MaxSecretSizeProvider      = (*Scanner)(nil)
 )
 
-// RE2 caps repetitions at 1,000, so five adjacent groups enforce 5,000.
-var keyPat = regexp.MustCompile("\\b(1:ACP:[A-Za-z0-9+/=]{43,1000}[A-Za-z0-9+/=]{0,1000}[A-Za-z0-9+/=]{0,1000}[A-Za-z0-9+/=]{0,1000}[A-Za-z0-9+/=]{0,1000})(?:[\\t\\r\\n \\\"']|$)")
+var keyPat = regexp.MustCompile(`\b(1:ACP:[A-Za-z0-9+/=]{43,})(?:[^A-Za-z0-9+/=]|\z)`)
+
+const (
+	secretPrefix         = "1:ACP:"
+	maxEncodedSecretSize = 5000
+)
 
 // SailPoint IdentityIQ's globally shipped AES key for alias 1.
 // Decryption behavior ported from https://github.com/covertchannelblog/iiq_decrypt.
 var defaultKey = []byte{0x8c, 0x34, 0xaf, 0x4f, 0xab, 0xa6, 0x15, 0xbe, 0x29, 0xb2, 0x98, 0x9b, 0xa4, 0xf0, 0x08, 0x55}
 
-func (Scanner) Keywords() []string { return []string{"1:ACP:"} }
+func (Scanner) Keywords() []string { return []string{secretPrefix} }
 
-func (Scanner) MaxSecretSize() int64 { return 5006 }
+func (Scanner) MaxSecretSize() int64 { return int64(len(secretPrefix) + maxEncodedSecretSize) }
 
 func (Scanner) Type() detector_typepb.DetectorType {
 	return detector_typepb.DetectorType_SailPointIdentityIQ
@@ -67,8 +71,8 @@ func (Scanner) IsFalsePositive(_ detectors.Result) (bool, string) { return false
 // decryptMatch trims Base64-looking text after an unpadded secret, preferring
 // the longest prefix that decrypts successfully.
 func decryptMatch(match string) ([]byte, string, error) {
-	for end := len(match); end >= len("1:ACP:")+43; end-- {
-		if (end-len("1:ACP:"))%4 != 0 {
+	for end := min(len(match), len(secretPrefix)+maxEncodedSecretSize); end >= len(secretPrefix)+43; end-- {
+		if (end-len(secretPrefix))%4 != 0 {
 			continue
 		}
 		secret := match[:end]
@@ -81,7 +85,7 @@ func decryptMatch(match string) ([]byte, string, error) {
 }
 
 func decrypt(secret string) ([]byte, error) {
-	encoded := secret[len("1:ACP:"):]
+	encoded := secret[len(secretPrefix):]
 	encrypted, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil || len(encrypted) <= aes.BlockSize || len(encrypted)%aes.BlockSize != 0 {
 		return nil, errors.New("invalid ACP ciphertext")
