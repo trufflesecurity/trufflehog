@@ -35,9 +35,14 @@ type MetricsReporter interface {
 
 // DetectorMetricsReporter is an optional interface that a MetricsReporter can additionally implement to receive
 // verification timing attributed to the detector that incurred it. Implementations must be thread-safe.
+//
+// What one sample covers depends on the detector. For a detectors.ResultVerifier, a sample is a single remote
+// VerifyResult call. For any other detector, a sample is a whole FromData(verify=true) pass over a chunk, including
+// its regex pass. A given detector always takes the same path, so its samples stay comparable to its own baseline;
+// a detector that starts implementing detectors.ResultVerifier shifts its distribution, which resets that baseline
+// rather than signaling a provider change.
 type DetectorMetricsReporter interface {
-	// AddFromDataVerifyTimeSpent records wall time spent verifying credentials remotely, either in a call to
-	// detector.FromData with verify=true or, for detectors that implement detectors.ResultVerifier, in the
-	// per-result verification of cache misses.
+	// AddDetectorVerifyTimeSpent records wall time spent verifying credentials remotely for one detector. It is not
+	// called for results served from the cache.
 	AddDetectorVerifyTimeSpent(detectorType detector_typepb.DetectorType, wallTime time.Duration)
 }
