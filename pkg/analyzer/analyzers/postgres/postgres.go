@@ -6,8 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/fatih/color"

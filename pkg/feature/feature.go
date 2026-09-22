@@ -13,6 +13,7 @@ var (
 	UserAgentSuffix                          AtomicString
 	UseSimplifiedGitlabEnumeration           atomic.Bool
 	UseGitMirror                             atomic.Bool
+	UseGitLowMemoryScan                      atomic.Bool
 	GitlabProjectsPerPage                    atomic.Int64
 	UseGithubGraphQLAPI                      atomic.Bool // use github graphql api to fetch issues, pr's and comments
 	HTMLDecoderEnabled                       atomic.Bool

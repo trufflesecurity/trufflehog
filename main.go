@@ -66,6 +66,7 @@ var (
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	noIgnoreTag                = cli.Flag("no-ignore-tag", "Report results even if the line has a 'trufflehog:ignore' comment.").Bool()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
 	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
@@ -91,6 +92,7 @@ var (
 	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
 	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
 	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	gitLowMemoryScan         = cli.Flag("git-low-memory-scan", "Reduce memory use for git scanning.").Hidden().Bool()
 	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()
@@ -518,6 +520,10 @@ func run(state overseer.State, logSync func() error) {
 		feature.GitCloneTimeoutDuration.Store(int64(*gitCloneTimeout))
 	}
 
+	if *gitLowMemoryScan {
+		feature.UseGitLowMemoryScan.Store(true)
+	}
+
 	if *skipAdditionalRefs {
 		feature.SkipAdditionalRefs.Store(true)
 	}
@@ -655,6 +661,7 @@ func run(state overseer.State, logSync func() error) {
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
+		NoIgnoreTag:              *noIgnoreTag,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,

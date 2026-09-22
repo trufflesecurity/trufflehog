@@ -38,6 +38,24 @@ const (
 	pgDbType         = "db_type"
 )
 
+// nonConnectionParams are query-string arguments that ORMs append to
+// Postgres connection URIs but that are not libpq connection keywords. lib/pq and pgx
+// forward any key they don't recognize to the server as a startup runtime parameter,
+// which the server rejects with 42704. Exluding them prevents this
+var nonConnectionParams = map[string]struct{}{
+	"schema":           {}, // Prisma: search_path selector
+	"connection_limit": {}, // Prisma: client-side pool size
+	"pool_timeout":     {}, // Prisma: pool-acquisition wait
+	"socket_timeout":   {}, // Prisma: per-query timeout
+	"pgbouncer":        {}, // Prisma: PgBouncer compatibility mode
+	"sslidentity":      {}, // Prisma: PKCS12 certificate path
+}
+
+func isNonConnectionParam(key string) bool {
+	_, ok := nonConnectionParams[key]
+	return ok
+}
+
 // This detector currently only finds Postgres connection string URIs
 // (https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) When it finds one, it uses
 // pq.ParseURI to normalize this into space-separated key-value pair Postgres connection string, and then uses a regular
@@ -49,9 +67,9 @@ const (
 // Multi-host connection string URIs are currently not supported because pq.ParseURI doesn't parse them correctly. If we
 // happen to run into a case where this matters we can address it then.
 var (
-	_                  detectors.Detector = (*Scanner)(nil)
-	uriPattern                            = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
-	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
+	_          detectors.Detector = (*Scanner)(nil)
+	uriPattern                    = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
+	connStrPartPattern = regexp.MustCompile(`([[:alpha:]_]+)='(.+?)' ?`)
 )
 
 type Scanner struct {
@@ -275,13 +293,31 @@ func getDeadlineInSeconds(ctx context.Context) (int, bool) {
 	return int(duration.Seconds()), true
 }
 
-func isErrorDatabaseNotFound(err error, dbName string) bool {
-	if dbName == "" {
-		dbName = "postgres"
-	}
-	missingDbErrorText := fmt.Sprintf("database \"%s\" does not exist", dbName)
+// The server looks the database up only after authenticating, so this confirms the credentials.
+const invalidCatalogName = "3D000"
 
-	return strings.Contains(err.Error(), missingDbErrorText)
+// Message text is only a fallback, for proxies that relay a failure without a SQLSTATE; the server
+// translates messages per lc_messages. Postgres substitutes the user name, not "postgres", when a
+// connection string names no database (src/backend/tcop/backend_startup.c).
+func isErrorDatabaseNotFound(err error, params map[string]string) bool {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && pqErr.Code == invalidCatalogName {
+		return true
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == invalidCatalogName {
+		return true
+	}
+
+	dbName := params[pgDbname]
+	if dbName == "" {
+		dbName = params[pgUser]
+	}
+	if dbName == "" {
+		return false
+	}
+
+	return strings.Contains(err.Error(), fmt.Sprintf("database %q does not exist", dbName))
 }
 
 func verifyPostgres(ctx context.Context, params map[string]string) (bool, error) {
@@ -299,7 +335,7 @@ func verifyPostgres(ctx context.Context, params map[string]string) (bool, error)
 func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, error) {
 	conn, err := pgx.Connect(ctx, pgxConnString(params))
 	if err != nil {
-		return classifyPostgresVerifyError(err, params[pgDbname])
+		return classifyPostgresVerifyError(err, params)
 	}
 	defer func() {
 		// Best-effort close after verification; the verify outcome is already decided.
@@ -309,7 +345,7 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 	}()
 
 	if err := conn.Ping(ctx); err != nil {
-		return classifyPostgresVerifyError(err, params[pgDbname])
+		return classifyPostgresVerifyError(err, params)
 	}
 	return true, nil
 }
@@ -320,7 +356,7 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 func pgxConnString(params map[string]string) string {
 	var connStr strings.Builder
 	for key, value := range params {
-		if key == pgDbType || key == pgRequiressl {
+		if key == pgDbType || key == pgRequiressl || isNonConnectionParam(key) {
 			continue
 		}
 		fmt.Fprintf(&connStr, "%s='%s'", key, value)
@@ -328,7 +364,7 @@ func pgxConnString(params map[string]string) string {
 	return connStr.String()
 }
 
-func classifyPostgresVerifyError(err error, dbName string) (bool, error) {
+func classifyPostgresVerifyError(err error, params map[string]string) (bool, error) {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
@@ -341,7 +377,7 @@ func classifyPostgresVerifyError(err error, dbName string) (bool, error) {
 	if strings.Contains(err.Error(), "password authentication failed") {
 		return false, nil
 	}
-	if isErrorDatabaseNotFound(err, dbName) {
+	if isErrorDatabaseNotFound(err, params) {
 		return true, nil
 	}
 	return false, err
@@ -370,6 +406,9 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 
 	var connStr string
 	for key, value := range params {
+		if isNonConnectionParam(key) {
+			continue
+		}
 		connStr += fmt.Sprintf("%s='%s'", key, value)
 	}
 
@@ -392,7 +431,7 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 		params[pgSslmode] = pgSslmodeDisable
 		defer delete(params, pgSslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgresPq(params)
-	case isErrorDatabaseNotFound(err, params[pgDbname]):
+	case isErrorDatabaseNotFound(err, params):
 		return true, nil // If we know this, we were able to authenticate
 	default:
 		return false, err

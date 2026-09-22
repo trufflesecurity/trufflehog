@@ -115,6 +115,62 @@ fatal: unable to access 'https://github.com/org/repo.git/': The requested URL re
 	assert.False(t, isRetryableCloneError(nil))
 }
 
+func TestCloneRetryDelay(t *testing.T) {
+	rateLimitErr := errors.New("The requested URL returned error: 429")
+	networkErr := errors.New("fatal: early EOF")
+
+	// Rate limits take longer to clear, so they back off from a much larger
+	// base than transient network errors.
+	assert.Equal(t, cloneRateLimitBackoff, cloneRetryDelay(rateLimitErr, 1))
+	assert.Equal(t, 2*cloneRateLimitBackoff, cloneRetryDelay(rateLimitErr, 2))
+
+	assert.Equal(t, cloneRetryBackoff, cloneRetryDelay(networkErr, 1))
+	assert.Equal(t, 2*cloneRetryBackoff, cloneRetryDelay(networkErr, 2))
+}
+
+func TestStripPassword(t *testing.T) {
+	tests := []struct {
+		name         string
+		url          string
+		wantURL      string
+		wantPassword string
+	}{
+		{
+			name:         "username and password are removed",
+			url:          "https://user:pass@github.com/org/repo.git",
+			wantURL:      "https://github.com/org/repo.git",
+			wantPassword: "pass",
+		},
+		{
+			name:         "username without a password is removed",
+			url:          "https://user@github.com/org/repo.git",
+			wantURL:      "https://github.com/org/repo.git",
+			wantPassword: "",
+		},
+		{
+			name:         "url without credentials is unchanged",
+			url:          "https://github.com/org/repo.git",
+			wantURL:      "https://github.com/org/repo.git",
+			wantPassword: "",
+		},
+		{
+			name:         "scp style git@ url is returned as is",
+			url:          "git@github.com:org/repo.git",
+			wantURL:      "git@github.com:org/repo.git",
+			wantPassword: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotURL, gotPassword, err := stripPassword(tt.url)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantURL, gotURL)
+			assert.Equal(t, tt.wantPassword, gotPassword)
+		})
+	}
+}
+
 func TestCreateClonePath(t *testing.T) {
 	t.Run("temp dir when clonePath is empty", func(t *testing.T) {
 		path, err := createClonePath("https://github.com/org/repo.git", "")
@@ -1544,4 +1600,50 @@ func TestGitChunk_LongLine(t *testing.T) {
 	// ensure the goroutine has finished writing to count before we read it
 	// one chunk for the commit/file metadata, and at least one chunk for the file content
 	assert.Equal(t, 2, count, "expected two chunks from a file with a 100 KB line")
+}
+
+func TestGitLowMemoryScan(t *testing.T) {
+	feature.UseGitLowMemoryScan.Store(true)
+	t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	thisrepo := &sourcespb.Git{
+		Directories: []string{"../../../"},
+		Credential: &sourcespb.Git_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+	}
+	wantChunk := &sources.Chunk{
+		SourceType:   sourcespb.SourceType_SOURCE_TYPE_GIT,
+		SourceName:   "this repo, low memory",
+		SourceVerify: false,
+	}
+
+	s := Source{}
+	conn, err := anypb.New(thisrepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Init(ctx, "this repo, low memory", 0, 0, false, conn, 1)
+	if err != nil {
+		t.Errorf("Source.Init() error = %v", err)
+		return
+	}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		assert.NoError(t, s.Chunks(ctx, chunksCh))
+	}()
+
+	gotChunk := <-chunksCh
+	gotChunk.Data = nil
+	// Commits don't come in a deterministic order, so remove metadata comparison
+	gotChunk.SourceMetadata = nil
+	if diff := pretty.Compare(gotChunk, wantChunk); diff != "" {
+		t.Errorf("Source.Chunks() UseGitLowMemoryScan diff: (-got +want)\n%s", diff)
+		t.Errorf("Data: %s", string(gotChunk.Data))
+	}
 }
