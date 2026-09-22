@@ -156,6 +156,13 @@ func TestOkta_OAuthVerification(t *testing.T) {
 			wantVerified: false,
 		},
 		{
+			name:         "400 without recognized keyword (e.g. invalid_scope) returns verification error",
+			statusCode:   400,
+			body:         `{"error":"invalid_scope","error_description":"The authorization server resource does not have any configured default scopes."}`,
+			wantVerified: false,
+			wantErr:      true,
+		},
+		{
 			name:         "401 is unverified",
 			statusCode:   401,
 			body:         ``,

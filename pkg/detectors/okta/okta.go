@@ -187,13 +187,25 @@ func verifyOktaOAuthClientCredentials(ctx context.Context, client *http.Client, 
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		body, _ := io.ReadAll(resp.Body)
-		return strings.Contains(string(body), "\"access_token\""), nil
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+		return strings.Contains(string(respBody), "\"access_token\""), nil
 	case http.StatusBadRequest:
-		body, _ := io.ReadAll(resp.Body)
-		// Okta authenticates the client before checking grant-type authorization, so
-		// "unauthorized_client" still confirms client_secret is valid.
-		return strings.Contains(string(body), "unauthorized_client"), nil
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+		// Okta authenticates the client before grant-type checks, so "unauthorized_client" still confirms the secret.
+		if strings.Contains(string(respBody), "unauthorized_client") {
+			return true, nil
+		}
+		if strings.Contains(string(respBody), "invalid_client") {
+			return false, nil
+		}
+		// Other 400s (e.g. invalid_scope) say nothing about the secret; surface as an error.
+		return false, fmt.Errorf("response body missing expected keyword")
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
