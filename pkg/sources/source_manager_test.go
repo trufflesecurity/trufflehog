@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -125,6 +124,7 @@ func TestSourceManagerRun(t *testing.T) {
 		// The Chunks channel should be empty now.
 		_, err = tryRead(mgr.Chunks())
 		assert.Error(t, err)
+		assert.ErrorIs(t, ref.Err(), ErrJobDone)
 	}
 }
 
@@ -362,8 +362,9 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	ref.CancelRun(cancelErr)
 	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
-	assert.True(t, errors.Is(ref.Snapshot().FatalError(), returnedErr))
-	assert.True(t, errors.Is(ref.Snapshot().FatalErrors(), cancelErr))
+	assert.ErrorIs(t, ref.Snapshot().FatalError(), returnedErr)
+	assert.ErrorIs(t, ref.Snapshot().FatalErrors(), cancelErr)
+	assert.ErrorIs(t, ref.Err(), cancelErr)
 }
 
 func TestSourceManagerAvailableCapacity(t *testing.T) {
