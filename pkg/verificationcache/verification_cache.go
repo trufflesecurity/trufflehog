@@ -40,17 +40,16 @@ func New(resultCache ResultCache, metrics MetricsReporter) *VerificationCache {
 	}
 }
 
-// recordVerifyTime reports one remote verification pass to both metric views: the cross-detector aggregate and, when
-// the reporter opted in, the per-detector histogram. Used by the paths where a single detector.FromData call with
-// verify=true is the whole verification pass.
+// recordVerifyTime reports one remote verification to both metric views: the cross-detector aggregate and, when the
+// reporter opted in, the per-detector histogram. A verification is either one FromData(verify=true) pass or, for
+// detectors.ResultVerifier cache misses, one VerifyResult call.
 func (v *VerificationCache) recordVerifyTime(detectorType detector_typepb.DetectorType, wallTime time.Duration) {
 	v.metrics.AddFromDataVerifyTimeSpent(wallTime)
 	v.recordDetectorVerifyTime(detectorType, wallTime)
 }
 
-// recordVerifyTime reports one remote verification to both metric views: the cross-detector aggregate and, when the
-// reporter opted in, the per-detector histogram. A verification is either one FromData(verify=true) pass or, for
-// detectors.ResultVerifier cache misses, one VerifyResult call.
+// recordDetectorVerifyTime reports one verification sample to the per-detector view. It is a no-op for reporters that
+// do not implement DetectorMetricsReporter, which keeps existing MetricsReporter implementations unaffected.
 func (v *VerificationCache) recordDetectorVerifyTime(detectorType detector_typepb.DetectorType, wallTime time.Duration) {
 	if v.detectorMetrics != nil {
 		v.detectorMetrics.AddDetectorVerifyTimeSpent(detectorType, wallTime)
@@ -169,7 +168,7 @@ func (v *VerificationCache) verifyCacheMisses(
 	detectorType detector_typepb.DetectorType,
 	results []detectors.Result,
 ) ([]detectors.Result, error) {
-	// Only remote verification is timed, cache hits never reach verifyResult, so a fully cached chunk records nothing.
+	// Only remote verification is timed: cache hits never reach verifyResult, so a fully cached chunk records nothing.
 	verifyResult := func(i int) {
 		verifyStart := time.Now()
 		detector.VerifyResult(ctx, &results[i])
