@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 	regexp "github.com/wasilibs/go-re2"
 
@@ -36,6 +35,9 @@ const (
 	pgSslmodeRequire = "require"
 	pgUser           = "user"
 	pgDbType         = "db_type"
+
+	sqlStateInvalidPassword    = "28P01"
+	sqlStateInvalidCatalogName = "3D000"
 )
 
 // nonConnectionParams are query-string arguments that ORMs append to
@@ -67,9 +69,9 @@ func isNonConnectionParam(key string) bool {
 // Multi-host connection string URIs are currently not supported because pq.ParseURI doesn't parse them correctly. If we
 // happen to run into a case where this matters we can address it then.
 var (
-	_          detectors.Detector = (*Scanner)(nil)
-	uriPattern                    = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
-	connStrPartPattern = regexp.MustCompile(`([[:alpha:]_]+)='(.+?)' ?`)
+	_                  detectors.Detector = (*Scanner)(nil)
+	uriPattern                            = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
+	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]_]+)='(.+?)' ?`)
 )
 
 type Scanner struct {
@@ -82,6 +84,8 @@ type uriMatch struct {
 	params map[string]string
 	rawURI string
 }
+
+type sqlStateError interface{ SQLState() string }
 
 func New(opts ...func(*Scanner)) *Scanner {
 	scanner := &Scanner{
@@ -109,8 +113,10 @@ func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 	}
 }
 
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var (
+	_ detectors.Detector                   = (*Scanner)(nil)
+	_ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+)
 
 func (s Scanner) Keywords() []string {
 	return []string{"postgres"}
@@ -293,33 +299,6 @@ func getDeadlineInSeconds(ctx context.Context) (int, bool) {
 	return int(duration.Seconds()), true
 }
 
-// The server looks the database up only after authenticating, so this confirms the credentials.
-const invalidCatalogName = "3D000"
-
-// Message text is only a fallback, for proxies that relay a failure without a SQLSTATE; the server
-// translates messages per lc_messages. Postgres substitutes the user name, not "postgres", when a
-// connection string names no database (src/backend/tcop/backend_startup.c).
-func isErrorDatabaseNotFound(err error, params map[string]string) bool {
-	var pqErr *pq.Error
-	if errors.As(err, &pqErr) && pqErr.Code == invalidCatalogName {
-		return true
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == invalidCatalogName {
-		return true
-	}
-
-	dbName := params[pgDbname]
-	if dbName == "" {
-		dbName = params[pgUser]
-	}
-	if dbName == "" {
-		return false
-	}
-
-	return strings.Contains(err.Error(), fmt.Sprintf("database %q does not exist", dbName))
-}
-
 func verifyPostgres(ctx context.Context, params map[string]string) (bool, error) {
 	// Neon (managed Postgres) advertises SCRAM-SHA-256 with iteration count i=1.
 	// lib/pq rejects iteration fields shorter than 6 chars, which traps these
@@ -339,9 +318,7 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 	}
 	defer func() {
 		// Best-effort close after verification; the verify outcome is already decided.
-		if closeErr := conn.Close(ctx); closeErr != nil {
-			return
-		}
+		_ = conn.Close(ctx)
 	}()
 
 	if err := conn.Ping(ctx); err != nil {
@@ -365,22 +342,50 @@ func pgxConnString(params map[string]string) string {
 }
 
 func classifyPostgresVerifyError(err error, params map[string]string) (bool, error) {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "28P01": // invalid_password
-			return false, nil
-		case "3D000": // invalid_catalog_name — authenticated, DB missing
-			return true, nil
-		}
-	}
-	if strings.Contains(err.Error(), "password authentication failed") {
+	switch {
+	case isErrorInvalidPassword(err):
 		return false, nil
-	}
-	if isErrorDatabaseNotFound(err, params) {
+	case isErrorDatabaseNotFound(err, params):
+		// authenticated, but DB is missing
 		return true, nil
 	}
 	return false, err
+}
+
+// isErrorInvalidPassword checks for an invalid password error based on
+// SQLSTATE code and by message text.
+func isErrorInvalidPassword(err error) bool {
+	var pgErr sqlStateError
+	if errors.As(err, &pgErr) && pgErr.SQLState() == sqlStateInvalidPassword {
+		return true
+	}
+
+	return strings.Contains(err.Error(), "password authentication failed")
+}
+
+// isErrorDatabaseNotFound checks for a database not found error based on
+// SQLSTATE code and by message text. If we see this error, it happens after
+// authentication, which must have been successful.
+func isErrorDatabaseNotFound(err error, params map[string]string) bool {
+	var pgErr sqlStateError
+	if errors.As(err, &pgErr) && pgErr.SQLState() == sqlStateInvalidCatalogName {
+		return true
+	}
+
+	dbName := params[pgDbname]
+
+	if dbName == "" {
+		// If a database name isn't given in the connection, postgres
+		// looks for a database named after the connecting user.
+		dbName = params[pgUser]
+	}
+
+	if dbName == "" {
+		// Can't match nothing at this point (but can we even get here?)
+		return false
+	}
+
+	return strings.Contains(err.Error(), fmt.Sprintf("database %q does not exist", dbName))
 }
 
 func verifyPostgresPq(params map[string]string) (bool, error) {
@@ -422,8 +427,10 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 	switch {
 	case err == nil:
 		return true, nil
-	case strings.Contains(err.Error(), "password authentication failed"):
+	case isErrorInvalidPassword(err):
 		return false, nil
+	case isErrorDatabaseNotFound(err, params):
+		return true, nil // If we know this, we were able to authenticate
 	case errors.Is(err, pq.ErrSSLNotSupported) && params[pgSslmode] == "":
 		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
 		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
@@ -431,8 +438,6 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 		params[pgSslmode] = pgSslmodeDisable
 		defer delete(params, pgSslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgresPq(params)
-	case isErrorDatabaseNotFound(err, params):
-		return true, nil // If we know this, we were able to authenticate
 	default:
 		return false, err
 	}
