@@ -133,8 +133,9 @@ type JobProgress struct {
 	JobID      JobID
 	SourceID   SourceID
 	SourceName string
-	// ctx tracks job completion. Finish cancels it so Done closes and Err exposes
-	// the final completion cause.
+	// ctx represents the job's lifetime. It stays open while the job runs and is
+	// closed by Finish, at which point Done unblocks and Err returns the reason
+	// the job ended (the CancelRun cause or ErrJobDone).
 	ctx    context.Context
 	cancel context.CancelCauseFunc
 	// jobCancel stops the source's run context. It requests shutdown without
