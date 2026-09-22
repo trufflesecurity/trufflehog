@@ -856,6 +856,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = ctx
 	}
 
+	// The scan can stop before the diff channel is drained, on max depth or on
+	// reaching the base commit. Nothing else tells the parser that, so cancelling on
+	// the way out is what shuts down the git processes still producing diffs. Without
+	// it they sit blocked on a channel nobody is reading until the whole scan ends.
+	repoCtx, cancel := context.WithCancel(repoCtx)
+	defer cancel()
+
 	logger := repoCtx.Logger()
 	var logValues []any
 	if scanOptions.BaseHash != "" {

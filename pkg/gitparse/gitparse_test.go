@@ -30,8 +30,9 @@ func TestPrepGitArgs(t *testing.T) {
 	args := p.prepGitArgs(repopath, "", "", nil, false)
 	assert.Equal(t, []string{"-C", repopath}, args.global)
 	assert.Contains(t, args.log, "--all")
-	// A full-history scan skips deletions; a diff scan must not.
-	assert.Contains(t, args.log, "--diff-filter=AM")
+	// A full-history scan skips deletions; a diff scan must not. The filter is a
+	// diff option, so it lives in show and never reaches rev-list via args.log.
+	assert.NotContains(t, args.log, "--diff-filter=AM")
 	assert.Contains(t, args.show, "--diff-filter=AM")
 	assertNoRangeExclusion(t, args.log)
 	assert.Equal(t, []string{"GIT_DIR=" + filepath.Join(repopath, ".git")}, args.env)
@@ -42,8 +43,10 @@ func TestPrepGitArgs(t *testing.T) {
 	// head
 	assert.Contains(t, args.log, "branchname")
 	assert.NotContains(t, args.log, "--all")
-	// abbreviatedLog is implied by the empty base
-	assert.Contains(t, args.log, "--diff-filter=AM")
+	// abbreviatedLog is implied by the empty base. Only show carries the diff
+	// filter: args.log holds the options that choose commits and is what the
+	// lower-memory scan gives to `git rev-list`, which rejects diff options.
+	assert.NotContains(t, args.log, "--diff-filter=AM")
 	assert.Contains(t, args.show, "--diff-filter=AM")
 	assertNoRangeExclusion(t, args.log)
 	// excludedGlobs
