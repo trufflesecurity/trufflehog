@@ -15,9 +15,8 @@ type MetricsReporter interface {
 	AddCredentialVerificationsSaved(count int)
 
 	// AddFromDataVerifyTimeSpent records wall time spent verifying credentials remotely, either in a call to
-	// detector.FromData with verify=true or, for detectors that implement detectors.ResultVerifier, in a single
-	// VerifyResult call for a cache miss. The ResultVerifier path reports once per call, so implementations should
-	// not truncate each report to a coarse unit or short calls will be undercounted.
+	// detector.FromData with verify=true or, for detectors that implement detectors.ResultVerifier, in the
+	// per-result verification of cache misses.
 	AddFromDataVerifyTimeSpent(wallTime time.Duration)
 
 	// AddResultCacheHits records result cache hits. Not all cache hits result in elided remote verification requests

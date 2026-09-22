@@ -40,9 +40,9 @@ func New(resultCache ResultCache, metrics MetricsReporter) *VerificationCache {
 	}
 }
 
-// recordVerifyTime reports one remote verification to both metric views: the cross-detector aggregate and, when the
-// reporter opted in, the per-detector histogram. A verification is either one FromData(verify=true) pass or, for
-// detectors.ResultVerifier cache misses, one VerifyResult call.
+// recordVerifyTime reports one remote verification pass to both metric views: the cross-detector aggregate and, when
+// the reporter opted in, the per-detector histogram. Used by the paths where a single detector.FromData call with
+// verify=true is the whole verification pass.
 func (v *VerificationCache) recordVerifyTime(detectorType detector_typepb.DetectorType, wallTime time.Duration) {
 	v.metrics.AddFromDataVerifyTimeSpent(wallTime)
 	v.recordDetectorVerifyTime(detectorType, wallTime)
@@ -50,6 +50,8 @@ func (v *VerificationCache) recordVerifyTime(detectorType detector_typepb.Detect
 
 // recordDetectorVerifyTime reports one verification sample to the per-detector view. It is a no-op for reporters that
 // do not implement DetectorMetricsReporter, which keeps existing MetricsReporter implementations unaffected.
+// verifyCacheMisses calls it directly because it samples each VerifyResult call per detector but reports the aggregate
+// once per chunk.
 func (v *VerificationCache) recordDetectorVerifyTime(detectorType detector_typepb.DetectorType, wallTime time.Duration) {
 	if v.detectorMetrics != nil {
 		v.detectorMetrics.AddDetectorVerifyTimeSpent(detectorType, wallTime)
@@ -169,11 +171,20 @@ func (v *VerificationCache) verifyCacheMisses(
 	results []detectors.Result,
 ) ([]detectors.Result, error) {
 	// Only remote verification is timed: cache hits never reach verifyResult, so a fully cached chunk records nothing.
+	// The aggregate is summed and reported once per chunk because MetricsReporter implementations such as
+	// InMemoryMetrics truncate each report to whole milliseconds, which would drop time if reported per call.
+	var timeSpentVerifying time.Duration
+	defer func() {
+		if timeSpentVerifying > 0 {
+			v.metrics.AddFromDataVerifyTimeSpent(timeSpentVerifying)
+		}
+	}()
 	verifyResult := func(i int) {
 		verifyStart := time.Now()
 		detector.VerifyResult(ctx, &results[i])
 		elapsed := time.Since(verifyStart)
-		v.recordVerifyTime(detectorType, elapsed)
+		v.recordDetectorVerifyTime(detectorType, elapsed)
+		timeSpentVerifying += elapsed
 	}
 
 	for i := range results {
