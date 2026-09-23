@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -25,11 +26,87 @@ import (
 // for poorly defined regexps.
 const maxTotalMatches = 100
 
+// ─── OAuth2 token acquisition ────────────────────────────────────────
+
+// ropcTokenSource implements oauth2.TokenSource for the Resource Owner
+// Password Credentials grant (RFC 6749 Section 4.3). Caching and
+// expiry are handled by oauth2.ReuseTokenSource; this type only
+// performs the token exchange.
+type ropcTokenSource struct {
+	conf     *oauth2.Config
+	username string
+	password string
+	// httpCtx carries the HTTP client for TLS and timeout settings
+	// via the oauth2.HTTPClient context key. Stored at construction
+	// time so PasswordCredentialsToken uses our SaneHttpClient.
+	httpCtx context.Context
+}
+
+func (s *ropcTokenSource) Token() (*oauth2.Token, error) {
+	return s.conf.PasswordCredentialsToken(s.httpCtx, s.username, s.password)
+}
+
+// newROPCTokenSource builds an oauth2.TokenSource for the ROPC grant,
+// wrapped in ReuseTokenSource for automatic caching with a 10-second
+// expiry buffer.
+func newROPCTokenSource(auth *custom_detectorspb.VerifierAuth, ropc *custom_detectorspb.ROPCConfig) oauth2.TokenSource {
+	conf := &oauth2.Config{
+		ClientID:     ropc.GetClientId(),
+		ClientSecret: ropc.GetClientSecret(),
+		Endpoint: oauth2.Endpoint{
+			TokenURL:  auth.GetTokenEndpoint(),
+			AuthStyle: oauth2.AuthStyleInParams,
+		},
+	}
+	if scope := ropc.GetScope(); scope != "" {
+		conf.Scopes = strings.Split(scope, " ")
+	}
+	// Inject SaneHttpClient so the token endpoint request uses our
+	// TLS configuration and timeout settings.
+	httpCtx := context.WithValue(context.Background(), oauth2.HTTPClient, httpClient)
+	base := &ropcTokenSource{
+		conf:     conf,
+		username: ropc.GetUsername(),
+		password: ropc.GetPassword(),
+		httpCtx:  httpCtx,
+	}
+	return oauth2.ReuseTokenSource(nil, base)
+}
+
+// customDetectorVerifier binds a VerifierConfig to an optional
+// OAuth2TokenSource. This avoids parallel slices and ensures the auth
+// config can never get out of sync with its verifier.
+type customDetectorVerifier struct {
+	config      *custom_detectorspb.VerifierConfig
+	tokenSource detectors.OAuth2TokenSource // nil when no auth is configured
+}
+
+// BuildTokenSource creates the appropriate OAuth2TokenSource for a
+// VerifierConfig's auth block, or returns nil if no auth is set.
+// Exported so the enterprise pipeline can build token sources from
+// proto config without duplicating grant-type logic.
+func BuildTokenSource(auth *custom_detectorspb.VerifierAuth) detectors.OAuth2TokenSource {
+	if auth == nil {
+		return nil
+	}
+	switch cfg := auth.GetGrantConfig().(type) {
+	case *custom_detectorspb.VerifierAuth_Ropc:
+		return newROPCTokenSource(auth, cfg.Ropc)
+	default:
+		return nil
+	}
+}
+
+// ─── Custom detector ─────────────────────────────────────────────────
+
 // CustomRegexWebhook is a CustomRegex with webhook validation that is
 // guaranteed to be valid (assuming the data is not changed after
 // initialization).
 type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
+	// verifiers pairs each VerifierConfig with its optional token source.
+	// Built once in NewWebhookCustomRegex; used in createResults.
+	verifiers []customDetectorVerifier
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -76,8 +153,21 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	// Ensure primary regex name is set.
 	ensurePrimaryRegexNameSet(pb)
 
+	// Build the verifier slice, pairing each VerifierConfig with its
+	// token source (nil when auth isn't configured).
+	verifiers := make([]customDetectorVerifier, 0, len(pb.GetVerify()))
+	for _, vc := range pb.GetVerify() {
+		verifiers = append(verifiers, customDetectorVerifier{
+			config:      vc,
+			tokenSource: BuildTokenSource(vc.GetAuth()),
+		})
+	}
+
 	// TODO: Copy only necessary data out of pb.
-	return &CustomRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{
+		CustomRegex: pb,
+		verifiers:   verifiers,
+	}, nil
 }
 
 var httpClient = common.SaneHttpClient()
@@ -288,16 +378,16 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		rangesInEffect bool
 	)
 
-	// Try each config until we get a definitive answer.
-	for _, verifyConfig := range c.GetVerify() {
+	// Try each verifier until we get a definitive answer.
+	for _, v := range c.verifiers {
 		if common.IsDone(ctx) {
 			return ctx.Err()
 		}
-		req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
+		req, err := http.NewRequestWithContext(ctx, "POST", v.config.GetEndpoint(), bytes.NewReader(jsonBody))
 		if err != nil {
 			continue
 		}
-		for _, header := range verifyConfig.GetHeaders() {
+		for _, header := range v.config.GetHeaders() {
 			key, value, found := strings.Cut(header, ":")
 			if !found {
 				continue
@@ -307,7 +397,18 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		if req.Header.Get("Content-Type") == "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
-		resp, err := httpClient.Do(req)
+
+		// If this verifier has OAuth2 auth, build an authenticated client
+		// that transparently adds the Bearer token to each request.
+		client := httpClient
+		if v.tokenSource != nil {
+			client = oauth2.NewClient(
+				context.WithValue(ctx, oauth2.HTTPClient, httpClient),
+				v.tokenSource,
+			)
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			continue
 		}
@@ -316,8 +417,8 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			_ = resp.Body.Close()
 		}()
 
-		successRanges := verifyConfig.GetSuccessRanges()
-		rotatedRanges := verifyConfig.GetRotatedRanges()
+		successRanges := v.config.GetSuccessRanges()
+		rotatedRanges := v.config.GetRotatedRanges()
 
 		if len(successRanges) == 0 && len(rotatedRanges) == 0 {
 			// Backward compat: no ranges configured, use legacy behavior.
