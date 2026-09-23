@@ -148,7 +148,7 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 	}))
 	defer server.Close()
 
-	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey:     string(privKey),
 		InstallationId: "4242",
 		AppId:          "12345",
@@ -184,7 +184,7 @@ func TestNewAppConnectorInstallationIDOptionalWithScanAllInstallations(t *testin
 	defer server.Close()
 
 	// scanAllInstallations=true with no installationId configured should succeed.
-	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey: string(privKey),
 		AppId:      "12345",
 	}, true)
@@ -192,7 +192,7 @@ func TestNewAppConnectorInstallationIDOptionalWithScanAllInstallations(t *testin
 	require.NotNil(t, connector)
 
 	// Without scanAllInstallations, installationId is still required.
-	_, err = NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	_, err = NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey: string(privKey),
 		AppId:      "12345",
 	}, false)
@@ -215,7 +215,7 @@ func TestAPIClientAndGraphQLClientNonNilWithoutDefaultInstallation(t *testing.T)
 	}))
 	defer server.Close()
 
-	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey: string(privKey),
 		AppId:      "12345",
 	}, true)
@@ -434,4 +434,26 @@ func TestAddMembersByOrgWithClient(t *testing.T) {
 	assert.Contains(t, s.memberCache, "alice")
 	assert.Contains(t, s.memberCache, "bob")
 	assert.Contains(t, s.memberCache, "charlie")
+}
+
+func TestAppsBaseURL(t *testing.T) {
+	u, err := appsBaseURL("https://foo.ghe.com/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.foo.ghe.com/", u)
+
+	u, err = appsBaseURL("https://ghes.intranet/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://ghes.intranet/api/v3/", u)
+
+	u, err = appsBaseURL("https://ghes.intranet/api/v3/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://ghes.intranet/api/v3/", u)
+
+	u, err = appsBaseURL("https://api.github.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.github.com/", u)
+
+	u, err = appsBaseURL("https://api.github.com/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.github.com/", u)
 }

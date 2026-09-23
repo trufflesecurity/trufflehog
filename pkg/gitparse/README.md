@@ -15,7 +15,7 @@ A `Diff` is one file's added content inside one commit, along with the details o
 commit:
 
 ```go
-diffChan, err := parser.RepoPath(ctx, repoPath, "", true, nil, false)
+diffChan, err := parser.RepoPath(ctx, repoPath, "", "", nil, false)
 for diff := range diffChan {
     diff.Commit.Hash    // the commit this change belongs to
     diff.PathB          // the path of the changed file

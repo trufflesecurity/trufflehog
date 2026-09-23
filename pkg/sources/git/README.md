@@ -248,7 +248,7 @@ A clone that fails because of a network problem or what looks like a rate limit 
 ### What Doesn't Get Scanned
 
 - Files excluded by the include paths, exclude paths, or exclude globs filters
-- Commits past `--max-depth`, or older than the commit given to `--since-commit`
+- Commits past `--max-depth`, or reachable from the commit given to `--since-commit` (that commit and its ancestors)
 - Refs other than the one named by `--branch`, when that flag is used
 - Binary files, when `--force-skip-binaries` is used
 - Binary files whose extension TruffleHog already skips, such as common image, audio, video, and font types
