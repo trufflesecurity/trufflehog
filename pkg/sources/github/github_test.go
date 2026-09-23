@@ -2992,3 +2992,77 @@ func TestCreateAPIClient_CloudGitHub(t *testing.T) {
 		t.Errorf("expected https://api.github.com/, got: %s", client.BaseURL.String())
 	}
 }
+
+func TestProcessComments_ListErrors(t *testing.T) {
+	info := repoInfo{owner: "owner", name: "repo", fullName: "owner/repo"}
+
+	tests := []struct {
+		name    string
+		path    string
+		status  int
+		wantErr bool
+		process func(s *Source, ctx context.Context, reporter sources.ChunkReporter) error
+	}{
+		{
+			name:   "issue comments 404 is skipped",
+			path:   "/repos/owner/repo/issues/comments",
+			status: http.StatusNotFound,
+			process: func(s *Source, ctx context.Context, reporter sources.ChunkReporter) error {
+				return s.processIssueComments(ctx, s.connector.APIClient(), info, reporter, nil)
+			},
+		},
+		{
+			name:    "issue comments 403 is returned",
+			path:    "/repos/owner/repo/issues/comments",
+			status:  http.StatusForbidden,
+			wantErr: true,
+			process: func(s *Source, ctx context.Context, reporter sources.ChunkReporter) error {
+				return s.processIssueComments(ctx, s.connector.APIClient(), info, reporter, nil)
+			},
+		},
+		{
+			name:   "pull request comments 404 is skipped",
+			path:   "/repos/owner/repo/pulls/comments",
+			status: http.StatusNotFound,
+			process: func(s *Source, ctx context.Context, reporter sources.ChunkReporter) error {
+				return s.processPRComments(ctx, s.connector.APIClient(), info, reporter, nil)
+			},
+		},
+		{
+			name:    "pull request comments 403 is returned",
+			path:    "/repos/owner/repo/pulls/comments",
+			status:  http.StatusForbidden,
+			wantErr: true,
+			process: func(s *Source, ctx context.Context, reporter sources.ChunkReporter) error {
+				return s.processPRComments(ctx, s.connector.APIClient(), info, reporter, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			defer gock.CleanUnmatchedRequest()
+
+			gock.New("https://api.github.com").
+				Get(tt.path).
+				Reply(tt.status).
+				JSON(map[string]string{"message": http.StatusText(tt.status)})
+
+			s := initTestSource(&sourcespb.GitHub{
+				Credential: &sourcespb.GitHub_Token{Token: "super secret token"},
+			})
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			err := tt.process(s, context.Background(), sources.ChanReporter{Ch: chunksCh})
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Empty(t, chunksCh)
+			assert.False(t, gock.HasUnmatchedRequest())
+			assert.True(t, gock.IsDone())
+		})
+	}
+}

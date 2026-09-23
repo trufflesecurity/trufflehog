@@ -2110,6 +2110,11 @@ func (s *Source) processIssueComments(ctx context.Context, apiClient *github.Cli
 			continue
 		}
 		if err != nil {
+			if isGitHub404Error(err) {
+				ctx.Logger().V(2).Info("issue comments not available (issues likely disabled for repo), skipping",
+					"repo", repoInfo.fullName, "error", err)
+				return nil
+			}
 			return err
 		}
 
@@ -2210,6 +2215,11 @@ func (s *Source) processPRComments(ctx context.Context, apiClient *github.Client
 			continue
 		}
 		if err != nil {
+			if isGitHub404Error(err) {
+				ctx.Logger().V(2).Info("pull request comments not available (pull requests likely disabled for repo), skipping",
+					"repo", repoInfo.fullName, "error", err)
+				return nil
+			}
 			return err
 		}
 
