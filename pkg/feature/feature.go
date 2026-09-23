@@ -54,6 +54,7 @@ var (
 	ResendDetectorEnabled                    atomic.Bool
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
 	HumioAPITokenDetectorEnabled             atomic.Bool
+	KongDetectorEnabled                      atomic.Bool
 )
 
 type AtomicString struct {
