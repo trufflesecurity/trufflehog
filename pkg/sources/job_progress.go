@@ -241,6 +241,17 @@ func (jp *JobProgress) End(end time.Time) {
 
 	jp.executeHooks(func(hook JobProgressHook) { hook.End(jp.Ref(), end) })
 }
+
+// finishWithCause finishes the job with the given cause. Just calling Finish
+// would use ErrJobDone. This would be inaccurate in some cases, for example, if
+// a job is rejected by the source manager.
+func (jp *JobProgress) finishWithCause(cause error) {
+	jp.cancelCauseOnce.Do(func() {
+		jp.cancelCause = cause
+	})
+	jp.Finish()
+}
+
 func (jp *JobProgress) Finish() {
 	jp.cancelCauseOnce.Do(func() {
 		jp.cancelCause = ErrJobDone
