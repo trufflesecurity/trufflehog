@@ -369,7 +369,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	if e.detectorWorkerMultiplier < 1 {
 		// bound by net i/o so it's higher than other workers
 		// e.detectorWorkerMultiplier = 8
-		e.detectorWorkerMultiplier = e.concurrency
+		e.detectorWorkerMultiplier = 1
 	}
 
 	if e.notificationWorkerMultiplier < 1 {
@@ -520,7 +520,7 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 func (e *Engine) initialize(ctx context.Context) error {
 	// The cache size is set to 5000 entries, which is a balance between memory usage and the need for effective deduplication.
 	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
-	const cacheSize = 5000
+	const cacheSize = 40000
 
 	cache, err := lru.New[string, struct{}](cacheSize)
 	if err != nil {
@@ -1315,19 +1315,6 @@ func (e *Engine) processResult(
 	e.results <- secret
 }
 
-func (e *Engine) NewNotifierWorker(ctx context.Context) {
-	for result := range e.ResultsChan() {
-		atomic.AddUint32(&e.numFoundResults, 1)
-		if result.Verified {
-			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
-		} else {
-			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
-		}
-
-		_ = e.dispatcher.Dispatch(ctx, result)
-	}
-}
-
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
 		startTime := time.Now()
@@ -1371,17 +1358,11 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// from reverification, since we are expected to see the same
 		// result from reverification and want to Dispatch it below.
 
-		/*
-			if result.SecretID == 0 {
-				h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
-				key := string(h[:])
-				if _, ok := e.dedupeCache.Get(key); ok {
-					resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
-					continue
-				}
-				e.dedupeCache.Add(key, struct{}{})
+		if !result.IsForReverification() {
+			if contained, _ := e.dedupeCache.ContainsOrAdd(result.Key(), struct{}{}); contained {
+				resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
 			}
-		*/
+		}
 
 		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)

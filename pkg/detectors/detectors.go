@@ -2,6 +2,7 @@ package detectors
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -245,6 +246,25 @@ type ResultWithMetadata struct {
 	// ChunkData holds the original pre-decode source chunk data, preserved
 	// for secret storage encryption in the dispatcher.
 	ChunkData []byte
+}
+
+// IsReverificationResult reports whether this is result was built during reverification
+func (r *ResultWithMetadata) IsForReverification() bool {
+	// Results only have a SecretID when they're being reverified
+	return r.SecretID == 0
+}
+
+// Returns a unique key for this result, suitable for caching
+func (r *ResultWithMetadata) Key() string {
+	h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v",
+		r.DetectorName,
+		r.DetectorType.String(),
+		r.Raw,
+		r.RawV2,
+		r.SourceMetadata,
+	)))
+
+	return string(h[:])
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
