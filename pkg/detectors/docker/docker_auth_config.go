@@ -188,11 +188,12 @@ func verifyMatch(ctx logContext.Context, client *http.Client, registry string, u
 			return false, nil
 		}
 
-		if strings.HasPrefix(h, "Basic") {
+		scheme, _, _ := strings.Cut(h, " ")
+		if strings.EqualFold(scheme, "Basic") {
 			return false, nil
 		}
 
-		if !strings.HasPrefix(h, "Bearer") {
+		if !strings.EqualFold(scheme, "Bearer") {
 			return false, fmt.Errorf("unsupported WWW-Authenticate auth scheme: %s", h)
 		}
 
