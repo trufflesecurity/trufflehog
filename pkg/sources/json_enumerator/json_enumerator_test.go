@@ -105,7 +105,7 @@ func TestScanEnumerator(t *testing.T) {
 				defer close(chunksChan)
 				ctx := context.WithLogger(t.Context(), logr.Discard())
 				source := &Source{}
-				workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, chunksChan)
+				workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, sources.ChanReporter{Ch: chunksChan})
 			}()
 
 			enc := json.NewEncoder(writeJSON)
@@ -190,7 +190,7 @@ func TestScanEnumeratorAPKContentRouting(t *testing.T) {
 			defer close(chunksChan)
 			ctx := context.WithLogger(t.Context(), logr.Discard())
 			source := &Source{}
-			workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, chunksChan)
+			workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, sources.ChanReporter{Ch: chunksChan})
 		}()
 
 		// No filename is set on the record; routing is content-based only.

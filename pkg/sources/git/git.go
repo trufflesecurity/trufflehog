@@ -6,12 +6,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -41,11 +41,18 @@ import (
 const (
 	SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
 	// maxCloneAttempts is the total number of times a clone is attempted when
-	// each failure is classified as a transient network error.
+	// each failure is classified as a transient network or rate-limit error.
 	maxCloneAttempts = 3
-	// cloneRetryBackoff is the base wait between clone attempts; it is
-	// multiplied by the number of failed attempts so far.
+	// cloneRetryBackoff is the base wait between clone attempts after a
+	// transient network error; it is multiplied by the number of failed
+	// attempts so far.
 	cloneRetryBackoff = 5 * time.Second
+	// cloneRateLimitBackoff is the base wait after a clone attempt fails
+	// with what looks like a GitHub/GitLab secondary rate limit (bare 403
+	// or 429). GitHub's guidance for secondary rate limits is to wait at
+	// least a minute before retrying, so this starts well above the
+	// network-error backoff and grows per attempt.
+	cloneRateLimitBackoff = 60 * time.Second
 )
 
 type Source struct {
@@ -120,11 +127,12 @@ type Config struct {
 // NewGit creates a new Git instance with the provided configuration. The Git instance is used to interact with
 // Git repositories.
 func NewGit(config *Config) *Git {
-	var parser *gitparse.Parser
+	parserOpts := []gitparse.Option{}
 	if config.UseCustomContentWriter {
-		parser = gitparse.NewParser(gitparse.UseCustomContentWriter())
-	} else {
-		parser = gitparse.NewParser()
+		parserOpts = append(parserOpts, gitparse.UseCustomContentWriter())
+	}
+	if feature.UseGitLowMemoryScan.Load() {
+		parserOpts = append(parserOpts, gitparse.UseLowMemoryScan())
 	}
 
 	return &Git{
@@ -138,7 +146,7 @@ func NewGit(config *Config) *Git {
 		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
-		parser:             parser,
+		parser:             gitparse.NewParser(parserOpts...),
 	}
 }
 
@@ -484,8 +492,9 @@ type cloneParams struct {
 // outer function for centralized error handling and cleanup.
 //
 // Failures classified as transient network errors (e.g. a connection reset
-// mid-transfer) are retried up to maxCloneAttempts times, each attempt
-// starting from a fresh clone directory. All other failures, including clone
+// mid-transfer) or as a secondary rate limit (a bare 403 or 429 from the
+// remote) are retried up to maxCloneAttempts times, each attempt starting
+// from a fresh clone directory. All other failures, including clone
 // timeouts (see feature.GitCloneTimeoutDuration), are returned immediately.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clonePath string, authInUrl bool, args ...string) (string, *git.Repository, error) {
 	timeout := time.Duration(feature.GitCloneTimeoutDuration.Load())
@@ -520,15 +529,17 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 			return "", nil, fmt.Errorf("failed to clean clone path for retry: %w (original clone error: %w)", rmErr, err)
 		}
 
-		ctx.Logger().Info("git clone interrupted by network error; retrying",
+		delay := cloneRetryDelay(err, attempt)
+		ctx.Logger().Info("git clone interrupted; retrying",
 			"attempt", attempt,
 			"max_attempts", maxCloneAttempts,
+			"delay", delay.String(),
 			"error", err.Error(),
 		)
 		select {
 		case <-ctx.Done():
 			return "", nil, ctx.Err()
-		case <-time.After(cloneRetryBackoff * time.Duration(attempt)):
+		case <-time.After(delay):
 		}
 	}
 
@@ -536,10 +547,30 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clone
 }
 
 // isRetryableCloneError reports whether a clone failure looks like a
-// transient network interruption (e.g. a connection reset mid-transfer)
-// rather than a permanent condition like an auth or permission error.
+// transient condition (a network interruption, e.g. a connection reset
+// mid-transfer, or a secondary rate limit) rather than a permanent
+// condition like an auth or permission error.
 func isRetryableCloneError(err error) bool {
-	return err != nil && ClassifyCloneError(err.Error()) == cloneFailureNetwork
+	if err == nil {
+		return false
+	}
+	switch ClassifyCloneError(err.Error()) {
+	case cloneFailureNetwork, cloneFailureRateLimit:
+		return true
+	default:
+		return false
+	}
+}
+
+// cloneRetryDelay returns how long to wait before the next clone attempt,
+// scaled by the failure class: rate-limit errors back off much more slowly
+// than transient network errors, since GitHub/GitLab secondary rate limits
+// take on the order of a minute or more to clear.
+func cloneRetryDelay(err error, attempt int) time.Duration {
+	if ClassifyCloneError(err.Error()) == cloneFailureRateLimit {
+		return cloneRateLimitBackoff * time.Duration(attempt)
+	}
+	return cloneRetryBackoff * time.Duration(attempt)
 }
 
 // createClonePath creates the directory a repository will be cloned into and
@@ -825,6 +856,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = ctx
 	}
 
+	// The scan can stop before the diff channel is drained, on max depth or on
+	// reaching the base commit. Nothing else tells the parser that, so cancelling on
+	// the way out is what shuts down the git processes still producing diffs. Without
+	// it they sit blocked on a channel nobody is reading until the whole scan ends.
+	repoCtx, cancel := context.WithCancel(repoCtx)
+	defer cancel()
+
 	logger := repoCtx.Logger()
 	var logValues []any
 	if scanOptions.BaseHash != "" {
@@ -837,7 +875,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isRepoBare(path))
+	// git computes the base..head range, so every commit on diffChan is in scope.
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash, scanOptions.ExcludeGlobs, isRepoBare(path))
 	if err != nil {
 		return err
 	}
@@ -861,10 +900,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		commit := diff.Commit
 		fullHash := commit.Hash
-		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
-			logger.V(1).Info("reached base commit", "commit", fullHash)
-			break
-		}
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
@@ -1005,6 +1040,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		if err := chunkData(diff); err != nil {
 			return err
 		}
+	}
+
+	// empty base..head range exits successfully
+	if scanOptions.BaseHash != "" && depth == 0 {
+		logger.Info("no commits in range", logValues...)
 	}
 	return nil
 }

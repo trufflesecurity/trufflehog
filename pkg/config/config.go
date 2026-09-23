@@ -17,6 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gitlab"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/jenkins"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/json_enumerator"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/s3"
 )
@@ -97,6 +98,8 @@ func instantiateSourceFromType(sourceType string) (sources.Source, error) {
 		source = new(filesystem.Source)
 	case sourcespb.SourceType_SOURCE_TYPE_JENKINS.String():
 		source = new(jenkins.Source)
+	case sourcespb.SourceType_SOURCE_TYPE_JSON_ENUMERATOR.String():
+		source = new(json_enumerator.Source)
 	case sourcespb.SourceType_SOURCE_TYPE_GCS.String():
 		source = new(gcs.Source)
 	case sourcespb.SourceType_SOURCE_TYPE_GCS_UNAUTHED.String():
