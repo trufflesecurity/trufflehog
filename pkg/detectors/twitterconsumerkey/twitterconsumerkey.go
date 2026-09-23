@@ -143,7 +143,10 @@ func fetchBearerToken(ctx context.Context, client *http.Client, key, secret stri
 		}
 		return token.AccessToken, nil
 	default:
-		body, _ := io.ReadAll(io.LimitReader(res.Body, 1024))
+		body, readErr := io.ReadAll(res.Body)
+		if readErr != nil {
+			return "", fmt.Errorf("unexpected HTTP response status %d; failed to read response body: %w", res.StatusCode, readErr)
+		}
 		if len(body) > 0 {
 			return "", fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, strings.TrimSpace(string(body)))
 		}
