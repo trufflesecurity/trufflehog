@@ -52,6 +52,7 @@ var (
 	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 	SolarwindsDetectorEnabled                atomic.Bool
 	ResendDetectorEnabled                    atomic.Bool
+	ComposioDetectorEnabled                  atomic.Bool
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
 	HumioAPITokenDetectorEnabled             atomic.Bool
 )
