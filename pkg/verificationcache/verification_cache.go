@@ -9,13 +9,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/hasher"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // VerificationCache is a structure that can be used to cache verification results from detectors so that a given
 // credential does not trigger multiple identical remote verification attempts.
 type VerificationCache struct {
-	metrics     MetricsReporter
-	resultCache ResultCache
+	metrics         MetricsReporter
+	resultCache     ResultCache
+	detectorMetrics DetectorMetricsReporter // optional
 
 	hashMu sync.Mutex
 	hasher hasher.Hasher
@@ -28,11 +30,31 @@ func New(resultCache ResultCache, metrics MetricsReporter) *VerificationCache {
 	if metrics == nil {
 		metrics = &InMemoryMetrics{}
 	}
+	detectorMetrics, _ := metrics.(DetectorMetricsReporter)
 
 	return &VerificationCache{
-		metrics:     metrics,
-		resultCache: resultCache,
-		hasher:      hasher.NewBlake2B(),
+		metrics:         metrics,
+		resultCache:     resultCache,
+		detectorMetrics: detectorMetrics,
+		hasher:          hasher.NewBlake2B(),
+	}
+}
+
+// recordVerifyTime reports one remote verification pass to both metric views: the cross-detector aggregate and, when
+// the reporter opted in, the per-detector histogram. Used by the paths where a single detector.FromData call with
+// verify=true is the whole verification pass.
+func (v *VerificationCache) recordVerifyTime(detectorType detector_typepb.DetectorType, wallTime time.Duration) {
+	v.metrics.AddFromDataVerifyTimeSpent(wallTime)
+	v.recordDetectorVerifyTime(detectorType, wallTime)
+}
+
+// recordDetectorVerifyTime reports one verification sample to the per-detector view. It is a no-op for reporters that
+// do not implement DetectorMetricsReporter, which keeps existing MetricsReporter implementations unaffected.
+// verifyCacheMisses calls it directly because it samples each VerifyResult call per detector but reports the aggregate
+// once per chunk.
+func (v *VerificationCache) recordDetectorVerifyTime(detectorType detector_typepb.DetectorType, wallTime time.Duration) {
+	if v.detectorMetrics != nil {
+		v.detectorMetrics.AddDetectorVerifyTimeSpent(detectorType, wallTime)
 	}
 }
 
@@ -62,7 +84,7 @@ func (v *VerificationCache) FromData(
 		if verify {
 			start := time.Now()
 			defer func() {
-				v.metrics.AddFromDataVerifyTimeSpent(time.Since(start))
+				v.recordVerifyTime(detector.Type(), time.Since(start))
 			}()
 		}
 
@@ -82,7 +104,7 @@ func (v *VerificationCache) FromData(
 		// avoiding re-running verification for every result in the chunk.
 		// only if a detector implements detectors.ResultVerifier
 		if resultVerifier, ok := detector.(detectors.ResultVerifier); ok {
-			return v.verifyCacheMisses(ctx, resultVerifier, withoutRemoteVerification)
+			return v.verifyCacheMisses(ctx, resultVerifier, detector.Type(), withoutRemoteVerification)
 		}
 		isEverythingCached := true
 		var cacheHitsInCurrentChunk int
@@ -117,7 +139,7 @@ func (v *VerificationCache) FromData(
 	start := time.Now()
 	withRemoteVerification, err := detector.FromData(ctx, verify, data)
 	if verify {
-		v.metrics.AddFromDataVerifyTimeSpent(time.Since(start))
+		v.recordVerifyTime(detector.Type(), time.Since(start))
 	}
 	if err != nil {
 		return nil, err
@@ -145,10 +167,12 @@ func (v *VerificationCache) FromData(
 func (v *VerificationCache) verifyCacheMisses(
 	ctx context.Context,
 	detector detectors.ResultVerifier,
+	detectorType detector_typepb.DetectorType,
 	results []detectors.Result,
 ) ([]detectors.Result, error) {
-	// Only remote verification counts toward verify time; a fully cached chunk records
-	// nothing, matching the all-or-nothing path's early return on full cache coverage.
+	// Only remote verification is timed: cache hits never reach verifyResult, so a fully cached chunk records nothing.
+	// The aggregate is summed and reported once per chunk because MetricsReporter implementations such as
+	// InMemoryMetrics truncate each report to whole milliseconds, which would drop time if reported per call.
 	var timeSpentVerifying time.Duration
 	defer func() {
 		if timeSpentVerifying > 0 {
@@ -158,7 +182,9 @@ func (v *VerificationCache) verifyCacheMisses(
 	verifyResult := func(i int) {
 		verifyStart := time.Now()
 		detector.VerifyResult(ctx, &results[i])
-		timeSpentVerifying += time.Since(verifyStart)
+		elapsed := time.Since(verifyStart)
+		v.recordDetectorVerifyTime(detectorType, elapsed)
+		timeSpentVerifying += elapsed
 	}
 
 	for i := range results {
