@@ -2,6 +2,7 @@
 dist
 .env
 *.test
+[._]*.sw[a-p]
 
 # binary
 trufflehog
