@@ -52,29 +52,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.semaphore.co/api/v4/account?apikey=%s", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/vnd.semaphore+json; version=3")
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, "account_id") {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.semaphore.co/api/v4/account?apikey=%s", resMatch), nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Accept", "application/vnd.semaphore+json; version=3")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, "account_id") {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

@@ -48,30 +48,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.weatherstack.com/current?access_key=%s&query=LA", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, `location`) || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) && validResponse {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.weatherstack.com/current?access_key=%s&query=LA", resMatch), nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	validResponse := strings.Contains(body, `location`) || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
+	if (res.StatusCode >= 200 && res.StatusCode < 300) && validResponse {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
