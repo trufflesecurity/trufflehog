@@ -31,6 +31,66 @@ message VerifierConfig {
   repeated string headers = 3;
   repeated string successRanges = 4;
   repeated string rotatedRanges = 5;
+  // Optional OAuth2 auth for the verification endpoint. When set, the
+  // scanner acquires a bearer token before making the verification call.
+  VerifierAuth auth = 6;
+  // Optional custom request shape for the verification POST body.
+  // When set, the body is built from this template instead of the
+  // default detector-specific format. Values may contain $token
+  // references (e.g. $secret, $detector_type) that are substituted
+  // at runtime.
+  VerifyRequestBody request = 7;
+}
+
+// VerifyRequestBody defines a customer-controlled POST body for the
+// verification endpoint. Keys in the body map are free-form (sent
+// as-is in the JSON payload). Values are either literal strings or
+// $token references substituted at runtime. Supported tokens:
+//   $secret        - the detected credential value
+//   $detector_type - e.g. "Github", "CustomRegex"
+//   $detector_name - custom name if set, empty string otherwise
+//   $token         - current OAuth2 Bearer token (for endpoints that
+//                    want it in the body rather than just the header)
+message VerifyRequestBody {
+  map<string, string> body = 1;
+}
+
+// VerifierAuth selects the authentication method for a verification
+// endpoint. The auth method is determined by which oneof field is set.
+message VerifierAuth {
+  oneof auth_config {
+    OAuth2Config oauth2 = 1;
+    // Future auth methods:
+    // ApiKeyConfig api_key = 2;
+    // MtlsConfig mtls = 3;
+  }
+}
+
+// OAuth2Config configures OAuth2 token acquisition. The token_endpoint
+// is the IdP's token URL, and the grant type is determined by which
+// oneof field is set.
+message OAuth2Config {
+  string token_endpoint = 1;
+  oneof grant_config {
+    ROPCConfig ropc = 2;
+    // Future grant types:
+    // ClientCredentialsConfig client_credentials = 3;
+  }
+}
+
+// ROPCConfig holds credentials for the Resource Owner Password
+// Credentials grant (RFC 6749 Section 4.3). Deprecated by RFC 9700
+// but still used in environments with trusted server-side clients
+// (e.g. self-hosted scanners).
+message ROPCConfig {
+  string username = 1;
+  string password = 2;
+  string client_id = 3;
+  string client_secret = 4;
+  // Optional OAuth2 scope(s) to request, space-delimited per RFC 6749
+  // Section 3.3. Some IdPs require a scope to issue tokens with the
+  // correct audience or permissions.
+  string scope = 5;
 }
 
 message ValidationConfig {
