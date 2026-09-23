@@ -5,6 +5,7 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -542,4 +543,58 @@ func TestUnitHookCloseConcurrentWithFinish(t *testing.T) {
 	assert.NoError(t, hook.Close())
 	wg.Wait()
 	<-drained
+}
+
+// TestSourceManagerSemaphoreAcquireError tests what happens when acquiring the
+// semaphore tracking concurrent sources fails.
+func TestSourceManagerSemaphoreAcquireError(t *testing.T) {
+	assertFinishedAfterAcquireError := func(t *testing.T, ref JobProgressRef, err error) {
+		t.Helper()
+		assert.IsType(t, Fatal{}, err)
+
+		// The acquire should fail, so the job should be finished
+		select {
+		case <-ref.Done():
+		default:
+			assert.FailNow(t, "job should have been finished")
+		}
+
+		// Check that the ref has the same error as what the manager returns
+		assert.ErrorIs(t, ref.Err(), err)
+		assert.NotErrorIs(t, ref.Err(), ErrJobDone, "job should not be marked as done on failure to acquire semaphore")
+	}
+
+	// Timeout for the context in these tests.
+	// The duration does not matter since synctest uses a fake clock.
+	const timeoutDuration = time.Hour
+
+	t.Run("EnumerateAndScan", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			mgr := NewManager(WithConcurrentSources(0))
+			source, err := buildDummy(&counterChunker{count: 1})
+			assert.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+			defer cancel()
+			ref, err := mgr.EnumerateAndScan(ctx, "dummy", source)
+			assertFinishedAfterAcquireError(t, ref, err)
+			// No job was started, so Wait should not block or error
+			assert.NoError(t, mgr.Wait())
+		})
+	})
+
+	t.Run("Scan", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			mgr := NewManager(WithConcurrentSources(0))
+			source, err := buildDummy(&counterChunker{count: 1})
+			assert.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+			defer cancel()
+			ref, err := mgr.Scan(ctx, "dummy", source, countChunk(123))
+			assertFinishedAfterAcquireError(t, ref, err)
+			// No job was started, so Wait should not block or error
+			assert.NoError(t, mgr.Wait())
+		})
+	})
 }
