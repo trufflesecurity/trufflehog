@@ -22,7 +22,7 @@ var (
 		api:
 			auth_type: "API-Key"
 			in: "Header"
-			dandelion_secret: "xccl325526f9cp6qzh89qkgoklje5ds9"
+			dandelion_secret: "abcd1234abcd1234abcd1234abcd1234"
 			base_url: "https://api.example.com/v1/example?token=$dandelion_secret"
 			response_code: 200
 
@@ -30,7 +30,7 @@ var (
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
-	secret = "xccl325526f9cp6qzh89qkgoklje5ds9"
+	secret = "abcd1234abcd1234abcd1234abcd1234"
 )
 
 func TestDandelion_Pattern(t *testing.T) {
