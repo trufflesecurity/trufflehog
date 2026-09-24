@@ -2,6 +2,7 @@
 dist
 .env
 *.test
+[._]*.sw[a-p]
 
 # rapid property test failure recordings, for local reproduction only
 testdata/rapid/
