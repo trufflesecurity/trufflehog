@@ -63,18 +63,11 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 	return nil
 }
 
-// formatWarningCommand renders a GitHub Actions "::warning::" workflow command for a single
-// finding. file and message can contain characters that git allows but GitHub's workflow-command
-// syntax does not (e.g. a scanned file path can contain a newline). Escaping them keeps the
-// emitted command well-formed and confined to a single line.
-// https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions
 func formatWarningCommand(file string, line int64, message string) string {
 	return fmt.Sprintf("::warning file=%s,line=%d,endLine=%d::%s\n",
 		escapeWorkflowProperty(file), line, line, escapeWorkflowData(strings.TrimSuffix(message, "\n")))
 }
 
-// escapeWorkflowData escapes a workflow-command data value (e.g. the message after the final
-// "::"). '%' is escaped first so it can't be used to construct one of the other sequences.
 func escapeWorkflowData(s string) string {
 	s = strings.ReplaceAll(s, "%", "%25")
 	s = strings.ReplaceAll(s, "\r", "%0D")
@@ -82,8 +75,6 @@ func escapeWorkflowData(s string) string {
 	return s
 }
 
-// escapeWorkflowProperty escapes a workflow-command property value (e.g. file=...), which
-// additionally can't contain ':' or ',' without breaking the property list.
 func escapeWorkflowProperty(s string) string {
 	s = escapeWorkflowData(s)
 	s = strings.ReplaceAll(s, ":", "%3A")
