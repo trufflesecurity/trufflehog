@@ -398,6 +398,20 @@ message S3 {
   string endpoint = 10 [(validate.rules).string.uri_ref = true];
   // region is the region used to sign requests. Defaults to us-east-1.
   string region = 11;
+  // include_prefixes limits the scan to objects whose key matches one of these
+  // key prefixes. Leave empty to consider every object in the bucket.
+  repeated string include_prefixes = 12;
+  // exclude_prefixes skips objects whose key matches one of these key prefixes.
+  repeated string exclude_prefixes = 13;
+  // include_extensions limits the scan to objects whose key ends in one of these
+  // file extensions, written without a leading dot (e.g. "tf", "yaml"). Leave
+  // empty to consider every extension. Cannot be combined with
+  // exclude_extensions.
+  repeated string include_extensions = 14;
+  // exclude_extensions skips objects whose key ends in one of these file
+  // extensions, written without a leading dot (e.g. "zip", "mp4"). Cannot be
+  // combined with include_extensions.
+  repeated string exclude_extensions = 15;
 }
 
 message Slack {

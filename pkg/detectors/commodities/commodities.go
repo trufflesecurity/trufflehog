@@ -48,34 +48,44 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client.Timeout = 5 * time.Second
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://commodities-api.com/api/latest?access_key="+resMatch, nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				bodyString := string(bodyBytes)
-				validResponse := strings.Contains(bodyString, `"success":true`)
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if validResponse {
-						s1.Verified = true
-					} else {
-						s1.Verified = false
-					}
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	client.Timeout = 5 * time.Second
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://commodities-api.com/api/latest?access_key="+resMatch, nil)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	bodyString := string(bodyBytes)
+	validResponse := strings.Contains(bodyString, `"success":true`)
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		if validResponse {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

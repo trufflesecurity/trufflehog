@@ -1,7 +1,7 @@
 package custom_detectors
 
 import (
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strconv"
 	"strings"
 )

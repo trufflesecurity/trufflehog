@@ -1,7 +1,6 @@
 package github
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -130,12 +129,6 @@ type unitEnvelope struct {
 func (u unitEnvelope) SourceUnitID() (string, sources.SourceUnitKind) { return u.ID, u.Kind }
 func (u unitEnvelope) Display() string                                { return u.Name }
 
-func decodeBase64(data []byte) ([]byte, error) {
-	out := make([]byte, base64.StdEncoding.DecodedLen(len(data)))
-	n, err := base64.StdEncoding.Decode(out, data)
-	return out[:n], err
-}
-
 func unmarshalSourceUnit[unitType sources.SourceUnit](data []byte) (unitType, error) {
 	u := new(unitType)
 
@@ -171,20 +164,12 @@ func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
 		return env, nil
 	case "repo":
 		if len(env.UnitData) > 0 {
-			decodedData, err := decodeBase64(env.UnitData)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding repo unit data: %w", err)
-			}
-			return unmarshalSourceUnit[RepoUnit](decodedData)
+			return unmarshalSourceUnit[RepoUnit](env.UnitData)
 		}
 		return RepoUnit{Name: env.Name, URL: env.ID}, nil
 	case "gist":
-		decodedData, err := decodeBase64(env.UnitData)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding gist unit data: %w", err)
-		}
 		if len(env.UnitData) > 0 {
-			return unmarshalSourceUnit[GistUnit](decodedData)
+			return unmarshalSourceUnit[GistUnit](env.UnitData)
 		}
 		return GistUnit{Name: env.Name, URL: env.ID}, nil
 	default:
@@ -417,6 +402,17 @@ func (s *Source) Validate(ctx context.Context) []error {
 		- Returns 401 for invalid credentials but works with no auth (as unauthenticated)
 		- Doesn't consume API quota when called
 	*/
+	// When scanAllInstallations is set with no githubApp.installationId,
+	// there's no default installation token to call RateLimit with (see
+	// appConnector.HasDefaultInstallation). Validate the App credentials
+	// directly against the app-level (JWT-authenticated) client instead.
+	if connector, ok := s.connector.(*appConnector); ok && !connector.HasDefaultInstallation() {
+		if _, _, err := connector.InstallationClient().Apps.Get(ctx, ""); err != nil {
+			return []error{err}
+		}
+		return nil
+	}
+
 	if _, _, err := s.connector.APIClient().RateLimit.Get(ctx); err != nil {
 		return []error{err}
 	}
@@ -599,6 +595,9 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 	}
 
 	if !s.ignoreGists && isGistUrl(urlParts) {
+		if connector, ok := s.connector.(*appConnector); ok && !connector.HasDefaultInstallation() {
+			return repo, fmt.Errorf("cannot fetch gist %q: githubApp.installationId is required as a fallback installation to scan gists together with scanAllInstallations", repo)
+		}
 		// Cache gist info.
 		for {
 			gistID := extractGistID(urlParts)
@@ -768,6 +767,15 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 				return err
 			}
 			ctx.Logger().Info("Scanning repos", "org_members", len(s.memberCache))
+			if !connector.HasDefaultInstallation() {
+				// Member repos/gists live outside any installation's own
+				// listing, so there is no installation token to fetch them
+				// with (see appConnector.HasDefaultInstallation). Skip with a
+				// clear message instead of letting each per-member API call
+				// fail against installation ID 0.
+				ctx.Logger().Info("Skipping org member repos and gists: githubApp.installationId is required as a fallback installation to scan members together with scanAllInstallations", "org_members", len(s.memberCache))
+				return nil
+			}
 			// TODO: Replace loop below with a call to s.addReposForMembers(ctx, reporter)
 			for member := range s.memberCache {
 				logger := ctx.Logger().WithValues("member", member)
@@ -1145,6 +1153,10 @@ func (s *Source) mapRemainingAccessibleRepos(
 	connector *appConnector,
 	wantedRepos map[string]repoMappingRequest,
 ) error {
+	if !connector.HasDefaultInstallation() {
+		return fmt.Errorf("cannot resolve %d configured repo(s) outside installation listings: githubApp.installationId is required as a fallback installation together with scanAllInstallations", len(wantedRepos))
+	}
+
 	var errs error
 	client := connector.APIClient()
 	for _, requested := range wantedRepos {

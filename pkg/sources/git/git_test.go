@@ -115,6 +115,62 @@ fatal: unable to access 'https://github.com/org/repo.git/': The requested URL re
 	assert.False(t, isRetryableCloneError(nil))
 }
 
+func TestCloneRetryDelay(t *testing.T) {
+	rateLimitErr := errors.New("The requested URL returned error: 429")
+	networkErr := errors.New("fatal: early EOF")
+
+	// Rate limits take longer to clear, so they back off from a much larger
+	// base than transient network errors.
+	assert.Equal(t, cloneRateLimitBackoff, cloneRetryDelay(rateLimitErr, 1))
+	assert.Equal(t, 2*cloneRateLimitBackoff, cloneRetryDelay(rateLimitErr, 2))
+
+	assert.Equal(t, cloneRetryBackoff, cloneRetryDelay(networkErr, 1))
+	assert.Equal(t, 2*cloneRetryBackoff, cloneRetryDelay(networkErr, 2))
+}
+
+func TestStripPassword(t *testing.T) {
+	tests := []struct {
+		name         string
+		url          string
+		wantURL      string
+		wantPassword string
+	}{
+		{
+			name:         "username and password are removed",
+			url:          "https://user:pass@github.com/org/repo.git",
+			wantURL:      "https://github.com/org/repo.git",
+			wantPassword: "pass",
+		},
+		{
+			name:         "username without a password is removed",
+			url:          "https://user@github.com/org/repo.git",
+			wantURL:      "https://github.com/org/repo.git",
+			wantPassword: "",
+		},
+		{
+			name:         "url without credentials is unchanged",
+			url:          "https://github.com/org/repo.git",
+			wantURL:      "https://github.com/org/repo.git",
+			wantPassword: "",
+		},
+		{
+			name:         "scp style git@ url is returned as is",
+			url:          "git@github.com:org/repo.git",
+			wantURL:      "git@github.com:org/repo.git",
+			wantPassword: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotURL, gotPassword, err := stripPassword(tt.url)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantURL, gotURL)
+			assert.Equal(t, tt.wantPassword, gotPassword)
+		})
+	}
+}
+
 func TestCreateClonePath(t *testing.T) {
 	t.Run("temp dir when clonePath is empty", func(t *testing.T) {
 		path, err := createClonePath("https://github.com/org/repo.git", "")
@@ -1544,4 +1600,727 @@ func TestGitChunk_LongLine(t *testing.T) {
 	// ensure the goroutine has finished writing to count before we read it
 	// one chunk for the commit/file metadata, and at least one chunk for the file content
 	assert.Equal(t, 2, count, "expected two chunks from a file with a 100 KB line")
+}
+
+func TestGitLowMemoryScan(t *testing.T) {
+	feature.UseGitLowMemoryScan.Store(true)
+	t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	thisrepo := &sourcespb.Git{
+		Directories: []string{"../../../"},
+		Credential: &sourcespb.Git_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+	}
+	wantChunk := &sources.Chunk{
+		SourceType:   sourcespb.SourceType_SOURCE_TYPE_GIT,
+		SourceName:   "this repo, low memory",
+		SourceVerify: false,
+	}
+
+	s := Source{}
+	conn, err := anypb.New(thisrepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Init(ctx, "this repo, low memory", 0, 0, false, conn, 1)
+	if err != nil {
+		t.Errorf("Source.Init() error = %v", err)
+		return
+	}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	go func() {
+		assert.NoError(t, s.Chunks(ctx, chunksCh))
+	}()
+
+	gotChunk := <-chunksCh
+	gotChunk.Data = nil
+	// Commits don't come in a deterministic order, so remove metadata comparison
+	gotChunk.SourceMetadata = nil
+	if diff := pretty.Compare(gotChunk, wantChunk); diff != "" {
+		t.Errorf("Source.Chunks() UseGitLowMemoryScan diff: (-got +want)\n%s", diff)
+		t.Errorf("Data: %s", string(gotChunk.Data))
+	}
+}
+
+// Planted secrets for the base..head fixture. Unverifiable on purpose; the
+// scan runs with verification off and we only assert they were chunked.
+const (
+	fixtureAWSKey      = "AKIAXYZDQCEN4B6JSJQI"
+	fixtureGitHubToken = "ghp_a1B2c3D4e5F6g7H8i9J0kLmNoPqRsTuVwXyZ"
+)
+
+// mergedBaseFixture is a repository whose feature branch merged its base in,
+// the shape reported in INT-1054 / CSM-2357:
+//
+//	F: feature work after merge      <- head
+//	M: merge main into feature
+//	|\
+//	| C: newer base work             <- base (and the merge-base of main/feature)
+//	| B: base work
+//	E: more feature work             <- GitHub token
+//	D: feature work                  <- AWS key
+//	|/
+//	A: common ancestor
+//
+// git log C..F is F M E D. With the customer's dates (D, E older than C) the
+// pre-fix scanner stopped at C and never reached E or D.
+type mergedBaseFixture struct {
+	path string
+	sha  map[string]string // commit letter -> full hash
+}
+
+// buildMergedBaseFixture creates the repository above with pinned committer
+// dates so the ordering `git log` produces is deterministic. When
+// branchNewerThanBase is true the topology is identical but D and E carry
+// dates after C, which is the case the pre-fix code happened to get right;
+// the fix must produce the same commit set either way. withUnreachableBase
+// adds G on main after the merge, so that a base of G is not an ancestor of
+// head, the shape GitHub Actions produce via pull_request.base.sha.
+func buildMergedBaseFixture(t *testing.T, branchNewerThanBase, withUnreachableBase bool) mergedBaseFixture {
+	t.Helper()
+	f := mergedBaseFixture{path: setupTestRepo(t, "merged-base"), sha: map[string]string{}}
+	git := func(args ...string) {
+		t.Helper()
+		out, err := exec.Command("git", append([]string{"-C", f.path}, args...)...).CombinedOutput()
+		assert.NoError(t, err, "git %v: %s", args, out)
+	}
+	appendFile := func(name string, lines ...string) {
+		t.Helper()
+		fh, err := os.OpenFile(filepath.Join(f.path, name), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		assert.NoError(t, err)
+		_, err = fh.WriteString(strings.Join(lines, "\n") + "\n")
+		assert.NoError(t, err)
+		assert.NoError(t, fh.Close())
+		git("add", name)
+	}
+	// commit pins both dates so hashes and log ordering are reproducible.
+	commit := func(letter, date, msg string) {
+		t.Helper()
+		cmd := exec.Command("git", "-C", f.path, "commit", "-q", "-m", msg)
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_DATE="+date, "GIT_COMMITTER_DATE="+date)
+		out, err := cmd.CombinedOutput()
+		assert.NoError(t, err, "commit %s: %s", letter, out)
+		sha, err := exec.Command("git", "-C", f.path, "rev-parse", "HEAD").Output()
+		assert.NoError(t, err)
+		f.sha[letter] = strings.TrimSpace(string(sha))
+	}
+
+	// Customer dates: branch work predates the base work it later merges in.
+	dates := map[string]string{
+		"A": "2026-01-01T00:00:00Z",
+		"D": "2026-01-02T00:00:00Z", "E": "2026-01-03T00:00:00Z",
+		"B": "2026-01-04T00:00:00Z", "C": "2026-01-05T00:00:00Z",
+		"M": "2026-01-06T00:00:00Z", "F": "2026-01-07T00:00:00Z", "G": "2026-01-08T00:00:00Z",
+	}
+	if branchNewerThanBase {
+		dates["B"], dates["C"] = "2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z"
+		dates["D"], dates["E"] = "2026-01-04T00:00:00Z", "2026-01-05T00:00:00Z"
+	}
+
+	git("switch", "-q", "-c", "main")
+	appendFile("README.md", "A")
+	commit("A", dates["A"], "A: common ancestor")
+
+	git("switch", "-q", "-c", "feature")
+	appendFile("feature.txt", "D",
+		"aws_access_key_id = "+fixtureAWSKey,
+		"aws_secret_access_key = Tg0pz8Jii8hkLx4+PnUisM8GmKs3a2DK+9qz/lie")
+	commit("D", dates["D"], "D: feature work")
+	appendFile("feature.txt", "E", "github_token = "+fixtureGitHubToken)
+	commit("E", dates["E"], "E: more feature work")
+
+	git("switch", "-q", "main")
+	appendFile("base.txt", "B")
+	commit("B", dates["B"], "B: base work")
+	appendFile("base.txt", "C")
+	commit("C", dates["C"], "C: newer base work")
+
+	git("switch", "-q", "feature")
+	{
+		cmd := exec.Command("git", "-C", f.path, "merge", "-q", "--no-ff", "main", "-m", "M: merge main into feature")
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_DATE="+dates["M"], "GIT_COMMITTER_DATE="+dates["M"])
+		out, err := cmd.CombinedOutput()
+		assert.NoError(t, err, "merge: %s", out)
+		sha, err := exec.Command("git", "-C", f.path, "rev-parse", "HEAD").Output()
+		assert.NoError(t, err)
+		f.sha["M"] = strings.TrimSpace(string(sha))
+	}
+	appendFile("feature.txt", "F", "github_token = "+fixtureGitHubToken)
+	commit("F", dates["F"], "F: feature work after merge")
+
+	if withUnreachableBase {
+		git("switch", "-q", "main")
+		appendFile("base.txt", "G")
+		commit("G", dates["G"], "G: base work after the merge")
+		git("switch", "-q", "feature")
+	}
+	return f
+}
+
+// scanFixtureCommits runs Git.ScanRepo over the fixture with the given
+// base/head and returns the set of commit hashes that produced chunks plus the
+// concatenated chunk data, so callers can assert both coverage and content.
+func scanFixtureCommits(t *testing.T, f mergedBaseFixture, base, head string) (map[string]bool, string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	got, data, err := scanRepoRange(ctx, t, f.path, base, head)
+	assert.NoError(t, err)
+	return got, data
+}
+
+// scanRepoRange runs a base..head diff scan over the repository at repoPath and
+// reports the commits that produced chunks, the concatenated chunk data, and
+// the scan error. Callers that expect a failing scan assert on the error.
+func scanRepoRange(ctx context.Context, t *testing.T, repoPath, base, head string) (map[string]bool, string, error) {
+	t.Helper()
+
+	// Open through the package's own wrapper so the test takes the same
+	// path real callers do (bare detection, .git discovery).
+	repo, err := RepoFromPath(repoPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	g := NewGit(&Config{
+		SourceName:  "range fixture",
+		SourceType:  sourcespb.SourceType_SOURCE_TYPE_GIT,
+		Concurrency: 1,
+		SourceMetadataFunc: func(info SourceMetadataInfo) *source_metadatapb.MetaData {
+			return &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{Git: &source_metadatapb.Git{Commit: info.Commit, File: info.File}},
+			}
+		},
+	})
+
+	chunksCh := make(chan *sources.Chunk, 64)
+	scanErr := make(chan error, 1)
+	go func() {
+		defer close(chunksCh)
+		scanErr <- g.ScanRepo(ctx, repo, repoPath, NewScanOptions(ScanOptionBaseHash(base), ScanOptionHeadCommit(head)), sources.ChanReporter{Ch: chunksCh})
+	}()
+
+	got := map[string]bool{}
+	var data strings.Builder
+	for c := range chunksCh {
+		got[c.SourceMetadata.GetGit().GetCommit()] = true
+		data.Write(c.Data)
+	}
+	return got, data.String(), <-scanErr
+}
+
+// TestScanRepo_BaseMergedIntoHead is the regression test for INT-1054: a
+// diff scan must cover exactly `git log base..head` regardless of commit
+// dates or whether base is reachable from head.
+func TestScanRepo_BaseMergedIntoHead(t *testing.T) {
+	// Every commit on the feature side of the range, i.e. git log C..F.
+	wantScanned := []string{"F", "M", "E", "D"}
+	// The merged-in base work and the common ancestor must never be scanned.
+	wantSkipped := []string{"A", "B", "C"}
+
+	cases := []struct {
+		name                string
+		branchNewerThanBase bool
+		unreachableBase     bool
+		base                string // commit letter passed as --since-commit
+	}{
+		{
+			// The customer's reproducer: base is the main tip that was merged in,
+			// and the branch commits predate it.
+			name: "base is the merged-in main tip and older branch commits are skipped",
+			base: "C",
+		},
+		{
+			// GitHub Action pull_request path: base.sha has moved past the merge,
+			// so normalizeConfig resolves it to the merge-base C. Must match case 1.
+			name:            "base is unreachable from head",
+			unreachableBase: true,
+			base:            "G",
+		},
+		{
+			// Same topology, dates flipped: pins that the result is a function of
+			// the graph, not of committer dates.
+			name:                "branch commits newer than the merged-in base tip",
+			branchNewerThanBase: true,
+			base:                "C",
+		},
+	}
+
+	// Both parser strategies build their `git log` from the same args, so both
+	// must agree.
+	for _, lowMemory := range []bool{false, true} {
+		mode := "default"
+		if lowMemory {
+			mode = "low-memory"
+		}
+		t.Run(mode, func(t *testing.T) {
+			feature.UseGitLowMemoryScan.Store(lowMemory)
+			t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
+
+			for _, tc := range cases {
+				t.Run(tc.name, func(t *testing.T) {
+					f := buildMergedBaseFixture(t, tc.branchNewerThanBase, tc.unreachableBase)
+					got, data := scanFixtureCommits(t, f, f.sha[tc.base], f.sha["F"])
+
+					for _, letter := range wantScanned {
+						assert.True(t, got[f.sha[letter]], "commit %s (%s) should have been scanned; got %v", letter, f.sha[letter][:7], got)
+					}
+					for _, letter := range wantSkipped {
+						assert.False(t, got[f.sha[letter]], "commit %s (%s) is reachable from base and must not be scanned", letter, f.sha[letter][:7])
+					}
+					// The secrets live in D and E, the commits the pre-fix code dropped.
+					assert.Contains(t, data, fixtureAWSKey, "AWS key from commit D missing from scanned data")
+					assert.Contains(t, data, fixtureGitHubToken, "GitHub token from commit E/F missing from scanned data")
+				})
+			}
+		})
+	}
+}
+
+// TestNormalizeConfig_BaseWithoutHead pins what normalizeConfig does and does
+// not do with a base and no head: it resolves the base to a hash and leaves the
+// head empty. The parser then walks --all ^base (see gitparse.Parser.RepoPath).
+// normalizeConfig must not invent a head, because that would route the
+// base-only shape through MergeBase, which go-git cannot compute across the
+// graft of a shallow clone, including the --shallow-since clone
+// prepareRepoSinceCommit makes for exactly this shape.
+func TestNormalizeConfig_BaseWithoutHead(t *testing.T) {
+	// main: A; feature: A -> B, checked out.
+	path := setupTestRepo(t, "base-without-head")
+	addTestFileAndCommit(t, path, "a.txt", "a\n")
+	runGit(t, path, "branch", "-M", "main")
+	shaA := gitRevParse(t, path, "HEAD")
+	runGit(t, path, "switch", "-q", "-c", "feature")
+	addTestFileAndCommit(t, path, "b.txt", "b\n")
+	shaB := gitRevParse(t, path, "HEAD")
+
+	repo, err := RepoFromPath(path)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name       string
+		base, head string
+		wantBase   string
+		wantHead   string
+	}{
+		{
+			// The base is resolved to a hash; the head stays empty and no merge
+			// base is computed. The parser turns this into --all ^main.
+			name: "base ref and no head leaves head empty",
+			base: "main", wantBase: shaA, wantHead: "",
+		},
+		{
+			// The pre-commit hook passes HEAD as both ends (main.go). Both
+			// resolve to the same hash and MergeBase short-circuits without
+			// walking history, so the empty HEAD..HEAD range is safe on a
+			// shallow local clone too.
+			name: "base HEAD and head HEAD resolve to the same commit",
+			base: "HEAD", head: "HEAD", wantBase: shaB, wantHead: shaB,
+		},
+		{
+			// Full-history scans set neither end and must stay that way; an
+			// implicit head here would silently narrow --all to one branch.
+			name: "no base leaves head empty",
+			base: "", wantBase: "", wantHead: "",
+		},
+		{
+			name: "head without base is resolved but gets no base",
+			head: "feature", wantBase: "", wantHead: shaB,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewScanOptions(ScanOptionBaseHash(tt.base), ScanOptionHeadCommit(tt.head))
+			assert.NoError(t, normalizeConfig(opts, repo))
+			assert.Equal(t, tt.wantBase, opts.BaseHash, "BaseHash")
+			assert.Equal(t, tt.wantHead, opts.HeadHash, "HeadHash")
+		})
+	}
+}
+
+// TestScanRepo_BaseWithoutHead runs the base-without-head shape end to end.
+// `--since-commit X` with no `--branch` covers every commit since X on any
+// ref (`git log --all ^X`), not just the checked-out branch: users scanning a
+// mirror or a remote URL rely on that to catch secrets on side branches. The
+// merged-base fixture gets an extra branch with its own planted secret that is
+// not reachable from the checked-out feature branch; a base-only scan must
+// find it, and the pre-commit hook, which passes HEAD as both ends, must not.
+func TestScanRepo_BaseWithoutHead(t *testing.T) {
+	const (
+		sideSecret   = "ghp_SideBranchTokenThatBaseOnlyMustCatch000"
+		stagedSecret = "ghp_StagedTokenThatPreCommitMustStillCatch0"
+	)
+
+	// Fixture ends checked out on feature at F. Add the side branch off the
+	// common ancestor and come back to feature so HEAD is F.
+	build := func(t *testing.T) mergedBaseFixture {
+		f := buildMergedBaseFixture(t, false, false)
+		runGit(t, f.path, "switch", "-q", "-c", "side", f.sha["A"])
+		addTestFileAndCommit(t, f.path, "side.txt", "github_token = "+sideSecret+"\n")
+		f.sha["X"] = gitRevParse(t, f.path, "HEAD")
+		runGit(t, f.path, "switch", "-q", "feature")
+		return f
+	}
+
+	// assertAllSinceC checks the --all ^C set: everything on feature after the
+	// merge base plus the side branch, never the base's own history.
+	assertAllSinceC := func(t *testing.T, f mergedBaseFixture, got map[string]bool, data string) {
+		t.Helper()
+		for _, letter := range []string{"F", "M", "E", "D", "X"} {
+			assert.True(t, got[f.sha[letter]], "commit %s should have been scanned; got %v", letter, got)
+		}
+		for _, letter := range []string{"A", "B", "C"} {
+			assert.False(t, got[f.sha[letter]], "commit %s is reachable from C and must not be scanned", letter)
+		}
+		assert.Contains(t, data, sideSecret, "a base-only scan must cover branches other than the checked-out one")
+	}
+
+	for _, lowMemory := range []bool{false, true} {
+		mode := "default"
+		if lowMemory {
+			mode = "low-memory"
+		}
+		t.Run(mode, func(t *testing.T) {
+			feature.UseGitLowMemoryScan.Store(lowMemory)
+			t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
+
+			t.Run("base only scans every ref since base", func(t *testing.T) {
+				f := build(t)
+				got, data := scanFixtureCommits(t, f, f.sha["C"], "")
+				assertAllSinceC(t, f, got, data)
+			})
+
+			t.Run("explicit head narrows to one branch", func(t *testing.T) {
+				f := build(t)
+				got, data := scanFixtureCommits(t, f, f.sha["C"], f.sha["F"])
+
+				// git log C..F: the side branch is not reachable from F.
+				for _, letter := range []string{"F", "M", "E", "D"} {
+					assert.True(t, got[f.sha[letter]], "commit %s should have been scanned; got %v", letter, got)
+				}
+				for _, letter := range []string{"A", "B", "C", "X"} {
+					assert.False(t, got[f.sha[letter]], "commit %s is outside C..F and must not be scanned", letter)
+				}
+				assert.NotContains(t, data, sideSecret)
+			})
+
+			// The history from the PR review, where the old --all walk that
+			// stopped at the base happened to cover the side branch:
+			//
+			//	      o1 - o2         other
+			//	     /
+			//	a - b - c             main   <- HEAD
+			//
+			// --since-commit a with no --branch must still scan o1 and o2.
+			t.Run("commits only on other branches are scanned", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				path := setupTestRepo(t, "cross-ref")
+				sha := map[string]string{}
+				commit := func(name string) {
+					addTestFileAndCommit(t, path, name+".txt", name+"\n")
+					sha[name] = gitRevParse(t, path, "HEAD")
+				}
+				commit("a")
+				runGit(t, path, "branch", "-M", "main")
+				runGit(t, path, "switch", "-q", "-c", "other")
+				commit("o1")
+				commit("o2")
+				runGit(t, path, "switch", "-q", "main")
+				commit("b")
+				commit("c")
+
+				got, _, err := scanRepoRange(ctx, t, path, sha["a"], "")
+				assert.NoError(t, err)
+				for _, name := range []string{"b", "c", "o1", "o2"} {
+					assert.True(t, got[sha[name]], "commit %s should have been scanned; got %v", name, got)
+				}
+				assert.False(t, got[sha["a"]], "the base is excluded from its own range")
+
+				// With --branch main the same base covers main only.
+				got, _, err = scanRepoRange(ctx, t, path, sha["a"], "main")
+				assert.NoError(t, err)
+				for _, name := range []string{"b", "c"} {
+					assert.True(t, got[sha[name]], "commit %s should have been scanned; got %v", name, got)
+				}
+				for _, name := range []string{"a", "o1", "o2"} {
+					assert.False(t, got[sha[name]], "commit %s is outside a..main and must not be scanned", name)
+				}
+			})
+
+			// main.go's pre-commit override sets both ends to HEAD, so the
+			// commit range is empty and only staged changes are scanned.
+			t.Run("pre-commit shape scans only staged changes", func(t *testing.T) {
+				f := build(t)
+				assert.NoError(t, os.WriteFile(filepath.Join(f.path, "staged.txt"), []byte("github_token = "+stagedSecret+"\n"), 0o644))
+				runGit(t, f.path, "add", "staged.txt")
+
+				got, data := scanFixtureCommits(t, f, "HEAD", "HEAD")
+
+				// HEAD..HEAD is empty, so no commit in the repository may produce
+				// chunks. Staged chunks carry no commit hash and are asserted on
+				// through the data instead.
+				for letter, sha := range f.sha {
+					assert.False(t, got[sha], "commit %s was scanned but HEAD..HEAD is empty; got %v", letter, got)
+				}
+				assert.Contains(t, data, stagedSecret, "staged changes must still be scanned")
+				assert.NotContains(t, data, sideSecret, "a commit on another branch leaked into the hook scan")
+			})
+
+			// Remote URLs are cloned with --mirror, so production base-only scans
+			// run against a bare repository and every ref the mirror carries is
+			// in scope.
+			t.Run("bare mirror clone scans every ref since base", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				f := build(t)
+				mirror := filepath.Join(t.TempDir(), "mirror.git")
+				runGit(t, "", "clone", "-q", "--mirror", "file://"+f.path, mirror)
+				assert.True(t, isRepoBare(mirror), "fixture is not bare")
+
+				got, data, err := scanRepoRange(ctx, t, mirror, f.sha["C"], "")
+				assert.NoError(t, err)
+				assertAllSinceC(t, f, got, data)
+			})
+		})
+	}
+}
+
+// TestScanRepo_SwappedRangeEnds pins the behavior when the base is a descendant
+// of the head, e.g. a CI job that passes its arguments in the wrong order. The
+// range base..head is empty, so nothing is scanned and the scan succeeds; it
+// must not widen to anything else. ScanCommits logs the empty range at Info so
+// the case is visible at the default log level without failing the pre-commit
+// hook, whose HEAD..HEAD range is empty by design.
+func TestScanRepo_SwappedRangeEnds(t *testing.T) {
+	f := buildMergedBaseFixture(t, false, false)
+
+	// base F is a descendant of head C: git log C ^F is empty.
+	got, data := scanFixtureCommits(t, f, f.sha["F"], f.sha["C"])
+
+	assert.Empty(t, got, "an empty range must not scan any commit; got %v", got)
+	assert.NotContains(t, data, fixtureAWSKey)
+	assert.NotContains(t, data, fixtureGitHubToken)
+}
+
+// TestScanRepo_BaseNotUsable pins the behavior when a diff scan is given a base
+// it cannot turn into a commit in the repository. Every case must fail the scan:
+// the tempting alternative, degrading to a full-history scan, reports success
+// for a scan that covered a different range than the user asked for, which is
+// the class of silent miss INT-1054 is about.
+func TestScanRepo_BaseNotUsable(t *testing.T) {
+	// A syntactically valid hash that is not in any fixture below.
+	const absentHash = "1111111111111111111111111111111111111111"
+
+	tests := []struct {
+		name string
+		// setup returns the repo path plus the base and head to scan.
+		setup   func(t *testing.T) (repoPath, base, head string)
+		wantErr string
+	}{
+		{
+			// A branch name that does not exist, e.g. a CI job passing a deleted
+			// or misspelled base branch.
+			name: "base ref does not exist",
+			setup: func(t *testing.T) (string, string, string) {
+				path := setupTestRepo(t, "unknown-ref")
+				addTestFileAndCommit(t, path, "a.txt", "a\n")
+				return path, "no-such-branch", gitRevParse(t, path, "HEAD")
+			},
+			wantErr: "unable to resolve ref",
+		},
+		{
+			// A well-formed hash for an object the repository does not have. This
+			// is what an externally shallow checkout looks like when the base is
+			// older than the fetch depth.
+			name: "base hash is not in the repository",
+			setup: func(t *testing.T) (string, string, string) {
+				path := setupTestRepo(t, "absent-hash")
+				addTestFileAndCommit(t, path, "a.txt", "a\n")
+				return path, absentHash, gitRevParse(t, path, "HEAD")
+			},
+			wantErr: "unable to resolve commit",
+		},
+		{
+			// Two root commits: both refs resolve, but they share no history, so
+			// there is no range between them to scan.
+			name: "base and head have no common ancestor",
+			setup: func(t *testing.T) (string, string, string) {
+				path := setupTestRepo(t, "unrelated")
+				addTestFileAndCommit(t, path, "a.txt", "a\n")
+				base := gitRevParse(t, path, "HEAD")
+				runGit(t, path, "switch", "-q", "--orphan", "unrelated")
+				addTestFileAndCommit(t, path, "b.txt", "b\n")
+				return path, base, gitRevParse(t, path, "HEAD")
+			},
+			wantErr: "merge base",
+		},
+		{
+			// actions/checkout at its default fetch-depth: the clone holds only
+			// the tip, so a base from before the cutoff is simply absent.
+			name: "shallow clone does not contain the base",
+			setup: func(t *testing.T) (string, string, string) {
+				origin := setupTestRepo(t, "shallow-origin")
+				addTestFileAndCommit(t, origin, "a.txt", "a\n")
+				base := gitRevParse(t, origin, "HEAD")
+				addTestFileAndCommit(t, origin, "b.txt", "b\n")
+
+				// --depth needs a file:// URL; git ignores it for plain local paths.
+				shallow := filepath.Join(t.TempDir(), "shallow")
+				runGit(t, "", "clone", "-q", "--depth", "1", "file://"+origin, shallow)
+				assert.False(t, gitHasObject(t, shallow, base), "fixture is not shallow: base is present")
+
+				return shallow, base, gitRevParse(t, shallow, "HEAD")
+			},
+			wantErr: "unable to resolve commit",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			repoPath, base, head := tt.setup(t)
+			got, _, err := scanRepoRange(ctx, t, repoPath, base, head)
+
+			assert.ErrorContains(t, err, tt.wantErr)
+			assert.Empty(t, got, "a scan that cannot resolve its base must not fall back to scanning commits")
+		})
+	}
+}
+
+// TestScanRepo_ShallowClone pins where the graft boundary of a shallow clone
+// starts to matter for a diff scan. git itself handles a truncated history
+// fine, so the boundary that counts is the one go-git needs to walk in
+// normalizeConfig: MergeBase loads a commit's parents before it can recognize
+// the commit as the range boundary (bfsCommitIterator.Next), so a base sitting
+// on the graft has no resolvable merge base.
+//
+// That walk only runs when both ends are supplied. With a base alone the
+// parser defaults the head to HEAD and git computes the range, so the same
+// clone scans cleanly; this is the shape `--since-commit X` without `--branch`
+// takes against a GitHub URL, where prepareRepoSinceCommit clones with
+// --shallow-since and puts X on the graft. See
+// https://github.com/trufflesecurity/trufflehog/issues/4895 for the both-ends
+// failure surfacing on GitLab.
+func TestScanRepo_ShallowClone(t *testing.T) {
+	// A fixture deep enough that a clone can keep the base and still cut the
+	// history off somewhere above it.
+	newOrigin := func(t *testing.T) string {
+		origin := setupTestRepo(t, "shallow-origin")
+		for _, f := range []string{"a.txt", "b.txt", "c.txt", "d.txt"} {
+			addTestFileAndCommit(t, origin, f, f+"\n")
+		}
+		return origin
+	}
+	clone := func(t *testing.T, origin, depth string) string {
+		// --depth needs a file:// URL; git ignores it for plain local paths.
+		path := filepath.Join(t.TempDir(), "shallow")
+		runGit(t, "", "clone", "-q", "--depth", depth, "file://"+origin, path)
+		return path
+	}
+	// Depth 2 keeps the tip and the base; the base's parent is cut off, which
+	// is the shape --shallow-since produces for its own base commit.
+	graftAtBase := func(t *testing.T) (shallow, head, base string) {
+		shallow = clone(t, newOrigin(t), "2")
+		head, base = gitRevParse(t, shallow, "HEAD"), gitRevParse(t, shallow, "HEAD~1")
+		assert.False(t, gitHasObject(t, shallow, base+"^"), "fixture is wrong: the base's parent is present")
+		return shallow, head, base
+	}
+
+	// Both parser strategies build their `git log` from the same args, so both
+	// must agree.
+	for _, lowMemory := range []bool{false, true} {
+		mode := "default"
+		if lowMemory {
+			mode = "low-memory"
+		}
+		t.Run(mode, func(t *testing.T) {
+			feature.UseGitLowMemoryScan.Store(lowMemory)
+			t.Cleanup(func() { feature.UseGitLowMemoryScan.Store(false) })
+
+			t.Run("base is the graft boundary", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				shallow, head, base := graftAtBase(t)
+
+				got, _, err := scanRepoRange(ctx, t, shallow, base, head)
+
+				assert.ErrorContains(t, err, "unable to resolve merge base")
+				assert.Empty(t, got, "an unresolvable merge base must fail the scan, not scan an arbitrary range")
+			})
+
+			t.Run("base is the graft boundary with implicit head", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				// Same clone, no head: normalizeConfig must not invent a head
+				// and run MergeBase, or the --shallow-since path would fail
+				// exactly where it used to work. git walks --all ^base, and the
+				// clone's only ref is the tip.
+				shallow, head, base := graftAtBase(t)
+
+				got, _, err := scanRepoRange(ctx, t, shallow, base, "")
+
+				assert.NoError(t, err)
+				assert.True(t, got[head], "the one commit since base should have been scanned; got %v", got)
+				assert.False(t, got[base], "the base is excluded from its own range")
+			})
+
+			t.Run("base is above the graft boundary", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				// One more commit of depth is all it takes: the base's parent is
+				// present, so the merge base resolves and git scans the range over
+				// a history it cannot fully walk.
+				shallow := clone(t, newOrigin(t), "3")
+				head, base := gitRevParse(t, shallow, "HEAD"), gitRevParse(t, shallow, "HEAD~1")
+				assert.True(t, gitHasObject(t, shallow, base+"^"), "fixture is wrong: the base's parent is missing")
+
+				got, _, err := scanRepoRange(ctx, t, shallow, base, head)
+
+				assert.NoError(t, err)
+				assert.True(t, got[head], "the one commit in base..head should have been scanned; got %v", got)
+				assert.False(t, got[base], "the base is excluded from its own range")
+			})
+		})
+	}
+}
+
+// runGit runs a git command, failing the test on error. An empty repoPath runs
+// git outside any repository, which clone needs.
+func runGit(t *testing.T, repoPath string, args ...string) {
+	t.Helper()
+	if repoPath != "" {
+		args = append([]string{"-C", repoPath}, args...)
+	}
+	out, err := exec.Command("git", args...).CombinedOutput()
+	assert.NoError(t, err, "git %v: %s", args, out)
+}
+
+func gitRevParse(t *testing.T, repoPath, rev string) string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", repoPath, "rev-parse", rev).Output()
+	assert.NoError(t, err)
+	return strings.TrimSpace(string(out))
+}
+
+// gitHasObject reports whether the repository holds the commit named by rev,
+// used to confirm where a shallow fixture's graft boundary actually landed
+// before asserting on behavior that depends on it.
+func gitHasObject(t *testing.T, repoPath, rev string) bool {
+	t.Helper()
+	return exec.Command("git", "-C", repoPath, "cat-file", "-e", rev+"^{commit}").Run() == nil
 }

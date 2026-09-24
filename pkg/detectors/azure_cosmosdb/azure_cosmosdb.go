@@ -7,11 +7,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 

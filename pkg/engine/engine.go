@@ -126,6 +126,10 @@ type Config struct {
 	FilterUnverified      bool
 	ShouldScanEntireChunk bool
 
+	// NoIgnoreTag disables the "trufflehog:ignore" tag. If set to true, results are
+	// reported even when the line they were found on carries the tag.
+	NoIgnoreTag bool
+
 	Dispatcher ResultsDispatcher
 
 	// SourceManager orchestrates source enumeration and concurrent chunk production.
@@ -195,6 +199,8 @@ type Engine struct {
 	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
 	// If this flag is set to true, the engine will scan the entire chunk.
 	scanEntireChunk bool
+	// noIgnoreTag disables the "trufflehog:ignore" tag, so tagged lines are still reported.
+	noIgnoreTag bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	AhoCorasickCore *ahocorasick.Core
@@ -259,6 +265,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		verificationOverlap:                 cfg.VerificationOverlap,
 		sourceManager:                       cfg.SourceManager,
 		scanEntireChunk:                     cfg.ShouldScanEntireChunk,
+		noIgnoreTag:                         cfg.NoIgnoreTag,
 		detectorVerificationOverrides:       cfg.DetectorVerificationOverrides,
 		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
@@ -1265,7 +1272,8 @@ func (e *Engine) filterResults(
 }
 
 // processResult generates a detectors.ResultWithMetadata from the provided chunk and result and puts it on the results
-// channel, unless the result exists on a line with an ignore tag, in which case no result is generated.
+// channel, unless the result exists on a line with an ignore tag and --no-ignore-tag is not passed, in which case
+// no result is generated.
 func (e *Engine) processResult(
 	ctx context.Context,
 	res detectors.Result,
@@ -1290,7 +1298,7 @@ func (e *Engine) processResult(
 		}
 		chunk = copyChunk
 	}
-	if ignoreLinePresent {
+	if ignoreLinePresent && !e.noIgnoreTag {
 		resultsDropped.WithLabelValues("process_result", "ignore_line_tag", res.DetectorType.String()).Inc()
 		return
 	}
@@ -1423,11 +1431,16 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		}
 	}
 
-	lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
+	data := chunk.Data
+	if originalOffset := sourceOffset(chunk.OriginalData, chunk.Data, offset, len(secretBytes)); originalOffset >= 0 {
+		data, offset = chunk.OriginalData, originalOffset
+	}
+
+	lineNumber := int64(bytes.Count(data[:offset], []byte("\n")))
 	result.SetPrimarySecretLine(lineNumber)
 
 	// If the line containing the secret has the ignore tag, we should ignore the result.
-	after := chunk.Data[offset+len(secretBytes):]
+	after := data[offset+len(secretBytes):]
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
 		endLine = len(after)
@@ -1436,6 +1449,124 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		return lineNumber, true
 	}
 	return lineNumber, false
+}
+
+// sourceOffset maps an offset in decoded data back onto the pre-decode buffer,
+// returning -1 when the detected value has no counterpart in the source.
+func sourceOffset(originalData, data []byte, offset, length int) int {
+	if len(originalData) == 0 || length == 0 || offset < 0 || offset+length > len(data) {
+		return -1
+	}
+	if bytes.Equal(originalData, data) {
+		return offset
+	}
+
+	secret := data[offset : offset+length]
+	preceding := bytes.Count(data[:offset], secret)
+	sourceIndex, sourceCount := nthOccurrence(originalData, secret, preceding)
+	if sourceCount == 0 {
+		return -1
+	}
+	// Decoders emit the occurrences they keep in source order, so an unchanged
+	// occurrence count makes the nth decoded match the nth source match.
+	if sourceCount == preceding+bytes.Count(data[offset:], secret) {
+		return sourceIndex
+	}
+	// Decoding dropped or merged occurrences, so order alone no longer identifies
+	// the match and the surrounding text has to break the tie.
+	return bestAlignedOccurrence(originalData, data, offset, length)
+}
+
+// nthOccurrence returns the offset of the nth zero-indexed non-overlapping
+// occurrence of sep in data along with the total occurrence count. The offset is
+// -1 when data holds fewer than n+1 occurrences.
+func nthOccurrence(data, sep []byte, n int) (int, int) {
+	index, count, start := -1, 0, 0
+	for {
+		next := bytes.Index(data[start:], sep)
+		if next == -1 {
+			return index, count
+		}
+		if count == n {
+			index = start + next
+		}
+		count++
+		start += next + len(sep)
+	}
+}
+
+// alignedContextBytes bounds the neighbourhood each candidate source occurrence is
+// scored over, keeping the comparison linear in the number of candidates. A kilobyte
+// is far more context than a decoder needs to give itself away.
+const alignedContextBytes = 1024
+
+// bestAlignedOccurrence picks the source occurrence of the detected value whose
+// neighbourhood best survives into the decoded neighbourhood. No rule is exact here:
+// when a decoder drops one copy of a value and keeps another, the copies are only
+// distinguishable by the text around them.
+func bestAlignedOccurrence(originalData, data []byte, offset, length int) int {
+	secret := data[offset : offset+length]
+	best, bestScore := -1, -1
+	for start := 0; ; {
+		next := bytes.Index(originalData[start:], secret)
+		if next == -1 {
+			return best
+		}
+		candidate := start + next
+		if score := alignmentScore(originalData, data, candidate, offset, length); score > bestScore {
+			best, bestScore = candidate, score
+		}
+		start = candidate + length
+	}
+}
+
+// alignmentScore measures how much of the decoded neighbourhood still reads, in
+// order, out of the source around a candidate. Decoders interleave removals with the
+// text they keep, so the source side is allowed gaps that the decoded side is not.
+func alignmentScore(originalData, data []byte, candidate, offset, length int) int {
+	sourceBefore := lastBytes(originalData[:candidate], alignedContextBytes)
+	decodedBefore := lastBytes(data[:offset], alignedContextBytes)
+	sourceAfter := firstBytes(originalData[candidate+length:], alignedContextBytes)
+	decodedAfter := firstBytes(data[offset+length:], alignedContextBytes)
+	return matchBackward(sourceBefore, decodedBefore) + matchForward(sourceAfter, decodedAfter)
+}
+
+// matchBackward returns the length of the longest suffix of decoded that appears as a
+// subsequence of source. Matching greedily from the right is optimal for that.
+func matchBackward(source, decoded []byte) int {
+	matched, j := 0, len(decoded)-1
+	for i := len(source) - 1; i >= 0 && j >= 0; i-- {
+		if source[i] == decoded[j] {
+			matched, j = matched+1, j-1
+		}
+	}
+	return matched
+}
+
+// matchForward returns the length of the longest prefix of decoded that appears as a
+// subsequence of source.
+func matchForward(source, decoded []byte) int {
+	matched := 0
+	for i := 0; i < len(source) && matched < len(decoded); i++ {
+		if source[i] == decoded[matched] {
+			matched++
+		}
+	}
+	return matched
+}
+
+func lastBytes(data []byte, n int) []byte {
+	if len(data) > n {
+		return data[len(data)-n:]
+	}
+	return data
+}
+
+func firstBytes(data []byte, n int) []byte {
+	if len(data) > n {
+		return data[:n]
+	}
+	return data
 }
 
 // AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same

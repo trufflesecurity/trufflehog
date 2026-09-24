@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -437,4 +440,94 @@ func TestSource_ClientAddressing(t *testing.T) {
 			assert.Equal(t, tt.wantPathStyle, opts.UsePathStyle)
 		})
 	}
+}
+
+func TestSource_Init_IncludeAndExcludeExtensionsError(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:        &sourcespb.S3_Unauthenticated{},
+		IncludeExtensions: []string{"tf"},
+		ExcludeExtensions: []string{"zip"},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.Error(t, err)
+}
+
+// Prefixes, unlike extensions and unlike buckets, accept an include list and an
+// exclude list together.
+func TestSource_Init_IncludeAndExcludePrefixesAllowed(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		IncludePrefixes: []string{"src/"},
+		ExcludePrefixes: []string{"src/vendor/"},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.NoError(t, err)
+	assert.True(t, s.objectFilter.shouldInclude("src/main.tf"))
+	assert.False(t, s.objectFilter.shouldInclude("src/vendor/dep.tf"))
+}
+
+// A source with no filters configured must scan every object, so that existing
+// scans behave exactly as they did before object filtering was added.
+func TestSource_Init_UnconfiguredFilterScansEverything(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.NoError(t, err)
+	assert.True(t, s.objectFilter.shouldInclude("any/key.zip"))
+}
+
+// A filtered object must still be marked complete on the checkpointer. Otherwise
+// the low water mark stalls at the first filtered object and a resumed scan redoes
+// every object after it.
+func TestSource_PageChunker_FilteredObjectsAdvanceCheckpoint(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+
+	const objectCount = 10
+	page := &awss3.ListObjectsV2Output{Contents: make([]s3types.Object, objectCount)}
+	for i := range objectCount {
+		key := fmt.Sprintf("archive/key-%02d.txt", i)
+		size := int64(1024)
+		page.Contents[i] = s3types.Object{Key: &key, Size: &size}
+	}
+
+	checkpointer := NewCheckpointer(ctx, &sources.Progress{}, false)
+
+	// Every object is filtered, so pageChunker never reaches GetObject and needs
+	// no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, objectCount)},
+		checkpointer,
+	)
+
+	assert.Zero(t, scanned)
+	assert.EqualValues(t, objectCount, filtered)
+
+	resumeInfo, err := checkpointer.ResumePoint(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "test-bucket", resumeInfo.CurrentBucket)
+	assert.Equal(t, *page.Contents[objectCount-1].Key, resumeInfo.StartAfter)
 }

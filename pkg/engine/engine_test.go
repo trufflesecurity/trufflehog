@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	aCtx "context"
 	"fmt"
 	"math/rand"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
+	"pgregory.net/rapid"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -230,6 +232,205 @@ func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
 	assert.False(t, isIgnored)
 	// offset 2 means line 3
 	assert.Equal(t, int64(2), lineOffset)
+}
+
+// HTML-like tags can collapse source blank lines during decoding.
+func TestFragmentLineOffsetUsesOriginalData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	result.SetPrimarySecretValue(`token = "synthetic-secret-value-123456"`)
+	chunk := &sources.Chunk{
+		Data:         []byte("# Date format:\n\ntoken = \"synthetic-secret-value-123456\""),
+		OriginalData: []byte("# Date format: <yyyymmdd>\n\n\n\n\ntoken = \"synthetic-secret-value-123456\""),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(5), lineOffset)
+}
+
+// Some decoded secrets have no matching source byte sequence.
+func TestFragmentLineOffsetFallsBackToDecodedData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	chunk := &sources.Chunk{
+		Data:         []byte("decoded header\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("encoded-source-data"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(1), lineOffset)
+}
+
+// Decoding can change the newline count between duplicate matches.
+func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data:         []byte("synthetic-secret-value-123456\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("synthetic-secret-value-123456\n\nsynthetic-secret-value-123456"),
+	}
+	results := []detectors.Result{{Raw: secret}, {Raw: secret}}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	lineOffset, _ := FragmentLineOffset(chunk, &results[1])
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// The same value can occur in discarded markup and emitted text, so surrounding
+// text has to identify which source occurrence the decoder kept.
+func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("heading\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("<div class=\"synthetic-secret-value-123456\">\n" +
+			"<p>heading</p>\n<p>synthetic-secret-value-123456</p>"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// A dropped occurrence can sit after the surviving one, so a later source match is
+// not automatically the right one.
+func TestFragmentLineOffsetSkipsLaterRemovedOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("heading\nsynthetic-secret-value-123456\ntrailer"),
+		OriginalData: []byte("<p>heading</p>\n<p>synthetic-secret-value-123456</p>\n" +
+			"<div class=\"synthetic-secret-value-123456\">trailer</div>"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(1), lineOffset)
+}
+
+// UTF-8 decoding replaces line breaks alongside malformed bytes.
+func TestFragmentLineOffsetUsesInvalidOriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	originalData := append([]byte("heading\n\xff\n"), secret...)
+	chunk := &sources.Chunk{
+		Data:         originalData,
+		OriginalData: originalData,
+	}
+	require.NotNil(t, (&decoders.UTF8{}).FromChunk(chunk))
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// Mapping must count bytes across multibyte UTF-8 before the secret.
+func TestFragmentLineOffsetUsesUTF8OriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data:         append([]byte("préface\n"), secret...),
+		OriginalData: append([]byte("préface\n\n"), secret...),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// Replacement runes shift the decoded offset of the second match.
+func TestFragmentLineOffsetMapsInvalidOriginalDataDuplicates(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	originalData := append([]byte("\xff\n"), secret...)
+	originalData = append(originalData, '\n', 0xfe, '\n')
+	originalData = append(originalData, secret...)
+	chunk := &sources.Chunk{Data: originalData, OriginalData: originalData}
+	require.NotNil(t, (&decoders.UTF8{}).FromChunk(chunk))
+	results := []detectors.Result{{Raw: secret}, {Raw: secret}}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	lineOffset, _ := FragmentLineOffset(chunk, &results[1])
+
+	assert.Equal(t, int64(3), lineOffset)
+}
+
+// Source markup can retain an ignore tag absent from decoded data.
+func TestFragmentLineOffsetUsesOriginalDataIgnoreTag(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("synthetic-secret-value-123456\ntext"),
+		OriginalData: []byte("<p>synthetic-secret-value-123456</p>" +
+			"<div class=\"trufflehog:ignore\">text</div>"),
+	}
+
+	_, ignored := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.True(t, ignored)
+}
+
+func buildDroppedSpanChunk(t *rapid.T, secret []byte, decoys bool) (*sources.Chunk, int) {
+	spans := rapid.IntRange(1, 8).Draw(t, "spans")
+	target := rapid.IntRange(0, spans-1).Draw(t, "target")
+
+	var original, decoded []byte
+	var secretOffset int
+	for i := range spans {
+		span := fmt.Appendf(nil, "<p id=%d>word%d\n</p>\n", i, i)
+		dropped := i != target && rapid.Bool().Draw(t, fmt.Sprintf("dropped%d", i))
+		if i == target {
+			secretOffset = len(original) + len(span)
+		}
+		if i == target || (decoys && dropped && rapid.Bool().Draw(t, fmt.Sprintf("decoy%d", i))) {
+			span = append(append(span, secret...), '\n')
+		}
+		original = append(original, span...)
+		if !dropped {
+			decoded = append(decoded, span...)
+		}
+	}
+	return &sources.Chunk{Data: decoded, OriginalData: original}, secretOffset
+}
+
+// Decoders drop whole spans, and the value they keep still has to land on its own
+// source line however much text went missing around it.
+func TestFragmentLineOffsetMapsDroppedSourceSpans(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		chunk, secretOffset := buildDroppedSpanChunk(t, secret, false)
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		assert.Equal(t, int64(bytes.Count(chunk.OriginalData[:secretOffset], []byte{'\n'})), lineOffset)
+	})
+}
+
+// When a dropped span holds the same value as a kept one the copies are only
+// distinguishable by their surroundings, so the exact line is best-effort. What is
+// not negotiable is that the reported line holds the value in the source.
+func TestFragmentLineOffsetReportsLineHoldingSecret(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		chunk, _ := buildDroppedSpanChunk(t, secret, true)
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		lines := bytes.Split(chunk.OriginalData, []byte{'\n'})
+		require.Less(t, int(lineOffset), len(lines))
+		assert.Contains(t, string(lines[lineOffset]), string(secret))
+	})
+}
+
+// Generated binary prefixes exercise byte values without requiring valid UTF-8.
+func TestFragmentLineOffsetMapsArbitraryOriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		prefix := rapid.SliceOfN(rapid.Byte(), 0, 16).Draw(t, "prefix")
+		removed := rapid.SliceOfN(rapid.Byte(), 1, 16).Draw(t, "removed")
+		suffix := rapid.SliceOfN(rapid.Byte(), 0, 16).Draw(t, "suffix")
+		data := append(append(append(bytes.Clone(prefix), secret...), suffix...), '\n')
+		originalData := append(append(append(append(bytes.Clone(prefix), removed...), secret...), suffix...), '\n')
+		chunk := &sources.Chunk{Data: data, OriginalData: originalData}
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		assert.Equal(t, int64(bytes.Count(originalData[:len(prefix)+len(removed)], []byte{'\n'})), lineOffset)
+	})
 }
 
 // TestFragmentLineOffset_DuplicateSecrets verifies that when the same secret
@@ -721,6 +922,39 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 
 	// Assert that no results were generated
 	assert.Empty(t, e.results)
+}
+
+func TestProcessResult_IgnoreLinePresentWithNoIgnoreTag_ResultGenerated(t *testing.T) {
+	// Arrange: Create an engine that does not honor ignore tags
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1), noIgnoreTag: true}
+
+	// Arrange: Create a Chunk
+	chunk := sources.Chunk{
+		Data: []byte("swordfish trufflehog:ignore"),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Git{
+				Git: &source_metadatapb.Git{
+					Line: 1,
+				},
+			},
+		},
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		Raw:      []byte("swordfish"),
+		Verified: true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+
+	// Assert that the result was reported anyway, with its line number still set
+	require.Len(t, e.results, 1)
+	r := <-e.results
+	assert.Equal(t, []byte("swordfish"), r.Raw)
+	assert.Equal(t, int64(1), r.SourceMetadata.GetGit().GetLine())
 }
 
 func TestProcessResult_AllFieldsCopied(t *testing.T) {
@@ -2081,5 +2315,87 @@ func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
 
 			assert.Equal(t, tt.wantDispatch, len(disp.results))
 		})
+	}
+}
+
+func setupSourceMappingBench(size int, decode bool) (*sources.Chunk, *detectors.Result) {
+	secret := []byte("synthetic-secret-value-123456")
+	var original, decoded []byte
+	for i := 0; len(original) < size; i++ {
+		original = append(original, fmt.Sprintf("<p class=\"row\">line%d</p>\n", i)...)
+		decoded = append(decoded, fmt.Sprintf("line%d\n", i)...)
+	}
+	original = append(original, "<p>"...)
+	original = append(original, secret...)
+	original = append(original, "</p>\n"...)
+	decoded = append(decoded, secret...)
+	decoded = append(decoded, '\n')
+	if !decode {
+		decoded = original
+	}
+	return &sources.Chunk{Data: decoded, OriginalData: original}, &detectors.Result{Raw: secret}
+}
+
+func benchmarkSourceMapping(b *testing.B, size int, decode bool) {
+	chunk, result := setupSourceMappingBench(size, decode)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
+	}
+}
+
+func BenchmarkFragmentLineOffset_Identical_Small(b *testing.B) {
+	benchmarkSourceMapping(b, 64, false)
+}
+
+func BenchmarkFragmentLineOffset_Identical_DefaultChunkSize(b *testing.B) {
+	benchmarkSourceMapping(b, sources.DefaultChunkSize, false)
+}
+
+func BenchmarkFragmentLineOffset_Identical_Large(b *testing.B) {
+	benchmarkSourceMapping(b, 64*1024, false)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_Small(b *testing.B) {
+	benchmarkSourceMapping(b, 64, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_DefaultChunkSize(b *testing.B) {
+	benchmarkSourceMapping(b, sources.DefaultChunkSize, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_MaxRealisticChunk(b *testing.B) {
+	benchmarkSourceMapping(b, sources.TotalChunkSize, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_Large(b *testing.B) {
+	benchmarkSourceMapping(b, 64*1024, true)
+}
+
+func setupAmbiguousSourceBench(size int) (*sources.Chunk, *detectors.Result) {
+	secret := []byte("synthetic-secret-value-123456")
+	original := []byte("<div class=\"synthetic-secret-value-123456\">\n")
+	var decoded []byte
+	for i := 0; len(original) < size; i++ {
+		original = append(original, fmt.Sprintf("<p class=\"row\">line%d</p>\n", i)...)
+		decoded = append(decoded, fmt.Sprintf("line%d\n", i)...)
+	}
+	original = append(original, "<p>"...)
+	original = append(original, secret...)
+	original = append(original, "</p>\n"...)
+	decoded = append(decoded, secret...)
+	decoded = append(decoded, '\n')
+	return &sources.Chunk{Data: decoded, OriginalData: original}, &detectors.Result{Raw: secret}
+}
+
+// The same value occurs in both discarded markup and emitted text, so the source
+// occurrence has to be picked by its surroundings.
+func BenchmarkFragmentLineOffset_Ambiguous_DefaultChunkSize(b *testing.B) {
+	chunk, result := setupAmbiguousSourceBench(sources.DefaultChunkSize)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
 	}
 }
