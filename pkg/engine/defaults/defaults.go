@@ -660,6 +660,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/runrunit"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sailpointidentityiq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saladcloudapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesblink"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salescookie"
@@ -1586,6 +1587,7 @@ func buildDetectorList() []detectors.Detector {
 		&rubygems.Scanner{},
 		&runrunit.Scanner{},
 		&saladcloudapikey.Scanner{},
+		&sailpointidentityiq.Scanner{},
 		&salesblink.Scanner{},
 		&salescookie.Scanner{},
 		&salesflare.Scanner{},
