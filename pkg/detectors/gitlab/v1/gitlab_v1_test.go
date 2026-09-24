@@ -45,6 +45,16 @@ func TestGitLab_Pattern(t *testing.T) {
 			input: "GITLAB_TOKEN=ABc123456789dEFghIJK",
 			want:  []string{"ABc123456789dEFghIJKhttps://gitlab.com"},
 		},
+		{
+			name:  "dotted format without glpat- prefix",
+			input: `gitlab_token ="ThisIsNotAValidTokenAtAllNoWayXx.01.a1b2c3d4e"`,
+			want:  []string{"ThisIsNotAValidTokenAtAllNoWayXx.01.a1b2c3d4ehttps://gitlab.com"},
+		},
+		{
+			name:  "dotted format with glpat- prefix should be ignored",
+			input: `gitlab_token ="glpat-ThisIsNotAValidTokenAtAllNoWayXx.01.a1b2c3d4e"`,
+			want:  nil,
+		},
 	}
 
 	for _, test := range tests {
