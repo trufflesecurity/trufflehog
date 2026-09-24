@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -57,10 +58,37 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 		message = fmt.Sprintf("Found %s %s%s result with %s encoding 🐷🔑\n", verifiedStatus, out.DetectorType, name, out.DecoderType)
 	}
 
-	fmt.Printf("::warning file=%s,line=%d,endLine=%d::%s",
-		out.Filename, out.StartLine, out.StartLine, message)
+	fmt.Print(formatWarningCommand(out.Filename, out.StartLine, message))
 
 	return nil
+}
+
+// formatWarningCommand renders a GitHub Actions "::warning::" workflow command for a single
+// finding. file and message can contain characters that git allows but GitHub's workflow-command
+// syntax does not (e.g. a scanned file path can contain a newline). Escaping them keeps the
+// emitted command well-formed and confined to a single line.
+// https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions
+func formatWarningCommand(file string, line int64, message string) string {
+	return fmt.Sprintf("::warning file=%s,line=%d,endLine=%d::%s\n",
+		escapeWorkflowProperty(file), line, line, escapeWorkflowData(strings.TrimSuffix(message, "\n")))
+}
+
+// escapeWorkflowData escapes a workflow-command data value (e.g. the message after the final
+// "::"). '%' is escaped first so it can't be used to construct one of the other sequences.
+func escapeWorkflowData(s string) string {
+	s = strings.ReplaceAll(s, "%", "%25")
+	s = strings.ReplaceAll(s, "\r", "%0D")
+	s = strings.ReplaceAll(s, "\n", "%0A")
+	return s
+}
+
+// escapeWorkflowProperty escapes a workflow-command property value (e.g. file=...), which
+// additionally can't contain ':' or ',' without breaking the property list.
+func escapeWorkflowProperty(s string) string {
+	s = escapeWorkflowData(s)
+	s = strings.ReplaceAll(s, ":", "%3A")
+	s = strings.ReplaceAll(s, ",", "%2C")
+	return s
 }
 
 type gitHubActionsOutputFormat struct {
