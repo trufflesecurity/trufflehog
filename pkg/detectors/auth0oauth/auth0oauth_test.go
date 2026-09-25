@@ -50,10 +50,51 @@ func TestAuth0oAuth_Pattern(t *testing.T) {
 			name: "invalid pattern",
 			input: `
 				# do not share these credentials
-				auth0_credentials file: 
+				auth0_credentials file:
 					auth0_clientID: e4T9Cw1CtwE8ufoESVBB7Hi1U-e4T9Cw1CtwE8ufoESVBB7Hi1U
-					secret: MBqIYgxH0vZaL1s5314lgPDLqHX^ZsY59PSew63A_L6rySqcy5J3rFcGcpdeSQ_+tTx1kCXOZY_JUy-rXwGtKCleBsaUfpchggQEAy_yhzWnqv4_GzJivBif85bqiJi3ZA63DAauoJ2PF27fvS 
+					secret: MBqIYgxH0vZaL1s5314lgPDLqHX^ZsY59PSew63A_L6rySqcy5J3rFcGcpdeSQ_+tTx1kCXOZY_JUy-rXwGtKCleBsaUfpchggQEAy_yhzWnqv4_GzJivBif85bqiJi3ZA63DAauoJ2PF27fvS
 					domain: 9-KhTIdSopSaMQ2v1YxdFEJN#qd51AzSGQu2yRaFauth1.com
+				`,
+			want: nil,
+		},
+		{
+			// Auth0 Private Cloud tenants default to an Auth0-managed domain in
+			// the form *.auth0app.com rather than *.auth0.com.
+			name: "valid pattern - private cloud auth0app.com domain",
+			input: `
+				# do not share these credentials
+				auth0_credentials file:
+					auth0_clientID: odJFCrnl2edlBDdz1C5Jau2RJtBRnlWmTSHf6pWk
+					secret: 6sHrFH2ZUCr-lgotu2iXW7GboIRoL3u6aHwnMztVuaP_coUNEhEkk_iqq8vH2BzNZV45pF
+					domain: api.example-corp.auth0app.com
+				`,
+			want: []string{"odJFCrnl2edlBDdz1C5Jau2RJtBRnlWmTSHf6pWk6sHrFH2ZUCr-lgotu2iXW7GboIRoL3u6aHwnMztVuaP_coUNEhEkk_iqq8vH2BzNZV45pF"},
+		},
+		{
+			// word-boundary behavior is unchanged by this fix: a leading run of
+			// word characters immediately before "auth0app.com" still matches in
+			// full, same as it already does today for "...auth0.com" domains.
+			name: "valid pattern - auth0app.com with no separator before suffix",
+			input: `
+				# do not share these credentials
+				auth0_credentials file:
+					auth0_clientID: tyLBhhOhg9uhkxiiEZpFfk1OHAOEHYqM6Ojb
+					secret: 6mjBHqSiFVKu4MbMnrHontIKARAH_Ggl2JfaQqHu42bojteVs3qfNUfTAFnT0tEuw0dwQ0FIunWe8Cz6
+					domain: xauth0app.com
+				`,
+			want: []string{"tyLBhhOhg9uhkxiiEZpFfk1OHAOEHYqM6Ojb6mjBHqSiFVKu4MbMnrHontIKARAH_Ggl2JfaQqHu42bojteVs3qfNUfTAFnT0tEuw0dwQ0FIunWe8Cz6"},
+		},
+		{
+			// a domain with neither the "auth0.com" nor "auth0app.com" suffix
+			// must not match — the optional (?:app)? group must not degrade the
+			// pattern into matching arbitrary ".com" domains.
+			name: "invalid pattern - domain has neither auth0.com nor auth0app.com suffix",
+			input: `
+				# do not share these credentials
+				auth0_credentials file:
+					auth0_clientID: SNDCdyZQJiJSZQdoHwHen3SO3oXyGf3azU3iQOpMN0PZ
+					secret: Lqy1WwMZaMKA3P744B8vkKQlENCzsdfF8j61yX-ZFsan2Cw7gFp6r7O425u85HFJ_EJ4jKEIQOkrtDXtBi10Q71hA1
+					domain: api.example.com
 				`,
 			want: nil,
 		},

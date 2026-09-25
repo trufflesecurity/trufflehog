@@ -27,7 +27,11 @@ var (
 
 	clientIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"auth0"}) + `\b([a-zA-Z0-9_-]{32,60})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
-	domainPat       = regexp.MustCompile(`\b([a-zA-Z0-9][a-zA-Z0-9._-]*auth0\.com)\b`) // could be part of url
+	// could be part of url; auth0app.com is Auth0's managed domain for Private Cloud tenants.
+	// TODO: a bare domain with no leading character (e.g. "auth0.com" or "auth0app.com" with
+	// no subdomain/prefix at all) never matches, since the leading character class must be
+	// consumed before the literal "auth0" substring. Pre-existing, unrelated to this fix.
+	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9][a-zA-Z0-9._-]*auth0(?:app)?\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
