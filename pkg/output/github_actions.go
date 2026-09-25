@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -57,10 +58,28 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 		message = fmt.Sprintf("Found %s %s%s result with %s encoding 🐷🔑\n", verifiedStatus, out.DetectorType, name, out.DecoderType)
 	}
 
-	fmt.Printf("::warning file=%s,line=%d,endLine=%d::%s",
-		out.Filename, out.StartLine, out.StartLine, message)
+	fmt.Print(formatWarningCommand(out.Filename, out.StartLine, message))
 
 	return nil
+}
+
+func formatWarningCommand(file string, line int64, message string) string {
+	return fmt.Sprintf("::warning file=%s,line=%d,endLine=%d::%s\n",
+		escapeWorkflowProperty(file), line, line, escapeWorkflowData(strings.TrimSuffix(message, "\n")))
+}
+
+func escapeWorkflowData(s string) string {
+	s = strings.ReplaceAll(s, "%", "%25")
+	s = strings.ReplaceAll(s, "\r", "%0D")
+	s = strings.ReplaceAll(s, "\n", "%0A")
+	return s
+}
+
+func escapeWorkflowProperty(s string) string {
+	s = escapeWorkflowData(s)
+	s = strings.ReplaceAll(s, ":", "%3A")
+	s = strings.ReplaceAll(s, ",", "%2C")
+	return s
 }
 
 type gitHubActionsOutputFormat struct {
