@@ -18,14 +18,13 @@ type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
-// testing github action
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomResultsCleaner = (*Scanner)(nil)
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
-	domainPat     = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.(?:okta(?:preview|-emea|-gov)?\.com|okta\.mil)\b`)
+	domainPat     = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b`)
 	tokenPat      = regexp.MustCompile(`\b00[a-zA-Z0-9_-]{40}\b`)
 
 	// Okta app/client IDs: "0oa" + 17 base62 characters.
