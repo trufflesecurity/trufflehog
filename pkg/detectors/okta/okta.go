@@ -18,6 +18,7 @@ type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
+// testing github action
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomResultsCleaner = (*Scanner)(nil)
