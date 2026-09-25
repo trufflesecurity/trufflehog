@@ -111,7 +111,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	// First load the credential from the found key
-	credentials, err := google.CredentialsFromJSON(ctx, []byte(token), "https://www.googleapis.com/auth/cloud-platform")
+	// Same untrusted input as the gcp detector. keyPat matches on `client_secret`, which is the
+	// authorized_user shape — an ADC file — so that is the only type this verifier should honour.
+	credentials, err := google.CredentialsFromJSONWithType(ctx, []byte(token), google.AuthorizedUser, "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		return false, nil, err
 	}
