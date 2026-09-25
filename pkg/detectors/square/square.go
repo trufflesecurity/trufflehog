@@ -2,7 +2,9 @@ package square
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -14,12 +16,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	defaultClient = common.SaneHttpClient()
+
+	// there are a few endpoints we can check, but merchants seems the least sensitive.
+	verifyURL = "https://connect.squareupsandbox.com/v2/merchants"
+
 	// more context to be added if this is too generic
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"square"}) + `(EAAA[a-zA-Z0-9\-_+=]{60})`)
 )
@@ -53,37 +62,103 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			// there are a few endpoints we can check, but templates seems the least sensitive.
-			// 403 will be issued if the scope is wrong but the key is correct
-			baseURL := "https://connect.squareupsandbox.com/v2/merchants"
-
-			client := common.SaneHttpClient()
-
-			// test `merchants` scope - its commonly allowed and low sensitivity
-			req, err := http.NewRequestWithContext(ctx, "GET", baseURL, nil)
-			if err != nil {
-				continue
+			client := s.client
+			if client == nil {
+				client = defaultClient
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			req.Header.Add("Content-Type", "application/json")
-			// unclear if this version needs to be set or matters, seems to work without, but docs want it
-			// req.Header.Add("Square-Version", "2020-08-12")
-			res, err := client.Do(req)
-			if err == nil {
-				_ = res.Body.Close() // The request body is unused.
 
-				// 200 means good key and has `merchants` scope - default allowed by square
-				// 401 is bad key
-				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					result.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			result.Verified = isVerified
+			result.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, result)
 	}
 
 	return
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, verifyURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Content-Type", "application/json")
+	// unclear if this version needs to be set or matters, seems to work without, but docs want it
+	// req.Header.Add("Square-Version", "2020-08-12")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		// good key and has `merchants` scope - default allowed by square
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	case http.StatusForbidden:
+		// A 403 only proves the key is valid when Square itself says the scope is insufficient.
+		// Anything else may come from a TLS-intercepting proxy or Square's edge (rate limiting, bot protection).
+		body := readBody(res)
+		if hasErrorCode(body, "INSUFFICIENT_SCOPES") {
+			return true, nil
+		}
+		return false, fmt.Errorf("unexpected 403 from Square: %s", truncateBody(body))
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, truncateBody(readBody(res)))
+	}
+}
+
+// squareErrorResponse is Square's error envelope for non-2xx responses.
+// See https://developer.squareup.com/docs/build-basics/handling-errors.
+type squareErrorResponse struct {
+	Errors []struct {
+		Category string `json:"category"`
+		Code     string `json:"code"`
+		Detail   string `json:"detail"`
+	} `json:"errors"`
+}
+
+const (
+	maxBodySize      = 4 << 10 // cap how much of the response body we read
+	maxErrorBodySize = 512     // cap how much of the body we put in an error
+)
+
+func readBody(res *http.Response) []byte {
+	body, _ := io.ReadAll(io.LimitReader(res.Body, maxBodySize))
+	return body
+}
+
+func hasErrorCode(body []byte, code string) bool {
+	var apiErr squareErrorResponse
+	if err := json.Unmarshal(body, &apiErr); err != nil {
+		return false
+	}
+	for _, e := range apiErr.Errors {
+		if e.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+// truncateBody collapses whitespace and caps the body so an HTML block page doesn't flood the output.
+func truncateBody(body []byte) string {
+	s := strings.Join(strings.Fields(string(body)), " ")
+	if s == "" {
+		return "<empty body>"
+	}
+	if len(s) > maxErrorBodySize {
+		return s[:maxErrorBodySize] + "..."
+	}
+	return s
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
