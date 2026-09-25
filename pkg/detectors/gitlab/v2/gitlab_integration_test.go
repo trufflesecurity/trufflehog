@@ -328,7 +328,7 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, good key but wrong scope",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, `{"error":"insufficient_scope","error_description":"The request requires higher privileges than provided by the access token.","scope":"read_user api read_api"}`)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
@@ -345,6 +345,27 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "found but ambiguous 403 (not insufficient_scope)",
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_Gitlab,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        "2",
+					},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",

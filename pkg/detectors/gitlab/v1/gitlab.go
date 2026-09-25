@@ -146,16 +146,23 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 	case http.StatusOK:
 		return json.Valid(bodyBytes), nil, nil
 	case http.StatusForbidden:
-		// check if the user account is blocked or not
 		stringBody := string(bodyBytes)
+
+		// A valid token whose account is blocked still authenticates, so treat it as verified.
 		if strings.Contains(stringBody, BlockedUserMessage) {
 			return true, map[string]string{
 				"blocked": "True",
 			}, nil
 		}
 
-		// Good key but not the right scope
-		return true, nil, nil
+		if json.Valid(bodyBytes) &&
+			(strings.Contains(stringBody, "insufficient_scope") ||
+				strings.Contains(stringBody, "insufficient_granular_scope")) {
+			// Good key but not the right scope
+			return true, nil, nil
+		}
+
+		return false, nil, fmt.Errorf("unexpected 403 response, unable to verify token")
 	case http.StatusUnauthorized:
 		// Nothing to do; zero values are the ones we want
 		return false, nil, nil
