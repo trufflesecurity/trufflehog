@@ -37,7 +37,15 @@ var (
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
+
+	// GitLab's forbidden! helper formats every reasoned 403 as "403 Forbidden - <reason>".
+	forbiddenWithReasonPrefix = "403 Forbidden - "
 )
+
+type gitlabErrorResponse struct {
+	Message string `json:"message"`
+	Error   string `json:"error"`
+}
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
@@ -140,24 +148,29 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 	}
 
 	// 200 means good key and has `read_user` scope
-	// 403 means good key but not the right scope
+	// 403 from GitLab means good key, but either the scope or the account state denies access
 	// 401 is bad key
 	switch res.StatusCode {
 	case http.StatusOK:
 		return json.Valid(bodyBytes), nil, nil
 	case http.StatusForbidden:
-		stringBody := string(bodyBytes)
-
-		// A valid token whose account is blocked still authenticates, so treat it as verified.
-		if strings.Contains(stringBody, BlockedUserMessage) {
-			return true, map[string]string{
-				"blocked": "True",
-			}, nil
+		var errResp gitlabErrorResponse
+		if err := json.Unmarshal(bodyBytes, &errResp); err != nil {
+			return false, nil, fmt.Errorf("unexpected 403 response, unable to verify token")
 		}
 
-		if json.Valid(bodyBytes) &&
-			(strings.Contains(stringBody, "insufficient_scope") ||
-				strings.Contains(stringBody, "insufficient_granular_scope")) {
+		switch {
+		// GitLab only rejects an account (blocked, deactivated, password expired, unconfirmed
+		// email, etc.) after the token has resolved to a user.
+		case strings.HasPrefix(errResp.Message, forbiddenWithReasonPrefix):
+			extraData := map[string]string{
+				"access_denied_reason": strings.TrimPrefix(errResp.Message, forbiddenWithReasonPrefix),
+			}
+			if strings.HasPrefix(errResp.Message, BlockedUserMessage) {
+				extraData["blocked"] = "True"
+			}
+			return true, extraData, nil
+		case errResp.Error == "insufficient_scope", errResp.Error == "insufficient_granular_scope":
 			// Good key but not the right scope
 			return true, nil, nil
 		}
