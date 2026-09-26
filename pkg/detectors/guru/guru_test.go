@@ -19,14 +19,14 @@ var (
 		"authentication_type": "",
 		"verification_url": "https://api.example.com/example",
 		"test_secrets": {
-			"guru_user": "434EWv@Z7KcKlP6M5FO0",
+			"guru_user": "434EWv@z7kc.p6m5f",
 			"guru_secret": "v7zypoou-t6ld-uq7a-qsmm-j3y1mh0w5cf1"
 		},
 		"expected_response": "200",
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "434EWv@Z7KcKlP6M5FO0"
+	secret = "434EWv@z7kc.p6m5f"
 )
 
 func TestGuru_Pattern(t *testing.T) {
