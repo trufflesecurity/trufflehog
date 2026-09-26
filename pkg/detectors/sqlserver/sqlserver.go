@@ -54,6 +54,11 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	// SQLServer connection string is a semicolon delimited set of case-insensitive parameters which may go in any order.
 	pattern = regexp.MustCompile("(?:\n|`|'|\"| )?((?:[A-Za-z0-9_ ]+=[^;$'`\"$]+;?){3,})(?:'|`|\"|\r\n|\n)?")
+
+	// A password that is exactly one brace-delimited token is a templating
+	// placeholder rather than a credential. Covers .NET string.Format positional
+	// arguments ({0}, {1}, ...) and named tokens such as {Password}.
+	placeholderPattern = regexp.MustCompile(`^\{[^{}]*\}$`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -75,6 +80,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if paramsUnsafe.Password == "" {
+			continue
+		}
+
+		if placeholderPattern.MatchString(paramsUnsafe.Password) {
 			continue
 		}
 
