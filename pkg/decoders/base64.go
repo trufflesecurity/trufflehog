@@ -18,6 +18,13 @@ var (
 	b64EndChars = "+/-_="
 	// Given characters are mostly ASCII, we can use a simple array to map.
 	b64CharsetMapping [128]bool
+	// Standard and URL-safe alphabets, each with and without padding.
+	b64Encodings = []*base64.Encoding{
+		base64.StdEncoding,
+		base64.RawStdEncoding,
+		base64.URLEncoding,
+		base64.RawURLEncoding,
+	}
 )
 
 func init() {
@@ -37,14 +44,13 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	decodedSubstrings := make(map[string][]byte)
 
 	for _, str := range encodedSubstrings {
-		dec, err := base64.StdEncoding.DecodeString(str)
-		if err == nil && len(dec) > 0 && isASCII(dec) {
-			decodedSubstrings[str] = dec
-		}
-
-		dec, err = base64.RawURLEncoding.DecodeString(str)
-		if err == nil && len(dec) > 0 && isASCII(dec) {
-			decodedSubstrings[str] = dec
+		// A string that several encodings accept decodes to the same bytes with each of them.
+		for _, enc := range b64Encodings {
+			dec, err := enc.DecodeString(str)
+			if err == nil && len(dec) > 0 && isASCII(dec) {
+				decodedSubstrings[str] = dec
+				break
+			}
 		}
 	}
 
