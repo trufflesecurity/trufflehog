@@ -1357,14 +1357,15 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// This deduplication only applies to results that are *not*
 		// from reverification, since we are expected to see the same
 		// result from reverification and want to Dispatch it below.
+
+		// Notifier workers share this cache; the check and insert must be one atomic step.
 		if result.SecretID == 0 {
 			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
 			key := string(h[:])
-			if _, ok := e.dedupeCache.Get(key); ok {
+			if found, _ := e.dedupeCache.ContainsOrAdd(key, struct{}{}); found {
 				resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
 				continue
 			}
-			e.dedupeCache.Add(key, struct{}{})
 		}
 
 		if result.Verified {
