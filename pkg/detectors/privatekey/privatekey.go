@@ -27,6 +27,30 @@ var (
 	}
 )
 
+// knownTestKeyFingerprints holds the SHA-1 fingerprints (hex-encoded, matching the
+// output of FingerprintPEMKey) of well-known, publicly committed test/example private
+// keys. These keys ship unmodified in widely distributed packages and are only used to
+// spin up local test servers; they are not real credentials, so flagging them produces
+// false positives.
+//
+// The fingerprints below cover the Node.js core TLS test fixture keys (agent1..4,
+// client1..2, proxy1..2, server1..2) that the `tunnel` npm package vendors under
+// test/keys/. Those same key files appear in the node_modules of countless downstream
+// projects that depend on `tunnel` (e.g. several Azure SDK packages). See
+// https://github.com/trufflesecurity/trufflehog/issues/5299.
+var knownTestKeyFingerprints = map[string]struct{}{
+	"fe7715c7bc2137f36b366fac476c2c29cb9ff885": {}, // agent1-key.pem
+	"cfcbaa9f3e475e397d5ea1808fdfef7c961bf03a": {}, // agent2-key.pem
+	"64a4d4f9680ddb544a15322acfc3bfba5a7d60eb": {}, // agent3-key.pem
+	"e342c159e097a4b79b361c2fd6c8ed42bd6629f3": {}, // agent4-key.pem
+	"f788f2bc8d26134c78305a34cb261a881cb105dc": {}, // client1-key.pem
+	"eb228c0291c750d2661713d58dd426c8d60d4514": {}, // client2-key.pem
+	"2c8a3af664e06fd598b02a108504effab26641e9": {}, // proxy1-key.pem
+	"d414f9ed9c2f83e4b7386f38b76eb958d96877df": {}, // proxy2-key.pem
+	"7e28ec3dbb3758ba8c60a366a2eda27d5864b674": {}, // server1-key.pem
+	"f69f9bfbe4e144689045a01a3466bcb3a39a9aa9": {}, // server2-key.pem
+}
+
 type Scanner struct {
 	IncludeExpired bool
 }
@@ -100,6 +124,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		fingerprint, err := FingerprintPEMKey(parsedKey)
 		if err != nil {
+			continue
+		}
+
+		// Skip well-known, publicly committed test/example keys that are shipped
+		// unmodified in widely distributed packages. They are not real credentials and
+		// flagging them produces false positives.
+		if _, known := knownTestKeyFingerprints[fingerprint]; known {
 			continue
 		}
 
