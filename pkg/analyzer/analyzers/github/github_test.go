@@ -432,7 +432,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
               "Metadata": {
                 "owner": "sirdetectsalot",
                 "expiration": "2026-03-24T15:27:38+05:00",
-                "type": "Fine-Grained GitHub Personal Access Token"
+                "type": "Fine-Grained GitHub Personal Access Token",
+                "is_fine_grained": true
               }
             }`,
 		},
@@ -480,7 +481,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
               "Metadata": {
                 "owner": "truffle-sandbox",
                 "expiration": "0001-01-01T00:00:00Z",
-                "type": "Classic GitHub Personal Access Token"
+                "type": "Classic GitHub Personal Access Token",
+                "is_fine_grained": false
               }
             }`,
 			wantErr: false,

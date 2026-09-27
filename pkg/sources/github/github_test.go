@@ -375,15 +375,11 @@ func TestAppConnector_EnterpriseBaseURL(t *testing.T) {
 	privateKey := createPrivateKey()
 	enterpriseEndpoint := "https://api.example.ghe.com"
 
-	connector, err := NewAppConnector(
-		context.Background(),
-		enterpriseEndpoint,
-		&credentialspb.GitHubApp{
-			PrivateKey:     privateKey,
-			InstallationId: "1337",
-			AppId:          "4141",
-		},
-		false)
+	connector, err := NewAppConnector(enterpriseEndpoint, &credentialspb.GitHubApp{
+		PrivateKey:     privateKey,
+		InstallationId: "1337",
+		AppId:          "4141",
+	}, false)
 	require.NoError(t, err)
 
 	appConn, ok := connector.(*appConnector)

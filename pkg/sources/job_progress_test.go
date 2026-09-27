@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -105,6 +106,77 @@ func TestJobProgressHook(t *testing.T) {
 	jp.ReportUnit(reportUnit)
 	jp.ReportChunk(reportUnit, reportChunk)
 	jp.Finish()
+}
+
+func TestJobProgressErr(t *testing.T) {
+	t.Run("ref with no job", func(t *testing.T) {
+		ref := JobProgressRef{}
+		assert.ErrorIs(t, ref.Err(), ErrNoJob)
+		assert.NotErrorIs(t, ref.Err(), ErrJobDone)
+	})
+
+	// function to create a cancellable job
+	newCancellableJob := func() (context.Context, *JobProgress, JobProgressRef) {
+		runCtx, cancel := context.WithCancelCause(context.Background())
+		jp := NewJobProgress(123, 456, "source name", WithCancel(cancel))
+		return runCtx, jp, jp.Ref()
+	}
+	t.Run("finished without cancel", func(t *testing.T) {
+		_, jp, ref := newCancellableJob()
+		// Still running: Err is nil on both the job and the ref.
+		assert.NoError(t, jp.Err())
+		assert.NoError(t, ref.Err())
+		jp.Finish()
+		<-ref.Done()
+		assert.ErrorIs(t, jp.Err(), ErrJobDone)
+		assert.ErrorIs(t, ref.Err(), ErrJobDone)
+	})
+	t.Run("cancelled via CancelRun", func(t *testing.T) {
+		_, jp, ref := newCancellableJob()
+		cause := fmt.Errorf("abort! abort!")
+		ref.CancelRun(cause)
+		// CancelRun only requests a stop. Until Finish runs, Done is still
+		// open and Err must still report the job as running.
+		select {
+		case <-ref.Done():
+			assert.FailNow(t, "job should not be done before Finish")
+		default:
+		}
+		assert.NoError(t, jp.Err())
+		assert.NoError(t, ref.Err())
+		jp.Finish()
+		<-ref.Done()
+		assert.ErrorIs(t, jp.Err(), cause)
+		assert.ErrorIs(t, ref.Err(), cause)
+	})
+	t.Run("cancel after finish does not change Err", func(t *testing.T) {
+		_, jp, ref := newCancellableJob()
+		jp.Finish()
+		ref.CancelRun(fmt.Errorf("too late"))
+		assert.ErrorIs(t, ref.Err(), ErrJobDone)
+	})
+
+	t.Run("nil cause is reported as cancelled", func(t *testing.T) {
+		_, jp, ref := newCancellableJob()
+		ref.CancelRun(nil)
+		jp.Finish()
+		assert.ErrorIs(t, ref.Err(), context.Canceled)
+		assert.NotErrorIs(t, ref.Err(), ErrJobDone)
+	})
+
+	t.Run("first cause wins", func(t *testing.T) {
+		runCtx, jp, ref := newCancellableJob()
+		first := fmt.Errorf("first cause")
+		second := fmt.Errorf("second cause")
+		ref.CancelRun(first)
+		ref.CancelRun(second)
+		// The source's run context sees the first cause, not the second.
+		assert.ErrorIs(t, context.Cause(runCtx), first)
+		jp.Finish()
+		<-ref.Done()
+		assert.ErrorIs(t, ref.Err(), first)
+		assert.NotErrorIs(t, ref.Err(), second)
+	})
 }
 
 func TestJobProgressDone(t *testing.T) {

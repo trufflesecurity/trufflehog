@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -73,7 +73,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		passwordMatches[p] = struct{}{}
 	}
 
-EndpointLoop:
 	for username := range registryMatches {
 		for password := range passwordMatches {
 			r := detectors.Result{
@@ -89,26 +88,30 @@ EndpointLoop:
 
 			if verify {
 				if invalidHosts.Exists(username) {
-					logger.V(3).Info("Skipping invalid registry", "username", username)
-					continue EndpointLoop
-				}
-
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, verificationErr := verifyMatch(ctx, client, username, password)
-				if isVerified {
-					delete(passwordMatches, password)
-					r.Verified = true
-				}
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoSuchHost) {
-						invalidHosts.Set(username, struct{}{})
-						continue EndpointLoop
+					// An earlier candidate already proved this host does not resolve, so the lookup is
+					// skipped. The finding is still reported: dropping it here would make the reported
+					// secrets depend on whether verification was requested, and on the order in which
+					// candidates happened to be processed.
+					logger.V(3).Info("Skipping verification: no such host", "username", username)
+					r.SetVerificationError(errNoSuchHost, password)
+				} else {
+					client := s.client
+					if client == nil {
+						client = defaultClient
 					}
-					r.SetVerificationError(verificationErr, password)
+
+					isVerified, verificationErr := verifyMatch(ctx, client, username, password)
+					if isVerified {
+						delete(passwordMatches, password)
+						r.Verified = true
+					}
+					if verificationErr != nil {
+						var dnsErr *net.DNSError
+						if errors.As(verificationErr, &dnsErr) && dnsErr.IsNotFound {
+							invalidHosts.Set(username, struct{}{})
+						}
+						r.SetVerificationError(verificationErr, password)
+					}
 				}
 			}
 
@@ -137,10 +140,6 @@ func verifyMatch(ctx context.Context, client *http.Client, username string, pass
 	req.SetBasicAuth(username, password)
 	res, err := client.Do(req)
 	if err != nil {
-		// lookup foo.azurecr.io: no such host
-		if strings.Contains(err.Error(), "no such host") {
-			return false, errNoSuchHost
-		}
 		return false, err
 	}
 	defer func() {

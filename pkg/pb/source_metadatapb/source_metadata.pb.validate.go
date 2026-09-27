@@ -3204,6 +3204,10 @@ func (m *SharePoint) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Version
+
+	// no validation rules for CommentNumber
+
 	if len(errors) > 0 {
 		return SharePointMultiError(errors)
 	}
