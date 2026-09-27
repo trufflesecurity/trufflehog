@@ -26,6 +26,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -60,8 +61,6 @@ type Source struct {
 	endpoint *url.URL
 	// objectFilter is never nil after Init.
 	objectFilter *objectFilter
-	// objectProgress is never nil after Init.
-	objectProgress *scanProgress
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -93,7 +92,6 @@ func (s *Source) Init(
 	s.verify = verify
 	s.concurrency = concurrency
 	s.errorCount = &sync.Map{}
-	s.objectProgress = &scanProgress{}
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
@@ -309,9 +307,10 @@ type pageMetadata struct {
 
 // processingState tracks the state of concurrent S3 object processing.
 type processingState struct {
-	errorCount    *sync.Map // Thread-safe map tracking errors per prefix
-	objectCount   *uint64   // Total number of objects processed
-	filteredCount *uint64   // Total number of objects excluded by the object filter
+	errorCount    *sync.Map     // Thread-safe map tracking errors per prefix
+	objectCount   *uint64       // Total number of objects processed
+	filteredCount *uint64       // Total number of objects excluded by the object filter
+	progress      *unitProgress // Progress inside the unit, nil for a legacy scan
 }
 
 // resumePosition tracks where to restart scanning S3 buckets and objects after an interruption.
@@ -422,7 +421,7 @@ func (s *Source) scanBuckets(
 			)
 		}
 
-		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer)
+		objectCount := s.scanBucket(ctx, client, role, bucket, sources.ChanReporter{Ch: chunksChan}, startAfter, checkpointer, nil)
 		*totalObjectCount += objectCount
 	}
 
@@ -442,6 +441,7 @@ func (s *Source) scanBucket(
 	reporter sources.ChunkReporter,
 	startAfter *string,
 	checkpointer *Checkpointer,
+	progress *unitProgress,
 ) uint64 {
 	s.metricsCollector.RecordBucketForRole(role)
 
@@ -460,11 +460,14 @@ func (s *Source) scanBucket(
 		return 0
 	}
 
-	if checkpointer.isUnitScan {
-		countCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		s.objectProgress.listingsInFlight.Add(1)
-		go s.countBucket(countCtx, regionalClient, bucket, startAfter)
+	// scannedWholeBucket is set once the listing below has gone from the start of the bucket to the end.
+	var scannedWholeBucket bool
+	if progress != nil {
+		stopCount := s.startCount(ctx, regionalClient, bucket, startAfter, progress)
+		defer func() {
+			stopCount()
+			progress.finish(scannedWholeBucket)
+		}()
 	}
 
 	errorCount := sync.Map{}
@@ -477,6 +480,7 @@ func (s *Source) scanBucket(
 	pageNumber := 1
 	paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
 	var objectCount, filteredCount uint64
+	listFailed := false
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -493,6 +497,7 @@ func (s *Source) scanBucket(
 				ctx.Logger().Error(err, "could not list objects in bucket")
 			}
 			s.metricsCollector.RecordBucketListError(bucket, role)
+			listFailed = true
 			break
 		}
 		pageMetadata := pageMetadata{
@@ -506,11 +511,13 @@ func (s *Source) scanBucket(
 			errorCount:    &errorCount,
 			objectCount:   &objectCount,
 			filteredCount: &filteredCount,
+			progress:      progress,
 		}
 		s.pageChunker(ctx, pageMetadata, processingState, reporter, checkpointer)
 
 		pageNumber++
 	}
+	scannedWholeBucket = startAfter == nil && !listFailed && ctx.Err() == nil
 
 	// A filter that excludes everything otherwise looks exactly like a clean scan
 	// of an empty bucket, so say so rather than finishing silently.
@@ -571,6 +578,35 @@ func (s *Source) getRegionalClientForBucket(
 	return regionalClient, nil
 }
 
+// Reasons the scan skips an object without downloading it. They are also the reason label on the
+// skipped objects metric.
+const (
+	skipReasonObjectFilter          = "object_filter"
+	skipReasonStorageClass          = "storage_class"
+	skipReasonSizeLimit             = "size_limit"
+	skipReasonEmptyFile             = "empty_file"
+	skipReasonIncompatibleExtension = "incompatible_extension"
+)
+
+// skipReason returns why the scan skips an object without downloading it, or "" if it downloads it.
+// The count pass uses it too, so the progress total holds exactly the objects the scan downloads.
+func (s *Source) skipReason(obj s3types.Object) string {
+	switch {
+	case !s.objectFilter.shouldInclude(*obj.Key):
+		return skipReasonObjectFilter
+	case obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr:
+		return skipReasonStorageClass
+	case *obj.Size > s.maxObjectSize:
+		return skipReasonSizeLimit
+	case *obj.Size == 0:
+		return skipReasonEmptyFile
+	case common.SkipFile(*obj.Key):
+		return skipReasonIncompatibleExtension
+	default:
+		return ""
+	}
+}
+
 // pageChunker emits chunks onto the given channel from a page.
 func (s *Source) pageChunker(
 	ctx context.Context,
@@ -580,12 +616,6 @@ func (s *Source) pageChunker(
 	checkpointer *Checkpointer,
 ) {
 	checkpointer.Reset() // Reset the checkpointer for each PAGE
-	// The legacy scan reports progress per bucket through SetProgressComplete, which the per-object
-	// percent would overwrite. Objects countsTowardProgress excludes are skipped above without a call.
-	objectDone := func(int64) {}
-	if checkpointer.isUnitScan {
-		objectDone = s.objectDone
-	}
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 	for objIdx, obj := range metadata.page.Contents {
 		octx := context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
@@ -593,57 +623,17 @@ func (s *Source) pageChunker(
 			return
 		}
 
-		// Skip objects excluded by the configured prefixes or extensions.
-		if !s.objectFilter.shouldInclude(*obj.Key) {
-			atomic.AddUint64(state.filteredCount, 1)
-			octx.Logger().V(5).Info("Skipping filtered object")
-			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "object_filter", float64(*obj.Size))
-			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
-				octx.Logger().Error(err, "could not update progress for filtered object")
+		// Skip objects the scan never downloads: filtered, Glacier, too large, empty or of an
+		// incompatible extension. They are left out of the unit's progress on both sides.
+		if reason := s.skipReason(obj); reason != "" {
+			if reason == skipReasonObjectFilter {
+				atomic.AddUint64(state.filteredCount, 1)
 			}
-			objectDone(*obj.Size)
-			continue
-		}
-
-		// Skip GLACIER and GLACIER_IR objects.
-		if obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr {
-			octx.Logger().V(5).Info("Skipping object in storage class", "storage_class", obj.StorageClass)
-			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "storage_class", float64(*obj.Size))
+			octx.Logger().V(5).Info("Skipping object", "reason", reason)
+			s.metricsCollector.RecordObjectSkipped(metadata.bucket, reason, float64(*obj.Size))
 			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
-				octx.Logger().Error(err, "could not update progress for glacier object")
+				octx.Logger().Error(err, "could not update progress for skipped object", "reason", reason)
 			}
-			continue
-		}
-
-		// Ignore large files.
-		if *obj.Size > s.maxObjectSize {
-			octx.Logger().V(5).Info("Skipping large file", "max_object_size", s.maxObjectSize)
-			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "size_limit", float64(*obj.Size))
-			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
-				octx.Logger().Error(err, "could not update progress for large file")
-			}
-			continue
-		}
-
-		// File empty file.
-		if *obj.Size == 0 {
-			octx.Logger().V(5).Info("Skipping empty file")
-			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "empty_file", 0)
-			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
-				octx.Logger().Error(err, "could not update progress for empty file")
-			}
-			objectDone(*obj.Size)
-			continue
-		}
-
-		// Skip incompatible extensions.
-		if common.SkipFile(*obj.Key) {
-			octx.Logger().V(5).Info("Skipping file with incompatible extension")
-			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "incompatible_extension", float64(*obj.Size))
-			if err := checkpointer.UpdateObjectCompletion(octx, objIdx, metadata.bucket, metadata.role, metadata.page.Contents); err != nil {
-				octx.Logger().Error(err, "could not update progress for incompatible file")
-			}
-			objectDone(*obj.Size)
 			continue
 		}
 
@@ -652,7 +642,7 @@ func (s *Source) pageChunker(
 			if common.IsDone(octx) {
 				return octx.Err()
 			}
-			defer objectDone(*obj.Size)
+			defer state.progress.objectDone(*obj.Size)
 
 			if strings.HasSuffix(*obj.Key, "/") {
 				octx.Logger().V(5).Info("Skipping directory")
@@ -908,7 +898,13 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		startAfterPtr = &startAfter
 	}
 	defer s.ClearEncodedResumeInfoFor(unitID)
-	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer)
+
+	// Counting the bucket costs an extra listing of it, so it only runs where something reads the result.
+	var progress *unitProgress
+	if feature.EnableS3UnitProgress.Load() {
+		progress = newUnitProgress(unitID, &s.Progress)
+	}
+	s.scanBucket(ctx, defaultClient, s3unit.Role, s3unit.Bucket, reporter, startAfterPtr, checkpointer, progress)
 	return nil
 }
 

@@ -645,8 +645,8 @@ func TestSourceChunksResumptionWithRole(t *testing.T) {
 	assert.Less(t, count, sourceTotalChunkCount, "Should have processed less than total chunks on resume")
 }
 
-func TestSource_ChunkUnit_ReportsPercent(t *testing.T) {
-	t.Parallel()
+func TestSource_ChunkUnit_ReportsUnitProgress(t *testing.T) {
+	enableUnitProgress(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -665,12 +665,13 @@ func TestSource_ChunkUnit_ReportsPercent(t *testing.T) {
 	require.Len(t, reporter.Units, 1)
 	require.NoError(t, s.ChunkUnit(ctx, reporter.Units[0], &reporter))
 
-	require.Eventually(t, func() bool { return s.objectProgress.listingsInFlight.Load() == 0 }, 5*time.Second, 10*time.Millisecond)
-	assert.False(t, s.objectProgress.countIncomplete.Load())
-	assert.Positive(t, s.objectProgress.objectsTotal.Load())
-	assert.Equal(t, s.objectProgress.objectsTotal.Load(), s.objectProgress.objectsDone.Load())
-	assert.EqualValues(t, 99, s.GetProgress().PercentComplete)
-
 	unitID, _ := reporter.Units[0].SourceUnitID()
+	progress, ok := s.GetUnitProgressFor(unitID)
+	require.True(t, ok)
+	assert.Equal(t, sources.UnitProgressReady, progress.State)
+	assert.Positive(t, progress.ItemsTotal)
+	assert.Equal(t, progress.ItemsTotal, progress.ItemsDone)
+	assert.Equal(t, progress.BytesTotal, progress.BytesDone)
+	assert.EqualValues(t, 99, progress.Percent())
 	assert.Empty(t, s.GetEncodedResumeInfoFor(unitID))
 }

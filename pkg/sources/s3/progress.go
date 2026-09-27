@@ -1,137 +1,152 @@
 package s3
 
 import (
-	"math"
-	"sync/atomic"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const progressMessage = "Scanning objects"
+// unitProgress tracks how far a unit scan has got through its bucket and publishes it on the source's
+// Progress under the unit's ID. Each ChunkUnit call has its own, so buckets scanned at the same time
+// never mix their counts.
+type unitProgress struct {
+	unitID   string
+	progress *sources.Progress
 
-// scanProgress aggregates object and byte counts across every bucket the source is scanning,
-// so that concurrent ChunkUnit calls sharing one Progress publish one consistent number.
-type scanProgress struct {
-	objectsDone, bytesDone   atomic.Uint64
-	objectsTotal, bytesTotal atomic.Uint64
-
-	// listingsInFlight is the number of buckets whose count pass has not finished.
-	// Percent is unknown while it is non-zero.
-	listingsInFlight atomic.Int32
-
-	// countIncomplete is set when a count pass ended before listing its whole bucket, whether it failed
-	// or was cancelled, leaving totals too low to divide by.
-	countIncomplete atomic.Bool
+	mu       sync.Mutex
+	current  sources.UnitProgress
+	finished bool
 }
 
-func (p *scanProgress) addDone(objects, bytes uint64) {
-	p.objectsDone.Add(objects)
-	p.bytesDone.Add(bytes)
+func newUnitProgress(unitID string, progress *sources.Progress) *unitProgress {
+	return &unitProgress{unitID: unitID, progress: progress}
 }
 
-func (p *scanProgress) addTotal(objects, bytes uint64) {
-	p.objectsTotal.Add(objects)
-	p.bytesTotal.Add(bytes)
-}
-
-// percent returns the share of bytes done, capped at 99 because only the unit finishing makes a job complete.
-func (p *scanProgress) percent() int64 {
-	if p.listingsInFlight.Load() > 0 || p.countIncomplete.Load() {
-		return 0
+// update applies f and publishes the result. Publishing under the lock keeps an older value from
+// replacing a newer one. Nothing changes once the unit has finished.
+func (p *unitProgress) update(f func(current *sources.UnitProgress)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.finished {
+		return
 	}
-
-	total := p.bytesTotal.Load()
-	if total == 0 {
-		return 0
-	}
-
-	return int64(min(p.bytesDone.Load()*100/total, 99))
+	f(&p.current)
+	p.progress.SetUnitProgressFor(p.unitID, p.current)
 }
 
-// countBucket walks the bucket once, summing object count and size. Keys at or before startAfter are also
-// counted as done, so a resumed scan starts its bar where the previous run stopped. Nothing is retained per object.
-//
-// The caller must increment listingsInFlight before starting it,
-// so that percent never divides by a total that is still being counted.
-func (s *Source) countBucket(ctx context.Context, client *s3.Client, bucket string, startAfter *string) {
-	var counted bool
+// objectDone records that the scan is finished with an object it downloads, whether or not the
+// download worked. It does nothing on a nil receiver, which is how a legacy scan runs.
+func (p *unitProgress) objectDone(size int64) {
+	if p == nil {
+		return
+	}
+	p.update(func(current *sources.UnitProgress) {
+		current.ItemsDone++
+		current.BytesDone += uint64(max(size, 0))
+	})
+}
 
-	// Publish after the decrement, because percent reports nothing while a count is in flight. Without it
-	// the bar stays at 0 until the next object finishes, which for large objects is minutes.
-	defer func() {
-		if !counted {
-			s.objectProgress.countIncomplete.Store(true)
+// counted adds a listed page to the totals. Objects an earlier run finished count as done too.
+func (p *unitProgress) counted(items, bytes, resumedItems, resumedBytes uint64) {
+	p.update(func(current *sources.UnitProgress) {
+		current.ItemsTotal += items
+		current.BytesTotal += bytes
+		current.ItemsDone += resumedItems
+		current.BytesDone += resumedBytes
+		current.ResumedBytes += resumedBytes
+	})
+}
+
+func (p *unitProgress) setState(state sources.UnitProgressState) {
+	p.update(func(current *sources.UnitProgress) { current.State = state })
+}
+
+// finish settles the totals once the scan of the bucket has ended. scannedWholeBucket means the scan
+// listed the bucket from the start to the end, so it has seen every object there is.
+func (p *unitProgress) finish(scannedWholeBucket bool) {
+	p.update(func(current *sources.UnitProgress) {
+		switch {
+		case current.State == sources.UnitProgressReady:
+			// Objects added during the scan can take the done count past the total.
+			current.ItemsTotal = max(current.ItemsTotal, current.ItemsDone)
+			current.BytesTotal = max(current.BytesTotal, current.BytesDone)
+		case scannedWholeBucket:
+			// The count pass did not get to the end, but the scan did, so what it did is the total.
+			current.ItemsTotal = current.ItemsDone
+			current.BytesTotal = current.BytesDone
+			current.State = sources.UnitProgressReady
+		default:
+			current.State = sources.UnitProgressUnavailable
 		}
-		s.objectProgress.listingsInFlight.Add(-1)
-		s.publishProgress()
+		p.finished = true
+	})
+}
+
+// startCount runs the count pass alongside the scan. It returns a function that stops the count and
+// waits for it to exit, so nothing is counted after the unit finishes.
+func (s *Source) startCount(
+	ctx context.Context,
+	client *s3.Client,
+	bucket string,
+	startAfter *string,
+	progress *unitProgress,
+) func() {
+	countCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+
+	progress.setState(sources.UnitProgressCounting)
+	go func() {
+		defer close(done)
+		defer common.Recover(countCtx)
+		s.countBucket(countCtx, client, bucket, startAfter, progress)
 	}()
 
+	return func() {
+		cancel()
+		<-done
+	}
+}
+
+// countBucket lists the whole bucket once to add up the objects the scan downloads and their size,
+// since S3 has no API that reports either. Keys at or before startAfter were finished by an earlier
+// run, so they count as done too. Nothing is kept per object.
+func (s *Source) countBucket(
+	ctx context.Context,
+	client *s3.Client,
+	bucket string,
+	startAfter *string,
+	progress *unitProgress,
+) {
 	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: &bucket})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			// Cancellation means the scan ended first, so the pages already counted stay unusable rather
-			// than becoming a total the rest of the scan divides by.
+			// A cancelled count means the unit has finished, and finish settles the totals.
 			if ctx.Err() == nil {
 				ctx.Logger().V(2).Info("could not count objects for progress", "bucket", bucket, "err", err)
+				progress.setState(sources.UnitProgressUnavailable)
 			}
 			return
 		}
 
-		var objects, bytes, doneObjects, doneBytes uint64
+		var items, bytes, resumedItems, resumedBytes uint64
 		for _, obj := range page.Contents {
-			if !s.countsTowardProgress(obj) {
+			if s.skipReason(obj) != "" {
 				continue
 			}
 			size := uint64(max(*obj.Size, 0))
-			objects++
+			items++
 			bytes += size
 			if startAfter != nil && *obj.Key <= *startAfter {
-				doneObjects++
-				doneBytes += size
+				resumedItems++
+				resumedBytes += size
 			}
 		}
-		s.objectProgress.addTotal(objects, bytes)
-		s.objectProgress.addDone(doneObjects, doneBytes)
+		progress.counted(items, bytes, resumedItems, resumedBytes)
 	}
-	counted = true
-}
-
-// countsTowardProgress reports whether an object belongs in the progress ratio. Objects this scan will
-// never download are left out of both the total and the done count, so that the percent tracks the bytes
-// actually fetched rather than jumping whenever a skipped object goes by.
-//
-// The order of the tests mirrors pageChunker, which checks the object filter before anything else and
-// counts what the filter skips as done. A filtered object therefore belongs in the total as well,
-// whatever its storage class or size, or the done count would climb past a total it was never in.
-func (s *Source) countsTowardProgress(obj s3types.Object) bool {
-	if !s.objectFilter.shouldInclude(*obj.Key) {
-		return true
-	}
-	if obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr {
-		return false
-	}
-	return *obj.Size <= s.maxObjectSize
-}
-
-// objectDone records that an object has been scanned or skipped.
-func (s *Source) objectDone(size int64) {
-	s.objectProgress.addDone(1, uint64(max(size, 0)))
-	s.publishProgress()
-}
-
-func (s *Source) publishProgress() {
-	s.SetProgressPercent(
-		s.objectProgress.percent(),
-		clampInt32(s.objectProgress.objectsDone.Load()),
-		clampInt32(s.objectProgress.objectsTotal.Load()),
-		progressMessage,
-	)
-}
-
-func clampInt32(v uint64) int32 {
-	return int32(min(v, math.MaxInt32))
+	progress.setState(sources.UnitProgressReady)
 }

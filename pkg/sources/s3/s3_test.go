@@ -532,12 +532,13 @@ func TestSource_PageChunker_FilteredObjectsAdvanceCheckpoint(t *testing.T) {
 	assert.Equal(t, *page.Contents[objectCount-1].Key, resumeInfo.StartAfter)
 }
 
-func TestSource_PageChunker_UnitScanCountsSkippedObjectsAsDone(t *testing.T) {
+func TestSource_PageChunker_UnitScanLeavesSkippedObjectsOutOfProgress(t *testing.T) {
 	ctx := context.Background()
 
 	conn, err := anypb.New(&sourcespb.S3{
 		Credential:      &sourcespb.S3_Unauthenticated{},
 		ExcludePrefixes: []string{"archive/"},
+		MaxObjectSize:   1024,
 	})
 	require.NoError(t, err)
 
@@ -545,62 +546,36 @@ func TestSource_PageChunker_UnitScanCountsSkippedObjectsAsDone(t *testing.T) {
 	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
 	s.SetEncodedResumeInfoFor("test-bucket", "earlier-key")
 
-	const objectCount, objectSize = 10, 1024
-	page := &awss3.ListObjectsV2Output{Contents: make([]s3types.Object, objectCount)}
-	for i := range objectCount {
-		key := fmt.Sprintf("archive/key-%02d.txt", i)
-		size := int64(objectSize)
-		page.Contents[i] = s3types.Object{Key: &key, Size: &size}
-	}
-	s.objectProgress.addTotal(objectCount, objectCount*objectSize)
-
-	// Every object is filtered, so pageChunker never reaches GetObject and needs no client.
-	var scanned, filtered uint64
-	s.pageChunker(
-		ctx,
-		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
-		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
-		sources.ChanReporter{Ch: make(chan *sources.Chunk, objectCount)},
-		NewCheckpointer(ctx, &s.Progress, true),
-	)
-
-	assert.EqualValues(t, objectCount, s.objectProgress.objectsDone.Load())
-	assert.EqualValues(t, objectCount*objectSize, s.objectProgress.bytesDone.Load())
-	assert.EqualValues(t, 99, s.GetProgress().PercentComplete)
-	assert.EqualValues(t, objectCount, s.GetProgress().SectionsCompleted)
-	// Filtered objects advance the checkpoint to the last key of the page, and the percent update
-	// must not disturb the per-unit resume map.
-	assert.Equal(t, *page.Contents[objectCount-1].Key, s.GetEncodedResumeInfoFor("test-bucket"))
-}
-
-func TestSource_PageChunker_UnitScanLeavesUncountedObjectsOutOfProgress(t *testing.T) {
-	ctx := context.Background()
-
-	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}, MaxObjectSize: 1024})
-	require.NoError(t, err)
-
-	s := Source{}
-	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
-
-	glacierKey, oversizeKey := "cold.txt", "huge.txt"
-	size, oversize := int64(512), int64(4096)
+	filteredKey, glacierKey, oversizeKey, emptyKey, imageKey := "archive/a.txt", "cold.txt", "huge.txt", "none.txt", "photo.jpg"
+	size, oversize, empty := int64(512), int64(4096), int64(0)
 	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{
+		{Key: &filteredKey, Size: &size},
 		{Key: &glacierKey, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
 		{Key: &oversizeKey, Size: &oversize},
+		{Key: &emptyKey, Size: &empty},
+		{Key: &imageKey, Size: &size},
 	}}
 
-	// Neither object is downloaded, so pageChunker needs no client.
+	// No object is downloaded, so pageChunker needs no client.
 	var scanned, filtered uint64
 	s.pageChunker(
 		ctx,
 		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
-		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		processingState{
+			errorCount:    &sync.Map{},
+			objectCount:   &scanned,
+			filteredCount: &filtered,
+			progress:      newUnitProgress("test-bucket", &s.Progress),
+		},
 		sources.ChanReporter{Ch: make(chan *sources.Chunk, len(page.Contents))},
 		NewCheckpointer(ctx, &s.Progress, true),
 	)
 
-	assert.Zero(t, s.objectProgress.objectsDone.Load())
-	assert.Zero(t, s.objectProgress.bytesDone.Load())
+	_, reported := s.GetUnitProgressFor("test-bucket")
+	assert.False(t, reported, "skipped objects are in neither the total nor the done count")
+	assert.EqualValues(t, 1, filtered)
+	// Skipped objects still advance the checkpoint to the last key of the page.
+	assert.Equal(t, *page.Contents[len(page.Contents)-1].Key, s.GetEncodedResumeInfoFor("test-bucket"))
 }
 
 func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
@@ -628,7 +603,48 @@ func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
 		NewCheckpointer(ctx, &s.Progress, false),
 	)
 
-	assert.Zero(t, s.objectProgress.objectsDone.Load())
+	_, reported := s.GetUnitProgressFor("test-bucket")
+	assert.False(t, reported)
 	assert.EqualValues(t, 1, s.GetProgress().SectionsRemaining)
 	assert.Equal(t, "Bucket: test-bucket", s.GetProgress().Message)
+}
+
+func TestSource_SkipReason(t *testing.T) {
+	filter, err := newObjectFilter(nil, []string{"archive/"}, nil, nil)
+	require.NoError(t, err)
+	s := Source{maxObjectSize: 1024, objectFilter: filter}
+
+	key, filteredKey, imageKey := "keep/obj.txt", "archive/obj.txt", "keep/photo.jpg"
+	size, oversize, empty := int64(512), int64(2048), int64(0)
+
+	tests := []struct {
+		name string
+		obj  s3types.Object
+		want string
+	}{
+		{name: "standard object", obj: s3types.Object{Key: &key, Size: &size}, want: ""},
+		{name: "at the size limit", obj: s3types.Object{Key: &key, Size: &s.maxObjectSize}, want: ""},
+		{name: "over the size limit", obj: s3types.Object{Key: &key, Size: &oversize}, want: skipReasonSizeLimit},
+		{
+			name: "glacier",
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+			want: skipReasonStorageClass,
+		},
+		{
+			name: "glacier instant retrieval",
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacierIr},
+			want: skipReasonStorageClass,
+		},
+		{name: "empty", obj: s3types.Object{Key: &key, Size: &empty}, want: skipReasonEmptyFile},
+		{name: "incompatible extension", obj: s3types.Object{Key: &imageKey, Size: &size}, want: skipReasonIncompatibleExtension},
+		{name: "filtered", obj: s3types.Object{Key: &filteredKey, Size: &size}, want: skipReasonObjectFilter},
+		// The filter is checked first, matching the reason the skipped objects metric has always recorded.
+		{name: "filtered and over the size limit", obj: s3types.Object{Key: &filteredKey, Size: &oversize}, want: skipReasonObjectFilter},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, s.skipReason(tt.obj))
+		})
+	}
 }
