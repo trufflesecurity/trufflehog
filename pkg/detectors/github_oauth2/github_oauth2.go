@@ -19,10 +19,20 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
+// This detector emits the cartesian product of every client ID and client secret in a
+// chunk, so chunks routinely carry dozens of candidate pairs. Implementing ResultVerifier
+// lets the verification cache verify only the pairs it has not seen before instead of
+// re-verifying the whole product whenever one pair is novel.
+var _ detectors.ResultVerifier = (*Scanner)(nil)
+
 var (
 	// Oauth2 client ID and secret
 	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-zA-Z0-9]{20})\b`)
 	oauth2ClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{40})\b`)
+
+	// tokenURL is a variable rather than a direct reference to github.Endpoint.TokenURL so
+	// that verification tests can redirect it at an httptest server.
+	tokenURL = github.Endpoint.TokenURL
 )
 
 const (
@@ -59,19 +69,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 			}
 
-			config := &clientcredentials.Config{
-				ClientID:     idMatch[1],
-				ClientSecret: secretMatch[1],
-				TokenURL:     github.Endpoint.TokenURL,
-			}
+			// Verification is delegated so that this path and the verification cache's
+			// per-result path share one implementation.
 			if verify {
-				_, err := config.Token(ctx)
-				// if client id and client secret is correct, it will return bad verification code error as we do not pass any verification code
-				// docs: https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors#bad-verification-code
-				if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
-					// mark result as verified only in case of bad verification code error, for any other error the result will be unverified
-					s1.Verified = true
-				}
+				s.VerifyResult(ctx, &s1)
 			}
 
 			results = append(results, s1)
@@ -79,6 +80,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+// VerifyResult verifies a single client ID / client secret pair.
+// the verification cache calls it directly for results that missed the cache, which
+// is what keeps a chunk of many pairs from re-verifying pairs whose status is already known.
+func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
+	clientID := result.SecretParts["id"]
+	clientSecret := result.SecretParts["secret"]
+	clientCredentials := &clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     tokenURL,
+	}
+
+	_, err := clientCredentials.Token(ctx)
+	// if client id and client secret is correct, it will return bad verification code error as we do not pass any verification code
+	// docs: https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors#bad-verification-code
+	if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
+		// mark result as verified only in case of bad verification code error, for any other error the result will be unverified
+		result.Verified = true
+	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

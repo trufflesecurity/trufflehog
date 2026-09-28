@@ -49,48 +49,57 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := &bytes.Buffer{}
-			writer := multipart.NewWriter(payload)
-			fw, err := writer.CreateFormField("api_key")
-			if err != nil {
-				continue
-			}
-			_, err = io.Copy(fw, strings.NewReader(resMatch))
-			if err != nil {
-				continue
-			}
-			fw, err = writer.CreateFormField("text")
-			if err != nil {
-				continue
-			}
-			_, err = io.Copy(fw, strings.NewReader("sample text"))
-			if err != nil {
-				continue
-			}
-			_ = writer.Close()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader(payload.Bytes()))
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", writer.FormDataContentType())
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "intent") {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	payload := &bytes.Buffer{}
+	writer := multipart.NewWriter(payload)
+	fw, err := writer.CreateFormField("api_key")
+	if err != nil {
+		return false, err
+	}
+	_, err = io.Copy(fw, strings.NewReader(resMatch))
+	if err != nil {
+		return false, err
+	}
+	fw, err = writer.CreateFormField("text")
+	if err != nil {
+		return false, err
+	}
+	_, err = io.Copy(fw, strings.NewReader("sample text"))
+	if err != nil {
+		return false, err
+	}
+	_ = writer.Close()
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader(payload.Bytes()))
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "intent") {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

@@ -145,8 +145,10 @@ func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string,
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	if err := sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
-		progress.ReportError(Fatal{err})
-		return progress.Ref(), Fatal{err}
+		fatalErr := Fatal{err}
+		progress.ReportError(fatalErr)
+		progress.finishWithCause(fatalErr)
+		return progress.Ref(), fatalErr
 	}
 	s.wg.Add(1)
 	go func() {
@@ -239,8 +241,10 @@ func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Sour
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	if err := s.sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
-		progress.ReportError(Fatal{err})
-		return progress.Ref(), Fatal{err}
+		fatalErr := Fatal{err}
+		progress.ReportError(fatalErr)
+		progress.finishWithCause(fatalErr)
+		return progress.Ref(), fatalErr
 	}
 	s.wg.Add(1)
 	go func() {

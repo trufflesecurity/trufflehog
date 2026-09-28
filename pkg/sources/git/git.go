@@ -856,6 +856,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = ctx
 	}
 
+	// The scan can stop before the diff channel is drained, on max depth or on
+	// reaching the base commit. Nothing else tells the parser that, so cancelling on
+	// the way out is what shuts down the git processes still producing diffs. Without
+	// it they sit blocked on a channel nobody is reading until the whole scan ends.
+	repoCtx, cancel := context.WithCancel(repoCtx)
+	defer cancel()
+
 	logger := repoCtx.Logger()
 	var logValues []any
 	if scanOptions.BaseHash != "" {
@@ -868,7 +875,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isRepoBare(path))
+	// git computes the base..head range, so every commit on diffChan is in scope.
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash, scanOptions.ExcludeGlobs, isRepoBare(path))
 	if err != nil {
 		return err
 	}
@@ -892,10 +900,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		commit := diff.Commit
 		fullHash := commit.Hash
-		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
-			logger.V(1).Info("reached base commit", "commit", fullHash)
-			break
-		}
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
@@ -1036,6 +1040,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		if err := chunkData(diff); err != nil {
 			return err
 		}
+	}
+
+	// empty base..head range exits successfully
+	if scanOptions.BaseHash != "" && depth == 0 {
+		logger.Info("no commits in range", logValues...)
 	}
 	return nil
 }

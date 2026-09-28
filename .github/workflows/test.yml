@@ -38,7 +38,7 @@ jobs:
         if: ${{ success() || failure() }} # always run this step, even if there were previous errors
       - name: Upload test results to BuildPulse for flaky test detection
         if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
-        uses: buildpulse/buildpulse-action@0b048a4942e59de0796568d1035946e283be6b3a # main
+        uses: buildpulse/buildpulse-action@d4d8e00c645a2e3db0419a43664bbcf868080234 # v0.12.0
         with:
           account: 79229934
           repository: 77726177

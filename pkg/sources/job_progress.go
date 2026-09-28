@@ -39,6 +39,13 @@ type JobProgressHook interface {
 	Finish(JobProgressRef)
 }
 
+var (
+	// ErrNoJob is returned when there is no JobProgress associated with the reference.
+	ErrNoJob = errors.New("no job")
+	// ErrJobDone is returned when the job finishes without being cancelled.
+	ErrJobDone = errors.New("job done")
+)
+
 // JobProgressRef is a wrapper of a JobProgress for read-only access to its state.
 // If the job supports it, the reference can also be used to cancel running via
 // CancelRun.
@@ -55,6 +62,16 @@ func (r *JobProgressRef) Snapshot() JobProgressMetrics {
 		return JobProgressMetrics{}
 	}
 	return r.jobProgress.Snapshot()
+}
+
+// Err reports why the job ended, or nil if it is still running. See
+// JobProgress.Err for the possible values. If the ref does not reference a
+// JobProgress, it does not track any job and ErrNoJob is returned.
+func (r *JobProgressRef) Err() error {
+	if r.jobProgress == nil {
+		return ErrNoJob
+	}
+	return r.jobProgress.Err()
 }
 
 // Done returns a channel that will block until the job has completed.
@@ -75,7 +92,15 @@ func (r *JobProgressRef) CancelRun(cause error) {
 	if r.jobProgress == nil || r.jobProgress.jobCancel == nil {
 		return
 	}
-	r.jobProgress.jobCancel(cause)
+	if cause == nil {
+		cause = context.Canceled
+	}
+
+	r.jobProgress.cancelCauseOnce.Do(func() {
+		r.jobProgress.cancelCause = cause
+	})
+	// cancel with the first recorded cause.
+	r.jobProgress.jobCancel(r.jobProgress.cancelCause)
 }
 
 // Fatal is a wrapper around error to differentiate non-fatal errors from fatal
@@ -108,11 +133,17 @@ type JobProgress struct {
 	JobID      JobID
 	SourceID   SourceID
 	SourceName string
-	// Tracks whether the job is finished or not.
+	// ctx represents the job's lifetime. It stays open while the job runs and is
+	// closed by Finish, at which point Done unblocks and Err returns the reason
+	// the job ended (the CancelRun cause or ErrJobDone).
 	ctx    context.Context
-	cancel context.CancelFunc
-	// Requests to cancel the job.
+	cancel context.CancelCauseFunc
+	// jobCancel stops the source's run context. It requests shutdown without
+	// marking the job complete. Finish remains responsible for closing Done.
 	jobCancel context.CancelCauseFunc
+	// Tracks the cause of the cancellation. First cause is used.
+	cancelCauseOnce sync.Once
+	cancelCause     error
 	// Metrics.
 	metrics     JobProgressMetrics
 	metricsLock sync.Mutex
@@ -160,7 +191,7 @@ func WithCancel(cancel context.CancelCauseFunc) func(*JobProgress) {
 
 // NewJobProgress creates a new job report for the given source and job ID.
 func NewJobProgress(jobID JobID, sourceID SourceID, sourceName string, opts ...func(*JobProgress)) *JobProgress {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancelCause(context.Background())
 	jp := &JobProgress{
 		JobID:      jobID,
 		SourceID:   sourceID,
@@ -210,10 +241,31 @@ func (jp *JobProgress) End(end time.Time) {
 
 	jp.executeHooks(func(hook JobProgressHook) { hook.End(jp.Ref(), end) })
 }
+
+// finishWithCause finishes the job with the given cause. Just calling Finish
+// would use ErrJobDone. This would be inaccurate in some cases, for example, if
+// a job is rejected by the source manager.
+func (jp *JobProgress) finishWithCause(cause error) {
+	jp.cancelCauseOnce.Do(func() {
+		jp.cancelCause = cause
+	})
+	jp.Finish()
+}
+
 func (jp *JobProgress) Finish() {
-	jp.cancel()
+	jp.cancelCauseOnce.Do(func() {
+		jp.cancelCause = ErrJobDone
+	})
+	jp.cancel(jp.cancelCause)
 	jp.executeHooks(func(hook JobProgressHook) { hook.Finish(jp.Ref()) })
 }
+
+// Err mirrors context.Err for the job. It returns:
+//   - nil: The job is still running. This includes the period after CancelRun
+//     is called but before the job finishes.
+//   - the cause passed to CancelRun: the job finished after being cancelled.
+//   - ErrJobDone: the job finished without being cancelled.
+func (jp *JobProgress) Err() error            { return context.Cause(jp.ctx) }
 func (jp *JobProgress) Done() <-chan struct{} { return jp.ctx.Done() }
 func (jp *JobProgress) ReportUnit(unit SourceUnit) {
 	jp.metricsLock.Lock()

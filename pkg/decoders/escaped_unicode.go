@@ -19,7 +19,14 @@ var _ Decoder = (*EscapedUnicode)(nil)
 var (
 	// Standard Unicode notation.
 	//https://unicode.org/standard/principles.html
-	codePointPat = regexp.MustCompile(`\bU\+([a-fA-F0-9]{4}).?`)
+	//
+	// The word boundary that belongs at the front of this pattern is applied by
+	// codePointMatches instead of being written here. A leading empty-width
+	// assertion stops regexp from extracting a literal prefix, and without a
+	// prefix every offset in the chunk has to be tried rather than skipping
+	// straight to the next "U+". That one difference made this pattern cost
+	// more than every other pattern in this file combined.
+	codePointPat = regexp.MustCompile(`U\+([a-fA-F0-9]{4}).?`)
 
 	// Common escape sequence used in programming languages.
 	escapePat = regexp.MustCompile(`(?i:\\{1,2}u)([a-fA-F0-9]{4})`)
@@ -52,6 +59,53 @@ var (
 	// hexEscapePat = regexp.MustCompile(`0x([a-fA-F0-9]{1,6})(?:\s|$)`)
 )
 
+// Every escape form this decoder understands starts with a fixed literal: a
+// backslash for the \uXXXX family and CSS escapes, "U+" for standard code
+// point notation, "&#x" for HTML and "%u" for percent encoding. Looking for
+// that literal is far cheaper than running the pattern, and a chunk without it
+// cannot match, so each pattern is only run once its anchor is present.
+var (
+	codePointAnchor = []byte("U+")
+	htmlAnchor      = []byte("&#x")
+	percentAnchor   = []byte("%u")
+)
+
+// isWordByte reports whether c is a word character as \b defines it: ASCII
+// letters, digits and underscore.
+func isWordByte(c byte) bool {
+	return c == '_' ||
+		('0' <= c && c <= '9') ||
+		('a' <= c && c <= 'z') ||
+		('A' <= c && c <= 'Z')
+}
+
+// codePointMatches returns the submatch indices of every U+XXXX sequence in
+// input that starts on a word boundary.
+//
+// This is the check the leading \b used to perform. "U" is itself a word
+// character, so the boundary holds exactly when the sequence starts the input
+// or follows a byte that is not a word character.
+//
+// Dropping a match here can never hide another one. A second "U+" cannot begin
+// inside the four hex digits, since "+" is not a hex digit, so the only overlap
+// possible is the trailing optional byte covering a following "U". That "U"
+// is preceded by a hex digit, which is a word character, so the boundary would
+// have rejected it as well.
+func codePointMatches(input []byte) [][]int {
+	if !bytes.Contains(input, codePointAnchor) {
+		return nil
+	}
+	all := codePointPat.FindAllSubmatchIndex(input, -1)
+	kept := all[:0]
+	for _, m := range all {
+		if m[0] > 0 && isWordByte(input[m[0]-1]) {
+			continue
+		}
+		kept = append(kept, m)
+	}
+	return kept
+}
+
 func (d *EscapedUnicode) Type() detectorspb.DecoderType {
 	return detectorspb.DecoderType_ESCAPED_UNICODE
 }
@@ -70,29 +124,31 @@ func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	// Process patterns in priority order - more specific patterns first
 	// This prevents conflicts where multiple patterns match the same input
 
+	hasBackslash := bytes.IndexByte(chunkData, '\\') >= 0
+
 	// Long escape format (8 hex digits) - highest priority
-	if longEscapePat.Match(chunkData) {
+	if hasBackslash && longEscapePat.Match(chunkData) {
 		matched = true
 		chunkData = decodeLongEscape(chunkData)
-	} else if braceEscapePat.Match(chunkData) {
+	} else if hasBackslash && braceEscapePat.Match(chunkData) {
 		matched = true
 		chunkData = decodeBraceEscape(chunkData)
-	} else if perlEscapePat.Match(chunkData) {
+	} else if hasBackslash && perlEscapePat.Match(chunkData) {
 		matched = true
 		chunkData = decodePerlEscape(chunkData)
-	} else if htmlEscapePat.Match(chunkData) {
+	} else if bytes.Contains(chunkData, htmlAnchor) && htmlEscapePat.Match(chunkData) {
 		matched = true
 		chunkData = decodeHtmlEscape(chunkData)
-	} else if percentEscapePat.Match(chunkData) {
+	} else if bytes.Contains(chunkData, percentAnchor) && percentEscapePat.Match(chunkData) {
 		matched = true
 		chunkData = decodePercentEscape(chunkData)
-	} else if escapePat.Match(chunkData) {
+	} else if hasBackslash && escapePat.Match(chunkData) {
 		matched = true
 		chunkData = decodeEscaped(chunkData)
-	} else if codePointPat.Match(chunkData) {
+	} else if codePointIdx := codePointMatches(chunkData); len(codePointIdx) > 0 {
 		matched = true
-		chunkData = decodeCodePoint(chunkData)
-	} else if cssEscapePat.Match(chunkData) {
+		chunkData = decodeCodePointAt(chunkData, codePointIdx)
+	} else if hasBackslash && cssEscapePat.Match(chunkData) {
 		matched = true
 		chunkData = decodeCssEscape(chunkData)
 		// } else if hexEscapePat.Match(chunkData) {
@@ -154,8 +210,13 @@ func decodeWithPattern(input []byte, re *regexp.Regexp) []byte {
 
 func decodeCodePoint(input []byte) []byte {
 	// Find all Unicode escape sequences in the input byte slice
-	indices := codePointPat.FindAllSubmatchIndex(input, -1)
+	return decodeCodePointAt(input, codePointMatches(input))
+}
 
+// decodeCodePointAt is decodeCodePoint driven by indices the caller already
+// has. FromChunk needs the match list to decide whether this pattern applies,
+// so it passes that list straight through rather than scanning a second time.
+func decodeCodePointAt(input []byte, indices [][]int) []byte {
 	// Iterate over found indices in reverse order to avoid modifying the slice length
 	utf8Bytes := make([]byte, maxBytesPerRune)
 	for i := len(indices) - 1; i >= 0; i-- {

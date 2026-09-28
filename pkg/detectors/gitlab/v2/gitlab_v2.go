@@ -82,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				maps.Copy(s1.ExtraData, extraData)
 
-				s1.SetVerificationError(verificationErr)
+				s1.SetVerificationError(verificationErr, resMatch)
 
 				// for verified keys break out of the endpoint loop to continue to next secret
 				if s1.Verified {
