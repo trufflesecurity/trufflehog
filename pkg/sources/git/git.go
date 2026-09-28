@@ -1393,6 +1393,7 @@ func normalizeConfig(ctx context.Context, scanOptions *ScanOptions, repo *git.Re
 	}
 
 	// Use the same Git history and object database as the parser, including shallow grafts.
+	// Keep this environment in sync with gitparse.prepGitArgs.
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		return fmt.Errorf("unable to resolve repository path: %w", err)
@@ -1403,6 +1404,7 @@ func normalizeConfig(ctx context.Context, scanOptions *ScanOptions, repo *git.Re
 		gitDir = absPath
 	}
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "merge-base", headCommit.Hash.String(), baseCommit.Hash.String())
+	// Replace the process environment so GIT_DIR or GIT_TRACE cannot redirect or pollute this lookup.
 	cmd.Env = []string{"GIT_DIR=" + gitDir}
 	if isBare {
 		for _, key := range []string{"GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"} {
@@ -1416,7 +1418,13 @@ func normalizeConfig(ctx context.Context, scanOptions *ScanOptions, repo *git.Re
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			if exitErr.ExitCode() == 1 && len(exitErr.Stderr) == 0 {
-				return errors.New("unable to resolve merge base: no merge base found")
+				message := "unable to resolve merge base: no merge base found"
+				shallowCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "rev-parse", "--is-shallow-repository")
+				shallowCmd.Env = cmd.Env
+				if shallow, shallowErr := shallowCmd.Output(); shallowErr == nil && strings.TrimSpace(string(shallow)) == "true" {
+					message += " (repository is shallow; fetch more history)"
+				}
+				return errors.New(message)
 			}
 			return fmt.Errorf("unable to resolve merge base: %w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
 		}

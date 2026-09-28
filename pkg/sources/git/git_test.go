@@ -2255,6 +2255,59 @@ func TestScanRepo_ShallowClone(t *testing.T) {
 				assert.False(t, got[base], "the base is excluded from its own range")
 			})
 
+			t.Run("main advances past the feature fork", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				origin := setupTestRepo(t, "advanced-main-origin")
+				addTestFileAndCommit(t, origin, "a.txt", "a\n")
+				addTestFileAndCommit(t, origin, "fork.txt", "fork\n")
+				runGit(t, origin, "branch", "-M", "main")
+				fork := gitRevParse(t, origin, "HEAD")
+				runGit(t, origin, "switch", "-q", "-c", "feature")
+				addTestFileAndCommit(t, origin, "feature.txt", "feature\n")
+				featureHead := gitRevParse(t, origin, "HEAD")
+
+				shallow := filepath.Join(t.TempDir(), "shallow-feature")
+				runGit(t, "", "clone", "-q", "--depth", "2", "--no-single-branch", "-b", "feature", "file://"+origin, shallow)
+				runGit(t, origin, "switch", "-q", "main")
+				addTestFileAndCommit(t, origin, "main-1.txt", "main 1\n")
+				addTestFileAndCommit(t, origin, "main-2.txt", "main 2\n")
+				// Fetch the advanced main without deepening past the shared fork.
+				runGit(t, shallow, "fetch", "-q", "--depth=3", "origin", "main:refs/remotes/origin/main")
+				mainHead := gitRevParse(t, shallow, "origin/main")
+				assert.False(t, gitHasObject(t, shallow, fork+"^"), "the fork should still be at the shallow boundary")
+
+				got, _, err := scanRepoRange(ctx, t, shallow, mainHead, featureHead)
+
+				assert.NoError(t, err)
+				assert.True(t, got[featureHead], "the feature commit should be scanned; got %v", got)
+				assert.False(t, got[fork], "the merge base is excluded")
+				assert.False(t, got[mainHead], "main-only commits are excluded")
+			})
+
+			t.Run("fork is below both shallow boundaries", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				origin := setupTestRepo(t, "missing-fork-origin")
+				addTestFileAndCommit(t, origin, "fork.txt", "fork\n")
+				runGit(t, origin, "branch", "-M", "main")
+				runGit(t, origin, "switch", "-q", "-c", "feature")
+				addTestFileAndCommit(t, origin, "feature.txt", "feature\n")
+				runGit(t, origin, "switch", "-q", "main")
+				addTestFileAndCommit(t, origin, "main.txt", "main\n")
+
+				shallow := filepath.Join(t.TempDir(), "shallow-both-tips")
+				runGit(t, "", "clone", "-q", "--depth", "1", "--no-single-branch", "-b", "feature", "file://"+origin, shallow)
+				assert.False(t, gitHasObject(t, shallow, gitRevParse(t, origin, "HEAD~1")), "the fork should be absent")
+
+				got, _, err := scanRepoRange(ctx, t, shallow, gitRevParse(t, shallow, "origin/main"), gitRevParse(t, shallow, "HEAD"))
+
+				assert.ErrorContains(t, err, "repository is shallow; fetch more history")
+				assert.Empty(t, got, "an unresolved merge base must not scan an arbitrary range")
+			})
+
 			t.Run("foreign Git environment cannot redirect the range", func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
