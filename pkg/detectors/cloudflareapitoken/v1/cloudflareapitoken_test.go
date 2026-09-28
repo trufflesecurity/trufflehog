@@ -23,12 +23,18 @@ var (
 			auth_type: "Bearer"
 			base_url: "https://api.example.com/v1/user"
 			cloudflare_token: "kOjD1yceduu2jxL2uuwT9dkOIudU3_54sLCEud6j"
+			cloudflare_token_hyphen: "zymMlopiWfqUyHRSIf8NFmAUNLnY5Yx0y3RnjDQ-"
+			cloudflare_token_underscore: "zymMlopiWfqUyHRSIf8NFmAUNLnY5Yx0y3RnjDQ_"
 
 		# Notes:
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
-	secret = "kOjD1yceduu2jxL2uuwT9dkOIudU3_54sLCEud6j"
+	secrets = []string{
+		"kOjD1yceduu2jxL2uuwT9dkOIudU3_54sLCEud6j",
+		"zymMlopiWfqUyHRSIf8NFmAUNLnY5Yx0y3RnjDQ-",
+		"zymMlopiWfqUyHRSIf8NFmAUNLnY5Yx0y3RnjDQ_",
+	}
 )
 
 func TestCloudFlareAPIToken_Pattern(t *testing.T) {
@@ -43,7 +49,7 @@ func TestCloudFlareAPIToken_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{secret},
+			want:  secrets,
 		},
 	}
 
