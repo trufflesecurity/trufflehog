@@ -510,6 +510,8 @@ type Progress struct {
 	EncodedResumeInfo     string
 	SectionsCompleted     int32
 	SectionsRemaining     int32
+	// unitProgressByID is used for progress inside a unit (see below)
+	unitProgressByID map[string]UnitProgress
 }
 
 // Validator is an interface for validating a source. Sources can optionally implement this interface to validate
@@ -635,3 +637,71 @@ func unmarshalEncodedResumeInfo(data string) map[string]string {
 }
 
 // -/sub-unit-resumption-----------------------------------------------------------
+
+// -unit-progress------------------------------------------------------------------
+//
+// The following methods let a Source report how far it has got inside a unit,
+// for units large enough that counting finished units reads as no progress.
+// They are kept apart from EncodedResumeInfo, so reporting progress never
+// changes where a resumed scan starts.
+//
+// Usage:
+//  - id should be the SourceUnit ID
+//
+
+// UnitProgressState says whether the totals in a UnitProgress are final.
+type UnitProgressState string
+
+const (
+	// UnitProgressCounting means the source is still finding out how much the
+	// unit holds, so the totals are only a lower bound.
+	UnitProgressCounting UnitProgressState = "counting"
+	// UnitProgressReady means the totals are final.
+	UnitProgressReady UnitProgressState = "ready"
+	// UnitProgressUnavailable means the source could not find out how much the
+	// unit holds, so only the done counts mean anything.
+	UnitProgressUnavailable UnitProgressState = "unavailable"
+)
+
+// UnitProgress is how far a Source has got through one unit. Items are
+// whatever the source scans one at a time, such as objects or files.
+type UnitProgress struct {
+	State      UnitProgressState `json:"state"`
+	ItemsDone  uint64            `json:"items_done"`
+	ItemsTotal uint64            `json:"items_total"`
+	BytesDone  uint64            `json:"bytes_done"`
+	BytesTotal uint64            `json:"bytes_total"`
+	// ResumedBytes is the part of BytesDone that an earlier run of the unit
+	// finished, so a scan rate can leave it out.
+	ResumedBytes uint64 `json:"resumed_bytes"`
+}
+
+// Percent returns the share of bytes done once the totals are final, and 0
+// before. It is capped at 99, because only the unit finishing makes it complete.
+func (u UnitProgress) Percent() int64 {
+	if u.State != UnitProgressReady || u.BytesTotal == 0 {
+		return 0
+	}
+	return int64(min(u.BytesDone*100/u.BytesTotal, 99))
+}
+
+// SetUnitProgressFor records the progress of the unit with the provided ID.
+func (p *Progress) SetUnitProgressFor(id string, progress UnitProgress) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	if p.unitProgressByID == nil {
+		p.unitProgressByID = make(map[string]UnitProgress)
+	}
+	p.unitProgressByID[id] = progress
+}
+
+// GetUnitProgressFor returns the progress last recorded for the unit with the
+// provided ID, and whether any was recorded.
+func (p *Progress) GetUnitProgressFor(id string) (UnitProgress, bool) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	progress, ok := p.unitProgressByID[id]
+	return progress, ok
+}
+
+// -/unit-progress-----------------------------------------------------------------
