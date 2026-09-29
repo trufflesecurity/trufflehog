@@ -644,3 +644,34 @@ func TestSourceChunksResumptionWithRole(t *testing.T) {
 	assert.Equal(t, 9638, count, "Should have processed all remaining data on resume")
 	assert.Less(t, count, sourceTotalChunkCount, "Should have processed less than total chunks on resume")
 }
+
+func TestSource_ChunkUnit_ReportsUnitProgress(t *testing.T) {
+	enableUnitProgress(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Buckets:    []string{"truffletestbucket"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "test percent", 0, 0, false, conn, 1))
+
+	reporter := sourcestest.TestReporter{}
+	require.NoError(t, s.Enumerate(ctx, &reporter))
+	require.Len(t, reporter.Units, 1)
+	require.NoError(t, s.ChunkUnit(ctx, reporter.Units[0], &reporter))
+
+	unitID, _ := reporter.Units[0].SourceUnitID()
+	progress, ok := s.GetUnitProgressFor(unitID)
+	require.True(t, ok)
+	assert.Equal(t, sources.UnitProgressReady, progress.State)
+	assert.Positive(t, progress.ItemsTotal)
+	assert.Equal(t, progress.ItemsTotal, progress.ItemsDone)
+	assert.Equal(t, progress.BytesTotal, progress.BytesDone)
+	assert.EqualValues(t, 99, progress.Percent())
+	assert.Empty(t, s.GetEncodedResumeInfoFor(unitID))
+}

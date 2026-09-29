@@ -223,3 +223,26 @@ func TestJobProgressErrorsFor(t *testing.T) {
 	assert.Equal(t, 1, len(metrics.ErrorsFor(CommonSourceUnit{ID: "bar"})))
 	assert.Equal(t, 0, len(metrics.ErrorsFor(CommonSourceUnit{ID: "baz"})))
 }
+
+func TestJobProgressRefUnitProgress(t *testing.T) {
+	var progress Progress
+	jp := NewJobProgress(123, 456, "source name")
+	jp.TrackProgress(&progress)
+	ref := jp.Ref()
+
+	_, ok := ref.UnitProgress("unit")
+	assert.False(t, ok)
+
+	want := UnitProgress{State: UnitProgressCounting, ItemsDone: 3, BytesDone: 300}
+	progress.SetUnitProgressFor("unit", want)
+	got, ok := ref.UnitProgress("unit")
+	assert.True(t, ok)
+	assert.Equal(t, want, got)
+
+	// A ref to no job, or to a job whose source reports no progress, has none to give.
+	_, ok = (&JobProgressRef{}).UnitProgress("unit")
+	assert.False(t, ok)
+	untracked := NewJobProgress(123, 456, "source name").Ref()
+	_, ok = untracked.UnitProgress("unit")
+	assert.False(t, ok)
+}
