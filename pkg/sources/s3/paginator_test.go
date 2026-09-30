@@ -200,3 +200,18 @@ func TestBucketPaginator_ErrorNamesPrefix(t *testing.T) {
 
 	assert.ErrorContains(t, listErr, `could not list prefix "src/"`)
 }
+
+func TestSource_ChunkUnit_CountsOnlyIncludePrefixes(t *testing.T) {
+	enableUnitProgress(t)
+	fake := &fakeS3{buckets: map[string]fakeBucket{"bucket": {objects: prefixTestObjects()}}}
+	s := newFakeS3Source(t, fake, withIncludePrefixes("infra/", "src/"))
+
+	unit := S3SourceUnit{Bucket: "bucket"}
+	require.NoError(t, s.ChunkUnit(context.Background(), unit, &sourcestest.TestReporter{}))
+
+	unitID, _ := unit.SourceUnitID()
+	got, _ := s.GetUnitProgressFor(unitID)
+	assert.Equal(t, sources.UnitProgressReady, got.State)
+	assert.EqualValues(t, 4, got.ItemsTotal)
+	assert.EqualValues(t, 4, fake.listCalls.Load(), "the count lists the same two prefixes as the scan")
+}
