@@ -773,7 +773,8 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.Client, ro
 			continue
 		}
 
-		_, err = regionalClient.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &bucket})
+		// Make the scan's first listing, so access limited to the include prefixes passes.
+		_, err = regionalClient.ListObjectsV2(ctx, s.listInputs(bucket, nil)[0])
 		if err == nil {
 			wasAbleToListAnyBucket = true
 		} else if shouldHaveAccessToAllBuckets {

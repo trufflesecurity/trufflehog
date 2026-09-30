@@ -215,3 +215,35 @@ func TestSource_ChunkUnit_CountsOnlyIncludePrefixes(t *testing.T) {
 	assert.EqualValues(t, 4, got.ItemsTotal)
 	assert.EqualValues(t, 4, fake.listCalls.Load(), "the count lists the same two prefixes as the scan")
 }
+
+// A policy can limit listing to some prefixes. Validate must list the way the scan does, or it
+// rejects access the scan has.
+func TestSource_Validate_ListsIncludePrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		prefixes []string
+		wantErr  bool
+	}{
+		{name: "whole bucket", wantErr: true},
+		{name: "include prefix", prefixes: []string{"infra/"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeS3{buckets: map[string]fakeBucket{
+				"bucket": {objects: prefixTestObjects(), listPrefix: "infra/"},
+			}}
+			s := newFakeS3Source(t, fake, withIncludePrefixes(tt.prefixes...), func(conn *sourcespb.S3) {
+				conn.Buckets = []string{"bucket"}
+			})
+
+			errs := s.Validate(context.Background())
+
+			if tt.wantErr {
+				assert.NotEmpty(t, errs)
+			} else {
+				assert.Empty(t, errs)
+			}
+		})
+	}
+}
