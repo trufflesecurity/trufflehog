@@ -1073,4 +1073,5 @@ enum DetectorType {
   SolarWindsObservability = 1069;
   HumioAPIToken = 1070;
   Resend = 1071;
+  Kong = 1072;
 }
