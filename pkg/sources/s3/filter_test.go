@@ -21,6 +21,7 @@ func TestObjectFilter_Unconfigured(t *testing.T) {
 	assert.True(t, filter.shouldInclude("any/key.zip"))
 	assert.True(t, filter.shouldInclude("Makefile"))
 	assert.True(t, (*objectFilter)(nil).shouldInclude("any/key.zip"))
+	assert.Nil(t, (*objectFilter)(nil).listPrefixes())
 }
 
 func TestObjectFilter_ExcludePrefix(t *testing.T) {
@@ -46,6 +47,17 @@ func TestObjectFilter_IncludeAndExcludePrefixes(t *testing.T) {
 	assert.True(t, filter.shouldInclude("src/main.go"))
 	assert.False(t, filter.shouldInclude("src/vendor/dep.go"), "exclusion takes precedence")
 	assert.False(t, filter.shouldInclude("docs/readme.md"), "matches no include prefix")
+}
+
+// A scan lists the include prefixes in turn, so they must come out sorted with
+// none under another, or keys would be listed twice or out of order.
+func TestObjectFilter_IncludePrefixesAreOutermost(t *testing.T) {
+	include := []string{"src/vendor/", "src/", "docs/", "src/", "a", "ab", "ac"}
+	filter := newTestObjectFilter(t, include, nil, nil, nil)
+
+	assert.Equal(t, []string{"a", "docs/", "src/"}, filter.listPrefixes())
+	assert.True(t, filter.shouldInclude("src/vendor/dep.go"), "a dropped prefix is still covered")
+	assert.True(t, filter.shouldInclude("ac/key.txt"))
 }
 
 func TestObjectFilter_ExcludeExtension(t *testing.T) {

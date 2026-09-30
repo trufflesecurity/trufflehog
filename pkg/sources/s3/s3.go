@@ -460,7 +460,8 @@ func (s *Source) scanBucket(
 		return 0
 	}
 
-	// scannedWholeBucket is set once the listing below has gone from the start of the bucket to the end.
+	// scannedWholeBucket is set once the listing below has gone from start to end, so it has seen every
+	// object the scan can include.
 	var scannedWholeBucket bool
 	if progress != nil {
 		stopCount := s.startCount(ctx, regionalClient, bucket, startAfter, progress)
@@ -472,14 +473,10 @@ func (s *Source) scanBucket(
 
 	errorCount := sync.Map{}
 
-	input := &s3.ListObjectsV2Input{Bucket: &bucket}
-	if startAfter != nil {
-		input.StartAfter = startAfter
-	}
-
 	pageNumber := 1
-	paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
+	paginator := newBucketPaginator(regionalClient, s.listInputs(bucket, startAfter))
 	var objectCount, filteredCount uint64
+	var listed int
 	listFailed := false
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
@@ -515,6 +512,7 @@ func (s *Source) scanBucket(
 		}
 		s.pageChunker(ctx, pageMetadata, processingState, reporter, checkpointer)
 
+		listed += len(output.Contents)
 		pageNumber++
 	}
 	scannedWholeBucket = startAfter == nil && !listFailed && ctx.Err() == nil
@@ -523,6 +521,11 @@ func (s *Source) scanBucket(
 	// of an empty bucket, so say so rather than finishing silently.
 	if objectCount == 0 && filteredCount > 0 {
 		ctx.Logger().Info("Scanned no objects in bucket", "excluded_by_object_filter", filteredCount)
+	}
+	// The same goes for include prefixes, which S3 applies itself: a mistyped one lists nothing rather than
+	// excluding anything.
+	if prefixes := s.objectFilter.listPrefixes(); len(prefixes) > 0 && listed == 0 && scannedWholeBucket {
+		ctx.Logger().Info("Found no objects under the include prefixes", "include_prefixes", prefixes)
 	}
 
 	return objectCount
