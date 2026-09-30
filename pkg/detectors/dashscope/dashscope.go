@@ -80,6 +80,10 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 			endpoint: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models",
 		},
 		{
+			name:     "cn-hongkong",
+			endpoint: "https://cn-hongkong.dashscope.aliyuncs.com/compatible-mode/v1/models",
+		},
+		{
 			name:     "us-virginia",
 			endpoint: "https://dashscope-us.aliyuncs.com/compatible-mode/v1/models",
 		},
