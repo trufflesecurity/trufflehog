@@ -28,6 +28,16 @@ var (
 	leadingHyphenSecret41  = "-u8jzPde0IgxLd6GncfBAepfJBd0Kh8oOOL8dKLzd"
 	trailingHyphenSecret41 = "u8jzPde0IgxLd6GncfBAepfJBd0Kh8oOOL8dKLzd-"
 	keyword                = "okta"
+
+	// One fixture per Okta tenant suffix, plus near-misses that must not match.
+	previewDomain = "acmecorp.oktapreview.com"
+	emeaDomain    = "acmecorp.okta-emea.com"
+	govDomain     = "acmecorp.okta-gov.com"
+	milDomain     = "acmecorp.okta.mil"
+	// okta-dnssec.com is a CNAME target for custom-domain DNSSEC, not a tenant domain.
+	dnssecDomain = "acmecorp.okta-dnssec.com"
+	// Guards the word boundary after the "mil" suffix.
+	militaryDomain = "acmecorp.okta.military"
 )
 
 func TestOkta_Pattern(t *testing.T) {
@@ -77,6 +87,46 @@ func TestOkta_Pattern(t *testing.T) {
 			name:  "valid pattern - oauth client_secret (41 chars) ending with hyphen",
 			input: fmt.Sprintf("%s domain - '%s'\n%s client_id - '%s'\nclient_secret: '%s'\n", keyword, validDomain, keyword, validClientID, trailingHyphenSecret41),
 			want:  []string{validDomain + ":" + validClientID + ":" + trailingHyphenSecret41},
+		},
+		{
+			name:  "valid pattern - token with oktapreview.com domain",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, previewDomain, keyword, validToken),
+			want:  []string{previewDomain + ":" + validToken},
+		},
+		{
+			name:  "valid pattern - token with okta-emea.com domain",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, emeaDomain, keyword, validToken),
+			want:  []string{emeaDomain + ":" + validToken},
+		},
+		{
+			name:  "valid pattern - token with okta-gov.com domain",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, govDomain, keyword, validToken),
+			want:  []string{govDomain + ":" + validToken},
+		},
+		{
+			name:  "valid pattern - token with okta.mil domain",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, milDomain, keyword, validToken),
+			want:  []string{milDomain + ":" + validToken},
+		},
+		{
+			name:  "valid pattern - oauth client credentials with okta-gov.com domain",
+			input: fmt.Sprintf("%s domain - '%s'\n%s client_id - '%s'\nclient_secret: '%s'\n", keyword, govDomain, keyword, validClientID, validClientSecret),
+			want:  []string{govDomain + ":" + validClientID + ":" + validClientSecret},
+		},
+		{
+			name:  "valid pattern - oauth client credentials with okta.mil domain",
+			input: fmt.Sprintf("%s domain - '%s'\n%s client_id - '%s'\nclient_secret: '%s'\n", keyword, milDomain, keyword, validClientID, validClientSecret),
+			want:  []string{milDomain + ":" + validClientID + ":" + validClientSecret},
+		},
+		{
+			name:  "invalid pattern - okta-dnssec.com is not a tenant domain",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, dnssecDomain, keyword, validToken),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - okta.mil suffix must end at a word boundary",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, militaryDomain, keyword, validToken),
+			want:  []string{},
 		},
 	}
 
