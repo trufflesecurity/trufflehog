@@ -94,7 +94,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		return true, extraData, nil
 	case http.StatusForbidden:
 		// 403 indicates lack of permission, but valid token
-		return true, nil, nil
+		return true, extraData, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
