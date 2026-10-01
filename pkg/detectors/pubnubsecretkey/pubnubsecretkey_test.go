@@ -45,16 +45,19 @@ func TestPubNubSecretKey_Pattern(t *testing.T) {
 			},
 		},
 		{
-			// Keys are laid out in pub/sub/sec order (typical PubNub SDK config) with a
-			// 100-char gap between the two sets, so each sec key's nearest pub and sub
-			// belong to the same credential set rather than a different one.
-			name: "two complete triples clearly separated - proximity matching pairs each correctly",
+			name: "two complete triples - all combinations produced",
 			input: fmt.Sprintf("pub=%s sub=%s sec=%s\n\n%spub=%s sub=%s sec=%s",
 				validPubKey, validSubKey, validSecKey,
 				strings.Repeat("x", 100),
 				validPubKey2, validSubKey2, validSecKey2),
 			want: []string{
 				validPubKey + "/" + validSubKey + "/" + validSecKey,
+				validPubKey + "/" + validSubKey + "/" + validSecKey2,
+				validPubKey + "/" + validSubKey2 + "/" + validSecKey,
+				validPubKey + "/" + validSubKey2 + "/" + validSecKey2,
+				validPubKey2 + "/" + validSubKey + "/" + validSecKey,
+				validPubKey2 + "/" + validSubKey + "/" + validSecKey2,
+				validPubKey2 + "/" + validSubKey2 + "/" + validSecKey,
 				validPubKey2 + "/" + validSubKey2 + "/" + validSecKey2,
 			},
 		},

@@ -62,55 +62,42 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, secIdx := range secIdxMatches {
 		resSec := dataStr[secIdx[2]:secIdx[3]]
-		resPub := nearestMatch(dataStr, pubIdxMatches, secIdx[2])
-		resSub := nearestMatch(dataStr, subIdxMatches, secIdx[2])
+		for _, pubIdx := range pubIdxMatches {
+			resPub := dataStr[pubIdx[2]:pubIdx[3]]
+			for _, subIdx := range subIdxMatches {
+				resSub := dataStr[subIdx[2]:subIdx[3]]
 
-		key := resPub + "/" + resSub + "/" + resSec
-		if _, ok := seen[key]; ok {
-			continue
+				key := resPub + "/" + resSub + "/" + resSec
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+
+				s1 := detectors.Result{
+					DetectorType: detector_typepb.DetectorType_PubNubSecretKey,
+					Raw:          []byte(resSec),
+					SecretParts: map[string]string{
+						"secret_key":    resSec,
+						"publish_key":   resPub,
+						"subscribe_key": resSub,
+					},
+					RawV2: []byte(key),
+				}
+
+				if verify {
+					isVerified, verificationErr := verifyPubNubSecret(ctx, s.getClient(), resPub, resSub, resSec)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr, resSec)
+				}
+
+				results = append(results, s1)
+			}
 		}
-		seen[key] = struct{}{}
-
-		s1 := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_PubNubSecretKey,
-			Raw:          []byte(resSec),
-			SecretParts: map[string]string{
-				"secret_key":    resSec,
-				"publish_key":   resPub,
-				"subscribe_key": resSub,
-			},
-			RawV2: []byte(key),
-		}
-
-		if verify {
-			isVerified, verificationErr := verifyPubNubSecret(ctx, s.getClient(), resPub, resSub, resSec)
-			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, resSec)
-		}
-
-		results = append(results, s1)
 	}
 
 	return results, nil
 }
 
-// nearestMatch returns the capture group value whose start position is closest to pos,
-// pairing each secret key with its most likely companion rather than a Cartesian product.
-func nearestMatch(data string, matches [][]int, pos int) string {
-	best := ""
-	bestDist := -1
-	for _, m := range matches {
-		dist := m[2] - pos
-		if dist < 0 {
-			dist = -dist
-		}
-		if bestDist < 0 || dist < bestDist {
-			bestDist = dist
-			best = data[m[2]:m[3]]
-		}
-	}
-	return best
-}
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
