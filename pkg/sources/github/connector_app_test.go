@@ -148,11 +148,11 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 	}))
 	defer server.Close()
 
-	connector, err := NewAppConnector(trContext.Background(), server.URL, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
 		PrivateKey:     string(privKey),
 		InstallationId: "4242",
 		AppId:          "12345",
-	})
+	}, false)
 	require.NoError(t, err)
 	require.NotNil(t, connector.APIClient())
 	require.NotNil(t, connector.GraphQLClient())
@@ -172,6 +172,75 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 	defer mu.Unlock()
 	require.Len(t, tokenRequestPaths, 1)
 	assert.Contains(t, tokenRequestPaths[0], "/app/installations/4242/access_tokens")
+}
+
+func TestNewAppConnectorInstallationIDOptionalWithScanAllInstallations(t *testing.T) {
+	privKey := generateTestPrivateKey(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]map[string]string{})
+	}))
+	defer server.Close()
+
+	// scanAllInstallations=true with no installationId configured should succeed.
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
+		PrivateKey: string(privKey),
+		AppId:      "12345",
+	}, true)
+	require.NoError(t, err)
+	require.NotNil(t, connector)
+
+	// Without scanAllInstallations, installationId is still required.
+	_, err = NewAppConnector(server.URL, &credentialspb.GitHubApp{
+		PrivateKey: string(privKey),
+		AppId:      "12345",
+	}, false)
+	require.Error(t, err)
+}
+
+// TestAPIClientAndGraphQLClientNonNilWithoutDefaultInstallation guards against
+// a nil-pointer panic: APIClient/GraphQLClient must never return nil, since
+// callers like Validate, mapRemainingAccessibleRepos, and member gist/repo
+// lookups call them unconditionally and dereference the result. Before this
+// fix, an appConnector with no default installation (installationID == 0,
+// the case when scanAllInstallations is true and installationId is omitted)
+// returned nil from a bare map lookup instead of lazily creating a client.
+func TestAPIClientAndGraphQLClientNonNilWithoutDefaultInstallation(t *testing.T) {
+	privKey := generateTestPrivateKey(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]map[string]string{})
+	}))
+	defer server.Close()
+
+	connector, err := NewAppConnector(server.URL, &credentialspb.GitHubApp{
+		PrivateKey: string(privKey),
+		AppId:      "12345",
+	}, true)
+	require.NoError(t, err)
+
+	assert.NotNil(t, connector.APIClient())
+	assert.NotNil(t, connector.GraphQLClient())
+}
+
+// TestCloneErrorsWithoutResolvedInstallation covers repos that fall back to
+// the connector's default installationID (e.g. member personal repos found
+// outside any installation's repo listing, see ensureRepoInstallation). When
+// scanAllInstallations is true and no githubApp.installationId is
+// configured, that default is unset (0); Clone must fail with an actionable
+// error instead of attempting to use installation ID 0.
+func TestCloneErrorsWithoutResolvedInstallation(t *testing.T) {
+	connector := &appConnector{
+		installationID:          0,
+		clientsByInstallationID: make(map[int64]*appInstallationClients),
+		repoInstallationMap:     make(map[string]int64),
+	}
+
+	_, _, err := connector.Clone(trContext.Background(), "https://github.com/some-member/personal-repo.git")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no GitHub App installation resolved")
 }
 
 func TestAPIClientForInstallationUsesConfiguredClient(t *testing.T) {
@@ -365,4 +434,26 @@ func TestAddMembersByOrgWithClient(t *testing.T) {
 	assert.Contains(t, s.memberCache, "alice")
 	assert.Contains(t, s.memberCache, "bob")
 	assert.Contains(t, s.memberCache, "charlie")
+}
+
+func TestAppsBaseURL(t *testing.T) {
+	u, err := appsBaseURL("https://foo.ghe.com/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.foo.ghe.com/", u)
+
+	u, err = appsBaseURL("https://ghes.intranet/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://ghes.intranet/api/v3/", u)
+
+	u, err = appsBaseURL("https://ghes.intranet/api/v3/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://ghes.intranet/api/v3/", u)
+
+	u, err = appsBaseURL("https://api.github.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.github.com/", u)
+
+	u, err = appsBaseURL("https://api.github.com/")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.github.com/", u)
 }

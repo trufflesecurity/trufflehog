@@ -95,9 +95,11 @@ func AnalyzeClassicToken(client *gh.Client, meta *common.TokenMetadata) (*common
 		}
 	}
 
+	// Gist enumeration is supplemental -- a rate-limit or transient failure
+	// should not discard the already-gathered metadata, repos, and permissions.
 	gists, err := common.GetAllGistsForUser(client)
 	if err != nil {
-		return nil, fmt.Errorf("enumerating gists for classic PAT: %w", err)
+		gists = nil
 	}
 
 	return &common.SecretInfo{

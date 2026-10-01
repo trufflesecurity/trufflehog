@@ -1071,5 +1071,7 @@ enum DetectorType {
   NewRelicInsightsQueryKey = 1067;
   NewRelicMobileAppToken = 1068;
   SolarWindsObservability = 1069;
-  PubNubSecretKey = 1070;
+  HumioAPIToken = 1070;
+  Resend = 1071;
+  PubNubSecretKey = 1072;
 }

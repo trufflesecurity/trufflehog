@@ -3,11 +3,13 @@ package gitparse
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,14 @@ const (
 
 	// defaultWaitDelay is the default time to wait after context cancellation before forcefully killing git processes.
 	defaultWaitDelay = 5 * time.Second
+
+	// logGroupSize is the number of commits per `git log` in the lower-memory scan mode.
+	//
+	// The hashes are fed in on stdin rather than as arguments, so a group is not
+	// limited by how long a command line may be and we can use full hashes. Bigger
+	// groups mean fewer git processes to start; each one still only holds state for
+	// its own group, which is what keeps memory flat however long the history is.
+	logGroupSize = 5000
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -130,6 +140,12 @@ type Parser struct {
 	waitDelay     time.Duration
 
 	useCustomContentWriter bool
+	lowMemoryScan          bool
+
+	// groupSize is how many commits go to each `git log` in the lower-memory scan.
+	// Zero means logGroupSize. Only the tests set it, so they can put a group
+	// boundary wherever they need one.
+	groupSize int
 }
 
 type ParseState int
@@ -191,6 +207,13 @@ func UseCustomContentWriter() Option {
 	return func(parser *Parser) { parser.useCustomContentWriter = true }
 }
 
+// UseLowMemoryScan sets the scan to optimize for limited memory at the cost of speed (currently up to 9%)
+func UseLowMemoryScan() Option {
+	return func(parser *Parser) {
+		parser.lowMemoryScan = true
+	}
+}
+
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
 func WithMaxDiffSize(maxDiffSize int64) Option {
@@ -233,60 +256,311 @@ func NewParser(options ...Option) *Parser {
 	return parser
 }
 
+type gitArgs struct {
+	env    []string
+	global []string
+	log    []string
+	show   []string
+	paths  []string
+}
+
 // RepoPath parses the output of the `git log` command for the `source` path.
-// The Diff chan will return diffs in the order they are parsed from the log.
+// The Diff chan will return diffs in the order they are parsed from the log,
+// though the diffs are generated using `git show` in groups.
+//
+// head and base are commit hashes or refs. When base is non-empty the log is
+// restricted to the range base..head (commits reachable from head but not from
+// base), which is the diff-scan contract behind `--since-commit`. The range is
+// computed by git itself so that it is independent of commit dates and merge
+// topology. An empty base means a full-history scan of head (or of --all when
+// head is also empty). An empty head with a non-empty base means every commit
+// reachable from any ref but not from base (`--all ^base`), which is what
+// `--since-commit X` without `--branch` has always covered; callers that want
+// a single-branch diff pass the head explicitly.
 func (c *Parser) RepoPath(
 	ctx context.Context,
 	source string,
 	head string,
-	abbreviatedLog bool,
+	base string,
 	excludedGlobs []string,
 	isBare bool,
-	additionalArgs ...string,
 ) (chan *Diff, error) {
-	args := []string{
-		"-C", source,
-		"log",
-		"--patch", // https://git-scm.com/docs/git-log#Documentation/git-log.txt---patch
-		"--full-history",
-		"--date=iso-strict",
-		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
-		"--notes",         // https://git-scm.com/docs/git-log#Documentation/git-log.txt---notesltrefgt
-	}
-	if abbreviatedLog {
-		args = append(args, "--diff-filter=AM")
-	}
-	if head != "" {
-		args = append(args, head)
-	} else {
-		args = append(args, "--all")
-	}
-	args = append(args, additionalArgs...) // These need to come before --
-	for _, glob := range excludedGlobs {
-		args = append(args, "--", ".", ":(exclude)"+glob)
+	args := c.prepGitArgs(source, head, base, excludedGlobs, isBare)
+
+	if c.lowMemoryScan {
+		return c.repoPathLowMemory(ctx, args)
 	}
 
-	cmd := exec.CommandContext(ctx, "git", args...)
-	absPath, err := filepath.Abs(source)
-	if err == nil {
-		if !isBare {
-			cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
-		} else {
-			cmd.Env = append(cmd.Env,
-				"GIT_DIR="+absPath,
+	showCmd := exec.CommandContext(ctx,
+		"git",
+		slices.Concat(args.global, []string{"log"}, args.show, args.log, args.paths)...,
+	)
+	showCmd.Env = args.env
+
+	return c.executeCommand(ctx, showCmd, false)
+}
+
+func (c *Parser) repoPathLowMemory(ctx context.Context, args gitArgs) (chan *Diff, error) {
+	commitGroups, err := c.enumerateCommits(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+
+	// c.executeCommand returns a channel that is later closed by a
+	// different goroutine after the command finishes, but we're not
+	// running a single command anymore. we'll use a channel of channels to
+	// reduce back to one channel we return to our caller.  Unbuffered so
+	// we have at most one git log running and one git log draining.
+	diffGroups := make(chan chan *Diff)
+	go func() {
+		defer common.RecoverWithExit(ctx)
+		defer close(diffGroups)
+
+		for group := range commitGroups {
+			if common.IsDone(ctx) {
+				return
+			}
+
+			// `git log` over an explicit list, not `git show`. The two print the
+			// same thing for ordinary commits, but only log applies --diff-filter
+			// to whole commits, so this is what keeps the set of scanned commits
+			// the same as the single-command form.
+			logCmd := exec.CommandContext(ctx,
+				"git",
+				slices.Concat(
+					args.global, []string{"log"}, args.show,
+					[]string{
+						// Keep the commits in the order rev-list gave them. Plain
+						// --no-walk would re-sort each group by commit date, which
+						// scrambles the order across groups.
+						"--no-walk=unsorted",
+						// Hashes come in on stdin, so the group size is ours to pick.
+						"--stdin",
+					},
+					args.paths,
+				)...,
 			)
-			// We need those variables to handle incoming commits
-			// while using trufflehog in pre-receive hooks
-			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
-				cmd.Env = append(cmd.Env, "GIT_OBJECT_DIRECTORY="+dir)
+			logCmd.Env = args.env
+			logCmd.Stdin = strings.NewReader(strings.Join(group, "\n") + "\n")
+
+			diffGroup, err := c.executeCommand(ctx, logCmd, false)
+			if err != nil {
+				ctx.Logger().Error(err, "Error executing git log for commit group.")
+				return
 			}
-			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
-				cmd.Env = append(cmd.Env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+			err = common.CancellableWrite(ctx, diffGroups, diffGroup)
+			if err != nil {
+				ctx.Logger().Error(err, "git log iteration cancelled")
+				return
 			}
+		}
+	}()
+
+	// and this is the single channel we're responsible for returning and
+	// closing.
+	diffChan := make(chan *Diff)
+	go func() {
+		defer common.RecoverWithExit(ctx)
+		defer close(diffChan)
+
+		var err error
+		for groupdiffs := range diffGroups {
+			for diff := range groupdiffs {
+				err = common.CancellableWrite(ctx, diffChan, diff)
+				if err != nil {
+					return // context cancel
+				}
+			}
+		}
+	}()
+
+	return diffChan, nil
+}
+
+// enumerateCommits asks git for the hashes of the commits we mean to scan, and
+// nothing else. It returns them in groups, so patch generation can start before the
+// whole history has been walked.
+//
+// This uses `git rev-list` rather than `git log`. rev-list is the plumbing command for
+// listing commits and never sets up git's diff machinery, which `git log` does as soon
+// as a diff option is present. On this repository that is the difference between 43 MB
+// and 3.4 MB of peak memory for a phase whose only job is to print hashes, and this is
+// the phase that sets the peak on long histories.
+// commitGroupSize is how many commits each `git log` gets.
+func (c *Parser) commitGroupSize() int {
+	// A size of zero or less would mean a group that never fills, so it falls back.
+	if c.groupSize <= 0 {
+		return logGroupSize
+	}
+	return c.groupSize
+}
+
+func (c *Parser) enumerateCommits(ctx context.Context, args gitArgs) (chan []string, error) {
+	// args.log holds only the options that choose commits, so it can go to rev-list
+	// as-is. Diff options live in args.show and rev-list would reject them.
+	cmd := exec.CommandContext(ctx,
+		"git", slices.Concat(
+			args.global, []string{"rev-list"},
+			args.log,
+			args.paths,
+		)...)
+	cmd.WaitDelay = c.waitDelay
+	cmd.Env = args.env
+
+	// Keep stderr, because it carries the reason a bad ref or a broken repo failed.
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+
+	stdOut, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to execute git rev-list: %w", err)
+	}
+
+	// Wait for the first byte before returning. A bad revision makes rev-list fail
+	// immediately, and this is the last moment we can hand that back to the caller as
+	// an error. Reporting it any later means closing the channel instead, and a typo in
+	// a branch name then looks exactly like an empty repository.
+	reader := bufio.NewReader(stdOut)
+	if _, err := reader.Peek(1); err != nil {
+		if waitErr := cmd.Wait(); waitErr != nil {
+			return nil, fmt.Errorf("failed to list commits: %w: %s", waitErr, strings.TrimSpace(stderr.String()))
+		}
+		if !errors.Is(err, io.EOF) {
+			return nil, fmt.Errorf("failed to read commit list: %w", err)
+		}
+
+		// git was happy and printed nothing, so there is genuinely nothing to scan.
+		empty := make(chan []string)
+		close(empty)
+		return empty, nil
+	}
+
+	commitGroups := make(chan []string)
+	go func() {
+		defer close(commitGroups)
+		defer func() {
+			if err := cmd.Wait(); err != nil {
+				ctx.Logger().Error(err, "git rev-list exited with error", "stderr", strings.TrimSpace(stderr.String()))
+			}
+		}()
+
+		s := bufio.NewScanner(reader)
+		groupSize := c.commitGroupSize()
+		commitGroup := make([]string, 0, groupSize)
+		for s.Scan() && !common.IsDone(ctx) {
+			commitGroup = append(commitGroup, s.Text())
+			if len(commitGroup) < groupSize {
+				continue
+			}
+			if err := common.CancellableWrite(ctx, commitGroups, commitGroup); err != nil {
+				ctx.Logger().Error(err, "git rev-list stopping early")
+				return
+			}
+			commitGroup = make([]string, 0, groupSize)
+		}
+
+		// The last group is almost never exactly full.
+		if len(commitGroup) != 0 {
+			if err := common.CancellableWrite(ctx, commitGroups, commitGroup); err != nil {
+				ctx.Logger().Error(err, "failed to flush last commit group")
+			}
+		}
+
+		if err := s.Err(); err != nil {
+			ctx.Logger().Error(err, "error reading commit list")
+		}
+	}()
+
+	return commitGroups, nil
+}
+
+func (c *Parser) prepGitArgs(source string, head string, base string, excludedGlobs []string, isBare bool) gitArgs {
+	// Full-history scans skip deletions; a diff scan must report every change in the range.
+	abbreviatedLog := base == ""
+
+	args := gitArgs{
+		global: []string{
+			"-C", source,
+		},
+		log: []string{
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---full-history
+			"--full-history",
+		},
+		show: []string{
+			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---patch
+			"--patch",
+			// https://git-scm.com/docs/git-log#Documentation/git-log.txt---dateformat
+			"--date=iso-strict",
+			// https://git-scm.com/docs/git-show#_pretty_formats
+			"--pretty=fuller",
+			// https://git-scm.com/docs/git-show#Documentation/git-show.txt---notesref
+			"--notes",
+		},
+		paths: []string{},
+	}
+
+	if abbreviatedLog {
+		// Only in show. args.log holds the options that choose commits, and it is
+		// also what the lower-memory scan hands to `git rev-list`, which rejects diff
+		// options outright. Leaving it out costs nothing: rev-list then lists a few
+		// commits whose diffs are all filtered away, and the `git log` that generates
+		// the patches drops those commits itself, exactly as the single-command form
+		// does.
+		// https://git-scm.com/docs/git-show#Documentation/git-show.txt---diff-filterACDMRTUXB
+		args.show = append(args.show, "--diff-filter=AM")
+	}
+
+	// The positive end of the walk, kept last before the -- (not required but
+	// sensible). With no head every ref is walked, so a base-only scan is
+	// `--all ^base`: everything since base on any branch, not just the checked
+	// out one. The pre-commit hook wants the empty HEAD..HEAD range and passes
+	// HEAD as both ends itself (see the isPreCommitHook override in main.go).
+	// https://git-scm.com/docs/git-log#Documentation/git-log.txt---all
+	switch {
+	case head != "":
+		args.log = append(args.log, head)
+	default:
+		args.log = append(args.log, "--all")
+	}
+
+	// `head ^base` is base..head. Keeping the two revisions as separate args
+	// means head is always the positive end of the range and the base is
+	// never spliced into a string git has to parse.
+	// https://git-scm.com/docs/gitrevisions#_specifying_ranges
+	if base != "" {
+		args.log = append(args.log, "^"+base)
+	}
+
+	// Pathspecs live in their own slice so `--` always trails every revision.
+	if len(excludedGlobs) != 0 {
+		args.paths = []string{"--", "."}
+		for _, glob := range excludedGlobs {
+			// This is not directly doc'd but added in git 1.9.0 and found in pathspec.c
+			args.paths = append(args.paths, ":(exclude)"+glob)
 		}
 	}
 
-	return c.executeCommand(ctx, cmd, false, c.waitDelay)
+	absPath, err := filepath.Abs(source)
+	if err == nil {
+		if !isBare {
+			args.env = append(args.env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+		} else {
+			args.env = append(args.env, "GIT_DIR="+absPath)
+			// We need those variables to handle incoming commits
+			// while using trufflehog in pre-receive hooks
+			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
+				args.env = append(args.env, "GIT_OBJECT_DIRECTORY="+dir)
+			}
+			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
+				args.env = append(args.env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+			}
+		}
+	}
+	return args
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
@@ -301,29 +575,29 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 		cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 	}
 
-	return c.executeCommand(ctx, cmd, true, c.waitDelay)
+	return c.executeCommand(ctx, cmd, true)
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
 // waitDelay specifies how long to wait after context cancellation before forcefully killing the process.
-func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool, waitDelay time.Duration) (chan *Diff, error) {
+func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan *Diff, error) {
 	diffChan := make(chan *Diff, 64)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
-		return diffChan, err
+		return nil, err
 	}
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
-		return diffChan, err
+		return nil, err
 	}
 
 	// Set WaitDelay to allow the command additional time to exit after context cancellation
-	cmd.WaitDelay = waitDelay
+	cmd.WaitDelay = c.waitDelay
 
 	err = cmd.Start()
 	if err != nil {
-		return diffChan, err
+		return nil, err
 	}
 
 	go func() {
@@ -355,7 +629,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 
 		totalLogSize int
 	)
-	var latestState = Initial
+	latestState := Initial
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
 		opts = append(opts, withCustomContentWriter(bufferwriter.New()))
@@ -990,10 +1264,25 @@ func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff,
 	if currentDiff != nil && (currentDiff.Len() > 0 || currentDiff.IsBinary) {
 		currentDiff.Commit = currentCommit
 		diffChan <- currentDiff
-	}
-	if currentCommit != nil {
-		if totalLogSize != nil {
-			*totalLogSize += currentCommit.Size
+		if currentCommit != nil {
+			currentCommit.hasDiffs = true
 		}
+	}
+
+	if currentCommit == nil {
+		return
+	}
+	if totalLogSize != nil {
+		*totalLogSize += currentCommit.Size
+	}
+
+	// A commit is normally finished off in the loop above, when the next commit line
+	// shows up. The last commit in the stream never gets that, so it is finished here
+	// instead, and it needs the same rule: a commit with no diffs of its own still has
+	// a message, an author and notes worth scanning, so it goes out on its own.
+	//
+	// Staged diffs come through here too and carry no commit, hence the hash check.
+	if !currentCommit.hasDiffs && currentCommit.Hash != "" {
+		diffChan <- &Diff{Commit: currentCommit}
 	}
 }

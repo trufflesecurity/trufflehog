@@ -55,9 +55,9 @@ type repoInfo struct {
 	owner      string                       // repository owner (user|organization).
 	name       string                       // repository name.
 	fullName   string                       // full repository name (owner/repo).
-	hasWiki    bool                         // whether the repository is likely to have a wiki.
 	size       int                          // size of the repository in kilobytes.
 	visibility source_metadatapb.Visibility // visibility of the repository (public/private).
+	hasWiki    bool                         // whether the repository is likely to have a wiki.
 }
 
 // cloneRepo clones a repository given its URL, returns the path and the repository object.
