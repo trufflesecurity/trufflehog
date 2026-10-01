@@ -153,6 +153,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_SolarWindsObservability:   {},
 	detector_typepb.DetectorType_HumioAPIToken:             {},
 	detector_typepb.DetectorType_Resend:                    {},
+	detector_typepb.DetectorType_KongKonnect:               {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()
@@ -302,7 +303,6 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_KalturaSession:                          {},
 	detector_typepb.DetectorType_Keygen:                                  {},
 	detector_typepb.DetectorType_KiteConnect:                             {},
-	detector_typepb.DetectorType_Kong:                                    {},
 	detector_typepb.DetectorType_KubeConfig:                              {},
 	detector_typepb.DetectorType_LinkedIn:                                {},
 	detector_typepb.DetectorType_Linode:                                  {},
