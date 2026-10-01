@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_Kong,
+			DetectorType: detector_typepb.DetectorType_KongKonnect,
 			Raw:          []byte(match),
 			SecretParts:  map[string]string{"key": match},
 		}
@@ -104,7 +104,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
-	return detector_typepb.DetectorType_Kong
+	return detector_typepb.DetectorType_KongKonnect
 }
 
 func (s Scanner) Description() string {
