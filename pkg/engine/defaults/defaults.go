@@ -1907,7 +1907,7 @@ func buildDetectorList() []detectors.Detector {
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
 		case *kong.Scanner:
-			return !feature.KongDetectorEnabled.Load()
+			return !feature.KongKonnectDetectorEnabled.Load()
 		default:
 			return false
 		}
