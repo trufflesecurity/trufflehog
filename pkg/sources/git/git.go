@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -613,6 +614,34 @@ func createClonePath(gitURL, clonePath string) (string, error) {
 	return path, nil
 }
 
+// repoLocalGitEnv is `git rev-parse --local-env-vars` without
+// GIT_CONFIG_PARAMETERS and GIT_CONFIG_COUNT, which Git's sanitize_repo_env
+// keeps so the caller's `git -c` config still reaches the clone.
+var repoLocalGitEnv = []string{
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	"GIT_CONFIG",
+	"GIT_OBJECT_DIRECTORY",
+	"GIT_DIR",
+	"GIT_WORK_TREE",
+	"GIT_IMPLICIT_WORK_TREE",
+	"GIT_GRAFT_FILE",
+	"GIT_INDEX_FILE",
+	"GIT_NO_REPLACE_OBJECTS",
+	"GIT_REPLACE_REF_BASE",
+	"GIT_PREFIX",
+	"GIT_SHALLOW_FILE",
+	"GIT_COMMON_DIR",
+}
+
+// cloneEnv drops repoLocalGitEnv so a clone started from a pre-commit hook
+// does not write into the index of the commit in progress.
+func cloneEnv() []string {
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return slices.Contains(repoLocalGitEnv, name)
+	})
+}
+
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
 // clonePath. It then opens the cloned repository, returning a git.Repository object.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
@@ -665,6 +694,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	gitArgs = append(gitArgs, params.args...)
 	gitArgs = append(gitArgs, cloneURL.String(), params.clonePath)
 	cloneCmd := exec.CommandContext(ctx, "git", gitArgs...)
+	cloneCmd.Env = cloneEnv()
 
 	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
