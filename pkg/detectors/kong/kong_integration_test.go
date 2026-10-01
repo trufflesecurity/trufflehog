@@ -50,7 +50,7 @@ func TestKong_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Kong,
+					DetectorType: detector_typepb.DetectorType_KongKonnect,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://developer.konghq.com/konnect-api/#konnect-api-authentication",
@@ -70,7 +70,7 @@ func TestKong_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Kong,
+					DetectorType: detector_typepb.DetectorType_KongKonnect,
 					Verified:     false,
 				},
 			},
@@ -99,7 +99,7 @@ func TestKong_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Kong,
+					DetectorType: detector_typepb.DetectorType_KongKonnect,
 					Verified:     false,
 				},
 			},
@@ -116,7 +116,7 @@ func TestKong_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Kong,
+					DetectorType: detector_typepb.DetectorType_KongKonnect,
 					Verified:     false,
 				},
 			},
