@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -2244,12 +2245,17 @@ func TestEngine_IterativeDecoding(t *testing.T) {
 	}
 }
 
-// captureDispatcher records every dispatched result for assertion in tests.
+// captureDispatcher records every dispatched result for assertion in tests. It
+// is safe for concurrent use because the engine runs many notifier workers
+// against a single dispatcher.
 type captureDispatcher struct {
+	mu      sync.Mutex
 	results []detectors.ResultWithMetadata
 }
 
 func (d *captureDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.results = append(d.results, result)
 	return nil
 }
@@ -2316,6 +2322,72 @@ func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
 			assert.Equal(t, tt.wantDispatch, len(disp.results))
 		})
 	}
+}
+
+// TestNotifierWorker_ConcurrentDuplicatesDispatchedOnce verifies that when many
+// notifier workers share the dedupe cache, identical results are dispatched
+// exactly once. The check-and-insert must be atomic; a separate lookup and add
+// lets two workers both miss and both dispatch.
+//
+// The race exists only on a key's first sighting, so the test uses many distinct
+// secrets and queues each one's copies back to back, giving every key its own
+// chance for workers to collide. It guards a logical race rather than a data
+// race, so -race does not flag the non-atomic version.
+func TestNotifierWorker_ConcurrentDuplicatesDispatchedOnce(t *testing.T) {
+	const (
+		numSecrets = 1000
+		numCopies  = 16
+		numWorkers = 16
+	)
+
+	// Sized to hold every key so eviction cannot cause a re-dispatch.
+	cache, err := lru.New[string, struct{}](numSecrets)
+	require.NoError(t, err)
+
+	disp := &captureDispatcher{}
+	e := &Engine{
+		results:                 make(chan detectors.ResultWithMetadata, numSecrets*numCopies),
+		dedupeCache:             cache,
+		dispatcher:              disp,
+		notifyVerifiedResults:   true,
+		notifyUnverifiedResults: true,
+		notifyUnknownResults:    true,
+	}
+
+	// Fill and close the channel before starting workers so they all contend
+	// on the cache at once instead of idling on an empty channel. SecretID
+	// stays 0 so every copy goes through the dedupe cache.
+	for i := range numSecrets {
+		result := detectors.ResultWithMetadata{
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{
+					Git: &source_metadatapb.Git{Line: 1},
+				},
+			},
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+			Result: detectors.Result{
+				DetectorType: detector_typepb.DetectorType(-1),
+				Raw:          []byte(fmt.Sprintf("secret-%d", i)),
+				Verified:     true,
+			},
+		}
+		for range numCopies {
+			e.results <- result
+		}
+	}
+	close(e.results)
+
+	var wg sync.WaitGroup
+	for range numWorkers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e.notifierWorker(context.Background())
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, numSecrets, len(disp.results))
 }
 
 func setupSourceMappingBench(size int, decode bool) (*sources.Chunk, *detectors.Result) {
