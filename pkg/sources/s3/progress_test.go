@@ -133,6 +133,8 @@ type fakeBucket struct {
 	// countDelay holds back listings that start from the beginning of the bucket, which only the count
 	// makes when the scan is resumed, so a test can make the scan finish first.
 	countDelay time.Duration
+	// listPrefix denies listings outside it, as an IAM policy on s3:prefix does.
+	listPrefix string
 }
 
 // fakeS3 serves the parts of the S3 API a unit scan uses, path style, two keys per page.
@@ -171,6 +173,12 @@ func (f *fakeS3) list(w http.ResponseWriter, r *http.Request, name string, bucke
 	const pageSize = 2
 
 	query := r.URL.Query()
+	prefix := query.Get("prefix")
+	if !strings.HasPrefix(prefix, bucket.listPrefix) {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+
 	after := query.Get("continuation-token")
 	if after == "" {
 		after = query.Get("start-after")
@@ -181,7 +189,7 @@ func (f *fakeS3) list(w http.ResponseWriter, r *http.Request, name string, bucke
 
 	keys := make([]string, 0, len(bucket.objects))
 	for key := range bucket.objects {
-		if key > after {
+		if strings.HasPrefix(key, prefix) && key > after {
 			keys = append(keys, key)
 		}
 	}
@@ -220,16 +228,21 @@ func sleep(r *http.Request, d time.Duration) bool {
 	}
 }
 
-// newFakeS3Source starts fake as an S3-compatible endpoint and returns a source initialized against it.
-func newFakeS3Source(t *testing.T, fake *fakeS3) *Source {
+// newFakeS3Source starts fake as an S3-compatible endpoint and returns a source initialized against it,
+// after configure has adjusted the connection.
+func newFakeS3Source(t *testing.T, fake *fakeS3, configure ...func(*sourcespb.S3)) *Source {
 	t.Helper()
 	server := httptest.NewServer(fake)
 	t.Cleanup(server.Close)
 
-	conn, err := anypb.New(&sourcespb.S3{
+	s3Conn := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 		Endpoint:   server.URL,
-	})
+	}
+	for _, f := range configure {
+		f(s3Conn)
+	}
+	conn, err := anypb.New(s3Conn)
 	require.NoError(t, err)
 
 	s := &Source{}
