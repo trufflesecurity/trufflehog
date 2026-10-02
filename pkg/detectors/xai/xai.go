@@ -90,13 +90,18 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey string) (bool,
 	case http.StatusOK:
 		// Parse the API response for useful information like name and ACLs
 		var data struct {
-			Name string   `json:"name"`
-			Acls []string `json:"acls"`
+			Name           string   `json:"name"`
+			Acls           []string `json:"acls"`
+			APIKeyBlocked  bool     `json:"api_key_blocked"`
+			APIKeyDisabled bool     `json:"api_key_disabled"`
 		}
 		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
 			// The API Key is still verified, but there are parsing errors.
 			// Hence, return true for verified along with error.
 			return true, nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+		if data.APIKeyBlocked || data.APIKeyDisabled {
+			return false, nil, nil
 		}
 
 		aclsStr := strings.Join(data.Acls, ",")
