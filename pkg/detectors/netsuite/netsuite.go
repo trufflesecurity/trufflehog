@@ -68,8 +68,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	tokenSecretMatches := trimUniqueMatches(tokenSecretPat.FindAllStringSubmatch(dataStr, -1))
 	accountIDMatches := trimUniqueMatches(accountIDPat.FindAllStringSubmatch(dataStr, -1))
 
+	// Every combination needs a token key, token secret and account ID.
+	if len(tokenKeyMatches) == 0 || len(tokenSecretMatches) == 0 || len(accountIDMatches) == 0 {
+		return nil, nil
+	}
+
+	// Raw and RawV2 hold only the consumer key and secret, so every combination for a pair is a duplicate of the same
+	// finding. Report one result per pair rather than one per combination of all five parts. The token key, token
+	// secret and account ID decide whether the pair is reported and whether it verifies.
 	for consumerKey := range consumerKeyMatches {
 		for consumerSecret := range consumerSecretMatches {
+			// No combination can use the same value as both consumer key and secret.
+			if consumerKey == consumerSecret {
+				continue
+			}
+
+			var pairResult *detectors.Result
+		combinations:
 			for tokenKey := range tokenKeyMatches {
 				for tokenSecret := range tokenSecretMatches {
 					for accountID := range accountIDMatches {
@@ -107,9 +122,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.Verified = isVerified
 							s1.SetVerificationError(err, consumerKey)
 						}
-						results = append(results, s1)
+
+						// Keep the verified result, else the first indeterminate one, else the first one.
+						if pairResult == nil || s1.Verified || (s1.VerificationError() != nil && pairResult.VerificationError() == nil) {
+							pairResult = &s1
+						}
+						if !verify || s1.Verified {
+							break combinations
+						}
 					}
 				}
+			}
+
+			if pairResult != nil {
+				results = append(results, *pairResult)
 			}
 		}
 	}
