@@ -22,7 +22,11 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	orgAuthTokenPat = regexp.MustCompile(`\b(sntrys_eyJ[a-zA-Z0-9=_+/]{197})\b`)
+	// The base64 payload encodes the org slug plus url/region_url, which vary
+	// per organization/region, so the token length is not fixed. Match a range
+	// rather than the single hardcoded length that only matched tokens which
+	// happened to total 197 characters.
+	orgAuthTokenPat = regexp.MustCompile(`\b(sntrys_eyJ[a-zA-Z0-9=_+/]{130,300})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
