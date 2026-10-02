@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v67/github"
 	"github.com/shurcooL/githubv4"
@@ -241,6 +243,171 @@ func TestCloneErrorsWithoutResolvedInstallation(t *testing.T) {
 	_, _, err := connector.Clone(trContext.Background(), "https://github.com/some-member/personal-repo.git")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no GitHub App installation resolved")
+}
+
+func TestAccessTokenForInstallation(t *testing.T) {
+	privKey := generateTestPrivateKey(t)
+
+	accessTokenServer := func(accessTokenHandler func(w http.ResponseWriter, r *http.Request)) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+
+			if r.Method == "POST" && strings.Contains(r.URL.Path, "access_tokens") {
+				accessTokenHandler(w, r)
+				return
+			}
+
+			// Default: return empty JSON array for any list endpoint.
+			_ = json.NewEncoder(w).Encode([]interface{}{})
+		}))
+	}
+
+	t.Run("invalid", func(t *testing.T) {
+		_, err := (&appConnector{}).accessTokenForInstallation(trContext.Background(), 0)
+		require.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":      "test-token",
+				"expires_at": "2099-01-01T00:00:00Z",
+			})
+		})
+		defer server.Close()
+
+		c, err := NewAppConnector(
+			server.URL,
+			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
+			false,
+		)
+		require.NoError(t, err)
+		ac := c.(*appConnector)
+
+		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
+		require.NoError(t, err)
+	})
+
+	t.Run("rate limit", func(t *testing.T) {
+		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("X-RateLimit-Remaining", "0")
+			w.WriteHeader(http.StatusForbidden)
+
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+		})
+		defer server.Close()
+
+		c, err := NewAppConnector(
+			server.URL,
+			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
+			false,
+		)
+		require.NoError(t, err)
+		ac := c.(*appConnector)
+
+		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
+		require.Error(t, err)
+
+		var gherr *github.RateLimitError
+		require.ErrorAs(t, err, &gherr)
+	})
+
+	t.Run("not found / no installation", func(t *testing.T) {
+		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+		})
+		defer server.Close()
+
+		c, err := NewAppConnector(
+			server.URL,
+			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
+			false,
+		)
+		require.NoError(t, err)
+		ac := c.(*appConnector)
+
+		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
+		require.Error(t, err)
+	})
+
+	t.Run("reuse", func(t *testing.T) {
+		var hits atomic.Int64
+
+		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":      "test-token",
+				"expires_at": "2099-01-01T00:00:00Z",
+			})
+		})
+		defer server.Close()
+
+		c, err := NewAppConnector(
+			server.URL,
+			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
+			false,
+		)
+		require.NoError(t, err)
+		ac := c.(*appConnector)
+
+		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
+		require.NoError(t, err)
+
+		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
+		require.NoError(t, err)
+
+		require.Equal(t, int64(1), hits.Load())
+	})
+
+	t.Run("expire", func(t *testing.T) {
+		var hits atomic.Int64
+		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":      "test-token",
+				"expires_at": "2099-01-01T00:00:00Z",
+			})
+		})
+		defer server.Close()
+
+		c, err := NewAppConnector(
+			server.URL,
+			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
+			false,
+		)
+		require.NoError(t, err)
+		ac := c.(*appConnector)
+
+		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
+		require.NoError(t, err)
+
+		cs, err := ac.clientsForInstallation(100)
+		require.NoError(t, err)
+		token := cs.accessTokenIfValid()
+		require.NotNil(t, token)
+
+		token.ExpiresAt = &github.Timestamp{Time: time.Now()}
+
+		token = cs.accessTokenIfValid()
+		require.Nil(t, token)
+
+		// race these for good measure
+		var wg sync.WaitGroup
+		for range 3 {
+			wg.Go(func() {
+				_, err := ac.accessTokenForInstallation(trContext.Background(), 100)
+				require.NoError(t, err)
+			})
+		}
+		wg.Wait()
+
+		token = cs.accessTokenIfValid()
+		require.NotNil(t, token)
+
+		require.Equal(t, int64(2), hits.Load())
+	})
 }
 
 func TestAPIClientForInstallationUsesConfiguredClient(t *testing.T) {
