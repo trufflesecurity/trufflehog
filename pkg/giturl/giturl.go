@@ -214,6 +214,12 @@ func GenerateLink(repo, commit, file string, line int64) string {
 var (
 	linePattern        = regexp.MustCompile(`L\d+`)
 	bbCloudLinePattern = regexp.MustCompile(`lines-\d+(:\d+)?`)
+
+	// issueOrPullRequestPath matches the path of an issue or pull request page,
+	// e.g. /owner/repo/issues/123 or /owner/repo/pull/123. Paths continuing past the
+	// number, such as a pull request's "Files changed" view, are deliberately not
+	// matched: those do address lines.
+	issueOrPullRequestPath = regexp.MustCompile(`^/[^/]+/[^/]+/(?:issues|pull)/\d+$`)
 )
 
 // UpdateLinkLineNumber updates the line number in a repository link.
@@ -230,6 +236,13 @@ func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) strin
 
 	if newLine <= 0 {
 		// Don't change the link if the line number is 0.
+		return link
+	}
+
+	if issueOrPullRequestPath.MatchString(parsedURL.Path) {
+		// Issue and pull request pages have no line anchors. The fragment there already
+		// addresses the issue itself or one of its comments (#issue-N, #issuecomment-N),
+		// and appending L<number> to it yields an anchor the page does not have.
 		return link
 	}
 
