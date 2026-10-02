@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -160,6 +161,7 @@ func TestNetsuite_Verification(t *testing.T) {
 		name         string
 		values       int
 		status       int
+		cancel       bool
 		wantVerified bool
 		wantErr      string
 		wantRequests int32
@@ -177,6 +179,14 @@ func TestNetsuite_Verification(t *testing.T) {
 			wantVerified: true,
 			wantRequests: 12,
 		},
+		{
+			name:         "canceled context sends no requests",
+			values:       16,
+			status:       http.StatusOK,
+			cancel:       true,
+			wantErr:      context.Canceled.Error(),
+			wantRequests: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -184,7 +194,13 @@ func TestNetsuite_Verification(t *testing.T) {
 			var requests atomic.Int32
 			client := fakeClient(&requests, func(*http.Request) int { return tt.status })
 
-			results, err := Scanner{client: client}.FromData(context.Background(), true, tokenDenseInput(tt.values))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				cancel()
+			}
+
+			results, err := Scanner{client: client}.FromData(ctx, true, tokenDenseInput(tt.values))
 			if err != nil {
 				t.Fatalf("error = %v", err)
 			}
@@ -242,5 +258,42 @@ func TestNetsuite_VerificationFindsTheAcceptedCombination(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("verified pairs diff: (-want +got)\n%s", diff)
+	}
+}
+
+func TestNetsuite_VerificationMissingHost(t *testing.T) {
+	invalidHosts.Clear()
+	t.Cleanup(invalidHosts.Clear)
+
+	var requests atomic.Int32
+	client := &http.Client{
+		Transport: common.FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				requests.Add(1)
+				return nil, &net.DNSError{Err: "no such host", Name: req.URL.Hostname(), IsNotFound: true}
+			},
+		},
+	}
+	s := Scanner{client: client}
+
+	// Scan twice, as if the data were split across two chunks. A missing host is unverified, as before.
+	for range 2 {
+		results, err := s.FromData(context.Background(), true, tokenDenseInput(4))
+		if err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		if len(results) != 12 {
+			t.Fatalf("expected 12 results, got %d", len(results))
+		}
+		for _, r := range results {
+			if r.Verified || r.VerificationError() != nil {
+				t.Fatalf("verified = %v, verification error = %v, want unverified", r.Verified, r.VerificationError())
+			}
+		}
+	}
+
+	// The first lookup caches the host, so no later combination or chunk looks it up again.
+	if got := requests.Load(); got != 1 {
+		t.Errorf("requests = %d, want 1", got)
 	}
 }

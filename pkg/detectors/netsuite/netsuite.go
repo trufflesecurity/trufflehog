@@ -7,7 +7,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,6 +19,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
@@ -41,6 +45,9 @@ var (
 	tokenSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netsuite", "token", "secret"}) + `\b([a-zA-Z0-9]{64})\b`)
 
 	accountIDPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netsuite", "account", "id"}) + `\b([a-zA-Z0-9-_]{6,15})\b`)
+
+	// invalidHosts holds account hosts that do not resolve, so later combinations skip the lookup.
+	invalidHosts = simple.NewCache[struct{}]()
 )
 
 type credentialSet struct {
@@ -130,6 +137,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if !verify || s1.Verified {
 							break combinations
 						}
+						if err := ctx.Err(); err != nil {
+							// Combinations left untried might have verified.
+							if pairResult.VerificationError() == nil {
+								pairResult.SetVerificationError(err, consumerKey)
+							}
+							break combinations
+						}
 					}
 				}
 			}
@@ -152,8 +166,19 @@ func (s Scanner) Description() string {
 }
 
 func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSet) (bool, error) {
+	// The engine waits for FromData to return even after its deadline, so send no request once the context is done.
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+
 	// for url, filter or replace underscore in accountID if needed and lower case the accountID
 	urlAccountId := strings.ToLower(strings.ReplaceAll(cs.accountID, "_", "-"))
+
+	// An earlier combination already found that this account's host does not resolve, so skip the lookup and
+	// return what the lookup would.
+	if invalidHosts.Exists(urlAccountId) {
+		return false, nil
+	}
 
 	baseUrl := "https://" + urlAccountId + ".suitetalk.api.netsuite.com"
 
@@ -190,12 +215,17 @@ func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSe
 	// Make the request
 	res, err := client.Do(req)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such host") {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			invalidHosts.Set(urlAccountId, struct{}{})
 			return false, nil
 		}
 		return false, err
 	}
-	defer func() { _ = res.Body.Close() }()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
