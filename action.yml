@@ -93,8 +93,29 @@ runs:
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
             BASE=${{github.event.pull_request.base.sha}}
             HEAD=${{github.event.pull_request.head.sha}}
+          else
+            # Unhandled event type (release, merge_group, pull_request_target, ...).
+            # BASE and HEAD stay empty, so the scan below covers the full history of
+            # every fetched ref rather than a diff. That may be what you want, but it
+            # should not be silent: say so, and name the event that caused it.
+            BASE=""
+            HEAD=""
+            echo "::warning::TruffleHog has no diff range for event '${{ github.event_name }}', so it is scanning the full history of all fetched refs. Set the 'base' and 'head' inputs explicitly to scan a specific range. Please see documentation (https://github.com/trufflesecurity/trufflehog#octocat-trufflehog-github-action)."
           fi
         fi
+        ##########################################
+        ## Log the resolved scan scope          ##
+        ##########################################
+        if [ -n "$BASE" ] && [ -n "$HEAD" ]; then
+          SCOPE="diff"
+        elif [ -n "$HEAD" ]; then
+          SCOPE="full history of branch '$HEAD'"
+        elif [ -n "$BASE" ]; then
+          SCOPE="every commit after '$BASE'"
+        else
+          SCOPE="full history of all fetched refs"
+        fi
+        echo "TruffleHog scan scope: ${SCOPE} [event='${{ github.event_name }}', since-commit='${BASE}', branch='${HEAD}']"
         ##########################################
         ##          Run TruffleHog              ##
         ##########################################
