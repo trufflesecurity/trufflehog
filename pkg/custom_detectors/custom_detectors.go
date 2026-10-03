@@ -37,9 +37,7 @@ var _ detectors.Detector = (*CustomRegexWebhook)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*CustomRegexWebhook)(nil)
 var _ detectors.MaxSecretSizeProvider = (*CustomRegexWebhook)(nil)
 
-// NewWebhookCustomRegex initializes and validates a CustomRegexWebhook. An
-// unexported type is intentionally returned here to ensure the values have
-// been validated.
+// NewWebhookCustomRegex initializes and validates a CustomRegexWebhook.
 func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebhook, error) {
 	// TODO: Return all validation errors.
 	if err := ValidateKeywords(pb.Keywords); err != nil {
