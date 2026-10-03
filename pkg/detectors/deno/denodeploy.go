@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -64,8 +65,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode == 200 {
+				defer func() { _ = res.Body.Close() }()
+				switch res.StatusCode {
+				case 200:
 					s1.Verified = true
 
 					body, err := io.ReadAll(res.Body)
@@ -81,9 +83,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							}
 						}
 					}
-				} else if res.StatusCode == 401 {
+				case 401:
 					// The secret is determinately not verified (nothing to do)
-				} else {
+				default:
 					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					s1.SetVerificationError(err, token)
 				}
@@ -98,8 +100,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_DenoDeploy
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_DenoDeploy
 }
 
 func (s Scanner) Description() string {

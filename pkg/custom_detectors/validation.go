@@ -2,7 +2,7 @@ package custom_detectors
 
 import (
 	"fmt"
-	"regexp"
+	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"strconv"
 	"strings"
 )
@@ -70,6 +70,28 @@ func ValidateVerifyHeaders(headers []string) error {
 		}
 	}
 	return nil
+}
+
+// StatusCodeMatchesRanges reports whether code falls within any of the given
+// ranges. Each element is either a single HTTP status code ("200") or a
+// hyphenated inclusive range ("200-299"). Entries must have been pre-validated
+// by ValidateVerifyRanges; malformed entries are silently skipped.
+func StatusCodeMatchesRanges(code int, ranges []string) bool {
+	for _, r := range ranges {
+		if !strings.Contains(r, "-") {
+			if c, err := strconv.Atoi(r); err == nil && c == code {
+				return true
+			}
+			continue
+		}
+		parts := strings.SplitN(r, "-", 2)
+		lo, err1 := strconv.Atoi(parts[0])
+		hi, err2 := strconv.Atoi(parts[1])
+		if err1 == nil && err2 == nil && code >= lo && code <= hi {
+			return true
+		}
+	}
+	return false
 }
 
 func ValidateVerifyRanges(ranges []string) error {

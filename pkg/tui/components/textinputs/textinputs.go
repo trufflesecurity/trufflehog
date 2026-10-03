@@ -18,10 +18,16 @@ var (
 	helpStyle    = blurredStyle
 	// cursorStyle         = focusedStyle.
 	// cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-
-	focusedSkipButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render("[ Run with defaults ]")
-	blurredSkipButton = fmt.Sprintf("[ %s ]", lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Run with defaults"))
 )
+
+func skipButtonView(focused bool) string {
+	// Keep rendering lazy. Rendering lipgloss styles at package init can make
+	// terminal color detection write escape sequences before non-TUI commands run.
+	if focused {
+		return focusedStyle.Render("[ Run with defaults ]")
+	}
+	return fmt.Sprintf("[ %s ]", blurredStyle.Render("Run with defaults"))
+}
 
 // SelectNextMsg used for emitting events when the 'Next' button is selected.
 type SelectNextMsg int
@@ -179,11 +185,7 @@ func (m Model) View() string {
 	}
 
 	if m.skipButton {
-		button := &blurredSkipButton
-		if m.focusIndex == -1 {
-			button = &focusedSkipButton
-		}
-		fmt.Fprintf(&b, "%s\n\n\n", *button)
+		fmt.Fprintf(&b, "%s\n\n\n", skipButtonView(m.focusIndex == -1))
 	}
 
 	for i := range m.inputs {

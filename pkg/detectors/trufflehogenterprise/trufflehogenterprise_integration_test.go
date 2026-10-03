@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestTrufflehogenterprise_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestTrufflehogenterprise_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TrufflehogEnterprise,
+					DetectorType: detector_typepb.DetectorType_TrufflehogEnterprise,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestTrufflehogenterprise_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_TrufflehogEnterprise,
+					DetectorType: detector_typepb.DetectorType_TrufflehogEnterprise,
 					Verified:     false,
 				},
 			},

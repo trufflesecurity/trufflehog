@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSatismeterWritekey_FromChunk(t *testing.T) {
@@ -52,12 +52,12 @@ func TestSatismeterWritekey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SatismeterWritekey,
+					DetectorType: detector_typepb.DetectorType_SatismeterWritekey,
 					Verified:     false,
 					RawV2:        []byte(projectID + token),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SatismeterWritekey,
+					DetectorType: detector_typepb.DetectorType_SatismeterWritekey,
 					Verified:     true,
 					RawV2:        []byte(projectID + writeKey),
 				},
@@ -74,12 +74,12 @@ func TestSatismeterWritekey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SatismeterWritekey,
+					DetectorType: detector_typepb.DetectorType_SatismeterWritekey,
 					Verified:     false,
 					RawV2:        []byte(inactiveProjectID + inactiveToken),
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SatismeterWritekey,
+					DetectorType: detector_typepb.DetectorType_SatismeterWritekey,
 					Verified:     false,
 					RawV2:        []byte(inactiveProjectID + inactiveWriteKey),
 				},

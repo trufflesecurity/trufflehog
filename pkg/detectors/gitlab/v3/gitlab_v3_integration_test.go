@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestGitlabV3_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -70,7 +70,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -90,7 +90,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -111,7 +111,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -124,7 +124,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, good key but wrong scope",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, `{"error":"insufficient_scope","error_description":"The request requires higher privileges than provided by the access token.","scope":"read_user api read_api"}`)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
@@ -132,7 +132,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detector_typepb.DetectorType_Gitlab,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
@@ -141,6 +141,27 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "found but ambiguous 403 (not insufficient_scope)",
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_Gitlab,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        "3",
+					},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
@@ -170,7 +191,7 @@ func TestGitlabV3_FromChunk(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError())
 				}
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
@@ -280,7 +301,7 @@ func TestGitlabV3_FromChunk_WithV1Secrets(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError())
 				}
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
@@ -362,7 +383,7 @@ func TestGitlabV3_FromChunk_WithV2Secrets(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError())
 				}
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {

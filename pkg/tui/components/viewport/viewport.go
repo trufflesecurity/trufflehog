@@ -25,8 +25,8 @@ func New(c common.Common) *Viewport {
 // SetSize implements common.Component.
 func (v *Viewport) SetSize(width, height int) {
 	v.common.SetSize(width, height)
-	v.Model.Width = width
-	v.Model.Height = height
+	v.Width = width
+	v.Height = height
 }
 
 // Init implements tea.Model.

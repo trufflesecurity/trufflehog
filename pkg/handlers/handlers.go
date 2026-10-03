@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archives"
+	"google.golang.org/protobuf/proto"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -53,14 +53,6 @@ var (
 	ErrProcessingWarning = errors.New("error processing file")
 )
 
-type readerConfig struct{ fileExtension string }
-
-type readerOption func(*readerConfig)
-
-func withFileExtension(ext string) readerOption {
-	return func(c *readerConfig) { c.fileExtension = ext }
-}
-
 // mimeTypeReader wraps an io.Reader with MIME type information.
 // This type is used to pass content through the processing pipeline
 // while carrying its detected MIME type, avoiding redundant type detection.
@@ -102,12 +94,7 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
 // The caller is responsible for closing the reader when it is no longer needed.
-func newFileReader(ctx context.Context, r io.Reader, options ...readerOption) (fReader fileReader, err error) {
-	var cfg readerConfig
-
-	for _, opt := range options {
-		opt(&cfg)
-	}
+func newFileReader(ctx context.Context, r io.Reader) (fReader fileReader, err error) {
 	// To detect the MIME type of the input data, we need a reader that supports seeking.
 	// This allows us to read the data multiple times if necessary without losing the original position.
 	// We use a BufferedReaderSeeker to wrap the original reader, enabling this functionality.
@@ -135,14 +122,25 @@ func newFileReader(ctx context.Context, r io.Reader, options ...readerOption) (f
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
-	// Check for APK files
-	if shouldHandleAsAPK(cfg, fReader) {
-		isAPK, err := isAPKFile(&fReader)
-		if err != nil {
-			return fReader, fmt.Errorf("error checking for APK: %w", err)
-		}
-		if isAPK {
+	// Detection is content-based, so this now runs for every zip/jar rather than only for files with an apk extension.
+	if shouldHandleAsAPK(fReader) {
+		// A failure here (e.g. truncated zip, corrupted central directory, or a polyglot that mimetype still
+		// reports as zip/jar) only means the file isn't a parseable APK. Since this check now runs for every
+		// zip/jar rather than only files with an .apk extension, we must not treat the error as fatal; otherwise
+		// any such file would be skipped entirely instead of falling through to the archive or default handler.
+		isAPK, apkErr := isAPKFile(&fReader)
+		switch {
+		case apkErr != nil:
+			logContext.AddLogger(ctx).Logger().V(3).Info(
+				"error checking for APK, falling back to normal handling", "error", apkErr)
+		case isAPK:
 			return handleAPKFile(&fReader)
+		}
+
+		// isAPKFile inspects the archive via zip.NewReader, which leaves the reader positioned mid-stream.
+		// Reset to the start so archive identification and any downstream handler read from the beginning.
+		if _, seekErr := fReader.Seek(0, io.SeekStart); seekErr != nil {
+			return fReader, fmt.Errorf("error resetting reader after APK check: %w", seekErr)
 		}
 	}
 
@@ -184,6 +182,8 @@ func newFileReader(ctx context.Context, r io.Reader, options ...readerOption) (f
 type DataOrErr struct {
 	Data []byte
 	Err  error
+	// LineNumber is the 1-indexed starting line of this data within the file.
+	LineNumber int64
 }
 
 // FileHandler represents a handler for files.
@@ -221,7 +221,6 @@ const (
 	rpmHandlerType     handlerType = "rpm"
 	apkHandlerType     handlerType = "apk"
 	defaultHandlerType handlerType = "default"
-	apkExt                         = ".apk"
 )
 
 type mimeType string
@@ -356,8 +355,7 @@ func HandleFile(
 		return errors.New("reader is nil")
 	}
 
-	readerOption := withFileExtension(getFileExtension(chunkSkel))
-	rdr, err := newFileReader(ctx, reader, readerOption)
+	rdr, err := newFileReader(ctx, reader)
 	if err != nil {
 		if errors.Is(err, ErrEmptyReader) {
 			ctx.Logger().V(5).Info("empty reader, skipping file")
@@ -403,6 +401,7 @@ func HandleFile(
 //
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
 // It returns nil upon successful processing of all data, or the first encountered fatal error.
+// Line numbers from DataOrErr are propagated to the chunk's source metadata for accurate reporting.
 func handleChunksWithError(
 	ctx logContext.Context,
 	dataErrChan <-chan DataOrErr,
@@ -421,12 +420,14 @@ func handleChunksWithError(
 				if isFatal(dataOrErr.Err) {
 					return dataOrErr.Err
 				}
-				ctx.Logger().Error(dataOrErr.Err, "non-critical error processing chunk")
+				ctx.Logger().V(2).Info("non-critical error processing chunk", "error", dataOrErr.Err)
 				continue
 			}
 			if len(dataOrErr.Data) > 0 {
 				chunk := *chunkSkel
 				chunk.Data = dataOrErr.Data
+				populateChunkLineNumber(&chunk, dataOrErr.LineNumber)
+
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					return fmt.Errorf("error reporting chunk: %w", err)
 				}
@@ -435,6 +436,37 @@ func handleChunksWithError(
 			return ctx.Err()
 		}
 	}
+}
+
+// populateChunkLineNumber sets the line number in the chunk's source metadata.
+// It clones the metadata to avoid sharing state between chunks, since chunk
+// skeletons reuse the same metadata pointer. Line number is expected to be 1-indexed.
+// If lineNumber is 0 or metadata is nil, no changes are made.
+func populateChunkLineNumber(chunk *sources.Chunk, lineNumber int64) {
+	if lineNumber == 0 || chunk.SourceMetadata == nil {
+		return
+	}
+
+	cloned := proto.CloneOf(chunk.SourceMetadata)
+	switch m := cloned.Data.(type) {
+	case *source_metadatapb.MetaData_Filesystem:
+		m.Filesystem.Line = lineNumber
+	case *source_metadatapb.MetaData_AzureRepos:
+		m.AzureRepos.Line = lineNumber
+	case *source_metadatapb.MetaData_Bitbucket:
+		m.Bitbucket.Line = lineNumber
+	case *source_metadatapb.MetaData_Gerrit:
+		m.Gerrit.Line = lineNumber
+	case *source_metadatapb.MetaData_Github:
+		m.Github.Line = lineNumber
+	case *source_metadatapb.MetaData_Gitlab:
+		m.Gitlab.Line = lineNumber
+	case *source_metadatapb.MetaData_Git:
+		m.Git.Line = lineNumber
+	case *source_metadatapb.MetaData_Huggingface:
+		m.Huggingface.Line = lineNumber
+	}
+	chunk.SourceMetadata = cloned
 }
 
 // isFatal determines whether the given error is a fatal error that should
@@ -455,91 +487,14 @@ func isFatal(err error) bool {
 	}
 }
 
-// getFileExtension extracts the file extension from the chunk's SourceMetadata.
-// It considers all sources defined in the MetaData message.
-// Note: Probably should add this as a method to the source_metadatapb object.
-// then it'd just be chunkSkel.SourceMetadata.GetFileExtension()
-func getFileExtension(chunkSkel *sources.Chunk) string {
-	if chunkSkel == nil || chunkSkel.SourceMetadata == nil {
-		return ""
-	}
-
-	var fileName string
-
-	// Inspect the SourceMetadata to determine the source type
-	switch metadata := chunkSkel.SourceMetadata.Data.(type) {
-	case *source_metadatapb.MetaData_Artifactory:
-		fileName = metadata.Artifactory.Path
-	case *source_metadatapb.MetaData_Azure:
-		fileName = metadata.Azure.File
-	case *source_metadatapb.MetaData_AzureRepos:
-		fileName = metadata.AzureRepos.File
-	case *source_metadatapb.MetaData_Bitbucket:
-		fileName = metadata.Bitbucket.File
-	case *source_metadatapb.MetaData_Buildkite:
-		fileName = metadata.Buildkite.Link
-	case *source_metadatapb.MetaData_Circleci:
-		fileName = metadata.Circleci.Link
-	case *source_metadatapb.MetaData_Confluence:
-		fileName = metadata.Confluence.File
-	case *source_metadatapb.MetaData_Docker:
-		fileName = metadata.Docker.File
-	case *source_metadatapb.MetaData_Ecr:
-		fileName = metadata.Ecr.File
-	case *source_metadatapb.MetaData_Filesystem:
-		fileName = metadata.Filesystem.File
-	case *source_metadatapb.MetaData_Git:
-		fileName = metadata.Git.File
-	case *source_metadatapb.MetaData_Github:
-		fileName = metadata.Github.File
-	case *source_metadatapb.MetaData_Gitlab:
-		fileName = metadata.Gitlab.File
-	case *source_metadatapb.MetaData_Gcs:
-		fileName = metadata.Gcs.Filename
-	case *source_metadatapb.MetaData_GoogleDrive:
-		fileName = metadata.GoogleDrive.File
-	case *source_metadatapb.MetaData_Huggingface:
-		fileName = metadata.Huggingface.File
-	case *source_metadatapb.MetaData_Jira:
-		fileName = metadata.Jira.Link
-	case *source_metadatapb.MetaData_Jenkins:
-		fileName = metadata.Jenkins.Link
-	case *source_metadatapb.MetaData_Npm:
-		fileName = metadata.Npm.File
-	case *source_metadatapb.MetaData_Pypi:
-		fileName = metadata.Pypi.File
-	case *source_metadatapb.MetaData_S3:
-		fileName = metadata.S3.File
-	case *source_metadatapb.MetaData_Slack:
-		fileName = metadata.Slack.File
-	case *source_metadatapb.MetaData_Sharepoint:
-		fileName = metadata.Sharepoint.Link
-	case *source_metadatapb.MetaData_Gerrit:
-		fileName = metadata.Gerrit.File
-	case *source_metadatapb.MetaData_Test:
-		fileName = metadata.Test.File
-	case *source_metadatapb.MetaData_Teams:
-		fileName = metadata.Teams.File
-	case *source_metadatapb.MetaData_TravisCI:
-		fileName = metadata.TravisCI.Link
-	// Add other sources if they have a file or equivalent field
-	// Skipping Syslog, Forager, Postman, Vector, Webhook and Elasticsearch
-	default:
-		return ""
-	}
-
-	// Use filepath.Ext to extract the file extension from the file name
-	ext := filepath.Ext(fileName)
-	return ext
-}
-
-// shouldHandleAsAPK checks if the file should be handled as an APK based on config and MIME type.
-// Note: We can't extend the mimetype package with an APK detection function b/c it would require adjusting settings
+// shouldHandleAsAPK reports whether the file should be inspected as a potential APK.
+// Detection is content-based (file magic): after confirming the file is a zip/jar, the caller runs isAPKFile, which
+// inspects the archive entries for APK markers such as AndroidManifest.xml and classes.dex.
+// It deliberately does NOT rely on the file extension so APKs are detected regardless of the source or filename.
+// Note: Don't extend the mimetype package with APK detection function. It would require adjusting settings
 // so that all files are fully read into a byte slice for detection (mimetype.SetLimit(0)), which would bloat memory.
-// Instead we call the isAPKFile function in here after ensuring it's a zip/jar file and has an .apk extension.
-func shouldHandleAsAPK(cfg readerConfig, fReader fileReader) bool {
+func shouldHandleAsAPK(fReader fileReader) bool {
 	return feature.EnableAPKHandler.Load() &&
-		cfg.fileExtension == apkExt &&
 		(fReader.mime.String() == string(zipMime) || fReader.mime.String() == string(jarMime))
 }
 

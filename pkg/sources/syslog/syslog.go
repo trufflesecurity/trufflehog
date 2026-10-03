@@ -83,13 +83,13 @@ func (s *Source) Validate(ctx context.Context) []error {
 			if err != nil {
 				errs = append(errs, fmt.Errorf("error listening on tcp socket: %s", err))
 			}
-			srv.Close()
+			_ = srv.Close()
 		case "udp":
 			srv, err := net.ListenPacket(s.conn.Protocol, s.conn.ListenAddress)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("error listening on udp socket: %s", err))
 			}
-			srv.Close()
+			_ = srv.Close()
 		}
 	}
 	if s.conn.Protocol != "tcp" && s.conn.Protocol != "udp" {
@@ -198,7 +198,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err != nil {
 			return errors.WrapPrefix(err, "error creating TLS listener", 0)
 		}
-		defer lis.Close()
+		defer func() { _ = lis.Close() }()
 
 		return s.acceptTCPConnections(ctx, lis, chunksChan)
 	case s.conn.Protocol == "tcp":
@@ -206,7 +206,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err != nil {
 			return errors.WrapPrefix(err, "error creating TCP listener", 0)
 		}
-		defer lis.Close()
+		defer func() { _ = lis.Close() }()
 
 		return s.acceptTCPConnections(ctx, lis, chunksChan)
 	case s.conn.Protocol == "udp":
@@ -218,7 +218,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err != nil {
 			return errors.WrapPrefix(err, "could not set UDP deadline", 0)
 		}
-		defer lis.Close()
+		defer func() { _ = lis.Close() }()
 
 		return s.acceptUDPConnections(ctx, lis, chunksChan)
 	default:
@@ -282,7 +282,7 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 			JobID:          s.JobID(),
 			SourceMetadata: metadata,
 			Data:           input,
-			Verify:         s.verify,
+			SourceVerify:   s.verify,
 		}
 	}
 }
@@ -332,7 +332,7 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 			SourceType:     s.syslog.sourceType,
 			SourceMetadata: metadata,
 			Data:           input,
-			Verify:         s.verify,
+			SourceVerify:   s.verify,
 		}
 	}
 }

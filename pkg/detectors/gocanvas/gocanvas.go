@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -53,36 +53,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_GoCanvas,
+				DetectorType: detector_typepb.DetectorType_GoCanvas,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 
 			if verify {
-				payload := url.Values{}
-				payload.Add("username", emailMatch)
-
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					body, errBody := io.ReadAll(res.Body)
-
-					if errBody == nil {
-						response := Response{}
-						if err := xml.Unmarshal(body, &response); err != nil {
-							continue
-						}
-
-						if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
-							s1.Verified = true
-						}
-					}
-				}
+				isVerified, verificationErr := verifyMatch(ctx, client, emailMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, emailMatch, resMatch)
 			}
 
 			results = append(results, s1)
@@ -92,14 +71,46 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func verifyMatch(ctx context.Context, client *http.Client, emailMatch string, resMatch string) (bool, error) {
+	payload := url.Values{}
+	payload.Add("username", emailMatch)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	response := Response{}
+	if err := xml.Unmarshal(body, &response); err != nil {
+		return false, err
+	}
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 type Response struct {
 	Error []struct {
 		ErrorCode int `xml:"ErrorCode"`
 	} `xml:"Error"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GoCanvas
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GoCanvas
 }
 
 func (s Scanner) Description() string {

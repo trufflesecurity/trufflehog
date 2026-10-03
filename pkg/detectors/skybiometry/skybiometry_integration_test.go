@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSkyBiometry_FromChunk(t *testing.T) {
@@ -50,11 +50,11 @@ func TestSkyBiometry_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SkyBiometry,
+					DetectorType: detector_typepb.DetectorType_SkyBiometry,
 					Verified:     true,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SkyBiometry,
+					DetectorType: detector_typepb.DetectorType_SkyBiometry,
 					Verified:     false,
 				},
 			},
@@ -70,11 +70,11 @@ func TestSkyBiometry_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SkyBiometry,
+					DetectorType: detector_typepb.DetectorType_SkyBiometry,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_SkyBiometry,
+					DetectorType: detector_typepb.DetectorType_SkyBiometry,
 					Verified:     false,
 				},
 			},

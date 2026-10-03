@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -51,29 +51,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resPword := strings.TrimSpace(pwordMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Onedesk,
+				DetectorType: detector_typepb.DetectorType_Onedesk,
 				Raw:          []byte(emailMatch),
+				SecretParts:  map[string]string{"key": emailMatch},
 			}
 
 			if verify {
-				payload := strings.NewReader(fmt.Sprintf(`{"email": "%s", "password": "%s"}`, emailMatch, resPword))
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://app.onedesk.com/rest/2.0/login/loginUser", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					body := string(bodyBytes)
-					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, `"code":"SUCCESS"`) {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyMatch(ctx, client, emailMatch, resPword)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, emailMatch, resPword)
 			}
 
 			results = append(results, s1)
@@ -82,8 +68,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Onedesk
+func verifyMatch(ctx context.Context, client *http.Client, emailMatch string, resPword string) (bool, error) {
+	payload := strings.NewReader(fmt.Sprintf(`{"email": "%s", "password": "%s"}`, emailMatch, resPword))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://app.onedesk.com/rest/2.0/login/loginUser", payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, `"code":"SUCCESS"`) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Onedesk
 }
 
 func (s Scanner) Description() string {

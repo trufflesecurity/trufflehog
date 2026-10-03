@@ -23,7 +23,8 @@ func TestMySQL(t *testing.T) {
 
 	ctx := context.Background()
 
-	mysqlC, err := mysql.RunContainer(ctx,
+	mysqlC, err := mysql.Run(ctx,
+		"mysql:8.0.36",
 		mysql.WithDatabase(mysqlDatabase),
 		mysql.WithUsername(mysqlUser),
 		mysql.WithPassword(mysqlPass),

@@ -28,11 +28,11 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSqu
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
 	if !ok {
-		return nil, errors.New("key not found in credentialInfo")
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationValidateCredentials, analyzers.ServiceConfig, "", errors.New("key not found in credentialInfo"))
 	}
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -173,7 +173,7 @@ func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 		return permissions, nil
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&permissions)
 	if err != nil {
@@ -210,7 +210,7 @@ func getUsers(cfg *config.Config, key string) (TeamJSON, error) {
 		return team, nil
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&team)
 	if err != nil {

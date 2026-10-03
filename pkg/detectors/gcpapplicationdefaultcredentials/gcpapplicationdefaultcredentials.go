@@ -15,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -76,9 +76,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		detectedClientID, _, _ := strings.Cut(creds.ClientID, ".")
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_GCPApplicationDefaultCredentials,
+			DetectorType: detector_typepb.DetectorType_GCPApplicationDefaultCredentials,
 			Raw:          []byte(detectedClientID),
-			RawV2:        []byte(detectedClientID + creds.RefreshToken),
+			SecretParts: map[string]string{
+				"client_id":     detectedClientID,
+				"refresh_token": creds.RefreshToken,
+			},
+			RawV2: []byte(detectedClientID + creds.RefreshToken),
 		}
 
 		if len(creds.RefreshToken) > 3 {
@@ -171,8 +175,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GCPApplicationDefaultCredentials
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GCPApplicationDefaultCredentials
 }
 
 func (s Scanner) Description() string {

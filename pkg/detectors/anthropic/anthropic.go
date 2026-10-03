@@ -2,8 +2,9 @@ package anthropic
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -47,9 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		keyMatch := strings.TrimSpace(key[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Anthropic,
+			DetectorType: detector_typepb.DetectorType_Anthropic,
 			Raw:          []byte(keyMatch),
 			ExtraData:    make(map[string]string),
+			SecretParts:  map[string]string{"key": keyMatch},
 		}
 
 		if verify {
@@ -58,28 +60,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isAdminKey := isAdminKey(keyMatch)
-			var isVerified bool
-			var err error
+			var (
+				isVerified      bool
+				verificationErr error
+			)
 
-			if isAdminKey {
-				isVerified, err = verifyAnthropicKey(ctx, client, adminKeyEndpoint, keyMatch)
+			if isAdminKey(keyMatch) {
 				s1.ExtraData["Type"] = "Admin Key"
-			} else if !isAdminKey {
-				isVerified, err = verifyAnthropicKey(ctx, client, apiKeyEndpoint, keyMatch)
-				s1.ExtraData["Type"] = "API Key"
+				isVerified, verificationErr = verifyAnthropicKey(ctx, client, adminKeyEndpoint, keyMatch)
 			} else {
-				return nil, errors.New("unknown key type detected for anthropic")
+				s1.ExtraData["Type"] = "API Key"
+				isVerified, verificationErr = verifyAnthropicKey(ctx, client, apiKeyEndpoint, keyMatch)
 			}
 
 			s1.Verified = isVerified
-			s1.SetVerificationError(err, keyMatch)
-
-			if s1.Verified {
-				s1.AnalysisInfo = map[string]string{
-					"key": keyMatch,
-				}
-			}
+			s1.SetVerificationError(verificationErr, keyMatch)
 		}
 
 		results = append(results, s1)
@@ -100,7 +95,7 @@ Endpoints:
 func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	req.Header.Set("x-api-key", key)
@@ -111,7 +106,10 @@ func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key 
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -122,12 +120,41 @@ func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key 
 		return false, nil
 
 	default:
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		// A 400 is invalid_request_error, never a bad-key signal (that's always 401),
+		// so it must stay indeterminate rather than count as not-live.
+		return false, apiError(res)
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Anthropic
+// anthropicErrorResponse is the Anthropic API's error envelope for non-2xx responses.
+// See https://platform.claude.com/docs/en/api/errors.
+type anthropicErrorResponse struct {
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+const maxErrorBodySize = 4 << 10 // cap how much of the error body we bother parsing
+
+// apiError enriches an unexpected status with the API's own error type/message when present.
+func apiError(res *http.Response) error {
+	body, err := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
+	if err != nil {
+		return fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	var apiErr anthropicErrorResponse
+	if err := json.Unmarshal(body, &apiErr); err != nil || apiErr.Error.Type == "" {
+		return fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return fmt.Errorf("unexpected HTTP response status %d (%s: %s)",
+		res.StatusCode, apiErr.Error.Type, apiErr.Error.Message)
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Anthropic
 }
 
 func (s Scanner) Description() string {

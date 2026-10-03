@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // TestAirtableoauth_FromChunk verifies the validity of an Airtable OAuth token
@@ -56,7 +56,7 @@ func TestAirtableoauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableOAuth,
+					DetectorType: detector_typepb.DetectorType_AirtableOAuth,
 					Verified:     true,
 				},
 			},
@@ -73,7 +73,7 @@ func TestAirtableoauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableOAuth,
+					DetectorType: detector_typepb.DetectorType_AirtableOAuth,
 					Verified:     false,
 				},
 			},
@@ -102,7 +102,7 @@ func TestAirtableoauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableOAuth,
+					DetectorType: detector_typepb.DetectorType_AirtableOAuth,
 					Verified:     false,
 				},
 			},
@@ -119,7 +119,7 @@ func TestAirtableoauth_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableOAuth,
+					DetectorType: detector_typepb.DetectorType_AirtableOAuth,
 					Verified:     false,
 				},
 			},

@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -46,31 +46,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, secret := range secMatches {
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_RazorPay,
+				DetectorType: detector_typepb.DetectorType_RazorPay,
 				Raw:          []byte(key),
-				RawV2:        []byte(key + secret),
-				Redacted:     key,
+				SecretParts: map[string]string{
+					"key":    key,
+					"secret": secret,
+				},
+				RawV2:    []byte(key + secret),
+				Redacted: key,
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.razorpay.com/v1/items?count=1", nil)
-				if err != nil {
-					continue
-				}
-				req.SetBasicAuth(key, secret)
-				res, err := client.Do(req)
-				if err == nil {
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						if json.Valid(bodyBytes) {
-							s1.Verified = true
-						}
-					}
-				}
+				isVerified, verificationErr := verifyMatch(ctx, client, key, secret)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, key, secret)
 			}
 
 			results = append(results, s1)
@@ -81,8 +70,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_RazorPay
+func verifyMatch(ctx context.Context, client *http.Client, key, secret string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.razorpay.com/v1/items?count=1", nil)
+	if err != nil {
+		return false, err
+	}
+	req.SetBasicAuth(key, secret)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	if res.StatusCode >= 200 && res.StatusCode < 300 && json.Valid(bodyBytes) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_RazorPay
 }
 
 func (s Scanner) Description() string {

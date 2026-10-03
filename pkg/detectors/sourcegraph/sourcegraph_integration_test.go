@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSourcegraph_FromChunk(t *testing.T) {
@@ -56,7 +56,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     true,
 				},
 			},
@@ -73,7 +73,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     true,
 				},
 			},
@@ -90,7 +90,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     true,
 				},
 			},
@@ -107,7 +107,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     true,
 				},
 			},
@@ -124,7 +124,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     false,
 				},
 			},
@@ -141,7 +141,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     false,
 				},
 			},
@@ -158,7 +158,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     false,
 				},
 			},
@@ -187,7 +187,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     false,
 				},
 			},
@@ -204,7 +204,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					DetectorType: detector_typepb.DetectorType_Sourcegraph,
 					Verified:     false,
 				},
 			},
@@ -226,7 +226,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {

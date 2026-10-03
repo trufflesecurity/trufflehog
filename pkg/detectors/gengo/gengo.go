@@ -17,7 +17,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -56,37 +56,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Gengo,
+				DetectorType: detector_typepb.DetectorType_Gengo,
 				Raw:          []byte(resSecretMatch),
-				RawV2:        []byte(resMatch + resSecretMatch),
+				SecretParts: map[string]string{
+					"key":    resMatch,
+					"secret": resSecretMatch,
+				},
+				RawV2: []byte(resMatch + resSecretMatch),
 			}
 
 			if verify {
-
-				timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-				signature := getGengoSignature(timestamp, resSecretMatch)
-
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.gengo.com/v2/account/me?ts=%s&api_key=%s&api_sig=%s", timestamp, resMatch, signature), nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Accept", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					body, errBody := io.ReadAll(res.Body)
-
-					if errBody == nil {
-						var response Response
-						if err := json.Unmarshal(body, &response); err != nil {
-							continue
-						}
-
-						if res.StatusCode >= 200 && res.StatusCode < 300 && response.OpStat == "ok" {
-							s1.Verified = true
-						}
-					}
-				}
+				isVerified, verificationErr := verifyMatch(ctx, client, resSecretMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resSecretMatch, resMatch)
 			}
 
 			results = append(results, s1)
@@ -94,6 +76,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resSecretMatch string, resMatch string) (bool, error) {
+
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	signature := getGengoSignature(timestamp, resSecretMatch)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.gengo.com/v2/account/me?ts=%s&api_key=%s&api_sig=%s", timestamp, resMatch, signature), nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Accept", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	var response Response
+	if err := json.Unmarshal(body, &response); err != nil {
+		return false, err
+	}
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 && response.OpStat == "ok" {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 type Response struct {
@@ -108,8 +122,8 @@ func getGengoSignature(timeStamp string, secret string) string {
 	return hex.EncodeToString(macsum)
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Gengo
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Gengo
 }
 
 func (s Scanner) Description() string {

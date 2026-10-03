@@ -12,6 +12,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 func CallAirtableAPI(token string, method string, url string) (*http.Response, error) {
@@ -21,7 +22,7 @@ func CallAirtableAPI(token string, method string, url string) (*http.Response, e
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := detectors.DetectorHttpClientWithNoLocalAddresses.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +39,7 @@ func FetchAirtableUserInfo(token string) (*AirtableUserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch Airtable user info, status: %d", resp.StatusCode)
@@ -61,7 +62,7 @@ func FetchAirtableBases(token string) (*AirtableBases, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch Airtable bases, status: %d", resp.StatusCode)
@@ -90,12 +91,12 @@ func fetchBaseSchema(token string, baseID string) (*Schema, error) {
 	if !exists {
 		return nil, fmt.Errorf("endpoint for GetBaseSchemaEndpoint does not exist")
 	}
-	url := strings.Replace(endpoint.URL, "{baseID}", baseID, -1)
+	url := strings.ReplaceAll(endpoint.URL, "{baseID}", baseID)
 	resp, err := CallAirtableAPI(token, endpoint.Method, url)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch schema for base %s, status: %d", baseID, resp.StatusCode)

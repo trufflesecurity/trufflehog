@@ -198,6 +198,90 @@ func TestCustomDetectorsVerifyRangeValidation(t *testing.T) {
 	}
 }
 
+func TestStatusCodeMatchesRanges(t *testing.T) {
+	tests := []struct {
+		name   string
+		code   int
+		ranges []string
+		want   bool
+	}{
+		{
+			name:   "single code match",
+			code:   200,
+			ranges: []string{"200"},
+			want:   true,
+		},
+		{
+			name:   "single code no match",
+			code:   201,
+			ranges: []string{"200"},
+			want:   false,
+		},
+		{
+			name:   "range lower bound",
+			code:   200,
+			ranges: []string{"200-250"},
+			want:   true,
+		},
+		{
+			name:   "range upper bound",
+			code:   250,
+			ranges: []string{"200-250"},
+			want:   true,
+		},
+		{
+			name:   "range middle",
+			code:   225,
+			ranges: []string{"200-250"},
+			want:   true,
+		},
+		{
+			name:   "range outside below",
+			code:   199,
+			ranges: []string{"200-250"},
+			want:   false,
+		},
+		{
+			name:   "range outside above",
+			code:   251,
+			ranges: []string{"200-250"},
+			want:   false,
+		},
+		{
+			name:   "multiple ranges first match",
+			code:   200,
+			ranges: []string{"200", "300-399"},
+			want:   true,
+		},
+		{
+			name:   "multiple ranges second match",
+			code:   301,
+			ranges: []string{"200", "300-399"},
+			want:   true,
+		},
+		{
+			name:   "multiple ranges no match",
+			code:   500,
+			ranges: []string{"200", "300-399"},
+			want:   false,
+		},
+		{
+			name:   "empty ranges",
+			code:   200,
+			ranges: nil,
+			want:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := StatusCodeMatchesRanges(tt.code, tt.ranges)
+			if got != tt.want {
+				t.Errorf("StatusCodeMatchesRanges(%d, %v) = %v, want %v", tt.code, tt.ranges, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCustomDetectorsVerifyRegexVarsValidation(t *testing.T) {
 	tests := []struct {
 		name    string

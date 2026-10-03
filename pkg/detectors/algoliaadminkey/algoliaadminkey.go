@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -68,30 +69,37 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	// Test matches.
 	for key := range keyMatches {
 		for id := range idMatches {
-			if invalidHosts.Exists(id) {
-				logger.V(3).Info("Skipping application id: no such host", "host", id)
-				delete(idMatches, id)
-				continue
-			}
-
 			r := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AlgoliaAdminKey,
+				DetectorType: detector_typepb.DetectorType_AlgoliaAdminKey,
 				Raw:          []byte(key),
-				RawV2:        []byte(id + ":" + key),
+				SecretParts: map[string]string{
+					"id":  id,
+					"key": key,
+				},
+				RawV2: []byte(id + ":" + key),
 			}
 
 			if verify {
-				// Verify if the key is a valid Algolia Admin Key.
-				isVerified, extraData, verificationErr := verifyMatch(ctx, id, key)
-				r.Verified = isVerified
-				r.ExtraData = extraData
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(id, struct{}{})
-						continue
-					}
+				if invalidHosts.Exists(id) {
+					// An earlier candidate already proved this host does not resolve, so the lookup is
+					// skipped. The finding is still reported: dropping it here would make the reported
+					// secrets depend on whether verification was requested, and on the order in which
+					// candidates happened to be processed.
+					logger.V(3).Info("Skipping application id: no such host", "host", id)
+					r.SetVerificationError(errNoHost, key)
+				} else {
+					// Verify if the key is a valid Algolia Admin Key.
+					isVerified, extraData, verificationErr := verifyMatch(ctx, id, key)
+					r.Verified = isVerified
+					r.ExtraData = extraData
+					if verificationErr != nil {
+						var dnsErr *net.DNSError
+						if errors.As(verificationErr, &dnsErr) && dnsErr.IsNotFound {
+							invalidHosts.Set(id, struct{}{})
+						}
 
-					r.SetVerificationError(verificationErr, key)
+						r.SetVerificationError(verificationErr, key)
+					}
 				}
 			}
 
@@ -123,11 +131,6 @@ func verifyMatch(ctx context.Context, appId, apiKey string) (bool, map[string]st
 
 	res, err := client.Do(req)
 	if err != nil {
-		// lookup xyz.algolia.net: no such host
-		if strings.Contains(err.Error(), "no such host") {
-			return false, nil, errNoHost
-		}
-
 		return false, nil, err
 	}
 	defer func() {
@@ -179,8 +182,8 @@ type keyResponse struct {
 	Description string   `json:"description"`
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AlgoliaAdminKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AlgoliaAdminKey
 }
 
 func (s Scanner) Description() string {

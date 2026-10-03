@@ -42,7 +42,7 @@ func TestBitBar_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"64pq66z15thg8fh3acd00l35lpyg7c82"},
@@ -83,7 +83,7 @@ func TestBitBar_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

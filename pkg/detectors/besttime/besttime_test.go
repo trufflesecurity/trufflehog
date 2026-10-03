@@ -36,7 +36,7 @@ func TestBestTime_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"pri_099889f14d114dfaae476569b395eade"},
@@ -71,7 +71,7 @@ func TestBestTime_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

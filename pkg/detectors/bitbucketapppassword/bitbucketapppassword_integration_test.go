@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestBitbucketAppPassword_FromData_Integration(t *testing.T) {
@@ -39,7 +39,7 @@ func TestBitbucketAppPassword_FromData_Integration(t *testing.T) {
 			input: fmt.Sprintf("https://%s:%s@bitbucket.org", username, validPassword),
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BitbucketAppPassword,
+					DetectorType: detector_typepb.DetectorType_BitbucketAppPassword,
 					Verified:     true,
 					Raw:          []byte(fmt.Sprintf("%s:%s", username, validPassword)),
 				},
@@ -50,7 +50,7 @@ func TestBitbucketAppPassword_FromData_Integration(t *testing.T) {
 			input: fmt.Sprintf("https://%s:%s@bitbucket.org", username, invalidPassword),
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BitbucketAppPassword,
+					DetectorType: detector_typepb.DetectorType_BitbucketAppPassword,
 					Verified:     false,
 					Raw:          []byte(fmt.Sprintf("%s:%s", username, invalidPassword)),
 				},

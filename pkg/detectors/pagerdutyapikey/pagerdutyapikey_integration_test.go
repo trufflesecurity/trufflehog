@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPagerDutyApiKey_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     true,
 				},
 			},
@@ -65,7 +65,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     false,
 				},
 			},
@@ -73,7 +73,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, verified but unexpected api surface",
+			name: "found, unverified due to not found (404)",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
@@ -82,12 +82,76 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified via 403 (valid key, insufficient permissions)",
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, `{"error":{"message":"Access Denied","code":2010}}`)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, indeterminate due to rate limiting (429)",
+			s:    Scanner{client: common.ConstantResponseHttpClient(429, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     false,
 				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
+		},
+		{
+			name: "found, unverified due to bad request (400)",
+			s:    Scanner{client: common.ConstantResponseHttpClient(400, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified via 402 (valid key, account plan limitation)",
+			s:    Scanner{client: common.ConstantResponseHttpClient(402, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name: "found, unverified",
@@ -99,7 +163,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detector_typepb.DetectorType_PagerDutyApiKey,
 					Verified:     false,
 				},
 			},

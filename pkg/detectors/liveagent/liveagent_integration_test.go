@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestLiveAgent_FromChunk(t *testing.T) {
@@ -55,7 +55,7 @@ func TestLiveAgent_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LiveAgent,
+					DetectorType: detector_typepb.DetectorType_LiveAgent,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"domain": wantUrl,
@@ -74,7 +74,7 @@ func TestLiveAgent_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LiveAgent,
+					DetectorType: detector_typepb.DetectorType_LiveAgent,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"domain": wantUrl,

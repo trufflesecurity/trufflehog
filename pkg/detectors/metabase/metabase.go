@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -55,29 +56,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Metabase,
+				DetectorType: detector_typepb.DetectorType_Metabase,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resURLMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"url": resURLMatch,
+				},
+				RawV2: []byte(resMatch + resURLMatch),
 			}
 
 			if verify {
-				u.Path = "/api/user/current"
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("X-Metabase-Session", resMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					body, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					if res.StatusCode == http.StatusOK && json.Valid(body) {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyMatch(ctx, client, u, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			results = append(results, s1)
@@ -87,8 +78,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Metabase
+func verifyMatch(ctx context.Context, client *http.Client, u *url.URL, resMatch string) (bool, error) {
+	u.Path = "/api/user/current"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("X-Metabase-Session", resMatch)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	if res.StatusCode == http.StatusOK && json.Valid(body) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Metabase
 }
 
 func (s Scanner) Description() string {

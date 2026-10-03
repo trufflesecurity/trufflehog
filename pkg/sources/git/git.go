@@ -6,12 +6,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -38,7 +38,22 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
+	// maxCloneAttempts is the total number of times a clone is attempted when
+	// each failure is classified as a transient network or rate-limit error.
+	maxCloneAttempts = 3
+	// cloneRetryBackoff is the base wait between clone attempts after a
+	// transient network error; it is multiplied by the number of failed
+	// attempts so far.
+	cloneRetryBackoff = 5 * time.Second
+	// cloneRateLimitBackoff is the base wait after a clone attempt fails
+	// with what looks like a GitHub/GitLab secondary rate limit (bare 403
+	// or 429). GitHub's guidance for secondary rate limits is to wait at
+	// least a minute before retrying, so this starts well above the
+	// network-error backoff and grows per attempt.
+	cloneRateLimitBackoff = 60 * time.Second
+)
 
 type Source struct {
 	name     string
@@ -57,12 +72,27 @@ type Source struct {
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
 func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
+// SourceMetadataInfo contains the metadata fields passed to SourceMetadataFunc.
+// Using a struct allows adding new fields without breaking existing consumers.
+type SourceMetadataInfo struct {
+	File                string
+	Email               string
+	Commit              string
+	Timestamp           string
+	Repository          string
+	RepositoryLocalPath string
+	Line                int64
+}
+
+// SourceMetadataFunc is a function that maps git source metadata to a protobuf MetaData message.
+type SourceMetadataFunc func(info SourceMetadataInfo) *source_metadatapb.MetaData
+
 type Git struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
 	sourceID           sources.SourceID
 	jobID              sources.JobID
-	sourceMetadataFunc func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData
+	sourceMetadataFunc SourceMetadataFunc
 	verify             bool
 	metrics            metricsCollector
 	concurrency        *semaphore.Weighted
@@ -76,7 +106,7 @@ type Git struct {
 // Config for a Git source.
 type Config struct {
 	Concurrency        int
-	SourceMetadataFunc func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData
+	SourceMetadataFunc SourceMetadataFunc
 
 	SourceName   string
 	JobID        sources.JobID
@@ -97,11 +127,12 @@ type Config struct {
 // NewGit creates a new Git instance with the provided configuration. The Git instance is used to interact with
 // Git repositories.
 func NewGit(config *Config) *Git {
-	var parser *gitparse.Parser
+	parserOpts := []gitparse.Option{}
 	if config.UseCustomContentWriter {
-		parser = gitparse.NewParser(gitparse.UseCustomContentWriter())
-	} else {
-		parser = gitparse.NewParser()
+		parserOpts = append(parserOpts, gitparse.UseCustomContentWriter())
+	}
+	if feature.UseGitLowMemoryScan.Load() {
+		parserOpts = append(parserOpts, gitparse.UseLowMemoryScan())
 	}
 
 	return &Git{
@@ -115,7 +146,7 @@ func NewGit(config *Config) *Git {
 		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
-		parser:             parser,
+		parser:             gitparse.NewParser(parserOpts...),
 	}
 }
 
@@ -212,17 +243,17 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info SourceMetadataInfo) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
-						Commit:              sanitizer.UTF8(commit),
-						File:                sanitizer.UTF8(file),
-						Email:               sanitizer.UTF8(email),
-						Repository:          sanitizer.UTF8(repository),
-						Timestamp:           sanitizer.UTF8(timestamp),
-						Line:                line,
-						RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
+						Commit:              sanitizer.UTF8(info.Commit),
+						File:                sanitizer.UTF8(info.File),
+						Email:               sanitizer.UTF8(info.Email),
+						Repository:          sanitizer.UTF8(info.Repository),
+						Timestamp:           sanitizer.UTF8(info.Timestamp),
+						Line:                info.Line,
+						RepositoryLocalPath: sanitizer.UTF8(info.RepositoryLocalPath),
 					},
 				},
 			}
@@ -304,7 +335,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURI string, reporter sources.
 		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 		if !s.conn.GetPrintLegacyJson() {
 			if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-				defer os.RemoveAll(path)
+				defer func() { _ = os.RemoveAll(path) }()
 			}
 		}
 
@@ -358,7 +389,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 		if !s.conn.GetPrintLegacyJson() {
 			if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
-				defer os.RemoveAll(gitDir)
+				defer func() { _ = os.RemoveAll(gitDir) }()
 			}
 		}
 
@@ -389,7 +420,7 @@ func RepoFromPath(path string) (*git.Repository, error) {
 
 func CleanOnError(err *error, path string) {
 	if *err != nil {
-		os.RemoveAll(path)
+		_ = os.RemoveAll(path)
 	}
 }
 
@@ -434,9 +465,12 @@ func normalizeFileURI(uri *url.URL) (*url.URL, error) {
 		return nil, fmt.Errorf("failed to resolve absolute path for %q: %w", rawPath, err)
 	}
 
+	// Convert to forward slashes (for Windows compatibility)
+	normalizedPath := filepath.ToSlash(absPath)
+
 	normalizedURI := &url.URL{
 		Scheme: "file",
-		Path:   absPath,
+		Path:   normalizedPath,
 	}
 
 	return normalizedURI, nil
@@ -456,38 +490,127 @@ type cloneParams struct {
 // infrastructure, ensuring that any encountered errors trigger a cleanup of resources.
 // The core cloning logic is delegated to a nested function, which returns errors to the
 // outer function for centralized error handling and cleanup.
+//
+// Failures classified as transient network errors (e.g. a connection reset
+// mid-transfer) or as a secondary rate limit (a bare 403 or 429 from the
+// remote) are retried up to maxCloneAttempts times, each attempt starting
+// from a fresh clone directory. All other failures, including clone
+// timeouts (see feature.GitCloneTimeoutDuration), are returned immediately.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, clonePath string, authInUrl bool, args ...string) (string, *git.Repository, error) {
-	var path string
-	var err error
-
-	// If --clone-path is set, create a subdirectory <clonePath>/trufflehog-<repo-name> with permissions 0755.
-	if clonePath != "" {
-		path = filepath.Join(clonePath, "trufflehog-"+strings.TrimSuffix(filepath.Base(gitURL), gitDirName))
-		if err = os.MkdirAll(path, 0755); err != nil {
-			return "", nil, fmt.Errorf("failed to create clone path %s: %w", clonePath, err)
-		}
-	} else {
-		// otherwise, create a temporary directory in the system temp path.
-		path, err = cleantemp.MkdirTemp()
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to create temporary clone path: %w", err)
-		}
-	}
-
 	timeout := time.Duration(feature.GitCloneTimeoutDuration.Load())
 
-	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl, timeout})
-	if err != nil {
-		// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
-		// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
-		CleanOnError(&err, path)
+	var path string
+	var repo *git.Repository
+	var err error
+	for attempt := 1; attempt <= maxCloneAttempts; attempt++ {
+		// Each attempt starts from a fresh clone directory.
+		path, err = createClonePath(gitURL, clonePath)
+		if err != nil {
+			return "", nil, err
+		}
 
-		// Note: We don't need to record the clone failure here as it's already
-		// recorded in executeClone when the error occurs
-		return "", nil, err
+		repo, err = executeClone(ctx, cloneParams{userInfo, gitURL, args, path, authInUrl, timeout})
+		if err == nil {
+			return path, repo, nil
+		}
+
+		if attempt >= maxCloneAttempts || !isRetryableCloneError(err) || common.IsDone(ctx) {
+			// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
+			// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
+			CleanOnError(&err, path)
+
+			// Note: We don't need to record the clone failure here as it's already
+			// recorded in executeClone when the error occurs
+			return "", nil, err
+		}
+
+		// Discard the partial clone; the next iteration recreates a fresh directory.
+		if rmErr := os.RemoveAll(path); rmErr != nil {
+			return "", nil, fmt.Errorf("failed to clean clone path for retry: %w (original clone error: %w)", rmErr, err)
+		}
+
+		delay := cloneRetryDelay(err, attempt)
+		ctx.Logger().Info("git clone interrupted; retrying",
+			"attempt", attempt,
+			"max_attempts", maxCloneAttempts,
+			"delay", delay.String(),
+			"error", err.Error(),
+		)
+		select {
+		case <-ctx.Done():
+			return "", nil, ctx.Err()
+		case <-time.After(delay):
+		}
 	}
 
-	return path, repo, nil
+	return "", nil, err
+}
+
+// isRetryableCloneError reports whether a clone failure looks like a
+// transient condition (a network interruption, e.g. a connection reset
+// mid-transfer, or a secondary rate limit) rather than a permanent
+// condition like an auth or permission error.
+func isRetryableCloneError(err error) bool {
+	if err == nil {
+		return false
+	}
+	switch ClassifyCloneError(err.Error()) {
+	case cloneFailureNetwork, cloneFailureRateLimit:
+		return true
+	default:
+		return false
+	}
+}
+
+// cloneRetryDelay returns how long to wait before the next clone attempt,
+// scaled by the failure class: rate-limit errors back off much more slowly
+// than transient network errors, since GitHub/GitLab secondary rate limits
+// take on the order of a minute or more to clear.
+func cloneRetryDelay(err error, attempt int) time.Duration {
+	if ClassifyCloneError(err.Error()) == cloneFailureRateLimit {
+		return cloneRateLimitBackoff * time.Duration(attempt)
+	}
+	return cloneRetryBackoff * time.Duration(attempt)
+}
+
+// createClonePath creates the directory a repository will be cloned into and
+// returns its path. When clonePath is set (the --clone-path flag), the
+// directory is <clonePath>/trufflehog-<repo-name>-<random> with permissions
+// 0755; otherwise a fresh temporary directory (0700, per os.MkdirTemp) is
+// created in the system temp path. It is called both before the first clone
+// attempt and to replace the directory between retries.
+//
+// Every call returns a directory of its own. Naming it after the URL's last
+// segment alone collides for same-named repos in different groups, and for
+// the same repo cloned twice, which lets concurrent workers clone into and
+// delete each other's directories.
+func createClonePath(gitURL, clonePath string) (string, error) {
+	if clonePath == "" {
+		path, err := cleantemp.MkdirTemp()
+		if err != nil {
+			return "", fmt.Errorf("failed to create temporary clone path: %w", err)
+		}
+		return path, nil
+	}
+
+	if err := os.MkdirAll(clonePath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create clone path %s: %w", clonePath, err)
+	}
+
+	// The trufflehog- prefix is what cleantemp.CleanTempDirsForLegacyJSON
+	// sweeps, so it has to survive; the repo name is kept for readability
+	// under --no-cleanup.
+	slug := strings.TrimSuffix(filepath.Base(gitURL), gitDirName)
+	path, err := os.MkdirTemp(clonePath, "trufflehog-"+slug+"-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create clone path in %s: %w", clonePath, err)
+	}
+
+	// os.MkdirTemp creates 0700; --clone-path directories are 0755.
+	if err := os.Chmod(path, 0755); err != nil {
+		return "", fmt.Errorf("failed to set permissions on clone path %s: %w", path, err)
+	}
+	return path, nil
 }
 
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
@@ -573,7 +696,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "error", err)
+		logger.V(0).Info("git clone failed", "error", err)
 		failureReason := ClassifyCloneError(output)
 		exitCode := cloneCmd.ProcessState.ExitCode()
 		metricsInstance.RecordCloneOperation(statusFailure, failureReason, exitCode)
@@ -660,6 +783,50 @@ func (s *Git) CommitsScanned() uint64 {
 
 const gitDirName = ".git"
 
+// resolveGitDir resolves the actual git directory path for a repository.
+// In a regular repository, .git is a directory containing the git data.
+// In a git worktree, .git is a file containing a "gitdir: <path>" reference
+// to the actual git directory location.
+// This function handles both cases and returns the path to the actual git directory.
+func resolveGitDir(repoPath string) (string, error) {
+	gitPath := filepath.Join(repoPath, gitDirName)
+
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat .git: %w", err)
+	}
+
+	// If .git is a directory, return it directly
+	if info.IsDir() {
+		return gitPath, nil
+	}
+
+	// .git is a file (worktree) - read and parse the gitdir reference
+	content, err := os.ReadFile(gitPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read .git file: %w", err)
+	}
+
+	// Parse "gitdir: <path>" format
+	line := strings.TrimSpace(string(content))
+	const gitdirPrefix = "gitdir: "
+	if !strings.HasPrefix(line, gitdirPrefix) {
+		return "", fmt.Errorf("invalid .git file format: expected 'gitdir: <path>', got %q", line)
+	}
+
+	gitdirPath := strings.TrimPrefix(line, gitdirPrefix)
+
+	// The path may be relative to the worktree directory
+	if !filepath.IsAbs(gitdirPath) {
+		gitdirPath = filepath.Join(repoPath, gitdirPath)
+	}
+
+	// Clean the path to resolve any ".." components
+	gitdirPath = filepath.Clean(gitdirPath)
+
+	return gitdirPath, nil
+}
+
 // getGitDir returns the likely path of the ".git" directory.
 // If the repository is bare, it will be at the top-level; otherwise, it
 // exists in the ".git" directory at the root of the working tree.
@@ -689,6 +856,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = ctx
 	}
 
+	// The scan can stop before the diff channel is drained, on max depth or on
+	// reaching the base commit. Nothing else tells the parser that, so cancelling on
+	// the way out is what shuts down the git processes still producing diffs. Without
+	// it they sit blocked on a channel nobody is reading until the whole scan ends.
+	repoCtx, cancel := context.WithCancel(repoCtx)
+	defer cancel()
+
 	logger := repoCtx.Logger()
 	var logValues []any
 	if scanOptions.BaseHash != "" {
@@ -701,7 +875,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isRepoBare(path))
+	// git computes the base..head range, so every commit on diffChan is in scope.
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash, scanOptions.ExcludeGlobs, isRepoBare(path))
 	if err != nil {
 		return err
 	}
@@ -725,14 +900,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		commit := diff.Commit
 		fullHash := commit.Hash
-		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
-			logger.V(1).Info("reached base commit", "commit", fullHash)
-			break
-		}
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
 		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
@@ -744,8 +914,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// Scan the commit metadata.
 			// See https://github.com/trufflesecurity/trufflehog/issues/2683
 			var (
-				metadata = s.sourceMetadataFunc("", email, fullHash, when, remoteURL, path, 0)
-				sb       strings.Builder
+				metadata = s.sourceMetadataFunc(SourceMetadataInfo{
+					Email:               email,
+					Commit:              fullHash,
+					Timestamp:           when,
+					Repository:          remoteURL,
+					RepositoryLocalPath: path,
+				})
+				sb strings.Builder
 			)
 			sb.WriteString(email)
 			sb.WriteString("\n")
@@ -759,7 +935,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           []byte(sb.String()),
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			if err := reporter.ChunkOk(ctx, chunk); err != nil {
 				return err
@@ -786,14 +962,21 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				continue
 			}
 
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, path, 0)
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              fullHash,
+				Timestamp:           when,
+				Repository:          remoteURL,
+				RepositoryLocalPath: path,
+			})
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
 				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
@@ -813,7 +996,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 
 		chunkData := func(d *gitparse.Diff) error {
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, path, int64(diff.LineStart))
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              fullHash,
+				Timestamp:           when,
+				Repository:          remoteURL,
+				RepositoryLocalPath: path,
+				Line:                int64(diff.LineStart),
+			})
 
 			reader, err := d.ReadCloser()
 			if err != nil {
@@ -824,7 +1015,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				)
 				return nil
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			data := make([]byte, d.Len())
 			if _, err := io.ReadFull(reader, data); err != nil {
@@ -842,13 +1033,18 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           data,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
 		if err := chunkData(diff); err != nil {
 			return err
 		}
+	}
+
+	// empty base..head range exits successfully
+	if scanOptions.BaseHash != "" && depth == 0 {
+		logger.Info("no commits in range", logValues...)
 	}
 	return nil
 }
@@ -859,9 +1055,17 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		ctx.Logger().Error(err, "error creating reader for chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	originalChunk := bufio.NewScanner(reader)
+	// Default bufio max token size (64 KB) is too small for files with long lines
+	// (e.g. minified JS, base64 blobs). Raise the cap to 10 MB so those lines
+	// are still scanned; the oversize-line path below will chunk them correctly.
+	// The initial buffer starts at 4 KB (same as bufio's default) and grows only
+	// when a line actually exceeds the current size, keeping allocations cheap for
+	// the common case of small diffs.
+	const maxScanTokenSize = 10 * 1024 * 1024
+	originalChunk.Buffer(make([]byte, 4096), maxScanTokenSize)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
@@ -872,7 +1076,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			// Add oversize chunk info
 			if newChunkBuffer.Len() > 0 {
 				// Send the existing fragment.
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+lastOffset))
+				metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+					File:       fileName,
+					Email:      email,
+					Commit:     hash,
+					Timestamp:  when,
+					Repository: urlMetadata,
+					Line:       int64(diff.LineStart + lastOffset),
+				})
 				chunk := sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -880,7 +1091,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-					Verify:         s.verify,
+					SourceVerify:   s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -892,7 +1103,14 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			}
 			if len(line) > sources.DefaultChunkSize {
 				// Send the oversize line.
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+offset))
+				metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+					File:       fileName,
+					Email:      email,
+					Commit:     hash,
+					Timestamp:  when,
+					Repository: urlMetadata,
+					Line:       int64(diff.LineStart + offset),
+				})
 				chunk := sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -900,7 +1118,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           line,
-					Verify:         s.verify,
+					SourceVerify:   s.verify,
 				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
@@ -914,9 +1132,30 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			ctx.Logger().Error(err, "error writing to chunk buffer", "filename", fileName, "commit", hash, "file", diff.PathB)
 		}
 	}
+	if err := originalChunk.Err(); err != nil {
+		// A single diff line exceeding maxScanTokenSize (e.g. minified JS or a
+		// base64 blob) is an expected condition for pathological files, not a
+		// failure. bufio.Scanner stops after this line, so the remainder of the
+		// diff is not scanned; log at a lower level to keep it out of the error
+		// stream while still recording that content was truncated. Genuine reader
+		// errors are still surfaced at ERROR.
+		if errors.Is(err, bufio.ErrTooLong) {
+			ctx.Logger().V(2).Info("skipping oversize diff line; remainder of file not scanned",
+				"filename", fileName, "commit", hash, "file", diff.PathB, "max_line_bytes", maxScanTokenSize)
+		} else {
+			ctx.Logger().Error(err, "error scanning chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
+		}
+	}
 	// Send anything still in the new chunk buffer
 	if newChunkBuffer.Len() > 0 {
-		metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, "", int64(diff.LineStart+lastOffset))
+		metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+			File:       fileName,
+			Email:      email,
+			Commit:     hash,
+			Timestamp:  when,
+			Repository: urlMetadata,
+			Line:       int64(diff.LineStart + lastOffset),
+		})
 		chunk := sources.Chunk{
 			SourceName:     s.sourceName,
 			SourceID:       s.sourceID,
@@ -924,7 +1163,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			SourceType:     s.sourceType,
 			SourceMetadata: metadata,
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
-			Verify:         s.verify,
+			SourceVerify:   s.verify,
 		}
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
 			// TODO: Return error.
@@ -1017,14 +1256,21 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				continue
 			}
 
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, path, 0)
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              "Staged",
+				Timestamp:           when,
+				Repository:          urlMetadata,
+				RepositoryLocalPath: path,
+			})
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
 				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(err, "error handling binary file")
@@ -1033,14 +1279,22 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		}
 
 		chunkData := func(d *gitparse.Diff) error {
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, path, int64(diff.LineStart))
+			metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+				File:                fileName,
+				Email:               email,
+				Commit:              "Staged",
+				Timestamp:           when,
+				Repository:          urlMetadata,
+				RepositoryLocalPath: path,
+				Line:                int64(diff.LineStart),
+			})
 
 			reader, err := d.ReadCloser()
 			if err != nil {
 				logger.Error(err, "error creating reader for staged")
 				return nil
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			data := make([]byte, d.Len())
 			if _, err := reader.Read(data); err != nil {
@@ -1054,7 +1308,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           data,
-				Verify:         s.verify,
+				SourceVerify:   s.verify,
 			}
 			return reporter.ChunkOk(ctx, chunk)
 		}
@@ -1341,7 +1595,15 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 			if !isRepoBare(path) {
 				// Only copy index file for non-bare clones from working directory repos. This is used to see staged changes.
 				// Note: To scan **un**staged changes in the future, we'd need to set core.worktree to the original path.
-				originalIndexPath := filepath.Join(strings.TrimPrefix(normalizedURI.String(), "file://"), gitDirName, "index")
+				uriPath := normalizedURI.Path
+
+				// Resolve the actual git directory (handles both regular repos and worktrees)
+				originalGitDir, err := resolveGitDir(uriPath)
+				if err != nil {
+					return path, remote, fmt.Errorf("failed to resolve git directory: %w", err)
+				}
+
+				originalIndexPath := filepath.Join(originalGitDir, "index")
 				clonedIndexPath := filepath.Join(path, gitDirName, "index")
 
 				indexData, err := os.ReadFile(originalIndexPath)
@@ -1350,6 +1612,24 @@ func PrepareRepo(ctx context.Context, uriString, clonePath string, trustLocalGit
 				}
 				if err := os.WriteFile(clonedIndexPath, indexData, 0644); err != nil {
 					return path, remote, fmt.Errorf("failed to write index file: %w", err)
+				}
+
+				// Add the source object store as an alternate so staged blobs are accessible.
+				// git clone with file:// only transfers reachable objects; staged blobs must
+				// be reached via the original object store.
+				// For worktrees, the commondir file points to the main repo's git dir
+				// which holds the actual shared object store.
+				sourceObjectsPath := filepath.Join(originalGitDir, "objects")
+				if commondirData, err := os.ReadFile(filepath.Join(originalGitDir, "commondir")); err == nil {
+					commondir := strings.TrimSpace(string(commondirData))
+					if !filepath.IsAbs(commondir) {
+						commondir = filepath.Join(originalGitDir, commondir)
+					}
+					sourceObjectsPath = filepath.Join(filepath.Clean(commondir), "objects")
+				}
+				alternatesPath := filepath.Join(path, gitDirName, "objects", "info", "alternates")
+				if err := os.MkdirAll(filepath.Dir(alternatesPath), 0755); err == nil {
+					_ = os.WriteFile(alternatesPath, []byte(sourceObjectsPath+"\n"), 0644)
 				}
 			}
 		}

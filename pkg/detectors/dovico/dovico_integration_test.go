@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDovico_FromChunk(t *testing.T) {
@@ -50,11 +50,11 @@ func TestDovico_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detector_typepb.DetectorType_Dovico,
 					Verified:     true,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detector_typepb.DetectorType_Dovico,
 					Verified:     false,
 				},
 			},
@@ -70,11 +70,11 @@ func TestDovico_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detector_typepb.DetectorType_Dovico,
 					Verified:     false,
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detector_typepb.DetectorType_Dovico,
 					Verified:     false,
 				},
 			},

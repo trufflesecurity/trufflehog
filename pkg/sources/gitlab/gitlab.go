@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -9,6 +10,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/gobwas/glob"
+	"github.com/hashicorp/golang-lru/v2/expirable"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"golang.org/x/oauth2"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -20,19 +30,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
-
-	gogit "github.com/go-git/go-git/v5"
-	"github.com/gobwas/glob"
-	gitlab "gitlab.com/gitlab-org/api/client-go"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
 
-// This is the URL for gitlab hosted at gitlab.com
-const gitlabBaseURL = "https://gitlab.com/"
+// Base URL for GitLab Cloud (hosted at gitlab.com)
+const gitlabCloudBaseURL = "https://gitlab.com/"
 
 type Source struct {
 	name     string
@@ -71,16 +74,22 @@ type Source struct {
 	sources.CommonSourceUnitUnmarshaller
 
 	useAuthInUrl bool
-
-	clonePath string
-	noCleanup bool
+	clonePath    string
+	noCleanup    bool
 
 	printLegacyJSON bool
 
-	projectsPerPage int
+	projectsPerPage int64
 
 	// cache of repo URL to project info, used when generating metadata for chunks
-	repoToProjCache repoToProjectCache
+	projectMetadataCache *expirable.LRU[string, *projectMetadata]
+}
+
+// projectMetadata represents GitLab project metadata.
+type projectMetadata struct {
+	id    int64
+	name  string
+	owner string
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -183,7 +192,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.clonePath = conn.GetClonePath()
 	s.noCleanup = conn.GetNoCleanup()
 	s.printLegacyJSON = conn.GetPrintLegacyJson()
-	s.projectsPerPage = int(feature.GitlabProjectsPerPage.Load())
+	s.projectsPerPage = feature.GitlabProjectsPerPage.Load()
 
 	if s.projectsPerPage > 100 {
 		return fmt.Errorf("invalid config: maximum allowed projects per page for gitlab is 100")
@@ -230,22 +239,34 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		SkipBinaries: conn.GetSkipBinaries(),
 		SkipArchives: conn.GetSkipArchives(),
 		Concurrency:  concurrency,
-		SourceMetadataFunc: func(file, email, commit, timestamp, repository, repositoryLocalPath string, line int64) *source_metadatapb.MetaData {
+		SourceMetadataFunc: func(info git.SourceMetadataInfo) *source_metadatapb.MetaData {
 			gitlabMetadata := &source_metadatapb.Gitlab{
-				Commit:              sanitizer.UTF8(commit),
-				File:                sanitizer.UTF8(file),
-				Email:               sanitizer.UTF8(email),
-				Repository:          sanitizer.UTF8(repository),
-				RepositoryLocalPath: sanitizer.UTF8(repositoryLocalPath),
-				Link:                giturl.GenerateLink(repository, commit, file, line),
-				Timestamp:           sanitizer.UTF8(timestamp),
-				Line:                line,
+				Commit:              sanitizer.UTF8(info.Commit),
+				File:                sanitizer.UTF8(info.File),
+				Email:               sanitizer.UTF8(info.Email),
+				Repository:          sanitizer.UTF8(info.Repository),
+				RepositoryLocalPath: sanitizer.UTF8(info.RepositoryLocalPath),
+				Link:                giturl.GenerateLink(info.Repository, info.Commit, info.File, info.Line),
+				Timestamp:           sanitizer.UTF8(info.Timestamp),
+				Line:                info.Line,
 			}
-			proj, ok := s.repoToProjCache.get(repository)
+			// check for project metadata in the cache
+			project, ok := s.projectMetadataCache.Get(info.Repository)
+			if !ok {
+				// Long-running scans of a single large repo can outlive the
+				// cache TTL between the initial ensureProjectInCache call and
+				// later chunks from that same repo. Repopulate on miss.
+				s.ensureProjectInCache(ctx, info.Repository)
+				project, ok = s.projectMetadataCache.Get(info.Repository)
+			}
 			if ok {
-				gitlabMetadata.ProjectId = int64(proj.id)
-				gitlabMetadata.ProjectName = proj.name
-				gitlabMetadata.ProjectOwner = proj.owner
+				ctx.Logger().V(5).Info("cache hit inside source metadata func: found project metadata in the cache", "cache_key", info.Repository)
+				gitlabMetadata.ProjectId = project.id
+				gitlabMetadata.ProjectName = project.name
+				gitlabMetadata.ProjectOwner = project.owner
+			} else {
+				ctx.Logger().Error(errors.New("failed to get repo metadata from cache"),
+					"cache miss: not found project metadata in the cache", "cache_key", info.Repository)
 			}
 
 			return &source_metadatapb.MetaData{
@@ -259,9 +280,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	}
 	s.git = git.NewGit(cfg)
 
-	s.repoToProjCache = repoToProjectCache{
-		cache: make(map[string]*project),
-	}
+	s.projectMetadataCache = expirable.NewLRU[string, *projectMetadata](
+		15000, // upto 15000 entries
+		nil,
+		60*time.Minute, // time-based expiration - 1 hour
+	)
 
 	return nil
 }
@@ -313,8 +336,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	} else {
 		gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
-		// ensure project details for specified repos are cached
-		// this is required to populate metadata during chunking
+		// Ensure project details for the specified repositories are cached.
+		// This is required to populate metadata during chunking.
+		// Note: Repository URLs are already normalized, so the cache check
+		// uses the normalized repo URL directly.
 		for _, repo := range repos {
 			s.ensureProjectInCache(ctx, repo)
 		}
@@ -387,7 +412,7 @@ func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target s
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{Gitlab: meta},
 			},
-			Verify: s.verify,
+			SourceVerify: s.verify,
 		}
 
 		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
@@ -472,8 +497,9 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	// Initialize a new api instance.
 	switch s.authMethod {
 	case "OAUTH":
-		apiClient, err := gitlab.NewOAuthClient(
-			s.token,
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
@@ -482,11 +508,9 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
 		}
 		return apiClient, nil
-
 	case "BASIC_AUTH":
-		apiClient, err := gitlab.NewBasicAuthClient(
-			s.user,
-			s.password,
+		apiClient, err := gitlab.NewAuthSourceClient(
+			&gitlab.PasswordCredentialsAuthSource{Username: s.user, Password: s.password},
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
@@ -503,8 +527,9 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		}
 		fallthrough
 	case "TOKEN":
-		apiClient, err := gitlab.NewOAuthClient(
-			s.token,
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: s.token})
+		apiClient, err := gitlab.NewAuthSourceClient(
+			gitlab.OAuthTokenSource{TokenSource: ts},
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
@@ -548,7 +573,7 @@ func (s *Source) getAllProjectRepos(
 		return fmt.Errorf("unable to authenticate using %s: %w", s.authMethod, err)
 	}
 
-	uniqueProjects := make(map[int]*gitlab.Project)
+	uniqueProjects := make(map[int64]*gitlab.Project)
 	// Record the projectsWithNamespace for logging.
 	var projectsWithNamespace []string
 
@@ -585,7 +610,10 @@ func (s *Source) getAllProjectRepos(
 			}
 			// Report the unit.
 			ctx.Logger().V(3).Info("accepting project")
-			s.cacheGitlabProject(proj)
+
+			// Cache the GitLab project metadata.
+			s.cacheGitlabProjectMetadata(ctx, proj)
+
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
@@ -629,7 +657,7 @@ func (s *Source) getAllProjectRepos(
 		Owned:        gitlab.Ptr(false),
 	}
 
-	if s.url != gitlabBaseURL {
+	if s.url != gitlabCloudBaseURL {
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
@@ -721,7 +749,7 @@ func (s *Source) getAllProjectReposV2(
 	}
 
 	// for gitlab.com instance, include only projects where the user is a member.
-	if s.url == gitlabBaseURL {
+	if s.url == gitlabCloudBaseURL {
 		projectQueryOptions.Membership = gitlab.Ptr(true)
 	}
 
@@ -782,7 +810,9 @@ func (s *Source) getAllProjectReposV2(
 			// report the unit.
 			projCtx.Logger().V(3).Info("accepting project")
 
-			s.cacheGitlabProject(project)
+			// Cache the GitLab project metadata.
+			s.cacheGitlabProjectMetadata(projCtx, project)
+
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: project.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 
@@ -836,7 +866,7 @@ func (s *Source) getAllProjectReposInGroups(
 	}
 
 	// For non gitlab.com instances, you might want to adjust access levels
-	if s.url != gitlabBaseURL {
+	if s.url != gitlabCloudBaseURL {
 		projectOpts.MinAccessLevel = gitlab.Ptr(gitlab.GuestPermissions)
 	}
 
@@ -898,7 +928,9 @@ func (s *Source) getAllProjectReposInGroups(
 				// report the unit.
 				projCtx.Logger().V(3).Info("accepting project")
 
-				s.cacheGitlabProject(proj)
+				// Cache the GitLab project metadata.
+				s.cacheGitlabProjectMetadata(projCtx, proj)
+
 				unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 				gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 				projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
@@ -976,9 +1008,14 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 			if !s.printLegacyJSON {
 				if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-					defer os.RemoveAll(path)
+					defer func() { _ = os.RemoveAll(path) }()
 				}
 			}
+
+			// Re-populate the cache if the entry expired since it was first
+			// cached during enumeration; scanRepos can run for hours on
+			// large orgs, longer than the cache's TTL.
+			s.ensureProjectInCache(ctx, repoURL)
 
 			logger.V(2).Info("starting scan", "num", i+1, "total", len(s.repos))
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
@@ -1019,77 +1056,6 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
-}
-
-func buildIgnorer(include, exclude []string, onCompile func(err error, pattern string)) func(repo string) bool {
-
-	// compile and load globRepoFilter
-	globRepoFilter := newGlobRepoFilter(include, exclude, onCompile)
-
-	f := func(repo string) bool {
-		if !globRepoFilter.includeRepo(repo) || globRepoFilter.ignoreRepo(repo) {
-			return true
-		}
-		return false
-	}
-
-	return f
-}
-
-func normalizeRepos(repos []string) ([]string, []error) {
-	// Optimistically allocate space for all valid repositories.
-	validRepos := make([]string, 0, len(repos))
-	var errs []error
-	for _, prj := range repos {
-		repo, err := giturl.NormalizeGitlabRepo(prj)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("unable to normalize gitlab repo url %q: %w", prj, err))
-			continue
-		}
-
-		validRepos = append(validRepos, repo)
-	}
-	return validRepos, errs
-}
-
-// normalizeGitlabEndpoint ensures that if an endpoint is going to gitlab.com, we use https://gitlab.com/ as the endpoint.
-// If we see the protocol is http, we error, because this shouldn't be used.
-// Otherwise, it ensures we are using https as our protocol, if none was provided.
-func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
-	if gitlabEndpoint == "" {
-		return gitlabBaseURL, nil
-	}
-
-	gitlabURL, err := url.Parse(gitlabEndpoint)
-	if err != nil {
-		return "", err
-	}
-
-	// We probably didn't receive a URL with a scheme, which messed up the parsing.
-	if gitlabURL.Host == "" {
-		gitlabURL, err = url.Parse("https://" + gitlabEndpoint)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	// If the host is gitlab.com, this is the cloud version, which has only one valid endpoint.
-	if gitlabURL.Host == "gitlab.com" {
-		return gitlabBaseURL, nil
-	}
-
-	// Beyond here, on-prem gitlab is being used, so we have to mostly leave things as-is.
-
-	if gitlabURL.Scheme != "https" {
-		return "", fmt.Errorf("https was not used as URL scheme, but is required. Please use https")
-	}
-
-	// The gitlab library wants trailing slashes.
-	if !strings.HasSuffix(gitlabURL.Path, "/") {
-		gitlabURL.Path = gitlabURL.Path + "/"
-	}
-
-	return gitlabURL.String(), nil
 }
 
 // Enumerate reports all GitLab repositories to be scanned to the reporter. If
@@ -1156,11 +1122,19 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		return nil
 	}
 
+	// Normalize before cloning so the git remote URL (used as the cache key
+	// when attaching metadata to chunks) matches the key used when caching
+	// project details below.
+	normalizedRepoURL, err := giturl.NormalizeGitlabRepo(repoURL)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to normalize GitLab Repo", "repo", repoURL)
+		return err
+	}
+
 	var path string
 	var repo *gogit.Repository
-	var err error
 	if s.authMethod == "UNAUTHENTICATED" {
-		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL, s.clonePath)
+		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, normalizedRepoURL, s.clonePath)
 	} else {
 		// If a username is not provided we need to use a default one in order to clone a private repo.
 		// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
@@ -1169,7 +1143,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			user = "placeholder"
 		}
 
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, s.clonePath, user, s.useAuthInUrl)
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, normalizedRepoURL, s.clonePath, user, s.useAuthInUrl)
 	}
 	if err != nil {
 		return err
@@ -1179,34 +1153,36 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 	if !s.printLegacyJSON {
 		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.noCleanup && s.clonePath != "") {
-			defer os.RemoveAll(path)
+			defer func() { _ = os.RemoveAll(path) }()
 		}
 	}
 
 	// ensure project details are cached
 	// this is required to populate metadata during chunking
-	s.ensureProjectInCache(ctx, repoURL)
+	s.ensureProjectInCache(ctx, normalizedRepoURL)
 
 	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 }
 
-// ensureProjectInCache checks if the project for the given repo URL is in the cache,
-// and if not, queries the GitLab API to fetch the project and adds it to the cache.
-func (s *Source) ensureProjectInCache(ctx context.Context, repoUrl string) {
-	// check if project is already in cache
-	if _, ok := s.repoToProjCache.get(repoUrl); ok {
+// ensureProjectInCache ensures that the project for the given repository URL
+// exists in the cache. If not, it fetches the project from the GitLab API
+// and stores it in the cache.
+func (s *Source) ensureProjectInCache(ctx context.Context, repoURL string) {
+	// Check if the project is already cached.
+	if _, ok := s.projectMetadataCache.Get(repoURL); ok {
+		ctx.Logger().V(5).Info("cache hit: found project metadata in the cache", "cache_key", repoURL)
 		return
 	}
 
-	// query project
-	proj, err := s.getGitlabProject(ctx, repoUrl)
+	// Fetch the project from GitLab.
+	project, err := s.getGitlabProject(ctx, repoURL)
 	if err != nil {
-		ctx.Logger().Error(err, "could not fetch project for repo", "repo", repoUrl)
+		ctx.Logger().Error(err, "failed to fetch GitLab project", "repo", repoURL)
 		return
 	}
 
-	// add to cache
-	s.cacheGitlabProject(proj)
+	// Cache the project metadata.
+	s.cacheGitlabProjectMetadata(ctx, project)
 }
 
 func (s *Source) getGitlabProject(ctx context.Context, repoUrl string) (*gitlab.Project, error) {
@@ -1229,16 +1205,100 @@ func (s *Source) getGitlabProject(ctx context.Context, repoUrl string) (*gitlab.
 	return proj, nil
 }
 
-func (s *Source) cacheGitlabProject(gitlabProj *gitlab.Project) {
-	proj := &project{
-		id:   gitlabProj.ID,
-		name: gitlabProj.NameWithNamespace,
+// cacheGitlabProjectMetadata caches GitLab project metadata keyed by the
+// normalized GitLab repository URL.
+func (s *Source) cacheGitlabProjectMetadata(ctx context.Context, glProject *gitlab.Project) {
+	proj := &projectMetadata{
+		id:   int64(glProject.ID),
+		name: glProject.NameWithNamespace,
 	}
-	if gitlabProj.Owner != nil {
-		proj.owner = gitlabProj.Owner.Email
-		if proj.owner == "" {
-			proj.owner = gitlabProj.Owner.Username
+
+	if glProject.Owner != nil {
+		if email := glProject.Owner.Email; email != "" {
+			proj.owner = email
+		} else {
+			proj.owner = glProject.Owner.Username
 		}
 	}
-	s.repoToProjCache.set(gitlabProj.HTTPURLToRepo, proj)
+
+	repoURL, err := giturl.NormalizeGitlabRepo(glProject.HTTPURLToRepo)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to normalize GitLab Repo", "repo", glProject.HTTPURLToRepo)
+		return
+	}
+
+	ctx.Logger().V(5).Info("cache set: added project metadata in the cache", "cache_key", repoURL)
+	s.projectMetadataCache.Add(repoURL, proj)
+}
+
+func buildIgnorer(include, exclude []string, onCompile func(err error, pattern string)) func(repo string) bool {
+
+	// compile and load globRepoFilter
+	globRepoFilter := newGlobRepoFilter(include, exclude, onCompile)
+
+	f := func(repo string) bool {
+		if !globRepoFilter.includeRepo(repo) || globRepoFilter.ignoreRepo(repo) {
+			return true
+		}
+		return false
+	}
+
+	return f
+}
+
+// normalizeRepos convert the repo urls from https://gitlab.com/org/repo -> https://gitlab.com/org/repo.git
+func normalizeRepos(repos []string) ([]string, []error) {
+	// Optimistically allocate space for all valid repositories.
+	validRepos := make([]string, 0, len(repos))
+	var errs []error
+	for _, prj := range repos {
+		repo, err := giturl.NormalizeGitlabRepo(prj)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("unable to normalize gitlab repo url %q: %w", prj, err))
+			continue
+		}
+
+		validRepos = append(validRepos, repo)
+	}
+	return validRepos, errs
+}
+
+// normalizeGitlabEndpoint ensures that if an endpoint is going to gitlab.com, we use https://gitlab.com/ as the endpoint.
+// If we see the protocol is http, we error, because this shouldn't be used.
+// Otherwise, it ensures we are using https as our protocol, if none was provided.
+func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
+	if gitlabEndpoint == "" {
+		return gitlabCloudBaseURL, nil
+	}
+
+	gitlabURL, err := url.Parse(gitlabEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	// We probably didn't receive a URL with a scheme, which messed up the parsing.
+	if gitlabURL.Host == "" {
+		gitlabURL, err = url.Parse("https://" + gitlabEndpoint)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// If the host is gitlab.com, this is the cloud version, which has only one valid endpoint.
+	if gitlabURL.Host == "gitlab.com" {
+		return gitlabCloudBaseURL, nil
+	}
+
+	// Beyond here, on-prem gitlab is being used, so we have to mostly leave things as-is.
+
+	if gitlabURL.Scheme != "https" {
+		return "", fmt.Errorf("https was not used as URL scheme, but is required. Please use https")
+	}
+
+	// The gitlab library wants trailing slashes.
+	if !strings.HasSuffix(gitlabURL.Path, "/") {
+		gitlabURL.Path = gitlabURL.Path + "/"
+	}
+
+	return gitlabURL.String(), nil
 }

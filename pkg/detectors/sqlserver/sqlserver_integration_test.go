@@ -18,7 +18,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/mssql"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSQLServerIntegration_FromChunk(t *testing.T) {
@@ -67,7 +67,7 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SQLServer,
+					DetectorType: detector_typepb.DetectorType_SQLServer,
 					Raw:          []byte(password),
 					RawV2: []byte(urlEncode(fmt.Sprintf("sqlserver://sa:%s@localhost:%s?database=master&dial+timeout=15&disableretry=false",
 						password,
@@ -89,7 +89,7 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SQLServer,
+					DetectorType: detector_typepb.DetectorType_SQLServer,
 					Raw:          []byte("123"),
 					RawV2: []byte(fmt.Sprintf("sqlserver://sa:123@localhost:%s?dial+timeout=15&disableretry=false",
 						port.Port())),
@@ -123,7 +123,7 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SQLServer,
+					DetectorType: detector_typepb.DetectorType_SQLServer,
 					Redacted: fmt.Sprintf("sqlserver://sa:********@localhost:%s?database=master&dial+timeout=15&disableretry=false",
 						port.Port()),
 					Raw: []byte(password),
@@ -145,7 +145,7 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SQLServer,
+					DetectorType: detector_typepb.DetectorType_SQLServer,
 					Raw:          []byte("P@ssw0rd!"),
 					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@unreachablehost?database=master&dial+timeout=15&disableretry=false"),
 					Redacted:     "sqlserver://sa:********@unreachablehost?database=master&dial+timeout=15&disableretry=false",
@@ -219,7 +219,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SQLServer,
+					DetectorType: detector_typepb.DetectorType_SQLServer,
 					Redacted:     "sqlserver://sa:********@localhost?database=Demo&dial+timeout=15&disableretry=false",
 					Verified:     true,
 				},
@@ -241,7 +241,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SQLServer,
+					DetectorType: detector_typepb.DetectorType_SQLServer,
 					Redacted:     "sqlserver://sa:********@localhost?dial+timeout=15&disableretry=false",
 					Verified:     false,
 				},
@@ -279,7 +279,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SQLServer,
+					DetectorType: detector_typepb.DetectorType_SQLServer,
 					Redacted:     "sqlserver://username:********@server_name?database=testdb&dial+timeout=15&disableretry=false&encrypt=true",
 					Verified:     true,
 				},

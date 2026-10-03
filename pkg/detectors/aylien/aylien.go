@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -49,9 +49,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Aylien,
+				DetectorType: detector_typepb.DetectorType_Aylien,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"id":  resIdMatch,
+				},
+				RawV2: []byte(resMatch + resIdMatch),
 			}
 			if verify {
 				isVerified, err := verifyMatch(ctx, client, resIdMatch, resMatch)
@@ -92,8 +96,8 @@ func verifyMatch(ctx context.Context, client *http.Client, id, key string) (bool
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Aylien
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Aylien
 }
 
 func (s Scanner) Description() string {

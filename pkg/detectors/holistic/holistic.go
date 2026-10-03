@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -41,31 +41,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Holistic,
+			DetectorType: detector_typepb.DetectorType_Holistic,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.holistic.dev/api/v1/project", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("x-api-key", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-
-				bodyString := string(bodyBytes)
-				errorResponse := strings.Contains(bodyString, `"data":[]`)
-
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 && !errorResponse {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -74,8 +58,37 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Holistic
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.holistic.dev/api/v1/project", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("x-api-key", resMatch)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	bodyString := string(bodyBytes)
+	errorResponse := strings.Contains(bodyString, `"data":[]`)
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 && !errorResponse {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Holistic
 }
 
 func (s Scanner) Description() string {

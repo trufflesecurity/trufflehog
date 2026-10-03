@@ -12,7 +12,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestURI_FromChunk(t *testing.T) {
@@ -39,7 +39,7 @@ func TestURI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_URI,
+					DetectorType: detector_typepb.DetectorType_URI,
 					Verified:     false,
 					Redacted:     "https://user:********@httpwatch.com",
 				},
@@ -56,7 +56,7 @@ func TestURI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_URI,
+					DetectorType: detector_typepb.DetectorType_URI,
 					Verified:     true,
 					Redacted:     "https://httpwatch:********@www.httpwatch.com",
 				},
@@ -73,7 +73,7 @@ func TestURI_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_URI,
+					DetectorType: detector_typepb.DetectorType_URI,
 					Verified:     true,
 					Redacted:     "https://httpwatch:********@www.httpwatch.com",
 				},
@@ -90,7 +90,7 @@ func TestURI_FromChunk(t *testing.T) {
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_URI,
+					DetectorType: detector_typepb.DetectorType_URI,
 					Verified:     false,
 					Redacted:     "https://httpwatch:********@www.httpwatch.com",
 				}

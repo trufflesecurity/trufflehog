@@ -37,7 +37,7 @@ func TestApacta_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"abcd1234-ef56-gh78-ij90-klmn1234opqr"},
@@ -73,7 +73,7 @@ func TestApacta_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

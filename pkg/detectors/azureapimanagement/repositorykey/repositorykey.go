@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -30,7 +30,7 @@ var (
 	passwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", "password"}) + `\b(git&[0-9]{12}&[a-zA-Z0-9\/+]{85}[a-zA-Z0-9]==)`)
 
 	invalidHosts  = simple.NewCache[struct{}]()
-	noSuchHostErr = errors.New("Could not resolve host")
+	errNoSuchHost = errors.New("no such host")
 )
 
 const (
@@ -60,29 +60,35 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniquePasswordMatches[strings.TrimSpace(matches[1])] = struct{}{}
 	}
 
-EndpointLoop:
 	for urlMatch := range uniqueUrlsMatches {
 		for passwordMatch := range uniquePasswordMatches {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureApiManagementRepositoryKey,
+				DetectorType: detector_typepb.DetectorType_AzureApiManagementRepositoryKey,
 				Raw:          []byte(passwordMatch),
-				RawV2:        []byte(urlMatch + passwordMatch),
+				SecretParts: map[string]string{
+					"url":      urlMatch,
+					"password": passwordMatch,
+				},
+				RawV2: []byte(urlMatch + passwordMatch),
 			}
 
 			if verify {
 				if invalidHosts.Exists(urlMatch) {
-					logger.V(3).Info("Skipping invalid registry", "url", urlMatch)
-					continue EndpointLoop
-				}
-
-				isVerified, err := verifyUrlPassword(ctx, urlMatch, azureGitUsername, passwordMatch)
-				s1.Verified = isVerified
-				if err != nil {
-					if errors.Is(err, noSuchHostErr) {
-						invalidHosts.Set(urlMatch, struct{}{})
-						continue EndpointLoop
+					// An earlier candidate already proved this host does not resolve, so the lookup is
+					// skipped. The finding is still reported: dropping it here would make the reported
+					// secrets depend on whether verification was requested, and on the order in which
+					// candidates happened to be processed.
+					logger.V(3).Info("Skipping verification: no such host", "url", urlMatch)
+					s1.SetVerificationError(errNoSuchHost, urlMatch)
+				} else {
+					isVerified, err := verifyUrlPassword(ctx, urlMatch, azureGitUsername, passwordMatch)
+					s1.Verified = isVerified
+					if err != nil {
+						if errors.Is(err, errNoSuchHost) {
+							invalidHosts.Set(urlMatch, struct{}{})
+						}
+						s1.SetVerificationError(err, urlMatch)
 					}
-					s1.SetVerificationError(err, urlMatch)
 				}
 			}
 			results = append(results, s1)
@@ -92,8 +98,8 @@ EndpointLoop:
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureApiManagementRepositoryKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureApiManagementRepositoryKey
 }
 
 func (s Scanner) Description() string {
@@ -152,7 +158,7 @@ func verifyUrlPassword(_ context.Context, repoUrl, user, password string) (bool,
 		if strings.Contains(outputString, "Authentication failed") {
 			return false, nil
 		} else if strings.Contains(outputString, "Could not resolve host") {
-			return false, noSuchHostErr
+			return false, errNoSuchHost
 		}
 		return false, err
 	}

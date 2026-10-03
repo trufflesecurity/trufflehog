@@ -2,14 +2,15 @@ package infura
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -40,29 +41,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Infura,
+			DetectorType: detector_typepb.DetectorType_Infura,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
-			payload := strings.NewReader(`{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://mainnet.infura.io/v3/"+resMatch, payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				if strings.Contains(body, `"result"`) {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -71,8 +58,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Infura
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	payload := strings.NewReader(`{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://mainnet.infura.io/v3/"+resMatch, payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if strings.Contains(body, `"result"`) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Infura
 }
 
 func (s Scanner) Description() string {

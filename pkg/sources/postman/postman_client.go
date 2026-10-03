@@ -283,7 +283,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString st
 		}
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	c.Metrics.apiRequests.WithLabelValues(urlString).Inc()
 
@@ -344,6 +344,10 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 		)
 		return nil
 	}
+
+	c.Metrics.apiMonthlyRequestsLimit.WithLabelValues().Set(
+		float64(rateLimitTotalMonth),
+	)
 
 	if rateLimitTotalMonth == 0 {
 		ctx.Logger().V(2).Info("RateLimit-Limit-Month is zero, cannot compute usage percentage")

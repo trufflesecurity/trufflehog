@@ -49,11 +49,16 @@ func NewTokenConnector(ctx context.Context, apiEndpoint, token, clonePath string
 		return nil, fmt.Errorf("error creating GraphQL client: %w", err)
 	}
 
+	// Treat both GHES and GHE.com as "enterprise" for enumeration purposes.
+	// GHE.com (GHEC with data residency) is a dedicated enterprise environment
+	// with EMU, so enterprise-level enumeration (e.g., addAllVisibleOrgs) applies.
+	isEnterprise := !strings.EqualFold(apiEndpoint, cloudV3Endpoint)
+
 	return &tokenConnector{
 		apiClient:          apiClient,
 		graphqlClient:      graphqlClient,
 		token:              token,
-		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudV3Endpoint),
+		isGitHubEnterprise: isEnterprise,
 		handleRateLimit:    handleRateLimit,
 		authInUrl:          authInUrl,
 		clonePath:          clonePath,
@@ -62,6 +67,10 @@ func NewTokenConnector(ctx context.Context, apiEndpoint, token, clonePath string
 
 func (c *tokenConnector) APIClient() *github.Client {
 	return c.apiClient
+}
+
+func (c *tokenConnector) APIClientForRepo(_ string) (*github.Client, error) {
+	return c.apiClient, nil
 }
 
 func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
@@ -74,6 +83,10 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...stri
 
 func (c *tokenConnector) GraphQLClient() *githubv4.Client {
 	return c.graphqlClient
+}
+
+func (c *tokenConnector) GraphQLClientForRepo(_ context.Context, _ string) (*githubv4.Client, error) {
+	return c.graphqlClient, nil
 }
 
 func (c *tokenConnector) IsGithubEnterprise() bool {

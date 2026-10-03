@@ -40,6 +40,8 @@ func TestJdbc_Pattern(t *testing.T) {
 							<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
 							<jdbc-url>jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false</jdbc-url>
 							<jdbc-url>jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks</jdbc-url>
+							<jdbc-url>(jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb)</jdbc-url>
+							<jdbc-url>jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser&</jdbc-url>
 							<working-dir>$ProjectFileDir$</working-dir>
 							</data-source>
 						</component>
@@ -50,6 +52,8 @@ func TestJdbc_Pattern(t *testing.T) {
 				"jdbc:mysql:localhost:3306/mydatabase",
 				"jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false",
 				"jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks",
+				"jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb",
+				"jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser",
 			},
 		},
 		{
@@ -64,8 +68,10 @@ func TestJdbc_Pattern(t *testing.T) {
 						"jdbc:oracle:thin:@host:1521:db",
 						"jdbc:mysql://host:3306/db,other_param",
 						"jdbc:db2://host:50000/db?param=1"
-					]
-				}`,
+						"jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser"
+						"jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb"
+						]
+						}`,
 			want: []string{
 				"jdbc:postgresql://localhost:5432/mydb",
 				"jdbc:mysql://user:pass@host:3306/db?param=1",
@@ -73,6 +79,15 @@ func TestJdbc_Pattern(t *testing.T) {
 				"jdbc:oracle:thin:@host:1521:db",
 				"jdbc:mysql://host:3306/db",
 				"jdbc:db2://host:50000/db?param=1",
+				"jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser",
+				"jdbc:mysql://testuser:testpassword@tcp(localhost:1521)/testdb",
+			},
+		},
+		{
+			name: "trailing non-alphanumeric characters in password",
+			input: `jdbc:hive9://foo.example.com:10191/default;user=MyRoleUser;password=MyPa$$w0rd...`,
+			want: []string{
+				"jdbc:hive9://foo.example.com:10191/default;user=MyRoleUser;password=MyPa$$w0rd...",
 			},
 		},
 		{
@@ -134,6 +149,76 @@ func TestJdbc_Pattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJdbc_ExtraData(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         string
+		wantHost     string
+		wantUsername string
+		wantDatabase string
+	}{
+		{
+			name:         "mysql with basic auth",
+			data:         `jdbc:mysql://root:password@localhost:3306/testdb`,
+			wantHost:     "tcp(localhost:3306)",
+			wantUsername: "root",
+			wantDatabase: "testdb",
+		},
+		{
+			name:         "postgresql with basic auth",
+			data:         `jdbc:postgresql://postgres:secret@dbhost:5432/mydb`,
+			wantHost:     "dbhost:5432",
+			wantUsername: "postgres",
+			wantDatabase: "mydb",
+		},
+		{
+			name:         "sqlserver with semicolon params",
+			data:         `jdbc:sqlserver://server.example.com:1433;database=testdb;user=sa;password=Pass123`,
+			wantHost:     "server.example.com:1433",
+			wantUsername: "sa",
+			wantDatabase: "testdb",
+		},
+		{
+			name:         "mysql with query params for credentials",
+			data:         `jdbc:mysql://dbhost:3307/testdb?user=admin&password=secret`,
+			wantHost:     "tcp(dbhost:3307)",
+			wantUsername: "admin",
+			wantDatabase: "testdb",
+		},
+		{
+			name:         "postgresql with query params for credentials",
+			data:         `jdbc:postgresql://localhost:1521/testdb?sslmode=disable&password=testpassword&user=testuser`,
+			wantHost:     "localhost:1521",
+			wantUsername: "testuser",
+			wantDatabase: "testdb",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			results, err := s.FromData(context.Background(), false, []byte(tt.data))
+			require.NoError(t, err)
+			require.NotEmpty(t, results, "expected at least one result")
+
+			r := results[0]
+			assert.Equal(t, tt.wantHost, r.ExtraData["host"])
+			assert.Equal(t, tt.wantUsername, r.ExtraData["username"])
+			assert.Equal(t, tt.wantDatabase, r.ExtraData["database"])
+		})
+	}
+}
+
+func TestJdbc_ExtraData_UnsupportedSubprotocol(t *testing.T) {
+	// For unsupported subprotocols (e.g., sqlite), ExtraData should be nil
+	// because we can't parse connection info, but the result should still be returned.
+	s := Scanner{}
+	results, err := s.FromData(context.Background(), false, []byte(`jdbc:sqlite:/data/test.db`))
+	require.NoError(t, err)
+	require.NotEmpty(t, results, "expected at least one result")
+	assert.Nil(t, results[0].ExtraData, "expected nil ExtraData for unsupported subprotocol")
 }
 
 func TestJdbc_FromDataWithIgnorePattern(t *testing.T) {

@@ -1,90 +1,142 @@
 {
-    "AnalyzerType": 2,
-    "Bindings": [
-        {
-            "Resource": {
-                "Name": "Claude 3.5 Sonnet (New)",
-                "FullyQualifiedName": "claude-3-5-sonnet-20241022",
-                "Type": "model",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "full_access",
-                "Parent": null
-            }
+  "AnalyzerType": 2,
+  "Bindings": [
+    {
+      "Resource": {
+        "Name": "Claude Sonnet 4.6",
+        "FullyQualifiedName": "claude-sonnet-4-6",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Opus 4.6",
+        "FullyQualifiedName": "claude-opus-4-6",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Opus 4.5",
+        "FullyQualifiedName": "claude-opus-4-5-20251101",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Haiku 4.5",
+        "FullyQualifiedName": "claude-haiku-4-5-20251001",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Sonnet 4.5",
+        "FullyQualifiedName": "claude-sonnet-4-5-20250929",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Opus 4.1",
+        "FullyQualifiedName": "claude-opus-4-1-20250805",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Opus 4",
+        "FullyQualifiedName": "claude-opus-4-20250514",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Sonnet 4",
+        "FullyQualifiedName": "claude-sonnet-4-20250514",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Sonnet 3.7",
+        "FullyQualifiedName": "claude-3-7-sonnet-20250219",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Haiku 3.5",
+        "FullyQualifiedName": "claude-3-5-haiku-20241022",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "Claude Haiku 3",
+        "FullyQualifiedName": "claude-3-haiku-20240307",
+        "Type": "model",
+        "Metadata": {},
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
+    },
+    {
+      "Resource": {
+        "Name": "",
+        "FullyQualifiedName": "msgbatch_015FDqbx29LDeVvbwwyCe314",
+        "Type": "message_batch",
+        "Metadata": {
+          "expires_at": "2025-02-05T07:36:34.761695+00:00",
+          "results_url": ""
         },
-        {
-            "Resource": {
-                "Name": "Claude 3.5 Haiku",
-                "FullyQualifiedName": "claude-3-5-haiku-20241022",
-                "Type": "model",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "full_access",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Claude 3.5 Sonnet (Old)",
-                "FullyQualifiedName": "claude-3-5-sonnet-20240620",
-                "Type": "model",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "full_access",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Claude 3 Haiku",
-                "FullyQualifiedName": "claude-3-haiku-20240307",
-                "Type": "model",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "full_access",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Claude 3 Opus",
-                "FullyQualifiedName": "claude-3-opus-20240229",
-                "Type": "model",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "full_access",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "",
-                "FullyQualifiedName": "msgbatch_015FDqbx29LDeVvbwwyCe314",
-                "Type": "message_batch",
-                "Metadata": {
-                    "expires_at": "2025-02-05T07:36:34.761695+00:00",
-                    "results_url": "https://api.anthropic.com/v1/messages/batches/msgbatch_015FDqbx29LDeVvbwwyCe314/results"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "full_access",
-                "Parent": null
-            }
-        }
-    ],
-    "UnboundedResources": null,
-    "Metadata": {
-        "Valid_Key": true
+        "Parent": null
+      },
+      "Permission": { "Value": "full_access", "Parent": null },
+      "Condition": ""
     }
+  ],
+  "UnboundedResources": null,
+  "Metadata": { "Valid_Key": true }
 }

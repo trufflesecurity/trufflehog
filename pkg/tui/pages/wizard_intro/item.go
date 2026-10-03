@@ -129,7 +129,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	cmd = styles.Command.Render(cmd)
 
 	s.WriteString(cmd)
-	fmt.Fprint(w,
+	_, _ = fmt.Fprint(w,
 		d.common.Zone.Mark(i.ID(),
 			styles.Base.Render(s.String()),
 		),

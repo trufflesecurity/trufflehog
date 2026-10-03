@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
-
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestWit_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestWit_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Wit,
+					DetectorType: detector_typepb.DetectorType_Wit,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestWit_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Wit,
+					DetectorType: detector_typepb.DetectorType_Wit,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,17 @@ func TestWit_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(
+				detectors.Result{},
+				"ExtraData",
+				"verificationError",
+				"primarySecret",
+				"SecretParts",
+				"chunkOffset",
+				"chunkOffsetSet",
+			)
+
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Wit.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

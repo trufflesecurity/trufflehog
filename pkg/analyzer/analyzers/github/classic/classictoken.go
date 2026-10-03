@@ -91,13 +91,15 @@ func AnalyzeClassicToken(client *gh.Client, meta *common.TokenMetadata) (*common
 		var err error
 		repos, err = common.GetAllReposForUser(client)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("enumerating repos for classic PAT: %w", err)
 		}
 	}
 
+	// Gist enumeration is supplemental -- a rate-limit or transient failure
+	// should not discard the already-gathered metadata, repos, and permissions.
 	gists, err := common.GetAllGistsForUser(client)
 	if err != nil {
-		return nil, err
+		gists = nil
 	}
 
 	return &common.SecretInfo{

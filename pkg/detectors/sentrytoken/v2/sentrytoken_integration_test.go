@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSentryToken_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
+					DetectorType: detector_typepb.DetectorType_SentryToken,
 					Verified:     true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
+					DetectorType: detector_typepb.DetectorType_SentryToken,
 					Verified:     false,
 				},
 			},
@@ -82,7 +82,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
+					DetectorType: detector_typepb.DetectorType_SentryToken,
 					Verified:     false,
 				},
 			},
@@ -99,7 +99,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
+					DetectorType: detector_typepb.DetectorType_SentryToken,
 					Verified:     false,
 				},
 			},

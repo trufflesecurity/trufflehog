@@ -3,13 +3,14 @@ package github
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -37,7 +38,33 @@ var (
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
+
+	// tokenTypesByPrefix maps each GitHub token prefix to a human-readable type.
+	// Each prefix identifies a materially different credential (PAT, OAuth
+	// grant, or GitHub App token) that is revoked/rotated through a different
+	// GitHub settings page.
+	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
+	tokenTypesByPrefix = map[string]string{
+		"ghp_":        "Personal Access Token (classic)",
+		"github_pat_": "Personal Access Token (fine-grained)",
+		"gho_":        "OAuth Access Token",
+		"ghu_":        "GitHub App User-to-Server Token",
+		"ghs_":        "GitHub App Server-to-Server (installation) Token",
+		"ghr_":        "GitHub App Refresh Token",
+	}
 )
+
+// githubTokenType returns the human-readable token type for a matched token,
+// keyed off its prefix. Falls back to a generic label if no known prefix
+// matches (should not happen given keyPat, but keeps this safe).
+func githubTokenType(token string) string {
+	for prefix, tokenType := range tokenTypesByPrefix {
+		if strings.HasPrefix(token, prefix) {
+			return tokenType
+		}
+	}
+	return "Unknown GitHub token"
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -57,13 +84,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		token := match[1]
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Github,
+			DetectorType: detector_typepb.DetectorType_Github,
 			Raw:          []byte(token),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
+				"token_type":     githubTokenType(token),
 			},
-			AnalysisInfo: map[string]string{"key": token},
+			SecretParts: map[string]string{"key": token},
 		}
 
 		if verify {
@@ -87,8 +115,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Github
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Github
 }
 
 func (s Scanner) Description() string {

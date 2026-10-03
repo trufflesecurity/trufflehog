@@ -47,11 +47,11 @@ func (b *Buffer) Write(data []byte) (int, error) {
 	}
 
 	size := len(data)
-	bufferLength := b.Buffer.Len()
+	bufferLength := b.Len()
 	totalSizeNeeded := bufferLength + size
 
 	// If the total size is within the threshold, write to the buffer.
-	availableSpace := b.Buffer.Cap() - bufferLength
+	availableSpace := b.Cap() - bufferLength
 	growSize := totalSizeNeeded - bufferLength
 	if growSize > availableSpace {
 		// We are manually growing the buffer so we can track the growth via metrics.

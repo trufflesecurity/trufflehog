@@ -20,7 +20,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestJdbcVerified(t *testing.T) {
@@ -29,8 +29,8 @@ func TestJdbcVerified(t *testing.T) {
 	postgresUser := gofakeit.Username()
 	postgresPass := gofakeit.Password(true, true, true, false, false, 10)
 	postgresDB := gofakeit.Word()
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:13-alpine"),
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:13-alpine",
 		postgres.WithDatabase(postgresDB),
 		postgres.WithUsername(postgresUser),
 		postgres.WithPassword(postgresPass),
@@ -56,8 +56,8 @@ func TestJdbcVerified(t *testing.T) {
 	mysqlUser := gofakeit.Username()
 	mysqlPass := gofakeit.Password(true, true, true, false, false, 10)
 	mysqlDatabase := gofakeit.Word()
-	mysqlC, err := mysql.RunContainer(ctx,
-		mysql.WithDatabase(mysqlDatabase),
+	mysqlC, err := mysql.Run(ctx,
+		"mysql:8.0.36",
 		mysql.WithUsername(mysqlUser),
 		mysql.WithPassword(mysqlPass),
 	)
@@ -79,8 +79,8 @@ func TestJdbcVerified(t *testing.T) {
 	sqlServerPass := gofakeit.Password(true, true, true, false, false, 10)
 	sqlServerDatabase := "master"
 
-	mssqlContainer, err := mssql.RunContainer(ctx,
-		testcontainers.WithImage("mcr.microsoft.com/azure-sql-edge"),
+	mssqlContainer, err := mssql.Run(ctx,
+		"mcr.microsoft.com/azure-sql-edge",
 		mssql.WithAcceptEULA(),
 		mssql.WithPassword(sqlServerPass),
 	)
@@ -121,10 +121,14 @@ func TestJdbcVerified(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
 						postgresHost, postgresPort.Port(), postgresDB, strings.Repeat("*", len(postgresPass)), postgresUser),
+					SecretParts: map[string]string{
+						"connection_string": fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
+							postgresHost, postgresPort.Port(), postgresDB, postgresPass, postgresUser),
+					},
 				},
 			},
 			wantErr: false,
@@ -139,10 +143,14 @@ func TestJdbcVerified(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     true,
 					Redacted: fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
 						mysqlUser, strings.Repeat("*", len(mysqlPass)), mysqlHost, mysqlPort.Port(), mysqlDatabase),
+					SecretParts: map[string]string{
+						"connection_string": fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
+							mysqlUser, mysqlPass, mysqlHost, mysqlPort.Port(), mysqlDatabase),
+					},
 				},
 			},
 			wantErr: false,
@@ -157,10 +165,14 @@ func TestJdbcVerified(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     true,
 					Redacted: fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
 						sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, strings.Repeat("*", len(sqlServerPass))),
+					SecretParts: map[string]string{
+						"connection_string": fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
+							sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, sqlServerPass),
+					},
 				},
 			},
 			wantErr: false,
@@ -183,6 +195,7 @@ func TestJdbcVerified(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
@@ -212,7 +225,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:mysql://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
 				},
@@ -228,7 +241,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:postgresql://host:5342/testdb?password=******",
 				},
@@ -254,7 +267,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
 				},
@@ -270,7 +283,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
 				},
@@ -286,7 +299,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
+					DetectorType: detector_typepb.DetectorType_JDBC,
 					Verified:     false,
 					Redacted:     "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=*********************",
 				},
@@ -310,7 +323,8 @@ func TestJdbc_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+				got[i].SecretParts = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

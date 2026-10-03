@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestJiraToken_FromChunk(t *testing.T) {
@@ -52,7 +52,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -73,7 +73,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -106,7 +106,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -127,7 +127,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detector_typepb.DetectorType_JiraToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
@@ -141,6 +141,9 @@ func TestJiraToken_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.s.SetCloudEndpoint(tt.s.CloudEndpoint())
+			tt.s.UseCloudEndpoint(true)
+			tt.s.UseFoundEndpoints(true)
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("JiraToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -165,6 +168,9 @@ func TestJiraToken_FromChunk(t *testing.T) {
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
+	s.SetCloudEndpoint(s.CloudEndpoint())
+	s.UseCloudEndpoint(true)
+	s.UseFoundEndpoints(true)
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
 			b.ResetTimer()

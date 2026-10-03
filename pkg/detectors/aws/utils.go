@@ -86,11 +86,13 @@ func GetHMAC(key []byte, data []byte) []byte {
 	return hasher.Sum(nil)
 }
 
-func CleanResults(results []detectors.Result) []detectors.Result {
+func CleanResults(results []detectors.Result, verificationEnabled bool) []detectors.Result {
 	if len(results) == 0 {
 		return results
 	}
-
+	if !verificationEnabled {
+		return results
+	}
 	// For every ID, we want at most one result, preferably verified.
 	idResults := map[string]detectors.Result{}
 	for _, result := range results {

@@ -15,7 +15,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -50,8 +50,8 @@ func (s Scanner) Keywords() []string {
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureStorage
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureStorage
 }
 
 func (s Scanner) Description() string {
@@ -99,6 +99,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: s.Type(),
 				Raw:          []byte(key),
 				RawV2:        []byte(fmt.Sprintf(`{"accountName":"%s","accountKey":"%s"}`, name, key)),
+				SecretParts: map[string]string{
+					"account_name": name,
+					"account_key":  key,
+				},
 				ExtraData: map[string]string{
 					"Account_name": name,
 				},

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -17,14 +18,33 @@ import (
 // once it has been extracted or decompressed by the specific handler.
 // This allows the specialized handlers to focus on their specific archive formats while leveraging
 // the common functionality provided by the defaultHandler for processing the extracted content.
-type defaultHandler struct{ metrics *metrics }
+type defaultHandler struct {
+	chunkReader sources.ChunkReader
+	metrics     *metrics
+}
+
+// defaultHandlerOption is a functional option for configuring a defaultHandler.
+type defaultHandlerOption func(*defaultHandler)
+
+// withChunkReader sets a custom ChunkReader for the handler.
+// This is primarily used for testing to inject mock chunk readers.
+func withChunkReader(cr sources.ChunkReader) defaultHandlerOption {
+	return func(h *defaultHandler) { h.chunkReader = cr }
+}
 
 // newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
 // The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
 // ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
 // specific handler that invoked them.
-func newDefaultHandler(handlerType handlerType) *defaultHandler {
-	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
+func newDefaultHandler(handlerType handlerType, opts ...defaultHandlerOption) *defaultHandler {
+	h := &defaultHandler{
+		chunkReader: sources.NewChunkReader(),
+		metrics:     newHandlerMetrics(handlerType),
+	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 // HandleFile processes non-archive files.
@@ -91,6 +111,7 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(
 // on the type, particularly for binary files. It manages reading file chunks and writing them to the archive channel,
 // effectively collecting the final bytes for further processing. This function is a key component in ensuring that all
 // file content, regardless of being an archive or not, is handled appropriately.
+// It also tracks line numbers for each chunk to enable accurate line number reporting for secrets.
 func (h *defaultHandler) handleNonArchiveContent(
 	ctx logContext.Context,
 	reader mimeTypeReader,
@@ -106,10 +127,12 @@ func (h *defaultHandler) handleNonArchiveContent(
 		return nil
 	}
 
-	chunkReader := sources.NewChunkReader()
-	for data := range chunkReader(ctx, reader) {
+	// Track the current line number (1-indexed) across chunks.
+	// This allows accurate line number reporting for secrets found in later chunks.
+	currentLine := int64(1)
+	for chunkResult := range h.chunkReader(ctx, reader) {
 		dataOrErr := DataOrErr{}
-		if err := data.Error(); err != nil {
+		if err := chunkResult.Error(); err != nil {
 			h.metrics.incErrors()
 			dataOrErr.Err = fmt.Errorf("%w: error reading chunk: %v", ErrProcessingWarning, err)
 			if writeErr := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); writeErr != nil {
@@ -118,11 +141,18 @@ func (h *defaultHandler) handleNonArchiveContent(
 			continue
 		}
 
-		dataOrErr.Data = data.Bytes()
+		chunkBytes := chunkResult.Bytes()
+		dataOrErr.Data = chunkBytes
+		dataOrErr.LineNumber = currentLine
 		if err := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); err != nil {
 			return err
 		}
-		h.metrics.incBytesProcessed(len(data.Bytes()))
+		h.metrics.incBytesProcessed(len(chunkBytes))
+
+		// Count newlines in the content portion only (excluding peek chunkResult) to avoid
+		// double-counting newlines that will appear at the start of the next chunk.
+		contentSize := chunkResult.ContentSize()
+		currentLine += int64(bytes.Count(chunkBytes[:contentSize], []byte{'\n'}))
 	}
 	return nil
 }

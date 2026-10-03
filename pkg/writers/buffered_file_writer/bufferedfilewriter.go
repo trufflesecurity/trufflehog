@@ -132,7 +132,7 @@ func (w *BufferedFileWriter) String() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var buf bytes.Buffer
 	// Read the file contents into the buffer.
@@ -312,6 +312,6 @@ func newAutoDeletingFileReader(file *os.File) *autoDeletingFileReader {
 
 // Close implements the io.Closer interface, deletes the file after closing.
 func (r *autoDeletingFileReader) Close() error {
-	defer os.Remove(r.Name()) // Delete the file after closing
+	defer func() { _ = os.Remove(r.Name()) }() // Delete the file after closing
 	return r.File.Close()
 }

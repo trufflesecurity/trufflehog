@@ -9,7 +9,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
@@ -40,8 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 
 		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Mailchimp,
+			DetectorType: detector_typepb.DetectorType_Mailchimp,
 			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
 		}
 		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/mailchimp/",
@@ -59,13 +60,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("accept", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					result.Verified = true
 				}
-			}
-			result.AnalysisInfo = map[string]string{
-				"key": match,
 			}
 		}
 
@@ -75,8 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Mailchimp
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Mailchimp
 }
 
 func (s Scanner) Description() string {

@@ -375,7 +375,7 @@ func (s *Source) chunk(ctx context.Context, proj project, buildNum BuildNum, ste
 					},
 				},
 			},
-			Verify: s.verify,
+			SourceVerify: s.verify,
 		}
 		if err := data.Error(); err != nil {
 			return err

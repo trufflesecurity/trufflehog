@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestDronaHQ_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestDronaHQ_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DronaHQ,
+					DetectorType: detector_typepb.DetectorType_DronaHQ,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestDronaHQ_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_DronaHQ,
+					DetectorType: detector_typepb.DetectorType_DronaHQ,
 					Verified:     false,
 				},
 			},

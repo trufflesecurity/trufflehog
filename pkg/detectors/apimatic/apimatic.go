@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -46,8 +46,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for apiKey := range uniqueApiKeys {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_APIMatic,
+			DetectorType: detector_typepb.DetectorType_APIMatic,
 			Raw:          []byte(apiKey),
+			SecretParts:  map[string]string{"key": apiKey},
 		}
 
 		if verify {
@@ -99,8 +100,8 @@ func verifyAPImaticKey(ctx context.Context, client *http.Client, key string) (bo
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_APIMatic
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_APIMatic
 }
 
 func (s Scanner) Description() string {

@@ -54,7 +54,7 @@ func GetSecret(ctx context.Context, gcpProject, name string) (secret *Secret, er
 	if err != nil {
 		return nil, errors.Errorf("failed to create secretmanager client: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{
 		Name: parent,

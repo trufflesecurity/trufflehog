@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPlivo_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestPlivo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Plivo,
+					DetectorType: detector_typepb.DetectorType_Plivo,
 					Redacted:     id,
 					Verified:     true,
 					RawV2:        []byte(secret + id),
@@ -67,7 +67,7 @@ func TestPlivo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Plivo,
+					DetectorType: detector_typepb.DetectorType_Plivo,
 					Redacted:     id,
 					Verified:     false,
 					RawV2:        []byte(inactiveSecret + id),

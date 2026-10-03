@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v67/github"
+	"golang.org/x/time/rate"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/classic"
@@ -15,6 +16,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+// According to GitHub's rate limiting documentation, the default rate limit for
+// authenticated requests (PAT) is 5000 requests per hour. This equates to roughly 1.39
+// requests per second. To provide some buffer, we set the rate limit to 1.25
+// requests per second with a burst of 10.
+// https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28
+var rateLimiter = rate.NewLimiter(rate.Limit(1.25), 10)
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
@@ -27,7 +35,10 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeGit
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
-		return nil, err
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", err)
+	}
+	if info == nil {
+		return nil, analyzers.NewAnalysisError(a.Type().String(), analyzers.OperationAnalyzePermissions, analyzers.ServiceAPI, "", fmt.Errorf("GitHub analyzer returned no data for token"))
 	}
 	return secretInfoToAnalyzerResult(info), nil
 }
@@ -39,9 +50,10 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 	result := &analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeGitHub,
 		Metadata: map[string]any{
-			"owner":      info.Metadata.User.Login,
-			"type":       info.Metadata.Type,
-			"expiration": info.Metadata.Expiration,
+			"owner":           info.Metadata.User.Login,
+			"type":            info.Metadata.Type,
+			"expiration":      info.Metadata.Expiration,
+			"is_fine_grained": info.Metadata.FineGrained,
 		},
 	}
 	result.Bindings = append(result.Bindings, secretInfoToUserBindings(info)...)
@@ -72,11 +84,11 @@ func secretInfoToUserBindings(info *common.SecretInfo) []analyzers.Binding {
 }
 
 func userToResource(user *gh.User) *analyzers.Resource {
-	name := *user.Login
+	name := user.GetLogin()
 	return &analyzers.Resource{
 		Name:               name,
 		FullyQualifiedName: fmt.Sprintf("github.com/%s", name),
-		Type:               strings.ToLower(*user.Type), // "user" or "organization"
+		Type:               strings.ToLower(user.GetType()), // "user" or "organization"
 	}
 }
 
@@ -103,11 +115,26 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 	}
 	var bindings []analyzers.Binding
 	for _, repo := range repos {
+		// A repo has identity independent of its owner (name/full_name); if the
+		// owner is absent we still emit the repo but leave Parent unset.
+		var parent *analyzers.Resource
+		if owner := repo.GetOwner(); owner != nil {
+			parent = userToResource(owner)
+		}
+		// repo.GetName() could theoretically be empty for a deleted/ghost repo
+		// object; fall back to FullName so Name is never empty.
+		name := repo.GetName()
+		if name == "" {
+			name = repo.GetFullName()
+		}
+		if name == "" {
+			continue
+		}
 		resource := analyzers.Resource{
-			Name:               *repo.Name,
-			FullyQualifiedName: fmt.Sprintf("github.com/%s", *repo.FullName),
+			Name:               name,
+			FullyQualifiedName: fmt.Sprintf("github.com/%s", repo.GetFullName()),
 			Type:               "repository",
-			Parent:             userToResource(repo.Owner),
+			Parent:             parent,
 		}
 		bindings = append(bindings, analyzers.BindAllPermissions(resource, perms...)...)
 	}
@@ -117,11 +144,23 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 func secretInfoToGistBindings(info *common.SecretInfo) []analyzers.Binding {
 	var bindings []analyzers.Binding
 	for _, gist := range info.Gists {
+		// A gist without an owner cannot be attributed to a user, so we cannot
+		// build a meaningful resource or FQN for it. Skip it rather than
+		// producing silently corrupt output (e.g. "gist.github.com//id").
+		if gist.GetOwner() == nil {
+			continue
+		}
+		// Gist descriptions are optional; fall back to the gist ID so Name is
+		// never empty (proto validation requires len >= 1).
+		name := gist.GetDescription()
+		if name == "" {
+			name = gist.GetID()
+		}
 		resource := analyzers.Resource{
-			Name:               *gist.Description,
-			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", *gist.Owner.Login, *gist.ID),
+			Name:               name,
+			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", gist.GetOwner().GetLogin(), gist.GetID()),
 			Type:               "gist",
-			Parent:             userToResource(gist.Owner),
+			Parent:             userToResource(gist.GetOwner()),
 		}
 		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
 	}
@@ -132,7 +171,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*common.SecretInfo, err
 	if cfg == nil {
 		cfg = &config.Config{}
 	}
-	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg)).WithAuthToken(key)
+	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg, analyzers.WithRateLimiter(rateLimiter))).WithAuthToken(key)
 
 	md, err := common.GetTokenMetadata(key, client)
 	if err != nil {

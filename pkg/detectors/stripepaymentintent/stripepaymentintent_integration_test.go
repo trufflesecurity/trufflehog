@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestStripepaymentintent_FromChunk(t *testing.T) {
@@ -96,7 +96,7 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 			hasVerified := false
 			for i := range got {
 				// Check that all results have the correct detector type
-				if got[i].DetectorType != detectorspb.DetectorType_StripePaymentIntent {
+				if got[i].DetectorType != detector_typepb.DetectorType_StripePaymentIntent {
 					t.Errorf("Stripepaymentintent.FromData() result %d has wrong DetectorType", i)
 				}
 

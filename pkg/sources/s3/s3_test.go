@@ -2,11 +2,16 @@ package s3
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +41,76 @@ func TestSource_Init_IncludeAndIgnoreBucketsError(t *testing.T) {
 	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
 
 	assert.Error(t, err)
+}
+
+func TestSource_ListErrorsAreExpected(t *testing.T) {
+	tests := []struct {
+		name    string
+		role    string
+		buckets []string
+		want    bool
+	}{
+		{
+			name: "no role, no explicit buckets",
+			want: false,
+		},
+		{
+			name:    "no role, explicit buckets",
+			buckets: []string{"bucket-a"},
+			want:    false,
+		},
+		{
+			name: "role without explicit buckets, denials are expected",
+			role: "arn:aws:iam::123456789012:role/some-role",
+			want: true,
+		},
+		{
+			name:    "role with explicit buckets, denials are errors",
+			role:    "arn:aws:iam::123456789012:role/some-role",
+			buckets: []string{"bucket-a"},
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn, err := anypb.New(&sourcespb.S3{
+				Credential: &sourcespb.S3_AccessKey{
+					AccessKey: &credentialspb.KeySecret{
+						Key:    "ignored for test",
+						Secret: "ignored for test",
+					},
+				},
+				Buckets: tt.buckets,
+				Roles:   []string{tt.role},
+			})
+			require.NoError(t, err)
+
+			s := Source{}
+			require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+			assert.Equal(t, tt.want, s.listErrorsAreExpected(tt.role))
+		})
+	}
+}
+
+func TestSource_ScanBucketsReportsCumulativeObjectCount(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+	// Simulate a later role pass after an earlier pass already scanned three
+	// objects. The pass below scans no buckets, so the completion message must
+	// still report the cumulative total rather than resetting to zero.
+	totalObjectCount := uint64(3)
+	s.scanBuckets(context.Background(), nil, "", nil, make(chan *sources.Chunk, 1), &totalObjectCount)
+
+	assert.Equal(t, uint64(3), totalObjectCount)
+	assert.Contains(t, s.Message, "3 objects scanned")
 }
 
 func TestSource_Chunks(t *testing.T) {
@@ -166,19 +241,410 @@ func TestSource_Chunks(t *testing.T) {
 }
 
 func TestSource_UnmarshalSourceUnit(t *testing.T) {
+	roleARN := "arn:aws:iam::123456789012:role/my-role"
+
+	// envelope mirrors the JSON shape thog persists between the enumerate and
+	// scan passes: the SourceUnit proto marshalled with encoding/json, where
+	// unit_data (if present) is the original unit as base64-encoded bytes.
+	type envelope struct {
+		ID       string `json:"id"`
+		Kind     string `json:"kind,omitempty"`
+		Display  string `json:"display,omitempty"`
+		UnitData string `json:"unit_data,omitempty"`
+	}
+
+	marshalEnvelope := func(t *testing.T, id string, kind string, unit *S3SourceUnit) []byte {
+		t.Helper()
+		env := envelope{ID: id, Kind: kind, Display: id}
+		if unit != nil {
+			raw, err := json.Marshal(unit)
+			require.NoError(t, err)
+			env.UnitData = base64.StdEncoding.EncodeToString(raw)
+		}
+		data, err := json.Marshal(env)
+		require.NoError(t, err)
+		return data
+	}
+
+	tests := []struct {
+		name     string
+		data     []byte
+		wantUnit S3SourceUnit
+		wantErr  bool
+	}{
+		{
+			name:     "bare unit, role-bearing ARN",
+			data:     []byte(`{"Bucket":"my-test-bucket","Role":"` + roleARN + `"}`),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN},
+		},
+		{
+			name:     "bare unit, role-less",
+			data:     []byte(`{"Bucket":"my-test-bucket"}`),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket"},
+		},
+		{
+			name: "envelope with unit_data, role-bearing",
+			data: marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", roleARN), "bucket",
+				&S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN}),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN},
+		},
+		{
+			name: "envelope with unit_data, role-less",
+			data: marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", ""), "bucket",
+				&S3SourceUnit{Bucket: "my-test-bucket"}),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket"},
+		},
+		{
+			name:     "envelope without unit_data, role-bearing, rebuilt from id",
+			data:     marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", roleARN), "bucket", nil),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket", Role: roleARN},
+		},
+		{
+			name:     "envelope without unit_data, role-less, rebuilt from id",
+			data:     marshalEnvelope(t, constructS3SourceUnitID("my-test-bucket", ""), "bucket", nil),
+			wantUnit: S3SourceUnit{Bucket: "my-test-bucket"},
+		},
+		{
+			// A CommonSourceUnit-shaped bare unit from another source also has
+			// an "id" field; only S3's own "bucket" kind may trigger the
+			// envelope id-rebuild path, or this would be misread as a bucket.
+			name:    "bare unit from another source is rejected, not misread as an envelope",
+			data:    []byte(`{"kind":"repository","id":"some-repo-id"}`),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+			unit, err := s.UnmarshalSourceUnit(tt.data)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err, "UnmarshalSourceUnit should not return an error")
+
+			s3Unit, ok := unit.(S3SourceUnit)
+			require.True(t, ok, "Unmarshaled unit should be of type S3SourceUnit")
+			assert.Equal(t, tt.wantUnit, s3Unit)
+		})
+	}
+}
+
+func TestSource_ObjectLink(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{
+			name: "aws",
+			want: "https://my-bucket.s3.eu-west-1.amazonaws.com/dir/key.txt",
+		},
+		{
+			name:     "custom endpoint",
+			endpoint: "https://s3.internal.example.com",
+			want:     "https://s3.internal.example.com/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "custom endpoint with trailing slash",
+			endpoint: "https://s3.internal.example.com/",
+			want:     "https://s3.internal.example.com/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "custom endpoint with port and base path",
+			endpoint: "http://minio.test:9000/base",
+			want:     "http://minio.test:9000/base/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "endpoint without a scheme is assumed https",
+			endpoint: "s3.internal.example.com",
+			want:     "https://s3.internal.example.com/my-bucket/dir/key.txt",
+		},
+		{
+			name:     "host and port without a scheme is assumed https",
+			endpoint: "s3.internal.example.com:9000",
+			want:     "https://s3.internal.example.com:9000/my-bucket/dir/key.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn, err := anypb.New(&sourcespb.S3{
+				Credential: &sourcespb.S3_Unauthenticated{},
+				Endpoint:   tt.endpoint,
+			})
+			require.NoError(t, err)
+
+			s := Source{}
+			require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
+
+			assert.Equal(t, tt.want, s.objectLink("my-bucket", "eu-west-1", "dir/key.txt"))
+		})
+	}
+}
+
+func TestSource_Init_InvalidEndpoint(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Endpoint:   "https://s3.internal.example.com:not-a-port",
+	})
+	require.NoError(t, err)
+
 	s := Source{}
+	assert.ErrorContains(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1), "endpoint")
+}
 
-	unitJSON := `{
-		"Bucket": "my-test-bucket",
-		"Role": "my-test-role"
-	}`
+func TestSource_ClientAddressing(t *testing.T) {
+	tests := []struct {
+		name          string
+		conn          *sourcespb.S3
+		wantRegion    string
+		wantEndpoint  *string
+		wantPathStyle bool
+	}{
+		{
+			name:       "aws defaults",
+			conn:       &sourcespb.S3{},
+			wantRegion: defaultAWSRegion,
+		},
+		{
+			name:       "explicit region without endpoint",
+			conn:       &sourcespb.S3{Region: "ap-south-1"},
+			wantRegion: "ap-south-1",
+		},
+		{
+			name:          "custom endpoint implies path style",
+			conn:          &sourcespb.S3{Endpoint: "https://s3.internal.example.com"},
+			wantRegion:    defaultAWSRegion,
+			wantEndpoint:  aws.String("https://s3.internal.example.com"),
+			wantPathStyle: true,
+		},
+	}
 
-	unit, err := s.UnmarshalSourceUnit([]byte(unitJSON))
-	require.NoError(t, err, "UnmarshalSourceUnit should not return an error")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.conn.Credential = &sourcespb.S3_Unauthenticated{}
+			conn, err := anypb.New(tt.conn)
+			require.NoError(t, err)
 
-	s3Unit, ok := unit.(S3SourceUnit)
-	require.True(t, ok, "Unmarshaled unit should be of type S3SourceUnit")
+			s := Source{}
+			require.NoError(t, s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1))
 
-	assert.Equal(t, "my-test-bucket", s3Unit.Bucket, "Bucket field should match")
-	assert.Equal(t, "my-test-role", s3Unit.Role, "Role field should match")
+			client, err := s.newClient(context.Background(), s.defaultRegion(), "")
+			require.NoError(t, err)
+
+			opts := client.Options()
+			assert.Equal(t, tt.wantRegion, opts.Region)
+			assert.Equal(t, tt.wantEndpoint, opts.BaseEndpoint)
+			assert.Equal(t, tt.wantPathStyle, opts.UsePathStyle)
+		})
+	}
+}
+
+func TestSource_Init_IncludeAndExcludeExtensionsError(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:        &sourcespb.S3_Unauthenticated{},
+		IncludeExtensions: []string{"tf"},
+		ExcludeExtensions: []string{"zip"},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.Error(t, err)
+}
+
+// Prefixes, unlike extensions and unlike buckets, accept an include list and an
+// exclude list together.
+func TestSource_Init_IncludeAndExcludePrefixesAllowed(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		IncludePrefixes: []string{"src/"},
+		ExcludePrefixes: []string{"src/vendor/"},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.NoError(t, err)
+	assert.True(t, s.objectFilter.shouldInclude("src/main.tf"))
+	assert.False(t, s.objectFilter.shouldInclude("src/vendor/dep.tf"))
+}
+
+// A source with no filters configured must scan every object, so that existing
+// scans behave exactly as they did before object filtering was added.
+func TestSource_Init_UnconfiguredFilterScansEverything(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.NoError(t, err)
+	assert.True(t, s.objectFilter.shouldInclude("any/key.zip"))
+}
+
+// A filtered object must still be marked complete on the checkpointer. Otherwise
+// the low water mark stalls at the first filtered object and a resumed scan redoes
+// every object after it.
+func TestSource_PageChunker_FilteredObjectsAdvanceCheckpoint(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+
+	const objectCount = 10
+	page := &awss3.ListObjectsV2Output{Contents: make([]s3types.Object, objectCount)}
+	for i := range objectCount {
+		key := fmt.Sprintf("archive/key-%02d.txt", i)
+		size := int64(1024)
+		page.Contents[i] = s3types.Object{Key: &key, Size: &size}
+	}
+
+	checkpointer := NewCheckpointer(ctx, &sources.Progress{}, false)
+
+	// Every object is filtered, so pageChunker never reaches GetObject and needs
+	// no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, objectCount)},
+		checkpointer,
+	)
+
+	assert.Zero(t, scanned)
+	assert.EqualValues(t, objectCount, filtered)
+
+	resumeInfo, err := checkpointer.ResumePoint(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "test-bucket", resumeInfo.CurrentBucket)
+	assert.Equal(t, *page.Contents[objectCount-1].Key, resumeInfo.StartAfter)
+}
+
+func TestSource_PageChunker_UnitScanLeavesSkippedObjectsOutOfProgress(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+		MaxObjectSize:   1024,
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+	s.SetEncodedResumeInfoFor("test-bucket", "earlier-key")
+
+	filteredKey, glacierKey, oversizeKey, emptyKey, imageKey := "archive/a.txt", "cold.txt", "huge.txt", "none.txt", "photo.jpg"
+	size, oversize, empty := int64(512), int64(4096), int64(0)
+	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{
+		{Key: &filteredKey, Size: &size},
+		{Key: &glacierKey, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+		{Key: &oversizeKey, Size: &oversize},
+		{Key: &emptyKey, Size: &empty},
+		{Key: &imageKey, Size: &size},
+	}}
+
+	// No object is downloaded, so pageChunker needs no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{
+			errorCount:    &sync.Map{},
+			objectCount:   &scanned,
+			filteredCount: &filtered,
+			progress:      newUnitProgress("test-bucket", &s.Progress),
+		},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, len(page.Contents))},
+		NewCheckpointer(ctx, &s.Progress, true),
+	)
+
+	_, reported := s.GetUnitProgressFor("test-bucket")
+	assert.False(t, reported, "skipped objects are in neither the total nor the done count")
+	assert.EqualValues(t, 1, filtered)
+	// Skipped objects still advance the checkpoint to the last key of the page.
+	assert.Equal(t, *page.Contents[len(page.Contents)-1].Key, s.GetEncodedResumeInfoFor("test-bucket"))
+}
+
+func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+	s.SetProgressComplete(0, 1, "Bucket: test-bucket", "")
+
+	key, size := "archive/key.txt", int64(1024)
+	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{{Key: &key, Size: &size}}}
+
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)},
+		NewCheckpointer(ctx, &s.Progress, false),
+	)
+
+	_, reported := s.GetUnitProgressFor("test-bucket")
+	assert.False(t, reported)
+	assert.EqualValues(t, 1, s.GetProgress().SectionsRemaining)
+	assert.Equal(t, "Bucket: test-bucket", s.GetProgress().Message)
+}
+
+func TestSource_SkipReason(t *testing.T) {
+	filter, err := newObjectFilter(nil, []string{"archive/"}, nil, nil)
+	require.NoError(t, err)
+	s := Source{maxObjectSize: 1024, objectFilter: filter}
+
+	key, filteredKey, imageKey := "keep/obj.txt", "archive/obj.txt", "keep/photo.jpg"
+	size, oversize, empty := int64(512), int64(2048), int64(0)
+
+	tests := []struct {
+		name string
+		obj  s3types.Object
+		want string
+	}{
+		{name: "standard object", obj: s3types.Object{Key: &key, Size: &size}, want: ""},
+		{name: "at the size limit", obj: s3types.Object{Key: &key, Size: &s.maxObjectSize}, want: ""},
+		{name: "over the size limit", obj: s3types.Object{Key: &key, Size: &oversize}, want: skipReasonSizeLimit},
+		{
+			name: "glacier",
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+			want: skipReasonStorageClass,
+		},
+		{
+			name: "glacier instant retrieval",
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacierIr},
+			want: skipReasonStorageClass,
+		},
+		{name: "empty", obj: s3types.Object{Key: &key, Size: &empty}, want: skipReasonEmptyFile},
+		{name: "incompatible extension", obj: s3types.Object{Key: &imageKey, Size: &size}, want: skipReasonIncompatibleExtension},
+		{name: "filtered", obj: s3types.Object{Key: &filteredKey, Size: &size}, want: skipReasonObjectFilter},
+		// The filter is checked first, matching the reason the skipped objects metric has always recorded.
+		{name: "filtered and over the size limit", obj: s3types.Object{Key: &filteredKey, Size: &oversize}, want: skipReasonObjectFilter},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, s.skipReason(tt.obj))
+		})
+	}
 }

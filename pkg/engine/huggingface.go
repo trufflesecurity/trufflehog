@@ -10,7 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/huggingface"
 )
 
-// HuggingFaceConfig represents the configuration for HuggingFace.
+// HuggingfaceConfig represents the configuration for HuggingFace.
 type HuggingfaceConfig struct {
 	Endpoint           string
 	Models             []string
@@ -24,16 +24,20 @@ type HuggingfaceConfig struct {
 	IgnoreSpaces       []string
 	IncludeDatasets    []string
 	IgnoreDatasets     []string
+	Buckets            []string
+	IncludeBuckets     []string
+	IgnoreBuckets      []string
 	SkipAllModels      bool
 	SkipAllSpaces      bool
 	SkipAllDatasets    bool
+	SkipAllBuckets     bool
 	IncludeDiscussions bool
 	IncludePrs         bool
 	Token              string
 	Concurrency        int
 }
 
-// ScanGitHub scans HuggingFace with the provided options.
+// ScanHuggingface scans HuggingFace with the provided options.
 func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sources.JobProgressRef, error) {
 	connection := sourcespb.Huggingface{
 		Endpoint:           c.Endpoint,
@@ -48,9 +52,13 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sour
 		IgnoreSpaces:       c.IgnoreSpaces,
 		IncludeDatasets:    c.IncludeDatasets,
 		IgnoreDatasets:     c.IgnoreDatasets,
+		Buckets:            c.Buckets,
+		IncludeBuckets:     c.IncludeBuckets,
+		IgnoreBuckets:      c.IgnoreBuckets,
 		SkipAllModels:      c.SkipAllModels,
 		SkipAllSpaces:      c.SkipAllSpaces,
 		SkipAllDatasets:    c.SkipAllDatasets,
+		SkipAllBuckets:     c.SkipAllBuckets,
 		IncludeDiscussions: c.IncludeDiscussions,
 		IncludePrs:         c.IncludePrs,
 	}

@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -42,30 +43,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Raven,
+			DetectorType: detector_typepb.DetectorType_Raven,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.raventools.com/api?key=%s&method=profile_info&format=json", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if json.Valid(bodyBytes) {
-						s1.Verified = true
-					} else {
-						s1.Verified = false
-					}
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -74,8 +60,34 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Raven
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.raventools.com/api?key=%s&method=profile_info&format=json", resMatch), nil)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		if json.Valid(bodyBytes) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Raven
 }
 
 func (s Scanner) Description() string {

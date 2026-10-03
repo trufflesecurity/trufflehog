@@ -44,7 +44,7 @@ import (
 )
 
 var (
-	cli = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cli = kingpin.New("trufflehog", "TruffleHog is a tool for finding credentials. Run without a command for interactive mode.")
 	cmd string
 	// https://github.com/trufflesecurity/trufflehog/blob/main/CONTRIBUTING.md#logging-in-trufflehog
 	logLevel            = cli.Flag("log-level", `Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".`).Default("0").Int()
@@ -55,7 +55,8 @@ var (
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	sarifOut            = cli.Flag("sarif", "Output in SARIF format for upload to GitHub code scanning (e.g. via github/codeql-action/upload-sarif).").Bool()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").PlaceHolder("N").Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
@@ -65,7 +66,9 @@ var (
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	noIgnoreTag                = cli.Flag("no-ignore-tag", "Report results even if the line has a 'trufflehog:ignore' comment.").Bool()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
+	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
 	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
@@ -86,11 +89,13 @@ var (
 	noVerificationCache = cli.Flag("no-verification-cache", "Disable verification caching").Bool()
 
 	// Add feature flags
-	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
-	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
-	gitCloneTimeout    = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
-	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
-	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
+	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	gitLowMemoryScan         = cli.Flag("git-low-memory-scan", "Reduce memory use for git scanning.").Hidden().Bool()
+	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
+	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()
 
 	gitScan                = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI             = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -102,7 +107,7 @@ var (
 	gitScanMaxDepth        = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	gitScanBare            = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
 	gitClonePath           = gitScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
-	gitNoCleanup           = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	gitNoCleanup           = gitScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.").Bool()
 	gitTrustLocalGitConfig = gitScan.Flag("trust-local-git-config", "Trust local git config.").Bool()
 	_                      = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
 	_                      = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
@@ -126,8 +131,9 @@ var (
 	githubCommentsTimeframeDays = githubScan.Flag("comments-timeframe", "Number of days in the past to review when scanning issue, PR, and gist comments.").Uint32()
 	githubAuthInUrl             = githubScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
-	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.").Bool()
 	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
+	githubExcludeArchived       = githubScan.Flag("exclude-archived", "Exclude archived repositories from scan.").Bool()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -150,8 +156,8 @@ var (
 	gitlabScanIncludeRepos = gitlabScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
 	gitlabScanExcludeRepos = gitlabScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	gitlabAuthInUrl        = gitlabScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
-	gitlabClonePath        = gitlabScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir)").String()
-	gitlabNoCleanup        = gitlabScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path).").Bool()
+	gitlabClonePath        = gitlabScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
+	gitlabNoCleanup        = gitlabScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.").Bool()
 
 	filesystemScan  = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemPaths = filesystemScan.Arg("path", "Path to file or directory to scan.").Strings()
@@ -159,8 +165,9 @@ var (
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Strings()
 	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive = filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
-	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanIncludePaths    = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	filesystemScanExcludePaths    = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanMaxSymlinkDepth = filesystemScan.Flag("max-symlink-depth", "Maximum depth to follow symlinks during filesystem scan.").Short('s').Int32()
 
 	s3Scan              = cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey           = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
@@ -171,6 +178,13 @@ var (
 	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag. Incompatible with --ignore-bucket.").Strings()
 	s3ScanIgnoreBuckets = s3Scan.Flag("ignore-bucket", "Name of S3 bucket to ignore. You can repeat this flag. Incompatible with --bucket.").Strings()
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
+	s3ScanEndpoint      = s3Scan.Flag("endpoint", "Endpoint of an S3-compatible service to scan instead of AWS S3. (eg. https://s3.internal.example.com)").String()
+	s3ScanRegion        = s3Scan.Flag("region", "Region used to sign requests. Defaults to us-east-1.").String()
+
+	s3ScanIncludePrefixes   = s3Scan.Flag("include-prefix", "Only scan objects whose key starts with this prefix. You can repeat this flag.").Strings()
+	s3ScanExcludePrefixes   = s3Scan.Flag("exclude-prefix", "Skip objects whose key starts with this prefix. You can repeat this flag. Takes precedence over --include-prefix.").Strings()
+	s3ScanIncludeExtensions = s3Scan.Flag("include-extension", "Only scan objects with this file extension, written without a leading dot (eg. tf). You can repeat this flag. Incompatible with --exclude-extension.").Strings()
+	s3ScanExcludeExtensions = s3Scan.Flag("exclude-extension", "Skip objects with this file extension, written without a leading dot (eg. zip). You can repeat this flag. Incompatible with --include-extension.").Strings()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
 	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
@@ -247,11 +261,12 @@ var (
 	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
 	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
 
-	huggingfaceScan     = cli.Command("huggingface", "Find credentials in HuggingFace datasets, models and spaces.")
+	huggingfaceScan     = cli.Command("huggingface", "Find credentials in HuggingFace datasets, models, spaces and buckets.")
 	huggingfaceEndpoint = huggingfaceScan.Flag("endpoint", "HuggingFace endpoint.").Default("https://huggingface.co").String()
 	huggingfaceModels   = huggingfaceScan.Flag("model", "HuggingFace model to scan. You can repeat this flag. Example: 'username/model'").Strings()
 	huggingfaceSpaces   = huggingfaceScan.Flag("space", "HuggingFace space to scan. You can repeat this flag. Example: 'username/space'").Strings()
 	huggingfaceDatasets = huggingfaceScan.Flag("dataset", "HuggingFace dataset to scan. You can repeat this flag. Example: 'username/dataset'").Strings()
+	huggingfaceBuckets  = huggingfaceScan.Flag("bucket", "HuggingFace bucket to scan. You can repeat this flag. Example: 'username/bucket'").Strings()
 	huggingfaceOrgs     = huggingfaceScan.Flag("org", `HuggingFace organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
 	huggingfaceUsers    = huggingfaceScan.Flag("user", `HuggingFace user to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
 	huggingfaceToken    = huggingfaceScan.Flag("token", "HuggingFace token. Can be provided with environment variable HUGGINGFACE_TOKEN.").Envar("HUGGINGFACE_TOKEN").String()
@@ -262,18 +277,46 @@ var (
 	huggingfaceIgnoreModels       = huggingfaceScan.Flag("ignore-models", "Models to ignore in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)").Strings()
 	huggingfaceIgnoreSpaces       = huggingfaceScan.Flag("ignore-spaces", "Spaces to ignore in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)").Strings()
 	huggingfaceIgnoreDatasets     = huggingfaceScan.Flag("ignore-datasets", "Datasets to ignore in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)").Strings()
+	huggingfaceIncludeBuckets     = huggingfaceScan.Flag("include-buckets", "Buckets to include in scan. You can repeat this flag. Must use HuggingFace bucket full name. Example: 'username/bucket' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreBuckets      = huggingfaceScan.Flag("ignore-buckets", "Buckets to ignore in scan. You can repeat this flag. Must use HuggingFace bucket full name. Example: 'username/bucket' (Only used with --user or --org)").Strings()
 	huggingfaceSkipAllModels      = huggingfaceScan.Flag("skip-all-models", "Skip all model scans. (Only used with --user or --org)").Bool()
 	huggingfaceSkipAllSpaces      = huggingfaceScan.Flag("skip-all-spaces", "Skip all space scans. (Only used with --user or --org)").Bool()
 	huggingfaceSkipAllDatasets    = huggingfaceScan.Flag("skip-all-datasets", "Skip all dataset scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllBuckets     = huggingfaceScan.Flag("skip-all-buckets", "Skip all bucket scans. (Only used with --user or --org)").Bool()
 	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
 	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
 	multiScanScan  = cli.Command("multi-scan", "Find credentials in multiple sources defined in configuration.")
 
+	jsonEnumeratorScan  = cli.Command("json-enumerator", "Find credentials from a JSON enumerator input.")
+	jsonEnumeratorPaths = jsonEnumeratorScan.Arg("path", "Path to JSON enumerator file to scan.").Strings()
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
+
+// expandTilde replaces a leading ~ in each argument with the user's home
+// directory. This compensates for bypassing the shell (which would normally
+// perform this expansion) while still avoiding shell metacharacter injection.
+func expandTilde(args []string) []string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return args
+	}
+	out := make([]string, len(args))
+	for i, arg := range args {
+		switch {
+		case arg == "~":
+			out[i] = home
+		case strings.HasPrefix(arg, "~/"):
+			out[i] = home + arg[1:]
+		default:
+			out[i] = arg
+		}
+	}
+	return out
+}
 
 func init() {
 	_, _ = maxprocs.Set()
@@ -292,6 +335,8 @@ func init() {
 	cli.HelpFlag.Short('h')
 	cli.UsageWriter(os.Stdout)
 
+	registerManPageFlag(cli)
+
 	// Check if the TUI environment variable is set.
 	if ok, err := strconv.ParseBool(os.Getenv("TUI_PARENT")); err == nil {
 		usingTUI = ok
@@ -303,12 +348,17 @@ func init() {
 			os.Exit(0)
 		}
 
-		binary, err := exec.LookPath("sh")
+		// The TUI passes user input as literal strings. Since we no longer
+		// invoke a shell, we must expand ~ ourselves so paths like ~/foo
+		// resolve correctly.
+		args = expandTilde(args)
+
+		binary, err := exec.LookPath(os.Args[0])
 		if err == nil {
 			// On success, this call will never return. On failure, fallthrough
 			// to overwriting os.Args.
-			cmd := strings.Join(append(os.Args[:1], args...), " ")
-			_ = syscall.Exec(binary, []string{"sh", "-c", cmd}, append(os.Environ(), "TUI_PARENT=true"))
+			execArgs := append([]string{binary}, args...)
+			_ = syscall.Exec(binary, execArgs, append(os.Environ(), "TUI_PARENT=true"))
 		}
 
 		// Overwrite the Args slice so overseer works properly.
@@ -347,6 +397,13 @@ func init() {
 	}
 }
 
+// syncLogs flushes logs when the program exits.
+func syncLogs(syncFn func() error) {
+	if syncFn != nil {
+		_ = syncFn()
+	}
+}
+
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -358,15 +415,16 @@ func main() {
 	context.SetDefaultLogger(logger)
 
 	if *localDev {
-		run(overseer.State{})
+		run(overseer.State{}, sync)
 		os.Exit(0)
 	}
 
-	defer func() { _ = sync() }()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, sync)
 
 	updateCfg := overseer.Config{
-		Program:       run,
+		Program: func(s overseer.State) {
+			run(s, sync)
+		},
 		Debug:         *debug,
 		RestartSignal: syscall.SIGTERM,
 		// TODO: Eventually add a PreUpgrade func for signature check w/ x509 PKCS1v15
@@ -387,10 +445,10 @@ func main() {
 	}
 }
 
-func run(state overseer.State) {
-
+func run(state overseer.State, logSync func() error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
+	defer syncLogs(logSync)
 
 	go func() {
 		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
@@ -399,7 +457,7 @@ func run(state overseer.State) {
 	}()
 
 	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
+	logFatal := logFatalFunc(logger, logSync)
 
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -413,6 +471,8 @@ func run(state overseer.State) {
 		} else {
 			logger.Info("cleaned temporary artifacts")
 		}
+
+		syncLogs(logSync)
 		os.Exit(0)
 	}()
 
@@ -421,7 +481,11 @@ func run(state overseer.State) {
 	if *githubScanToken != "" {
 		// NOTE: this kludge is here to do an authenticated shallow commit
 		// TODO: refactor to better pass credentials
-		os.Setenv("GITHUB_TOKEN", *githubScanToken)
+		_ = os.Setenv("GITHUB_TOKEN", *githubScanToken)
+	}
+
+	if *concurrency <= 0 {
+		*concurrency = runtime.NumCPU()
 	}
 
 	// When setting a base commit, chunks must be scanned in order.
@@ -456,12 +520,20 @@ func run(state overseer.State) {
 		feature.GitCloneTimeoutDuration.Store(int64(*gitCloneTimeout))
 	}
 
+	if *gitLowMemoryScan {
+		feature.UseGitLowMemoryScan.Store(true)
+	}
+
 	if *skipAdditionalRefs {
 		feature.SkipAdditionalRefs.Store(true)
 	}
 
 	if *userAgentSuffix != "" {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
+	}
+
+	if *dropUnverifiedJWTResults {
+		feature.DropUnverifiedJWTResults.Store(true)
 	}
 
 	// OSS Default APK handling on
@@ -476,6 +548,47 @@ func run(state overseer.State) {
 
 	// OSS Default using github graphql api for issues, pr's and comments
 	feature.UseGithubGraphQLAPI.Store(false)
+
+	// OSS Default Use HTML Decoder on
+	feature.HTMLDecoderEnabled.Store(true)
+
+	// New detector flags
+	feature.PineconeDetectorEnabled.Store(true)
+	feature.CloudinaryDetectorEnabled.Store(true)
+	feature.GitLabOAuthDetectorEnabled.Store(true)
+	feature.FigmaV3DetectorEnabled.Store(true)
+	feature.SonarCloudV2DetectorEnabled.Store(true)
+	feature.EnigmaDetectorEnabled.Store(true)
+	feature.DatadogApiKeyDetectorEnabled.Store(true)
+	feature.TlyDetectorEnabled.Store(true)
+	feature.WitDetectorEnabled.Store(true)
+	feature.RevDetectorEnabled.Store(true)
+	feature.UserDetectorEnabled.Store(true)
+	feature.BraintrustDetectorEnabled.Store(true)
+	feature.PgAnalyzeReadKeyDetectorEnabled.Store(true)
+	feature.RedHatPyxisDetectorEnabled.Store(true)
+	feature.OctopusDeployDetectorEnabled.Store(true)
+	feature.OpenRouterDetectorEnabled.Store(true)
+	feature.NewRelicInsightsInsertKeyDetectorEnabled.Store(true)
+	feature.DuffelTokenDetectorEnabled.Store(true)
+	feature.ShippoDetectorEnabled.Store(true)
+	feature.IPInfoDetectorEnabled.Store(true)
+	feature.LobDetectorEnabled.Store(true)
+	feature.HashiCorpVaultBatchTokenDetectorEnabled.Store(true)
+	feature.HashiCorpVaultTokenDetectorEnabled.Store(true)
+	feature.CloudflareApiTokenV2DetectorEnabled.Store(true)
+	feature.CloudflareGlobalApiKeyV2DetectorEnabled.Store(true)
+	feature.DuoDetectorEnabled.Store(true)
+	feature.NewRelicLicenseKeyDetectorEnabled.Store(true)
+	feature.NewRelicBrowserKeyDetectorEnabled.Store(true)
+	feature.NewRelicUserKeyDetectorEnabled.Store(true)
+	feature.NewRelicInsightsQueryKeyDetectorEnabled.Store(true)
+	feature.NewRelicMobileAppTokenDetectorEnabled.Store(true)
+	feature.MSTeamsWebhookV2DetectorEnabled.Store(true)
+	feature.SolarwindsDetectorEnabled.Store(true)
+	feature.ResendDetectorEnabled.Store(true)
+	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
+	feature.HumioAPITokenDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -510,11 +623,13 @@ func run(state overseer.State) {
 		printer = new(output.JSONPrinter)
 	case *gitHubActionsFormat:
 		printer = new(output.GitHubActionsPrinter)
+	case *sarifOut:
+		printer = new(output.SarifPrinter)
 	default:
 		printer = new(output.PlainPrinter)
 	}
 
-	if !*jsonLegacy && !*jsonOut {
+	if !*jsonLegacy && !*jsonOut && !*sarifOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
@@ -546,10 +661,12 @@ func run(state overseer.State) {
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
+		NoIgnoreTag:              *noIgnoreTag,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
 		ShouldScanEntireChunk:    *scanEntireChunk,
+		MaxDecodeDepth:           *maxDecodeDepth,
 		VerificationCacheMetrics: &verificationCacheMetrics,
 	}
 
@@ -579,6 +696,15 @@ func run(state overseer.State) {
 		logFatal(err, "error running scan")
 	}
 
+	// SARIF can't be streamed like the other output formats: it's a single JSON document
+	// wrapping every result, so it's buffered by the printer and written out here, once
+	// scanning has fully finished.
+	if sarifPrinter, ok := printer.(*output.SarifPrinter); ok {
+		if err := sarifPrinter.Flush(os.Stdout); err != nil {
+			logFatal(err, "error writing SARIF output")
+		}
+	}
+
 	verificationCacheMetricsSnapshot := struct {
 		Hits                    int32
 		Misses                  int32
@@ -606,6 +732,7 @@ func run(state overseer.State) {
 
 	if metrics.hasFoundResults && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
+		syncLogs(logSync)
 		os.Exit(183)
 	}
 }
@@ -675,7 +802,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	handleFinishedMetrics := func(ctx context.Context, finishedMetrics <-chan sources.UnitMetrics, jobReportWriter io.WriteCloser) {
 		go func() {
 			defer func() {
-				jobReportWriter.Close()
+				_ = jobReportWriter.Close()
 				if namer, ok := jobReportWriter.(interface{ Name() string }); ok {
 					ctx.Logger().Info("report written", "path", namer.Name())
 				} else {
@@ -765,6 +892,28 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			PrintLegacyJSON:     *jsonLegacy,
 			TrustLocalGitConfig: *gitTrustLocalGitConfig,
 		}
+
+		// detect if trufflehog is running git source as a pre-commit hook
+		if isPreCommitHook() {
+			ctx.Logger().Info("Running as a pre-commit hook, overriding default flags for hook context")
+
+			// Override git configuration for pre-commit hook context
+			gitCfg.TrustLocalGitConfig = true
+			// Only scan staged changes. Both ends are HEAD so the commit range is
+			// HEAD..HEAD, which is empty; a base with no head would instead walk
+			// every ref not reachable from HEAD (see gitparse.Parser.RepoPath).
+			gitCfg.BaseRef = "HEAD"
+			gitCfg.HeadRef = "HEAD"
+
+			// Override result filters for pre-commit hook context
+			// In hook mode, we only want to show verified secrets and unknown findings
+			*results = "verified,unknown"
+
+			// Override failure behavior for pre-commit hook context
+			// In hook mode, we want to fail the commit if any secrets are found
+			*fail = true
+		}
+
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		} else {
@@ -781,6 +930,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if len(*githubScanOrgs) > 0 && len(*githubScanRepos) > 0 {
 			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories at the same time")
+		}
+		// --include-repos/--exclude-repos only filter repos enumerated from an org/user scan;
+		// explicit --repo entries bypass that filtering step entirely (see enumerate() in
+		// pkg/sources/github/github.go), so combining them with --repo would silently no-op
+		// the filters instead of erroring.
+		if len(*githubScanRepos) > 0 && (len(*githubIncludeRepos) > 0 || len(*githubExcludeRepos) > 0) {
+			return scanMetrics, fmt.Errorf("invalid config: --include-repos and --exclude-repos only apply to organization or user scans and cannot be used with --repo")
 		}
 
 		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {
@@ -807,6 +963,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ClonePath:                  *githubClonePath,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
+			ExcludeArchived:            *githubExcludeArchived,
 			PrintLegacyJSON:            *jsonLegacy,
 		}
 
@@ -873,6 +1030,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Paths:            paths,
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
+			MaxSymlinkDepth:  *filesystemScanMaxSymlinkDepth,
 		}
 		if ref, err := eng.ScanFileSystem(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
@@ -881,14 +1039,20 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
-			Key:           *s3ScanKey,
-			Secret:        *s3ScanSecret,
-			SessionToken:  *s3ScanSessionToken,
-			Buckets:       *s3ScanBuckets,
-			IgnoreBuckets: *s3ScanIgnoreBuckets,
-			Roles:         *s3ScanRoleArns,
-			CloudCred:     *s3ScanCloudEnv,
-			MaxObjectSize: int64(*s3ScanMaxObjectSize),
+			Key:               *s3ScanKey,
+			Secret:            *s3ScanSecret,
+			SessionToken:      *s3ScanSessionToken,
+			Buckets:           *s3ScanBuckets,
+			IgnoreBuckets:     *s3ScanIgnoreBuckets,
+			Roles:             *s3ScanRoleArns,
+			CloudCred:         *s3ScanCloudEnv,
+			MaxObjectSize:     int64(*s3ScanMaxObjectSize),
+			Endpoint:          *s3ScanEndpoint,
+			Region:            *s3ScanRegion,
+			IncludePrefixes:   *s3ScanIncludePrefixes,
+			ExcludePrefixes:   *s3ScanExcludePrefixes,
+			IncludeExtensions: *s3ScanIncludeExtensions,
+			ExcludeExtensions: *s3ScanExcludeExtensions,
 		}
 		if ref, err := eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
@@ -1040,8 +1204,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			*huggingfaceEndpoint = strings.TrimRight(*huggingfaceEndpoint, "/")
 		}
 
-		if len(*huggingfaceModels) == 0 && len(*huggingfaceSpaces) == 0 && len(*huggingfaceDatasets) == 0 && len(*huggingfaceOrgs) == 0 && len(*huggingfaceUsers) == 0 {
-			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space or dataset")
+		if len(*huggingfaceModels) == 0 && len(*huggingfaceSpaces) == 0 && len(*huggingfaceDatasets) == 0 && len(*huggingfaceBuckets) == 0 && len(*huggingfaceOrgs) == 0 && len(*huggingfaceUsers) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space, dataset or bucket")
 		}
 
 		cfg := engine.HuggingfaceConfig{
@@ -1049,18 +1213,22 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Models:             *huggingfaceModels,
 			Spaces:             *huggingfaceSpaces,
 			Datasets:           *huggingfaceDatasets,
+			Buckets:            *huggingfaceBuckets,
 			Organizations:      *huggingfaceOrgs,
 			Users:              *huggingfaceUsers,
 			Token:              *huggingfaceToken,
 			IncludeModels:      *huggingfaceIncludeModels,
 			IncludeSpaces:      *huggingfaceIncludeSpaces,
 			IncludeDatasets:    *huggingfaceIncludeDatasets,
+			IncludeBuckets:     *huggingfaceIncludeBuckets,
 			IgnoreModels:       *huggingfaceIgnoreModels,
 			IgnoreSpaces:       *huggingfaceIgnoreSpaces,
 			IgnoreDatasets:     *huggingfaceIgnoreDatasets,
+			IgnoreBuckets:      *huggingfaceIgnoreBuckets,
 			SkipAllModels:      *huggingfaceSkipAllModels,
 			SkipAllSpaces:      *huggingfaceSkipAllSpaces,
 			SkipAllDatasets:    *huggingfaceSkipAllDatasets,
+			SkipAllBuckets:     *huggingfaceSkipAllBuckets,
 			IncludeDiscussions: *huggingfaceIncludeDiscussions,
 			IncludePrs:         *huggingfaceIncludePrs,
 			Concurrency:        *concurrency,
@@ -1083,6 +1251,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		cfg := sources.StdinConfig{}
 		if ref, err := eng.ScanStdinInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
+	case jsonEnumeratorScan.FullCommand():
+		cfg := sources.JSONEnumeratorConfig{Paths: *jsonEnumeratorPaths}
+		if ref, err := eng.ScanJSONEnumeratorInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan JSON enumerator input: %v", err)
 		} else {
 			refs = []sources.JobProgressRef{ref}
 		}
@@ -1147,9 +1322,10 @@ func parseResults(input *string) (map[string]struct{}, error) {
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
 // function will terminate the program without cleanup.
-func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+func logFatalFunc(logger logr.Logger, logSync func() error) func(error, string, ...any) {
 	return func(err error, message string, keyAndVals ...any) {
 		logger.Error(err, message, keyAndVals...)
+		syncLogs(logSync)
 		if err != nil {
 			os.Exit(1)
 			return
@@ -1208,4 +1384,41 @@ func validateClonePath(clonePath string, noCleanup bool) error {
 	}
 
 	return nil
+}
+
+// isPreCommitHook detects if trufflehog is running as a pre-commit hook
+func isPreCommitHook() bool {
+	// Pre-commit.com framework detection
+	// Docs: https://pre-commit.com/#pre-commit
+	// Sets PRE_COMMIT=1 environment variable when running hooks
+	if os.Getenv("PRE_COMMIT") == "1" {
+		return true
+	}
+
+	// Husky framework detection (modern versions)
+	// Docs: https://typicode.github.io/husky/get-started.html#disabling-hooks
+	// Sets HUSKY=1 environment variable for all hooks
+	if os.Getenv("HUSKY") == "1" {
+		return true
+	}
+
+	// Husky legacy detection (versions < 4.0)
+	// Sets HUSKY_GIT_PARAMS for git hooks, containing commit parameters
+	// Reference: https://github.com/typicode/husky/tree/v0.14.3
+	if os.Getenv("HUSKY_GIT_PARAMS") != "" {
+		return true
+	}
+
+	// Local Git hook detection (non-framework)
+	// Native Git hooks don't set specific environment variables by default.
+	// To detect local hooks without frameworks, we must explicitly set
+	// an environment variable in the hook script:
+	// Example in .git/hooks/pre-commit:
+	//   export TRUFFLEHOG_PRE_COMMIT=1
+	// Than we can detect it
+	if os.Getenv("TRUFFLEHOG_PRE_COMMIT") == "1" {
+		return true
+	}
+
+	return false
 }
