@@ -21,9 +21,11 @@ type Scanner struct {
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.EndpointCustomizer = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.Versioner          = (*Scanner)(nil)
+)
 
 func (Scanner) Version() int          { return 3 }
 func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
@@ -31,7 +33,7 @@ func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 var (
 	defaultClient = common.SaneHttpClient()
 	// pattern taken from gitlab's PR for the format change: https://gitlab.com/gitlab-org/gitlab/-/merge_requests/169322
-	keyPat = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{27,300}.[0-9a-z]{2}.[a-z0-9]{9})\b`)
+	keyPat = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{27,300}\.[0-9a-z]{2}\.[a-z0-9]{9})\b`)
 )
 
 func (s Scanner) getClient() *http.Client {

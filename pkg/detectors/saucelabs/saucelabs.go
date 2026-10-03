@@ -27,7 +27,7 @@ var (
 	// as per signup page username can be between 2 to 70 characters and must only contain letters, numbers, or characters (_-.)
 	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"saucelabs", "username"}) + `\b([a-zA-Z0-9_\.-]{2,70})`)
 	keyPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"saucelabs"}) + `\b([a-z0-9]{8}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{12})\b`)
-	baseUrlPat  = regexp.MustCompile(`\b(api\.(?:us|eu)-(?:west|east|central)-[0-9].saucelabs\.com)\b`)
+	baseUrlPat  = regexp.MustCompile(`\b(api\.(?:us|eu)-(?:west|east|central)-[0-9]\.saucelabs\.com)\b`)
 
 	fixedBaseURL = "api.us-west-1.saucelabs.com"
 )
