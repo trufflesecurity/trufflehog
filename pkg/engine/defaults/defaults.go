@@ -217,6 +217,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/d7network"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dandelion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dareboost"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dashscope"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databrickstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogapikey"
@@ -1126,6 +1127,7 @@ func buildDetectorList() []detectors.Detector {
 		// &dailyco.Scanner{},
 		&dandelion.Scanner{},
 		&dareboost.Scanner{},
+		&dashscope.Scanner{},
 		&databox.Scanner{},
 		&databrickstoken.Scanner{},
 		&datadogapikey.Scanner{},
@@ -1904,6 +1906,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ResendDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
+		case *dashscope.Scanner:
+			return !feature.DashScopeDetectorEnabled.Load()
 		default:
 			return false
 		}
