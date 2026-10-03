@@ -3,12 +3,10 @@ package detectors
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"slices"
 	"sync"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/ssrf"
 )
 
 var DetectorHttpClientWithNoLocalAddresses *http.Client
@@ -98,16 +97,26 @@ func NewDetectorTransport(T http.RoundTripper) http.RoundTripper {
 	return &detectorTransport{T: T}
 }
 
-func isLocalIP(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate() || ip.IsUnspecified() {
-		return true
-	}
+// ErrNoLocalIP is returned when a client configured with WithNoLocalIP
+// refuses to dial a non-public address.
+//
+// Deprecated: it is an alias of ssrf.ErrEgressBlocked; new code should use
+// that sentinel directly.
+var ErrNoLocalIP = ssrf.ErrEgressBlocked
 
-	return false
-}
-
-var ErrNoLocalIP = errors.New("dialing local IP addresses is not allowed")
-
+// WithNoLocalIP configures the client to refuse connections to non-public
+// addresses: loopback, link-local (incl. cloud metadata), private, CGNAT,
+// multicast, and the other special-use ranges the ssrf package classifies.
+// The check runs in the guarded dialer on each resolved address, so it is
+// DNS-rebinding safe (the previous implementation vetted a LookupIP result
+// and then dialed the hostname again, which a rebinding resolver could race)
+// and it re-runs on every redirect hop's fresh dial.
+//
+// Two behavior notes against the previous implementation: any DialContext
+// already set on the transport is REPLACED, not chained, so custom dialers
+// (SOCKS, custom resolvers) are discarded; and blocking is per resolved
+// address, so a hostname resolving to both a public and a non-public record
+// connects via the public one where it previously refused the whole host.
 func WithNoLocalIP() ClientOption {
 	return func(c *http.Client) {
 		if c.Transport == nil {
@@ -128,28 +137,10 @@ func WithNoLocalIP() ClientOption {
 			}
 		}
 
-		// If the original DialContext is nil, set it to the default dialer
-		if transport.DialContext == nil {
-			transport.DialContext = defaultDialer.DialContext
-		}
-		originalDialContext := transport.DialContext
-		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-
-			ips, err := net.LookupIP(host)
-			if err != nil {
-				return nil, err
-			}
-
-			if slices.ContainsFunc(ips, isLocalIP) {
-				return nil, ErrNoLocalIP
-			}
-
-			return originalDialContext(ctx, network, net.JoinHostPort(host, port))
-		}
+		// The guarded dialer replaces any existing DialContext; within this
+		// package that is only ever nil or defaultDialer, whose settings the
+		// guard preserves.
+		transport.DialContext = ssrf.GuardDialer(defaultDialer).DialContext
 	}
 }
 
