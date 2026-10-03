@@ -1,6 +1,7 @@
 package giturl
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -273,6 +274,16 @@ func TestGenerateLink(t *testing.T) {
 			},
 			want: "https://github.com/hxnyk/hxnyk/wiki/Home/",
 		},
+		{
+			name: "AC-1 control character in github path",
+			args: args{
+				repo:   "https://github.com/ibm-developer-skills-network/jbbmo-Introduction-to-Git-and-GitHub.git",
+				commit: "b8938b6ea34624d7376285d1f47b577dac9e2619",
+				file:   "\rexit",
+				line:   int64(1),
+			},
+			want: "https://github.com/ibm-developer-skills-network/jbbmo-Introduction-to-Git-and-GitHub/blob/b8938b6ea34624d7376285d1f47b577dac9e2619/%0Dexit#L1",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -400,6 +411,14 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 			},
 			want: "https://github.com/coinbase/cbpay-js/blob/abcdefg/folder/%5Bname%5D/file",
 		},
+		{
+			name: "AC-2 control character link updates line",
+			args: args{
+				link:    "https://github.com/ibm-developer-skills-network/jbbmo-Introduction-to-Git-and-GitHub/blob/b8938b6ea34624d7376285d1f47b577dac9e2619/%0Dexit#L1",
+				newLine: int64(7),
+			},
+			want: "https://github.com/ibm-developer-skills-network/jbbmo-Introduction-to-Git-and-GitHub/blob/b8938b6ea34624d7376285d1f47b577dac9e2619/%0Dexit#L7",
+		},
 	}
 
 	for _, tt := range tests {
@@ -407,6 +426,81 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 			got := UpdateLinkLineNumber(context.Background(), tt.args.link, tt.args.newLine)
 			if got != tt.want && !tt.wantErr {
 				t.Errorf("UpdateLinkLineNumber() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenerateLinkThenUpdateLineNumber(t *testing.T) {
+	t.Parallel()
+
+	type step struct {
+		file    string
+		newLine int64
+		// wantGenerated is checked only when non-empty.
+		wantGenerated string
+		want          string
+	}
+
+	controlSteps := make([]step, 0, 33)
+	for b := 0; b <= 0x1F; b++ {
+		controlSteps = append(controlSteps, step{
+			file:    "x" + string(rune(b)) + "y",
+			newLine: 3,
+			want:    fmt.Sprintf("https://github.com/org/repo/blob/abc123/x%%%02Xy#L3", b),
+		})
+	}
+	controlSteps = append(controlSteps, step{
+		file:    "x\x7fy",
+		newLine: 3,
+		want:    "https://github.com/org/repo/blob/abc123/x%7Fy#L3",
+	})
+
+	tests := []struct {
+		name   string
+		repo   string
+		commit string
+		steps  []step
+	}{
+		{
+			name:   "AC-3 ticket carriage return round trip",
+			repo:   "https://github.com/ibm-developer-skills-network/jbbmo-Introduction-to-Git-and-GitHub.git",
+			commit: "b8938b6ea34624d7376285d1f47b577dac9e2619",
+			steps: []step{{
+				file:    "\rexit",
+				newLine: 5,
+				want:    "https://github.com/ibm-developer-skills-network/jbbmo-Introduction-to-Git-and-GitHub/blob/b8938b6ea34624d7376285d1f47b577dac9e2619/%0Dexit#L5",
+			}},
+		},
+		{
+			name:   "AC-4 all control characters round trip",
+			repo:   "https://github.com/org/repo.git",
+			commit: "abc123",
+			steps:  controlSteps,
+		},
+		{
+			name:   "AC-5 percent and brackets unchanged",
+			repo:   "https://github.com/org/repo.git",
+			commit: "abc123",
+			steps: []step{{
+				file:          "a%b[c]",
+				newLine:       5,
+				wantGenerated: "https://github.com/org/repo/blob/abc123/a%25b%5Bc%5D#L1",
+				want:          "https://github.com/org/repo/blob/abc123/a%2525b%255Bc%255D#L5",
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, s := range tt.steps {
+				generated := GenerateLink(tt.repo, tt.commit, s.file, 1)
+				if s.wantGenerated != "" && generated != s.wantGenerated {
+					t.Errorf("GenerateLink(%q) = %q, want %q", s.file, generated, s.wantGenerated)
+				}
+				if got := UpdateLinkLineNumber(context.Background(), generated, s.newLine); got != s.want {
+					t.Errorf("UpdateLinkLineNumber(GenerateLink(%q)) = %q, want %q", s.file, got, s.want)
+				}
 			}
 		})
 	}
