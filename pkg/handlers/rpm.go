@@ -117,7 +117,7 @@ func (h *rpmHandler) processRPMFiles(
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
 				dataOrErrChan <- DataOrErr{
-					Err: fmt.Errorf("%w: error processing RPM archive: %v", ErrProcessingWarning, err),
+					Err: fmt.Errorf("%w: error processing RPM archive: %w", ErrProcessingWarning, err),
 				}
 				h.metrics.incErrors()
 			}
