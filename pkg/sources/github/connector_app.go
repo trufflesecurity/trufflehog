@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
@@ -40,7 +41,15 @@ type appConnector struct {
 type appInstallationClients struct {
 	apiClient     *github.Client
 	graphqlClient *githubv4.Client
-	transport     *ghinstallation.Transport
+	tokenMu       sync.RWMutex
+	token         *github.InstallationToken
+}
+
+func (cs *appInstallationClients) accessTokenIfValid() *github.InstallationToken {
+	if cs.token == nil || cs.token.GetExpiresAt().Before(time.Now()) {
+		return nil
+	}
+	return cs.token
 }
 
 var _ Connector = (*appConnector)(nil)
@@ -155,17 +164,57 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 		return "", nil, fmt.Errorf("no GitHub App installation resolved for repo %q; set githubApp.installationId to a fallback installation to scan repos outside installation listings (e.g. member repos with scanUsers) together with scanAllInstallations", repoURL)
 	}
 
-	clients, err := c.clientsForInstallation(installID)
+	token, err := c.accessTokenForInstallation(ctx, installID)
 	if err != nil {
-		return "", nil, fmt.Errorf("could not prepare github clients for installation %d: %w", installID, err)
-	}
-
-	token, err := clients.transport.Token(ctx)
-	if err != nil {
-		return "", nil, fmt.Errorf("could not create installation token for installation %d: %w", installID, err)
+		return "", nil, err
 	}
 
 	return git.CloneRepoUsingToken(ctx, token, repoURL, "", "x-access-token", true, args...)
+}
+
+// accessTokenForInstallation returns an installation access token.
+func (c *appConnector) accessTokenForInstallation(ctx context.Context, installID int64) (string, error) {
+	if installID == 0 {
+		return "", fmt.Errorf("tried to fetch installation access token for id 0")
+	}
+
+	clients, err := c.clientsForInstallation(installID)
+	if err != nil {
+		return "", err
+	}
+
+	clients.tokenMu.RLock()
+	token := clients.accessTokenIfValid()
+	clients.tokenMu.RUnlock()
+
+	if token != nil {
+		return token.GetToken(), nil
+	}
+
+	clients.tokenMu.Lock()
+	defer clients.tokenMu.Unlock()
+
+	if token := clients.accessTokenIfValid(); token != nil {
+		return token.GetToken(), nil
+	}
+
+	token, _, err = c.installationClient.Apps.CreateInstallationToken(
+		ctx,
+		installID,
+		&github.InstallationTokenOptions{},
+	)
+	if err != nil {
+		return "", fmt.Errorf("could not create installation token for installation %d: %w", installID, err)
+	}
+
+	if exp := token.GetExpiresAt(); !exp.IsZero() {
+		// Refresh just before the real expiry
+		token.ExpiresAt = &github.Timestamp{Time: exp.Add(-time.Minute)}
+	}
+
+	clients.token = token
+
+	return token.GetToken(), nil
 }
 
 // installationIDForRepo returns the mapped installation ID for repoURL. When no
@@ -325,7 +374,6 @@ func (c *appConnector) createAPIClientsForInstallation(installationID int64) (*a
 	return &appInstallationClients{
 		apiClient:     apiClient,
 		graphqlClient: gqlClient,
-		transport:     transport,
 	}, nil
 }
 

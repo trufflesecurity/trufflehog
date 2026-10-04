@@ -111,9 +111,9 @@ func (s *Source) startCount(
 	}
 }
 
-// countBucket lists the whole bucket once to add up the objects the scan downloads and their size,
-// since S3 has no API that reports either. Keys at or before startAfter were finished by an earlier
-// run, so they count as done too. Nothing is kept per object.
+// countBucket lists the bucket from the start, the same way the scan does, to add up the objects the
+// scan downloads and their size, since S3 has no API that reports either. Keys at or before startAfter
+// were finished by an earlier run, so they count as done too. Nothing is kept per object.
 func (s *Source) countBucket(
 	ctx context.Context,
 	client *s3.Client,
@@ -121,7 +121,7 @@ func (s *Source) countBucket(
 	startAfter *string,
 	progress *unitProgress,
 ) {
-	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: &bucket})
+	paginator := newBucketPaginator(client, s.listInputs(bucket, nil))
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {

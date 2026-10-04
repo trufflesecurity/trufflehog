@@ -41,7 +41,9 @@ Prefixes are literal, so `--include-prefix=log` matches `logs/app.txt` and `logs
 
 The two kinds are combined with AND: an object has to pass both to be scanned. Entries are trimmed, and blank ones are ignored.
 
-Filtering happens after listing, so it saves `GetObject` requests but not `ListObjectsV2` requests. A bucket is still paginated in full even when a prefix covers a small part of it. Pushing prefixes into `ListObjectsV2Input.Prefix` would cut that too, and has not been done.
+Include prefixes are also sent to S3 as `ListObjectsV2Input.Prefix`. A bucket is listed once per include prefix instead of in full, so the listing covers only the keys they select, and each prefix costs at least one `ListObjectsV2` request per bucket even when nothing is under it. A prefix under another, like `src/vendor/` under `src/`, is dropped, since the shorter one already lists it. Directory buckets are listed in full, because they only accept a prefix that ends in `/`.
+
+Exclude prefixes and extensions have no server-side form, so they are matched after listing. They save `GetObject` requests but not `ListObjectsV2` requests.
 
 Three edge cases worth knowing:
 
@@ -55,7 +57,7 @@ Prefixes are matched with `strings.HasPrefix`, so an exclude prefix naming one k
 
 The same prefixes and extensions apply to every bucket in a scan. There is no way to scope a prefix to one bucket.
 
-If a filter excludes every object in a bucket, the scan logs `Scanned no objects in bucket` with the count, so a mistyped prefix does not look like a clean scan of an empty bucket.
+If a filter excludes every object in a bucket, the scan logs `Scanned no objects in bucket` with the count. If nothing is listed under the include prefixes at all, it logs `Found no objects under the include prefixes`. Either way, a mistyped prefix does not look like a clean scan of an empty bucket.
 
 ## Objects skipped regardless of configuration
 
@@ -82,6 +84,8 @@ The endpoint is parsed in `Init`, so a malformed one fails at startup rather tha
 `Checkpointer` tracks which objects in the current page of up to 1000 have finished, and records the highest consecutively completed key as `StartAfter` in `Progress.EncodedResumeInfo`, along with the bucket and role. An interrupted scan resumes from there.
 
 Only consecutive completions are checkpointed. If objects 0 to 5 and 7 to 8 are done but 6 is not, the checkpoint stops at 5, so resuming may rescan a few objects but never misses one.
+
+With include prefixes the scan lists each in turn. They are listed in key order and none is under another, so keys still arrive in ascending order and the checkpoint stays a single key. Resuming passes it as `StartAfter` to every prefix, and S3 returns nothing for the prefixes already finished. A checkpoint from a scan that listed the whole bucket resumes the same way.
 
 This matters when adding a new skip to `pageChunker`: a skipped object still has to call `UpdateObjectCompletion`. Skipping without it stalls the checkpoint at the first skipped object, and a resumed scan then redoes everything after it.
 
