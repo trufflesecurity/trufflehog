@@ -1902,6 +1902,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SolarwindsDetectorEnabled.Load()
 		case *humioapitoken.Scanner:
 			return !feature.HumioAPITokenDetectorEnabled.Load()
+		case *pubnubsecretkey.Scanner:
+			return !feature.PubNubSecretKeyDetectorEnabled.Load()
 		case *resend.Scanner:
 			return !feature.ResendDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
