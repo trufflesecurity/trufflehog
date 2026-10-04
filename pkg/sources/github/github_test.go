@@ -2992,3 +2992,43 @@ func TestCreateAPIClient_CloudGitHub(t *testing.T) {
 		t.Errorf("expected https://api.github.com/, got: %s", client.BaseURL.String())
 	}
 }
+
+func TestGetReposByOrgOrUser_UserWithTokenScansNamedUser(t *testing.T) {
+	defer gock.Off()
+
+	// The named account is a user (not an org): ListByOrg 404s, so the user
+	// fallback must enumerate THAT user's repos, never the token owner's.
+	// See https://github.com/trufflesecurity/trufflehog/issues/4517.
+	gock.New("https://api.github.com").
+		Get("/orgs/alice/repos").
+		Reply(404).
+		JSON(map[string]string{"message": "Not Found"})
+
+	gock.New("https://api.github.com").
+		Get("/users/alice/repos").
+		Reply(200).
+		JSON([]map[string]string{
+			{"full_name": "alice/owned-repo", "clone_url": "https://github.com/alice/owned-repo.git"},
+		})
+
+	gock.New("https://api.github.com").
+		Get("/users/alice/gists").
+		Reply(200).
+		JSON([]map[string]string{})
+
+	// /user/repos (the authenticated-user endpoint) is intentionally NOT mocked.
+	// A regression to the authenticated path would 404 here and fail the call.
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+	})
+	_, err := s.getReposByOrgOrUser(context.Background(), "alice", noopReporter())
+	require.NoError(t, err)
+
+	assert.True(t, s.filteredRepoCache.Exists("alice/owned-repo"))
+	assert.False(t, s.filteredRepoCache.Exists("tokenowner/secret-repo"))
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
