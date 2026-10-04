@@ -65,3 +65,49 @@ func TestRenamedFileIsScannedAtNewPath(t *testing.T) {
 		})
 	}
 }
+
+// The staged scan runs the same rename detection plus --diff-filter=AM
+// combination through `git diff --cached`, so a rename that exists only in
+// the index is dropped the same way a committed one is: `git diff` reports
+// nothing at all for it, and live content under the new name is never
+// scanned (#4672). This test stages (but does not commit) a rename and
+// requires a diff carrying the content at the new path.
+func TestStagedRenameIsScannedAtNewPath(t *testing.T) {
+	dir := t.TempDir()
+	runTestGit(t, dir, "init", "-q")
+	runTestGit(t, dir, "config", "user.email", "test@example.com")
+	runTestGit(t, dir, "config", "user.name", "Test")
+
+	content := "first line\nmarker-for-staged-rename-test\nlast line\n"
+	if err := os.WriteFile(filepath.Join(dir, "before.txt"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runTestGit(t, dir, "add", "-A")
+	runTestGit(t, dir, "commit", "-qm", "adds a file")
+
+	// Stage the rename only; HEAD still names the file before.txt.
+	runTestGit(t, dir, "mv", "before.txt", "after.txt")
+
+	diffChan, err := NewParser().Staged(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("Staged: %v", err)
+	}
+
+	found := false
+	for diff := range diffChan {
+		if diff.Len() == 0 {
+			continue
+		}
+		got, err := diff.contentWriter.String()
+		if err != nil {
+			t.Fatalf("reading diff for %s: %v", diff.PathB, err)
+		}
+		if diff.PathB == "after.txt" && strings.Contains(got, "marker-for-staged-rename-test") {
+			found = true
+		}
+	}
+
+	if !found {
+		t.Errorf("staged rename was not scanned at its new path")
+	}
+}
