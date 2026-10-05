@@ -1,63 +1,71 @@
-package detectors
+package detectors_test
 
 import (
 	"bytes"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 )
 
-// The engine can give verifier auth to any detector that embeds
-// EndpointSetter, because EndpointSetter satisfies VerifierAuthCustomizer.
-// The token is only attached if the detector builds its verification client
-// with VerificationClient. A detector that skips the wrap still accepts auth
-// and sends unauthenticated requests, which an auth proxy answers as if every
-// secret were invalid. No runtime check can see which client a detector uses,
-// so this test reads detector source instead.
-func TestEndpointSetterDetectorsUseVerificationClient(t *testing.T) {
-	var checked int
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			return nil
-		}
-		if d.Name() == "testdata" {
-			return filepath.SkipDir
+// modulePrefix is stripped from a detector's package path to find its source
+// directory relative to the repository root.
+const modulePrefix = "github.com/trufflesecurity/trufflehog/v3/"
+
+// The engine can give verifier auth to any default detector that satisfies
+// VerifierAuthCustomizer, whether it embeds EndpointSetter directly or
+// inherits it by embedding another detector's Scanner (as GitHub v2 embeds
+// v1). The token is only attached if the detector builds its verification
+// client with VerificationClient. A detector that skips the wrap still accepts
+// auth and sends unauthenticated requests, which an auth proxy answers as if
+// every secret were invalid. No runtime check can see which client a detector
+// uses, so this test reads the source of the package that defines each
+// detector's concrete type, which is where its FromData lives.
+func TestVerifierAuthDetectorsUseVerificationClient(t *testing.T) {
+	scanned := make(map[string]bool)
+	for _, d := range defaults.DefaultDetectors() {
+		if _, ok := d.(detectors.VerifierAuthCustomizer); !ok {
+			continue
 		}
 
-		embeds, calls, err := scanForVerificationClient(path)
-		if err != nil {
-			return err
+		typ := reflect.TypeOf(d)
+		if typ.Kind() == reflect.Pointer {
+			typ = typ.Elem()
 		}
-		if embeds {
-			checked++
-			assert.True(t, calls,
-				"%s embeds detectors.EndpointSetter but never calls VerificationClient; build the verification client with s.VerificationClient(...)", path)
+		pkgPath := typ.PkgPath()
+		if _, done := scanned[pkgPath]; done {
+			continue
 		}
-		return nil
-	})
-	require.NoError(t, err)
-	assert.NotZero(t, checked, "found no detectors embedding EndpointSetter; the source scan is broken")
+
+		rel, ok := strings.CutPrefix(pkgPath, modulePrefix)
+		require.True(t, ok, "detector %s is defined outside this module", pkgPath)
+		// The test runs in pkg/detectors, two levels below the repository root.
+		calls, err := callsVerificationClient(filepath.Join("..", "..", rel))
+		require.NoError(t, err)
+		scanned[pkgPath] = calls
+
+		assert.True(t, calls,
+			"%s accepts verifier auth but never calls VerificationClient; build the verification client with s.VerificationClient(...)", pkgPath)
+	}
+	assert.NotEmpty(t, scanned, "found no default detectors that accept verifier auth; the check is broken")
 }
 
-// scanForVerificationClient reports whether the non-test Go files in dir
-// embed detectors.EndpointSetter in a struct, and whether any of them call a
-// VerificationClient method. The embed and the call may sit in different
-// files of the same package.
-func scanForVerificationClient(dir string) (embeds, calls bool, err error) {
+// callsVerificationClient reports whether any non-test Go file in dir calls a
+// method named VerificationClient.
+func callsVerificationClient(dir string) (bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
 
 	fset := token.NewFileSet()
@@ -68,47 +76,28 @@ func scanForVerificationClient(dir string) (embeds, calls bool, err error) {
 		}
 		src, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
-			return false, false, err
+			return false, err
 		}
-		// Most of the ~1000 detector packages never mention either name, so
-		// skip parsing them.
-		if !bytes.Contains(src, []byte("EndpointSetter")) && !bytes.Contains(src, []byte("VerificationClient")) {
+		if !bytes.Contains(src, []byte("VerificationClient")) {
 			continue
 		}
 		file, err := parser.ParseFile(fset, name, src, 0)
 		if err != nil {
-			return false, false, err
+			return false, err
 		}
 
+		var calls bool
 		ast.Inspect(file, func(n ast.Node) bool {
-			switch n := n.(type) {
-			case *ast.StructType:
-				for _, field := range n.Fields.List {
-					if len(field.Names) == 0 && isDetectorsEndpointSetter(field.Type) {
-						embeds = true
-					}
-				}
-			case *ast.CallExpr:
-				if sel, ok := n.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "VerificationClient" {
+			if call, ok := n.(*ast.CallExpr); ok {
+				if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "VerificationClient" {
 					calls = true
 				}
 			}
-			return true
+			return !calls
 		})
+		if calls {
+			return true, nil
+		}
 	}
-	return embeds, calls, nil
-}
-
-// isDetectorsEndpointSetter matches an embedded field of type
-// detectors.EndpointSetter or *detectors.EndpointSetter.
-func isDetectorsEndpointSetter(expr ast.Expr) bool {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		expr = star.X
-	}
-	sel, ok := expr.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "EndpointSetter" {
-		return false
-	}
-	pkg, ok := sel.X.(*ast.Ident)
-	return ok && pkg.Name == "detectors"
+	return false, nil
 }
