@@ -25,6 +25,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -110,6 +111,15 @@ type Config struct {
 	ExcludeDetectors              string
 	CustomVerifiersOnly           bool
 	VerifierEndpoints             map[string]string
+
+	// VerifierAuth authenticates verification requests to custom verifier
+	// endpoints that sit behind an auth proxy. It is keyed like the parsed
+	// VerifierEndpoints, and every entry must have a matching
+	// VerifierEndpoints entry: auth only ever applies to configured
+	// endpoints. Detectors receive it through VerifierAuthCustomizer and
+	// attach the token inside their own HTTP client, so verification still
+	// runs through each detector's FromData.
+	VerifierAuth map[config.DetectorID]*verifierauth.Config
 
 	// Verify determines whether the scanner will verify candidate secrets.
 	Verify bool
@@ -306,6 +316,12 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Auth misconfiguration is checked before any filter runs, because a
+	// filter can only keep or drop a detector. Dropping a detector whose auth
+	// can't be applied would silently remove it from the scan.
+	if err := validateVerifierAuth(cfg.VerifierAuth, detectorsWithCustomVerifierEndpoints); err != nil {
+		return nil, err
+	}
 	if len(detectorsWithCustomVerifierEndpoints) > 0 {
 		filters = append(filters, func(d detectors.Detector) bool {
 			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
@@ -324,6 +340,17 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 
 			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
+			}
+
+			// validateVerifierAuth has already confirmed this detector type
+			// supports auth, so the type assertion only fails for a detector
+			// instance that diverges from its registered default.
+			if authCfg, ok := getWithDetectorID(d, cfg.VerifierAuth); ok && authCfg != nil {
+				authCustomizer, ok := d.(detectors.VerifierAuthCustomizer)
+				if !ok {
+					return false
+				}
+				authCustomizer.SetVerifierAuth(authCfg)
 			}
 
 			return true
@@ -451,6 +478,30 @@ func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.Detec
 		}
 	}
 	return customVerifierEndpoints, nil
+}
+
+// validateVerifierAuth rejects verifier auth that could not take effect:
+// auth for a detector with no custom verifier endpoints (auth only ever
+// applies to configured endpoints) and auth for a detector type that cannot
+// accept it. Either would otherwise send requests to the auth proxy without
+// the token, which typically reads as every secret being unverified.
+func validateVerifierAuth(auth map[config.DetectorID]*verifierauth.Config, endpoints map[config.DetectorID][]string) error {
+	if len(auth) == 0 {
+		return nil
+	}
+	supportsAuth := defaults.DefaultDetectorTypesImplementing[detectors.VerifierAuthCustomizer]()
+	for id, authCfg := range auth {
+		if authCfg == nil {
+			continue
+		}
+		if _, ok := endpoints[id]; !ok {
+			return fmt.Errorf("verifier auth configured for detector %q without custom verifier endpoints", id.String())
+		}
+		if _, ok := supportsAuth[id.ID]; !ok {
+			return fmt.Errorf("verifier auth configured for detector %q, which does not support verifier auth", id.String())
+		}
+	}
+	return nil
 }
 
 // detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
