@@ -2,14 +2,75 @@ package analyzers
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/ssrf"
 	"golang.org/x/time/rate"
 )
+
+// restrictEgress gates whether analyzer HTTP clients enforce the SSRF egress
+// guard from pkg/ssrf. Analyzers take their endpoints from scanned content (a
+// secret's domain, a connection string), so a hosted deployment must refuse
+// dials into internal address space. Default false preserves behavior for the
+// OSS CLI and self-hosted use, which legitimately analyze credentials for
+// internal services.
+var restrictEgress atomic.Bool
+
+// SetEgressRestriction enables or disables the analyzer SSRF egress guard.
+// When enabled, every client built by this package (NewAnalyzeClient,
+// NewAnalyzeClientUnrestricted, HttpStatusTest.RunTest, and the
+// RateLimitRoundTripper fallback) refuses to connect to non-public addresses,
+// checked after DNS resolution and re-checked on every redirect hop.
+func SetEgressRestriction(enabled bool) {
+	restrictEgress.Store(enabled)
+}
+
+// baseTransport returns the round tripper analyzer clients build on: the
+// guarded transport when the egress restriction is enabled, otherwise
+// http.DefaultTransport.
+func baseTransport() http.RoundTripper {
+	if restrictEgress.Load() {
+		return safeEgressTransport
+	}
+	return http.DefaultTransport
+}
+
+// safeEgressTransport is http.DefaultTransport with the sole modification of a
+// guarded dialer (see ssrf.GuardDialer). Cloning preserves proxy and timeout
+// settings; note the pkg/ssrf caveat that a forward proxy moves the final
+// connection out of the dialer's sight, so egress policy must then also be
+// enforced at the proxy.
+var safeEgressTransport = newSafeEgressTransport()
+
+func newSafeEgressTransport() *http.Transport {
+	guarded, ok := http.DefaultTransport.(*http.Transport)
+	if ok {
+		guarded = guarded.Clone()
+	} else {
+		// http.DefaultTransport is always an *http.Transport; this is a
+		// defensive fallback mirroring the standard library's field values.
+		guarded = &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	}
+	// Mirror http.DefaultTransport's dialer (30s timeout and keep-alive).
+	guarded.DialContext = ssrf.GuardDialer(&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
+	return guarded
+}
 
 type AnalyzeClient struct {
 	http.Client
@@ -34,7 +95,7 @@ type ClientOption func(*http.Client)
 // This returns a client that is restricted and filters out unsafe requests returning a success status code.
 func NewAnalyzeClient(cfg *config.Config, opts ...func(*http.Client)) *http.Client {
 	client := &http.Client{
-		Transport: AnalyzerRoundTripper{parent: http.DefaultTransport},
+		Transport: AnalyzerRoundTripper{parent: baseTransport()},
 	}
 	if cfg != nil && cfg.LoggingEnabled {
 		client = &http.Client{
@@ -53,7 +114,7 @@ func NewAnalyzeClient(cfg *config.Config, opts ...func(*http.Client)) *http.Clie
 // This returns a client that is unrestricted and does not filter out unsafe requests returning a success status code.
 func NewAnalyzeClientUnrestricted(cfg *config.Config, opts ...ClientOption) *http.Client {
 	client := &http.Client{
-		Transport: http.DefaultTransport,
+		Transport: baseTransport(),
 	}
 	if cfg != nil && cfg.LoggingEnabled {
 		client = &http.Client{
@@ -151,7 +212,7 @@ type RateLimitRoundTripper struct {
 
 func (rt RateLimitRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if rt.parent == nil {
-		rt.parent = http.DefaultTransport
+		rt.parent = baseTransport()
 	}
 	if rt.limiter != nil {
 		if err := rt.limiter.Wait(req.Context()); err != nil {
