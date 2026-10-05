@@ -2527,8 +2527,9 @@ func TestTryAdditionalBaseRefs_LegacyNamesKeepTheirCommit(t *testing.T) {
 	// starting with origin/, and only the first one did before.
 	runGit(t, repoPath, "update-ref", "refs/pull/7/head", a)
 	runGit(t, repoPath, "update-ref", "refs/origin/pull/7/head", b)
-	// A remote-tracking name expands to its HEAD too.
-	runGit(t, repoPath, "update-ref", "refs/queue/9/HEAD", a)
+	// A branch literally named for the legacy remote-tracking path, which
+	// could answer before the relocated ref.
+	runGit(t, repoPath, "update-ref", "refs/heads/origin/pull/7/head", b)
 
 	clonePath, repo, err := CloneRepoUsingUnauthenticated(ctx, "file://"+repoPath, "")
 	if clonePath != "" {
@@ -2544,9 +2545,10 @@ func TestTryAdditionalBaseRefs_LegacyNamesKeepTheirCommit(t *testing.T) {
 		want string
 	}{
 		{name: "origin/pull/7/head", want: a},
+		{name: "remotes/origin/pull/7/head", want: a},
 		{name: "refs/remotes/origin/pull/7/head", want: a},
-		{name: "origin/queue/9", want: a},
 		{name: "origin/origin/pull/7/head", want: b},
+		{name: "refs/remotes/origin/origin/pull/7/head", want: b},
 	} {
 		resolved, err := TryAdditionalBaseRefs(repo, tc.name)
 		if assert.NoError(t, err, "%q did not resolve", tc.name) {

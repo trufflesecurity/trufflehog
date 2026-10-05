@@ -1494,28 +1494,25 @@ func stripPassword(u string) (string, string, error) {
 
 // TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
 func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, error) {
-	candidates := []string{
-		base,
-		"refs/heads/" + base,
-		"refs/remotes/origin/" + base,
-	}
+	candidates := []string{base}
 	// The additional refs used to land under refs/remotes/origin/, so a scan
 	// can still be configured with a name that points there. Try the same ref
-	// in its current place, in the order those names used to resolve, before
-	// the plain name below.
+	// in its current place at the position the old name held, which is inside
+	// the expansion of the plain name above, so the names below cannot answer
+	// first.
 	for _, legacy := range []string{"refs/remotes/origin/", "remotes/origin/", "origin/"} {
 		if rest := strings.TrimPrefix(base, legacy); rest != base {
-			candidates = append(candidates,
-				additionalRefsNamespace+rest,
-				// git expands a remote-tracking name to its HEAD as well.
-				additionalRefsNamespace+rest+"/HEAD")
+			candidates = append(candidates, additionalRefsNamespace+rest)
 			break
 		}
 	}
-	// Last, so anything that already resolved keeps resolving to the same
-	// commit: the additional refs a non-mirror clone fetched, under their own
-	// path.
-	candidates = append(candidates, additionalRefsNamespace+base)
+	candidates = append(candidates,
+		"refs/heads/"+base,
+		"refs/remotes/origin/"+base,
+		// Last, so anything that already resolved keeps resolving to the same
+		// commit: the additional refs a non-mirror clone fetched, under their
+		// own path.
+		additionalRefsNamespace+base)
 
 	for _, candidate := range candidates {
 		outHash, err := repo.ResolveRevision(plumbing.Revision(candidate))
