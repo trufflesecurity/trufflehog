@@ -1497,9 +1497,10 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 	candidates := []string{base}
 	// The additional refs used to land under refs/remotes/origin/, so a scan
 	// can still be configured with a name that points there. Try the same ref
-	// in its current place at the position the old name held, which is inside
-	// the expansion of the plain name above, so the names below cannot answer
-	// first.
+	// in its current place, ahead of the names below so they cannot answer
+	// first. git's own expansion of the plain name above still runs ahead of
+	// it, so another ref answering to that exact name still wins, as it does
+	// without this.
 	for _, legacy := range []string{"refs/remotes/origin/", "remotes/origin/", "origin/"} {
 		if rest := strings.TrimPrefix(base, legacy); rest != base {
 			candidates = append(candidates, additionalRefsNamespace+rest)
