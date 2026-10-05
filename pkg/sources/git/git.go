@@ -613,6 +613,26 @@ func createClonePath(gitURL, clonePath string) (string, error) {
 	return path, nil
 }
 
+// additionalRefsNamespace holds the refs a plain clone leaves behind: tags,
+// notes, and the pull or merge request refs that carry code never merged to a
+// branch. A non-mirror clone asks for them with
+// remote.origin.fetch=+refs/*:refs/trufflehog/*.
+//
+// The destination has to sit outside refs/remotes/origin/ and has to keep each
+// source ref's own path. git clone writes its own
+// +refs/heads/*:refs/remotes/origin/* refspec next to the one given with -c, so
+// any destination under refs/remotes/origin/ can be claimed by a branch as
+// well: a repository holding both refs/heads/<name> and refs/<name> drove two
+// source refs onto refs/remotes/origin/<name> and git refused the entire clone
+// with "multiple updates for ref". Keeping the source path also keeps the
+// source repository's own guarantee that no ref is a directory prefix of
+// another, which flattening refs/heads/<name> onto <name> broke: a branch named
+// foo beside refs/foo/bar used to need both refs/remotes/origin/foo and
+// refs/remotes/origin/foo/bar.
+//
+// Scans walk every ref under refs/, so refs here are scanned like any other.
+const additionalRefsNamespace = "refs/trufflehog/"
+
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
 // clonePath. It then opens the cloned repository, returning a git.Repository object.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
@@ -651,7 +671,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		if !feature.SkipAdditionalRefs.Load() {
 			gitArgs = append(gitArgs,
 				"-c",
-				"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+				"remote.origin.fetch=+refs/*:"+additionalRefsNamespace+"*")
 		}
 	}
 
@@ -1472,6 +1492,10 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 		"",
 		"refs/heads/",
 		"refs/remotes/origin/",
+		// Last, so a name that already resolved keeps resolving to the same
+		// commit: the additional refs a non-mirror clone fetched, under their
+		// own path, so a base or branch named for one of them still resolves.
+		additionalRefsNamespace,
 	}
 	for _, prefix := range revisionPrefixes {
 		outHash, err := repo.ResolveRevision(plumbing.Revision(prefix + base))
