@@ -71,7 +71,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20250404061050-e13639e27357
 	github.com/marusama/semaphore/v2 v2.5.0
-	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-isatty v0.0.24
 	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d
 	github.com/microsoft/go-mssqldb v1.8.2
 	github.com/mitchellh/go-ps v1.0.0
