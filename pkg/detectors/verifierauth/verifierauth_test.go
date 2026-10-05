@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -431,7 +432,61 @@ func TestWrapClient_TokenFailureFailsRequestWithoutSending(t *testing.T) {
 	client := cfg.WrapClient(verifier.Client(), []string{verifier.URL})
 
 	err := get(t, client, verifier.URL, nil)
-	assert.Error(t, err)
+	var tokenErr *TokenError
+	require.ErrorAs(t, err, &tokenErr)
+	assert.Equal(t, cfg.trace, tokenErr.Trace)
+	var retrieveErr *oauth2.RetrieveError
+	assert.ErrorAs(t, tokenErr.Err, &retrieveErr, "the IdP's response is kept for callers that ask for it")
+	assert.Empty(t, verifier.requests())
+}
+
+// Result.SetVerificationError reports only the innermost error of the chain
+// http.Client returns, so that error must be the one naming verifier auth.
+func TestWrapClient_AuthErrorsAreTheInnermostErrorOfTheRequestError(t *testing.T) {
+	idp := newFakeIdP(t)
+	idp.status = http.StatusUnauthorized
+	idp.response = map[string]any{"error": "invalid_grant"}
+	verifier := newRecordingServer(t, nil)
+	cfg := mustConfig(t, ropcAuth(idp.URL, ""))
+	client := cfg.WrapClient(verifier.Client(), []string{verifier.URL})
+
+	innermost := func(err error) error {
+		for errors.Unwrap(err) != nil {
+			err = errors.Unwrap(err)
+		}
+		return err
+	}
+
+	err := get(t, client, verifier.URL, nil)
+	assert.IsType(t, &TokenError{}, innermost(err))
+
+	err = get(t, client, verifier.URL, http.Header{"Authorization": {"Bearer secret-under-test"}})
+	leaf := innermost(err)
+	assert.ErrorIs(t, leaf, ErrHeaderCollision)
+	assert.Contains(t, leaf.Error(), `header "Authorization"`)
+	assert.Contains(t, leaf.Error(), "oauth2_trace="+cfg.trace)
+}
+
+// Detectors read "dial tcp" or "no such host" in a request error, or a
+// *net.DNSError in its chain, as "the verification host does not exist".
+// An unreachable IdP must not trip those checks.
+func TestWrapClient_UnreachableIdPErrorDoesNotLookLikeMissingVerificationHost(t *testing.T) {
+	idp := newFakeIdP(t)
+	idpURL := idp.URL
+	idp.Close()
+	verifier := newRecordingServer(t, nil)
+	cfg := mustConfig(t, ropcAuth(idpURL, ""))
+	client := cfg.WrapClient(verifier.Client(), []string{verifier.URL})
+
+	err := get(t, client, verifier.URL, nil)
+	var tokenErr *TokenError
+	require.ErrorAs(t, err, &tokenErr)
+	require.ErrorContains(t, tokenErr.Err, "dial tcp", "precondition: the cause is a network error")
+	for _, marker := range []string{"no such host", "dial tcp", "connection refused"} {
+		assert.NotContains(t, err.Error(), marker)
+	}
+	var opErr *net.OpError
+	assert.False(t, errors.As(err, &opErr), "the IdP's network error must not be reachable through the chain")
 	assert.Empty(t, verifier.requests())
 }
 

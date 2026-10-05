@@ -3,12 +3,14 @@ package detectors
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth/verifierauthtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 )
 
@@ -141,4 +143,62 @@ func TestEndpointSetter_VerificationClientAttachesTokenForConfiguredEndpoints(t 
 
 	assert.Equal(t, "Bearer idp-token", gotToken)
 	assert.Equal(t, "Bearer secret-under-test", gotSecret)
+}
+
+// Detectors report a failed request through Result.SetVerificationError,
+// which keeps only the innermost error's message. Verifier auth failures must
+// survive that as a message that names verifier auth and carries the
+// oauth2_trace, rather than as whatever the IdP or network returned.
+func TestEndpointSetter_VerifierAuthFailuresSurviveSetVerificationError(t *testing.T) {
+	var hits atomic.Int32
+	authProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(authProxy.Close)
+
+	// verificationError sends a detector-style request through the wrapped
+	// client and records the outcome the way a detector would.
+	verificationError := func(t *testing.T, s *EndpointSetter, header http.Header) error {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, authProxy.URL+"/api/v4/user", nil)
+		require.NoError(t, err)
+		req.Header = header
+		resp, err := s.VerificationClient(authProxy.Client()).Do(req)
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		require.Error(t, err)
+
+		var result Result
+		result.SetVerificationError(err, "secret-under-test")
+		return result.VerificationError()
+	}
+
+	t.Run("header collision", func(t *testing.T) {
+		var s EndpointSetter
+		require.NoError(t, s.SetConfiguredEndpoints(authProxy.URL))
+		s.SetVerifierAuth(verifierauthtest.Config(t, verifierauthtest.NewIdP(t), ""))
+
+		err := verificationError(t, &s, http.Header{"Authorization": {"Bearer secret-under-test"}})
+		assert.ErrorContains(t, err, verifierauth.ErrHeaderCollision.Error())
+		assert.ErrorContains(t, err, `header "Authorization"`)
+		assert.ErrorContains(t, err, "oauth2_trace=")
+		assert.NotContains(t, err.Error(), "secret-under-test")
+	})
+
+	t.Run("token unavailable", func(t *testing.T) {
+		idp := verifierauthtest.NewIdP(t)
+		idp.RejectCredentials()
+		var s EndpointSetter
+		require.NoError(t, s.SetConfiguredEndpoints(authProxy.URL))
+		s.SetVerifierAuth(verifierauthtest.Config(t, idp, ""))
+
+		err := verificationError(t, &s, http.Header{})
+		assert.ErrorContains(t, err, "verifier auth: could not obtain access token")
+		assert.ErrorContains(t, err, "oauth2_trace=")
+		assert.NotContains(t, err.Error(), "invalid_grant", "the IdP's error stays in the logs")
+	})
+
+	assert.Zero(t, hits.Load(), "neither failure sends the request")
 }

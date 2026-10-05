@@ -1,6 +1,7 @@
 package jiradatacenterpat
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 
@@ -31,15 +32,12 @@ var (
 	// Since the first byte is always an ASCII digit (0x30–0x39), the first base64 character is always M, N, or O.
 	// This is also verified by generating 25+ tokens.
 	// The trailing boundary (?:[^A-Za-z0-9+/=]|\z) is used instead of \b to correctly handle tokens ending in + or /.
-	patPat  = atlassiandatacenter.GetDCTokenPat(keywords)
-	urlPat  = atlassiandatacenter.GetURLPat(keywords)
+	patPat = atlassiandatacenter.GetDCTokenPat(keywords)
+	urlPat = atlassiandatacenter.GetURLPat(keywords)
 )
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.

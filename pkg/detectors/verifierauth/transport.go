@@ -9,13 +9,51 @@ import (
 	"strings"
 )
 
+// The errors below reach detectors wrapped in *url.Error by http.Client, and
+// both are deliberately leaf errors with no Unwrap. Two consumers depend on
+// that:
+//   - Result.SetVerificationError keeps only the innermost error's message,
+//     so the leaf is what users see as the verification error. It has to
+//     say "verifier auth" and carry the oauth2_trace for log correlation.
+//   - Detectors classify request errors to decide that the verification
+//     host does not exist, by substring ("no such host", "dial tcp") or by
+//     errors.As into *net.DNSError. An IdP failure must not be mistaken for
+//     a missing verification host, so the IdP's error is neither in the
+//     message nor reachable through the chain.
+
 // ErrHeaderCollision reports that a request already carries the header the
 // access token would be written to. Built-in detectors commonly send the
 // secret under test in Authorization; overwriting it would hand the
 // verification service the token instead of the secret and produce wrong
 // verdicts, so the request is refused instead. The fix is to set tokenHeader
-// to a header the auth proxy reads.
+// to a header the auth proxy reads. Match it with errors.Is.
 var ErrHeaderCollision = errors.New("verifier auth token header is already set by the detector; set oauth2 tokenHeader to a different header")
+
+// headerCollisionError is the ErrHeaderCollision instance returned for a
+// request, adding the header name and trace to the message.
+type headerCollisionError struct {
+	header string
+	trace  string
+}
+
+func (e *headerCollisionError) Error() string {
+	return fmt.Sprintf("%v (header %q, oauth2_trace=%s)", ErrHeaderCollision, e.header, e.trace)
+}
+
+func (e *headerCollisionError) Is(target error) bool { return target == ErrHeaderCollision }
+
+// TokenError reports that no access token could be obtained, so the request
+// was not sent. The IdP's error is kept in Err for callers that ask for it
+// with errors.As, and every real fetch failure is logged with the same
+// oauth2_trace and the token endpoint.
+type TokenError struct {
+	Trace string
+	Err   error
+}
+
+func (e *TokenError) Error() string {
+	return fmt.Sprintf("verifier auth: could not obtain access token (oauth2_trace=%s; see logs for the cause)", e.Trace)
+}
 
 // WrapClient returns a copy of base whose transport attaches an access token
 // to requests bound for allowedEndpoints. Timeout, redirect policy, and
@@ -103,13 +141,13 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if len(req.Header.Values(t.cfg.tokenHeader)) > 0 {
 		closeBody(req)
-		return nil, fmt.Errorf("%w (header %q, oauth2_trace=%s)", ErrHeaderCollision, t.cfg.tokenHeader, t.cfg.trace)
+		return nil, &headerCollisionError{header: t.cfg.tokenHeader, trace: t.cfg.trace}
 	}
 
 	tok, err := t.cfg.tokens.Token()
 	if err != nil {
 		closeBody(req)
-		return nil, fmt.Errorf("verifier auth: obtaining access token (oauth2_trace=%s): %w", t.cfg.trace, err)
+		return nil, &TokenError{Trace: t.cfg.trace, Err: err}
 	}
 
 	authed := req.Clone(req.Context())

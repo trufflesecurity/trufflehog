@@ -1,6 +1,7 @@
 package sumologickey
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -90,10 +91,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		)
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
+			client := s.VerificationClient(cmp.Or(s.client, defaultClient))
 
 			// Endpoints applies the engine's endpoint configuration:
 			// configured verifier endpoints, the US cloud endpoint, and
