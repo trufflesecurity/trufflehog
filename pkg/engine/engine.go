@@ -1210,7 +1210,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 				for i, ep := range oauthV.Endpoints() {
 					configs[i] = OAuthVerifyConfig{Endpoint: ep}
 				}
-				e.verificationCache.VerifyWith(oauthCtx, results, func(vCtx context.Context, r *detectors.Result) {
+				e.verificationCache.VerifyWith(oauthCtx, data.detector.Type(), results, func(vCtx context.Context, r *detectors.Result) {
 					verified, verifyErr := OAuthVerify(vCtx, nil, oauthV.OAuth2TokenSource(), configs, r)
 					r.Verified = verified
 					r.SetVerificationError(verifyErr, string(r.Raw))

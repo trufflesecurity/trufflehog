@@ -884,6 +884,17 @@ func TestVerificationCache_FromData_PerDetectorTiming_RecordsOnVerificationError
 // external verification strategies (e.g. OAuth2). The cache behavior mirrors
 // verifyCacheMisses: per-result lookup, verify on miss, store after verify.
 
+// verifyWithTestType matches the DetectorType on the VerifyWith test results
+// and testDetector.Type, so the shared-cache test can cross between paths.
+const verifyWithTestType detector_typepb.DetectorType = -1
+
+// slowVerify marks a result verified after enough wall time to be observable,
+// so per-detector samples carry a nonzero duration.
+func slowVerify(_ logContext.Context, r *detectors.Result) {
+	r.Verified = true
+	time.Sleep(2 * time.Millisecond)
+}
+
 func TestVerificationCache_VerifyWith_NilCache(t *testing.T) {
 	// Without a result cache, VerifyWith should call verifyFn for every
 	// result and still record the time spent verifying.
@@ -895,7 +906,7 @@ func TestVerificationCache_VerifyWith_NilCache(t *testing.T) {
 	}
 
 	var callCount int
-	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, func(_ logContext.Context, r *detectors.Result) {
 		callCount++
 		r.Verified = true
 		time.Sleep(2 * time.Millisecond)
@@ -920,7 +931,7 @@ func TestVerificationCache_VerifyWith_AllCacheMisses(t *testing.T) {
 	}
 
 	var callCount int
-	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, func(_ logContext.Context, r *detectors.Result) {
 		callCount++
 		r.Verified = true
 		time.Sleep(2 * time.Millisecond)
@@ -960,7 +971,7 @@ func TestVerificationCache_VerifyWith_AllCacheHits(t *testing.T) {
 		detectors.Result{Redacted: "world", Verified: true})
 
 	var callCount int
-	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, _ *detectors.Result) {
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, func(_ logContext.Context, _ *detectors.Result) {
 		callCount++
 	})
 
@@ -988,7 +999,7 @@ func TestVerificationCache_VerifyWith_PartialCacheHit(t *testing.T) {
 		detectors.Result{Redacted: "hello", Verified: true})
 
 	var verifiedRedacted []string
-	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, func(_ logContext.Context, r *detectors.Result) {
 		verifiedRedacted = append(verifiedRedacted, r.Redacted)
 		r.Verified = false
 		r.SetVerificationError(errors.New("endpoint unreachable"), r.Redacted)
@@ -1022,7 +1033,7 @@ func TestVerificationCache_VerifyWith_DuplicateResults(t *testing.T) {
 	}
 
 	var callCount int
-	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, func(_ logContext.Context, r *detectors.Result) {
 		callCount++
 		r.Verified = true
 		time.Sleep(2 * time.Millisecond)
@@ -1053,7 +1064,7 @@ func TestVerificationCache_VerifyWith_DoesNotCacheSecretMaterial(t *testing.T) {
 	result.SetPrimarySecretValue("hello")
 	results := []detectors.Result{result}
 
-	cache.VerifyWith(logContext.Background(), results, func(_ logContext.Context, r *detectors.Result) {
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, func(_ logContext.Context, r *detectors.Result) {
 		r.Verified = true
 	})
 
@@ -1082,7 +1093,7 @@ func TestVerificationCache_VerifyWith_CacheSharedWithFromData(t *testing.T) {
 	oauthResults := []detectors.Result{
 		{Redacted: "shared-secret", Raw: []byte("shared-secret"), RawV2: []byte("v2"), DetectorType: -1},
 	}
-	cache.VerifyWith(logContext.Background(), oauthResults, func(_ logContext.Context, r *detectors.Result) {
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, oauthResults, func(_ logContext.Context, r *detectors.Result) {
 		r.Verified = true
 	})
 	assert.Equal(t, int32(1), metrics.ResultCacheMisses.Load())
@@ -1110,4 +1121,70 @@ func TestVerificationCache_VerifyWith_CacheSharedWithFromData(t *testing.T) {
 	// 1 miss from VerifyWith (step 1), 1 hit from FromData (step 2).
 	assert.Equal(t, int32(1), metrics.ResultCacheHits.Load())
 	assert.Equal(t, int32(1), metrics.ResultCacheMisses.Load())
+}
+
+// Without a result cache every result is a remote call, so each one gets its
+// own per-detector sample while the aggregate is still reported once.
+func TestVerificationCache_VerifyWith_PerDetectorTiming_NilCacheSamplesPerRemoteCall(t *testing.T) {
+	metrics := detectorMetricsRecorder{}
+	cache := New(nil, &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: verifyWithTestType},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), DetectorType: verifyWithTestType},
+	}
+
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, slowVerify)
+
+	assertSampleTypes(t, &metrics, verifyWithTestType, verifyWithTestType)
+	assert.Equal(t, 1, metrics.aggregateReportCount())
+}
+
+func TestVerificationCache_VerifyWith_PerDetectorTiming_PartialCacheHit(t *testing.T) {
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: verifyWithTestType},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), DetectorType: verifyWithTestType},
+	}
+	cache.resultCache.Set(getResultCacheKey(t, cache, results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, slowVerify)
+
+	// Only the miss is verified remotely, so the cache hit contributes no sample.
+	assertSampleTypes(t, &metrics, verifyWithTestType)
+	assert.Equal(t, 1, metrics.aggregateReportCount())
+}
+
+func TestVerificationCache_VerifyWith_PerDetectorTiming_AllCacheHits(t *testing.T) {
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	results := []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), DetectorType: verifyWithTestType},
+	}
+	cache.resultCache.Set(getResultCacheKey(t, cache, results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+
+	cache.VerifyWith(logContext.Background(), verifyWithTestType, results, slowVerify)
+
+	assertSampleTypes(t, &metrics)
+	assert.Equal(t, 0, metrics.aggregateReportCount())
+}
+
+// The sample is attributed to the detector type the caller passes, which is
+// what lets the histogram separate providers sharing one verification cache.
+func TestVerificationCache_VerifyWith_PerDetectorTiming_AttributesToCallerDetectorType(t *testing.T) {
+	const (
+		firstType  detector_typepb.DetectorType = -10
+		secondType detector_typepb.DetectorType = -11
+	)
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+
+	cache.VerifyWith(logContext.Background(), firstType,
+		[]detectors.Result{{Redacted: "hello", Raw: []byte("hello"), DetectorType: firstType}}, slowVerify)
+	cache.VerifyWith(logContext.Background(), secondType,
+		[]detectors.Result{{Redacted: "world", Raw: []byte("world"), DetectorType: secondType}}, slowVerify)
+
+	assertSampleTypes(t, &metrics, firstType, secondType)
 }

@@ -230,34 +230,40 @@ type VerifyFunc func(ctx context.Context, result *detectors.Result)
 // Results are modified in place: cache hits get their verification status
 // copied from the cached entry, and cache misses are verified via verifyFn
 // and then stored.
+//
+// detectorType attributes verification time to the detector that incurred
+// it. Timing follows verifyCacheMisses: one per-detector sample per verifyFn
+// call, so the histogram reads as provider latency, and one aggregate report
+// per call to VerifyWith, because the aggregate truncates to whole
+// milliseconds and would drop time if reported per call.
 func (v *VerificationCache) VerifyWith(
 	ctx context.Context,
+	detectorType detector_typepb.DetectorType,
 	results []detectors.Result,
 	verifyFn VerifyFunc,
 ) {
-	// No cache configured — verify everything directly. This mirrors
-	// FromData's passthrough behavior when resultCache is nil.
-	if v.resultCache == nil {
-		var timeSpentVerifying time.Duration
-		defer func() {
-			if timeSpentVerifying > 0 {
-				v.metrics.AddFromDataVerifyTimeSpent(timeSpentVerifying)
-			}
-		}()
-		for i := range results {
-			start := time.Now()
-			verifyFn(ctx, &results[i])
-			timeSpentVerifying += time.Since(start)
-		}
-		return
-	}
-
 	var timeSpentVerifying time.Duration
 	defer func() {
 		if timeSpentVerifying > 0 {
 			v.metrics.AddFromDataVerifyTimeSpent(timeSpentVerifying)
 		}
 	}()
+	verifyResult := func(i int) {
+		verifyStart := time.Now()
+		verifyFn(ctx, &results[i])
+		elapsed := time.Since(verifyStart)
+		v.recordDetectorVerifyTime(detectorType, elapsed)
+		timeSpentVerifying += elapsed
+	}
+
+	// No cache configured: verify everything directly. This mirrors
+	// FromData's passthrough behavior when resultCache is nil.
+	if v.resultCache == nil {
+		for i := range results {
+			verifyResult(i)
+		}
+		return
+	}
 
 	for i := range results {
 		cacheKey, err := v.getResultCacheKey(results[i])
@@ -266,9 +272,7 @@ func (v *VerificationCache) VerifyWith(
 				"operation", "read")
 			// Fail open: a result we cannot key still deserves verification,
 			// matching verifyCacheMisses where a key error falls through.
-			start := time.Now()
-			verifyFn(ctx, &results[i])
-			timeSpentVerifying += time.Since(start)
+			verifyResult(i)
 			continue
 		}
 		if cacheHit, ok := v.resultCache.Get(string(cacheKey)); ok {
@@ -279,10 +283,7 @@ func (v *VerificationCache) VerifyWith(
 			continue
 		}
 		v.metrics.AddResultCacheMisses(1)
-
-		start := time.Now()
-		verifyFn(ctx, &results[i])
-		timeSpentVerifying += time.Since(start)
+		verifyResult(i)
 
 		// Store the result without raw secret material — this cache
 		// outlives any single chunk, so credentials must not linger.
