@@ -45,7 +45,7 @@ require (
 	github.com/getsentry/sentry-go v0.32.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.19.2
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.8.1
