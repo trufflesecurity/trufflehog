@@ -31,7 +31,7 @@ var (
 	// TODO: Investigate custom `azure-api.net` endpoints.
 	// https://github.com/openai/openai-python#microsoft-azure-openai
 	azureUrlPat = regexp.MustCompile(`(?i)([a-z0-9-]+\.openai\.azure\.com)`)
-	azureKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"api[_.-]?key", "openai[_.-]?key"}) + `\b(?-i:([a-f0-9]{32}))\b`)
+	azureKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"api[_.-]?key", "openai[_.-]?key"}) + `\b(?-i:([a-f0-9]{32}|[a-zA-Z0-9]{84}))\b`)
 
 	invalidServices = simple.NewCache[struct{}]()
 )
@@ -76,7 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for token := range tokens {
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
-			Redacted:     token[:3] + "..." + token[25:],
+			Redacted:     token[:3] + "..." + token[len(token)-4:],
 			Raw:          []byte(token),
 			SecretParts:  map[string]string{"key": token},
 		}
