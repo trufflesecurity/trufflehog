@@ -1,9 +1,15 @@
 package detectors
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 )
 
 func TestEmbeddedEndpointSetter(t *testing.T) {
@@ -57,4 +63,82 @@ func TestEmbeddedEndpointSetter(t *testing.T) {
 		assert.Equal(t, []string{"foo", "bar"}, s.Endpoints())
 	})
 
+}
+
+// newTestVerifierAuth builds a verifier auth config backed by a fake IdP that
+// always issues "idp-token".
+func newTestVerifierAuth(t *testing.T, tokenHeader string) *verifierauth.Config {
+	t.Helper()
+	idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"idp-token","token_type":"Bearer","expires_in":3600}`))
+	}))
+	t.Cleanup(idp.Close)
+
+	cfg, err := verifierauth.FromProto(&custom_detectorspb.VerifierAuth{
+		AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{Oauth2: &custom_detectorspb.OAuth2Config{
+			TokenEndpoint: idp.URL,
+			TokenHeader:   tokenHeader,
+			GrantConfig: &custom_detectorspb.OAuth2Config_Ropc{Ropc: &custom_detectorspb.ROPCConfig{
+				Username: "svc", Password: "pw", ClientId: "client",
+			}},
+		}},
+	}, true)
+	require.NoError(t, err)
+	return cfg
+}
+
+func TestEndpointSetter_VerifierAuthRestrictsEndpointsToConfigured(t *testing.T) {
+	var s EndpointSetter
+	require.NoError(t, s.SetConfiguredEndpoints("https://authproxy.example.com"))
+	s.SetCloudEndpoint("https://api.example.com")
+	s.UseCloudEndpoint(true)
+	s.UseFoundEndpoints(true)
+	require.Equal(t,
+		[]string{"https://authproxy.example.com", "https://api.example.com", "https://found.example.com"},
+		s.Endpoints("https://found.example.com"))
+
+	s.SetVerifierAuth(newTestVerifierAuth(t, ""))
+	assert.Equal(t, []string{"https://authproxy.example.com"}, s.Endpoints("https://found.example.com"))
+
+	// Re-enabling public endpoints after auth is set must not bring them back.
+	s.UseCloudEndpoint(true)
+	s.UseFoundEndpoints(true)
+	assert.Equal(t, []string{"https://authproxy.example.com"}, s.Endpoints("https://found.example.com"))
+
+	// Clearing auth restores the normal endpoint rules.
+	s.SetVerifierAuth(nil)
+	assert.Equal(t,
+		[]string{"https://authproxy.example.com", "https://api.example.com", "https://found.example.com"},
+		s.Endpoints("https://found.example.com"))
+}
+
+func TestEndpointSetter_VerificationClientWithoutAuthReturnsBase(t *testing.T) {
+	var s EndpointSetter
+	base := &http.Client{}
+	assert.Same(t, base, s.VerificationClient(base))
+}
+
+func TestEndpointSetter_VerificationClientAttachesTokenForConfiguredEndpoints(t *testing.T) {
+	var gotToken, gotSecret string
+	authProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotToken = r.Header.Get("X-Auth-Proxy-Token")
+		gotSecret = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(authProxy.Close)
+
+	var s EndpointSetter
+	require.NoError(t, s.SetConfiguredEndpoints(authProxy.URL))
+	s.SetVerifierAuth(newTestVerifierAuth(t, "X-Auth-Proxy-Token"))
+
+	req, err := http.NewRequest(http.MethodGet, authProxy.URL+"/api/v4/user", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer secret-under-test")
+	resp, err := s.VerificationClient(authProxy.Client()).Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+
+	assert.Equal(t, "Bearer idp-token", gotToken)
+	assert.Equal(t, "Bearer secret-under-test", gotSecret)
 }

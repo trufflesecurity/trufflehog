@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -90,6 +91,15 @@ type EndpointCustomizer interface {
 	SetCloudEndpoint(string)
 	UseCloudEndpoint(bool)
 	UseFoundEndpoints(bool)
+}
+
+// VerifierAuthCustomizer is an optional interface for detectors whose
+// configured verification endpoints sit behind an auth proxy. It is separate
+// from EndpointCustomizer so existing implementers are unaffected; detectors
+// that embed EndpointSetter get it for free, and route their verification
+// requests through EndpointSetter.VerificationClient to apply it.
+type VerifierAuthCustomizer interface {
+	SetVerifierAuth(*verifierauth.Config)
 }
 
 type CloudProvider interface {
