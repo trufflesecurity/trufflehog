@@ -57,7 +57,7 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
 
 4. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults/defaults.go`
 
-5. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
+5. Proceed from step 3 of [Creating a new Secret Detector](#creating-a-new-secret-detector)
 
 ### Creating a new Secret Detector
 

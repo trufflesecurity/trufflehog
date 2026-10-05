@@ -427,7 +427,7 @@ For every potential credential that is detected, we've painstakingly implemented
 - **unverified**: Credential detected but not confirmed valid (may be invalid, expired, or verification disabled)  
 - **unknown**: Verification attempted but failed due to errors, such as a network or API failure
 
-For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
+For example, the [AWS credential detector](pkg/detectors/aws/access_keys/accesskey.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 # :memo: Usage
 

@@ -15,7 +15,7 @@ The purpose of Secret Detectors is to discover secrets with exceptionally high s
     - [Sourcing Guidelines](#sourcing-guidelines)
     - [Development Guidelines](#development-guidelines)
     - [Development Dependencies](#development-dependencies)
-    - [Creating a new Secret Scanner](#creating-a-new-secret-detector)
+    - [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
   - [Populating SecretParts](#populating-secretparts)
   - [Addendum](#addendum)
     - [Verification indeterminacy](#verification-indeterminacy)
@@ -35,7 +35,7 @@ If you think that something should be included outside of these guidelines, plea
 ### Development Guidelines
 
 - When reasonable, favor using the `net/http` library to make requests instead of bringing in another library.
-- Use the [`common.SaneHttpClient`](pkg/common/http.go) for the `http.Client` whenever possible.
+- Use the [`common.SaneHttpClient`](/pkg/common/http.go) for the `http.Client` whenever possible.
 - We recommend an editor with gopls integration (such as Vscode with Go plugin) for benefits like easily running tests, autocompletion, linting, type checking, etc.
 
 ### Development Dependencies
@@ -179,7 +179,7 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
    ```
    Note: We increment the detectors file name `detectors(n+1)` once the previous one exceeds the max size allowed by GSM (65kb).
 
-4. Access the secret value as shown in the [example code](pkg/detectors/heroku/heroku_test.go).
+4. Access the secret value as shown in the [example code](/pkg/detectors/heroku/v1/heroku_integration_test.go).
 
 ### Setting up Google Cloud SDK
 
