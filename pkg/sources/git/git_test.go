@@ -2427,6 +2427,31 @@ func TestCloneRepo_AdditionalRefsOutsideRemoteNamespace(t *testing.T) {
 			extraName := additionalRefsNamespace + strings.TrimPrefix(tc.extraRef, "refs/")
 			assert.Equal(t, extraCommit, refs[extraName], "extra ref %q missing; refs=%v", extraName, refs)
 
+			// Every name a scan can be pointed at has to reach an exact
+			// commit, or the scan covers the wrong history. The full ref is
+			// unambiguous and always reaches the extra ref.
+			resolves := func(name, want string) {
+				t.Helper()
+				resolved, err := TryAdditionalBaseRefs(repo, name)
+				if assert.NoError(t, err, "%q did not resolve", name) {
+					assert.Equal(t, want, resolved.String(), "%q resolved to the wrong commit", name)
+				}
+			}
+			extraTail := strings.TrimPrefix(tc.extraRef, "refs/")
+			resolves(extraName, extraCommit)
+
+			if tc.branch == extraTail {
+				// A branch claims the short name, and it keeps the
+				// remote-tracking name git clone gave it.
+				resolves("refs/remotes/origin/"+extraTail, branchCommit)
+			} else {
+				// Nothing else claims the name, so every form that reached the
+				// extra ref under the old destination still reaches it.
+				resolves(extraTail, extraCommit)
+				resolves("refs/remotes/origin/"+extraTail, extraCommit)
+				resolves("origin/"+extraTail, extraCommit)
+			}
+
 			if tc.branch == "" {
 				return
 			}
@@ -2437,13 +2462,6 @@ func TestCloneRepo_AdditionalRefsOutsideRemoteNamespace(t *testing.T) {
 			assert.Equal(t, branchCommit, refs[additionalRefsNamespace+"heads/"+tc.branch],
 				"branch %q missing under the additional refs; refs=%v", tc.branch, refs)
 
-			// Resolving the extra ref by name still works, which is what the
-			// old refs/remotes/origin/ destination provided.
-			resolved, err := TryAdditionalBaseRefs(repo, strings.TrimPrefix(tc.extraRef, "refs/"))
-			assert.NoError(t, err)
-			if err == nil {
-				assert.NotEmpty(t, resolved.String())
-			}
 		})
 	}
 }
