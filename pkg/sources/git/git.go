@@ -632,10 +632,11 @@ func createClonePath(gitURL, clonePath string) (string, error) {
 //
 // Scans walk every ref under refs/, so refs here are scanned like any other.
 //
-// A short name can still be ambiguous, as it is in git itself: a source branch
-// literally named trufflehog/heads/<branch> shares a short name with the copy
-// of <branch> made here, and git's own expansion order decides which one a
-// short name reaches. Name the full ref to be exact.
+// A short name can still be ambiguous, as it is in git itself. A source branch
+// or tag named trufflehog/<path of a ref copied here>, say
+// trufflehog/heads/main, shares a short name with that copy, and git's own
+// expansion order decides which one the short name reaches. Name the full ref
+// to be exact.
 const additionalRefsNamespace = "refs/trufflehog/"
 
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
@@ -1497,20 +1498,24 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 		base,
 		"refs/heads/" + base,
 		"refs/remotes/origin/" + base,
-		// After the names above, so anything that already resolved keeps
-		// resolving to the same commit: the additional refs a non-mirror clone
-		// fetched, under their own path.
-		additionalRefsNamespace + base,
 	}
 	// The additional refs used to land under refs/remotes/origin/, so a scan
 	// can still be configured with a name that points there. Try the same ref
-	// in its current place, last, after every name above has failed.
+	// in its current place, in the order those names used to resolve, before
+	// the plain name below.
 	for _, legacy := range []string{"refs/remotes/origin/", "remotes/origin/", "origin/"} {
 		if rest := strings.TrimPrefix(base, legacy); rest != base {
-			candidates = append(candidates, additionalRefsNamespace+rest)
+			candidates = append(candidates,
+				additionalRefsNamespace+rest,
+				// git expands a remote-tracking name to its HEAD as well.
+				additionalRefsNamespace+rest+"/HEAD")
 			break
 		}
 	}
+	// Last, so anything that already resolved keeps resolving to the same
+	// commit: the additional refs a non-mirror clone fetched, under their own
+	// path.
+	candidates = append(candidates, additionalRefsNamespace+base)
 
 	for _, candidate := range candidates {
 		outHash, err := repo.ResolveRevision(plumbing.Revision(candidate))

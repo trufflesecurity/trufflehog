@@ -2449,6 +2449,7 @@ func TestCloneRepo_AdditionalRefsOutsideRemoteNamespace(t *testing.T) {
 				// extra ref under the old destination still reaches it.
 				resolves(extraTail, extraCommit)
 				resolves("refs/remotes/origin/"+extraTail, extraCommit)
+				resolves("remotes/origin/"+extraTail, extraCommit)
 				resolves("origin/"+extraTail, extraCommit)
 			}
 
@@ -2500,5 +2501,100 @@ func TestTryAdditionalBaseRefs_BranchNameStaysStable(t *testing.T) {
 	assert.NoError(t, err)
 	if err == nil {
 		assert.Equal(t, topic, resolved.String(), "topic must resolve to the branch topic, not heads/topic")
+	}
+}
+
+// TestTryAdditionalBaseRefs_LegacyNamesKeepTheirCommit pins the resolution of
+// names that pointed at the old destination for the additional refs, including
+// the two shapes where the additional refs namespace and a legacy name can both
+// match.
+func TestTryAdditionalBaseRefs_LegacyNamesKeepTheirCommit(t *testing.T) {
+	defer func(prev bool) { feature.UseGitMirror.Store(prev) }(feature.UseGitMirror.Load())
+	feature.UseGitMirror.Store(true)
+
+	ctx := context.Background()
+	repoPath := filepath.Join(t.TempDir(), "legacy-names")
+	runGit(t, "", "init", "--quiet", "--initial-branch=main", repoPath)
+	runGit(t, repoPath, "config", "user.name", "Test User")
+	runGit(t, repoPath, "config", "user.email", "test@example.com")
+	runGit(t, repoPath, "config", "commit.gpgsign", "false")
+	addTestFileAndCommit(t, repoPath, "first.txt", "first")
+	a := gitRevParse(t, repoPath, "HEAD")
+	addTestFileAndCommit(t, repoPath, "second.txt", "second")
+	b := gitRevParse(t, repoPath, "HEAD")
+
+	// refs/pull/7/head and refs/origin/pull/7/head both answer to a name
+	// starting with origin/, and only the first one did before.
+	runGit(t, repoPath, "update-ref", "refs/pull/7/head", a)
+	runGit(t, repoPath, "update-ref", "refs/origin/pull/7/head", b)
+	// A remote-tracking name expands to its HEAD too.
+	runGit(t, repoPath, "update-ref", "refs/queue/9/HEAD", a)
+
+	clonePath, repo, err := CloneRepoUsingUnauthenticated(ctx, "file://"+repoPath, "")
+	if clonePath != "" {
+		defer func() { _ = os.RemoveAll(clonePath) }()
+	}
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
+
+	for _, tc := range []struct {
+		name string
+		want string
+	}{
+		{name: "origin/pull/7/head", want: a},
+		{name: "refs/remotes/origin/pull/7/head", want: a},
+		{name: "origin/queue/9", want: a},
+		{name: "origin/origin/pull/7/head", want: b},
+	} {
+		resolved, err := TryAdditionalBaseRefs(repo, tc.name)
+		if assert.NoError(t, err, "%q did not resolve", tc.name) {
+			assert.Equal(t, tc.want, resolved.String(), "%q resolved to the wrong commit", tc.name)
+		}
+	}
+}
+
+// TestTryAdditionalBaseRefs_ShortNameAmbiguity pins the accepted trade-off. A
+// source ref named for the additional refs namespace shares a short name with
+// the copy made there, and git's expansion order picks the copy. The full ref
+// stays exact either way.
+func TestTryAdditionalBaseRefs_ShortNameAmbiguity(t *testing.T) {
+	defer func(prev bool) { feature.UseGitMirror.Store(prev) }(feature.UseGitMirror.Load())
+	feature.UseGitMirror.Store(true)
+
+	ctx := context.Background()
+	repoPath := filepath.Join(t.TempDir(), "shadowed")
+	runGit(t, "", "init", "--quiet", "--initial-branch=main", repoPath)
+	runGit(t, repoPath, "config", "user.name", "Test User")
+	runGit(t, repoPath, "config", "user.email", "test@example.com")
+	runGit(t, repoPath, "config", "commit.gpgsign", "false")
+	addTestFileAndCommit(t, repoPath, "first.txt", "first")
+	mainCommit := gitRevParse(t, repoPath, "HEAD")
+	addTestFileAndCommit(t, repoPath, "second.txt", "second")
+	tagged := gitRevParse(t, repoPath, "HEAD")
+	runGit(t, repoPath, "reset", "--quiet", "--hard", mainCommit)
+
+	// Named for where the copy of refs/heads/main lands.
+	shadowing := strings.TrimPrefix(additionalRefsNamespace, "refs/") + "heads/main"
+	runGit(t, repoPath, "tag", shadowing, tagged)
+
+	clonePath, repo, err := CloneRepoUsingUnauthenticated(ctx, "file://"+repoPath, "")
+	if clonePath != "" {
+		defer func() { _ = os.RemoveAll(clonePath) }()
+	}
+	assert.NoError(t, err, "a repository with such a ref still has to clone")
+	if err != nil {
+		return
+	}
+
+	resolved, err := TryAdditionalBaseRefs(repo, shadowing)
+	if assert.NoError(t, err) {
+		assert.Equal(t, mainCommit, resolved.String(),
+			"the short name reaches the copy of main, which is the accepted ambiguity")
+	}
+	resolved, err = TryAdditionalBaseRefs(repo, "refs/tags/"+shadowing)
+	if assert.NoError(t, err) {
+		assert.Equal(t, tagged, resolved.String(), "the full ref must stay exact")
 	}
 }
