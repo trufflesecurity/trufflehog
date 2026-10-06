@@ -38,6 +38,7 @@ var (
 const (
 	githubBadVerificationCodeError        = "bad_verification_code"
 	githubIncorrectClientCredentialsError = "incorrect_client_credentials"
+	githubClientNotFoundError             = "404 Not Found"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -102,6 +103,8 @@ func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
 	if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
 		result.Verified = true
 	} else if err != nil && strings.Contains(err.Error(), githubIncorrectClientCredentialsError) {
+		result.Verified = false
+	} else if err != nil && strings.Contains(err.Error(), githubClientNotFoundError) {
 		result.Verified = false
 	} else {
 		result.SetVerificationError(err, clientSecret)

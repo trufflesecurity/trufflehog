@@ -123,6 +123,13 @@ func TestGithubOAuth2_VerifyResult(t *testing.T) {
 			wantVerified: false,
 		},
 		{
+			name:         "dead credential - unknown client ID returns 404",
+			status:       http.StatusNotFound,
+			contentType:  "text/plain; charset=utf-8",
+			body:         "Not Found",
+			wantVerified: false,
+		},
+		{
 			name:                  "server error - unknown",
 			status:                http.StatusInternalServerError,
 			contentType:           "text/plain",
