@@ -617,6 +617,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/protocolsio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/proxycrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubpublishkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubsecretkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pulumi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/purestake"
@@ -1539,6 +1540,7 @@ func buildDetectorList() []detectors.Detector {
 		&protocolsio.Scanner{},
 		&proxycrawl.Scanner{},
 		&pubnubpublishkey.Scanner{},
+		&pubnubsecretkey.Scanner{},
 		&pubnubsubscriptionkey.Scanner{},
 		&pulumi.Scanner{},
 		&purestake.Scanner{},
@@ -1900,6 +1902,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SolarwindsDetectorEnabled.Load()
 		case *humioapitoken.Scanner:
 			return !feature.HumioAPITokenDetectorEnabled.Load()
+		case *pubnubsecretkey.Scanner:
+			return !feature.PubNubSecretKeyDetectorEnabled.Load()
 		case *resend.Scanner:
 			return !feature.ResendDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
