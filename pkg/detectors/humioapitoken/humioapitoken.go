@@ -1,6 +1,7 @@
 package humioapitoken
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -79,10 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
+			client := s.VerificationClient(cmp.Or(s.client, defaultClient))
 
 			// Verification only targets known SaaS regions (US via
 			// CloudEndpoint, EU via additionalCloudEndpoints) plus any
