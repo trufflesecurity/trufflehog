@@ -589,6 +589,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.ResendDetectorEnabled.Store(true)
 	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
 	feature.HumioAPITokenDetectorEnabled.Store(true)
+	feature.KongKonnectDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
