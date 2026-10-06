@@ -101,7 +101,9 @@ func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
 	// docs: https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors
 	if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
 		result.Verified = true
-	} else if err != nil && !strings.Contains(err.Error(), githubIncorrectClientCredentialsError) {
+	} else if err != nil && strings.Contains(err.Error(), githubIncorrectClientCredentialsError) {
+		result.Verified = false
+	} else {
 		result.SetVerificationError(err, clientSecret)
 	}
 }
