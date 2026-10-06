@@ -152,6 +152,9 @@ func TestSumoLogicKey_Verification(t *testing.T) {
 			if tt.wantVerified && r.ExtraData["endpoint"] != ts.URL {
 				t.Errorf("ExtraData[endpoint] = %q, want %q", r.ExtraData["endpoint"], ts.URL)
 			}
+			if tt.wantVerified && r.ExtraData["access_id"] != "suDkVYKjXZAwsz" {
+				t.Errorf("ExtraData[access_id] = %q, want %q", r.ExtraData["access_id"], "suDkVYKjXZAwsz")
+			}
 		})
 	}
 }

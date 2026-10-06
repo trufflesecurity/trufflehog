@@ -84,6 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for accessKey := range keyMatches {
 		var (
 			verified         bool
+			verifiedId       string
 			verifiedEndpoint string
 			lastErr          error
 		)
@@ -110,7 +111,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						lastErr = vErr
 					}
 					if isVerified {
-						verified, verifiedEndpoint, lastErr = true, baseURL, nil
+						verified, verifiedId, verifiedEndpoint, lastErr = true, id, baseURL, nil
 						break verification
 					}
 				}
@@ -118,7 +119,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		r := createResult(rawV2Id, accessKey, rawV2URL, verified, lastErr)
+		// Which access ID and endpoint a key verified with are reported here
+		// rather than in RawV2, so they don't affect the secret's identity.
+		// RawV2 omits the access ID when the data names several, and keys
+		// are managed by access ID, so triage needs it from here.
 		if verified {
+			r.ExtraData["access_id"] = verifiedId
 			r.ExtraData["endpoint"] = verifiedEndpoint
 		}
 		results = append(results, *r)
