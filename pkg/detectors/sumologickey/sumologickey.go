@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -44,8 +45,10 @@ func (s Scanner) Keywords() []string {
 	return []string{"sumo", "accessId", "accessKey"}
 }
 
-// Default US API endpoint.
-func (Scanner) CloudEndpoint() string { return "api.sumologic.com" }
+// CloudEndpoint is the US API endpoint. Endpoints are full URLs so that
+// configured verifier endpoints, which may carry a path prefix, are used as
+// given.
+func (Scanner) CloudEndpoint() string { return "https://api.sumologic.com" }
 
 // FromData will find and optionally verify SumoLogicKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -59,50 +62,70 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
 		keyMatches[match[1]] = struct{}{}
 	}
-	endpointMatches := make(map[string]struct{})
+	hostMatches := make(map[string]struct{})
 	for _, match := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		endpointMatches[match[0]] = struct{}{}
+		hostMatches[match[0]] = struct{}{}
 	}
-	if len(endpointMatches) == 0 {
-		endpointMatches[s.CloudEndpoint()] = struct{}{}
+	foundEndpoints := make([]string, 0, len(hostMatches))
+	for host := range hostMatches {
+		foundEndpoints = append(foundEndpoints, "https://"+host)
 	}
+
+	// RawV2 identifies the secret, so it is built only from what the data
+	// says and never from the verification outcome. Otherwise the same key
+	// gets a different identity when it flips between verified and
+	// unverified (for example when it is revoked), and consumers that dedupe
+	// on RawV2 record it as a new secret. The access ID and regional host are
+	// included only when the data names exactly one of each. The host is kept
+	// bare (no scheme) because existing identities were recorded that way.
+	rawV2Id := soleKey(idMatches)
+	rawV2URL := soleKey(hostMatches)
 
 	for accessKey := range keyMatches {
 		var (
-			r           *detectors.Result
-			accessId    string
-			apiEndpoint string
+			verified         bool
+			verifiedId       string
+			verifiedEndpoint string
+			lastErr          error
 		)
 
-		for id := range idMatches {
-			accessId = id
+		if verify {
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
 
-			for e := range endpointMatches {
-				apiEndpoint = e
-
-				if verify {
-					client := s.client
-					if client == nil {
-						client = defaultClient
+			// Endpoints applies the engine's endpoint configuration:
+			// configured verifier endpoints, the US cloud endpoint, and
+			// regional hosts found in the data, each only when enabled.
+			//
+			// Only non-nil errors overwrite lastErr so that a clean 401 from
+			// the wrong region or access ID doesn't erase a failure (500,
+			// timeout) from a pair that might be authoritative.
+			endpoints := s.Endpoints(foundEndpoints...)
+		verification:
+			for id := range idMatches {
+				for _, baseURL := range endpoints {
+					isVerified, vErr := verifyMatch(ctx, client, baseURL, id, accessKey)
+					if vErr != nil {
+						lastErr = vErr
 					}
-
-					isVerified, verificationErr := verifyMatch(ctx, client, apiEndpoint, accessId, accessKey)
 					if isVerified {
-						r = createResult(accessId, accessKey, apiEndpoint, isVerified, verificationErr)
+						verified, verifiedId, verifiedEndpoint, lastErr = true, id, baseURL, nil
+						break verification
 					}
 				}
 			}
 		}
 
-		if r == nil {
-			// Only include the accessId if we're confident which one it is.
-			if len(idMatches) != 1 {
-				accessId = ""
-			}
-			if len(endpointMatches) != 1 || apiEndpoint == s.CloudEndpoint() {
-				apiEndpoint = ""
-			}
-			r = createResult(accessId, accessKey, apiEndpoint, false, nil)
+		r := createResult(rawV2Id, accessKey, rawV2URL, verified, lastErr)
+		// Which access ID and endpoint a key verified with are reported here
+		// rather than in RawV2, so they don't affect the secret's identity.
+		// RawV2 omits the access ID when the data names several, and keys
+		// are managed by access ID, so triage needs it from here.
+		if verified {
+			r.ExtraData["access_id"] = verifiedId
+			r.ExtraData["endpoint"] = verifiedEndpoint
 		}
 		results = append(results, *r)
 	}
@@ -110,8 +133,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, endpoint string, id string, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v1/users", endpoint), nil)
+// soleKey returns the only key in m, or "" when m has zero or several keys.
+func soleKey(m map[string]struct{}) string {
+	if len(m) != 1 {
+		return ""
+	}
+	for k := range m {
+		return k
+	}
+	return ""
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, baseURL string, id string, key string) (bool, error) {
+	endpoint, err := url.JoinPath(baseURL, "/api/v1/users")
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
 	}
