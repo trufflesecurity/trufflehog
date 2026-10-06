@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -44,8 +45,10 @@ func (s Scanner) Keywords() []string {
 	return []string{"sumo", "accessId", "accessKey"}
 }
 
-// Default US API endpoint.
-func (Scanner) CloudEndpoint() string { return "api.sumologic.com" }
+// CloudEndpoint is the US API endpoint. Endpoints are full URLs so that
+// configured verifier endpoints, which may carry a path prefix, are used as
+// given.
+func (Scanner) CloudEndpoint() string { return "https://api.sumologic.com" }
 
 // FromData will find and optionally verify SumoLogicKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -59,30 +62,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
 		keyMatches[match[1]] = struct{}{}
 	}
-	endpointMatches := make(map[string]struct{})
+	hostMatches := make(map[string]struct{})
 	for _, match := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		endpointMatches[match[0]] = struct{}{}
+		hostMatches[match[0]] = struct{}{}
 	}
-	if len(endpointMatches) == 0 {
-		endpointMatches[s.CloudEndpoint()] = struct{}{}
+	foundEndpoints := make([]string, 0, len(hostMatches))
+	for host := range hostMatches {
+		foundEndpoints = append(foundEndpoints, "https://"+host)
 	}
 
 	// RawV2 identifies the secret, so it is built only from what the data
 	// says and never from the verification outcome. Otherwise the same key
 	// gets a different identity when it flips between verified and
 	// unverified (for example when it is revoked), and consumers that dedupe
-	// on RawV2 record it as a new secret. The access ID and URL are included
-	// only when the data names exactly one of each.
+	// on RawV2 record it as a new secret. The access ID and regional host are
+	// included only when the data names exactly one of each. The host is kept
+	// bare (no scheme) because existing identities were recorded that way.
 	rawV2Id := soleKey(idMatches)
-	rawV2URL := soleKey(endpointMatches)
-	if rawV2URL == s.CloudEndpoint() {
-		rawV2URL = ""
-	}
+	rawV2URL := soleKey(hostMatches)
 
 	for accessKey := range keyMatches {
 		var (
 			verified         bool
 			verifiedEndpoint string
+			lastErr          error
 		)
 
 		if verify {
@@ -91,19 +94,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
+			// Endpoints applies the engine's endpoint configuration:
+			// configured verifier endpoints, the US cloud endpoint, and
+			// regional hosts found in the data, each only when enabled.
+			//
+			// Only non-nil errors overwrite lastErr so that a clean 401 from
+			// the wrong region or access ID doesn't erase a failure (500,
+			// timeout) from a pair that might be authoritative.
+			endpoints := s.Endpoints(foundEndpoints...)
 		verification:
 			for id := range idMatches {
-				for e := range endpointMatches {
-					isVerified, _ := verifyMatch(ctx, client, e, id, accessKey)
+				for _, baseURL := range endpoints {
+					isVerified, vErr := verifyMatch(ctx, client, baseURL, id, accessKey)
+					if vErr != nil {
+						lastErr = vErr
+					}
 					if isVerified {
-						verified, verifiedEndpoint = true, e
+						verified, verifiedEndpoint, lastErr = true, baseURL, nil
 						break verification
 					}
 				}
 			}
 		}
 
-		r := createResult(rawV2Id, accessKey, rawV2URL, verified, nil)
+		r := createResult(rawV2Id, accessKey, rawV2URL, verified, lastErr)
 		if verified {
 			r.ExtraData["endpoint"] = verifiedEndpoint
 		}
@@ -124,8 +138,12 @@ func soleKey(m map[string]struct{}) string {
 	return ""
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, endpoint string, id string, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v1/users", endpoint), nil)
+func verifyMatch(ctx context.Context, client *http.Client, baseURL string, id string, key string) (bool, error) {
+	endpoint, err := url.JoinPath(baseURL, "/api/v1/users")
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
 	}
