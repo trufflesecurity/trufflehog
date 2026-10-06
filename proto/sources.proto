@@ -441,6 +441,8 @@ message Gerrit {
   repeated string projects = 4;
   bool skip_binaries = 5;
   bool skip_archives = 6;
+  // Gerrit API request timeout in seconds. Unset or 0 uses the default (20s).
+  int32 api_timeout_seconds = 7 [(validate.rules).int32 = {gte: 0, lte: 3600}];
 }
 
 message Jenkins {
