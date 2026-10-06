@@ -90,11 +90,12 @@ func TestGithubOAuth2_VerifyResult(t *testing.T) {
 	)
 
 	tests := []struct {
-		name         string
-		status       int
-		contentType  string
-		body         string
-		wantVerified bool
+		name                  string
+		status                int
+		contentType           string
+		body                  string
+		wantVerified          bool
+		wantVerificationError bool
 	}{
 		{
 			// GitHub answers a valid ID/secret pair with bad_verification_code, because the
@@ -108,6 +109,13 @@ func TestGithubOAuth2_VerifyResult(t *testing.T) {
 			wantVerified: true,
 		},
 		{
+			name:         "live credential - bad_verification_code as JSON",
+			status:       http.StatusOK,
+			contentType:  "application/json",
+			body:         `{"error":"bad_verification_code","error_description":"The code passed is incorrect or expired."}`,
+			wantVerified: true,
+		},
+		{
 			name:         "dead credential - incorrect_client_credentials",
 			status:       http.StatusUnauthorized,
 			contentType:  "application/x-www-form-urlencoded",
@@ -115,15 +123,25 @@ func TestGithubOAuth2_VerifyResult(t *testing.T) {
 			wantVerified: false,
 		},
 		{
-			// A transient server failure currently lands here as "not verified" rather than
-			// "unknown", because verification never calls SetVerificationError. That is a
-			// known false negative tracked on its own ticket; this case pins today's behavior
-			// so that changing it later is deliberate rather than accidental.
-			name:         "server error - recorded unverified rather than unknown",
-			status:       http.StatusInternalServerError,
-			contentType:  "text/plain",
-			body:         "boom",
-			wantVerified: false,
+			name:                  "server error - unknown",
+			status:                http.StatusInternalServerError,
+			contentType:           "text/plain",
+			body:                  "boom",
+			wantVerificationError: true,
+		},
+		{
+			name:                  "rate limited - unknown",
+			status:                http.StatusTooManyRequests,
+			contentType:           "text/html",
+			body:                  "<html>rate limited</html>",
+			wantVerificationError: true,
+		},
+		{
+			name:                  "unrecognized error code - unknown",
+			status:                http.StatusOK,
+			contentType:           "application/x-www-form-urlencoded",
+			body:                  "error=slow_down",
+			wantVerificationError: true,
 		},
 	}
 
@@ -160,6 +178,7 @@ func TestGithubOAuth2_VerifyResult(t *testing.T) {
 			Scanner{}.VerifyResult(ctx, &result)
 
 			assert.Equal(t, test.wantVerified, result.Verified)
+			assert.Equal(t, test.wantVerificationError, result.VerificationError() != nil, "verification error: %v", result.VerificationError())
 			// Confirms the pair travelled from SecretParts into the token request, which is
 			// the contract the verification cache relies on when it verifies a lone result.
 			assert.Equal(t, clientID, gotID)
