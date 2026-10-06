@@ -67,47 +67,61 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		endpointMatches[s.CloudEndpoint()] = struct{}{}
 	}
 
+	// RawV2 identifies the secret, so it is built only from what the data
+	// says and never from the verification outcome. Otherwise the same key
+	// gets a different identity when it flips between verified and
+	// unverified (for example when it is revoked), and consumers that dedupe
+	// on RawV2 record it as a new secret. The access ID and URL are included
+	// only when the data names exactly one of each.
+	rawV2Id := soleKey(idMatches)
+	rawV2URL := soleKey(endpointMatches)
+	if rawV2URL == s.CloudEndpoint() {
+		rawV2URL = ""
+	}
+
 	for accessKey := range keyMatches {
 		var (
-			r           *detectors.Result
-			accessId    string
-			apiEndpoint string
+			verified         bool
+			verifiedEndpoint string
 		)
 
-		for id := range idMatches {
-			accessId = id
+		if verify {
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
 
-			for e := range endpointMatches {
-				apiEndpoint = e
-
-				if verify {
-					client := s.client
-					if client == nil {
-						client = defaultClient
-					}
-
-					isVerified, verificationErr := verifyMatch(ctx, client, apiEndpoint, accessId, accessKey)
+		verification:
+			for id := range idMatches {
+				for e := range endpointMatches {
+					isVerified, _ := verifyMatch(ctx, client, e, id, accessKey)
 					if isVerified {
-						r = createResult(accessId, accessKey, apiEndpoint, isVerified, verificationErr)
+						verified, verifiedEndpoint = true, e
+						break verification
 					}
 				}
 			}
 		}
 
-		if r == nil {
-			// Only include the accessId if we're confident which one it is.
-			if len(idMatches) != 1 {
-				accessId = ""
-			}
-			if len(endpointMatches) != 1 || apiEndpoint == s.CloudEndpoint() {
-				apiEndpoint = ""
-			}
-			r = createResult(accessId, accessKey, apiEndpoint, false, nil)
+		r := createResult(rawV2Id, accessKey, rawV2URL, verified, nil)
+		if verified {
+			r.ExtraData["endpoint"] = verifiedEndpoint
 		}
 		results = append(results, *r)
 	}
 
 	return results, nil
+}
+
+// soleKey returns the only key in m, or "" when m has zero or several keys.
+func soleKey(m map[string]struct{}) string {
+	if len(m) != 1 {
+		return ""
+	}
+	for k := range m {
+		return k
+	}
+	return ""
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, endpoint string, id string, key string) (bool, error) {
