@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/oauth2"
@@ -27,6 +28,9 @@ var (
 	oauth2ClientID     = regexp.MustCompile("[0-9a-zA-Z\\-_]{16,}\\.apps\\.googleusercontent\\.com")
 	oauth2ClientSecret = regexp.MustCompile("GOCSPX-[0-9a-zA-Z\\-_]{20,}")
 )
+
+// Trimmed from Raw, otherwise "google" matches the false positive wordlist.
+const clientIDSuffix = ".apps.googleusercontent.com"
 
 func (s Scanner) Keywords() []string {
 	return []string{".apps.googleusercontent.com", "GOCSPX-", "oauth2_client_id", "oauth2_client_secret"}
@@ -65,14 +69,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					s1 := detectors.Result{
 						DetectorType: detector_typepb.DetectorType_GoogleOauth2ClientCredentials,
-						Raw:          []byte(clientID),
+						Raw:          []byte(strings.TrimSuffix(clientID, clientIDSuffix)),
 						RawV2:        []byte(clientID + clientSecret),
+						SecretParts: map[string]string{
+							"client_id":     clientID,
+							"client_secret": clientSecret,
+						},
 					}
 
 					if verify {
-						verified, vErr := verifyMatch(ctx, s.getClient(), clientID, clientSecret)
-						s1.Verified = verified
-						s1.SetVerificationError(vErr, clientSecret)
+						s.VerifyResult(ctx, &s1)
 					}
 
 					results = append(results, s1)
@@ -91,8 +97,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				seen[key] = true
 				s1 := detectors.Result{
 					DetectorType: detector_typepb.DetectorType_GoogleOauth2ClientCredentials,
-					Raw:          []byte(clientID),
+					Raw:          []byte(strings.TrimSuffix(clientID, clientIDSuffix)),
 					RawV2:        []byte(clientID),
+					SecretParts:  map[string]string{"client_id": clientID},
 				}
 				results = append(results, s1)
 			}
@@ -111,6 +118,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detector_typepb.DetectorType_GoogleOauth2ClientCredentials,
 					Raw:          []byte(clientSecret),
 					RawV2:        []byte(clientSecret),
+					SecretParts:  map[string]string{"client_secret": clientSecret},
 				}
 				results = append(results, s1)
 			}
@@ -126,27 +134,27 @@ func (s Scanner) getClient() *http.Client {
 	return defaultClient
 }
 
-// Google does not support the client_credentials grant, so exchange a bogus auth code instead:
-// a valid client ID and secret returns invalid_grant, an unknown client or wrong secret returns invalid_client.
-func verifyMatch(ctx context.Context, client *http.Client, clientID, clientSecret string) (bool, error) {
+// VerifyResult verifies a single client ID / client secret pair.
+func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
 	cfg := &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		ClientID:     result.SecretParts["client_id"],
+		ClientSecret: result.SecretParts["client_secret"],
 		Endpoint:     google.Endpoint,
 		RedirectURL:  "http://localhost",
 	}
-	_, err := cfg.Exchange(context.WithValue(ctx, oauth2.HTTPClient, client), "trufflehog")
+	// Google does not support the client_credentials grant, so exchange a bogus auth code instead:
+	// a valid client ID and secret returns invalid_grant, an unknown client or wrong secret returns invalid_client.
+	_, err := cfg.Exchange(context.WithValue(ctx, oauth2.HTTPClient, s.getClient()), "trufflehog")
 
 	var rErr *oauth2.RetrieveError
-	if !errors.As(err, &rErr) {
-		return false, err
+	if errors.As(err, &rErr) {
+		switch rErr.ErrorCode {
+		case "invalid_grant":
+			result.Verified = true
+			return
+		case "invalid_client":
+			return
+		}
 	}
-	switch rErr.ErrorCode {
-	case "invalid_grant":
-		return true, nil
-	case "invalid_client":
-		return false, nil
-	default:
-		return false, err
-	}
+	result.SetVerificationError(err, result.SecretParts["client_secret"])
 }

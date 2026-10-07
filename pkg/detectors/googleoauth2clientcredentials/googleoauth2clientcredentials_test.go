@@ -97,8 +97,8 @@ func TestGoogleOauth2ClientCredentials_Pattern(t *testing.T) {
 }
 
 func TestGoogleOauth2ClientCredentials_Verify(t *testing.T) {
-	input := `oauth2_client_id = '1234567890-abc123def456ghi789jkl.apps.googleusercontent.com'
-	oauth2_client_secret = 'GOCSPX-5aBcD3fgHiJK_lMnOpQRs'`
+	clientID, clientSecret := "1234567890-abc123def456ghi789jkl.apps.googleusercontent.com", "GOCSPX-5aBcD3fgHiJK_lMnOpQRs"
+	input := "oauth2_client_id = '" + clientID + "'\noauth2_client_secret = '" + clientSecret + "'"
 
 	tests := []struct {
 		name     string
@@ -125,6 +125,12 @@ func TestGoogleOauth2ClientCredentials_Verify(t *testing.T) {
 			}
 			if (results[0].VerificationError() != nil) != test.wantErr {
 				t.Errorf("VerificationError = %v, wantErr %v", results[0].VerificationError(), test.wantErr)
+			}
+			if fp, reason := detectors.GetFalsePositiveCheck(s)(results[0]); fp {
+				t.Errorf("flagged as false positive: %s", reason)
+			}
+			if diff := cmp.Diff(map[string]string{"client_id": clientID, "client_secret": clientSecret}, results[0].SecretParts); diff != "" {
+				t.Errorf("SecretParts diff: (-want +got)\n%s", diff)
 			}
 		})
 	}
