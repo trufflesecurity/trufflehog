@@ -1,38 +1,39 @@
-package gcpoauth2
+package googleoauth2clientcredentials
 
 import (
 	"context"
-	"strings"
+	"errors"
+	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
-	"golang.org/x/oauth2/clientcredentials"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	client *http.Client
 }
 
 var _ detectors.Detector = (*Scanner)(nil)
+
+var defaultClient = common.SaneHttpClient()
 
 var (
 	oauth2ClientID     = regexp.MustCompile("[0-9a-zA-Z\\-_]{16,}\\.apps\\.googleusercontent\\.com")
 	oauth2ClientSecret = regexp.MustCompile("GOCSPX-[0-9a-zA-Z\\-_]{20,}")
 )
 
-const (
-	gcpOAuthBadVerificationCodeError = "bad_verification_code"
-)
-
 func (s Scanner) Keywords() []string {
 	return []string{".apps.googleusercontent.com", "GOCSPX-", "oauth2_client_id", "oauth2_client_secret"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_GoogleOauth2
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_GoogleOauth2ClientCredentials
 }
 
 func (s Scanner) Description() string {
@@ -63,21 +64,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					pairedSecrets[clientSecret] = true
 
 					s1 := detectors.Result{
-						DetectorType: detectorspb.DetectorType_GoogleOauth2,
+						DetectorType: detector_typepb.DetectorType_GoogleOauth2ClientCredentials,
 						Raw:          []byte(clientID),
 						RawV2:        []byte(clientID + clientSecret),
 					}
 
 					if verify {
-						config := &clientcredentials.Config{
-							ClientID:     clientID,
-							ClientSecret: clientSecret,
-							TokenURL:     google.Endpoint.TokenURL,
-						}
-						_, err := config.Token(ctx)
-						if err != nil && strings.Contains(err.Error(), gcpOAuthBadVerificationCodeError) {
-							s1.Verified = true
-						}
+						verified, vErr := verifyMatch(ctx, s.getClient(), clientID, clientSecret)
+						s1.Verified = verified
+						s1.SetVerificationError(vErr, clientSecret)
 					}
 
 					results = append(results, s1)
@@ -95,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if !pairedIDs[clientID] && !seen[key] {
 				seen[key] = true
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_GoogleOauth2,
+					DetectorType: detector_typepb.DetectorType_GoogleOauth2ClientCredentials,
 					Raw:          []byte(clientID),
 					RawV2:        []byte(clientID),
 				}
@@ -113,7 +108,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if !pairedSecrets[clientSecret] && !seen[key] {
 				seen[key] = true
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_GoogleOauth2,
+					DetectorType: detector_typepb.DetectorType_GoogleOauth2ClientCredentials,
 					Raw:          []byte(clientSecret),
 					RawV2:        []byte(clientSecret),
 				}
@@ -122,4 +117,36 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 	return
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
+// Google does not support the client_credentials grant, so exchange a bogus auth code instead:
+// a valid client ID and secret returns invalid_grant, an unknown client or wrong secret returns invalid_client.
+func verifyMatch(ctx context.Context, client *http.Client, clientID, clientSecret string) (bool, error) {
+	cfg := &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Endpoint:     google.Endpoint,
+		RedirectURL:  "http://localhost",
+	}
+	_, err := cfg.Exchange(context.WithValue(ctx, oauth2.HTTPClient, client), "trufflehog")
+
+	var rErr *oauth2.RetrieveError
+	if !errors.As(err, &rErr) {
+		return false, err
+	}
+	switch rErr.ErrorCode {
+	case "invalid_grant":
+		return true, nil
+	case "invalid_client":
+		return false, nil
+	default:
+		return false, err
+	}
 }

@@ -1,4 +1,4 @@
-package gcpoauth2
+package googleoauth2clientcredentials
 
 import (
 	"context"
@@ -6,11 +6,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestGcpOAuth2_Pattern(t *testing.T) {
+func TestGoogleOauth2ClientCredentials_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -20,24 +21,24 @@ func TestGcpOAuth2_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "typical pattern - with keyword oauth2_client_id",
-			input: "oauth2_client_id = '1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.com'",
+			input: "oauth2_client_id = '1234567890-abc123def456ghi789jkl.apps.googleusercontent.com'",
 			want: []string{
-				"1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.com",
+				"1234567890-abc123def456ghi789jkl.apps.googleusercontent.com",
 			},
 		},
 		{
 			name:  "typical pattern - with keyword oauth2_client_secret",
-			input: "oauth2_client_secret = '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'",
+			input: "oauth2_client_secret = 'GOCSPX-5aBcD3fgHiJK_lMnOpQRs'",
 			want: []string{
-				"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",
+				"GOCSPX-5aBcD3fgHiJK_lMnOpQRs",
 			},
 		},
 		{
 			name: "typical pattern - multiline with both keywords",
-			input: `oauth2_client_id = '1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.com'
-			oauth2_client_secret = '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'`,
+			input: `oauth2_client_id = '1234567890-abc123def456ghi789jkl.apps.googleusercontent.com'
+			oauth2_client_secret = 'GOCSPX-5aBcD3fgHiJK_lMnOpQRs'`,
 			want: []string{
-				"1234567890-abc123def456ghi789jkl012mno345pq.apps.googleusercontent.comGOCSPX-5aBcD3fgHiJK_lMnOpQRstuVwXyZ",
+				"1234567890-abc123def456ghi789jkl.apps.googleusercontent.comGOCSPX-5aBcD3fgHiJK_lMnOpQRs",
 			},
 		},
 		{
@@ -90,6 +91,40 @@ func TestGcpOAuth2_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestGoogleOauth2ClientCredentials_Verify(t *testing.T) {
+	input := `oauth2_client_id = '1234567890-abc123def456ghi789jkl.apps.googleusercontent.com'
+	oauth2_client_secret = 'GOCSPX-5aBcD3fgHiJK_lMnOpQRs'`
+
+	tests := []struct {
+		name     string
+		status   int
+		body     string
+		verified bool
+		wantErr  bool
+	}{
+		{"valid client, bogus code", 400, `{"error":"invalid_grant","error_description":"Malformed auth code."}`, true, false},
+		{"unknown client", 401, `{"error":"invalid_client","error_description":"The OAuth client was not found."}`, false, false},
+		{"wrong secret", 401, `{"error":"invalid_client","error_description":"The provided client secret is invalid."}`, false, false},
+		{"unexpected response", 500, `oops`, false, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := Scanner{client: common.ConstantResponseHttpClient(test.status, test.body)}
+			results, err := s.FromData(context.Background(), true, []byte(input))
+			if err != nil || len(results) != 1 {
+				t.Fatalf("results = %v, err = %v", results, err)
+			}
+			if results[0].Verified != test.verified {
+				t.Errorf("Verified = %v, want %v", results[0].Verified, test.verified)
+			}
+			if (results[0].VerificationError() != nil) != test.wantErr {
+				t.Errorf("VerificationError = %v, wantErr %v", results[0].VerificationError(), test.wantErr)
 			}
 		})
 	}
