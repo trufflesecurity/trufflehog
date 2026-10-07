@@ -100,13 +100,18 @@ func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
 	// a valid pair is rejected with bad_verification_code and an invalid pair with
 	// incorrect_client_credentials.
 	// docs: https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors
-	if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
+	if err == nil {
+		return
+	}
+
+	errMsg := err.Error()
+	switch {
+	case strings.Contains(errMsg, githubBadVerificationCodeError):
 		result.Verified = true
-	} else if err != nil && strings.Contains(err.Error(), githubIncorrectClientCredentialsError) {
-		result.Verified = false
-	} else if err != nil && strings.Contains(err.Error(), githubClientNotFoundError) {
-		result.Verified = false
-	} else {
+	case strings.Contains(errMsg, githubIncorrectClientCredentialsError),
+		strings.Contains(errMsg, githubClientNotFoundError):
+		// dead credential, leave unverified with no error
+	default:
 		result.SetVerificationError(err, clientSecret)
 	}
 }
