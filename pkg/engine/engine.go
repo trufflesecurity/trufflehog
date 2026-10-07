@@ -179,6 +179,9 @@ type Config struct {
 	// 1 = single pass (no chaining), 2+ = chained (e.g., base64 inside UTF-16).
 	// Default: 5.
 	MaxDecodeDepth int
+
+	// Max size of the deduplication LRU cache
+	DedupeCacheSize int
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -251,6 +254,8 @@ type Engine struct {
 	verificationOverlapWorkerMultiplier int
 
 	maxDecodeDepth int
+
+	dedupeCacheSize int
 
 	// runtimeCollector exposes live channel/worker/scan counters to Prometheus
 	// while the engine is running. Set in Start, cleared in Finish.
@@ -569,11 +574,7 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
-	// The cache size is set to 5000 entries, which is a balance between memory usage and the need for effective deduplication.
-	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
-	const cacheSize = 5000
-
-	cache, err := lru.New[string, struct{}](cacheSize)
+	cache, err := lru.New[string, struct{}](e.dedupeCacheSize)
 	if err != nil {
 		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
