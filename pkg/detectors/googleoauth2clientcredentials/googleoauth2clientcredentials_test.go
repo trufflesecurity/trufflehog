@@ -134,4 +134,10 @@ func TestGoogleOauth2ClientCredentials_Verify(t *testing.T) {
 			}
 		})
 	}
+
+	orphan := detectors.Result{SecretParts: map[string]string{"client_secret": clientSecret}}
+	Scanner{client: common.ConstantResponseHttpClient(400, `{"error":"invalid_grant"}`)}.VerifyResult(context.Background(), &orphan)
+	if orphan.Verified || orphan.VerificationError() != nil {
+		t.Errorf("orphan secret was verified: %v %v", orphan.Verified, orphan.VerificationError())
+	}
 }

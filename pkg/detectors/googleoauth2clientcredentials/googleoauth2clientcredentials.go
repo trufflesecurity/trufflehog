@@ -136,9 +136,13 @@ func (s Scanner) getClient() *http.Client {
 
 // VerifyResult verifies a single client ID / client secret pair.
 func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
+	clientID, clientSecret := result.SecretParts["client_id"], result.SecretParts["client_secret"]
+	if clientID == "" || clientSecret == "" {
+		return
+	}
 	cfg := &oauth2.Config{
-		ClientID:     result.SecretParts["client_id"],
-		ClientSecret: result.SecretParts["client_secret"],
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
 		Endpoint:     google.Endpoint,
 		RedirectURL:  "http://localhost",
 	}
@@ -156,5 +160,5 @@ func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
 			return
 		}
 	}
-	result.SetVerificationError(err, result.SecretParts["client_secret"])
+	result.SetVerificationError(err, clientSecret)
 }
