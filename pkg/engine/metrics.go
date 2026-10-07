@@ -119,7 +119,7 @@ var (
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "chunks_dropped_total",
-		Help:      "Total number of chunks dropped by pipeline stage and reason.",
+		Help:      "Total number of chunks (or per-detector work items) dropped by pipeline stage and reason. Counted at the same granularity as chunks_entered_stage_total for the same stage.",
 	},
 		[]string{"stage", "reason", "source_type"},
 	)
