@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -41,8 +41,8 @@ func (s Scanner) Keywords() []string {
 	return []string{".azurecr.io"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureContainerRegistry
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_AzureContainerRegistry
 }
 
 func (s Scanner) Description() string {
@@ -73,38 +73,45 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		passwordMatches[p] = struct{}{}
 	}
 
-EndpointLoop:
 	for username := range registryMatches {
 		for password := range passwordMatches {
 			r := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureContainerRegistry,
+				DetectorType: detector_typepb.DetectorType_AzureContainerRegistry,
 				Raw:          []byte(password),
-				RawV2:        []byte(`{"username":"` + username + `","password":"` + password + `"}`),
-				Redacted:     username,
+				SecretParts: map[string]string{
+					"username": username,
+					"password": password,
+				},
+				RawV2:    []byte(`{"username":"` + username + `","password":"` + password + `"}`),
+				Redacted: username,
 			}
 
 			if verify {
 				if invalidHosts.Exists(username) {
-					logger.V(3).Info("Skipping invalid registry", "username", username)
-					continue EndpointLoop
-				}
-
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, verificationErr := verifyMatch(ctx, client, username, password)
-				if isVerified {
-					delete(passwordMatches, password)
-					r.Verified = true
-				}
-				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
-						invalidHosts.Set(username, struct{}{})
-						continue EndpointLoop
+					// An earlier candidate already proved this host does not resolve, so the lookup is
+					// skipped. The finding is still reported: dropping it here would make the reported
+					// secrets depend on whether verification was requested, and on the order in which
+					// candidates happened to be processed.
+					logger.V(3).Info("Skipping verification: no such host", "username", username)
+					r.SetVerificationError(errNoSuchHost, password)
+				} else {
+					client := s.client
+					if client == nil {
+						client = defaultClient
 					}
-					r.SetVerificationError(verificationErr, password)
+
+					isVerified, verificationErr := verifyMatch(ctx, client, username, password)
+					if isVerified {
+						delete(passwordMatches, password)
+						r.Verified = true
+					}
+					if verificationErr != nil {
+						var dnsErr *net.DNSError
+						if errors.As(verificationErr, &dnsErr) && dnsErr.IsNotFound {
+							invalidHosts.Set(username, struct{}{})
+						}
+						r.SetVerificationError(verificationErr, password)
+					}
 				}
 			}
 
@@ -122,7 +129,7 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
-var noSuchHostErr = errors.New("no such host")
+var errNoSuchHost = errors.New("no such host")
 
 func verifyMatch(ctx context.Context, client *http.Client, username string, password string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s.azurecr.io/v2/", username), nil)
@@ -133,10 +140,6 @@ func verifyMatch(ctx context.Context, client *http.Client, username string, pass
 	req.SetBasicAuth(username, password)
 	res, err := client.Do(req)
 	if err != nil {
-		// lookup foo.azurecr.io: no such host
-		if strings.Contains(err.Error(), "no such host") {
-			return false, noSuchHostErr
-		}
 		return false, err
 	}
 	defer func() {

@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -50,8 +50,8 @@ func (s Scanner) getClient() *http.Client {
 	return defaultClient
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SalesforceOauth2
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SalesforceOauth2
 }
 
 func (s Scanner) Description() string {
@@ -89,9 +89,14 @@ domainLoop:
 		for key := range uniqueKeyMatches {
 			for secret := range uniqueSecretMatches {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
+					DetectorType: detector_typepb.DetectorType_SalesforceOauth2,
 					Raw:          []byte(secret),
 					RawV2:        fmt.Appendf([]byte{}, "%s:%s:%s", domain, key, secret),
+					SecretParts: map[string]string{
+						"domain":        domain,
+						"client_id":     key,
+						"client_secret": secret,
+					},
 				}
 
 				if verify {
@@ -104,15 +109,6 @@ domainLoop:
 						}
 
 						s1.SetVerificationError(verificationErr, secret)
-					}
-
-					if isVerified {
-						s1.AnalysisInfo = map[string]string{
-							"domain":        domain,
-							"client_id":     key,
-							"client_secret": secret,
-						}
-
 					}
 				}
 

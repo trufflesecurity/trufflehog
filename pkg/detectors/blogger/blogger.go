@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -22,8 +22,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"blogger"}) + `\b([0-9A-Za-z-]{39})\b`)
+	// Google API keys always start with "AIzaSy" (6-char prefix + 33 remaining = 39 total).
+	// The prefix regex retains "blogger" proximity to distinguish from other Google API-backed things.
+	// No trailing \b because keys can end with '-', which is not a word character.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"blogger"}) + `\b(AIzaSy[0-9A-Za-z_-]{33})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -41,8 +43,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Blogger,
+			DetectorType: detector_typepb.DetectorType_Blogger,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -57,8 +60,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Blogger
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Blogger
 }
 
 func (s Scanner) Description() string {

@@ -5,17 +5,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
+	"net/url"
 	"strings"
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	sourcegit "github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 // repoInfoCache is a thread-safe cache to store information about repositories.
@@ -53,9 +55,9 @@ type repoInfo struct {
 	owner      string                       // repository owner (user|organization).
 	name       string                       // repository name.
 	fullName   string                       // full repository name (owner/repo).
-	hasWiki    bool                         // whether the repository is likely to have a wiki.
 	size       int                          // size of the repository in kilobytes.
 	visibility source_metadatapb.Visibility // visibility of the repository (public/private).
+	hasWiki    bool                         // whether the repository is likely to have a wiki.
 }
 
 // cloneRepo clones a repository given its URL, returns the path and the repository object.
@@ -244,8 +246,9 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 	opts := listOpts.getListOptions()
 
 	var (
-		numRepos, numForks int
-		uniqueOrgs         = map[string]struct{}{}
+		numRepos, numForks, numArchived int
+		numArchivedSkipped              int
+		uniqueOrgs                      = map[string]struct{}{}
 	)
 
 	// loop to handle pagination.
@@ -260,12 +263,26 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 
 		ctx.Logger().V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
-			if r.GetFork() {
-				if !s.conn.IncludeForks {
-					continue
-				}
+			isFork, isArchived := r.GetFork(), r.GetArchived()
+
+			if isFork && !s.conn.IncludeForks {
+				continue
+			}
+
+			if isArchived && s.conn.ExcludeArchived {
+				numArchivedSkipped++
+				logger.V(3).Info("skipping archived repository", "repo", r.GetFullName())
+				continue
+			}
+
+			if isFork {
 				numForks++
 			}
+
+			if isArchived {
+				numArchived++
+			}
+
 			numRepos++
 
 			// track unique organizations.
@@ -283,7 +300,22 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
 			s.cacheRepoInfo(r)
-			if err := reporter.UnitOk(ctx, RepoUnit{Name: repoName, URL: repoURL}); err != nil {
+
+			unit := RepoUnit{Name: repoName, URL: repoURL}
+			// Repos enumerated outside installation listings (e.g. member
+			// personal repos) belong to no installation; map them to the
+			// default installation so the scan-all mapping in ChunkUnit
+			// doesn't reject repos we just enumerated.
+			if connector, ok := s.connector.(*appConnector); ok && s.conn.GetScanAllInstallations() {
+				connector.ensureRepoInstallation(repoURL, r.GetName())
+				// Record the resolved installation on the unit so ChunkUnit
+				// scans it with the correct token without re-listing every
+				// installation's repos (INT-790).
+				if installID, mapped := connector.installationIDForRepo(repoURL); mapped {
+					unit.InstallationID = installID
+				}
+			}
+			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
 
@@ -297,7 +329,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 	}
 
 	// final logging of repository stats.
-	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
+	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_archived", numArchived, "num_archived_skipped", numArchivedSkipped, "num_orgs", len(uniqueOrgs))
 	githubOrgsEnumerated.WithLabelValues(s.name).Add(float64(len(uniqueOrgs)))
 
 	return nil
@@ -337,13 +369,25 @@ func (s *Source) cacheGistInfo(g *github.Gist) {
 // Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
 // but still don't have a cloneable wiki.
 func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
-	wikiURL := strings.TrimSuffix(repoURL, ".git") + "/wiki"
+	var wikiURL string
+	if repoInfo, ok := s.repoInfoCache.get(repoURL); ok {
+		if repoInfo.visibility == source_metadatapb.Visibility_private {
+			return true
+		}
+		wikiURL = wikiWebURLForRepoInfo(s.conn.GetEndpoint(), repoInfo)
+	} else {
+		var err error
+		wikiURL, err = wikiWebURLForRepoCloneURL(repoURL)
+		if err != nil {
+			return false
+		}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
 	if err != nil {
 		return false
 	}
 
-	res, err := s.connector.APIClient().Client().Do(req)
+	res, err := common.RetryableHTTPClientTimeout(githubHTTPTimeoutSeconds).Do(req)
 	if err != nil {
 		return false
 	}
@@ -358,15 +402,45 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 func (s *Source) normalizeRepo(repo string) (string, error) {
 
 	// If it's a full URL (has protocol), normalize it
-	if regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
-
+	if hasURLScheme(repo) {
 		return giturl.NormalizeGithubRepo(repo)
 	}
+	if isSCPStyleRepoURL(repo) {
+		repoURL, err := sourcegit.GitURLParse(repo)
+		if err == nil && repoURL.Host != "" && repoURL.Path != "" {
+			u := &url.URL{
+				Scheme: "https",
+				Host:   repoURL.Host,
+				Path:   repoURL.Path,
+			}
+			return giturl.NormalizeGithubRepo(u.String())
+		}
+	}
 	// If it's a repository name (contains / but not http), convert to full URL first
-	if strings.Contains(repo, "/") && !regexp.MustCompile(`^[a-z]+://`).MatchString(repo) {
+	if strings.Contains(repo, "/") && !hasURLScheme(repo) {
 		fullURL := "https://github.com/" + repo
+		// If using GitHub Enterprise, adjust the URL accordingly
+		if s.conn != nil && s.conn.Endpoint != "" && !isGitHubCloudEndpoint(s.conn.Endpoint) {
+			u, err := endpointBaseURL(s.conn.Endpoint)
+			if err != nil {
+				return "", fmt.Errorf("invalid enterprise endpoint: %w", err)
+			}
+			fullURL = u.JoinPath(strings.Split(repo, "/")...).String()
+		}
 		return giturl.NormalizeGithubRepo(fullURL)
 	}
 
 	return "", fmt.Errorf("no repositories found for %s", repo)
+}
+
+// extractRepoNameFromUrl extracts the "owner/repo" name from a GitHub repository URL.
+// Example: http://github.com/owner/repo.git -> owner/repo
+// If an invalid URL is provided, it returns the original string.
+func extractRepoNameFromUrl(repoURL string) string {
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		return repoURL
+	}
+	cleanedPath := strings.Trim(u.Path, "/")
+	return strings.TrimSuffix(cleanedPath, ".git")
 }

@@ -761,6 +761,47 @@ func (m *Bitbucket) validate(all bool) error {
 			}
 		}
 
+	case *Bitbucket_ApiToken:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetApiToken()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, BitbucketValidationError{
+						field:  "ApiToken",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, BitbucketValidationError{
+						field:  "ApiToken",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetApiToken()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return BitbucketValidationError{
+					field:  "ApiToken",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -1703,6 +1744,8 @@ func (m *Filesystem) validate(all bool) error {
 
 	// no validation rules for SkipBinaries
 
+	// no validation rules for MaxSymlinkDepth
+
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
 	}
@@ -2588,6 +2631,10 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for PrintLegacyJson
 
+	// no validation rules for ScanAllInstallations
+
+	// no validation rules for ExcludeArchived
+
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
 		if v == nil {
@@ -3442,6 +3489,8 @@ func (m *Huggingface) validate(all bool) error {
 
 	// no validation rules for IncludePrs
 
+	// no validation rules for SkipAllBuckets
+
 	switch v := m.Credential.(type) {
 	case *Huggingface_Token:
 		if v == nil {
@@ -4152,6 +4201,20 @@ func (m *S3) validate(all bool) error {
 
 	// no validation rules for EnableResumption
 
+	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+		err = S3ValidationError{
+			field:  "Endpoint",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for Region
+
 	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
 		if v == nil {
@@ -4816,6 +4879,17 @@ func (m *Gerrit) validate(all bool) error {
 	// no validation rules for SkipBinaries
 
 	// no validation rules for SkipArchives
+
+	if val := m.GetApiTimeoutSeconds(); val < 0 || val > 3600 {
+		err := GerritValidationError{
+			field:  "ApiTimeoutSeconds",
+			reason: "value must be inside range [0, 3600]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	switch v := m.Credential.(type) {
 	case *Gerrit_BasicAuth:
@@ -5884,6 +5958,12 @@ func (m *Sharepoint) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for SiteUrl
+
+	// no validation rules for IncludeVersions
+
+	// no validation rules for IncludeComments
+
+	// no validation rules for IncludeAttachments
 
 	switch v := m.Credential.(type) {
 	case *Sharepoint_Oauth:
@@ -7136,3 +7216,103 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = SlackContinuousValidationError{}
+
+// Validate checks the field values on JSONEnumerator with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *JSONEnumerator) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on JSONEnumerator with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in JSONEnumeratorMultiError,
+// or nil if none found.
+func (m *JSONEnumerator) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *JSONEnumerator) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return JSONEnumeratorMultiError(errors)
+	}
+
+	return nil
+}
+
+// JSONEnumeratorMultiError is an error wrapping multiple validation errors
+// returned by JSONEnumerator.ValidateAll() if the designated constraints
+// aren't met.
+type JSONEnumeratorMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m JSONEnumeratorMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m JSONEnumeratorMultiError) AllErrors() []error { return m }
+
+// JSONEnumeratorValidationError is the validation error returned by
+// JSONEnumerator.Validate if the designated constraints aren't met.
+type JSONEnumeratorValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e JSONEnumeratorValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e JSONEnumeratorValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e JSONEnumeratorValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e JSONEnumeratorValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e JSONEnumeratorValidationError) ErrorName() string { return "JSONEnumeratorValidationError" }
+
+// Error satisfies the builtin error interface
+func (e JSONEnumeratorValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sJSONEnumerator.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = JSONEnumeratorValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = JSONEnumeratorValidationError{}

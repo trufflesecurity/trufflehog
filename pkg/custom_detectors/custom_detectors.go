@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
-	"regexp"
+	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"slices"
 	"strings"
 
@@ -15,8 +17,9 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 // The maximum number of matches from one chunk. This const is used when
@@ -29,6 +32,13 @@ const maxTotalMatches = 100
 // initialization).
 type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
+
+	// verifyClients holds the HTTP client for each entry of Verify, by index.
+	// Verifiers without auth share httpClient; a verifier with auth gets a
+	// copy whose transport attaches an access token to requests for its
+	// endpoint. They are built once here so every verification for an auth
+	// config shares one cached token.
+	verifyClients []*http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -57,6 +67,7 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 		return nil, err
 	}
 
+	verifyClients := make([]*http.Client, 0, len(pb.Verify))
 	for _, verify := range pb.Verify {
 		if err := ValidateVerifyEndpoint(verify.Endpoint, verify.Unsafe); err != nil {
 			return nil, err
@@ -64,10 +75,59 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 		if err := ValidateVerifyHeaders(verify.Headers); err != nil {
 			return nil, err
 		}
+		if err := ValidateVerifyRanges(verify.SuccessRanges); err != nil {
+			return nil, err
+		}
+		if err := ValidateVerifyRanges(verify.RotatedRanges); err != nil {
+			return nil, err
+		}
+
+		// Auth is validated and built here so a bad config fails at load
+		// time. No token is fetched until the first verification.
+		authCfg, err := verifierauth.FromProto(verify.GetAuth(), verify.Unsafe)
+		if err != nil {
+			return nil, fmt.Errorf("verifier auth for %q: %w", verify.Endpoint, err)
+		}
+		if authCfg == nil {
+			verifyClients = append(verifyClients, httpClient)
+			continue
+		}
+		if err := validateHeadersAvoidTokenHeader(verify.Headers, authCfg.TokenHeader()); err != nil {
+			return nil, err
+		}
+		verifyClients = append(verifyClients, authCfg.WrapClient(httpClient, []string{verify.Endpoint}))
 	}
 
+	// Ensure primary regex name is set.
+	ensurePrimaryRegexNameSet(pb)
+
 	// TODO: Copy only necessary data out of pb.
-	return &CustomRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{CustomRegex: pb, verifyClients: verifyClients}, nil
+}
+
+// validateHeadersAvoidTokenHeader rejects a verify headers entry for the
+// header the access token is written to. The auth transport refuses to
+// overwrite a header the request already carries, so such a verifier could
+// never send a request; failing at load time says so up front.
+func validateHeadersAvoidTokenHeader(headers []string, tokenHeader string) error {
+	for _, header := range headers {
+		key, _, _ := strings.Cut(header, ":")
+		if http.CanonicalHeaderKey(strings.TrimSpace(key)) == tokenHeader {
+			return fmt.Errorf("header %q is the oauth2 tokenHeader; set tokenHeader to a different header or remove this header", header)
+		}
+	}
+	return nil
+}
+
+// verifyClient returns the HTTP client for the Verify entry at index i.
+// A CustomRegexWebhook built without NewWebhookCustomRegex has no
+// per-verifier clients; it falls back to the shared client and never
+// attaches auth.
+func (c *CustomRegexWebhook) verifyClient(i int) *http.Client {
+	if i < len(c.verifyClients) {
+		return c.verifyClients[i]
+	}
+	return httpClient
 }
 
 var httpClient = common.SaneHttpClient()
@@ -219,24 +279,39 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 
 	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType_CustomRegex,
+		DetectorType: detector_typepb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
 		ExtraData:    map[string]string{},
 	}
 
 	var raw string
+	secrets := make([]string, 0, len(match))
 	for _, key := range slices.Sorted(maps.Keys(match)) {
 		values := match[key]
 		// values[0] contains the entire regex match.
 		secret := values[0]
+		fullMatch := values[0]
 		if len(values) > 1 {
 			secret = values[1]
 		}
 		raw += secret
+		secrets = append(secrets, secret)
 
-		// if the match is of the primary regex, set it's value as primary secret value in result
+		// We set the full regex match as the primary secret value.
+		// Reasoning:
+		// The engine calculates the line number using the match. When a primary secret is set, it uses that value instead of the raw secret.
+		// While the secret match itself is sufficient to calculate the line number, the same group match could appear elsewhere in the data.
+		// To avoid ambiguity, we store the full regex match as the primary secret value.
+		// This primary secret value is used only for identifying the exact line number and is not used anywhere else.
+
+		// Example:
+		// Full regex match: secret = ABC123
+		// Secret (raw): ABC123
+
+		// In this case, the primary secret value stores the full string `secret = ABC123`,
+		// allowing the engine to pinpoint the exact location and avoid matching redundant occurrences of `ABC123` in the data.
 		if c.PrimaryRegexName == key {
-			result.SetPrimarySecretValue(secret)
+			result.SetPrimarySecretValue(fullMatch)
 		}
 	}
 
@@ -259,10 +334,19 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		// disrupt other verification.
 		return nil
 	}
-	// Try each config until we successfully verify.
-	for _, verifyConfig := range c.GetVerify() {
+
+	var (
+		definitive     bool
+		rangesInEffect bool
+		// requestErr is the most recent verifier request that got no
+		// response at all: a network, TLS, or timeout error, or a verifier
+		// auth failure (no access token, or a header collision).
+		requestErr error
+	)
+
+	// Try each config until we get a definitive answer.
+	for i, verifyConfig := range c.GetVerify() {
 		if common.IsDone(ctx) {
-			// TODO: Log we're possibly leaving out results.
 			return ctx.Err()
 		}
 		req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
@@ -272,13 +356,16 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		for _, header := range verifyConfig.GetHeaders() {
 			key, value, found := strings.Cut(header, ":")
 			if !found {
-				// Should be unreachable due to validation.
 				continue
 			}
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
 		}
-		resp, err := httpClient.Do(req)
+		if req.Header.Get("Content-Type") == "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		resp, err := c.verifyClient(i).Do(req)
 		if err != nil {
+			requestErr = err
 			continue
 		}
 		defer func() {
@@ -286,26 +373,67 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			_ = resp.Body.Close()
 		}()
 
-		if resp.StatusCode == http.StatusOK {
-			// mark the result as verified
+		successRanges := verifyConfig.GetSuccessRanges()
+		rotatedRanges := verifyConfig.GetRotatedRanges()
+
+		if len(successRanges) == 0 && len(rotatedRanges) == 0 {
+			// Backward compat: no ranges configured, use legacy behavior.
+			if resp.StatusCode == http.StatusOK {
+				result.Verified = true
+				definitive = true
+				storeResponseBody(resp, result.ExtraData)
+				break
+			}
+			// Legacy non-200 is a meaningful response (verifier said "no");
+			// mark definitive so a prior ranged verifier with rangesInEffect
+			// does not cause a spurious verification error.
+			definitive = true
+			continue
+		}
+
+		rangesInEffect = true
+		bothConfigured := len(successRanges) > 0 && len(rotatedRanges) > 0
+
+		if StatusCodeMatchesRanges(resp.StatusCode, successRanges) {
 			result.Verified = true
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				continue
-			}
-
-			// TODO: handle different content-type responses seperatly when implement custom detector configurations
-			responseStr := string(body)
-			// truncate to 200 characters if response length exceeds 200
-			if len(responseStr) > 200 {
-				responseStr = responseStr[:200]
-			}
-
-			// store the processed response in ExtraData
-			result.ExtraData["response"] = responseStr
-
+			definitive = true
+			storeResponseBody(resp, result.ExtraData)
 			break
+		}
+
+		if StatusCodeMatchesRanges(resp.StatusCode, rotatedRanges) {
+			definitive = true
+			break
+		}
+
+		// Status matched neither configured range.
+		if !bothConfigured {
+			// Only one side was configured: the non-matching response is
+			// treated as the opposite state.
+			//   successRanges only -> non-match means rotated
+			//   rotatedRanges only -> non-match means live
+			definitive = true
+			if len(rotatedRanges) > 0 {
+				result.Verified = true
+				storeResponseBody(resp, result.ExtraData)
+			}
+			break
+		}
+
+		// Both configured but neither matched -- try the next verifier.
+	}
+
+	// Without a definitive answer the result is "unable to verify", never a
+	// silent "not verified". A request that got no response says more about
+	// why than a status code that matched no range, so it is reported first.
+	// A legacy verifier's non-200 counts as an answer, so a later request
+	// error after it does not turn the result into an error.
+	if !definitive {
+		switch {
+		case requestErr != nil:
+			result.SetVerificationError(requestErr, secrets...)
+		case rangesInEffect:
+			result.SetVerificationError(errors.New("verification response status code did not match any configured successRanges or rotatedRanges"))
 		}
 	}
 
@@ -315,6 +443,20 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	case results <- result:
 		return nil
 	}
+}
+
+const maxResponseLen = 200
+
+func storeResponseBody(resp *http.Response, extraData map[string]string) {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	responseStr := string(body)
+	if len(responseStr) > maxResponseLen {
+		responseStr = responseStr[:maxResponseLen]
+	}
+	extraData["response"] = responseStr
 }
 
 func (c *CustomRegexWebhook) Keywords() []string {
@@ -382,8 +524,8 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 	return matches
 }
 
-func (c *CustomRegexWebhook) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_CustomRegex
+func (c *CustomRegexWebhook) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_CustomRegex
 }
 
 const defaultDescription = "This is a user-defined detector with no description provided."
@@ -393,4 +535,16 @@ func (c *CustomRegexWebhook) Description() string {
 		return defaultDescription
 	}
 	return c.GetDescription()
+}
+
+// ensurePrimaryRegexNameSet sets the PrimaryRegexName field to the
+// first regex name in sorted order if it is not already set.
+// We're sorting to ensure deterministic behavior.
+func ensurePrimaryRegexNameSet(pb *custom_detectorspb.CustomRegex) {
+	if pb.PrimaryRegexName == "" {
+		for _, name := range slices.Sorted(maps.Keys(pb.Regex)) {
+			pb.PrimaryRegexName = name
+			return
+		}
+	}
 }

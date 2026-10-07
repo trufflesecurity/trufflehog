@@ -814,5 +814,29 @@
       "valid_statuses": [400, 404, 429],
       "invalid_statuses": [403]
     }
+  },
+  {
+    "name": "metrics_write",
+    "title": "Submit Metrics",
+    "description": "Submit custom metrics to Datadog.",
+    "resource": "Metrics"
+  },
+  {
+    "name": "logs_write",
+    "title": "Submit Logs",
+    "description": "Send logs to Datadog for indexing and processing.",
+    "resource": "Logs"
+  },
+  {
+    "name": "events_write",
+    "title": "Submit Events",
+    "description": "Post events to the Datadog event stream.",
+    "resource": "Events"
+  },
+  {
+    "name": "service_checks_write",
+    "title": "Submit Service Checks",
+    "description": "Send service check statuses to Datadog.",
+    "resource": "Service Checks"
   }
 ]

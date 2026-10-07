@@ -13,14 +13,14 @@ import (
 func TestHandleRPMFile(t *testing.T) {
 	file, err := os.Open("testdata/test.rpm")
 	assert.Nil(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	rdr, err := newFileReader(ctx, file)
 	assert.NoError(t, err)
-	defer rdr.Close()
+	defer func() { _ = rdr.Close() }()
 
 	handler := newRPMHandler()
 	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)

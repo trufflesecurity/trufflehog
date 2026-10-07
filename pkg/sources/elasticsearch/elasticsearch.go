@@ -202,7 +202,7 @@ func (s *Source) Chunks(
 										},
 									},
 								},
-								Verify: s.verify,
+								SourceVerify: s.verify,
 							}
 
 							chunk.Data = []byte(document.message)

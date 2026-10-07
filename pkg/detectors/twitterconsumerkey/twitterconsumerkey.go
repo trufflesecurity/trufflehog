@@ -5,6 +5,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -57,9 +58,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			secret := strings.TrimSpace(secret)
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_TwitterConsumerkey,
+				DetectorType: detector_typepb.DetectorType_TwitterConsumerkey,
 				Raw:          []byte(key),
-				RawV2:        []byte(key + secret),
+				SecretParts: map[string]string{
+					"key":    key,
+					"secret": secret,
+				},
+				RawV2: []byte(key + secret),
 			}
 
 			if verify {
@@ -83,8 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_TwitterConsumerkey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_TwitterConsumerkey
 }
 
 func (s Scanner) Description() string {
@@ -99,7 +104,7 @@ func verifyBearerToken(ctx context.Context, client *http.Client, token string) (
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
 	if err == nil {
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		switch res.StatusCode {
 		case http.StatusOK, http.StatusForbidden:
 			// 403 indicates lack of permission, but valid token (could be due to twitter free tier)
@@ -128,7 +133,7 @@ func fetchBearerToken(ctx context.Context, client *http.Client, key, secret stri
 	if err != nil {
 		return "", err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -138,6 +143,13 @@ func fetchBearerToken(ctx context.Context, client *http.Client, key, secret stri
 		}
 		return token.AccessToken, nil
 	default:
+		body, readErr := io.ReadAll(res.Body)
+		if readErr != nil {
+			return "", fmt.Errorf("unexpected HTTP response status %d; failed to read response body: %w", res.StatusCode, readErr)
+		}
+		if len(body) > 0 {
+			return "", fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, strings.TrimSpace(string(body)))
+		}
 		return "", fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }

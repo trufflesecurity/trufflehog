@@ -2,6 +2,7 @@ package tableau
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -51,10 +52,7 @@ func (s Scanner) Keywords() []string {
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -85,10 +83,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, tokenSecret := range tokenSecrets {
 			for endpoint := range uniqueEndpoints {
 				result := detectors.Result{
-					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
+					DetectorType: detector_typepb.DetectorType_TableauPersonalAccessToken,
 					Raw:          []byte(tokenName),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", tokenName, tokenSecret, endpoint)),
 					ExtraData:    make(map[string]string),
+					SecretParts:  map[string]string{"token_name": tokenName, "pat_secret": tokenSecret, "endpoint": endpoint},
 				}
 
 				if verify {
@@ -254,8 +253,8 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_TableauPersonalAccessToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_TableauPersonalAccessToken
 }
 
 func (s Scanner) Description() string {

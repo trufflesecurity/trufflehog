@@ -38,11 +38,6 @@ func verifyCosmosTableDB(client *http.Client, accountUrl, key string) (bool, err
 
 	resp, err := client.Do(req)
 	if err != nil {
-		// lookup foo.table.cosmos.azure.com: no such host
-		if strings.Contains(err.Error(), "no such host") {
-			return false, errNoHost
-		}
-
 		return false, err
 	}
 	defer func() {

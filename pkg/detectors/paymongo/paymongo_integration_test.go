@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPaymongo_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestPaymongo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Paymongo,
+					DetectorType: detector_typepb.DetectorType_Paymongo,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestPaymongo_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Paymongo,
+					DetectorType: detector_typepb.DetectorType_Paymongo,
 					Verified:     false,
 				},
 			},

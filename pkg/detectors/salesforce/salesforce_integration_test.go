@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSalesforce_FromChunk(t *testing.T) {
@@ -57,7 +57,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Salesforce,
+					DetectorType: detector_typepb.DetectorType_Salesforce,
 					Verified:     true,
 				},
 			},
@@ -74,7 +74,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Salesforce,
+					DetectorType: detector_typepb.DetectorType_Salesforce,
 					Verified:     false,
 				},
 			},
@@ -103,7 +103,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Salesforce,
+					DetectorType: detector_typepb.DetectorType_Salesforce,
 					Verified:     false,
 				},
 			},
@@ -120,7 +120,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Salesforce,
+					DetectorType: detector_typepb.DetectorType_Salesforce,
 					Verified:     false,
 				},
 			},

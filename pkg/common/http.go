@@ -113,11 +113,8 @@ type InstrumentedTransport struct {
 }
 
 func (t *InstrumentedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-
-	sanitizedURL := sanitizeURL(req.URL.String())
-
-	// increment counter for the URL
-	recordHTTPRequest(sanitizedURL)
+	// increment counter for the request
+	recordHTTPRequest()
 
 	// Record start time for latency measurement
 	start := time.Now()
@@ -128,13 +125,13 @@ func (t *InstrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 	duration := time.Since(start)
 
 	if err != nil {
-		recordNetworkError(sanitizedURL)
+		recordNetworkError()
 		return nil, err
 	}
 
 	if resp != nil {
 		// record latency, response size and increment counter for non-200 status code
-		recordHTTPResponse(sanitizedURL, resp.StatusCode, duration.Seconds(), resp.ContentLength)
+		recordHTTPResponse(resp.StatusCode, duration.Seconds(), resp.ContentLength)
 	}
 
 	return resp, err

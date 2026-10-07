@@ -41,6 +41,15 @@ func TestAtlassian_Pattern(t *testing.T) {
 			`,
 			want: []string{"r6RkiQao3PgqY9MOKtonpJdU"},
 		},
+		{
+			name: "confluence macro-id near atlassian url - no match",
+			input: `
+				<a href="https://example.atlassian.net/wiki/spaces/X">link</a>
+				<ac:structured-macro ac:name="jira" ac:schema-version="1" ac:macro-id="11112222-3333-4444-5555-666677778888">
+				<ac:structured-macro ac:name="roadmap" ac:schema-version="1" ac:macro-id="aaaabbbb-cccc-dddd-eeee-ffff00001111">
+			`,
+			want: nil,
+		},
 	}
 
 	for _, test := range tests {

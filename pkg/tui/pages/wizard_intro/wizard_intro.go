@@ -101,8 +101,8 @@ func (m *WizardIntro) View() string {
 func (m *WizardIntro) ShortHelp() []key.Binding {
 	kb := make([]key.Binding, 0)
 	kb = append(kb,
-		m.Common.KeyMap.UpDown,
-		m.Common.KeyMap.Section,
+		m.KeyMap.UpDown,
+		m.KeyMap.Section,
 	)
 	return kb
 }

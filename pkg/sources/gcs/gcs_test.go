@@ -271,11 +271,11 @@ func createTestObject(id int) object {
 
 func createTestSourceChunk(id int) *sources.Chunk {
 	return &sources.Chunk{
-		SourceName: "test",
-		SourceType: sourcespb.SourceType_SOURCE_TYPE_GCS,
-		SourceID:   0,
-		Verify:     true,
-		Data:       []byte(fmt.Sprintf("hello world %d", id)),
+		SourceName:   "test",
+		SourceType:   sourcespb.SourceType_SOURCE_TYPE_GCS,
+		SourceID:     0,
+		SourceVerify: true,
+		Data:         []byte(fmt.Sprintf("hello world %d", id)),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Gcs{
 				Gcs: &source_metadatapb.GCS{
@@ -400,14 +400,14 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	// Test that the resume progress is set.
 	var progress strings.Builder
 	for i := range got {
-		progress.WriteString(fmt.Sprintf("md5hash%d", i))
+		fmt.Fprintf(&progress, "md5hash%d", i)
 		// Add a comma if not the last element.
 		if i != len(got)-1 {
 			progress.WriteString(",")
 		}
 	}
 
-	encodeResume := strings.Split(source.Progress.EncodedResumeInfo, ",")
+	encodeResume := strings.Split(source.EncodedResumeInfo, ",")
 	sort.Slice(encodeResume, func(i, j int) bool {
 		numI, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[i], "md5hash"))
 		numJ, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[j], "md5hash"))
@@ -415,9 +415,9 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	})
 
 	assert.Equal(t, progress.String(), strings.Join(encodeResume, ","))
-	assert.Equal(t, int32(defaultCachePersistIncrement), source.Progress.SectionsCompleted)
-	assert.Equal(t, int64(100), source.Progress.PercentComplete)
-	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", defaultCachePersistIncrement), source.Progress.Message)
+	assert.Equal(t, int32(defaultCachePersistIncrement), source.SectionsCompleted)
+	assert.Equal(t, int64(100), source.PercentComplete)
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", defaultCachePersistIncrement), source.Message)
 }
 
 func TestSource_CachePersistence(t *testing.T) {
@@ -457,8 +457,8 @@ func TestSource_CachePersistence(t *testing.T) {
 
 	// Test that the resume progress is empty.
 	// The cache should not have been persisted.
-	assert.Equal(t, "", source.Progress.EncodedResumeInfo)
-	assert.Equal(t, int32(wantObjCnt), source.Progress.SectionsCompleted)
-	assert.Equal(t, int64(100), source.Progress.PercentComplete)
-	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", wantObjCnt), source.Progress.Message)
+	assert.Equal(t, "", source.EncodedResumeInfo)
+	assert.Equal(t, int32(wantObjCnt), source.SectionsCompleted)
+	assert.Equal(t, int64(100), source.PercentComplete)
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", wantObjCnt), source.Message)
 }

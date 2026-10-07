@@ -2,9 +2,11 @@ package custom_detectors
 
 import (
 	"fmt"
-	"regexp"
+	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"strconv"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 )
 
 func ValidateKeywords(keywords []string) error {
@@ -52,15 +54,10 @@ func ValidatePrimaryRegexName(primaryRegexName string, regexes map[string]string
 	return nil
 }
 
+// ValidateVerifyEndpoint checks a verify endpoint with the same rule that
+// verifier auth applies to token endpoints, so the two cannot drift.
 func ValidateVerifyEndpoint(endpoint string, unsafe bool) error {
-	if len(endpoint) == 0 {
-		return fmt.Errorf("no endpoint")
-	}
-
-	if strings.HasPrefix(endpoint, "http://") && !unsafe {
-		return fmt.Errorf("http endpoint must have unsafe=true")
-	}
-	return nil
+	return verifierauth.ValidateEndpoint(endpoint, unsafe)
 }
 
 func ValidateVerifyHeaders(headers []string) error {
@@ -70,6 +67,28 @@ func ValidateVerifyHeaders(headers []string) error {
 		}
 	}
 	return nil
+}
+
+// StatusCodeMatchesRanges reports whether code falls within any of the given
+// ranges. Each element is either a single HTTP status code ("200") or a
+// hyphenated inclusive range ("200-299"). Entries must have been pre-validated
+// by ValidateVerifyRanges; malformed entries are silently skipped.
+func StatusCodeMatchesRanges(code int, ranges []string) bool {
+	for _, r := range ranges {
+		if !strings.Contains(r, "-") {
+			if c, err := strconv.Atoi(r); err == nil && c == code {
+				return true
+			}
+			continue
+		}
+		parts := strings.SplitN(r, "-", 2)
+		lo, err1 := strconv.Atoi(parts[0])
+		hi, err2 := strconv.Atoi(parts[1])
+		if err1 == nil && err2 == nil && code >= lo && code <= hi {
+			return true
+		}
+	}
+	return false
 }
 
 func ValidateVerifyRanges(ranges []string) error {

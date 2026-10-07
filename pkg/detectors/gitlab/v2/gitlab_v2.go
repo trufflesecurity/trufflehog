@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -12,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v1"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -34,19 +35,15 @@ var (
 )
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string { return []string{"glpat-"} }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Gitlab
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Gitlab
 }
 
 func (s Scanner) Description() string {
@@ -61,14 +58,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 
+		if detectors.StringShannonEntropy(resMatch) < 3.6 {
+			continue
+		}
+
 		for _, endpoint := range s.Endpoints() {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Gitlab,
+				DetectorType: detector_typepb.DetectorType_Gitlab,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + endpoint),
 				ExtraData: map[string]string{
 					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
 					"version":        fmt.Sprintf("%d", s.Version()),
+				},
+				SecretParts: map[string]string{
+					"key":  resMatch,
+					"host": endpoint,
 				},
 			}
 
@@ -78,16 +83,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				maps.Copy(s1.ExtraData, extraData)
 
-				s1.SetVerificationError(verificationErr)
+				s1.SetVerificationError(verificationErr, resMatch)
 
-				// for verified keys set the analysis info
+				// for verified keys break out of the endpoint loop to continue to next secret
 				if s1.Verified {
-					s1.AnalysisInfo = map[string]string{
-						"key":  resMatch,
-						"host": endpoint,
-					}
-
-					// if secret is verified with one endpoint, break the loop to continue to next secret
 					results = append(results, s1)
 					break
 				}

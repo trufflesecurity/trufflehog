@@ -212,7 +212,13 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 trufflehog github --org=trufflesecurity --results=verified
 ```
 
-## 3: Scan a GitHub Repo for only verified secrets and get JSON output
+## 3: Scan a GitHub Org excluding archived repositories
+
+```bash
+trufflehog github --org=trufflesecurity --exclude-archived
+```
+
+## 4: Scan a GitHub Repo for only verified secrets and get JSON output
 
 Command:
 
@@ -227,57 +233,59 @@ Expected output:
 ...
 ```
 
-## 4: Scan a GitHub Repo + its Issues and Pull Requests
+TruffleHog can also output [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) with `--sarif` instead of `--json`. GitHub code scanning understands SARIF natively, so uploading it surfaces findings inline on pull request diffs and in the repository's Security tab, and tracks findings as new/fixed across scans instead of reporting the same one every run — see the [TruffleHog Github Action](#octocat-trufflehog-github-action) section below for how to upload it. Note that, unlike the other output formats, SARIF results are buffered in memory for the full scan and written out at the end, since SARIF requires a single JSON document rather than a stream — fine for typical scans, but scans producing a very large number of results will use proportionally more memory.
+
+## 5: Scan a GitHub Repo + its Issues and Pull Requests
 
 ```bash
 trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
 ```
 
-## 5: Scan an S3 bucket for high-confidence results (verified + unknown)
+## 6: Scan an S3 bucket for high-confidence results (verified + unknown)
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --results=verified,unknown
 ```
 
-## 6: Scan S3 buckets using IAM Roles
+## 7: Scan S3 buckets using IAM Roles
 
 ```bash
 trufflehog s3 --role-arn=<iam role arn>
 ```
 
-## 7: Scan a Github Repo using SSH authentication in Docker
+## 8: Scan a Github Repo using SSH authentication in Docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
-## 8: Scan individual files or directories
+## 9: Scan individual files or directories
 
 ```bash
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 9: Scan a local git repo
+## 10: Scan a local git repo
 
 Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
 ```bash
-$ git clone git@github.com:trufflesecurity/test_keys.git
+git clone git@github.com:trufflesecurity/test_keys.git
 ```
 
 Run trufflehog from the parent directory (outside the git repo).
 ```bash
-$ trufflehog git file://test_keys --results=verified,unknown
+trufflehog git file://test_keys --results=verified,unknown
 ```
 
 To guard against malicious git configs in local scanning (see CVE-2025-41390), TruffleHog clones local git repositories to a temporary directory prior to scanning. This follows [Git's security best practices](https://git-scm.com/docs/git#_security). If you want to specify a custom path to clone the repository to (instead of tmp), you can use the `--clone-path` flag. If you'd like to skip the local cloning process and scan the repository directly (only do this for trusted repos), you can use the `--trust-local-git-config` flag.
 
-## 10: Scan GCS buckets for only verified secrets
+## 11: Scan GCS buckets for only verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified
 ```
 
-## 11: Scan a Docker image for only verified secrets
+## 12: Scan a Docker image for only verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -292,7 +300,7 @@ trufflehog docker --image docker://new_image:tag --results=verified
 trufflehog docker --image file://path_to_image.tar --results=verified
 ```
 
-## 12: Scan in CI
+## 13: Scan in CI
 
 Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
 
@@ -300,7 +308,7 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 trufflehog git file://. --since-commit main --branch feature-1 --results=verified,unknown --fail
 ```
 
-## 13: Scan a Postman workspace
+## 14: Scan a Postman workspace
 
 Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
@@ -308,13 +316,13 @@ Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple time
 trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
-## 14: Scan a Jenkins server
+## 15: Scan a Jenkins server
 
 ```bash
 trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
 ```
 
-## 15: Scan an Elasticsearch server
+## 16: Scan an Elasticsearch server
 
 ### Scan a Local Cluster
 
@@ -342,7 +350,7 @@ trufflehog elasticsearch \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
 ```
 
-## 16. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+## 17. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
 
 The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
 
@@ -356,21 +364,25 @@ In addition to the normal TruffleHog output, the `--object-discovery` flag creat
 
 For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github).
 
-## 17. Scan Hugging Face
+## 18. Scan Hugging Face
 
-### Scan a Hugging Face Model, Dataset or Space
+### Scan a Hugging Face Model, Dataset, Space or Bucket
 
 ```bash
-trufflehog huggingface --model <model_id> --space <space_id> --dataset <dataset_id>
+trufflehog huggingface \
+    --model <model_id> \
+    --dataset <dataset_id> \
+    --space <space_id> \
+    --bucket <bucket_id>
 ```
 
-### Scan all Models, Datasets and Spaces belonging to a Hugging Face Organization or User
+### Scan all Models, Datasets, Spaces and Buckets belonging to a Hugging Face Organization or User
 
 ```bash
 trufflehog huggingface --org <orgname> --user <username>
 ```
 
-(Optionally) When scanning an organization or user, you can skip an entire class of resources with `--skip-models`, `--skip-datasets`, `--skip-spaces` OR a particular resource with `--ignore-models <model_id>`, `--ignore-datasets <dataset_id>`, `--ignore-spaces <space_id>`.
+(Optionally) When scanning an organization or user, you can skip an entire class of resources with `--skip-all-models`, `--skip-all-datasets`, `--skip-all-spaces`, `--skip-all-buckets` OR a particular resource with `--ignore-models <model_id>`, `--ignore-datasets <dataset_id>`, `--ignore-spaces <space_id>`, `--ignore-buckets <bucket_id>`.
 
 ### Scan Discussion and PR Comments
 
@@ -378,7 +390,7 @@ trufflehog huggingface --org <orgname> --user <username>
 trufflehog huggingface --model <model_id> --include-discussions --include-prs
 ```
 
-## 18. Scan stdin Input
+## 19. Scan stdin Input
 
 ```bash
 aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
@@ -394,6 +406,8 @@ aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
   - A verified result means TruffleHog confirmed the credential is valid by testing it against the service's API. For private keys, we've confirmed the key can be used live for SSH or SSL authentication. Check out our Driftwood blog post to learn more [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 - Is there an easy way to ignore specific secrets?
   - If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets.
+- Can I find secrets with `trufflehog:ignore` included?
+  - Pass `--no-ignore-tag` to report results even when their line carries a `trufflehog:ignore` comment. This is useful for reviewing previously accepted findings.
 
 # :newspaper: What's new in v3?
 
@@ -413,7 +427,7 @@ For every potential credential that is detected, we've painstakingly implemented
 - **unverified**: Credential detected but not confirmed valid (may be invalid, expired, or verification disabled)  
 - **unknown**: Verification attempted but failed due to errors, such as a network or API failure
 
-For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
+For example, the [AWS credential detector](pkg/detectors/aws/access_keys/accesskey.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 # :memo: Usage
 
@@ -422,6 +436,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - git
 - github
 - gitlab
+- huggingface
 - docker
 - s3
 - filesystem (files and directories)
@@ -439,56 +454,135 @@ Each subcommand can have options that you can see with the `--help` flag provide
 
 ```
 $ trufflehog git --help
-usage: TruffleHog git [<flags>] <uri>
+usage: TruffleHog [<flags>] <command> [<args> ...]
 
-Find credentials in git repositories.
+TruffleHog is a tool for finding credentials.
+
 
 Flags:
-  -h, --help                Show context-sensitive help (also try --help-long and --help-man).
-      --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
-      --profile             Enables profiling and sets a pprof and fgprof server on :18066.
-  -j, --json                Output in JSON format.
-      --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
-      --github-actions      Output in GitHub Actions format.
-      --concurrency=20           Number of concurrent workers.
-      --no-verification     Don't verify the results.
-      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to all types.
-      --allow-verification-overlap
+  -h, --[no-]help                Show context-sensitive help (also try --help-long and --help-man).
+      --log-level=0              Logging verbosity on a scale of 0 (info) to 5 (trace). Can be
+                                 disabled with "-1".
+      --[no-]profile             Enables profiling and sets a pprof and fgprof server on :18066.
+  -j, --[no-]json                Output in JSON format.
+      --[no-]json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab,
+                                 and github sources.
+      --[no-]github-actions      Output in GitHub Actions format.
+      --[no-]sarif               Output in SARIF format for upload to GitHub code scanning (e.g.
+                                 via github/codeql-action/upload-sarif).
+      --concurrency=12           Number of concurrent workers.
+      --[no-]no-verification     Don't verify the results.
+      --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed
+                                 valid by API), unknown (verification failed due to error),
+                                 unverified (detected but not verified), filtered_unverified
+                                 (unverified but would have been filtered out). Defaults to
+                                 verified,unverified,unknown.
+      --[no-]no-color            Disable colorized output
+      --[no-]allow-verification-overlap
                                  Allow verification of similar credentials across detectors
-      --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
+      --[no-]filter-unverified   Only output first unverified result per chunk per detector if there
+                                 are more than one results.
       --filter-entropy=FILTER-ENTROPY
                                  Filter unverified results with Shannon entropy. Start with 3.0.
       --config=CONFIG            Path to configuration file.
-      --print-avg-detector-time
+      --[no-]print-avg-detector-time
                                  Print the average time spent on each detector.
-      --no-update           Don't check for updates.
-      --fail                Exit with code 183 if results are found.
+      --[no-]no-update           Don't check for updates.
+      --[no-]fail                Exit with code 183 if results are found.
+      --[no-]fail-on-scan-errors
+                                 Exit with non-zero error code if an error occurs during the scan.
       --verifier=VERIFIER ...    Set custom verification endpoints.
-      --custom-verifiers-only   Only use custom verification endpoints.
+      --[no-]custom-verifiers-only
+                                 Only use custom verification endpoints.
+      --detector-timeout=DETECTOR-TIMEOUT
+                                 Maximum time to spend scanning chunks per detector (e.g., 30s).
       --archive-max-size=ARCHIVE-MAX-SIZE
                                  Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
       --archive-max-depth=ARCHIVE-MAX-DEPTH
                                  Maximum depth of archive to scan.
       --archive-timeout=ARCHIVE-TIMEOUT
                                  Maximum time to spend extracting an archive.
-      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.
+      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or
+                                 IDs may be used, as well as ranges.
       --exclude-detectors=EXCLUDE-DETECTORS
-                                 Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.
-      --version             Show application version.
-  -i, --include-paths=INCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to include in scan.
-  -x, --exclude-paths=EXCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to exclude in scan.
-      --exclude-globs=EXCLUDE-GLOBS
-                                 Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.
-      --since-commit=SINCE-COMMIT
-                                 Commit to start scan from.
-      --branch=BRANCH            Branch to scan.
-      --max-depth=MAX-DEPTH      Maximum depth of commits to scan.
-      --bare                Scan bare repository (e.g. useful while using in pre-receive hooks)
+                                 Comma separated list of detector types to exclude. Protobuf name
+                                 or IDs may be used, as well as ranges. IDs defined here take
+                                 precedence over the include list.
+      --[no-]no-verification-cache
+                                 Disable verification caching
+      --[no-]force-skip-binaries
+                                 Force skipping binaries.
+      --[no-]force-skip-archives
+                                 Force skipping archives.
+      --[no-]skip-additional-refs
+                                 Skip additional references.
+      --user-agent-suffix=USER-AGENT-SUFFIX
+                                 Suffix to add to User-Agent.
+      --[no-]version             Show application version.
 
-Args:
-  <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
+Commands:
+help [<command>...]
+    Show help.
+
+git [<flags>] <uri>
+
+    Find credentials in git repositories.
+
+github [<flags>]
+    Find credentials in GitHub repositories.
+
+github-experimental --repo=REPO [<flags>]
+    Run an experimental GitHub scan. Must specify at least one experimental sub-module to run:
+    object-discovery.
+
+gitlab --token=TOKEN [<flags>]
+    Find credentials in GitLab repositories.
+
+filesystem [<flags>] [<path>...]
+    Find credentials in a filesystem.
+
+s3 [<flags>]
+    Find credentials in S3 buckets.
+
+gcs [<flags>]
+    Find credentials in GCS buckets.
+
+syslog --format=FORMAT [<flags>]
+    Scan syslog
+
+circleci --token=TOKEN
+    Scan CircleCI
+
+docker [<flags>]
+    Scan Docker Image
+
+
+travisci --token=TOKEN
+    Scan TravisCI
+
+postman [<flags>]
+    Scan Postman
+
+elasticsearch [<flags>]
+    Scan Elasticsearch
+
+jenkins --url=URL [<flags>]
+    Scan Jenkins
+
+huggingface [<flags>]
+    Find credentials in HuggingFace datasets, models and spaces.
+
+stdin
+    Find credentials from stdin.
+
+multi-scan
+    Find credentials in multiple sources defined in configuration.
+
+json-enumerator [<path>...]
+    Find credentials from a JSON enumerator input.
+
+analyze
+    Analyze API keys for fine-grained permissions information.
 ```
 
 For example, to scan a `git` repository, start with
@@ -505,7 +599,7 @@ The regex detectors can be used with any subcommand, while the sources defined
 in configuration are only for the `multi-scan` subcommand.
 
 The configuration format for sources can be found on Truffle Security's
-[source configuration documentation page](https://docs.trufflesecurity.com/scan-data-for-secrets).
+[source configuration documentation page](https://trufflesecurity.com/docs/connect-sources).
 
 Example GitHub source configuration and [options reference](https://docs.trufflesecurity.com/github#Fvm1I):
 
@@ -547,6 +641,58 @@ Multiple roles can be passed as separate arguments. The following command will a
 ```bash
 trufflehog s3 --role-arn=<iam-role-arn-1> --role-arn=<iam-role-arn-2>
 ```
+
+### Narrowing a scan to specific objects
+
+Large buckets often hold data that is never worth scanning, such as archives, media, and build artifacts. Two sets of flags keep those objects out of a scan. Both are matched against the object key before the object is downloaded, so a skipped object costs no GET request.
+
+Scan only the objects under one or more key prefixes:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-prefix=infra/ --include-prefix=services/
+```
+
+Skip the objects under a key prefix:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --exclude-prefix=projects/archived/
+```
+
+Both prefix flags can be used together to scan a subtree while leaving one part of it out. An object that matches an exclude prefix is always skipped, even if it also matches an include prefix:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-prefix=src/ --exclude-prefix=src/vendor/
+```
+
+Prefixes are matched literally, not as globs, and they are not confined to a path boundary. `--include-prefix=log` matches both `logs/app.txt` and `logs-archive/app.txt`.
+
+File extensions are filtered separately. Write them without a leading dot:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --exclude-extension=zip --exclude-extension=mp4
+```
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-extension=tf --include-extension=yaml
+```
+
+Unlike the prefix flags, `--include-extension` and `--exclude-extension` cannot be combined, because naming the extensions to scan already excludes every other one. Using both fails at startup.
+
+Extension matching is case insensitive, so `--exclude-extension=zip` also skips `BACKUP.ZIP`. An object whose key has no extension at all, such as `Makefile`, matches no entry: it is skipped when `--include-extension` is set, and kept when only `--exclude-extension` is set.
+
+Two things to watch when using `--include-extension`. A dotfile counts as all extension, so `.env` has the extension `env` and any include list that leaves out `env` will skip every `.env` file in the bucket. Since `.env` files are a common place for secrets to sit, add `--include-extension=env` unless you mean to skip them. And only the last extension counts, so `backup.tar.gz` has the extension `gz`: `--exclude-extension=tar.gz` matches nothing, while `--exclude-extension=gz` works.
+
+These flags also apply to object keys only, not to files inside an archive. `--exclude-extension=mp4` skips `clip.mp4` sitting in the bucket, but not a `clip.mp4` packed inside `media.zip`. Excluding `zip` skips the archive entirely.
+
+TruffleHog asks S3 to list only the keys under the include prefixes, so a prefix that covers a small part of a large bucket is listed quickly. Exclude prefixes and extensions are applied after listing, so they cut the cost of downloading objects but not the cost of listing them.
+
+Prefixes and extensions are applied together. An object has to pass both to be scanned, so the command below scans `src/main.tf` but skips both `src/bundle.zip` and `docs/guide.tf`:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --include-prefix=src/ --exclude-extension=zip
+```
+
+These flags narrow the objects within a bucket. To narrow which buckets are scanned, use `--bucket` or `--ignore-bucket`, which unlike the prefix flags cannot be used together.
 
 Exit Codes:
 
@@ -629,9 +775,24 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     head: # optional
     # Extra args to be passed to the trufflehog cli.
     extra_args: --log-level=2 --results=verified,unknown
+    # Scan with a specific TruffleHog version (default: latest).
+    version:
+    # Docker image to pull. Override to use a registry mirror (default: ghcr.io/trufflesecurity/trufflehog).
+    image:
 ```
 
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
+
+To upload results to GitHub code scanning instead, run TruffleHog directly with `--sarif` and pass the output to `github/codeql-action/upload-sarif`:
+
+```yaml
+- name: TruffleHog
+  run: trufflehog filesystem . --sarif --no-verification > results.sarif
+- name: Upload SARIF results
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
 
 #### Advanced Usage: Scan entire branch
 
@@ -690,6 +851,8 @@ status code, the secret is considered verified. If verification fails due to net
 Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret,
 and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
 your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
+
+The `verify` section is optional — if you omit it, matches are still reported as unverified, no webhook required. This makes Custom Detectors useful for flagging generic hardcoded secrets (e.g. `*.password=`, `*.secret=`) in config files like `.properties`, `.env`, or `.yaml` that TruffleHog's built-in, verified detectors won't otherwise catch. [Here](examples/generic_config_secrets.yml) is an example tuned for that use case.
 
 **NB:** This feature is alpha and subject to change.
 

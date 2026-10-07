@@ -74,3 +74,22 @@ func (t TargetedScanError) Error() string {
 func (t TargetedScanError) Unwrap() error {
 	return t.Err
 }
+
+// TargetNotFoundError indicates a targeted scan failed because the requested
+// target is definitively absent from the source (e.g. the file, commit, or
+// message it pointed to was deleted), as opposed to inaccessible due to
+// authorization or transient failures. Consumers can treat this as terminal:
+// retrying cannot succeed until a fresh scan updates the stored location.
+type TargetNotFoundError struct {
+	Err error
+}
+
+var _ error = (*TargetNotFoundError)(nil)
+
+func (t TargetNotFoundError) Error() string {
+	return t.Err.Error()
+}
+
+func (t TargetNotFoundError) Unwrap() error {
+	return t.Err
+}

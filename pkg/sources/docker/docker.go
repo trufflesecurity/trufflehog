@@ -351,8 +351,8 @@ func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEnt
 				},
 			},
 		},
-		Verify: s.verify,
-		Data:   []byte(historyInfo.entry.CreatedBy),
+		SourceVerify: s.verify,
+		Data:         []byte(historyInfo.entry.CreatedBy),
 	}
 
 	ctx.Logger().V(2).Info("scanning image history entry", "index", historyInfo.index, "layer", historyInfo.layerDigest)
@@ -382,7 +382,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	// Configure parallel gzip decompression for better performance
 	const (
@@ -394,7 +394,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	if err != nil {
 		return err
 	}
-	defer gzipReader.Close()
+	defer func() { _ = gzipReader.Close() }()
 
 	// Layers are tar archives, so we read them as tar files
 	tarReader := tar.NewReader(gzipReader)
@@ -464,7 +464,7 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 					},
 				},
 			},
-			Verify: s.verify,
+			SourceVerify: s.verify,
 		}
 		chunk.Data = data.Bytes()
 

@@ -48,7 +48,7 @@ func TestSource_Scan(t *testing.T) {
 				verify: true,
 			},
 			wantErr:              false,
-			totalScannedProjects: 2,
+			totalScannedProjects: 3,
 		},
 		{
 			name: "invalid token",
@@ -104,6 +104,42 @@ func TestSource_Scan(t *testing.T) {
 			// check total count of projects scanned
 			progress := s.GetProgress()
 			assert.Equal(t, tt.totalScannedProjects, progress.SectionsCompleted)
+		})
+	}
+}
+
+func TestRemoveCircleSha1Line(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "removes line containing CIRCLE_SHA1",
+			input: "export PATH=/usr/bin\nexport CIRCLE_SHA1=abcdef123456\necho done",
+			want:  "export PATH=/usr/bin\necho done",
+		},
+		{
+			name:  "no CIRCLE_SHA1 line present",
+			input: "line one\nline two",
+			want:  "line one\nline two",
+		},
+		{
+			name:  "removes multiple CIRCLE_SHA1 lines",
+			input: "a\nCIRCLE_SHA1=111\nb\nCIRCLE_SHA1=222\nc",
+			want:  "a\nb\nc",
+		},
+		{
+			name:  "empty input",
+			input: "",
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := removeCircleSha1Line([]byte(tt.input))
+			assert.Equal(t, tt.want, string(got))
 		})
 	}
 }

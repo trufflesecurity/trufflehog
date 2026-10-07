@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	aCtx "context"
 	"fmt"
 	"math/rand"
@@ -8,13 +9,17 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
+	"pgregory.net/rapid"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -25,6 +30,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -45,32 +51,32 @@ var _ detectors.Versioner = (*fakeDetectorV2)(nil)
 func (f fakeDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType(-1),
+			DetectorType: detector_typepb.DetectorType(-1),
 			Verified:     true,
 			Raw:          []byte("fake secret v1"),
 		},
 	}, nil
 }
 
-func (f fakeDetectorV1) Keywords() []string             { return []string{fakeDetectorKeyword} }
-func (f fakeDetectorV1) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
-func (f fakeDetectorV1) Version() int                   { return 1 }
+func (f fakeDetectorV1) Keywords() []string                 { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV1) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
+func (f fakeDetectorV1) Version() int                       { return 1 }
 
 func (f fakeDetectorV1) Description() string { return "fake detector v1" }
 
 func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
-			DetectorType: detectorspb.DetectorType(-1),
+			DetectorType: detector_typepb.DetectorType(-1),
 			Verified:     true,
 			Raw:          []byte("fake secret v2"),
 		},
 	}, nil
 }
 
-func (f fakeDetectorV2) Keywords() []string             { return []string{fakeDetectorKeyword} }
-func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
-func (f fakeDetectorV2) Version() int                   { return 2 }
+func (f fakeDetectorV2) Keywords() []string                 { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV2) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
+func (f fakeDetectorV2) Version() int                       { return 2 }
 
 func (f fakeDetectorV2) Description() string { return "fake detector v2" }
 
@@ -212,6 +218,307 @@ func TestFragmentLineOffsetWithPrimarySecret(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFragmentLineOffsetWithPrimarySecretMultiline(t *testing.T) {
+	result := &detectors.Result{
+		Raw: []byte("secret here"),
+	}
+	result.SetPrimarySecretValue("secret:\nsecret here")
+
+	chunk := &sources.Chunk{
+		Data: []byte("line1\nline2\nsecret:\nsecret here\nline5"),
+	}
+	lineOffset, isIgnored := FragmentLineOffset(chunk, result)
+	assert.False(t, isIgnored)
+	// offset 2 means line 3
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// HTML-like tags can collapse source blank lines during decoding.
+func TestFragmentLineOffsetUsesOriginalData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	result.SetPrimarySecretValue(`token = "synthetic-secret-value-123456"`)
+	chunk := &sources.Chunk{
+		Data:         []byte("# Date format:\n\ntoken = \"synthetic-secret-value-123456\""),
+		OriginalData: []byte("# Date format: <yyyymmdd>\n\n\n\n\ntoken = \"synthetic-secret-value-123456\""),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(5), lineOffset)
+}
+
+// Some decoded secrets have no matching source byte sequence.
+func TestFragmentLineOffsetFallsBackToDecodedData(t *testing.T) {
+	result := &detectors.Result{Raw: []byte("synthetic-secret-value-123456")}
+	chunk := &sources.Chunk{
+		Data:         []byte("decoded header\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("encoded-source-data"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, result)
+
+	assert.Equal(t, int64(1), lineOffset)
+}
+
+// Decoding can change the newline count between duplicate matches.
+func TestFragmentLineOffsetMapsOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data:         []byte("synthetic-secret-value-123456\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("synthetic-secret-value-123456\n\nsynthetic-secret-value-123456"),
+	}
+	results := []detectors.Result{{Raw: secret}, {Raw: secret}}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	lineOffset, _ := FragmentLineOffset(chunk, &results[1])
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// The same value can occur in discarded markup and emitted text, so surrounding
+// text has to identify which source occurrence the decoder kept.
+func TestFragmentLineOffsetSkipsRemovedOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("heading\nsynthetic-secret-value-123456"),
+		OriginalData: []byte("<div class=\"synthetic-secret-value-123456\">\n" +
+			"<p>heading</p>\n<p>synthetic-secret-value-123456</p>"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// A dropped occurrence can sit after the surviving one, so a later source match is
+// not automatically the right one.
+func TestFragmentLineOffsetSkipsLaterRemovedOriginalDataOccurrence(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("heading\nsynthetic-secret-value-123456\ntrailer"),
+		OriginalData: []byte("<p>heading</p>\n<p>synthetic-secret-value-123456</p>\n" +
+			"<div class=\"synthetic-secret-value-123456\">trailer</div>"),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(1), lineOffset)
+}
+
+// UTF-8 decoding replaces line breaks alongside malformed bytes.
+func TestFragmentLineOffsetUsesInvalidOriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	originalData := append([]byte("heading\n\xff\n"), secret...)
+	chunk := &sources.Chunk{
+		Data:         originalData,
+		OriginalData: originalData,
+	}
+	require.NotNil(t, (&decoders.UTF8{}).FromChunk(chunk))
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// Mapping must count bytes across multibyte UTF-8 before the secret.
+func TestFragmentLineOffsetUsesUTF8OriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data:         append([]byte("préface\n"), secret...),
+		OriginalData: append([]byte("préface\n\n"), secret...),
+	}
+
+	lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.Equal(t, int64(2), lineOffset)
+}
+
+// Replacement runes shift the decoded offset of the second match.
+func TestFragmentLineOffsetMapsInvalidOriginalDataDuplicates(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	originalData := append([]byte("\xff\n"), secret...)
+	originalData = append(originalData, '\n', 0xfe, '\n')
+	originalData = append(originalData, secret...)
+	chunk := &sources.Chunk{Data: originalData, OriginalData: originalData}
+	require.NotNil(t, (&decoders.UTF8{}).FromChunk(chunk))
+	results := []detectors.Result{{Raw: secret}, {Raw: secret}}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	lineOffset, _ := FragmentLineOffset(chunk, &results[1])
+
+	assert.Equal(t, int64(3), lineOffset)
+}
+
+// Source markup can retain an ignore tag absent from decoded data.
+func TestFragmentLineOffsetUsesOriginalDataIgnoreTag(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	chunk := &sources.Chunk{
+		Data: []byte("synthetic-secret-value-123456\ntext"),
+		OriginalData: []byte("<p>synthetic-secret-value-123456</p>" +
+			"<div class=\"trufflehog:ignore\">text</div>"),
+	}
+
+	_, ignored := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+	assert.True(t, ignored)
+}
+
+func buildDroppedSpanChunk(t *rapid.T, secret []byte, decoys bool) (*sources.Chunk, int) {
+	spans := rapid.IntRange(1, 8).Draw(t, "spans")
+	target := rapid.IntRange(0, spans-1).Draw(t, "target")
+
+	var original, decoded []byte
+	var secretOffset int
+	for i := range spans {
+		span := fmt.Appendf(nil, "<p id=%d>word%d\n</p>\n", i, i)
+		dropped := i != target && rapid.Bool().Draw(t, fmt.Sprintf("dropped%d", i))
+		if i == target {
+			secretOffset = len(original) + len(span)
+		}
+		if i == target || (decoys && dropped && rapid.Bool().Draw(t, fmt.Sprintf("decoy%d", i))) {
+			span = append(append(span, secret...), '\n')
+		}
+		original = append(original, span...)
+		if !dropped {
+			decoded = append(decoded, span...)
+		}
+	}
+	return &sources.Chunk{Data: decoded, OriginalData: original}, secretOffset
+}
+
+// Decoders drop whole spans, and the value they keep still has to land on its own
+// source line however much text went missing around it.
+func TestFragmentLineOffsetMapsDroppedSourceSpans(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		chunk, secretOffset := buildDroppedSpanChunk(t, secret, false)
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		assert.Equal(t, int64(bytes.Count(chunk.OriginalData[:secretOffset], []byte{'\n'})), lineOffset)
+	})
+}
+
+// When a dropped span holds the same value as a kept one the copies are only
+// distinguishable by their surroundings, so the exact line is best-effort. What is
+// not negotiable is that the reported line holds the value in the source.
+func TestFragmentLineOffsetReportsLineHoldingSecret(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		chunk, _ := buildDroppedSpanChunk(t, secret, true)
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		lines := bytes.Split(chunk.OriginalData, []byte{'\n'})
+		require.Less(t, int(lineOffset), len(lines))
+		assert.Contains(t, string(lines[lineOffset]), string(secret))
+	})
+}
+
+// Generated binary prefixes exercise byte values without requiring valid UTF-8.
+func TestFragmentLineOffsetMapsArbitraryOriginalData(t *testing.T) {
+	secret := []byte("synthetic-secret-value-123456")
+	rapid.Check(t, func(t *rapid.T) {
+		prefix := rapid.SliceOfN(rapid.Byte(), 0, 16).Draw(t, "prefix")
+		removed := rapid.SliceOfN(rapid.Byte(), 1, 16).Draw(t, "removed")
+		suffix := rapid.SliceOfN(rapid.Byte(), 0, 16).Draw(t, "suffix")
+		data := append(append(append(bytes.Clone(prefix), secret...), suffix...), '\n')
+		originalData := append(append(append(append(bytes.Clone(prefix), removed...), secret...), suffix...), '\n')
+		chunk := &sources.Chunk{Data: data, OriginalData: originalData}
+
+		lineOffset, _ := FragmentLineOffset(chunk, &detectors.Result{Raw: secret})
+
+		assert.Equal(t, int64(bytes.Count(originalData[:len(prefix)+len(removed)], []byte{'\n'})), lineOffset)
+	})
+}
+
+// TestFragmentLineOffset_DuplicateSecrets verifies that when the same secret
+// appears on multiple lines within a chunk, each result receives the correct
+// line number rather than always reporting the first occurrence's line.
+// Regression test for https://github.com/trufflesecurity/trufflehog/issues/2502
+func TestFragmentLineOffset_DuplicateSecrets(t *testing.T) {
+	secret := []byte("AKIA1234567890ABCDEF")
+	chunk := &sources.Chunk{
+		Data: []byte("line1\n" + // line 0
+			"line2\n" + // line 1
+			"AKIA1234567890ABCDEF\n" + // line 2 (first occurrence)
+			"line4\n" + // line 3
+			"AKIA1234567890ABCDEF\n" + // line 4 (second occurrence)
+			"line6\n" + // line 5
+			"AKIA1234567890ABCDEF\n"), // line 6 (third occurrence)
+	}
+
+	results := []detectors.Result{
+		{Raw: secret},
+		{Raw: secret},
+		{Raw: secret},
+	}
+	expectedLines := []int64{2, 4, 6}
+
+	AssignDuplicateLineOffsets(chunk, results)
+
+	seen := make(map[int64]bool)
+	for i, res := range results {
+		lineOffset, _ := FragmentLineOffset(chunk, &res)
+		assert.Equal(t, expectedLines[i], lineOffset,
+			"result[%d]: expected line %d but got %d", i, expectedLines[i], lineOffset)
+		assert.False(t, seen[lineOffset],
+			"result[%d]: line %d was already reported by a previous result (duplicate line number)", i, lineOffset)
+		seen[lineOffset] = true
+	}
+}
+
+func TestAssignDuplicateLineOffsets(t *testing.T) {
+	chunk := &sources.Chunk{
+		Data: []byte("aaa\nbbb\naaa\nccc\naaa\n"),
+	}
+	results := []detectors.Result{
+		{Raw: []byte("aaa")},
+		{Raw: []byte("aaa")},
+		{Raw: []byte("aaa")},
+		{Raw: []byte("bbb")},
+	}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	// Duplicates get offsets assigned.
+	assert.True(t, results[0].HasChunkOffset())
+	assert.Equal(t, int64(0), results[0].ChunkOffset())
+
+	assert.True(t, results[1].HasChunkOffset())
+	assert.Equal(t, int64(8), results[1].ChunkOffset()) // "aaa\nbbb\n" = 8 bytes
+
+	assert.True(t, results[2].HasChunkOffset())
+	assert.Equal(t, int64(16), results[2].ChunkOffset()) // "aaa\nbbb\naaa\nccc\n" = 16 bytes
+
+	// Unique secret does not get an offset.
+	assert.False(t, results[3].HasChunkOffset())
+}
+
+func TestFragmentLineOffset_DuplicateSecretsWithIgnoreTag(t *testing.T) {
+	secret := []byte("mysecret")
+	chunk := &sources.Chunk{
+		Data: []byte("mysecret\nfoo\nmysecret trufflehog:ignore\nbar\nmysecret\n"),
+	}
+	results := []detectors.Result{
+		{Raw: secret},
+		{Raw: secret},
+		{Raw: secret},
+	}
+	AssignDuplicateLineOffsets(chunk, results)
+
+	line0, ignored0 := FragmentLineOffset(chunk, &results[0])
+	assert.Equal(t, int64(0), line0)
+	assert.False(t, ignored0)
+
+	line1, ignored1 := FragmentLineOffset(chunk, &results[1])
+	assert.Equal(t, int64(2), line1)
+	assert.True(t, ignored1)
+
+	line2, ignored2 := FragmentLineOffset(chunk, &results[2])
+	assert.Equal(t, int64(4), line2)
+	assert.False(t, ignored2)
 }
 
 func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *detectors.Result) {
@@ -398,7 +705,7 @@ even more`,
 
 			tmpFile, err := os.CreateTemp("", "test_aws_credentials")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -446,10 +753,10 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
-	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
+	_, err = fmt.Fprintf(tmpFile, "test data using keyword %s", fakeDetectorKeyword)
 	assert.NoError(t, err)
 
 	const defaultOutputBufferSize = 64
@@ -490,8 +797,8 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = tmpFile.Close() }()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	_, err = tmpFile.WriteString("test stuff")
 	assert.Nil(t, err)
@@ -618,6 +925,39 @@ func TestProcessResult_IgnoreLinePresent_NothingGenerated(t *testing.T) {
 	assert.Empty(t, e.results)
 }
 
+func TestProcessResult_IgnoreLinePresentWithNoIgnoreTag_ResultGenerated(t *testing.T) {
+	// Arrange: Create an engine that does not honor ignore tags
+	e := Engine{results: make(chan detectors.ResultWithMetadata, 1), noIgnoreTag: true}
+
+	// Arrange: Create a Chunk
+	chunk := sources.Chunk{
+		Data: []byte("swordfish trufflehog:ignore"),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Git{
+				Git: &source_metadatapb.Git{
+					Line: 1,
+				},
+			},
+		},
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+	}
+
+	// Arrange: Create a Result
+	result := detectors.Result{
+		Raw:      []byte("swordfish"),
+		Verified: true,
+	}
+
+	// Act
+	e.processResult(context.AddLogger(t.Context()), result, chunk, 0, "", nil)
+
+	// Assert that the result was reported anyway, with its line number still set
+	require.Len(t, e.results, 1)
+	r := <-e.results
+	assert.Equal(t, []byte("swordfish"), r.Raw)
+	assert.Equal(t, int64(1), r.SourceMetadata.GetGit().GetLine())
+}
+
 func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	// Arrange: Create an engine
 	e := Engine{results: make(chan detectors.ResultWithMetadata, 1)}
@@ -643,7 +983,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 
 	// Arrange: Create a Result
 	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType(-1),
+		DetectorType: detector_typepb.DetectorType(-1),
 		ExtraData:    map[string]string{"key": "value"},
 		Raw:          []byte("something"),
 		RawV2:        []byte("something:else"),
@@ -665,7 +1005,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	assert.Equal(t, []byte("something:else"), r.RawV2)
 	assert.Equal(t, "someth***", r.Redacted)
 	assert.True(t, r.Verified)
-	assert.Equal(t, detectorspb.DetectorType(-1), r.DetectorType)
+	assert.Equal(t, detector_typepb.DetectorType(-1), r.DetectorType)
 	assert.Equal(t, sources.SourceID(1), r.SourceID)
 	assert.Equal(t, sources.JobID(2), r.JobID)
 	assert.Equal(t, int64(3), r.SecretID)
@@ -767,7 +1107,7 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	e, err := NewEngine(ctx, &c)
 	assert.NoError(t, err)
 
-	e.verificationOverlapTracker = new(verificationOverlapTracker)
+	e.verificationOverlapTracker = &atomic.Int32{}
 
 	e.Start(ctx)
 
@@ -783,8 +1123,8 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 
 	// We want 0 because these are custom detectors and verification should still occur.
-	wantDupe := 0
-	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
+	wantDupe := int32(0)
+	assert.Equal(t, wantDupe, e.verificationOverlapTracker.Load())
 }
 
 func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
@@ -801,7 +1141,7 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "no overlap, retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
 			},
 			retainFalsePositives:      true,
 			wantUnverifiedSecretCount: 1,
@@ -809,25 +1149,16 @@ func TestEngine_FalsePositivesRetainedCorrectly(t *testing.T) {
 		{
 			name: "no overlap, do not retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
 			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
 		},
 		{
-			name: "overlap, retain false positives",
-			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
-			},
-			retainFalsePositives:      true,
-			wantUnverifiedSecretCount: 2,
-		},
-		{
 			name: "overlap, do not retain false positives",
 			detectors: []detectors.Detector{
-				passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"sample"}},
-				passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"ample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"sample"}},
+				passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"ample"}},
 			},
 			retainFalsePositives:      false,
 			wantUnverifiedSecretCount: 0,
@@ -1159,12 +1490,15 @@ func (c customCleaner) FromData(aCtx.Context, bool, []byte) ([]detectors.Result,
 	return []detectors.Result{}, nil
 }
 
-func (c customCleaner) Keywords() []string             { return []string{} }
-func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+func (c customCleaner) Keywords() []string                 { return []string{} }
+func (c customCleaner) Type() detector_typepb.DetectorType { return detector_typepb.DetectorType(-1) }
 
 func (customCleaner) Description() string { return "" }
 
-func (c customCleaner) CleanResults([]detectors.Result) []detectors.Result {
+func (c customCleaner) CleanResults(result []detectors.Result, verficationEnabled bool) []detectors.Result {
+	if !verficationEnabled {
+		return []detectors.Result{{}}
+	}
 	return []detectors.Result{}
 }
 func (c customCleaner) ShouldCleanResultsIrrespectiveOfConfiguration() bool { return c.ignoreConfig }
@@ -1174,6 +1508,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 		name               string
 		cleaningConfigured bool
 		ignoreConfig       bool
+		verify             bool
 		resultsToClean     []detectors.Result
 		wantResults        []detectors.Result
 	}{
@@ -1181,6 +1516,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to clean",
 			cleaningConfigured: true,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
 		},
@@ -1188,6 +1524,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "respect config to not clean",
 			cleaningConfigured: false,
 			ignoreConfig:       false,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{{}},
 		},
@@ -1195,8 +1532,17 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			name:               "clean irrespective of config",
 			cleaningConfigured: false,
 			ignoreConfig:       true,
+			verify:             true,
 			resultsToClean:     []detectors.Result{{}},
 			wantResults:        []detectors.Result{},
+		},
+		{
+			name:               "clean irrespective of config with verification disabled",
+			cleaningConfigured: false,
+			ignoreConfig:       true,
+			verify:             false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{{}},
 		},
 	}
 
@@ -1210,9 +1556,10 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 			engine := Engine{
 				filterUnverified:     tt.cleaningConfigured,
 				retainFalsePositives: true,
+				verify:               tt.verify,
 			}
 
-			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
+			cleaned := engine.filterResults(context.Background(), "detect", &match, tt.resultsToClean)
 
 			assert.ElementsMatch(t, tt.wantResults, cleaned)
 		})
@@ -1296,25 +1643,25 @@ func TestEngine_ShouldVerifyChunk(t *testing.T) {
 		{
 			name:        "detector override by exact version",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 2},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 2},
 			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
 		},
 		{
 			name:        "detector override by versionless config",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 0},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 0},
 			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
 		},
 		{
 			name:        "no detector override because of detector type mismatch",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_NpmToken, Version: 2},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_NpmToken, Version: 2},
 			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
 		},
 		{
 			name:        "no detector override because of detector version mismatch",
 			detector:    &gitlab.Scanner{},
-			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 1},
+			overrideKey: config.DetectorID{ID: detector_typepb.DetectorType_Gitlab, Version: 1},
 			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
 		},
 	}
@@ -1357,12 +1704,28 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	assert.NoError(t, err)
 
 	var count int
+	noCloudEndpointDetectors := map[detector_typepb.DetectorType]struct{}{
+		detector_typepb.DetectorType_ArtifactoryAccessToken:     {},
+		detector_typepb.DetectorType_ArtifactoryReferenceToken:  {},
+		detector_typepb.DetectorType_TableauPersonalAccessToken: {},
+		detector_typepb.DetectorType_HashiCorpVaultAuth:         {},
+		detector_typepb.DetectorType_JiraDataCenterPAT:          {},
+		detector_typepb.DetectorType_ConfluenceDataCenter:       {},
+		detector_typepb.DetectorType_BitbucketDataCenter:        {},
+		detector_typepb.DetectorType_HashiCorpVaultBatchToken:   {},
+		detector_typepb.DetectorType_HashiCorpVaultToken:        {},
+		// these do not have any cloud endpoint
+	}
+
 	for _, det := range e.detectors {
 		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
 			id := config.GetDetectorID(det)
-			if len(endpoints.Endpoints()) == 0 && det.Type() != detectorspb.DetectorType_ArtifactoryAccessToken && det.Type() != detectorspb.DetectorType_TableauPersonalAccessToken { // artifactory and tableau does not have any cloud endpoint
-				t.Fatalf("detector %q Endpoints() is empty", id.String())
+			if len(endpoints.Endpoints()) == 0 {
+				if _, ok := noCloudEndpointDetectors[det.Type()]; !ok {
+					t.Fatalf("detector %q Endpoints() is empty", id.String())
+				}
 			}
+
 			count++
 		}
 	}
@@ -1391,6 +1754,18 @@ def test_something():
 			expectedFindings: 0,
 		},
 		{
+			name: "ignore postgres url without explicit port",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # The detector normalizes this URL to include :5432, but the ignore tag should still be honored.
+    assert connection_string == "postgres://master_user:master_password@hostname/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
 			name: "ignore not on secret line",
 			content: `
 # tests/example_false_positive.py
@@ -1414,7 +1789,7 @@ def test_something():
 
 			tmpFile, err := os.CreateTemp("", "test_creds")
 			assert.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
 			assert.NoError(t, err)
@@ -1452,7 +1827,7 @@ def test_something():
 }
 
 type passthroughDetector struct {
-	detectorType detectorspb.DetectorType
+	detectorType detector_typepb.DetectorType
 	keywords     []string
 	secret       string
 }
@@ -1470,9 +1845,9 @@ func (p passthroughDetector) FromData(_ aCtx.Context, verify bool, data []byte) 
 	}, nil
 }
 
-func (p passthroughDetector) Keywords() []string             { return p.keywords }
-func (p passthroughDetector) Type() detectorspb.DetectorType { return p.detectorType }
-func (p passthroughDetector) Description() string            { return "fake detector for testing" }
+func (p passthroughDetector) Keywords() []string                 { return p.keywords }
+func (p passthroughDetector) Type() detector_typepb.DetectorType { return p.detectorType }
+func (p passthroughDetector) Description() string                { return "fake detector for testing" }
 
 type passthroughDecoder struct{}
 
@@ -1483,78 +1858,119 @@ func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableC
 	}
 }
 
-func (p passthroughDecoder) Type() detectorspb.DecoderType { return detectorspb.DecoderType(-1) }
+func (p passthroughDecoder) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType(-1)
+}
 
+// TestEngine_DetectChunk_UsesVerifyFlag validates that detectChunk correctly forwards detectableChunk.verify to
+// detectors.
 func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
-	// Arrange: Create a minimal engine.
-	e := &Engine{
-		results:           make(chan detectors.ResultWithMetadata, 1),
-		verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+	testCases := []struct {
+		name   string
+		verify bool
+	}{
+		{name: "verify=true", verify: true},
+		{name: "verify=false", verify: false},
 	}
 
-	// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
-	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"keyword"}}})
-	detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
-	require.Len(t, detectorMatches, 1)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange: Create a minimal engine.
+			e := &Engine{
+				results:           make(chan detectors.ResultWithMetadata, 1),
+				verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+			}
 
-	// Arrange: Create a chunk to detect.
-	chunk := detectableChunk{
-		chunk: sources.Chunk{
-			Verify: true,
-		},
-		detector: detectorMatches[0],
-		wgDoneFn: func() {},
-	}
+			// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+			ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{passthroughDetector{keywords: []string{"keyword"}}})
+			detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
+			require.Len(t, detectorMatches, 1)
 
-	// Act
-	e.detectChunk(ctx, chunk)
-	close(e.results)
+			// Arrange: Create a chunk to detect.
+			chunk := detectableChunk{
+				detector: detectorMatches[0],
+				verify:   tc.verify,
+				wgDoneFn: func() {},
+			}
 
-	// Assert: Confirm that a result was generated and that it has the expected verify flag.
-	select {
-	case result := <-e.results:
-		assert.True(t, result.Result.Verified)
-	default:
-		t.Errorf("expected a result but did not get one")
+			// Act
+			e.detectChunk(ctx, chunk)
+			close(e.results)
+
+			// Assert: Confirm that a result was generated and that it has the expected verify flag.
+			select {
+			case result := <-e.results:
+				assert.Equal(t, tc.verify, result.Verified)
+			default:
+				t.Errorf("expected a result but did not get one")
+			}
+		})
 	}
 }
 
+// TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag validates that scannerWorker generates detectableChunk
+// structs that have the correct verify flag set. It also validates that the original chunks' SourceVerify flags are
+// unchanged.
 func TestEngine_ScannerWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
-	// Arrange: Create a minimal engine.
-	detector := &passthroughDetector{keywords: []string{"keyword"}}
-	e := &Engine{
-		AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
-		decoders:             []decoders.Decoder{passthroughDecoder{}},
-		detectableChunksChan: make(chan detectableChunk, 1),
-		sourceManager:        sources.NewManager(),
-		verify:               true,
+	testCases := []struct {
+		name         string
+		engineVerify bool
+		sourceVerify bool
+		wantVerify   bool
+	}{
+		{name: "engineVerify=false,sourceVerify=false", engineVerify: false, sourceVerify: false, wantVerify: false},
+		{name: "engineVerify=false,sourceVerify=true", engineVerify: false, sourceVerify: true, wantVerify: false},
+		{name: "engineVerify=true,sourceVerify=false", engineVerify: true, sourceVerify: false, wantVerify: false},
+		{name: "engineVerify=true,sourceVerify=true", engineVerify: true, sourceVerify: true, wantVerify: true},
 	}
 
-	// Arrange: Create a chunk to scan.
-	chunk := sources.Chunk{
-		Data:   []byte("keyword"),
-		Verify: true,
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange: Create a minimal engine.
+			detector := &passthroughDetector{keywords: []string{"keyword"}}
+			e := &Engine{
+				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
+				decoders:             []decoders.Decoder{passthroughDecoder{}},
+				detectableChunksChan: make(chan detectableChunk, 1),
+				sourceManager:        sources.NewManager(),
+				verify:               tc.engineVerify,
+				maxDecodeDepth:       1,
+			}
 
-	// Arrange: Enqueue a chunk to be scanned.
-	e.sourceManager.ScanChunk(&chunk)
+			// Arrange: Create a chunk to scan.
+			chunk := sources.Chunk{
+				Data:         []byte("keyword"),
+				SourceVerify: tc.sourceVerify,
+			}
 
-	// Act
-	go e.scannerWorker(ctx)
+			// Arrange: Enqueue a chunk to be scanned.
+			e.sourceManager.ScanChunk(&chunk)
 
-	// Assert: Confirm that a chunk was generated and that it has the expected verify flag.
-	select {
-	case chunk := <-e.detectableChunksChan:
-		assert.True(t, chunk.chunk.Verify)
-	case <-time.After(1 * time.Second):
-		t.Errorf("expected a detectableChunk but did not get one")
+			// Act
+			go e.scannerWorker(ctx)
+
+			// Assert: Confirm that a chunk was generated, that its SourceVerify flag is unchanged, and that its verify
+			// flag is correctly set.
+			select {
+			case chunk := <-e.detectableChunksChan:
+				assert.Equal(t, tc.sourceVerify, chunk.chunk.SourceVerify)
+				assert.Equal(t, tc.wantVerify, chunk.verify)
+			case <-time.After(1 * time.Second):
+				t.Errorf("expected a detectableChunk but did not get one")
+			}
+		})
 	}
 }
 
+// TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag validates that the results directly
+// generated by verificationOverlapWorker all came from detector invocations with the verify flag cleared (because these
+// results were generated from verification overlaps). It also validates that detectableChunk structs generated by
+// verificationOverlapWorker have their verify flags correctly set, and that these structs' original chunks'
+// SourceVerify flags are unchanged.
 func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t *testing.T) {
 	ctx := context.Background()
 
@@ -1580,15 +1996,15 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Arrange: Create a chunk to "scan."
 		chunk := sources.Chunk{
-			Data:   []byte("keyword ;oahpow8heg;blaisd"),
-			Verify: true,
+			Data:         []byte("keyword ;oahpow8heg;blaisd"),
+			SourceVerify: true,
 		}
 
 		// Arrange: Create overlapping detector matches. We can't create them directly, so we have to use a minimal A-H
 		// core.
 		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
-			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}},
-			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"keyw"}},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"keyword"}},
 		})
 		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
 		require.Len(t, detectorMatches, 2)
@@ -1608,14 +2024,16 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it).
 		for result := range e.results {
-			assert.False(t, result.Result.Verified)
+			assert.False(t, result.Verified)
 		}
 
-		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its
+		// verify flag is correctly set.
 		// CMR: There should be not be any of these chunks. However, due to what I believe is an unrelated bug, there
-		// are. This test ensures that even in that erroneous case, their Verify flag is correct.
+		// are. This test ensures that even in that erroneous case, their contents are correct.
 		for detectableChunk := range processedDetectableChunks {
-			assert.True(t, detectableChunk.chunk.Verify)
+			assert.True(t, detectableChunk.verify)
+			assert.True(t, detectableChunk.chunk.SourceVerify)
 		}
 	})
 	t.Run("no overlap", func(t *testing.T) {
@@ -1639,15 +2057,15 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 
 		// Arrange: Create a chunk to "scan."
 		chunk := sources.Chunk{
-			Data:   []byte("keyword ;oahpow8heg;blaisd"),
-			Verify: true,
+			Data:         []byte("keyword ;oahpow8heg;blaisd"),
+			SourceVerify: true,
 		}
 
 		// Arrange: Create non-overlapping detector matches. We can't create them directly, so we have to use a minimal
 		// A-H core.
 		ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
-			passthroughDetector{detectorType: detectorspb.DetectorType(-1), keywords: []string{"keyw"}, secret: "oahpow"},
-			passthroughDetector{detectorType: detectorspb.DetectorType(-2), keywords: []string{"keyword"}, secret: "blaisd"},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"keyw"}, secret: "oahpow"},
+			passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"keyword"}, secret: "blaisd"},
 		})
 		detectorMatches := ahcore.FindDetectorMatches(chunk.Data)
 		require.Len(t, detectorMatches, 2)
@@ -1664,9 +2082,392 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		close(e.detectableChunksChan)
 		close(processedDetectableChunks)
 
-		// Assert: Confirm that every generated detectable chunk carries the original Verify flag.
+		// Assert: Confirm that SourceVerify flags are unchanged, and verify flags are correctly set.
 		for detectableChunk := range processedDetectableChunks {
-			assert.True(t, detectableChunk.chunk.Verify)
+			assert.True(t, detectableChunk.chunk.SourceVerify)
+			assert.True(t, detectableChunk.verify)
 		}
 	})
+}
+
+func TestEngine_IterativeDecoding(t *testing.T) {
+	t.Parallel()
+
+	const (
+		// base64(base64("my-secret-key-test-value"))
+		doubleEncoded   = "YlhrdGMyVmpjbVYwTFd0bGVTMTBaWE4wTFhaaGJIVmw="
+		detectorKeyword = "my-secret"
+
+		// escapedUnicode("my-secret-key-test-value")
+		escapedUnicode = `\u006d\u0079\u002d\u0073\u0065\u0063\u0072\u0065\u0074\u002d\u006b\u0065\u0079\u002d\u0074\u0065\u0073\u0074\u002d\u0076\u0061\u006c\u0075\u0065`
+
+		// escapedUnicode(escapedUnicode("my-secret-key-test-value"))
+		doubleEscapedUnicode = `\u005c\u0075\u0030\u0030\u0036\u0064\u005c\u0075\u0030\u0030\u0037\u0039\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0033\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0036\u0033\u005c\u0075\u0030\u0030\u0037\u0032\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0036\u0062\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0039\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0036\u0035\u005c\u0075\u0030\u0030\u0037\u0033\u005c\u0075\u0030\u0030\u0037\u0034\u005c\u0075\u0030\u0030\u0032\u0064\u005c\u0075\u0030\u0030\u0037\u0036\u005c\u0075\u0030\u0030\u0036\u0031\u005c\u0075\u0030\u0030\u0036\u0063\u005c\u0075\u0030\u0030\u0037\u0035\u005c\u0075\u0030\u0030\u0036\u0035`
+
+		// base64(escapedUnicode("my-secret-key-test-value"))
+		b64EscapedUnicode = "XHUwMDZkXHUwMDc5XHUwMDJkXHUwMDczXHUwMDY1XHUwMDYzXHUwMDcyXHUwMDY1XHUwMDc0XHUwMDJkXHUwMDZiXHUwMDY1XHUwMDc5XHUwMDJkXHUwMDc0XHUwMDY1XHUwMDczXHUwMDc0XHUwMDJkXHUwMDc2XHUwMDYxXHUwMDZjXHUwMDc1XHUwMDY1"
+
+		// escapedUnicode(base64("my-secret-key-test-value"))
+		escapedUnicodeB64 = `\u0062\u0058\u006b\u0074\u0063\u0032\u0056\u006a\u0063\u006d\u0056\u0030\u004c\u0057\u0074\u006c\u0065\u0053\u0031\u0030\u005a\u0058\u004e\u0030\u004c\u0058\u005a\u0068\u0062\u0048\u0056\u006c`
+	)
+
+	// "token: bXktc2VjcmV0LWtleS10ZXN0LXZhbHVl end" as UTF-16LE
+	utf16ContainingBase64 := []byte{
+		116, 0, 111, 0, 107, 0, 101, 0, 110, 0, 58, 0, 32, 0,
+		98, 0, 88, 0, 107, 0, 116, 0, 99, 0, 50, 0, 86, 0, 106, 0,
+		99, 0, 109, 0, 86, 0, 48, 0, 76, 0, 87, 0, 116, 0, 108, 0,
+		101, 0, 83, 0, 49, 0, 48, 0, 90, 0, 88, 0, 78, 0, 48, 0,
+		76, 0, 88, 0, 90, 0, 104, 0, 98, 0, 72, 0, 86, 0, 108, 0,
+		32, 0, 101, 0, 110, 0, 100, 0,
+	}
+
+	tests := []struct {
+		name        string
+		input       []byte
+		depth       int
+		wantKeyword bool
+	}{
+		{
+			name:        "double base64, depth=1, miss",
+			input:       []byte("token: " + doubleEncoded),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "double base64, depth=2, found",
+			input:       []byte("token: " + doubleEncoded),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "utf16+base64, depth=1, miss",
+			input:       utf16ContainingBase64,
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "utf16+base64, depth=2, found",
+			input:       utf16ContainingBase64,
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "escaped unicode, depth=1, found",
+			input:       []byte("token: " + escapedUnicode),
+			depth:       1,
+			wantKeyword: true,
+		},
+		{
+			name:        "double escaped unicode, depth=1, miss",
+			input:       []byte("token: " + doubleEscapedUnicode),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "double escaped unicode, depth=2, found",
+			input:       []byte("token: " + doubleEscapedUnicode),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "base64+escaped unicode, depth=1, miss",
+			input:       []byte("token: " + b64EscapedUnicode),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "base64+escaped unicode, depth=2, found",
+			input:       []byte("token: " + b64EscapedUnicode),
+			depth:       2,
+			wantKeyword: true,
+		},
+		{
+			name:        "escaped unicode+base64, depth=1, miss",
+			input:       []byte("token: " + escapedUnicodeB64),
+			depth:       1,
+			wantKeyword: false,
+		},
+		{
+			name:        "escaped unicode+base64, depth=2, found",
+			input:       []byte("token: " + escapedUnicodeB64),
+			depth:       2,
+			wantKeyword: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			detector := &passthroughDetector{
+				keywords:     []string{detectorKeyword},
+				detectorType: detector_typepb.DetectorType(9999),
+			}
+			e := &Engine{
+				AhoCorasickCore:      ahocorasick.NewAhoCorasickCore([]detectors.Detector{detector}),
+				decoders:             decoders.DefaultDecoders(),
+				detectableChunksChan: make(chan detectableChunk, 64),
+				sourceManager:        sources.NewManager(),
+				maxDecodeDepth:       tt.depth,
+			}
+
+			e.sourceManager.ScanChunk(&sources.Chunk{Data: tt.input})
+			go e.scannerWorker(ctx)
+
+			var found bool
+			timeout := time.After(2 * time.Second)
+		Loop:
+			for {
+				select {
+				case dc := <-e.detectableChunksChan:
+					dc.wgDoneFn()
+					found = true
+					for {
+						select {
+						case dc2 := <-e.detectableChunksChan:
+							dc2.wgDoneFn()
+						case <-time.After(200 * time.Millisecond):
+							break Loop
+						}
+					}
+				case <-timeout:
+					break Loop
+				}
+			}
+
+			if tt.wantKeyword {
+				assert.True(t, found, "expected detector match")
+			} else {
+				assert.False(t, found, "unexpected detector match")
+			}
+		})
+	}
+}
+
+// captureDispatcher records every dispatched result for assertion in tests. It
+// is safe for concurrent use because the engine runs many notifier workers
+// against a single dispatcher.
+type captureDispatcher struct {
+	mu      sync.Mutex
+	results []detectors.ResultWithMetadata
+}
+
+func (d *captureDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.results = append(d.results, result)
+	return nil
+}
+
+// TestNotifierWorker_ReverifiedResultsBypassDedupe verifies that the notifier's
+// dedupe cache is skipped when a result carries a non-zero SecretID — i.e., when
+// it originated from reverification — so that the dispatcher sees every
+// reverification result even when the underlying secret has not changed.
+func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
+	tests := []struct {
+		name         string
+		secretID     int64
+		wantDispatch int
+	}{
+		{
+			name:         "non-reverified duplicates are deduplicated",
+			secretID:     0,
+			wantDispatch: 1,
+		},
+		{
+			name:         "reverified duplicates bypass the dedupe cache",
+			secretID:     42,
+			wantDispatch: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache, err := lru.New[string, struct{}](16)
+			require.NoError(t, err)
+
+			disp := &captureDispatcher{}
+			e := &Engine{
+				results:                 make(chan detectors.ResultWithMetadata, 4),
+				dedupeCache:             cache,
+				dispatcher:              disp,
+				notifyVerifiedResults:   true,
+				notifyUnverifiedResults: true,
+				notifyUnknownResults:    true,
+			}
+
+			result := detectors.ResultWithMetadata{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Git{
+						Git: &source_metadatapb.Git{Line: 1},
+					},
+				},
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+				SecretID:   tt.secretID,
+				Result: detectors.Result{
+					DetectorType: detector_typepb.DetectorType(-1),
+					Raw:          []byte("a-secret"),
+					Verified:     true,
+				},
+			}
+
+			// Push the same result twice — identical hash inputs.
+			e.results <- result
+			e.results <- result
+			close(e.results)
+
+			e.notifierWorker(context.Background())
+
+			assert.Equal(t, tt.wantDispatch, len(disp.results))
+		})
+	}
+}
+
+// TestNotifierWorker_ConcurrentDuplicatesDispatchedOnce verifies that when many
+// notifier workers share the dedupe cache, identical results are dispatched
+// exactly once. The check-and-insert must be atomic; a separate lookup and add
+// lets two workers both miss and both dispatch.
+//
+// The race exists only on a key's first sighting, so the test uses many distinct
+// secrets and queues each one's copies back to back, giving every key its own
+// chance for workers to collide. It guards a logical race rather than a data
+// race, so -race does not flag the non-atomic version.
+func TestNotifierWorker_ConcurrentDuplicatesDispatchedOnce(t *testing.T) {
+	const (
+		numSecrets = 1000
+		numCopies  = 16
+		numWorkers = 16
+	)
+
+	// Sized to hold every key so eviction cannot cause a re-dispatch.
+	cache, err := lru.New[string, struct{}](numSecrets)
+	require.NoError(t, err)
+
+	disp := &captureDispatcher{}
+	e := &Engine{
+		results:                 make(chan detectors.ResultWithMetadata, numSecrets*numCopies),
+		dedupeCache:             cache,
+		dispatcher:              disp,
+		notifyVerifiedResults:   true,
+		notifyUnverifiedResults: true,
+		notifyUnknownResults:    true,
+	}
+
+	// Fill and close the channel before starting workers so they all contend
+	// on the cache at once instead of idling on an empty channel. SecretID
+	// stays 0 so every copy goes through the dedupe cache.
+	for i := range numSecrets {
+		result := detectors.ResultWithMetadata{
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{
+					Git: &source_metadatapb.Git{Line: 1},
+				},
+			},
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+			Result: detectors.Result{
+				DetectorType: detector_typepb.DetectorType(-1),
+				Raw:          []byte(fmt.Sprintf("secret-%d", i)),
+				Verified:     true,
+			},
+		}
+		for range numCopies {
+			e.results <- result
+		}
+	}
+	close(e.results)
+
+	var wg sync.WaitGroup
+	for range numWorkers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e.notifierWorker(context.Background())
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, numSecrets, len(disp.results))
+}
+
+func setupSourceMappingBench(size int, decode bool) (*sources.Chunk, *detectors.Result) {
+	secret := []byte("synthetic-secret-value-123456")
+	var original, decoded []byte
+	for i := 0; len(original) < size; i++ {
+		original = append(original, fmt.Sprintf("<p class=\"row\">line%d</p>\n", i)...)
+		decoded = append(decoded, fmt.Sprintf("line%d\n", i)...)
+	}
+	original = append(original, "<p>"...)
+	original = append(original, secret...)
+	original = append(original, "</p>\n"...)
+	decoded = append(decoded, secret...)
+	decoded = append(decoded, '\n')
+	if !decode {
+		decoded = original
+	}
+	return &sources.Chunk{Data: decoded, OriginalData: original}, &detectors.Result{Raw: secret}
+}
+
+func benchmarkSourceMapping(b *testing.B, size int, decode bool) {
+	chunk, result := setupSourceMappingBench(size, decode)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
+	}
+}
+
+func BenchmarkFragmentLineOffset_Identical_Small(b *testing.B) {
+	benchmarkSourceMapping(b, 64, false)
+}
+
+func BenchmarkFragmentLineOffset_Identical_DefaultChunkSize(b *testing.B) {
+	benchmarkSourceMapping(b, sources.DefaultChunkSize, false)
+}
+
+func BenchmarkFragmentLineOffset_Identical_Large(b *testing.B) {
+	benchmarkSourceMapping(b, 64*1024, false)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_Small(b *testing.B) {
+	benchmarkSourceMapping(b, 64, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_DefaultChunkSize(b *testing.B) {
+	benchmarkSourceMapping(b, sources.DefaultChunkSize, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_MaxRealisticChunk(b *testing.B) {
+	benchmarkSourceMapping(b, sources.TotalChunkSize, true)
+}
+
+func BenchmarkFragmentLineOffset_Diffed_Large(b *testing.B) {
+	benchmarkSourceMapping(b, 64*1024, true)
+}
+
+func setupAmbiguousSourceBench(size int) (*sources.Chunk, *detectors.Result) {
+	secret := []byte("synthetic-secret-value-123456")
+	original := []byte("<div class=\"synthetic-secret-value-123456\">\n")
+	var decoded []byte
+	for i := 0; len(original) < size; i++ {
+		original = append(original, fmt.Sprintf("<p class=\"row\">line%d</p>\n", i)...)
+		decoded = append(decoded, fmt.Sprintf("line%d\n", i)...)
+	}
+	original = append(original, "<p>"...)
+	original = append(original, secret...)
+	original = append(original, "</p>\n"...)
+	decoded = append(decoded, secret...)
+	decoded = append(decoded, '\n')
+	return &sources.Chunk{Data: decoded, OriginalData: original}, &detectors.Result{Raw: secret}
+}
+
+// The same value occurs in both discarded markup and emitted text, so the source
+// occurrence has to be picked by its surroundings.
+func BenchmarkFragmentLineOffset_Ambiguous_DefaultChunkSize(b *testing.B) {
+	chunk, result := setupAmbiguousSourceBench(sources.DefaultChunkSize)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
+	}
 }

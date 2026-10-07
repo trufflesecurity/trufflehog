@@ -1,0 +1,63 @@
+{
+    "AnalyzerType": 37,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "Unknown User",
+                "FullyQualifiedName": "Unknown User",
+                "Type": "User",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "Submit Events",
+                "Parent": null
+            },
+            "Condition": ""
+        },
+        {
+            "Resource": {
+                "Name": "Unknown User",
+                "FullyQualifiedName": "Unknown User",
+                "Type": "User",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "Submit Logs",
+                "Parent": null
+            },
+            "Condition": ""
+        },
+        {
+            "Resource": {
+                "Name": "Unknown User",
+                "FullyQualifiedName": "Unknown User",
+                "Type": "User",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "Submit Metrics",
+                "Parent": null
+            },
+            "Condition": ""
+        },
+        {
+            "Resource": {
+                "Name": "Unknown User",
+                "FullyQualifiedName": "Unknown User",
+                "Type": "User",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "Submit Service Checks",
+                "Parent": null
+            },
+            "Condition": ""
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {}
+}

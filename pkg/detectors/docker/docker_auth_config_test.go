@@ -1,11 +1,14 @@
 package docker
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
 
 func TestDocker_Pattern(t *testing.T) {
@@ -103,9 +106,17 @@ func TestDocker_Pattern(t *testing.T) {
 		{
 			name: "content after last }",
 			// This is base64-encoded, however, that doesn't get detected in these tests.
-			//input: `{"kind":"AdmissionReview","apiVersion":"admission.k8s.io/v1","request":{"uid":"b9d17c49-1b2c-421a-8ae8-3b3d252d2f61","kind":{"group":"","version":"v1","kind":"Secret"},"resource":{"group":"","version":"v1","resource":"secrets"},"requestKind":{"group":"","version":"v1","kind":"Secret"},"requestResource":{"group":"","version":"v1","resource":"secrets"},"name":"regcred","namespace":"test-webhooks","operation":"CREATE","userInfo":{"username":"kube:admin","groups":["system:cluster-admins","system:authenticated"],"extra":{"scopes.authorization.openshift.io":["user:full"]}},"object":{"kind":"Secret","apiVersion":"v1","metadata":{"name":"regcred","namespace":"test-webhooks","uid":"544674ac-f0fb-4a30-994b-eab579e1f418","creationTimestamp":"2022-05-03T15:16:55Z","managedFields":[{"manager":"kubectl-create","operation":"Update","apiVersion":"v1","time":"2022-05-03T15:16:55Z","fieldsType":"FieldsV1","fieldsV1":{"f:data":{".":{},"f:.dockerconfigjson":{}},"f:type":{}}}]},"data":{".dockerconfigjson":"eyJhdXRocyI6eyJxdWF5LmlvIjp7InVzZXJuYW1lIjoiMTIzIiwicGFzc3dvcmQiOiIxMjMiLCJhdXRoIjoiTVRJek9qRXlNdz09In19fQ=="},"type":"kubernetes.io/dockerconfigjson"},"oldObject":null,"dryRun":false,"options":{"kind":"CreateOptions","apiVersion":"meta.k8s.io/v1","fieldManager":"kubectl-create"}}}`,
+			// input: `{"kind":"AdmissionReview","apiVersion":"admission.k8s.io/v1","request":{"uid":"b9d17c49-1b2c-421a-8ae8-3b3d252d2f61","kind":{"group":"","version":"v1","kind":"Secret"},"resource":{"group":"","version":"v1","resource":"secrets"},"requestKind":{"group":"","version":"v1","kind":"Secret"},"requestResource":{"group":"","version":"v1","resource":"secrets"},"name":"regcred","namespace":"test-webhooks","operation":"CREATE","userInfo":{"username":"kube:admin","groups":["system:cluster-admins","system:authenticated"],"extra":{"scopes.authorization.openshift.io":["user:full"]}},"object":{"kind":"Secret","apiVersion":"v1","metadata":{"name":"regcred","namespace":"test-webhooks","uid":"544674ac-f0fb-4a30-994b-eab579e1f418","creationTimestamp":"2022-05-03T15:16:55Z","managedFields":[{"manager":"kubectl-create","operation":"Update","apiVersion":"v1","time":"2022-05-03T15:16:55Z","fieldsType":"FieldsV1","fieldsV1":{"f:data":{".":{},"f:.dockerconfigjson":{}},"f:type":{}}}]},"data":{".dockerconfigjson":"eyJhdXRocyI6eyJxdWF5LmlvIjp7InVzZXJuYW1lIjoiMTIzIiwicGFzc3dvcmQiOiIxMjMiLCJhdXRoIjoiTVRJek9qRXlNdz09In19fQ=="},"type":"kubernetes.io/dockerconfigjson"},"oldObject":null,"dryRun":false,"options":{"kind":"CreateOptions","apiVersion":"meta.k8s.io/v1","fieldManager":"kubectl-create"}}}`,
 			input: `{"kind":"AdmissionReview","apiVersion":"admission.k8s.io/v1","request":{"uid":"b9d17c49-1b2c-421a-8ae8-3b3d252d2f61","kind":{"group":"","version":"v1","kind":"Secret"},"resource":{"group":"","version":"v1","resource":"secrets"},"requestKind":{"group":"","version":"v1","kind":"Secret"},"requestResource":{"group":"","version":"v1","resource":"secrets"},"name":"regcred","namespace":"test-webhooks","operation":"CREATE","userInfo":{"username":"kube:admin","groups":["system:cluster-admins","system:authenticated"],"extra":{"scopes.authorization.openshift.io":["user:full"]}},"object":{"kind":"Secret","apiVersion":"v1","metadata":{"name":"regcred","namespace":"test-webhooks","uid":"544674ac-f0fb-4a30-994b-eab579e1f418","creationTimestamp":"2022-05-03T15:16:55Z","managedFields":[{"manager":"kubectl-create","operation":"Update","apiVersion":"v1","time":"2022-05-03T15:16:55Z","fieldsType":"FieldsV1","fieldsV1":{"f:data":{".":{},"f:.dockerconfigjson":{}},"f:type":{}}}]},"data":{".dockerconfigjson":"{"auths":{"quay.io":{"username":"123","password":"123","auth":"MTIzOjEyMw=="}}}"},"type":"kubernetes.io/dockerconfigjson"},"oldObject":null,"dryRun":false,"options":{"kind":"CreateOptions","apiVersion":"meta.k8s.io/v1","fieldManager":"kubectl-create"}}}`,
 			want:  []string{`{"registry":"quay.io","auth":"MTIzOjEyMw=="}`},
+		},
+		{
+			name:  "extra matches on one line",
+			input: `{"auths":{"https://index.docker.io/v2/":{"auth":"Y29uZXhwOkZUQUBDTkNGMG5AenVyZTM="}}} anything at all; {"auths":{"https://index.docker.io/v2/":{"auth":"dHJ1ZmZsZWhvZzpiZDQyNzQ2Yy1hNzc3LTQ4ZDktYjBhMi04N2I2YzEzMjdkMDA="}}}`,
+			want: []string{
+				`{"registry":"https://index.docker.io/v2/","auth":"Y29uZXhwOkZUQUBDTkNGMG5AenVyZTM="}`,
+				`{"registry":"https://index.docker.io/v2/","auth":"dHJ1ZmZsZWhvZzpiZDQyNzQ2Yy1hNzc3LTQ4ZDktYjBhMi04N2I2YzEzMjdkMDA="}`,
+			},
 		},
 
 		// False-positives
@@ -289,5 +300,104 @@ func Test_ParseAuthenticateHeader(t *testing.T) {
 		if diff := cmp.Diff(expected, actual); diff != "" {
 			t.Errorf("%s diff: (-want +got)\n%s", input, diff)
 		}
+	}
+}
+
+func Test_VerifyMatch(t *testing.T) {
+	// base64 of "user:pass"
+	const basicAuth = "dXNlcjpwYXNz"
+
+	// bearerChallenge points the token realm back at the test server so the follow-up
+	// request stays in-process.
+	bearerChallenge := func(host string) string {
+		return `Bearer realm="http://` + host + `/token",service="registry"`
+	}
+
+	tests := []struct {
+		name         string
+		handler      http.HandlerFunc
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name: "harbor rejects basic auth",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Www-Authenticate", `Basic realm="harbor"`)
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name: "unauthorized without a challenge",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name: "unsupported scheme is still indeterminate",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Www-Authenticate", `Digest realm="registry"`)
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      true,
+		},
+		{
+			name: "bearer token exchange rejects credentials",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/token" {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				w.Header().Set("Www-Authenticate", bearerChallenge(r.Host))
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name: "bearer token exchange accepts credentials",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/token" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.Header().Set("Www-Authenticate", bearerChallenge(r.Host))
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name: "registry accepts basic auth",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{}`))
+			},
+			wantVerified: true,
+			wantErr:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(tc.handler)
+			defer server.Close()
+
+			verified, err := verifyMatch(context.Background(), server.Client(), server.URL, "user", basicAuth)
+
+			if tc.wantErr && err == nil {
+				t.Errorf("expected a verification error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("expected no verification error, got %v", err)
+			}
+			if verified != tc.wantVerified {
+				t.Errorf("verified = %v, want %v", verified, tc.wantVerified)
+			}
+		})
 	}
 }

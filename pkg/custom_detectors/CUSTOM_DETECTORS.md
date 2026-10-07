@@ -36,9 +36,66 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    - **`regex`**: Defines the patterns to identify potential secrets. You can specify one or more named regular expressions. For a detection to be successful, each named regex must find a match. Capture groups `()` within these regular expressions are used to extract specific portions of the matched text, enabling the detector to process and report on particular segments of the identified patterns.
 
    - **`verify`**: An optional section to validate detected secrets. If you want to verify or unverify detected secrets, this section needs to be configured. If not configured, all detected secrets will be marked as unverified. Read [verification server examples](#verification-server-examples)
+     - **`successRanges`**: A list of HTTP status codes (or ranges) that indicate the secret is **live** (active). When the verification server responds with a matching status code, the secret is marked as verified. Each entry can be a single code (`"200"`) or an inclusive range (`"200-202"`). If omitted (along with `rotatedRanges`), only `200` is treated as verified (backward compatible).
+     - **`rotatedRanges`**: A list of HTTP status codes (or ranges) that indicate the secret has been **rotated** (no longer active). When the verification server responds with a matching status code, the secret is definitively marked as unverified.
+
+     When only one of the two fields is configured, non-matching responses are treated as the opposite state (e.g., if only `successRanges` is set, any response that doesn't match is treated as rotated; if only `rotatedRanges` is set, any non-matching response is treated as live). When both fields are configured and the response matches neither, the result is treated as unknown/inconclusive. If no endpoint returns a response at all (for example a network error or an [auth](#authenticating-verification-requests) failure), the result carries a verification error rather than being reported as simply unverified.
+
+     Since `verify` is optional, Custom Detectors can also be used without a webhook to flag generic hardcoded secrets (e.g. `*.password=`, `*.secret=`) in config files such as `.properties`, `.env`, or `.yaml`. [Here](/examples/generic_config_secrets.yml) is an example config tuned for that use case.
+
+   Here's an example with configurable verification ranges:
+
+   ```yaml
+   # config.yaml
+   detectors:
+     - name: HogTokenDetector
+       keywords:
+         - hog
+       regex:
+         token: '[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}'
+       verify:
+         - endpoint: http://localhost:8000/
+           unsafe: true
+           headers:
+             - "Authorization: super secret authorization header"
+           successRanges:
+             - "200"
+           rotatedRanges:
+             - "401"
+             - "403"
+   ```
+
+   In this example, a `200` response from the verification server means the secret is live and needs rotation. A `401` or `403` means the secret has been rotated and is no longer active. Any other response is treated as inconclusive.
+
+   #### Authenticating verification requests
+
+   If the verification endpoint sits behind an OAuth2-protected proxy, add an `auth` block. TruffleHog obtains an access token from the identity provider and sends it as `Bearer <token>` on every request to that endpoint's host.
+
+   The only supported grant type is the Resource Owner Password Credentials (ROPC) grant ([RFC 6749 section 4.3](https://datatracker.ietf.org/doc/html/rfc6749#section-4.3)), configured under `ropc`. TruffleHog logs in with a service account's username and password plus the OAuth2 client's credentials, and repeats that login whenever the token expires. Other grants, such as client credentials or refresh tokens, are not supported.
+
+   ```yaml
+       verify:
+         - endpoint: https://verifier.example.com/
+           # Must be true if endpoint or tokenEndpoint uses HTTP
+           unsafe: false
+           auth:
+             oauth2:
+               tokenEndpoint: https://idp.example.com/oauth2/token
+               tokenHeader: X-Proxy-Authorization # optional, defaults to Authorization
+               ropc:
+                 username: scanner
+                 password: scanner-password
+                 clientId: trufflehog
+                 clientSecret: client-secret # optional
+                 scope: verify # optional, space-separated
+   ```
+
+   - The token is fetched on first use, reused until shortly before it expires, and never sent to any other host. If the identity provider doesn't say when the token expires, it is treated as valid for 5 minutes.
+   - `headers` may not set the `tokenHeader`; the config is rejected at startup if it does.
+   - If a token can't be obtained, affected results carry a verification error and the scan continues. Failed logins are retried with backoff (5 seconds, doubling up to 5 minutes) to avoid account lockouts.
 
    **Other allowed parameters:**
-   - **`primary_regex_name`**: This parameter allows you designate the primary regex pattern when multiple regex patterns are defined in the regex section. If a match is found, the match for the designated primary regex will be used to determine the line number. The value must be one of the names specified in the regex section.
+   - **`primary_regex_name`**: This parameter allows you designate the primary regex pattern when multiple regex patterns are defined in the regex section. If a match is found, the match for the designated primary regex will be used to determine the line number. The value must be one of the names specified in the regex section. If not provided, the first regex name in sorted order will be used as the primary regex by default.
    - **`exclude_regexes_capture`**: This parameter allows you to define regex patterns to exclude specific parts of a detected secret. If a match is found within the detected secret, the portion matching this regex is excluded from the result.
    - **`exclude_regexes_match`**: This parameter enables you to define regex patterns to exclude entire matches from being reported as secrets. This applies to the entire matched string, not just the token.
    - **`entropy`**: This parameter is used to assess the randomness of detected strings. High entropy often indicates that a string is a potential secret, such as an API key or password, due to its complexity and unpredictability. It helps in filtering false-positives. While an entropy threshold of `3` can be a starting point, it's essential to adjust this value based on your project's specific requirements and the nature of the data you have.

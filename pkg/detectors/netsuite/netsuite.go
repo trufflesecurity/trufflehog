@@ -7,7 +7,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,9 +19,10 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -41,6 +45,9 @@ var (
 	tokenSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netsuite", "token", "secret"}) + `\b([a-zA-Z0-9]{64})\b`)
 
 	accountIDPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netsuite", "account", "id"}) + `\b([a-zA-Z0-9-_]{6,15})\b`)
+
+	// invalidHosts holds account hosts that do not resolve, so later combinations skip the lookup.
+	invalidHosts = simple.NewCache[struct{}]()
 )
 
 type credentialSet struct {
@@ -68,8 +75,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	tokenSecretMatches := trimUniqueMatches(tokenSecretPat.FindAllStringSubmatch(dataStr, -1))
 	accountIDMatches := trimUniqueMatches(accountIDPat.FindAllStringSubmatch(dataStr, -1))
 
+	// Every combination needs a token key, token secret and account ID.
+	if len(tokenKeyMatches) == 0 || len(tokenSecretMatches) == 0 || len(accountIDMatches) == 0 {
+		return nil, nil
+	}
+
+	// Raw and RawV2 hold only the consumer key and secret, so every combination for a pair is a duplicate of the same
+	// finding. Report one result per pair rather than one per combination of all five parts. The token key, token
+	// secret and account ID decide whether the pair is reported and whether it verifies.
 	for consumerKey := range consumerKeyMatches {
 		for consumerSecret := range consumerSecretMatches {
+			// No combination can use the same value as both consumer key and secret.
+			if consumerKey == consumerSecret {
+				continue
+			}
+
+			var pairResult *detectors.Result
+		combinations:
 			for tokenKey := range tokenKeyMatches {
 				for tokenSecret := range tokenSecretMatches {
 					for accountID := range accountIDMatches {
@@ -86,9 +108,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 
 						s1 := detectors.Result{
-							DetectorType: detectorspb.DetectorType_Netsuite,
+							DetectorType: detector_typepb.DetectorType_Netsuite,
 							Raw:          []byte(consumerKey),
-							RawV2:        []byte(consumerKey + consumerSecret),
+							SecretParts: map[string]string{
+								"consumer_key":    consumerKey,
+								"consumer_secret": consumerSecret,
+							},
+							RawV2: []byte(consumerKey + consumerSecret),
 						}
 
 						if verify {
@@ -103,9 +129,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.Verified = isVerified
 							s1.SetVerificationError(err, consumerKey)
 						}
-						results = append(results, s1)
+
+						// Keep the verified result, else the first indeterminate one, else the first one.
+						if pairResult == nil || s1.Verified || (s1.VerificationError() != nil && pairResult.VerificationError() == nil) {
+							pairResult = &s1
+						}
+						if !verify || s1.Verified {
+							break combinations
+						}
+						if err := ctx.Err(); err != nil {
+							// Combinations left untried might have verified.
+							if pairResult.VerificationError() == nil {
+								pairResult.SetVerificationError(err, consumerKey)
+							}
+							break combinations
+						}
 					}
 				}
+			}
+
+			if pairResult != nil {
+				results = append(results, *pairResult)
 			}
 		}
 	}
@@ -113,8 +157,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Netsuite
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Netsuite
 }
 
 func (s Scanner) Description() string {
@@ -122,8 +166,19 @@ func (s Scanner) Description() string {
 }
 
 func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSet) (bool, error) {
+	// The engine waits for FromData to return even after its deadline, so send no request once the context is done.
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+
 	// for url, filter or replace underscore in accountID if needed and lower case the accountID
-	urlAccountId := strings.ToLower(strings.Replace(cs.accountID, "_", "-", -1))
+	urlAccountId := strings.ToLower(strings.ReplaceAll(cs.accountID, "_", "-"))
+
+	// An earlier combination already found that this account's host does not resolve, so skip the lookup and
+	// return what the lookup would.
+	if invalidHosts.Exists(urlAccountId) {
+		return false, nil
+	}
 
 	baseUrl := "https://" + urlAccountId + ".suitetalk.api.netsuite.com"
 
@@ -160,12 +215,17 @@ func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSe
 	// Make the request
 	res, err := client.Do(req)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such host") {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			invalidHosts.Set(urlAccountId, struct{}{})
 			return false, nil
 		}
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil

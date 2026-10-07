@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -37,14 +38,18 @@ var (
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
+
+	// GitLab's forbidden! helper formats every reasoned 403 as "403 Forbidden - <reason>".
+	forbiddenWithReasonPrefix = "403 Forbidden - "
 )
 
-func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
+type gitlabErrorResponse struct {
+	Message string `json:"message"`
+	Error   string `json:"error"`
+}
 
-	return defaultClient
+func (s Scanner) getClient() *http.Client {
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -53,8 +58,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"gitlab"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Gitlab
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Gitlab
 }
 
 func (s Scanner) Description() string {
@@ -81,12 +86,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		for _, endpoint := range s.Endpoints() {
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Gitlab,
+				DetectorType: detector_typepb.DetectorType_Gitlab,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + endpoint),
 				ExtraData: map[string]string{
 					"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
 					"version":        fmt.Sprintf("%d", s.Version()),
+				},
+				SecretParts: map[string]string{
+					"key":  resMatch,
+					"host": endpoint,
 				},
 			}
 
@@ -95,16 +104,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				maps.Copy(s1.ExtraData, extraData)
 
-				s1.SetVerificationError(verificationErr)
+				s1.SetVerificationError(verificationErr, resMatch)
 
-				// for verified keys set the analysis info
+				// for verified keys break out of the endpoint loop to continue to next secret
 				if s1.Verified {
-					s1.AnalysisInfo = map[string]string{
-						"key":  resMatch,
-						"host": endpoint,
-					}
-
-					// if secret is verified with one endpoint, break the loop to continue to next secret
 					results = append(results, s1)
 					break
 				}
@@ -134,7 +137,7 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 		return false, nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -142,22 +145,34 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 	}
 
 	// 200 means good key and has `read_user` scope
-	// 403 means good key but not the right scope
+	// 403 from GitLab means good key, but either the scope or the account state denies access
 	// 401 is bad key
 	switch res.StatusCode {
 	case http.StatusOK:
 		return json.Valid(bodyBytes), nil, nil
 	case http.StatusForbidden:
-		// check if the user account is blocked or not
-		stringBody := string(bodyBytes)
-		if strings.Contains(stringBody, BlockedUserMessage) {
-			return true, map[string]string{
-				"blocked": "True",
-			}, nil
+		var errResp gitlabErrorResponse
+		if err := json.Unmarshal(bodyBytes, &errResp); err != nil {
+			return false, nil, fmt.Errorf("unexpected 403 response, unable to verify token")
 		}
 
-		// Good key but not the right scope
-		return true, nil, nil
+		switch {
+		// GitLab only rejects an account (blocked, deactivated, password expired, unconfirmed
+		// email, etc.) after the token has resolved to a user.
+		case strings.HasPrefix(errResp.Message, forbiddenWithReasonPrefix):
+			extraData := map[string]string{
+				"access_denied_reason": strings.TrimPrefix(errResp.Message, forbiddenWithReasonPrefix),
+			}
+			if strings.HasPrefix(errResp.Message, BlockedUserMessage) {
+				extraData["blocked"] = "True"
+			}
+			return true, extraData, nil
+		case errResp.Error == "insufficient_scope", errResp.Error == "insufficient_granular_scope":
+			// Good key but not the right scope
+			return true, nil, nil
+		}
+
+		return false, nil, fmt.Errorf("unexpected 403 response, unable to verify token")
 	case http.StatusUnauthorized:
 		// Nothing to do; zero values are the ones we want
 		return false, nil, nil

@@ -12,6 +12,7 @@ import (
 
 var (
 	validKey               = "pat.4oXWHvYFRNOGLVpFTZGGTA.68077fc826afe36865614d58.2fFEmr57WO3zPmev3jze"
+	validKeyWithUnderscore = "pat.YDfcEm2LT_OUZrFZv1WVlg.6a4f91eb79dfb04b036caf48.FrDL8MGzpMygCMzZv1Kq"
 	validKeyWithoutKeyword = `API Key Token: pat.4oXWHvYFRNOGLVpFTZGGTA.68077fc826afe36865614d58.2fFEmr57WO3zPmev3jze
 	url |https://api.harness.io/`
 	invalidKey = "pat.4oXWHvYFRNOGLVpFTZGGTA.6807c5bed9599c324f6368ce.usCT2fzvADwSoXzXc"
@@ -30,6 +31,11 @@ func TestHarness_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validKey),
 			want:  []string{validKey},
+		},
+		{
+			name:  "valid pattern with underscore in account segment",
+			input: fmt.Sprintf("%s = '%s'", keyword, validKeyWithUnderscore),
+			want:  []string{validKeyWithUnderscore},
 		},
 		{
 			name:  "valid pattern - no keyword",

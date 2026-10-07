@@ -65,11 +65,91 @@ func TestSource_Token(t *testing.T) {
 	s.Init(ctx, "github integration test source", 0, 0, false, conn, 1)
 	s.filteredRepoCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
 
-	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient(), noopReporter())
+	err = s.enumerateWithApp(ctx, s.connector.(*appConnector), noopReporter())
 	assert.NoError(t, err)
 
 	_, _, err = s.cloneRepo(ctx, "https://github.com/truffle-test-integration-org/another-test-repo.git")
 	assert.NoError(t, err)
+}
+
+func TestSource_ExcludeArchived(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
+	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
+	if err != nil {
+		t.Fatal(err)
+	}
+	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
+	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
+	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
+
+	srcWithExclude := &sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     githubPrivateKeyNew,
+				InstallationId: githubInstallationIDNew,
+				AppId:          githubAppIDNew,
+			},
+		},
+		ExcludeArchived: true,
+	}
+	connWithExclude, err := anypb.New(srcWithExclude)
+	if err != nil {
+		panic(err)
+	}
+
+	sWithExclude := Source{
+		conn:          srcWithExclude,
+		memberCache:   map[string]struct{}{},
+		repoInfoCache: newRepoInfoCache(),
+	}
+	sWithExclude.Init(ctx, "github integration test source with exclude", 0, 0, false, connWithExclude, 1)
+	sWithExclude.filteredRepoCache = sWithExclude.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
+
+	err = sWithExclude.enumerateWithApp(ctx, sWithExclude.connector.(*appConnector), noopReporter())
+	assert.NoError(t, err)
+
+	srcWithoutExclude := &sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     githubPrivateKeyNew,
+				InstallationId: githubInstallationIDNew,
+				AppId:          githubAppIDNew,
+			},
+		},
+		ExcludeArchived: false,
+	}
+	connWithoutExclude, err := anypb.New(srcWithoutExclude)
+	if err != nil {
+		panic(err)
+	}
+
+	sWithoutExclude := Source{
+		conn:          srcWithoutExclude,
+		memberCache:   map[string]struct{}{},
+		repoInfoCache: newRepoInfoCache(),
+	}
+	sWithoutExclude.Init(ctx, "github integration test source without exclude", 0, 0, false, connWithoutExclude, 1)
+	sWithoutExclude.filteredRepoCache = sWithoutExclude.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
+
+	err = sWithoutExclude.enumerateWithApp(ctx, sWithoutExclude.connector.(*appConnector), noopReporter())
+	assert.NoError(t, err)
+
+	assert.Less(t, sWithExclude.filteredRepoCache.Count(), sWithoutExclude.filteredRepoCache.Count(),
+		"ExcludeArchived should result in strictly fewer repos (test org must have at least one archived repo). WithExclude: %d, WithoutExclude: %d",
+		sWithExclude.filteredRepoCache.Count(), sWithoutExclude.filteredRepoCache.Count())
+
+	t.Logf("Repos with ExcludeArchived=true: %d", sWithExclude.filteredRepoCache.Count())
+	t.Logf("Repos with ExcludeArchived=false: %d", sWithoutExclude.filteredRepoCache.Count())
 }
 
 func TestSource_ScanComments(t *testing.T) {
@@ -127,7 +207,7 @@ func TestSource_ScanComments(t *testing.T) {
 						},
 					},
 				},
-				Verify: false,
+				SourceVerify: false,
 			},
 			wantErr: false,
 		},
@@ -157,7 +237,7 @@ func TestSource_ScanComments(t *testing.T) {
 						},
 					},
 				},
-				Verify: false,
+				SourceVerify: false,
 			},
 			wantErr: false,
 		},
@@ -342,7 +422,7 @@ func TestSource_Scan(t *testing.T) {
 						},
 					},
 				},
-				Verify: false,
+				SourceVerify: false,
 			},
 			wantErr: false,
 		},
@@ -367,7 +447,7 @@ func TestSource_Scan(t *testing.T) {
 						},
 					},
 				},
-				Verify: false,
+				SourceVerify: false,
 			},
 			wantErr: false,
 		},
@@ -453,7 +533,7 @@ func TestSource_Scan(t *testing.T) {
 						},
 					},
 				},
-				Verify: false,
+				SourceVerify: false,
 			},
 			wantErr: false,
 		},
@@ -502,7 +582,7 @@ func TestSource_Scan(t *testing.T) {
 						},
 					},
 				},
-				Verify: false,
+				SourceVerify: false,
 			},
 			wantErr: false,
 			minRepo: 1,
@@ -596,7 +676,7 @@ func TestSource_paginateGists(t *testing.T) {
 						},
 					},
 				},
-				Verify: false,
+				SourceVerify: false,
 			},
 			wantErr:  false,
 			user:     "truffle-sandbox",
@@ -676,7 +756,7 @@ func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) so
 			if diff := pretty.Compare(chunk.SourceMetadata.GetGithub().Repository, wantChunk.SourceMetadata.GetGithub().Repository); diff == "" {
 				return nil
 			}
-			return sources.MatchError
+			return sources.ErrMatch
 		}
 		return nil
 	}
@@ -994,7 +1074,7 @@ func TestSource_ScanCommentsWithGraphql(t *testing.T) {
 				},
 			},
 		},
-		Verify: false,
+		SourceVerify: false,
 	}
 
 	s := Source{}

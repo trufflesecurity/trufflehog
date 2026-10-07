@@ -11,7 +11,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -27,7 +27,11 @@ var (
 
 	clientIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"auth0"}) + `\b([a-zA-Z0-9_-]{32,60})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
-	domainPat       = regexp.MustCompile(`\b([a-zA-Z0-9][a-zA-Z0-9._-]*auth0\.com)\b`) // could be part of url
+	// could be part of url; auth0app.com is Auth0's managed domain for Private Cloud tenants.
+	// TODO: a bare domain with no leading character (e.g. "auth0.com" or "auth0app.com" with
+	// no subdomain/prefix at all) never matches, since the leading character class must be
+	// consumed before the literal "auth0" substring. Pre-existing, unrelated to this fix.
+	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9][a-zA-Z0-9._-]*auth0(?:app)?\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -56,10 +60,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for clientSecretRes := range uniqueSecrets {
 			for domainRes := range uniqueDomainMatches {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					DetectorType: detector_typepb.DetectorType_Auth0oauth,
 					Redacted:     clientIdRes,
 					Raw:          []byte(clientSecretRes),
-					RawV2:        []byte(clientIdRes + clientSecretRes),
+					SecretParts: map[string]string{
+						"client_id":     clientIdRes,
+						"client_secret": clientSecretRes,
+					},
+					RawV2: []byte(clientIdRes + clientSecretRes),
 				}
 
 				if verify {
@@ -139,8 +147,8 @@ func verifyTuple(ctx context.Context, client *http.Client, domainRes, clientId, 
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Auth0oauth
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Auth0oauth
 }
 
 func (s Scanner) Description() string {

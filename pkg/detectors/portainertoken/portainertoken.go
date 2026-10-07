@@ -9,7 +9,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -48,16 +48,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			u, err := detectors.ParseURLAndStripPathAndParams(resEndpointMatch)
 			if err != nil {
-				fmt.Printf("\nINVALID URL\n")
 				// if the URL is invalid just move onto the next one
 				continue
 			}
 			u.Path = "/api/stacks"
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_PortainerToken,
+				DetectorType: detector_typepb.DetectorType_PortainerToken,
 				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resEndpointMatch),
+				SecretParts: map[string]string{
+					"key": resMatch,
+					"url": resEndpointMatch,
+				},
+				RawV2: []byte(resMatch + resEndpointMatch),
 			}
 
 			if verify {
@@ -75,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 
 				if err == nil {
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else if res.StatusCode == 401 {
@@ -97,8 +100,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PortainerToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_PortainerToken
 }
 
 func (s Scanner) Description() string {

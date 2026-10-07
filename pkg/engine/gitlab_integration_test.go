@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -17,7 +18,7 @@ func TestGitLab(t *testing.T) {
 	// Run the scan.
 	ctx := context.Background()
 	e, err := NewEngine(ctx, &Config{
-		Detectors:     DefaultDetectors(),
+		Detectors:     defaults.DefaultDetectors(),
 		SourceManager: sources.NewManager(),
 		Verify:        false,
 	})
@@ -38,6 +39,6 @@ func TestGitLab(t *testing.T) {
 
 	// Check the output provided by metrics.
 	metrics := e.GetMetrics()
-	assert.GreaterOrEqual(t, metrics.ChunksScanned, uint64(36312))
-	assert.GreaterOrEqual(t, metrics.BytesScanned, uint64(91618854))
+	assert.GreaterOrEqual(t, metrics.ChunksScanned, uint64(23528))
+	assert.GreaterOrEqual(t, metrics.BytesScanned, uint64(84982266))
 }

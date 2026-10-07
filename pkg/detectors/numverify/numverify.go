@@ -3,14 +3,15 @@ package numverify
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -37,8 +38,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Numverify,
+			DetectorType: detector_typepb.DetectorType_Numverify,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://apilayer.net/api/validate?access_key=%s&number=14158586273", resMatch), nil)
@@ -51,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					bodyString := string(bodyBytes)
 					validResponse := strings.Contains(bodyString, `country_code`) || strings.Contains(bodyString, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
-					defer res.Body.Close()
+					defer func() { _ = res.Body.Close() }()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if validResponse {
 							s1.Verified = true
@@ -68,8 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Numverify
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Numverify
 }
 
 func (s Scanner) Description() string {

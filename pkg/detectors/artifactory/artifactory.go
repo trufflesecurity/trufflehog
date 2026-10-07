@@ -1,10 +1,12 @@
 package artifactory
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -12,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -29,7 +31,7 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b([a-zA-Z0-9]{64,73})\b`)
+	keyPat = regexp.MustCompile(`\b(AKCp[a-zA-Z0-9]{69})\b`)
 	URLPat = regexp.MustCompile(`\b([A-Za-z0-9][A-Za-z0-9\-]{0,61}[A-Za-z0-9]\.jfrog\.io)`)
 
 	invalidHosts = simple.NewCache[struct{}]()
@@ -42,14 +44,11 @@ func (Scanner) CloudEndpoint() string { return "" }
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"artifactory", "jfrog.io"}
+	return []string{"artifactory", "jfrog.io", "AKCp"}
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // FromData will find and optionally verify Artifactory secrets in a given set of bytes.
@@ -77,33 +76,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueTokens {
 		for url := range uniqueUrls {
-			if invalidHosts.Exists(url) {
-				delete(uniqueUrls, url)
-				continue
-			}
-
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+				DetectorType: detector_typepb.DetectorType_ArtifactoryAccessToken,
 				Raw:          []byte(token),
 				RawV2:        []byte(token + url),
+				SecretParts: map[string]string{
+					"domain": url,
+					"token":  token,
+				},
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyArtifactory(ctx, s.getClient(), url, token)
-				s1.Verified = isVerified
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(url, struct{}{})
-						continue
-					}
-
-					s1.SetVerificationError(verificationErr, token)
-
-					if isVerified {
-						s1.AnalysisInfo = map[string]string{
-							"domain": url,
-							"token":  token,
+				if invalidHosts.Exists(url) {
+					// An earlier candidate already proved this host does not resolve, so the lookup is
+					// skipped. The finding is still reported: dropping it here would make the reported
+					// secrets depend on whether verification was requested, and on the order in which
+					// candidates happened to be processed.
+					s1.SetVerificationError(errNoHost, token)
+				} else {
+					isVerified, verificationErr := verifyArtifactory(ctx, s.getClient(), url, token)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						var dnsErr *net.DNSError
+						if errors.As(verificationErr, &dnsErr) && dnsErr.IsNotFound {
+							invalidHosts.Set(url, struct{}{})
 						}
+
+						s1.SetVerificationError(verificationErr, token)
 					}
 				}
 			}
@@ -126,11 +125,6 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 
 	resp, err := client.Do(req)
 	if err != nil {
-		// lookup foo.jfrog.io: no such host
-		if strings.Contains(err.Error(), "no such host") {
-			return false, errNoHost
-		}
-
 		return false, err
 	}
 
@@ -159,8 +153,8 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ArtifactoryAccessToken
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ArtifactoryAccessToken
 }
 
 func (s Scanner) Description() string {

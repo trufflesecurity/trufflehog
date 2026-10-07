@@ -13,7 +13,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestSumoLogicKey_FromChunk(t *testing.T) {
@@ -49,7 +49,7 @@ func TestSumoLogicKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SumoLogicKey,
+					DetectorType: detector_typepb.DetectorType_SumoLogicKey,
 					Verified:     true,
 				},
 			},
@@ -65,7 +65,7 @@ func TestSumoLogicKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SumoLogicKey,
+					DetectorType: detector_typepb.DetectorType_SumoLogicKey,
 					Verified:     false,
 				},
 			},
@@ -86,6 +86,9 @@ func TestSumoLogicKey_FromChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
+			s.UseCloudEndpoint(true)
+			s.SetCloudEndpoint(s.CloudEndpoint())
+			s.UseFoundEndpoints(true)
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SumoLogicKey.FromData() error = %v, wantErr %v", err, tt.wantErr)

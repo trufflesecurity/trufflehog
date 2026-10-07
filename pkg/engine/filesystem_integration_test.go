@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -62,7 +63,7 @@ func TestFilesystem(t *testing.T) {
 	// Run the scan.
 	ctx := context.Background()
 	e, err := NewEngine(ctx, &Config{
-		Detectors:     DefaultDetectors(),
+		Detectors:     defaults.DefaultDetectors(),
 		SourceManager: sources.NewManager(),
 		Verify:        false,
 	})

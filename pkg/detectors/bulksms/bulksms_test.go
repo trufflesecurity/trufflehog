@@ -41,7 +41,7 @@ func TestBulkSMS_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"QGxPqRyzvt%xEKcV&#ePJGn)k0d9a381A26C47380B85F2DB572314-ACBDC267B-8"},
@@ -81,7 +81,7 @@ func TestBulkSMS_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

@@ -10,7 +10,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -47,27 +47,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resURI := strings.TrimSpace(uriMatch[1])
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Freshbooks,
+				DetectorType: detector_typepb.DetectorType_Freshbooks,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf(`https://auth.freshbooks.com/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code`, resMatch, resURI), nil)
-				if err != nil {
-					continue
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					body := string(bodyBytes)
-					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, "Log In to FreshBooks") {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyMatch(ctx, client, resMatch, resURI)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch, resURI)
 			}
 
 			results = append(results, s1)
@@ -77,8 +65,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Freshbooks
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string, resURI string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf(`https://auth.freshbooks.com/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code`, resMatch, resURI), nil)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	body := string(bodyBytes)
+	if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, "Log In to FreshBooks") {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Freshbooks
 }
 
 func (s Scanner) Description() string {

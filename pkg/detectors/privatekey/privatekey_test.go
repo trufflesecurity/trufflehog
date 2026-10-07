@@ -96,3 +96,44 @@ func TestPrivatekey_Pattern(t *testing.T) {
 		})
 	}
 }
+
+// encryptedUncrackablePattern is an ed25519 key protected by a passphrase that
+// is not present in the built-in wordlist (pkg/detectors/privatekey/list.txt),
+// so Crack cannot recover it.
+var encryptedUncrackablePattern = `-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDnvQyInG
+vB+yh/WYczTGXbAAAAGAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAILUSv84lMSLVN0iP
+knFlHoYobo1oohtLNp/ihBaf76QxAAAAoErDjg2HQs1hgYm0vfyrpBxWrcJ1u/LQG4o6cm
+GJ3NnZmMmJemrnMXjGHB3zj63AEPxxyb6BWZH5Olb5gYMgWcnOU91cGvyC7aT6C5cOnFb1
+ZtkdxTxqeUOMFS51gwDT04aURSz/caCV9KN4Y2MCHyW+GWxxD7eL0R6KhyT2j0z2BewCw9
+kRN1fq3C2rTb+wTaNz8q9X0R+6JGxfXGhpTJ0=
+-----END OPENSSH PRIVATE KEY-----
+`
+
+// TestPrivatekey_EncryptedKeyReported asserts that a passphrase-protected key
+// whose passphrase cannot be cracked is still surfaced as an unverified finding
+// rather than being dropped silently (issue #5115).
+func TestPrivatekey_EncryptedKeyReported(t *testing.T) {
+	d := Scanner{}
+	input := fmt.Sprintf("%s = '%s'", keyword, encryptedUncrackablePattern)
+
+	results, err := d.FromData(context.Background(), false, []byte(input))
+	if err != nil {
+		t.Fatalf("FromData error = %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result for an encrypted key with an uncrackable passphrase, got %d", len(results))
+	}
+
+	r := results[0]
+	if r.Verified {
+		t.Errorf("expected the finding to be unverified")
+	}
+	if r.VerificationError() == nil {
+		t.Errorf("expected a verification error to be set on the finding")
+	}
+	if r.ExtraData["encrypted"] != "true" {
+		t.Errorf("expected ExtraData[\"encrypted\"] = \"true\", got %q", r.ExtraData["encrypted"])
+	}
+}

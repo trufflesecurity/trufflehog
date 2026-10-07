@@ -3,6 +3,9 @@ package todoist
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -10,6 +13,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 var (
 	validPattern   = "qpgv7z8amkp4ln55znaacezm9jy35wcayy6bya2r"
@@ -87,5 +96,48 @@ func TestTodoist_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+func TestTodoist_VerificationEndpoint(t *testing.T) {
+	d := Scanner{}
+	input := fmt.Sprintf("%s token = '%s'", keyword, validPattern)
+
+	prevClient := client
+	t.Cleanup(func() {
+		client = prevClient
+	})
+
+	called := false
+	client = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			called = true
+			if req.URL.String() != "https://api.todoist.com/api/v1/projects" {
+				t.Fatalf("unexpected verification URL: %s", req.URL.String())
+			}
+			if req.Header.Get("Authorization") == "" {
+				t.Fatal("missing Authorization header")
+			}
+
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	results, err := d.FromData(context.Background(), true, []byte(input))
+	if err != nil {
+		t.Fatalf("FromData returned error: %v", err)
+	}
+	if !called {
+		t.Fatal("verification HTTP request was not made")
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if !results[0].Verified {
+		t.Fatal("expected result to be verified")
 	}
 }

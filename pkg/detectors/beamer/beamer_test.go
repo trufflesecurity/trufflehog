@@ -38,7 +38,7 @@ func TestBeamer_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: []string{"DyVdf7+cAXw4MH9gT1CPotU31RMl__aLKbrABRWvT7TyO="},
@@ -75,7 +75,7 @@ func TestBeamer_Pattern(t *testing.T) {
 					// Perform the request
 					client := &http.Client{}
 					resp, _ := client.Do(req)
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 				}
 				`,
 			want: nil,

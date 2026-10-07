@@ -11,7 +11,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -20,8 +20,8 @@ type Scanner struct {
 
 var _ detectors.Detector = (*Scanner)(nil)
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Ngrok
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Ngrok
 }
 
 func (s Scanner) Description() string {
@@ -38,7 +38,13 @@ const (
 )
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b(2[a-zA-Z0-9]{26}_\d[a-zA-Z0-9]{20})\b`)
+	// ngrok API keys and authtokens are {prefix}_{suffix}, both alphanumeric with
+	// no fixed leading character. The prefix is 27 chars. Suffixes are usually 21
+	// chars with a leading digit, but real authtokens verified against the ngrok
+	// API (via ERR_NGROK_206) have been observed with 20-char and letter-leading
+	// suffixes, so the pattern must accept 20-21 chars starting with any
+	// alphanumeric character.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b([a-zA-Z0-9]{27}_[a-zA-Z0-9]{20,21})\b`)
 )
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -55,8 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueMatches {
 		r := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Ngrok,
+			DetectorType: detector_typepb.DetectorType_Ngrok,
 			Raw:          []byte(token),
+			SecretParts:  map[string]string{"key": token},
 		}
 
 		if verify {
@@ -66,9 +73,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, vErr := verifyMatch(ctx, s.client, token)
 			r.Verified = isVerified
 			r.SetVerificationError(vErr, token)
-			if isVerified {
-				r.AnalysisInfo = map[string]string{"key": token}
-			}
 		}
 
 		results = append(results, r)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct{}
@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.NewClientWithDedup(common.SaneHttpClient())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tickettailor"}) + `\b(sk_[0-9]{4}_[0-9]{6}_[a-f0-9]{32})`)
@@ -43,8 +43,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueKeyMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Tickettailor,
+			DetectorType: detector_typepb.DetectorType_Tickettailor,
 			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
 		}
 
 		if verify {
@@ -59,8 +60,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Tickettailor
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Tickettailor
 }
 
 func (s Scanner) Description() string {
@@ -76,7 +77,7 @@ func verifyTicketTailor(ctx context.Context, client *http.Client, apiKey string)
 	req.Header.Add("Accept", "application/json")
 	// as per API docs we only need to use apiKey as username in basic auth and leave password as empty: https://developers.tickettailor.com/#authentication
 	req.SetBasicAuth(apiKey, "")
-	resp, err := client.Do(req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Tickettailor, apiKey, req)
 	if err != nil {
 		return false, nil
 	}

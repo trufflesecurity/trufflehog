@@ -10,7 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -45,8 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Postman,
+			DetectorType: detector_typepb.DetectorType_Postman,
 			Raw:          []byte(resMatch),
+			SecretParts:  map[string]string{"key": resMatch},
 		}
 
 		if verify {
@@ -54,9 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyPostman(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
-			s1.AnalysisInfo = map[string]string{
-				"key": resMatch,
-			}
 		}
 
 		results = append(results, s1)
@@ -82,7 +80,7 @@ func verifyPostman(ctx context.Context, client *http.Client, token string) (bool
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -94,8 +92,8 @@ func verifyPostman(ctx context.Context, client *http.Client, token string) (bool
 	}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Postman
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_Postman
 }
 
 func (s Scanner) Description() string {

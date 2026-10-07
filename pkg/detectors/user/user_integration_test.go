@@ -9,11 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestUser_FromChunk(t *testing.T) {
@@ -25,6 +27,7 @@ func TestUser_FromChunk(t *testing.T) {
 	}
 	secret := testSecrets.MustGetField("USER")
 	inactiveSecret := testSecrets.MustGetField("USER_INACTIVE")
+	endpoint := testSecrets.MustGetField("USER_ENDPOINT")
 
 	type args struct {
 		ctx    context.Context
@@ -43,13 +46,19 @@ func TestUser_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a user secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("user token = %s\nurl = %s", secret, endpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_User,
+					DetectorType: detector_typepb.DetectorType_User,
 					Verified:     true,
+					Raw:          []byte(secret),
+					RawV2:        []byte(secret + ":" + endpoint),
+					SecretParts: map[string]string{
+						"key":      secret,
+						"endpoint": endpoint,
+					},
 				},
 			},
 			wantErr: false,
@@ -59,13 +68,19 @@ func TestUser_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a user secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("user token = %s\nurl = %s", inactiveSecret, endpoint)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_User,
+					DetectorType: detector_typepb.DetectorType_User,
 					Verified:     false,
+					Raw:          []byte(inactiveSecret),
+					RawV2:        []byte(inactiveSecret + ":" + endpoint),
+					SecretParts: map[string]string{
+						"key":      inactiveSecret,
+						"endpoint": endpoint,
+					},
 				},
 			},
 			wantErr: false,
@@ -84,8 +99,9 @@ func TestUser_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			tt.s.UseFoundEndpoints(true)
+
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("User.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -94,12 +110,59 @@ func TestUser_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("User.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(
+				detectors.Result{},
+				"ExtraData",
+				"verificationError",
+				"primarySecret",
+				"chunkOffset",
+				"chunkOffsetSet",
+			)
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+				t.Errorf("User.FromData() %s diff: (-want +got)\n%s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestUser_FromChunk_WithCustomEndpoint(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("USER")
+	endpoint := testSecrets.MustGetField("USER_ENDPOINT")
+
+	s := Scanner{}
+	s.UseFoundEndpoints(true)
+	if err := s.SetConfiguredEndpoints(endpoint); err != nil {
+		t.Fatal("Error in setting configured endpoint")
+	}
+
+	data := []byte(fmt.Sprintf("user token = %s", secret))
+
+	got, err := s.FromData(ctx, true, data)
+
+	require.NoError(t, err, "unexpected error from FromData")
+	require.Greater(t, len(got), 0, "expected at least 1 result")
+
+	expectedRawV2 := []byte(secret + ":" + endpoint)
+	if string(got[0].RawV2) != string(expectedRawV2) {
+		t.Errorf("User.FromData() rawV2 mismatch: got %s, want %s", string(got[0].RawV2), string(expectedRawV2))
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestProtocolsIO_FromChunk(t *testing.T) {
@@ -48,7 +48,7 @@ func TestProtocolsIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ProtocolsIO,
+					DetectorType: detector_typepb.DetectorType_ProtocolsIO,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestProtocolsIO_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ProtocolsIO,
+					DetectorType: detector_typepb.DetectorType_ProtocolsIO,
 					Verified:     false,
 				},
 			},

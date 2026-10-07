@@ -14,7 +14,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 func TestPhrase_FromChunk(t *testing.T) {
@@ -50,7 +50,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
+					DetectorType: detector_typepb.DetectorType_PhraseAccessToken,
 					Verified:     true,
 					Raw:          []byte(secret),
 				},
@@ -68,7 +68,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
+					DetectorType: detector_typepb.DetectorType_PhraseAccessToken,
 					Verified:     false,
 					Raw:          []byte(inactiveSecret),
 				},
@@ -98,7 +98,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
+					DetectorType: detector_typepb.DetectorType_PhraseAccessToken,
 					Verified:     false,
 					Raw:          []byte(secret),
 				},
@@ -116,7 +116,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
+					DetectorType: detector_typepb.DetectorType_PhraseAccessToken,
 					Verified:     false,
 					Raw:          []byte(secret),
 				},

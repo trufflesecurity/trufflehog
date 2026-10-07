@@ -30,6 +30,46 @@ message VerifierConfig {
   bool unsafe = 2;
   repeated string headers = 3;
   repeated string successRanges = 4;
+  repeated string rotatedRanges = 5;
+  // Optional authentication for verification requests, for endpoints that
+  // sit behind an auth proxy.
+  VerifierAuth auth = 6;
+}
+
+// VerifierAuth selects how verification requests authenticate to the auth
+// proxy in front of the verification endpoint. Exactly one mechanism may be
+// set.
+message VerifierAuth {
+  oneof auth_config {
+    OAuth2Config oauth2 = 1;
+  }
+}
+
+// OAuth2Config obtains an access token from an OAuth2 identity provider and
+// attaches it to every verification request sent to a configured endpoint.
+message OAuth2Config {
+  // Token endpoint of the identity provider. Must be HTTPS unless the
+  // verifier is marked unsafe.
+  string token_endpoint = 1;
+  oneof grant_config {
+    ROPCConfig ropc = 2;
+  }
+  // Request header that carries the access token as "Bearer <token>".
+  // Defaults to "Authorization". Detectors that send the secret under test
+  // in Authorization need a different header here, because the token is
+  // never allowed to overwrite a header the detector set.
+  string token_header = 3;
+}
+
+// ROPCConfig holds credentials for the OAuth2 Resource Owner Password
+// Credentials grant (RFC 6749 section 4.3).
+message ROPCConfig {
+  string username = 1;
+  string password = 2;
+  string client_id = 3;
+  string client_secret = 4;
+  // Space-separated scopes to request. Empty requests no scope.
+  string scope = 5;
 }
 
 message ValidationConfig {

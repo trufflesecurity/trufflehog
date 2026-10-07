@@ -54,6 +54,8 @@ enum SourceType {
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
   SOURCE_TYPE_SLACK_CONTINUOUS = 41;
+  SOURCE_TYPE_JSON_ENUMERATOR = 42;
+  SOURCE_TYPE_AWS_SECRETS_MANAGER = 43;
 }
 
 message LocalSource {
@@ -106,7 +108,7 @@ message Bitbucket {
     string token = 2;
     credentials.Oauth2 oauth = 3;
     credentials.BasicAuth basic_auth = 4;
-
+    credentials.BitbucketApiToken api_token = 14;
   }
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
@@ -184,6 +186,7 @@ message Filesystem {
   string include_paths_file = 3; // path to file containing newline separated list of paths
   string exclude_paths_file = 4; // path to file containing newline separated list of paths
   bool skip_binaries = 5; // allows skipping binary files from the scan
+  int32 max_symlink_depth = 6; // allows following symlinks upto specified max depth
 }
 
 message GCS {
@@ -279,6 +282,9 @@ message GitHub {
   bool no_cleanup = 23;
   bool ignore_gists = 24;
   bool print_legacy_json = 25;
+  // When using GitHub App credentials, enumerate repositories from every app installation.
+  bool scan_all_installations = 26;
+  bool exclude_archived = 27;
 }
 
 message GitHubExperimental {
@@ -334,6 +340,10 @@ message Huggingface {
   bool  skip_all_datasets = 18;
   bool include_discussions = 11;
   bool include_prs = 19;
+  repeated string buckets = 20;
+  repeated string ignore_buckets = 21;
+  repeated string include_buckets = 22;
+  bool skip_all_buckets = 23;
 }
 
 enum JiraInstallationType {
@@ -383,6 +393,25 @@ message S3 {
   repeated string roles = 7;
   repeated string ignore_buckets = 8;
   bool enable_resumption = 9 [deprecated = true];
+  // endpoint targets an S3-compatible service other than AWS S3. When set,
+  // per-bucket region discovery is skipped because it is an AWS-only API.
+  string endpoint = 10 [(validate.rules).string.uri_ref = true];
+  // region is the region used to sign requests. Defaults to us-east-1.
+  string region = 11;
+  // include_prefixes limits the scan to objects whose key matches one of these
+  // key prefixes. Leave empty to consider every object in the bucket.
+  repeated string include_prefixes = 12;
+  // exclude_prefixes skips objects whose key matches one of these key prefixes.
+  repeated string exclude_prefixes = 13;
+  // include_extensions limits the scan to objects whose key ends in one of these
+  // file extensions, written without a leading dot (e.g. "tf", "yaml"). Leave
+  // empty to consider every extension. Cannot be combined with
+  // exclude_extensions.
+  repeated string include_extensions = 14;
+  // exclude_extensions skips objects whose key ends in one of these file
+  // extensions, written without a leading dot (e.g. "zip", "mp4"). Cannot be
+  // combined with include_extensions.
+  repeated string exclude_extensions = 15;
 }
 
 message Slack {
@@ -412,6 +441,8 @@ message Gerrit {
   repeated string projects = 4;
   bool skip_binaries = 5;
   bool skip_archives = 6;
+  // Gerrit API request timeout in seconds. Unset or 0 uses the default (20s).
+  int32 api_timeout_seconds = 7 [(validate.rules).int32 = {gte: 0, lte: 3600}];
 }
 
 message Jenkins {
@@ -465,6 +496,9 @@ message Sharepoint {
     credentials.Oauth2 oauth = 1;
   }
   string site_url = 2;
+  bool include_versions = 3;
+  bool include_comments = 4;
+  bool include_attachments = 5;
 }
 
 message AzureRepos {
@@ -547,4 +581,8 @@ message Stdin {}
 message SlackContinuous {
   string namespace = 1;
   string project_id = 2;
+}
+
+message JSONEnumerator {
+  repeated string paths = 1;
 }

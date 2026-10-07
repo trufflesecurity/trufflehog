@@ -59,21 +59,23 @@ The Docker source supports several image reference formats:
 
 For public images that don't require authentication:
 
-**YAML Configuration:**
-```yaml
-sources:
-  - type: docker
-    name: public-images
-    docker:
-      unauthenticated: {}
-      images:
-        - nginx:latest
-        - alpine:3.18
-```
-
 **CLI Usage:**
 ```bash
 trufflehog docker --image nginx:latest
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Docker
+    unauthenticated: {}
+    images:
+    - nginx:latest
+    - alpine:3.18
+  name: public-images
+  type: SOURCE_TYPE_DOCKER
+  verify: true
 ```
 
 ---
@@ -82,23 +84,25 @@ trufflehog docker --image nginx:latest
 
 For private registries requiring username and password:
 
-**YAML Configuration:**
-```yaml
-sources:
-  - type: docker
-    name: private-registry
-    docker:
-      basic_auth:
-        username: myuser
-        password: mypassword
-      images:
-        - myregistry.com/private-image:latest
-        - myregistry.com/another-image:v1.0.0
-```
-
 **CLI Usage:**
 
 Trufflehog does not provide basic authentication using username and password through CLI at the moment.
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Docker
+    basic_auth:
+      username: myuser
+      password: mypassword
+    images:
+    - myregistry.com/private-image:latest
+    - myregistry.com/another-image:v1.0.0
+  name: private-registry
+  type: SOURCE_TYPE_DOCKER
+  verify: true
+```
 
 ---
 
@@ -106,21 +110,23 @@ Trufflehog does not provide basic authentication using username and password thr
 
 For registries using token-based authentication (e.g., Dockerhub registry):
 
-**YAML Configuration:**
-```yaml
-sources:
-  - type: docker
-    name: truffle-packages
-    docker:
-      bearer_token: "ghp_xxxxxxxxxxxxxxxxxxxx"
-      images:
-        - myorg/myapp:latest
-        - myorg/frontend:v2.1.0
-```
-
 **CLI Usage:**
 ```bash
 trufflehog docker --image myorg/myapp:latest --bearer-token eyJ_xxxxxxxxxxxxxxxxxxxx
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Docker
+    bearer_token: "ghp_xxxxxxxxxxxxxxxxxxxx"
+    images:
+    - myorg/myapp:latest
+    - myorg/frontend:v2.1.0
+  name: truffle-packages
+  type: SOURCE_TYPE_DOCKER
+  verify: true
 ```
 
 ---
@@ -128,18 +134,6 @@ trufflehog docker --image myorg/myapp:latest --bearer-token eyJ_xxxxxxxxxxxxxxxx
 #### 4. Docker Keychain
 
 Uses credentials from your local Docker configuration (`~/.docker/config.json`):
-
-**YAML Configuration:**
-```yaml
-sources:
-  - type: docker
-    name: local-docker-creds
-    docker:
-      docker_keychain: true
-      images:
-        - myregistry.com/private-image:latest
-        - docker.io/myorg/app:latest
-```
 
 **CLI Usage:**
 ```bash
@@ -159,6 +153,20 @@ docker login quay.io
 
 # Verify credentials are stored
 cat ~/.docker/config.json
+```
+
+**YAML Configuration:**
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.Docker
+    docker_keychain: true
+    images:
+    - myregistry.com/private-image:latest
+    - docker.io/myorg/app:latest
+  name: local-docker-creds
+  type: SOURCE_TYPE_DOCKER
+  verify: true
 ```
 
 ---
@@ -184,11 +192,13 @@ trufflehog docker --namespace myorg --registry-token <access_token>
 **YAML Configuration:**
 ```yaml
 sources:
-  - type: docker
-    name: org-scan
-    docker:
-      namespace: myorg
-      registry_token: "ghp_xxxxxxxxxxxxxxxxxxxx"
+- connection:
+    '@type': type.googleapis.com/sources.Docker
+    namespace: myorg
+    registry_token: "ghp_xxxxxxxxxxxxxxxxxxxx"
+  name: org-scan
+  type: SOURCE_TYPE_DOCKER
+  verify: true
 ```
 
 Supported registries:
@@ -281,19 +291,6 @@ docker login my-registry.io
 trufflehog docker --image my-registry.io/private-app:v1.0.0
 ```
 
-## Testing Results
-
-| Test Case | Status | Command/Configuration | Registry URL | Notes |
-|-----------|--------|----------------------|--------------|-------|
-| Scan remote image on DockerHub | ✅ Success | `--image <image_name>` | https://hub.docker.com/ | Public images work without authentication |
-| Scan specific tag of image on DockerHub | ✅ Success | `--image <image_name>:<tag_name>` | https://hub.docker.com/ | Tag specification working correctly |
-| Scan all images under namespace | In Progress | `--namespace <namespace>` | DockerHub, Quay, GHCR | Automatically discovers all public images |
-| Scan remote image on Quay.io | ✅ Success | `--image quay.io/prometheus/prometheus` | https://quay.io/search | Public Quay.io registry supported |
-| Scan multiple images | ✅ Success | `--image <image_name> --image <image_name>` | Multiple registries | Sequential scanning of multiple images |
-| Scan remote image on DockerHub with token | ✅ Success | `--token <token>`(Generate token using username and password) | https://hub.docker.com/ | Authenticated scanning for private repos |
-| Scan private image on Quay | ⏸️ Halted | N/A | https://quay.io/ | RedHat requires paid account for private repos |
-| Scan private image on GHCR | ✅ Success | `--image ghcr.io/<image_name>` | https://github.com/packages | GitHub Container Registry |
-
 ## Troubleshooting
 
 ### Common Issues
@@ -315,3 +312,8 @@ trufflehog docker --image my-registry.io/private-app:v1.0.0
 
 **Issue**: Files not being scanned
 **Solution**: Check exclude patterns and file size limits. Verify files are under 50MB.
+
+---
+
+**Issue**: Cannot scan private image on Quay.io
+**Note**: Quay.io requires a paid account to access private repositories. (Not supported yet)

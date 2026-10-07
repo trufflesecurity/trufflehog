@@ -9,7 +9,7 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -55,8 +55,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for email := range uniqueEmails {
 			for domain := range uniqueDomains {
 				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_ZendeskApi,
+					DetectorType: detector_typepb.DetectorType_ZendeskApi,
 					Raw:          []byte(token),
+					SecretParts:  map[string]string{"key": token},
 				}
 
 				if verify {
@@ -75,8 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ZendeskApi
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_ZendeskApi
 }
 
 func (s Scanner) Description() string {

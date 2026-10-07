@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/oauth2/clientcredentials"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 type Scanner struct {
@@ -48,8 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, idMatch := range idMatches {
 			idresMatch := strings.TrimSpace(idMatch[1])
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_SpotifyKey,
+				DetectorType: detector_typepb.DetectorType_SpotifyKey,
 				Raw:          []byte(resMatch),
+				SecretParts:  map[string]string{"key": resMatch},
 			}
 
 			if verify {
@@ -74,8 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SpotifyKey
+func (s Scanner) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType_SpotifyKey
 }
 
 func (s Scanner) Description() string {
