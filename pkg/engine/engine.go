@@ -286,6 +286,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
 		maxDecodeDepth:                      cfg.MaxDecodeDepth,
+		dedupeCacheSize:                     cfg.DedupeCacheSize,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
