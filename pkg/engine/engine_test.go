@@ -2295,6 +2295,7 @@ func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
 				notifyVerifiedResults:   true,
 				notifyUnverifiedResults: true,
 				notifyUnknownResults:    true,
+				dedupeCacheSize:         5000,
 			}
 
 			result := detectors.ResultWithMetadata{
@@ -2352,6 +2353,7 @@ func TestNotifierWorker_ConcurrentDuplicatesDispatchedOnce(t *testing.T) {
 		notifyVerifiedResults:   true,
 		notifyUnverifiedResults: true,
 		notifyUnknownResults:    true,
+		dedupeCacheSize:         5000,
 	}
 
 	// Fill and close the channel before starting workers so they all contend
