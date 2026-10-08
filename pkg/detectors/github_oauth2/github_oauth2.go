@@ -36,7 +36,9 @@ var (
 )
 
 const (
-	githubBadVerificationCodeError = "bad_verification_code"
+	githubBadVerificationCodeError        = "bad_verification_code"
+	githubIncorrectClientCredentialsError = "incorrect_client_credentials"
+	githubClientNotFoundError             = "404 Not Found"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -95,11 +97,22 @@ func (s Scanner) VerifyResult(ctx context.Context, result *detectors.Result) {
 	}
 
 	_, err := clientCredentials.Token(ctx)
-	// if client id and client secret is correct, it will return bad verification code error as we do not pass any verification code
-	// docs: https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors#bad-verification-code
-	if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
-		// mark result as verified only in case of bad verification code error, for any other error the result will be unverified
+	// a valid pair is rejected with bad_verification_code and an invalid pair with
+	// incorrect_client_credentials.
+	// docs: https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors
+	if err == nil {
+		return
+	}
+
+	errMsg := err.Error()
+	switch {
+	case strings.Contains(errMsg, githubBadVerificationCodeError):
 		result.Verified = true
+	case strings.Contains(errMsg, githubIncorrectClientCredentialsError),
+		strings.Contains(errMsg, githubClientNotFoundError):
+		// dead credential, leave unverified with no error
+	default:
+		result.SetVerificationError(err, clientSecret)
 	}
 }
 
