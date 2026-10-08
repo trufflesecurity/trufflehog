@@ -60,8 +60,13 @@ var (
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
-	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
-	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
+
+	// The default cache size is 5000 entries, which is a balance between memory usage and the need for effective deduplication.
+	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
+	dedupeCacheSize = cli.Flag("deduplication-cache-size", "Max size of the results deduplication cache, setting to 0 disables").Default("5000").Int()
+
+	noColor  = cli.Flag("no-color", "Disable colorized output").Bool()
+	noColour = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -669,6 +674,7 @@ func run(state overseer.State, logSync func() error) {
 		ShouldScanEntireChunk:    *scanEntireChunk,
 		MaxDecodeDepth:           *maxDecodeDepth,
 		VerificationCacheMetrics: &verificationCacheMetrics,
+		DedupeCacheSize:          *dedupeCacheSize,
 	}
 
 	if !*noVerificationCache {

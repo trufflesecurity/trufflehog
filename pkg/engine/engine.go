@@ -179,6 +179,9 @@ type Config struct {
 	// 1 = single pass (no chaining), 2+ = chained (e.g., base64 inside UTF-16).
 	// Default: 5.
 	MaxDecodeDepth int
+
+	// Max size of the deduplication LRU cache
+	DedupeCacheSize int
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -252,6 +255,8 @@ type Engine struct {
 
 	maxDecodeDepth int
 
+	dedupeCacheSize int
+
 	// runtimeCollector exposes live channel/worker/scan counters to Prometheus
 	// while the engine is running. Set in Start, cleared in Finish.
 	runtimeCollector *runtimeCollector
@@ -281,6 +286,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
 		maxDecodeDepth:                      cfg.MaxDecodeDepth,
+		dedupeCacheSize:                     cfg.DedupeCacheSize,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -569,14 +575,15 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
-	// The cache size is set to 5000 entries, which is a balance between memory usage and the need for effective deduplication.
-	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
-	const cacheSize = 5000
+	if e.dedupeCacheEnabled() {
+		cache, err := lru.New[string, struct{}](e.dedupeCacheSize)
+		if err != nil {
+			return fmt.Errorf("failed to initialize LRU cache: %w", err)
+		}
 
-	cache, err := lru.New[string, struct{}](cacheSize)
-	if err != nil {
-		return fmt.Errorf("failed to initialize LRU cache: %w", err)
+		e.dedupeCache = cache
 	}
+
 	const (
 		// detectableChunksChanMultiplier is set to accommodate a high number of concurrent worker goroutines.
 		// This multiplier ensures that the detectableChunksChan channel has sufficient buffer capacity
@@ -600,7 +607,6 @@ func (e *Engine) initialize(ctx context.Context) error {
 		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
 	)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer*resultsChanMultiplier)
-	e.dedupeCache = cache
 	ctx.Logger().V(4).Info("engine initialized")
 
 	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
@@ -614,6 +620,10 @@ func (e *Engine) initialize(ctx context.Context) error {
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
+}
+
+func (e *Engine) dedupeCacheEnabled() bool {
+	return e.dedupeCacheSize > 0
 }
 
 const ignoreTag = "trufflehog:ignore"
@@ -1410,7 +1420,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// result from reverification and want to Dispatch it below.
 
 		// Notifier workers share this cache; the check and insert must be one atomic step.
-		if result.SecretID == 0 {
+		if e.dedupeCacheEnabled() && result.SecretID == 0 {
 			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
 			key := string(h[:])
 			if found, _ := e.dedupeCache.ContainsOrAdd(key, struct{}{}); found {
