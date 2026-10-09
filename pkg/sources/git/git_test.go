@@ -1887,10 +1887,9 @@ func TestScanRepo_BaseMergedIntoHead(t *testing.T) {
 // TestNormalizeConfig_BaseWithoutHead pins what normalizeConfig does and does
 // not do with a base and no head: it resolves the base to a hash and leaves the
 // head empty. The parser then walks --all ^base (see gitparse.Parser.RepoPath).
-// normalizeConfig must not invent a head, because that would route the
-// base-only shape through MergeBase, which go-git cannot compute across the
-// graft of a shallow clone, including the --shallow-since clone
-// prepareRepoSinceCommit makes for exactly this shape.
+// normalizeConfig must not invent a head, because that would narrow the
+// base-only scan to one branch. prepareRepoSinceCommit makes a shallow clone
+// with the base at its graft boundary for exactly this shape.
 func TestNormalizeConfig_BaseWithoutHead(t *testing.T) {
 	// main: A; feature: A -> B, checked out.
 	path := setupTestRepo(t, "base-without-head")
@@ -1918,9 +1917,8 @@ func TestNormalizeConfig_BaseWithoutHead(t *testing.T) {
 		},
 		{
 			// The pre-commit hook passes HEAD as both ends (main.go). Both
-			// resolve to the same hash and MergeBase short-circuits without
-			// walking history, so the empty HEAD..HEAD range is safe on a
-			// shallow local clone too.
+			// resolve to the same hash, so the empty HEAD..HEAD range is safe
+			// on a shallow local clone too.
 			name: "base HEAD and head HEAD resolve to the same commit",
 			base: "HEAD", head: "HEAD", wantBase: shaB, wantHead: shaB,
 		},
@@ -1938,7 +1936,7 @@ func TestNormalizeConfig_BaseWithoutHead(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := NewScanOptions(ScanOptionBaseHash(tt.base), ScanOptionHeadCommit(tt.head))
-			assert.NoError(t, normalizeConfig(opts, repo))
+			assert.NoError(t, normalizeConfig(context.Background(), opts, repo, path))
 			assert.Equal(t, tt.wantBase, opts.BaseHash, "BaseHash")
 			assert.Equal(t, tt.wantHead, opts.HeadHash, "HeadHash")
 		})
@@ -2199,18 +2197,13 @@ func TestScanRepo_BaseNotUsable(t *testing.T) {
 	}
 }
 
-// TestScanRepo_ShallowClone pins where the graft boundary of a shallow clone
-// starts to matter for a diff scan. git itself handles a truncated history
-// fine, so the boundary that counts is the one go-git needs to walk in
-// normalizeConfig: MergeBase loads a commit's parents before it can recognize
-// the commit as the range boundary (bfsCommitIterator.Next), so a base sitting
-// on the graft has no resolvable merge base.
+// TestScanRepo_ShallowClone verifies that a diff scan can use a base at the
+// graft boundary when Git can resolve it, even without the base's parent.
 //
-// That walk only runs when both ends are supplied. With a base alone the
-// parser defaults the head to HEAD and git computes the range, so the same
-// clone scans cleanly; this is the shape `--since-commit X` without `--branch`
-// takes against a GitHub URL, where prepareRepoSinceCommit clones with
-// --shallow-since and puts X on the graft. See
+// Merge-base lookup only runs when both ends are supplied. With a base alone,
+// the parser lets Git compute the range across all refs; this is the shape
+// `--since-commit X` without `--branch` takes against a GitHub URL, where
+// prepareRepoSinceCommit clones with --shallow-since and puts X on the graft. See
 // https://github.com/trufflesecurity/trufflehog/issues/4895 for the both-ends
 // failure surfacing on GitLab.
 func TestScanRepo_ShallowClone(t *testing.T) {
@@ -2257,8 +2250,79 @@ func TestScanRepo_ShallowClone(t *testing.T) {
 
 				got, _, err := scanRepoRange(ctx, t, shallow, base, head)
 
-				assert.ErrorContains(t, err, "unable to resolve merge base")
-				assert.Empty(t, got, "an unresolvable merge base must fail the scan, not scan an arbitrary range")
+				assert.NoError(t, err)
+				assert.True(t, got[head], "the one commit since base should have been scanned; got %v", got)
+				assert.False(t, got[base], "the base is excluded from its own range")
+			})
+
+			t.Run("main advances past the feature fork", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				origin := setupTestRepo(t, "advanced-main-origin")
+				addTestFileAndCommit(t, origin, "a.txt", "a\n")
+				addTestFileAndCommit(t, origin, "fork.txt", "fork\n")
+				runGit(t, origin, "branch", "-M", "main")
+				fork := gitRevParse(t, origin, "HEAD")
+				runGit(t, origin, "switch", "-q", "-c", "feature")
+				addTestFileAndCommit(t, origin, "feature.txt", "feature\n")
+				featureHead := gitRevParse(t, origin, "HEAD")
+
+				shallow := filepath.Join(t.TempDir(), "shallow-feature")
+				runGit(t, "", "clone", "-q", "--depth", "2", "--no-single-branch", "-b", "feature", "file://"+origin, shallow)
+				runGit(t, origin, "switch", "-q", "main")
+				addTestFileAndCommit(t, origin, "main-1.txt", "main 1\n")
+				addTestFileAndCommit(t, origin, "main-2.txt", "main 2\n")
+				// Fetch the advanced main without deepening past the shared fork.
+				runGit(t, shallow, "fetch", "-q", "--depth=3", "origin", "main:refs/remotes/origin/main")
+				mainHead := gitRevParse(t, shallow, "origin/main")
+				assert.False(t, gitHasObject(t, shallow, fork+"^"), "the fork should still be at the shallow boundary")
+
+				got, _, err := scanRepoRange(ctx, t, shallow, mainHead, featureHead)
+
+				assert.NoError(t, err)
+				assert.True(t, got[featureHead], "the feature commit should be scanned; got %v", got)
+				assert.False(t, got[fork], "the merge base is excluded")
+				assert.False(t, got[mainHead], "main-only commits are excluded")
+			})
+
+			t.Run("fork is below both shallow boundaries", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				origin := setupTestRepo(t, "missing-fork-origin")
+				addTestFileAndCommit(t, origin, "fork.txt", "fork\n")
+				runGit(t, origin, "branch", "-M", "main")
+				runGit(t, origin, "switch", "-q", "-c", "feature")
+				addTestFileAndCommit(t, origin, "feature.txt", "feature\n")
+				runGit(t, origin, "switch", "-q", "main")
+				addTestFileAndCommit(t, origin, "main.txt", "main\n")
+
+				shallow := filepath.Join(t.TempDir(), "shallow-both-tips")
+				runGit(t, "", "clone", "-q", "--depth", "1", "--no-single-branch", "-b", "feature", "file://"+origin, shallow)
+				assert.False(t, gitHasObject(t, shallow, gitRevParse(t, origin, "HEAD~1")), "the fork should be absent")
+
+				got, _, err := scanRepoRange(ctx, t, shallow, gitRevParse(t, shallow, "origin/main"), gitRevParse(t, shallow, "HEAD"))
+
+				assert.ErrorContains(t, err, "repository is shallow; fetch more history")
+				assert.Empty(t, got, "an unresolved merge base must not scan an arbitrary range")
+			})
+
+			t.Run("foreign Git environment cannot redirect the range", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				shallow, head, base := graftAtBase(t)
+				foreign := setupTestRepo(t, "foreign")
+				addTestFileAndCommit(t, foreign, "foreign.txt", "foreign\n")
+				t.Setenv("GIT_DIR", filepath.Join(foreign, ".git"))
+				t.Setenv("GIT_TRACE", "1")
+
+				got, _, err := scanRepoRange(ctx, t, shallow, base, head)
+
+				assert.NoError(t, err)
+				assert.True(t, got[head], "the head commit should have been scanned; got %v", got)
+				assert.False(t, got[base], "the base is excluded from its own range")
 			})
 
 			t.Run("base is the graft boundary with implicit head", func(t *testing.T) {
@@ -2266,9 +2330,8 @@ func TestScanRepo_ShallowClone(t *testing.T) {
 				defer cancel()
 
 				// Same clone, no head: normalizeConfig must not invent a head
-				// and run MergeBase, or the --shallow-since path would fail
-				// exactly where it used to work. git walks --all ^base, and the
-				// clone's only ref is the tip.
+				// and narrow the scan to one ref. Git walks --all ^base, and
+				// the clone's only ref is the tip.
 				shallow, head, base := graftAtBase(t)
 
 				got, _, err := scanRepoRange(ctx, t, shallow, base, "")
@@ -2282,9 +2345,8 @@ func TestScanRepo_ShallowClone(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 
-				// One more commit of depth is all it takes: the base's parent is
-				// present, so the merge base resolves and git scans the range over
-				// a history it cannot fully walk.
+				// One more commit of depth puts the base above the graft, so
+				// Git scans the range over a history it cannot fully walk.
 				shallow := clone(t, newOrigin(t), "3")
 				head, base := gitRevParse(t, shallow, "HEAD"), gitRevParse(t, shallow, "HEAD~1")
 				assert.True(t, gitHasObject(t, shallow, base+"^"), "fixture is wrong: the base's parent is missing")
