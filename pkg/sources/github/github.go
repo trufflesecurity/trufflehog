@@ -80,6 +80,10 @@ type Source struct {
 	ignoreGists           bool
 	includeGistComments   bool
 	commentsTimeframeDays uint32
+	// commentRetryWait sleeps between retries of transient comment API
+	// failures and returns false if the context ended first. Nil uses
+	// sleepWithContext; tests inject a wait that returns immediately.
+	commentRetryWait func(context.Context, time.Duration) bool
 
 	sources.Progress
 
@@ -1358,7 +1362,8 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 		// This should never happen.
 		return fmt.Errorf("no repoInfo for URL: %s", repoURL)
 	}
-	duration, err := s.cloneAndScanRepo(ctx, repoURL, repoInfo, reporter)
+	start := time.Now()
+	gitDuration, err := s.cloneAndScanRepo(ctx, repoURL, repoInfo, reporter)
 	if err != nil {
 		return err
 	}
@@ -1385,8 +1390,12 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 	}
 
 	// Scan comments, if enabled.
+	var commentsDuration time.Duration
 	if s.includeGistComments || s.includeIssueComments || s.includePRComments {
-		if err := s.scanComments(ctx, repoURL, repoInfo, reporter); err != nil {
+		commentsStart := time.Now()
+		err := s.scanComments(ctx, repoURL, repoInfo, reporter)
+		commentsDuration = time.Since(commentsStart)
+		if err != nil {
 			err := fmt.Errorf("error scanning comments: %w", err)
 			if err := reporter.ChunkErr(ctx, err); err != nil {
 				return err
@@ -1394,7 +1403,13 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 		}
 	}
 
-	ctx.Logger().V(2).Info("finished scanning repo", "duration_seconds", duration)
+	// duration_seconds covers everything above: clone, git history, wiki, and
+	// comments. Git history and comments are broken out because on repos with
+	// many comments, the comment walks can take far longer than the git scan.
+	ctx.Logger().V(2).Info("finished scanning repo",
+		"duration_seconds", time.Since(start).Seconds(),
+		"git_scan_seconds", gitDuration.Seconds(),
+		"comments_seconds", commentsDuration.Seconds())
 	githubReposScanned.WithLabelValues(s.name).Inc()
 	return nil
 }
@@ -1862,35 +1877,54 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 	return urlString, urlParts, nil
 }
 
-const initialPage = 1 // page to start listing from
+// commentPager returns the pager every comment walk for one repo shares. Rate
+// limits are handled by waiting and retrying the same request, and each wait
+// is also reported to the chunk reporter. Transient failures are retried a
+// bounded number of times; see fetchWithRetry.
+func (s *Source) commentPager(ctx context.Context, apiClient *github.Client, reporter sources.ChunkReporter) pager {
+	wait := s.commentRetryWait
+	if wait == nil {
+		wait = func(ctx context.Context, d time.Duration) bool {
+			_, canceled := sleepWithContext(ctx, d)
+			return !canceled
+		}
+	}
+	return pager{
+		client:  apiClient,
+		perPage: defaultPagination,
+		retry: func(err error) bool {
+			return s.handleRateLimitWithChunkReporter(ctx, reporter, err)
+		},
+		wait: wait,
+	}
+}
 
+// processGistComments scans a gist's comments. The endpoint has no `since` or
+// sort parameters, so the comments timeframe is applied to each page as it
+// arrives, and a capped walk has no way to continue: it is reported as an
+// error rather than ending silently.
 func (s *Source) processGistComments(ctx context.Context, apiClient *github.Client, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	ctx.Logger().V(2).Info("Scanning GitHub Gist comments")
 
-	// GitHub Gist URL.
 	gistID := extractGistID(urlParts)
-
-	options := &github.ListOptions{
-		PerPage: defaultPagination,
-		Page:    initialPage,
+	p := s.commentPager(ctx, apiClient, reporter)
+	p.listing = "gist comments"
+	outcome, err := walkPages(ctx, p,
+		func(ctx context.Context) ([]*github.GistComment, *github.Response, error) {
+			return apiClient.Gists.ListComments(ctx, gistID, &github.ListOptions{PerPage: defaultPagination})
+		},
+		func(comments []*github.GistComment) error {
+			return s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter, cutoffTime)
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("gist comments: %w", &walkError{items: outcome.items, err: err})
 	}
-	for {
-		comments, _, err := apiClient.Gists.ListComments(ctx, gistID, options)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		options.Page++
-		if len(comments) < options.PerPage {
-			break
-		}
+	if outcome.capped {
+		return fmt.Errorf("gist comments: %w", &walkError{
+			items: outcome.items,
+			err:   errors.New("GitHub stopped paginating and this endpoint has no since filter to continue from"),
+		})
 	}
 	return nil
 }
@@ -1923,9 +1957,10 @@ func isGistUrl(urlParts []string) bool {
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
+		// Gist comments come back oldest first, so an old comment says nothing
+		// about the ones after it. Skip it and keep going.
 		if cutoffTime != nil && comment.GetCreatedAt().Before(*cutoffTime) {
-			break
+			continue
 		}
 
 		// Create chunk and send it to the channel.
@@ -1957,46 +1992,100 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 	return nil
 }
 
-// Note: these can't be consts because the address is needed when using with the GitHub library.
-var (
-	// sortType defines the criteria for sorting comments.
-	// By setting this to "updated" we can use this to reliably manage the comment timeframe filtering below
-	sortType = "updated"
-	// directionType defines the direction of sorting.
-	// "desc" means comments will be sorted in descending order, showing the latest comments first, which is critical for managing the comment timeframe filtering
-	directionType = "desc"
-	// allComments is a placeholder for specifying the comment ID to start listing from.
-	// A value of 0 means that all comments will be listed.
-	allComments = 0
-	// state of "all" for the ListByRepo captures both open and closed issues.
-	state = "all"
+// Repo listings sort by update time, oldest first, so a capped walk can
+// continue from the last update time it saw. See walkUpdatedSince.
+const (
+	sortByUpdated = "updated"
+	sortAscending = "asc"
+	// stateAll lists open and closed issues and pull requests.
+	stateAll = "all"
 )
 
+// commentPhase is one listing in a repo's comment scan. run returns how many
+// chunks it emitted. startLog, when set, is logged at V(2) before the phase
+// runs.
+type commentPhase struct {
+	name     string
+	startLog string
+	run      func() (int, error)
+}
+
+// processIssueandPRsWithCommentsREST scans a repo's issues, pull requests, and
+// their comments through the REST API.
+//
+// The phases are independent: a failure in one is collected and the rest
+// still run, so one capped or forbidden endpoint can't hide the others. All
+// failures come back joined into one error, which scanRepo reports as a
+// single ChunkErr for the repo. Chunks emitted before a failure are kept.
+//
+// The "Scanning issues" and "Scanning pull requests" V(2) lines are the only
+// log signal for scans on the unit path, whose comment errors go to the scan
+// details UI instead of the logs, so they keep their wording. The summary
+// line at the end records how far each phase got.
 func (s *Source) processIssueandPRsWithCommentsREST(
 	ctx context.Context, apiClient *github.Client, repoInfo repoInfo,
 	reporter sources.ChunkReporter, cutoffTime *time.Time,
 ) error {
+	p := s.commentPager(ctx, apiClient, reporter)
+	var since time.Time
+	if cutoffTime != nil {
+		since = *cutoffTime
+	}
+
+	// /issues returns issues and pull requests together. When issue comments
+	// are enabled, that one walk also emits PR bodies, so /pulls is only
+	// walked for configs that enable PR comments alone.
+	var phases []commentPhase
 	if s.includeIssueComments {
-		ctx.Logger().V(2).Info("Scanning issues")
-		if err := s.processIssues(ctx, apiClient, repoInfo, reporter); err != nil {
-			return err
+		bodies := "issues"
+		if s.includePRComments {
+			bodies = "issues and pull requests"
 		}
-		if err := s.processIssueComments(ctx, apiClient, repoInfo, reporter, cutoffTime); err != nil {
-			return err
-		}
+		phases = append(phases,
+			commentPhase{name: bodies, startLog: "Scanning issues", run: func() (int, error) {
+				return s.processIssues(ctx, p, repoInfo, reporter, s.includePRComments)
+			}},
+			commentPhase{name: "issue comments", run: func() (int, error) {
+				return s.processIssueComments(ctx, p, repoInfo, reporter, since)
+			}},
+		)
 	}
-
 	if s.includePRComments {
-		ctx.Logger().V(2).Info("Scanning pull requests")
-		if err := s.processPRs(ctx, apiClient, repoInfo, reporter); err != nil {
-			return err
+		prStartLog := "Scanning pull requests"
+		if !s.includeIssueComments {
+			phases = append(phases, commentPhase{name: "pull requests", startLog: prStartLog, run: func() (int, error) {
+				return s.processPRs(ctx, p, repoInfo, reporter)
+			}})
+			prStartLog = ""
 		}
-		if err := s.processPRComments(ctx, apiClient, repoInfo, reporter, cutoffTime); err != nil {
-			return err
-		}
+		phases = append(phases, commentPhase{name: "pull request comments", startLog: prStartLog, run: func() (int, error) {
+			return s.processPRComments(ctx, p, repoInfo, reporter, since)
+		}})
 	}
 
-	return nil
+	var (
+		errs    []error
+		failed  []string
+		summary []any
+	)
+	for _, phase := range phases {
+		if err := ctx.Err(); err != nil {
+			errs = append(errs, err)
+			break
+		}
+		if phase.startLog != "" {
+			ctx.Logger().V(2).Info(phase.startLog)
+		}
+		emitted, err := phase.run()
+		summary = append(summary, strings.ReplaceAll(phase.name, " ", "_"), emitted)
+		if err != nil {
+			failed = append(failed, phase.name)
+			errs = append(errs, fmt.Errorf("%s: %w", phase.name, err))
+		}
+	}
+	ctx.Logger().V(2).Info("finished scanning comments", append(summary, "failed_phases", failed)...)
+
+	return errors.Join(errs...)
 }
 
 func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
@@ -2024,44 +2113,52 @@ func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
 	return nil
 }
 
-func (s *Source) processIssues(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter) error {
-	bodyTextsOpts := &github.IssueListByRepoOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		State:     state,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processIssues walks /issues and emits issue bodies, plus pull request
+// bodies when includePRs is set. The listing always contains both, because
+// GitHub treats every pull request as an issue. Bodies are scanned in full
+// regardless of the comments timeframe.
+func (s *Source) processIssues(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter, includePRs bool) (int, error) {
+	emitted := 0
+	_, err := walkUpdatedSince(ctx, p, sinceWalk[*github.Issue]{
+		name: "issues",
+		list: listIssuesSince(p, repoInfo),
+		key:  issueKey,
+		visit: func(issues []*github.Issue) error {
+			n, err := s.chunkIssues(ctx, repoInfo, issues, reporter, func(issue *github.Issue) bool {
+				return includePRs || !issue.IsPullRequest()
+			})
+			emitted += n
+			return err
 		},
-	}
-
-	for {
-		issues, _, err := apiClient.Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkIssues(ctx, repoInfo, issues, reporter); err != nil {
-			return err
-		}
-
-		bodyTextsOpts.Page++
-
-		if len(issues) < defaultPagination {
-			break
-		}
-	}
-	return nil
+	})
+	return emitted, err
 }
 
-func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter) error {
+// listIssuesSince returns the /issues listing, issues and pull requests
+// together, for walkUpdatedSince.
+func listIssuesSince(p pager, repoInfo repoInfo) func(context.Context, time.Time) ([]*github.Issue, *github.Response, error) {
+	return func(ctx context.Context, since time.Time) ([]*github.Issue, *github.Response, error) {
+		return p.client.Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, &github.IssueListByRepoOptions{
+			State:       stateAll,
+			Sort:        sortByUpdated,
+			Direction:   sortAscending,
+			Since:       since,
+			ListOptions: github.ListOptions{PerPage: p.perPage},
+		})
+	}
+}
+
+func issueKey(issue *github.Issue) (int64, time.Time) {
+	return issue.GetID(), issue.GetUpdatedAt().Time
+}
+
+// chunkIssues emits a chunk for each issue that keep accepts, and returns how
+// many it emitted. Pull requests from /issues produce the same chunk as
+// chunkPullRequests: same link, author, timestamp, and title and body.
+func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter, keep func(*github.Issue) bool) (int, error) {
+	emitted := 0
 	for _, issue := range issues {
-		// Skip pull requests since covered by processPRs.
-		if issue.IsPullRequest() {
+		if !keep(issue) {
 			continue
 		}
 
@@ -2088,50 +2185,46 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
-			return err
+			return emitted, err
 		}
+		emitted++
 	}
-	return nil
+	return emitted, nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	issueOpts := &github.IssueListCommentsOptions{
-		Sort:      &sortType,
-		Direction: &directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processIssueComments walks every issue comment in the repo updated at or
+// after since. /issues/comments also returns comments on pull requests, since
+// GitHub treats every pull request as an issue. The endpoint stops at 300
+// pages, so the walk continues past that cap in since windows.
+func (s *Source) processIssueComments(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter, since time.Time) (int, error) {
+	return walkUpdatedSince(ctx, p, sinceWalk[*github.IssueComment]{
+		name:  "issue comments",
+		since: since,
+		list: func(ctx context.Context, since time.Time) ([]*github.IssueComment, *github.Response, error) {
+			opts := &github.IssueListCommentsOptions{
+				Sort:        github.String(sortByUpdated),
+				Direction:   github.String(sortAscending),
+				ListOptions: github.ListOptions{PerPage: p.perPage},
+			}
+			if !since.IsZero() {
+				opts.Since = &since
+			}
+			// Issue number 0 lists comments across the whole repo.
+			return p.client.Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, 0, opts)
 		},
-	}
-
-	for {
-		issueComments, _, err := apiClient.Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		issueOpts.Page++
-		if len(issueComments) < defaultPagination {
-			break
-		}
-	}
-	return nil
+		key: func(comment *github.IssueComment) (int64, time.Time) {
+			return comment.GetID(), comment.GetUpdatedAt().Time
+		},
+		visit: func(comments []*github.IssueComment) error {
+			return s.chunkIssueComments(ctx, repoInfo, comments, reporter)
+		},
+	})
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+// chunkIssueComments emits a chunk for each comment. The comments timeframe
+// is already applied by the API through `since`.
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter) error {
 	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
-		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
-			continue
-		}
-
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -2161,69 +2254,87 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 	return nil
 }
 
-func (s *Source) processPRs(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter) error {
-	prOpts := &github.PullRequestListOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		State:     state,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processPRs emits pull request bodies for configs that enable PR comments
+// but not issue comments; otherwise the /issues walk emits them. /pulls has
+// no `since` filter, so if GitHub caps it, the walk falls back to a windowed
+// /issues walk that emits only pull requests, skipping the ones /pulls
+// already emitted. The common case never pages through issues.
+func (s *Source) processPRs(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter) (int, error) {
+	emitted := 0
+	emittedNumbers := map[int]struct{}{}
+	p.listing = "pull requests"
+	outcome, err := walkPages(ctx, p,
+		func(ctx context.Context) ([]*github.PullRequest, *github.Response, error) {
+			return p.client.PullRequests.List(ctx, repoInfo.owner, repoInfo.name, &github.PullRequestListOptions{
+				State:       stateAll,
+				Sort:        sortByUpdated,
+				Direction:   sortAscending,
+				ListOptions: github.ListOptions{PerPage: p.perPage},
+			})
 		},
+		func(prs []*github.PullRequest) error {
+			if err := s.chunkPullRequests(ctx, repoInfo, prs, reporter); err != nil {
+				return err
+			}
+			for _, pr := range prs {
+				emittedNumbers[pr.GetNumber()] = struct{}{}
+			}
+			emitted += len(prs)
+			return nil
+		},
+	)
+	if err != nil {
+		return emitted, &walkError{items: outcome.items, err: err}
+	}
+	if !outcome.capped {
+		return emitted, nil
 	}
 
-	for {
-		prs, _, err := apiClient.PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
+	ctx.Logger().V(2).Info("pull request listing capped, continuing from the issue listing", "pull_requests_so_far", emitted)
+	_, err = walkUpdatedSince(ctx, p, sinceWalk[*github.Issue]{
+		name: "pull requests from issues",
+		list: listIssuesSince(p, repoInfo),
+		key:  issueKey,
+		visit: func(issues []*github.Issue) error {
+			n, err := s.chunkIssues(ctx, repoInfo, issues, reporter, func(issue *github.Issue) bool {
+				if !issue.IsPullRequest() {
+					return false
+				}
+				_, done := emittedNumbers[issue.GetNumber()]
+				return !done
+			})
+			emitted += n
 			return err
-		}
-
-		if err = s.chunkPullRequests(ctx, repoInfo, prs, reporter); err != nil {
-			return err
-		}
-
-		prOpts.Page++
-
-		if len(prs) < defaultPagination {
-			break
-		}
-	}
-	return nil
+		},
+	})
+	return emitted, err
 }
 
-func (s *Source) processPRComments(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	prOpts := &github.PullRequestListCommentsOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processPRComments walks every pull request review comment (the inline
+// comments on diffs) in the repo updated at or after since. Discussion
+// comments on pull requests come from /issues/comments instead. No cap has
+// been observed on this endpoint, but it gets the same since windows as
+// /issues/comments in case one exists.
+func (s *Source) processPRComments(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter, since time.Time) (int, error) {
+	return walkUpdatedSince(ctx, p, sinceWalk[*github.PullRequestComment]{
+		name:  "pull request comments",
+		since: since,
+		list: func(ctx context.Context, since time.Time) ([]*github.PullRequestComment, *github.Response, error) {
+			// Pull request number 0 lists review comments across the whole repo.
+			return p.client.PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, 0, &github.PullRequestListCommentsOptions{
+				Sort:        sortByUpdated,
+				Direction:   sortAscending,
+				Since:       since,
+				ListOptions: github.ListOptions{PerPage: p.perPage},
+			})
 		},
-	}
-
-	for {
-		prComments, _, err := apiClient.PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		prOpts.Page++
-
-		if len(prComments) < defaultPagination {
-			break
-		}
-	}
-	return nil
+		key: func(comment *github.PullRequestComment) (int64, time.Time) {
+			return comment.GetID(), comment.GetUpdatedAt().Time
+		},
+		visit: func(comments []*github.PullRequestComment) error {
+			return s.chunkPullRequestComments(ctx, repoInfo, comments, reporter)
+		},
+	})
 }
 
 func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []*github.PullRequest, reporter sources.ChunkReporter) error {
@@ -2257,13 +2368,10 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+// chunkPullRequestComments emits a chunk for each review comment. The
+// comments timeframe is already applied by the API through `since`.
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter) error {
 	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
-		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
-			continue
-		}
-
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,

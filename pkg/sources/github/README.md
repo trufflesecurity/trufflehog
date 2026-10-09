@@ -270,6 +270,16 @@ With `--clone-path` set, each repository still gets its own fresh subdirectory c
 5. **Comment Scanning**: If any comment flags are set, fetches issues, pull requests, or gist comments through the GitHub API and scans their text
 6. **Progress Tracking**: Keeps track of which repositories have already been scanned, so a scan can be resumed without redoing work
 
+### How Comments Are Fetched
+
+- `--issue-comments` scans issue titles and bodies, and every discussion comment in the repository. GitHub treats pull requests as issues, so this includes the discussion comments on pull requests.
+- `--pr-comments` scans pull request titles and bodies, and every review comment (the comments left inline on a diff).
+- Listings are paged by following the links GitHub returns, sorted by last update time. Some GitHub endpoints stop returning results after a fixed number of pages (the repository-wide issue comment listing stops at 300 pages); when that happens, the scan picks up from the last update time it reached, so large repositories are scanned in full.
+- A request that fails for a transient reason (a GitHub server error, a dropped connection, or a response cut off partway) is retried up to five times with backoff before it counts as a failure. Rate limits are waited out and retried separately, without a limit.
+- The comments timeframe is applied by GitHub. Issue and pull request bodies are scanned regardless of the timeframe.
+- Each listing is independent. If one fails, the others still run, everything read before the failure is still scanned, and the failure is reported as a scan error for that repository naming the listing, how many items it read, and where it stopped.
+- Gist comments can't be filtered or sorted by GitHub, so the timeframe is applied as they are read, and a gist whose comments GitHub stops paging through is reported as a scan error.
+
 ### What Gets Scanned
 
 - Every commit in every repository matching the scan target and filters
@@ -282,7 +292,7 @@ With `--clone-path` set, each repository still gets its own fresh subdirectory c
 - Archived repositories, when `--exclude-archived` is set
 - Repositories excluded by `--include-repos` or `--exclude-repos`, for an organization or user scan
 - Gists, when `--ignore-gists` is set, or when the scan target is a genuine organization rather than a user (gists only surface for user accounts, see the note above)
-- Comments older than the configured comments timeframe, when one is set
+- Comments last updated before the configured comments timeframe, when one is set (gist comments go by creation time)
 
 ## Usage Examples
 
