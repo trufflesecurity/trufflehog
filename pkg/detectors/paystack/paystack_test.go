@@ -99,15 +99,20 @@ func TestVerifyPaystackStatuses(t *testing.T) {
 	}
 }
 
-func TestVerifyPaystackTimeoutIsIndeterminate(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
-	}))
-	defer server.Close()
+type roundTripperFunc func(*http.Request) (*http.Response, error)
 
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestVerifyPaystackTimeoutIsIndeterminate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	verified, err := verifyPaystackKeyWithClient(ctx, "test-secret", server.Client(), server.URL)
+	httpClient := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		<-req.Context().Done()
+		return nil, req.Context().Err()
+	})}
+	verified, err := verifyPaystackKeyWithClient(ctx, "test-secret", httpClient, "https://example.invalid")
 	if verified {
 		t.Fatal("timed-out verification must not be marked verified")
 	}
