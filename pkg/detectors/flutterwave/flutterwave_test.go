@@ -64,14 +64,14 @@ func TestFlutterWave_Pattern(t *testing.T) {
 	}
 }
 
-type testRoundTripper func(*http.Request) (*http.Response, error)
+type flutterwaveTestRoundTripper func(*http.Request) (*http.Response, error)
 
-func (f testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (f flutterwaveTestRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
 func TestFlutterwaveVerificationUsesInjectedClient(t *testing.T) {
-	client := &http.Client{Transport: testRoundTripper(func(req *http.Request) (*http.Response, error) {
+	client := &http.Client{Transport: flutterwaveTestRoundTripper(func(req *http.Request) (*http.Response, error) {
 		if req.URL.String() != verifyURL {
 			t.Errorf("URL = %q, want %q", req.URL, verifyURL)
 		}
