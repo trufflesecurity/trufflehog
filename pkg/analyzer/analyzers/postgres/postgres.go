@@ -6,9 +6,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"maps"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -17,6 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/postgresurl"
 )
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
@@ -222,8 +224,6 @@ const (
 	pg_user            = "user"
 )
 
-var connStrPartPattern = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
-
 type SecretInfo struct {
 	Host       string
 	User       string
@@ -266,18 +266,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, connectionStr string) {
 }
 
 func AnalyzePermissions(ctx context.Context, cfg *config.Config, connectionStr string) (*SecretInfo, error) {
-
-	connStr, err := pq.ParseURL(string(connectionStr))
+	params, err := postgresurl.Parse(string(connectionStr))
 	if err != nil {
 		err = fmt.Errorf("failed to parse Postgres connection string: %w", err)
 		ctx.Logger().Error(err, "invalid postgres connection string")
 		return nil, err
 	}
-	parts := connStrPartPattern.FindAllStringSubmatch(connStr, -1)
-	params := make(map[string]string, len(parts))
-	for _, part := range parts {
-		params[part[1]] = part[2]
-	}
+
 	db, err := createConnection(ctx, params, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres database: %w", err)
@@ -318,22 +313,24 @@ func isErrorDatabaseNotFound(err error, dbName string, user string) bool {
 }
 
 func createConnection(ctx context.Context, params map[string]string, database string) (*sql.DB, error) {
-	if sslmode := params[pg_sslmode]; sslmode == pg_sslmode_allow || sslmode == pg_sslmode_prefer {
-		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
-		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
+	cloneParamsOnce := sync.OnceFunc(func() {
+		params = maps.Clone(params)
+	})
+
+	if params[pg_sslmode] == pg_sslmode_allow || params[pg_sslmode] == pg_sslmode_prefer {
+		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just
+		// ignore it. This will trigger the same logic that is run if no sslmode is set at
+		// all (which mimics 'prefer', which is the default).
+		cloneParamsOnce()
 		delete(params, pg_sslmode)
 	}
 
-	var connStr string
-	for key, value := range params {
-		if database != "" && key == "dbname" {
-			connStr += fmt.Sprintf("%s='%s'", key, database)
-		} else {
-			connStr += fmt.Sprintf("%s='%s'", key, value)
-		}
+	if database != "" {
+		cloneParamsOnce()
+		params[pg_dbname] = database
 	}
 
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", postgresurl.ParamsToConnStr(params))
 	if err != nil {
 		ctx.Logger().Error(err, "failed to open postgres connection", "database", database)
 		return nil, err
@@ -348,11 +345,11 @@ func createConnection(ctx context.Context, params map[string]string, database st
 		ctx.Logger().V(2).Info("postgres password authentication failed", "database", database)
 		return nil, err
 	case errors.Is(err, pq.ErrSSLNotSupported) && params[pg_sslmode] == "":
-		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
-		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
-		// connections are acceptable, so now we try a connection without SSL.
+		// If the sslmode is unset, then either it was unset in the candidate secret, or
+		// we've intentionally unset it because it was specified as 'allow' or 'prefer',
+		// neither of which pq supports. In all of these cases, non-SSL connections are
+		// acceptable, so now we try a connection without SSL.
 		params[pg_sslmode] = pg_sslmode_disable
-		defer delete(params, pg_sslmode) // We want to return with the original params map intact (for ExtraData)
 		return createConnection(ctx, params, database)
 	case isErrorDatabaseNotFound(err, params[pg_dbname], params[pg_user]):
 		color.Green("[!] Successfully connected to Postgres database.")

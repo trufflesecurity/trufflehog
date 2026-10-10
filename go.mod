@@ -68,7 +68,7 @@ require (
 	github.com/klauspost/pgzip v1.2.6
 	github.com/kylelemons/godebug v1.1.0
 	github.com/lestrrat-go/jwx/v3 v3.0.12
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.12.3
 	github.com/lrstanley/bubblezone v0.0.0-20250404061050-e13639e27357
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
