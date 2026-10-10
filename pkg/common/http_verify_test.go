@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-type verifyRoundTripper func(*http.Request) (*http.Response, error)
+type bearerVerificationRoundTripper func(*http.Request) (*http.Response, error)
 
-func (f verifyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (f bearerVerificationRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
@@ -29,7 +29,7 @@ func TestVerifyBearerTokenStatuses(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			client := &http.Client{Transport: verifyRoundTripper(func(req *http.Request) (*http.Response, error) {
+			client := &http.Client{Transport: bearerVerificationRoundTripper(func(req *http.Request) (*http.Response, error) {
 				if req.Method != http.MethodGet {
 					t.Errorf("method = %q, want GET", req.Method)
 				}
@@ -60,7 +60,7 @@ func TestVerifyBearerTokenStatuses(t *testing.T) {
 func TestVerifyBearerTokenCanceledRequestIsIndeterminate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	client := &http.Client{Transport: verifyRoundTripper(func(req *http.Request) (*http.Response, error) {
+	client := &http.Client{Transport: bearerVerificationRoundTripper(func(req *http.Request) (*http.Response, error) {
 		return nil, req.Context().Err()
 	})}
 	valid, err := VerifyBearerToken(ctx, client, "https://provider.example/read-only", "synthetic-secret")
