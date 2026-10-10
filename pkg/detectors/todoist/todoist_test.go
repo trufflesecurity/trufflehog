@@ -2,6 +2,7 @@ package todoist
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -100,31 +101,27 @@ func TestTodoist_Pattern(t *testing.T) {
 }
 
 func TestTodoist_VerificationEndpoint(t *testing.T) {
-	d := Scanner{}
 	input := fmt.Sprintf("%s token = '%s'", keyword, validPattern)
 
-	prevClient := client
-	t.Cleanup(func() {
-		client = prevClient
-	})
-
 	called := false
-	client = &http.Client{
-		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-			called = true
-			if req.URL.String() != "https://api.todoist.com/api/v1/projects" {
-				t.Fatalf("unexpected verification URL: %s", req.URL.String())
-			}
-			if req.Header.Get("Authorization") == "" {
-				t.Fatal("missing Authorization header")
-			}
+	d := Scanner{
+		client: &http.Client{
+			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				called = true
+				if req.URL.String() != "https://api.todoist.com/api/v1/projects" {
+					t.Fatalf("unexpected verification URL: %s", req.URL.String())
+				}
+				if req.Header.Get("Authorization") == "" {
+					t.Fatal("missing Authorization header")
+				}
 
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader("{}")),
-				Header:     make(http.Header),
-			}, nil
-		}),
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("{}")),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
 	}
 
 	results, err := d.FromData(context.Background(), true, []byte(input))
@@ -139,5 +136,91 @@ func TestTodoist_VerificationEndpoint(t *testing.T) {
 	}
 	if !results[0].Verified {
 		t.Fatal("expected result to be verified")
+	}
+}
+
+func TestTodoist_VerificationResponses(t *testing.T) {
+	input := fmt.Sprintf("%s token = '%s'", keyword, validPattern)
+
+	tests := []struct {
+		name                string
+		response            *http.Response
+		responseErr         error
+		wantVerified        bool
+		wantVerificationErr bool
+	}{
+		{
+			name: "valid token",
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+			wantVerified: true,
+		},
+		{
+			name: "valid token with nil body",
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+			},
+			wantVerified: true,
+		},
+		{
+			name: "unauthorized token",
+			response: &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+		},
+		{
+			name: "forbidden token",
+			response: &http.Response{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+		},
+		{
+			name:                "client error",
+			responseErr:         errors.New("network failure"),
+			wantVerificationErr: true,
+		},
+		{
+			name: "unexpected status",
+			response: &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+				Header:     make(http.Header),
+			},
+			wantVerificationErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := Scanner{
+				client: &http.Client{
+					Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+						return tt.response, tt.responseErr
+					}),
+				},
+			}
+
+			results, err := d.FromData(context.Background(), true, []byte(input))
+			if err != nil {
+				t.Fatalf("FromData returned error: %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+			if results[0].Verified != tt.wantVerified {
+				t.Fatalf("Verified = %v, want %v", results[0].Verified, tt.wantVerified)
+			}
+			if (results[0].VerificationError() != nil) != tt.wantVerificationErr {
+				t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, results[0].VerificationError())
+			}
+		})
 	}
 }
