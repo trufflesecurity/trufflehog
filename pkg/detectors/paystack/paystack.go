@@ -50,12 +50,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyPaystackKey(ctx context.Context, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.paystack.co/balance", nil)
+	return verifyPaystackKeyWithClient(ctx, key, client, "https://api.paystack.co/balance")
+}
+
+// verifyPaystackKeyWithClient keeps verification behavior testable without real credentials
+// or network access. The endpoint is fixed in production to a documented, read-only API.
+func verifyPaystackKeyWithClient(ctx context.Context, key string, httpClient *http.Client, endpoint string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return false, err
 	}
