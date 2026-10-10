@@ -734,6 +734,8 @@ func (eir *errorInjectingReader) Read(p []byte) (int, error) {
 
 // TestHandleGitCatFileWithPipeError tests that when an error is injected during the HandleFile processing,
 // the error is reported and the git cat-file command completes successfully.
+// HandleFile returns the processing error to the caller (the blob was never fully scanned), but it must
+// still drain the pipe so the git cat-file command is not left hanging.
 func TestHandleGitCatFileWithPipeError(t *testing.T) {
 	fileName := "largefile_with_error.bin"
 	fileSize := 100 * 1024               // 100 KB
@@ -773,7 +775,8 @@ func TestHandleGitCatFileWithPipeError(t *testing.T) {
 	go func() {
 		defer close(chunkCh)
 		err = HandleFile(ctx, wrappedReader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(false))
-		assert.NoError(t, err, "HandleFile should not return an error")
+		assert.Error(t, err, "HandleFile should report the stream error to the caller")
+		assert.Contains(t, err.Error(), "simulated error during newFileReader")
 	}()
 
 	for range chunkCh {
