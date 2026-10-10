@@ -22,6 +22,16 @@ func TestRemita_Pattern(t *testing.T) {
 			input: "remita_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcd",
 			want:  []string{"abcdefghijklmnopqrstuvwxyz1234567890abcd"},
 		},
+		{
+			name:  "rejects key-like value longer than maximum",
+			input: "remita_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcdEXTRA",
+			want:  []string{},
+		},
+		{
+			name:  "rejects alphanumeric suffix beyond maximum",
+			input: "remita_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcd0123456789",
+			want:  []string{},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -36,11 +46,7 @@ func TestRemita_Pattern(t *testing.T) {
 				return
 			}
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				return
 			}
 			actual := make(map[string]struct{}, len(results))
