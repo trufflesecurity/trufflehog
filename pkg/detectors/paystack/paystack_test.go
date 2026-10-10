@@ -64,15 +64,15 @@ func TestPaystack_Pattern(t *testing.T) {
 	}
 }
 
-type testRoundTripper func(*http.Request) (*http.Response, error)
+type paystackTestRoundTripper func(*http.Request) (*http.Response, error)
 
-func (f testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (f paystackTestRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
 func TestPaystackVerificationUsesInjectedClient(t *testing.T) {
 	key := "sk_test_" + strings.Repeat("A", 40)
-	client := &http.Client{Transport: testRoundTripper(func(req *http.Request) (*http.Response, error) {
+	client := &http.Client{Transport: paystackTestRoundTripper(func(req *http.Request) (*http.Response, error) {
 		if req.URL.String() != verifyURL {
 			t.Errorf("URL = %q, want %q", req.URL, verifyURL)
 		}
