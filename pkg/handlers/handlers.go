@@ -336,13 +336,15 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 // - If all chunks are processed successfully without critical errors
 //
 // The function will return an error in the following cases:
-// - If the reader is nil
-// - If there's an error creating the file reader
-// - If there's an error closing the reader
-// - If a critical error occurs during chunk processing (context cancellation, deadline exceeded, or ErrProcessingFatal)
-// - If there's an error reporting a chunk
+//   - If the reader is nil
+//   - If there's an error creating the file reader
+//   - If there's an error closing the reader
+//   - If a critical error occurs during chunk processing (context cancellation, deadline exceeded, or ErrProcessingFatal)
+//   - If there's an error reporting a chunk
+//   - After processing completes, if any file or archive member was left completely unscanned
+//     (e.g. a corrupt archive member that had to be skipped)
 //
-// Non-critical errors during chunk processing are logged
+// ErrProcessingWarning errors during chunk processing are logged
 // but do not cause the function to return an error.
 func HandleFile(
 	ctx logContext.Context,
@@ -397,10 +399,14 @@ func HandleFile(
 // - If it contains data, the function creates a chunk based on chunkSkel and reports it through the reporter.
 // - If it contains an error, the function handles it based on severity:
 //   - Fatal errors (context cancellation, deadline exceeded, ErrProcessingFatal) cause immediate termination
-//   - Non-fatal errors (ErrProcessingWarning and others) are logged and processing continues
+//   - Warnings (ErrProcessingWarning) come from content that was partially read; they are logged and processing continues
+//   - Other non-fatal errors come from files or archive members that were never scanned at all; they are
+//     accumulated and returned once the channel drains, so the caller can record the scan-coverage gap
+//     (e.g. so that --fail-on-scan-errors reflects an archive that was only partially inspected)
 //
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
-// It returns nil upon successful processing of all data, or the first encountered fatal error.
+// It returns nil upon successful processing of all data, the first encountered fatal error, or the accumulated
+// non-fatal scan-coverage errors after the channel closes.
 // Line numbers from DataOrErr are propagated to the chunk's source metadata for accurate reporting.
 func handleChunksWithError(
 	ctx logContext.Context,
@@ -408,19 +414,26 @@ func handleChunksWithError(
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 ) error {
+	var unscannedErrs []error
 	for {
 		select {
 		case dataOrErr, ok := <-dataErrChan:
 			if !ok {
 				// Channel closed, processing complete.
 				ctx.Logger().V(5).Info("dataErrChan closed, all chunks processed")
-				return nil
+				return errors.Join(unscannedErrs...)
 			}
 			if dataOrErr.Err != nil {
-				if isFatal(dataOrErr.Err) {
+				switch {
+				case isFatal(dataOrErr.Err):
 					return dataOrErr.Err
+				case errors.Is(dataOrErr.Err, ErrProcessingWarning) || errors.Is(dataOrErr.Err, io.EOF):
+					// Partially-read content and clean end-of-stream markers
+					// are benign: log and keep going.
+					ctx.Logger().V(2).Info("non-critical error processing chunk", "error", dataOrErr.Err)
+				default:
+					unscannedErrs = append(unscannedErrs, dataOrErr.Err)
 				}
-				ctx.Logger().V(2).Info("non-critical error processing chunk", "error", dataOrErr.Err)
 				continue
 			}
 			if len(dataOrErr.Data) > 0 {

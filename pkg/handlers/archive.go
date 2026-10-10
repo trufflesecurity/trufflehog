@@ -54,13 +54,15 @@ func newArchiveHandler() *archiveHandler {
 // - Unknown archive formats
 // - Errors opening decompressors
 // - Errors creating readers for decompressed content
-// - Errors during archive extraction
 //
 // Non-fatal errors that will be logged but allow processing to continue include:
-// - Empty readers encountered during nested archive processing
-// - Files exceeding maximum size limits
-// - Files with ignored extensions or binary content
-// - Errors opening individual files within archives
+//   - Empty readers encountered during nested archive processing
+//   - Files exceeding maximum size limits
+//   - Files with ignored extensions or binary content
+//   - Errors opening or reading individual members within archives (the member is
+//     skipped and extraction continues with the remaining members; the error is
+//     emitted on the channel so callers can tell the archive was only partially
+//     scanned)
 func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
@@ -209,7 +211,9 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 
 		f, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
+			// A single unreadable member must not abort extraction of the
+			// whole archive: skip it and keep scanning the remaining members.
+			return h.skipUnreadableMember(ctx, dataOrErrChan, file.Name(), err)
 		}
 		defer func() { _ = f.Close() }()
 
@@ -226,6 +230,13 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 					err = fmt.Errorf("panic occurred: %v", r)
 				}
 				lCtx.Logger().Error(err, "Panic occurred when reading archive")
+				// The panicking member was never scanned; surface that as a
+				// non-fatal error and let extraction continue.
+				if writeErr := common.CancellableWrite(ctx, dataOrErrChan, DataOrErr{
+					Err: fmt.Errorf("skipping unreadable archive member %s: %v", file.Name(), err),
+				}); writeErr != nil {
+					lCtx.Logger().V(2).Info("error reporting skipped archive member", "error", writeErr)
+				}
 			}
 		}()
 
@@ -235,7 +246,10 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
+			// Same contract as an open failure: e.g. a zip member with a
+			// checksum error aborts MIME detection, but its siblings are
+			// still independently readable.
+			return h.skipUnreadableMember(ctx, dataOrErrChan, file.Name(), err)
 		}
 		defer func() { _ = rdr.Close() }()
 
@@ -243,6 +257,36 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		h.metrics.observeFileSize(fileSize)
 
 		lCtx.Logger().V(4).Info("Opened file successfully", "filename", file.Name(), "size", file.Size())
-		return h.openArchive(lCtx, depth, rdr, dataOrErrChan)
+		if err := h.openArchive(lCtx, depth, rdr, dataOrErrChan); err != nil {
+			// Shutdown, timeouts, fatal processing errors, and the archive
+			// depth limit still abort the whole archive; anything else is
+			// scoped to this member, so skip it and continue with the rest.
+			if isFatal(err) || errors.Is(err, ErrMaxDepthReached) {
+				return err
+			}
+			return h.skipUnreadableMember(ctx, dataOrErrChan, file.Name(), err)
+		}
+		return nil
 	}
+}
+
+// skipUnreadableMember reports an archive member that could not be opened or
+// processed (for example a corrupt or truncated entry) as a non-fatal error on
+// dataOrErrChan and returns nil so the extractor continues with the remaining
+// members. The error is deliberately not wrapped in ErrProcessingWarning: the
+// member's content was never scanned at all, and handleChunksWithError surfaces
+// such coverage gaps to the caller once processing completes.
+func (h *archiveHandler) skipUnreadableMember(
+	ctx context.Context,
+	dataOrErrChan chan DataOrErr,
+	name string,
+	err error,
+) error {
+	h.metrics.incErrors()
+	if writeErr := common.CancellableWrite(ctx, dataOrErrChan, DataOrErr{
+		Err: fmt.Errorf("skipping unreadable archive member %s: %v", name, err),
+	}); writeErr != nil {
+		return writeErr
+	}
+	return nil
 }
