@@ -129,8 +129,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func isErrDeterminate(err error) bool {
 	var neterr *net.OpError
+	var certErr *tls.CertificateVerificationError
 
+	// A certificate verification failure means no authenticated channel could
+	// be established — the credential was never tested, so the result is
+	// indeterminate, not "invalid credential".
 	if errors.As(err, &neterr) ||
+		errors.As(err, &certErr) ||
 		errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, context.Canceled) {
 		return false
@@ -158,19 +163,21 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 			return nil
 		}
 
-		// STARTTLS
-		err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+		// STARTTLS. tls.Client performs no ServerName inference, so set it
+		// explicitly; certificate verification stays enabled — the bind below
+		// transmits the credential, so the peer must be authenticated first.
+		err = l.StartTLS(&tls.Config{ServerName: ldapURL.Hostname()})
 		if err != nil {
 			return err
 		}
 		// STARTTLS verify
 		return l.BindContext(ctx, username, password)
 	case "ldaps":
-		// TLS dial
+		// TLS dial. The default config verifies the certificate against the
+		// dialed host (tls.Dialer fills in ServerName).
 		l, err := ldap.DialURL(
 			uri,
 			ldap.DialWithContext(ctx),
-			ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 		)
 		if err != nil {
 			return err
