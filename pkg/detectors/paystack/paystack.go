@@ -3,8 +3,8 @@ package paystack
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -15,55 +15,63 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-	// TODO: support live key
-	keyPat = regexp.MustCompile(`\b(sk\_[a-z]{1,}\_[A-Za-z0-9]{40})\b`)
+	keyPat = regexp.MustCompile(`\b(sk_[a-z]+_[A-Za-z0-9]{40})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"paystack"}
+	return []string{"paystack", "sk_test_", "sk_live_"}
 }
 
-// FromData will find and optionally verify Paystack secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
-		s1 := detectors.Result{
+	for _, match := range keyPat.FindAllStringSubmatch(string(data), -1) {
+		if len(match) < 2 || match[1] == "" {
+			continue
+		}
+		key := match[1]
+		result := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_Paystack,
-			Raw:          []byte(resMatch),
-			SecretParts:  map[string]string{"key": resMatch},
+			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
 		}
-
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.paystack.co/customer", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
+			verified, verifyErr := verifyPaystackKey(ctx, key)
+			result.Verified = verified
+			if verifyErr != nil {
+				result.SetVerificationError(verifyErr, key)
 			}
 		}
-
-		results = append(results, s1)
+		results = append(results, result)
 	}
-
 	return results, nil
+}
+
+func verifyPaystackKey(ctx context.Context, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.paystack.co/balance", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+key)
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		// Other responses can indicate endpoint, network policy, or account issues;
+		// they do not prove that the credential is invalid.
+		return false, fmt.Errorf("unexpected Paystack verification status: %d", resp.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
@@ -71,5 +79,5 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Paystack is a payment processing service. Paystack API keys can be used to access and manage payment transactions and customer data."
+	return "Detects Paystack secret API keys"
 }
