@@ -90,15 +90,20 @@ func TestVerifyFlutterwaveStatuses(t *testing.T) {
 	}
 }
 
-func TestVerifyFlutterwaveTimeoutIsIndeterminate(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
-	}))
-	defer server.Close()
+type roundTripperFunc func(*http.Request) (*http.Response, error)
 
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestVerifyFlutterwaveTimeoutIsIndeterminate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	verified, err := verifyFlutterwaveWithClient(ctx, "test-secret", server.Client(), server.URL)
+	httpClient := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		<-req.Context().Done()
+		return nil, req.Context().Err()
+	})}
+	verified, err := verifyFlutterwaveWithClient(ctx, "test-secret", httpClient, "https://example.invalid")
 	if verified {
 		t.Fatal("timed-out verification must not be marked verified")
 	}
