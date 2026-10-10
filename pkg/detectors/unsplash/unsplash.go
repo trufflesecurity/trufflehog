@@ -2,6 +2,7 @@ package unsplash
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -53,10 +54,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				switch {
+				case res.StatusCode >= 200 && res.StatusCode < 300:
 					s1.Verified = true
+				case res.StatusCode == http.StatusUnauthorized:
+					// Determinately not verified — invalid key, nothing else to do.
+				default:
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
+			} else {
+				s1.SetVerificationError(err, resMatch)
 			}
+
 		}
 
 		results = append(results, s1)
