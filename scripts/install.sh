@@ -43,15 +43,15 @@ parse_args() {
 execute() {
   tmpdir=$(mktemp -d)
   log_debug "downloading files into ${tmpdir}"
-  http_download "${tmpdir}/${CHECKSUM}" "${CHECKSUM_URL}"
-  
+  http_download_with_retry "${tmpdir}/${CHECKSUM}" "${CHECKSUM_URL}"
+
   if [ "$VERIFY_SIGN" = true ]; then
-    http_download "${tmpdir}/${CHECKSUM}.${CERT_FORMAT}" "${CHECKSUM_URL}.${CERT_FORMAT}"
-    http_download "${tmpdir}/${CHECKSUM}.${SIG_FORMAT}" "${CHECKSUM_URL}.${SIG_FORMAT}"
+    http_download_with_retry "${tmpdir}/${CHECKSUM}.${CERT_FORMAT}" "${CHECKSUM_URL}.${CERT_FORMAT}"
+    http_download_with_retry "${tmpdir}/${CHECKSUM}.${SIG_FORMAT}" "${CHECKSUM_URL}.${SIG_FORMAT}"
     verify_sign "${tmpdir}/${CHECKSUM}" "${tmpdir}/${CHECKSUM}.${CERT_FORMAT}" "${tmpdir}/${CHECKSUM}.${SIG_FORMAT}"
   fi
 
-  http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
+  http_download_with_retry "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
   hash_sha256_verify "${tmpdir}/${TARBALL}" "${tmpdir}/${CHECKSUM}"
   srcdir="${tmpdir}"
   (cd "${tmpdir}" && untar "${TARBALL}")
@@ -275,6 +275,31 @@ http_download() {
   return 1
 }
 
+# GitHub occasionally marks a release "latest" (or lets a user tag/publish
+# one) before all of its platform archives have finished uploading, so a
+# release asset can 404 for a few minutes right after it's tagged even
+# though the release itself definitely exists (we already resolved TAG from
+# real release metadata by this point). Retry with a short delay to ride out
+# that window instead of failing immediately.
+http_download_with_retry() {
+  local_file=$1
+  source_url=$2
+  header=$3
+  attempt=1
+  while [ "$attempt" -le "$RETRY_MAX_ATTEMPTS" ]; do
+    if http_download "$local_file" "$source_url" "$header"; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$RETRY_MAX_ATTEMPTS" ]; then
+      log_info "asset not available yet for release '${TAG}' (attempt ${attempt}/${RETRY_MAX_ATTEMPTS}); it may still be uploading, retrying in ${RETRY_DELAY_SECONDS}s..."
+      sleep "$RETRY_DELAY_SECONDS"
+    fi
+    attempt=$((attempt + 1))
+  done
+  log_crit "release '${TAG}' still doesn't have '${source_url}' available after $((RETRY_MAX_ATTEMPTS * RETRY_DELAY_SECONDS))s -- it may still be building. Try again in a few minutes, or pin an earlier version, e.g.: sh -s -- -b ${BINDIR} <tag>. See https://github.com/${PREFIX}/releases for available tags."
+  return 1
+}
+
 http_copy() {
   tmp=$(mktemp)
   http_download "${tmp}" "$1" "$2" || return 1
@@ -372,6 +397,11 @@ COSIGN_BINARY=cosign
 VERIFY_SIGN=false
 CERT_FORMAT=pem
 SIG_FORMAT=sig
+# how many times (and how long to wait between) to retry a release asset
+# download that 404s, to ride out the window where a release is tagged but
+# its artifacts haven't finished uploading yet
+RETRY_MAX_ATTEMPTS=${RETRY_MAX_ATTEMPTS:-8}
+RETRY_DELAY_SECONDS=${RETRY_DELAY_SECONDS:-15}
 
 # use in logging routines
 log_prefix() {
