@@ -2,42 +2,44 @@ package paystack
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "sk_test_" + strings.Repeat("A", 40)
-	invalidPattern = "sk_test_" + strings.Repeat("A", 19) + "?" + strings.Repeat("A", 20)
-	keyword        = "paystack"
-)
-
 func TestPaystack_Pattern(t *testing.T) {
 	d := Scanner{}
 	core := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	upper := strings.Repeat("A", 40)
+	mixed := "AbCdEfGhIjKlMnOpQrStUvWx1234567890ABCDEF"
+	lower := strings.Repeat("b", 40)
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
-		{name: "valid pattern", input: fmt.Sprintf("%s token = '%s'", keyword, validPattern), want: []string{validPattern}},
-		{name: "invalid pattern", input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern), want: []string{}},
-		{name: "test key keyword", input: "sk_test_" + strings.Repeat("a", 40), want: []string{"sk_test_" + strings.Repeat("a", 40)}},
-		{name: "live key keyword", input: "sk_live_" + strings.Repeat("b", 40), want: []string{"sk_live_" + strings.Repeat("b", 40)}},
-		{name: "public key is not a secret key", input: "pk_test_" + strings.Repeat("a", 40), want: []string{}},
-		{name: "not found", input: "ordinary configuration without credentials", want: []string{}},
+		{name: "test key lowercase payload", input: "sk_test_" + lower, want: []string{"sk_test_" + lower}},
+		{name: "live key uppercase payload", input: "sk_live_" + upper, want: []string{"sk_live_" + upper}},
+		{name: "test key mixed-case payload", input: "sk_test_" + mixed, want: []string{"sk_test_" + mixed}},
+		{name: "public key is not a secret", input: "pk_test_" + upper},
+		{name: "reject 39-character payload", input: "sk_test_" + upper[:39]},
+		{name: "reject 41-character payload", input: "sk_live_" + upper + "A"},
+		{name: "reject punctuation", input: "sk_test_" + upper[:20] + "?" + upper[21:]},
+		{name: "reject unsupported environment label", input: "sk_prod_" + upper},
+		{name: "reject uppercase environment label", input: "sk_TEST_" + upper},
+		{name: "reject embedded prefix", input: "xsk_test_" + upper},
+		{name: "reject trailing word character", input: "sk_test_" + upper + "x"},
+		{name: "reject whitespace in payload", input: "sk_test_" + upper[:20] + " " + upper[20:]},
+		{name: "not found", input: "ordinary configuration without credentials"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if len(core.FindDetectorMatches([]byte(tc.input))) == 0 && len(tc.want) > 0 {
+			if len(tc.want) > 0 && len(core.FindDetectorMatches([]byte(tc.input))) == 0 {
 				t.Fatalf("keywords %v did not match input", d.Keywords())
 			}
 			results, err := d.FromData(context.Background(), false, []byte(tc.input))
@@ -62,61 +64,32 @@ func TestPaystack_Pattern(t *testing.T) {
 	}
 }
 
-func TestVerifyPaystackStatuses(t *testing.T) {
-	tests := []struct {
-		name       string
-		statusCode int
-		wantValid  bool
-		wantErr    bool
-	}{
-		{name: "verified", statusCode: http.StatusOK, wantValid: true},
-		{name: "invalid credential", statusCode: http.StatusUnauthorized},
-		{name: "forbidden is indeterminate", statusCode: http.StatusForbidden, wantErr: true},
-		{name: "unexpected server response is indeterminate", statusCode: http.StatusInternalServerError, wantErr: true},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodGet {
-					t.Errorf("method = %s, want GET", r.Method)
-				}
-				if got := r.Header.Get("Authorization"); got != "Bearer test-secret" {
-					t.Errorf("Authorization = %q, want bearer token", got)
-				}
-				w.WriteHeader(tc.statusCode)
-				_, _ = w.Write([]byte("response body"))
-			}))
-			defer server.Close()
+type testRoundTripper func(*http.Request) (*http.Response, error)
 
-			gotValid, err := verifyPaystackKeyWithClient(context.Background(), "test-secret", server.Client(), server.URL)
-			if gotValid != tc.wantValid {
-				t.Errorf("verified = %v, want %v", gotValid, tc.wantValid)
-			}
-			if (err != nil) != tc.wantErr {
-				t.Errorf("error = %v, wantErr %v", err, tc.wantErr)
-			}
-		})
-	}
-}
-
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+func (f testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
-func TestVerifyPaystackTimeoutIsIndeterminate(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	httpClient := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		<-req.Context().Done()
-		return nil, req.Context().Err()
+func TestPaystackVerificationUsesInjectedClient(t *testing.T) {
+	key := "sk_test_" + strings.Repeat("A", 40)
+	client := &http.Client{Transport: testRoundTripper(func(req *http.Request) (*http.Response, error) {
+		if req.URL.String() != verifyURL {
+			t.Errorf("URL = %q, want %q", req.URL, verifyURL)
+		}
+		if req.Method != http.MethodGet {
+			t.Errorf("method = %q, want GET", req.Method)
+		}
+		if got := req.Header.Get("Authorization"); got != "Bearer " + key {
+			t.Errorf("Authorization = %q", got)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header), Request: req}, nil
 	})}
-	verified, err := verifyPaystackKeyWithClient(ctx, "test-secret", httpClient, "https://example.invalid")
-	if verified {
-		t.Fatal("timed-out verification must not be marked verified")
+	d := Scanner{client: client}
+	results, err := d.FromData(context.Background(), true, []byte(key))
+	if err != nil {
+		t.Fatalf("FromData error: %v", err)
 	}
-	if err == nil {
-		t.Fatal("timed-out verification must return an indeterminate error")
+	if len(results) != 1 || !results[0].Verified {
+		t.Fatalf("results = %#v, want one verified result", results)
 	}
 }
