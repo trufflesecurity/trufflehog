@@ -29,7 +29,7 @@ func TestRemita_Pattern(t *testing.T) {
 		},
 		{
 			name:  "rejects alphanumeric suffix beyond maximum",
-			input: "remita_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcd0123456789",
+			input: "remita_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcd01234567890123456789012345678901234567890",
 			want:  []string{},
 		},
 	}
