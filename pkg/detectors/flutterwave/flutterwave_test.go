@@ -5,83 +5,61 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `[{
-		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
-		"name": "FlutterWave",
-		"type": "Detector",
-		"api": true,
-		"authentication_type": "",
-		"verification_url": "https://api.example.com/example",
-		"test_secrets": {
-			"flutterwave_secret": "FLWSECK-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-X"
-		},
-		"expected_response": "200",
-		"method": "GET",
-		"deprecated": false
-	}]`
-	secret = "FLWSECK-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-X"
-)
-
 func TestFlutterWave_Pattern(t *testing.T) {
 	d := Scanner{}
-	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
+	core := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name:  "live secret key",
+			input: `{"flutterwave_secret":"FLWSECK-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-X"}`,
+			want:  []string{"FLWSECK-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-X"},
+		},
+		{
+			name:  "test secret key",
+			input: `{"flutterwave_secret":"FLWSECK_TEST-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-X"}`,
+			want:  []string{"FLWSECK_TEST-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-X"},
+		},
+		{
+			name:  "public key is not a secret key",
+			input: `{"flutterwave_public_key":"FLWPUBK_TEST-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-X"}`,
+			want:  []string{},
+		},
+		{
+			name:  "reject malformed key",
+			input: `{"flutterwave_secret":"FLWSECK_TEST-aylhdv2oo3wf5tylj8s4d9bqb8adoebx-XX"}`,
+			want:  []string{},
 		},
 	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
-				return
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if len(core.FindDetectorMatches([]byte(tc.input))) == 0 {
+				t.Fatalf("keywords %v did not match input", d.Keywords())
 			}
-
-			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			results, err := d.FromData(context.Background(), false, []byte(tc.input))
 			if err != nil {
-				t.Errorf("error = %v", err)
-				return
+				t.Fatalf("FromData error: %v", err)
 			}
-
-			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
-				return
-			}
-
-			actual := make(map[string]struct{}, len(results))
-			for _, r := range results {
-				if len(r.RawV2) > 0 {
-					actual[string(r.RawV2)] = struct{}{}
-				} else {
-					actual[string(r.Raw)] = struct{}{}
+			got := make(map[string]struct{}, len(results))
+			for _, result := range results {
+				got[string(result.Raw)] = struct{}{}
+				if result.SecretParts["key"] != string(result.Raw) {
+					t.Errorf("SecretParts[key] = %q, want %q", result.SecretParts["key"], result.Raw)
 				}
 			}
-			expected := make(map[string]struct{}, len(test.want))
-			for _, v := range test.want {
-				expected[v] = struct{}{}
+			want := make(map[string]struct{}, len(tc.want))
+			for _, value := range tc.want {
+				want[value] = struct{}{}
 			}
-
-			if diff := cmp.Diff(expected, actual); diff != "" {
-				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("(-want +got):\n%s", diff)
 			}
 		})
 	}
