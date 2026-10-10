@@ -79,7 +79,7 @@ func TestPaystackVerificationUsesInjectedClient(t *testing.T) {
 		if req.Method != http.MethodGet {
 			t.Errorf("method = %q, want GET", req.Method)
 		}
-		if got := req.Header.Get("Authorization"); got != "Bearer " + key {
+		if got := req.Header.Get("Authorization"); got != "Bearer "+key {
 			t.Errorf("Authorization = %q", got)
 		}
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header), Request: req}, nil
