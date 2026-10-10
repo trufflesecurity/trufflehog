@@ -24,7 +24,7 @@ func TestRemita_Pattern(t *testing.T) {
 		},
 		{
 			name:  "rejects key-like value longer than maximum",
-			input: "remita_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcdEXTRA",
+			input: "remita_api_key=abcdefghijklmnopqrstuvwxyz1234567890abcd012345678901234567890123456789012345678900123456789012345678901234567890",
 			want:  []string{},
 		},
 		{
