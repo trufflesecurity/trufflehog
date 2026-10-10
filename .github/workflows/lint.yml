@@ -45,7 +45,7 @@ jobs:
     name: semgrep
     runs-on: ubuntu-latest
     container:
-      image: returntocorp/semgrep
+      image: returntocorp/semgrep:1.99.0@sha256:ae27024c16f7848cdbfd49c24ed0b78b13f13b85fcd7b87c679aaa8b0c0dce98
     if: (github.actor != 'dependabot[bot]')
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
