@@ -139,6 +139,8 @@ func GenerateLink(repo, commit, file string, line int64) string {
 	file = strings.ReplaceAll(file, "%", "%25")
 	file = strings.ReplaceAll(file, "[", "%5B")
 	file = strings.ReplaceAll(file, "]", "%5D")
+	// Control characters also break |url.Parse|. Encode them after '%' so their escapes aren't double-encoded.
+	file = escapeControlChars(file)
 
 	switch determineProvider(repo) {
 	case providerBitbucket:
@@ -214,12 +216,37 @@ func GenerateLink(repo, commit, file string, line int64) string {
 var (
 	linePattern        = regexp.MustCompile(`L\d+`)
 	bbCloudLinePattern = regexp.MustCompile(`lines-\d+(:\d+)?`)
+	// percentPattern matches a '%' and, if present, a following control-character escape (%00-%1F, %7F).
+	percentPattern = regexp.MustCompile(`%(?:[01][0-9A-Fa-f]|7[Ff])?`)
 )
+
+// escapeControlChars percent-encodes bytes below 0x20 and 0x7F as %XX in uppercase hex.
+func escapeControlChars(s string) string {
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c < 0x20 || c == 0x7F {
+			b.WriteByte('%')
+			b.WriteByte(hex[c>>4])
+			b.WriteByte(hex[c&0xF])
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
+}
 
 // UpdateLinkLineNumber updates the line number in a repository link.
 // Used post-link generation to refine reported issue locations within large scanned blocks.
 func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
-	link = strings.ReplaceAll(link, "%", "%25")
+	// Keep control-character escapes from GenerateLink single-encoded; double-encode every other '%'.
+	link = percentPattern.ReplaceAllStringFunc(link, func(m string) string {
+		if len(m) > 1 {
+			return m
+		}
+		return "%25"
+	})
 	link = strings.ReplaceAll(link, "[", "%5B")
 	link = strings.ReplaceAll(link, "]", "%5D")
 	parsedURL, err := url.Parse(link)
