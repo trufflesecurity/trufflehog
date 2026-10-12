@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -226,5 +227,53 @@ func TestCircleCI_PreservesEndpointErrorWhenLaterEndpointUnauthorized(t *testing
 func TestCircleCI_DefaultsToCloudEndpoint(t *testing.T) {
 	if got := (Scanner{}).CloudEndpoint(); got != "https://circleci.com" {
 		t.Fatalf("CloudEndpoint() = %q, want https://circleci.com", got)
+	}
+}
+
+func TestCircleCI_ConfiguredEndpointIsAdditiveToCloudEndpoint(t *testing.T) {
+	var (
+		mu   sync.Mutex
+		hits []string
+	)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits = append(hits, r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/configured/api/v2/me":
+			w.WriteHeader(http.StatusUnauthorized)
+		case "/cloud/api/v2/me":
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	// Mirror the engine defaults: the cloud endpoint stays enabled when --verifier adds a configured endpoint.
+	d := Scanner{client: server.Client()}
+	d.SetCloudEndpoint(server.URL + "/cloud")
+	d.UseCloudEndpoint(true)
+	if err := d.SetConfiguredEndpoints(server.URL + "/configured"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints() error = %v", err)
+	}
+
+	results, err := d.FromData(context.Background(), true, []byte(validPattern))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if !results[0].Verified {
+		t.Fatalf("Verified = false, want true (the cloud endpoint should still be tried)")
+	}
+	if err := results[0].VerificationError(); err != nil {
+		t.Fatalf("VerificationError() = %v, want nil", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if diff := cmp.Diff([]string{"/configured/api/v2/me", "/cloud/api/v2/me"}, hits); diff != "" {
+		t.Fatalf("requests (-want +got):\n%s", diff)
 	}
 }
