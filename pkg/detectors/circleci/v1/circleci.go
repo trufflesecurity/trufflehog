@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -16,10 +17,12 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
@@ -30,13 +33,15 @@ var (
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
-		return s.client
+		return s.VerificationClient(s.client)
 	}
 
-	return defaultClient
+	return s.VerificationClient(defaultClient)
 }
 
 func (Scanner) Version() int { return 1 }
+
+func (Scanner) CloudEndpoint() string { return "https://circleci.com" }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -74,8 +79,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			// https://circleci.com/docs/api/#authentication
-			isVerified, verificationErr := VerifyCircleCIToken(ctx, s.getClient(), token)
-			result.Verified = isVerified
+			var verificationErr error
+			for _, endpoint := range s.Endpoints() {
+				var isVerified bool
+				isVerified, verificationErr = VerifyCircleCIToken(ctx, s.getClient(), endpoint, token)
+				if isVerified {
+					result.Verified = true
+					verificationErr = nil
+					break
+				}
+			}
 			result.SetVerificationError(verificationErr, token)
 		}
 
@@ -85,8 +98,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func VerifyCircleCIToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://circleci.com/api/v2/me", http.NoBody)
+func VerifyCircleCIToken(ctx context.Context, client *http.Client, baseURL string, token string) (bool, error) {
+	verifyURL := strings.TrimRight(baseURL, "/") + "/api/v2/me"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, verifyURL, http.NoBody)
 	if err != nil {
 		return false, err
 	}
