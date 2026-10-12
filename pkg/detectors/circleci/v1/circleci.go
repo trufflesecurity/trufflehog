@@ -81,12 +81,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// https://circleci.com/docs/api/#authentication
 			var verificationErr error
 			for _, endpoint := range s.Endpoints() {
-				var isVerified bool
-				isVerified, verificationErr = VerifyCircleCIToken(ctx, s.getClient(), endpoint, token)
+				isVerified, endpointErr := VerifyCircleCIToken(ctx, s.getClient(), endpoint, token)
 				if isVerified {
 					result.Verified = true
 					verificationErr = nil
 					break
+				}
+				if verificationErr == nil && endpointErr != nil {
+					verificationErr = endpointErr
 				}
 			}
 			result.SetVerificationError(verificationErr, token)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -180,6 +181,42 @@ func TestCircleCI_VerifiesAgainstLaterConfiguredEndpoint(t *testing.T) {
 	}
 	if err := results[0].VerificationError(); err != nil {
 		t.Fatalf("VerificationError() = %v, want nil", err)
+	}
+}
+
+func TestCircleCI_PreservesEndpointErrorWhenLaterEndpointUnauthorized(t *testing.T) {
+	errorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer errorServer.Close()
+
+	unauthorizedServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer unauthorizedServer.Close()
+
+	d := Scanner{client: unauthorizedServer.Client()}
+	if err := d.SetConfiguredEndpoints(errorServer.URL, unauthorizedServer.URL); err != nil {
+		t.Fatalf("SetConfiguredEndpoints() error = %v", err)
+	}
+	d.UseCloudEndpoint(false)
+
+	results, err := d.FromData(context.Background(), true, []byte(`circleci api_key: "`+validToken+`"`))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if results[0].Verified {
+		t.Fatalf("Verified = true, want false")
+	}
+	verificationErr := results[0].VerificationError()
+	if verificationErr == nil {
+		t.Fatalf("VerificationError() = nil, want endpoint error")
+	}
+	if !strings.Contains(verificationErr.Error(), "unexpected status code: 500") {
+		t.Fatalf("VerificationError() = %v, want status code 500 error", verificationErr)
 	}
 }
 
