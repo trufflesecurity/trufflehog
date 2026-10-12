@@ -1,75 +1,43 @@
 package github
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type githubCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetNote() string {
-	return "Please enter an organization OR repository."
-}
-
-func GetFields() githubCmdModel {
-	org := textinputs.InputConfig{
-		Label:       "Organization",
-		Key:         "org",
-		Required:    true,
-		Help:        "GitHub organization to scan.",
-		Placeholder: "trufflesecurity",
+// Definition returns the github source configuration.
+func Definition() sources.Definition {
+	fields := []form.FieldSpec{
+		{
+			Key:         "org",
+			Label:       "Organization",
+			Help:        "GitHub organization to scan.",
+			Kind:        form.KindText,
+			Placeholder: "trufflesecurity",
+			Emit:        form.EmitLongFlagEq,
+			Group:       "target",
+		},
+		{
+			Key:         "repo",
+			Label:       "Repository",
+			Help:        "GitHub repo to scan.",
+			Kind:        form.KindText,
+			Placeholder: "https://github.com/trufflesecurity/test_keys",
+			Emit:        form.EmitLongFlagEq,
+			Group:       "target",
+		},
 	}
 
-	repo := textinputs.InputConfig{
-		Label:       "Repository",
-		Key:         "repo",
-		Required:    true,
-		Help:        "GitHub repo to scan.",
-		Placeholder: "https://github.com/trufflesecurity/test_keys",
+	return sources.Definition{
+		ID:          "github",
+		Title:       "GitHub",
+		Description: "Scan GitHub repositories and/or organizations.",
+		Tier:        sources.TierOSS,
+		Note:        "Please enter an organization OR repository.",
+		Command:     "github",
+		Fields:      fields,
+		Constraints: []form.Constraint{form.XOrGroup("target", 1, 1, fields)},
 	}
-
-	return githubCmdModel{textinputs.New([]textinputs.InputConfig{org, repo})}
-}
-
-// Handle default values since GitHub flags are OR operations
-func (m githubCmdModel) GetSpecialInputs() map[string]textinputs.Input {
-	inputs := m.GetInputs()
-	if inputs["org"].IsDefault != inputs["repo"].IsDefault {
-		if inputs["org"].IsDefault {
-			delete(inputs, "org")
-		}
-		if inputs["repo"].IsDefault {
-			delete(inputs, "repo")
-		}
-	}
-
-	return inputs
-}
-
-func (m githubCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "github")
-	inputs := m.GetSpecialInputs()
-
-	if inputs["org"].Value != "" {
-		command = append(command, "--org="+inputs["org"].Value)
-	}
-
-	if inputs["repo"].Value != "" {
-		command = append(command, "--repo="+inputs["repo"].Value)
-	}
-
-	return strings.Join(command, " ")
-}
-
-func (m githubCmdModel) Summary() string {
-	inputs := m.GetSpecialInputs()
-	labels := m.GetLabels()
-
-	keys := []string{"org", "repo"}
-	return common.SummarizeSource(keys, inputs, labels)
 }
