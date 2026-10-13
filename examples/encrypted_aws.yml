@@ -1,0 +1,60 @@
+# Surface AWS credentials that the built-in AWS detector cannot verify.
+#
+# The built-in AWS detector requires both an access key ID (AKIA/ABIA/ACCA…)
+# and a 40-character secret, then calls STS GetCallerIdentity. If the secret
+# is encrypted (SOPS, KMS, Helm secrets, etc.) that pair never matches, so
+# nothing is reported. These custom detectors omit `verify`, so matches are
+# reported as unverified — that is expected, because ciphertext cannot be
+# tested against STS.
+#
+# All named regexes on a detector must match in the same chunk. Prefer the
+# SOPS or KMS detectors when you know the ciphertext format; they only fire
+# when an access key ID sits next to encrypted material. The ID-only detector
+# will also match ordinary plaintext AWS keys (overlapping the built-in
+# detector), so use it only when the ciphertext format is unknown.
+#
+# OSS:
+#   trufflehog filesystem /path --config=examples/encrypted_aws.yml
+#
+# Enterprise: copy the `detectors:` entries into the scanner config.yaml.
+# Replace the ciphertext regex with the pattern from your environment if it
+# is not SOPS or KMS.
+
+detectors:
+  # SOPS / mozilla-sops / helm-secrets: ENC[AES256_GCM,data:...]
+  - name: AWS-SOPS-Encrypted-Secret
+    keywords:
+      - AKIA
+      - ABIA
+      - ACCA
+    regex:
+      access_key_id: '\b((?:AKIA|ABIA|ACCA)[A-Z0-9]{16})\b'
+      sops_blob: 'ENC\[AES256_GCM,data:([A-Za-z0-9+/=]{20,})'
+    primary_regex_name: access_key_id
+    entropy: 3.0
+    description: AWS access key ID paired with a SOPS AES256_GCM ciphertext
+
+  # AWS KMS ciphertext typically starts with AQICAH when base64-encoded.
+  - name: AWS-KMS-Encrypted-Secret
+    keywords:
+      - AKIA
+      - ABIA
+      - ACCA
+    regex:
+      access_key_id: '\b((?:AKIA|ABIA|ACCA)[A-Z0-9]{16})\b'
+      kms_ciphertext: '\b(AQICAH[A-Za-z0-9+/=]{80,})\b'
+    primary_regex_name: access_key_id
+    entropy: 3.0
+    description: AWS access key ID paired with a KMS ciphertext blob
+
+  # Last resort: report access key IDs even when no secret or ciphertext is
+  # present. Overlaps the built-in AWS detector for plaintext key pairs.
+  - name: AWS-Access-Key-ID
+    keywords:
+      - AKIA
+      - ABIA
+      - ACCA
+    regex:
+      access_key_id: '\b((?:AKIA|ABIA|ACCA)[A-Z0-9]{16})\b'
+    entropy: 3.0
+    description: AWS access key ID without a paired plaintext secret

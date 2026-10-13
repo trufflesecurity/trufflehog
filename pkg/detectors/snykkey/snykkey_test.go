@@ -24,6 +24,41 @@ set SNYK_API_TOKEN=885953dc-2469-443c-983d-5243d2d54116
 set PATH=%PATH%;C:\Program Files\nodejs\;C:\Program Files\Git\cmd`,
 			want: []string{"885953dc-2469-443c-983d-5243d2d54116"},
 		},
+		{
+			name:  "snyk_token env var",
+			input: `SNYK_TOKEN=885953dc-2469-443c-983d-5243d2d54116`,
+			want:  []string{"885953dc-2469-443c-983d-5243d2d54116"},
+		},
+		{
+			name:  "snykkey informal leak",
+			input: `You can find a snykkey secret 885953dc-2469-443c-983d-5243d2d54116 within`,
+			want:  []string{"885953dc-2469-443c-983d-5243d2d54116"},
+		},
+		{
+			name:  "token still reported when project is mentioned nearby",
+			input: `snyk_token for the project: 885953dc-2469-443c-983d-5243d2d54116`,
+			want:  []string{"885953dc-2469-443c-983d-5243d2d54116"},
+		},
+		{
+			name:  "snyk project id env var",
+			input: `SNYK_PROJECT_ID=885953dc-2469-443c-983d-5243d2d54116`,
+			want:  nil,
+		},
+		{
+			name:  "snyk org id env var",
+			input: `SNYK_ORG_ID=885953dc-2469-443c-983d-5243d2d54116`,
+			want:  nil,
+		},
+		{
+			name:  "snyk app project url",
+			input: `https://app.snyk.io/org/acme/project/885953dc-2469-443c-983d-5243d2d54116`,
+			want:  nil,
+		},
+		{
+			name:  "snyk yaml project field",
+			input: "snyk:\n  project: 885953dc-2469-443c-983d-5243d2d54116\n",
+			want:  nil,
+		},
 		// https://docs.snyk.io/snyk-api/get-a-projects-sbom-document-endpoint#how-to-generate-the-sbom-for-a-project
 		//	{
 		//		name: "curl example",

@@ -22,7 +22,21 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-var keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"snyk"}) + `\b([0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
+var (
+	// Snyk API tokens are UUIDs and almost always sit next to "snyk".
+	// Snyk Project / Org / Group IDs are also UUIDs and appear in the same
+	// neighborhood, which produced a lot of unverified false positives.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"snyk"}) + `\b([0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
+
+	// Definite identifier context in the 40 characters between "snyk" and the UUID.
+	identifierContextPat = regexp.MustCompile(`(?i)(?:project[_-]?id|org(?:anization)?[_-]?id|group[_-]?id|/projects?/|/orgs?/)`)
+
+	// Weaker identifier words. Only treated as a Project/Org ID when the match
+	// does not also look like a credential (token, key, secret, ...).
+	projectOrOrgWordPat = regexp.MustCompile(`(?i)(?:projects?|organi[sz]ations?|\borgs?\b)`)
+
+	credentialContextPat = regexp.MustCompile(`(?i)(?:token|key|secret|auth|password|credential)`)
+)
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -36,6 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	tokens := make(map[string]struct{})
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		if isLikelySnykIdentifier(match[0]) {
+			continue
+		}
 		tokens[match[1]] = struct{}{}
 	}
 
@@ -122,6 +139,15 @@ type userDetailsResponse struct {
 
 type organization struct {
 	Name string `json:"name"`
+}
+
+// isLikelySnykIdentifier reports whether a PrefixRegex match is a Snyk
+// Project, Org, or Group ID rather than an API token.
+func isLikelySnykIdentifier(fullMatch string) bool {
+	if identifierContextPat.MatchString(fullMatch) {
+		return true
+	}
+	return projectOrOrgWordPat.MatchString(fullMatch) && !credentialContextPat.MatchString(fullMatch)
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

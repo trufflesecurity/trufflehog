@@ -43,6 +43,8 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
 
      Since `verify` is optional, Custom Detectors can also be used without a webhook to flag generic hardcoded secrets (e.g. `*.password=`, `*.secret=`) in config files such as `.properties`, `.env`, or `.yaml`. [Here](/examples/generic_config_secrets.yml) is an example config tuned for that use case.
 
+     The same pattern works when a secret is present but cannot be verified against a provider API — for example an AWS access key whose secret is encrypted with SOPS or KMS. Omit `verify` so matches are reported as unverified. See [encrypted AWS credentials](/examples/encrypted_aws.yml).
+
    Here's an example with configurable verification ranges:
 
    ```yaml
