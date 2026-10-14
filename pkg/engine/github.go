@@ -68,5 +68,6 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		return sources.JobProgressRef{}, err
 	}
 	githubSource.WithScanOptions(scanOptions)
+	e.addPostScanHook(githubSource.CommitScannedDigests)
 	return e.sourceManager.EnumerateAndScan(ctx, sourceName, githubSource)
 }

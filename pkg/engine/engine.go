@@ -228,6 +228,9 @@ type Engine struct {
 	wgDetectorWorkers             sync.WaitGroup
 	WgNotifier                    sync.WaitGroup
 
+	// postScanHooks run at the end of a successful Finish, once every chunk has been fully processed.
+	postScanHooksMu sync.Mutex
+	postScanHooks   []func(context.Context)
 	// Runtime information.
 	metrics runtimeMetrics
 	// numFoundResults is used to keep track of the number of results found.
@@ -834,7 +837,24 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	e.unregisterRuntimeMetrics()
 
+	// Skipped on error or cancellation, when some chunks may not have been processed.
+	if err == nil && ctx.Err() == nil {
+		e.postScanHooksMu.Lock()
+		hooks := e.postScanHooks
+		e.postScanHooksMu.Unlock()
+		for _, hook := range hooks {
+			hook(ctx)
+		}
+	}
+
 	return err
+}
+
+// addPostScanHook registers hook to run at the end of a successful Finish.
+func (e *Engine) addPostScanHook(hook func(context.Context)) {
+	e.postScanHooksMu.Lock()
+	defer e.postScanHooksMu.Unlock()
+	e.postScanHooks = append(e.postScanHooks, hook)
 }
 
 func (e *Engine) ChunksChan() <-chan *sources.Chunk {
