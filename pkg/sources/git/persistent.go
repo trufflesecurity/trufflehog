@@ -101,7 +101,8 @@ func normalizeDirName(name string) string {
 // all current ref tips are preserved under refs/trufflehog/preserved/, so refs that get overwritten upstream still
 // keep their old commits reachable.
 //
-// Credentials are always sent as an HTTP header and never stored in the clone's configuration.
+// Credentials are sent as an HTTP header scoped to gitURL and never stored in the clone's configuration. A fetch is
+// refused if the clone's origin is not gitURL, so a swapped or edited clone can't redirect credentials elsewhere.
 func CloneOrFetchRepo(ctx context.Context, userInfo *url.Userinfo, gitURL, clonePath string) (string, *git.Repository, error) {
 	if clonePath == "" {
 		return "", nil, fmt.Errorf("persistent clones require a clone path")
@@ -119,7 +120,7 @@ func CloneOrFetchRepo(ctx context.Context, userInfo *url.Userinfo, gitURL, clone
 		if _, err := RepoFromPath(path); err != nil {
 			return "", nil, fmt.Errorf("%s exists but is not a valid git repository, remove it manually to re-clone: %w", path, err)
 		}
-		err = withCloneRetries(ctx, func() error { return fetchRepo(ctx, userInfo, path, timeout) })
+		err = withCloneRetries(ctx, func() error { return fetchRepo(ctx, userInfo, gitURL, path, timeout) })
 	case os.IsNotExist(statErr):
 		err = withCloneRetries(ctx, func() error { return cloneToPersistentPath(ctx, userInfo, gitURL, path, timeout) })
 	default:
@@ -169,7 +170,16 @@ func cloneToPersistentPath(ctx context.Context, userInfo *url.Userinfo, gitURL, 
 }
 
 // fetchRepo fetches into an existing clone using the refspec it was cloned with. It never prunes.
-func fetchRepo(ctx context.Context, userInfo *url.Userinfo, path string, timeout time.Duration) error {
+func fetchRepo(ctx context.Context, userInfo *url.Userinfo, gitURL, path string, timeout time.Duration) error {
+	expected, err := GitURLParse(gitURL)
+	if err != nil {
+		return fmt.Errorf("could not parse clone url: %w", err)
+	}
+	expected.User = nil
+
+	if err := verifyOrigin(ctx, path, expected); err != nil {
+		return err
+	}
 	if err := preserveRefs(ctx, path); err != nil {
 		return fmt.Errorf("could not preserve existing refs: %w", err)
 	}
@@ -180,16 +190,8 @@ func fetchRepo(ctx context.Context, userInfo *url.Userinfo, path string, timeout
 		defer cancel()
 	}
 
-	var gitArgs []string
-	secret := ""
-	if pass, ok := userInfo.Password(); ok {
-		secret = pass
-		header := base64.StdEncoding.EncodeToString([]byte(userInfo.Username() + ":" + pass))
-		gitArgs = append(gitArgs, "-c", "http.extraHeader=Authorization: Basic "+header)
-	}
-	gitArgs = append(gitArgs, "-C", path, "fetch", "--quiet", "--no-prune", "--force", "--tags", "origin")
-
-	cmd := exec.CommandContext(ctx, "git", gitArgs...)
+	secret, _ := userInfo.Password()
+	cmd := exec.CommandContext(ctx, "git", fetchArgs(userInfo, expected, path)...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	outputBytes, err := cmd.CombinedOutput()
 	output := string(outputBytes)
@@ -203,6 +205,47 @@ func fetchRepo(ctx context.Context, userInfo *url.Userinfo, path string, timeout
 		return fmt.Errorf("error executing git fetch: %w, %s", err, output)
 	}
 	return nil
+}
+
+// fetchArgs builds the git arguments for a fetch. Credentials are limited to requests for remote, so they are never
+// sent to any other URL the clone's configuration might point at.
+func fetchArgs(userInfo *url.Userinfo, remote *url.URL, path string) []string {
+	var args []string
+	if pass, ok := userInfo.Password(); ok {
+		header := base64.StdEncoding.EncodeToString([]byte(userInfo.Username() + ":" + pass))
+		args = append(args, "-c", "http."+remote.String()+".extraHeader=Authorization: Basic "+header)
+	}
+	return append(args, "-C", path, "fetch", "--quiet", "--no-prune", "--force", "--tags", "origin")
+}
+
+// verifyOrigin fails unless the clone's effective origin URL (after any insteadOf rewriting) is the expected repository.
+func verifyOrigin(ctx context.Context, path string, expected *url.URL) error {
+	out, err := gitOutput(ctx, path, "", "ls-remote", "--get-url", "origin")
+	if err != nil {
+		return err
+	}
+	// The URL itself is left out of the error since a hand-edited origin may embed credentials.
+	actual, err := GitURLParse(strings.TrimSpace(out))
+	if err != nil || !sameRemote(actual, expected) {
+		return fmt.Errorf("origin of %s is not the expected repository, refusing to fetch", path)
+	}
+	return nil
+}
+
+// sameRemote reports whether a and b name the same repository over the same scheme.
+func sameRemote(a, b *url.URL) bool {
+	if !strings.EqualFold(a.Scheme, b.Scheme) {
+		return false
+	}
+	pathA, errA := PersistentClonePath(withoutUser(a), "")
+	pathB, errB := PersistentClonePath(withoutUser(b), "")
+	return errA == nil && errB == nil && pathA == pathB
+}
+
+func withoutUser(u *url.URL) string {
+	c := *u
+	c.User = nil
+	return c.String()
 }
 
 // preserveRefs creates refs/trufflehog/preserved/<sha> for every ref tip not already preserved, so overwriting a ref

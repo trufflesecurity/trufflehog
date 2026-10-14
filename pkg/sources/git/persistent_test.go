@@ -1,6 +1,7 @@
 package git
 
 import (
+	neturl "net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -267,4 +268,72 @@ func TestRefsDigest(t *testing.T) {
 		require.NoError(t, SetScannedRefsDigest(ctx, path, d1))
 		assert.Equal(t, d1, ScannedRefsDigest(ctx, path))
 	})
+}
+
+func TestSameRemote(t *testing.T) {
+	parse := func(s string) *neturl.URL {
+		u, err := GitURLParse(s)
+		require.NoError(t, err)
+		return u
+	}
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{"identical", "https://github.com/org/repo.git", "https://github.com/org/repo.git", true},
+		{".git optional and github paths case-insensitive", "https://github.com/Org/Repo", "https://github.com/org/repo.git", true},
+		{"embedded credentials ignored", "https://user:pw@github.com/org/repo.git", "https://github.com/org/repo.git", true},
+		{"scheme downgrade", "http://github.com/org/repo.git", "https://github.com/org/repo.git", false},
+		{"different host", "https://evil.example.com/org/repo.git", "https://github.com/org/repo.git", false},
+		{"different repo", "https://github.com/org/other.git", "https://github.com/org/repo.git", false},
+		{"case matters off github", "https://git.example.com/Org/Repo.git", "https://git.example.com/org/repo.git", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sameRemote(parse(tt.a), parse(tt.b)))
+		})
+	}
+}
+
+func TestFetchArgs(t *testing.T) {
+	remote, err := neturl.Parse("https://github.com/org/repo.git")
+	require.NoError(t, err)
+
+	t.Run("credentials are scoped to the expected remote", func(t *testing.T) {
+		args := fetchArgs(neturl.UserPassword("user", "secret"), remote, "/clones/x")
+		require.GreaterOrEqual(t, len(args), 2)
+		assert.Equal(t, "-c", args[0])
+		assert.True(t, strings.HasPrefix(args[1], "http.https://github.com/org/repo.git.extraHeader=Authorization: Basic "), args[1])
+		assert.NotContains(t, strings.Join(args[2:], " "), "secret")
+		assert.Contains(t, args, "--no-prune")
+	})
+
+	t.Run("no header without credentials", func(t *testing.T) {
+		args := fetchArgs(nil, remote, "/clones/x")
+		assert.NotContains(t, strings.Join(args, " "), "extraHeader")
+	})
+}
+
+func TestCloneOrFetchRepo_RefusesForeignOrigin(t *testing.T) {
+	ctx := context.Background()
+	up, upURL := newUpstream(t)
+	commitT(t, up, "f", "A")
+	other, otherURL := newUpstream(t)
+	commitT(t, other, "f", "other")
+
+	clones := t.TempDir()
+	path, _, err := CloneOrFetchRepo(ctx, nil, upURL, clones)
+	require.NoError(t, err)
+
+	gitT(t, path, "remote", "set-url", "origin", otherURL)
+	before := gitT(t, path, "rev-parse", "refs/remotes/origin/main")
+
+	for _, userInfo := range []*neturl.Userinfo{nil, neturl.UserPassword("u", "p")} {
+		_, _, err = CloneOrFetchRepo(ctx, userInfo, upURL, clones)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not the expected repository")
+		assert.NotContains(t, err.Error(), otherURL)
+	}
+	assert.Equal(t, before, gitT(t, path, "rev-parse", "refs/remotes/origin/main"), "nothing was fetched")
 }
