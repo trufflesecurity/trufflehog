@@ -144,7 +144,7 @@ func withAPIKey(ctx context.Context, apiKey string) gcsManagerOption {
 
 // withJSONServiceAccount uses the provided JSON service account when creating a new GCS client.
 func withJSONServiceAccount(ctx context.Context, jsonServiceAccount []byte) gcsManagerOption {
-	creds, err := google.CredentialsFromJSON(ctx, jsonServiceAccount, storage.ScopeReadOnly)
+	creds, err := google.CredentialsFromJSONWithType(ctx, jsonServiceAccount, google.ServiceAccount, storage.ScopeReadOnly)
 	if err != nil {
 		return func(m *gcsManager) error {
 			return fmt.Errorf("failed to load credentials: %w", err)
