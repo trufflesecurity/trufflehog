@@ -36,6 +36,12 @@ type Connector interface {
 	Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error)
 }
 
+// persistentCloner is implemented by connectors that support persistent clones: cloning into a deterministic directory
+// under clonePath, or fetching into the clone left by an earlier run.
+type persistentCloner interface {
+	ClonePersistent(ctx context.Context, repoURL, clonePath string) (string, *gogit.Repository, error)
+}
+
 // isGHECloud returns true if the endpoint is a GHE.com instance
 // (GHEC with data residency). GHE.com uses the same root-level API layout as
 // api.github.com, NOT the GHES /api/v3/ layout.

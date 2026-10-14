@@ -62,6 +62,10 @@ func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string, args ...
 	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.clonePath, c.username, true, args...)
 }
 
+func (c *basicAuthConnector) ClonePersistent(ctx context.Context, repoURL, clonePath string) (string, *gogit.Repository, error) {
+	return git.CloneOrFetchRepoUsingToken(ctx, c.password, repoURL, clonePath, c.username)
+}
+
 func (c *basicAuthConnector) GraphQLClient() *githubv4.Client {
 	return c.graphqlClient
 }

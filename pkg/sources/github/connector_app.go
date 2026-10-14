@@ -172,6 +172,20 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 	return git.CloneRepoUsingToken(ctx, token, repoURL, "", "x-access-token", true, args...)
 }
 
+func (c *appConnector) ClonePersistent(ctx context.Context, repoURL, clonePath string) (string, *gogit.Repository, error) {
+	installID, _ := c.installationIDForRepo(repoURL)
+	if installID == 0 {
+		return "", nil, fmt.Errorf("no GitHub App installation resolved for repo %q", repoURL)
+	}
+
+	token, err := c.accessTokenForInstallation(ctx, installID)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return git.CloneOrFetchRepoUsingToken(ctx, token, repoURL, clonePath, "x-access-token")
+}
+
 // accessTokenForInstallation returns an installation access token.
 func (c *appConnector) accessTokenForInstallation(ctx context.Context, installID int64) (string, error) {
 	if installID == 0 {

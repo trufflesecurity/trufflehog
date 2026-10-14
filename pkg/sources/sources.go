@@ -342,6 +342,10 @@ type GithubConfig struct {
 	ExcludeArchived bool
 	// PrintLegacyJSON indicates whether to print legacy JSON output format for this source.
 	PrintLegacyJSON bool
+	// PersistentClones keeps clones in deterministic directories under ClonePath and fetches into them on later runs.
+	PersistentClones bool
+	// SkipScanIfUnchanged skips scanning persistent clones whose refs are unchanged since their last successful scan.
+	SkipScanIfUnchanged bool
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.

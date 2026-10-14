@@ -34,6 +34,8 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		IgnoreGists:                c.IgnoreGists,
 		ExcludeArchived:            c.ExcludeArchived,
 		PrintLegacyJson:            c.PrintLegacyJSON,
+		PersistentClones:           c.PersistentClones,
+		SkipScanIfUnchanged:        c.SkipScanIfUnchanged,
 	}
 
 	if len(c.Token) > 0 {

@@ -239,6 +239,12 @@ Ignore all gists in scan.
 .TP
 \fB--exclude-archived\fR
 Exclude archived repositories from scan.
+.TP
+\fB--persistent-clones\fR
+Keep clones in stable directories under --clone-path (required) and fetch new data into them on later runs instead of re-cloning. Existing clones are never pruned or deleted, and overwritten refs keep their old commits under refs/trufflehog/preserved/. Disk usage grows with every repository and is never reclaimed.
+.TP
+\fB--skip-scan-if-unchanged\fR
+With --persistent-clones, skip the secret scan (not the fetch) of repositories whose refs are unchanged since their last successful scan.
 .SS
 \fBgithub-experimental --repo=REPO [<flags>]\fR
 Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.

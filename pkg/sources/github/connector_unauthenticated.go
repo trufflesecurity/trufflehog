@@ -53,6 +53,10 @@ func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string, ar
 	return git.CloneRepoUsingUnauthenticated(ctx, repoURL, c.clonePath, args...)
 }
 
+func (c *unauthenticatedConnector) ClonePersistent(ctx context.Context, repoURL, clonePath string) (string, *gogit.Repository, error) {
+	return git.CloneOrFetchRepoUsingUnauthenticated(ctx, repoURL, clonePath)
+}
+
 func (c *unauthenticatedConnector) GraphQLClient() *githubv4.Client {
 	return c.graphqlClient
 }

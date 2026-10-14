@@ -139,6 +139,8 @@ var (
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.").Bool()
 	githubIgnoreGists           = githubScan.Flag("ignore-gists", "Ignore all gists in scan.").Bool()
 	githubExcludeArchived       = githubScan.Flag("exclude-archived", "Exclude archived repositories from scan.").Bool()
+	githubPersistentClones      = githubScan.Flag("persistent-clones", "Keep clones in stable directories under --clone-path (required) and fetch new data into them on later runs instead of re-cloning. Existing clones are never pruned or deleted, and overwritten refs keep their old commits under refs/trufflehog/preserved/. Disk usage grows with every repository and is never reclaimed.").Bool()
+	githubSkipScanIfUnchanged   = githubScan.Flag("skip-scan-if-unchanged", "With --persistent-clones, skip the secret scan (not the fetch) of repositories whose refs are unchanged since their last successful scan.").Bool()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -856,7 +858,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}
 	eng.Start(ctx)
 
-	persistGitRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup
+	persistGitRepo := *gitNoCleanup || *githubNoCleanup || *gitlabNoCleanup || *githubPersistentClones
 	gitCloneTempPath := ""
 
 	defer func() {
@@ -949,6 +951,9 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {
 			return scanMetrics, err
 		}
+		if err := validatePersistentClones(*githubPersistentClones, *githubSkipScanIfUnchanged, *githubClonePath, *githubAuthInUrl); err != nil {
+			return scanMetrics, err
+		}
 
 		cfg := sources.GithubConfig{
 			Endpoint:                   *githubScanEndpoint,
@@ -972,6 +977,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IgnoreGists:                *githubIgnoreGists,
 			ExcludeArchived:            *githubExcludeArchived,
 			PrintLegacyJSON:            *jsonLegacy,
+			PersistentClones:           *githubPersistentClones,
+			SkipScanIfUnchanged:        *githubSkipScanIfUnchanged,
 		}
 
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
@@ -1363,6 +1370,23 @@ func printAverageDetectorTime(e *engine.Engine) {
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
+}
+
+// validatePersistentClones checks the flag combinations --persistent-clones depends on.
+func validatePersistentClones(persistent, skipScanIfUnchanged bool, clonePath string, authInURL bool) error {
+	if skipScanIfUnchanged && !persistent {
+		return fmt.Errorf("invalid configuration: --skip-scan-if-unchanged can only be used together with --persistent-clones")
+	}
+	if !persistent {
+		return nil
+	}
+	if clonePath == "" {
+		return fmt.Errorf("invalid configuration: --persistent-clones can only be used together with --clone-path")
+	}
+	if authInURL {
+		return fmt.Errorf("invalid configuration: --persistent-clones cannot be combined with --auth-in-url, as credentials would be stored in the clones' git config")
+	}
+	return nil
 }
 
 // validateClonePath ensures that --clone-path, if provided, exists and is a directory.

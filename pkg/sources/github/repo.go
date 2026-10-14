@@ -62,6 +62,13 @@ type repoInfo struct {
 
 // cloneRepo clones a repository given its URL, returns the path and the repository object.
 func (s *Source) cloneRepo(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
+	if s.conn.GetPersistentClones() {
+		cloner, ok := s.connector.(persistentCloner)
+		if !ok {
+			return "", nil, fmt.Errorf("persistent clones are not supported by this GitHub connector")
+		}
+		return cloner.ClonePersistent(ctx, repoURL, s.conn.GetClonePath())
+	}
 	return s.connector.Clone(ctx, repoURL)
 }
 

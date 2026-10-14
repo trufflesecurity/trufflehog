@@ -81,6 +81,14 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...stri
 	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.clonePath, c.user, c.authInUrl, args...)
 }
 
+func (c *tokenConnector) ClonePersistent(ctx context.Context, repoURL, clonePath string) (string, *gogit.Repository, error) {
+	if err := c.setUserIfUnset(ctx); err != nil {
+		return "", nil, err
+	}
+
+	return git.CloneOrFetchRepoUsingToken(ctx, c.token, repoURL, clonePath, c.user)
+}
+
 func (c *tokenConnector) GraphQLClient() *githubv4.Client {
 	return c.graphqlClient
 }

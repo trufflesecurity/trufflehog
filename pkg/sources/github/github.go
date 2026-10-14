@@ -1409,9 +1409,24 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	}
 	// remove the path only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
 	// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
-	if !s.conn.GetPrintLegacyJson() {
+	if !s.conn.GetPrintLegacyJson() && !s.conn.GetPersistentClones() {
 		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
 			defer func() { _ = os.RemoveAll(path) }()
+		}
+	}
+
+	// A range-limited scan must not record or trust a digest meant for a full scan.
+	var refsDigest string
+	if s.conn.GetPersistentClones() && s.conn.GetSkipScanIfUnchanged() && s.conn.Base == "" && s.conn.Head == "" {
+		digest, err := git.RefsDigest(ctx, path)
+		switch {
+		case err != nil:
+			ctx.Logger().Error(err, "could not compute refs digest; scanning repo")
+		case digest == git.ScannedRefsDigest(ctx, path):
+			ctx.Logger().V(2).Info("skipping scan, refs unchanged since last successful scan", "repo", repoURL)
+			return duration, nil
+		default:
+			refsDigest = digest
 		}
 	}
 
@@ -1423,6 +1438,12 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
 	}
 	duration = time.Since(start)
+
+	if refsDigest != "" {
+		if err := git.SetScannedRefsDigest(ctx, path, refsDigest); err != nil {
+			ctx.Logger().Error(err, "could not record scanned refs digest")
+		}
+	}
 	return duration, nil
 }
 
@@ -2464,7 +2485,7 @@ func (s *Source) scanWikiTarget(ctx context.Context, wikiURL string, meta *sourc
 	if err != nil {
 		return fmt.Errorf("could not clone wiki for targeted scan: %w", err)
 	}
-	if !s.conn.GetPrintLegacyJson() {
+	if !s.conn.GetPrintLegacyJson() && !s.conn.GetPersistentClones() {
 		if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.NoCleanup && s.conn.GetClonePath() != "") {
 			defer func() { _ = os.RemoveAll(path) }()
 		}
