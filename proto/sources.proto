@@ -285,6 +285,10 @@ message GitHub {
   // When using GitHub App credentials, enumerate repositories from every app installation.
   bool scan_all_installations = 26;
   bool exclude_archived = 27;
+  // Keep clones in deterministic directories under clone_path and fetch into them on later runs.
+  bool persistent_clones = 28;
+  // With persistent_clones, skip the secret scan of repos whose refs are unchanged since the last successful scan.
+  bool skip_scan_if_unchanged = 29;
 }
 
 message GitHubExperimental {
