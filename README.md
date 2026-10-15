@@ -429,6 +429,10 @@ For every potential credential that is detected, we've painstakingly implemented
 
 For example, the [AWS credential detector](pkg/detectors/aws/access_keys/accesskey.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
+For detectors supporting custom endpoints, `--verifier DetectorName=https://internal.example.com`
+explicitly trusts that endpoint, including private network addresses. Endpoints extracted from
+scanned content and redirect hops remain subject to the detector's network restrictions.
+
 # :memo: Usage
 
 TruffleHog has a sub-command for each source of data that you may want to scan:

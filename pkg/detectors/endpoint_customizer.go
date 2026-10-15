@@ -1,8 +1,11 @@
 package detectors
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
@@ -76,14 +79,52 @@ func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
 	return endpoints
 }
 
-// VerificationClient returns the client a detector should use for
-// verification requests: base itself when no verifier auth is configured,
-// otherwise a copy of base that attaches the access token to requests for
-// the configured endpoints. Detectors call it wherever they would otherwise
-// use their verification client directly.
+// VerificationClient permits private addresses only for explicitly configured
+// endpoints, never for endpoints found in scanned content or redirect hops.
+// Verifier authentication, when configured, is applied to the same endpoints.
 func (e *EndpointSetter) VerificationClient(base *http.Client) *http.Client {
-	if e.verifierAuth == nil {
-		return base
+	client := base
+	if len(e.configuredEndpoints) > 0 {
+		clone := *base
+		transport := base.Transport
+		if transport == nil {
+			transport = http.DefaultTransport
+		}
+		clone.Transport = &configuredVerifierTransport{base: transport, endpoints: e.configuredEndpoints}
+		client = &clone
 	}
-	return e.verifierAuth.WrapClient(base, e.configuredEndpoints)
+	if e.verifierAuth != nil {
+		client = e.verifierAuth.WrapClient(client, e.configuredEndpoints)
+	}
+	return client
+}
+
+type configuredVerifierTransport struct {
+	base      http.RoundTripper
+	endpoints []string
+}
+
+func (t *configuredVerifierTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Response == nil {
+		for _, endpoint := range t.endpoints {
+			u, err := url.Parse(endpoint)
+			if err != nil || u.Host == "" || !strings.EqualFold(u.Scheme, req.URL.Scheme) ||
+				!strings.EqualFold(u.Hostname(), req.URL.Hostname()) || verifierPort(u) != verifierPort(req.URL) {
+				continue
+			}
+			clone := req.WithContext(context.WithValue(req.Context(), configuredVerifierKey{}, true))
+			return t.base.RoundTrip(clone)
+		}
+	}
+	return t.base.RoundTrip(req)
+}
+
+func verifierPort(u *url.URL) string {
+	if port := u.Port(); port != "" {
+		return port
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }

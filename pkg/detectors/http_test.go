@@ -20,8 +20,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
 
-		transport, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok, "Expected transport to be *http.Transport")
+		transport := client.Transport.(*guardedTransport).guarded.(*http.Transport)
 
 		_, err := transport.DialContext(context.Background(), "tcp", "127.0.0.1:8080")
 		assert.Error(t, err)
@@ -32,8 +31,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
 
-		transport, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok, "Expected transport to be *http.Transport")
+		transport := client.Transport.(*guardedTransport).guarded.(*http.Transport)
 
 		_, err := transport.DialContext(context.Background(), "tcp", "0.0.0.0:8080")
 		assert.Error(t, err)
@@ -44,8 +42,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
 
-		transport, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok, "Expected transport to be *http.Transport")
+		transport := client.Transport.(*guardedTransport).guarded.(*http.Transport)
 
 		_, err := transport.DialContext(context.Background(), "tcp", "[::]:8080")
 		assert.Error(t, err)
@@ -56,8 +53,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
 
-		transport, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok, "Expected transport to be *http.Transport")
+		transport := client.Transport.(*guardedTransport).guarded.(*http.Transport)
 
 		conn, err := transport.DialContext(context.Background(), "tcp", "google.com:80")
 		assert.NoError(t, err)
@@ -69,8 +65,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
 
-		transport, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok, "Expected transport to be *http.Transport")
+		transport := client.Transport.(*guardedTransport).guarded.(*http.Transport)
 
 		conn, err := transport.DialContext(context.Background(), "tcp", "1.1.1.1:80")
 		assert.NoError(t, err)
@@ -82,8 +77,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
 
-		transport, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok, "Expected transport to be *http.Transport")
+		transport := client.Transport.(*guardedTransport).guarded.(*http.Transport)
 
 		_, err := transport.DialContext(context.Background(), "tcp", "invalid-address")
 		assert.Error(t, err)
@@ -93,8 +87,7 @@ func TestWithNoLocalIP(t *testing.T) {
 		client := &http.Client{}
 		WithNoLocalIP()(client)
 
-		transport, ok := client.Transport.(*http.Transport)
-		assert.True(t, ok, "Expected transport to be *http.Transport")
+		transport := client.Transport.(*guardedTransport).guarded.(*http.Transport)
 
 		_, err := transport.DialContext(context.Background(), "tcp", "non-existent-host.local:80")
 		assert.Error(t, err)

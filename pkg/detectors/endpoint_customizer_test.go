@@ -202,3 +202,43 @@ func TestEndpointSetter_VerifierAuthFailuresSurviveSetVerificationError(t *testi
 
 	assert.Zero(t, hits.Load(), "neither failure sends the request")
 }
+
+func TestEndpointSetter_ConfiguredPrivateEndpoint(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, "/api", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	base := NewDetectorHttpClient(WithNoLocalIP())
+	var setter EndpointSetter
+	require.NoError(t, setter.SetConfiguredEndpoints(server.URL))
+	client := setter.VerificationClient(base)
+
+	resp, err := client.Get(server.URL + "/api")
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.EqualValues(t, 1, hits.Load())
+
+	// An unconfigured request cannot reuse the trusted connection pool.
+	_, err = base.Get(server.URL + "/api")
+	require.ErrorIs(t, err, ErrNoLocalIP)
+	require.EqualValues(t, 1, hits.Load())
+
+	// Even a redirect to the same configured origin must go through the guard.
+	_, err = client.Get(server.URL + "/redirect")
+	require.ErrorIs(t, err, ErrNoLocalIP)
+	require.EqualValues(t, 2, hits.Load())
+
+	var other EndpointSetter
+	require.NoError(t, other.SetConfiguredEndpoints("http://localhost:1"))
+	_, err = other.VerificationClient(base).Get(server.URL + "/api")
+	require.ErrorIs(t, err, ErrNoLocalIP)
+	require.EqualValues(t, 2, hits.Load())
+}
