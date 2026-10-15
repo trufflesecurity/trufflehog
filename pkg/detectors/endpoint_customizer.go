@@ -79,9 +79,11 @@ func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
 	return endpoints
 }
 
-// VerificationClient permits private addresses only for explicitly configured
-// endpoints, never for endpoints found in scanned content or redirect hops.
-// Verifier authentication, when configured, is applied to the same endpoints.
+// VerificationClient permits private addresses for initial requests to explicitly
+// configured origins (scheme, host, effective port), regardless of URL path or
+// endpoint provenance. Unconfigured discovered origins and all redirect hops
+// retain the detector's existing network restrictions.
+// Verifier authentication, when configured, is applied to configured origins.
 // Closing idle connections on the returned client also closes its verification pools.
 func (e *EndpointSetter) VerificationClient(base *http.Client) *http.Client {
 	client := base
