@@ -354,6 +354,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googlegemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2clientcredentials"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
@@ -1268,6 +1269,7 @@ func buildDetectorList() []detectors.Detector {
 		&goodday.Scanner{},
 		&googlegemini.Scanner{},
 		&googleoauth2.Scanner{},
+		&googleoauth2clientcredentials.Scanner{},
 		&grafana.Scanner{},
 		&grafanaserviceaccount.Scanner{},
 		&graphcms.Scanner{},
