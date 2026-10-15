@@ -174,6 +174,57 @@ func TestPythonBytecodeInArchiveIsScanned(t *testing.T) {
 	assert.Contains(t, string(combined), pycKeyword)
 }
 
+// Fixture: testdata/pyc_multi.pyc was compiled (CPython 3.12) from
+//
+//	mailgun_secondary = "36d330d315ae02721ebfbf6a17cf85e4fe7469e00b08121536e12e0def6866b67ad00111"
+//	deployment_note = "deliberately-long-second-string-literal-to-widen-the-keyword-gap-0123456789"
+//
+// Regression test for the review finding on PR #5434: emitting the flat
+// marshal string list in reverse puts a later co_consts value between an
+// earlier secret's keyword and the secret itself, pushing the keyword past
+// PrefixRegex's 40-character window so keyword-prefixed detectors miss it.
+// The handler must emit each code object's identifiers adjacent to the
+// values they name.
+const (
+	pycMultiToken   = "36d330d315ae02721ebfbf6a17cf85e4fe7469e00b08121536e12e0def6866b67ad00111"
+	pycMultiKeyword = "mailgun_secondary"
+)
+
+func TestPythonBytecodeMultiAssignmentKeywordBeforeSecret(t *testing.T) {
+	raw, err := os.ReadFile("testdata/pyc_multi.pyc")
+	require.NoError(t, err)
+
+	emitted := collectChunks(t, raw)
+	require.NotEmpty(t, emitted, "expected .pyc content to produce chunks, got none")
+
+	pattern := regexp.MustCompile(detectors.PrefixRegex([]string{"mailgun"}) + `\b([a-f0-9]{72})\b`)
+	var secrets []string
+	for _, m := range pattern.FindAllStringSubmatch(string(emitted), -1) {
+		secrets = append(secrets, m[1])
+	}
+	require.NotEmpty(t, secrets, "prefix detector missed every secret in multi-assignment .pyc output")
+	assert.Contains(t, secrets, pycMultiToken)
+
+	// The keyword must directly precede its secret: no unrelated literal may
+	// sit between them.
+	kwIdx := bytes.Index(emitted, []byte(pycMultiKeyword))
+	secIdx := bytes.Index(emitted, []byte(pycMultiToken))
+	require.NotEqual(t, -1, kwIdx)
+	require.NotEqual(t, -1, secIdx)
+	require.Less(t, kwIdx, secIdx, "keyword must precede the secret in handler output")
+	assert.Less(t, secIdx-kwIdx, 40, "keyword/secret gap must fit PrefixRegex's window")
+
+	// End-to-end with the real detector.
+	scanner := mailgun.Scanner{}
+	results, err := scanner.FromData(context.AddLogger(context.Background()), false, emitted)
+	require.NoError(t, err)
+	found := make(map[string]bool)
+	for _, r := range results {
+		found[string(r.Raw)] = true
+	}
+	assert.True(t, found[pycMultiToken], "mailgun detector missed the token in multi-assignment .pyc")
+}
+
 // Unit test for the marshal string extraction used on Python bytecode.
 func TestExtractPythonBytecodeStrings(t *testing.T) {
 	in := []byte{
