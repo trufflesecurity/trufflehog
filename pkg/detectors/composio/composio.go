@@ -1,6 +1,7 @@
 package composio
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -28,6 +29,14 @@ var _ detectors.CloudProvider = (*Scanner)(nil)
 func (Scanner) CloudEndpoint() string { return "https://backend.composio.dev" }
 
 var defaultClient = common.SaneHttpClient()
+
+// getClient returns the client verification requests go through. The
+// VerificationClient wrap is what attaches the operator's access token when
+// --verifier points at an auth-protected endpoint; without it those requests
+// go out unauthenticated and every key comes back looking dead.
+func (s Scanner) getClient() *http.Client {
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
+}
 
 const rotationGuide = "https://docs.composio.dev/reference/api-reference/api-keys/postApiKeyRevocation"
 
@@ -120,10 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
+				client := s.getClient()
 
 				// Only the cloud endpoint and operator-configured endpoints are
 				// used; URLs found in scanned data are never called. Only
@@ -186,7 +192,13 @@ type apiError struct {
 // The org key's dead slug HTTP_Unauthorized is shared with the banned-address
 // answer, so that one branch also reads the message; a copy change there
 // degrades to an undecided error, never to a wrong verdict.
-func verifyMatch(ctx context.Context, client *http.Client, baseURL string, pattern keyPattern, token string) (bool, map[string]string, error) {
+func verifyMatch(
+	ctx context.Context,
+	client *http.Client,
+	baseURL string,
+	pattern keyPattern,
+	token string,
+) (bool, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(baseURL, "/")+pattern.verifyPath, nil)
 	if err != nil {
 		return false, nil, err
@@ -209,7 +221,8 @@ func verifyMatch(ctx context.Context, client *http.Client, baseURL string, patte
 
 	case http.StatusUnauthorized, http.StatusForbidden:
 		var body apiError
-		if err := json.NewDecoder(io.LimitReader(res.Body, maxErrorBodyBytes)).Decode(&body); err != nil || body.Error.Slug == "" {
+		dec := json.NewDecoder(io.LimitReader(res.Body, maxErrorBodyBytes))
+		if err := dec.Decode(&body); err != nil || body.Error.Slug == "" {
 			return false, nil, fmt.Errorf("HTTP %d without a Composio error envelope", res.StatusCode)
 		}
 		return classifyRejection(res.StatusCode, body)
@@ -223,10 +236,12 @@ func classifyRejection(status int, body apiError) (bool, map[string]string, erro
 	slug, message := body.Error.Slug, body.Error.Message
 
 	switch {
-	case status == http.StatusUnauthorized && (slug == "APIKey_InvalidAPIKey" || slug == "APIKey_APIKeyExpired" || slug == "UserApiKey_Unauthorized"):
+	case status == http.StatusUnauthorized && (slug == "APIKey_InvalidAPIKey" ||
+		slug == "APIKey_APIKeyExpired" || slug == "UserApiKey_Unauthorized"):
 		return false, nil, nil
 
-	case status == http.StatusUnauthorized && slug == "HTTP_Unauthorized" && strings.HasPrefix(message, "Invalid x-org-api-key"):
+	case status == http.StatusUnauthorized && slug == "HTTP_Unauthorized" &&
+		strings.HasPrefix(message, "Invalid x-org-api-key"):
 		return false, nil, nil
 
 	case status == http.StatusUnauthorized && slug == "Auth_Unauthorized" && strings.Contains(message, "IP allowlist"):
@@ -248,5 +263,7 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Composio is an integration platform for AI agents. Composio API keys authenticate calls that execute tools, read connected accounts and manage triggers for a project, an organization or a user."
+	return "Composio is an integration platform for AI agents. Composio API " +
+		"keys authenticate calls that execute tools, read connected accounts " +
+		"and manage triggers for a project, an organization or a user."
 }
