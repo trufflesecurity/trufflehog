@@ -432,6 +432,8 @@ For example, the [AWS credential detector](pkg/detectors/aws/access_keys/accessk
 For detectors supporting custom endpoints, `--verifier DetectorName=https://internal.example.com`
 explicitly trusts that endpoint, including private network addresses. Endpoints extracted from
 scanned content and redirect hops remain subject to the detector's network restrictions.
+Clients derived for configured verifiers retain `CloseIdleConnections` behavior,
+including when verifier authentication and isolated verification pools are used.
 
 # :memo: Usage
 

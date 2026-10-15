@@ -77,6 +77,12 @@ func (t *detectorTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	return t.T.RoundTrip(req)
 }
 
+func (t *detectorTransport) CloseIdleConnections() {
+	if closer, ok := t.T.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+}
+
 var defaultDialer = &net.Dialer{
 	Timeout:   2 * time.Second,
 	KeepAlive: 5 * time.Second,

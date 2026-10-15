@@ -82,6 +82,7 @@ func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
 // VerificationClient permits private addresses only for explicitly configured
 // endpoints, never for endpoints found in scanned content or redirect hops.
 // Verifier authentication, when configured, is applied to the same endpoints.
+// Closing idle connections on the returned client also closes its verification pools.
 func (e *EndpointSetter) VerificationClient(base *http.Client) *http.Client {
 	client := base
 	if len(e.configuredEndpoints) > 0 {
@@ -90,7 +91,19 @@ func (e *EndpointSetter) VerificationClient(base *http.Client) *http.Client {
 		if transport == nil {
 			transport = http.DefaultTransport
 		}
-		clone.Transport = &configuredVerifierTransport{base: transport, endpoints: e.configuredEndpoints}
+		origins := make([]verifierOrigin, 0, len(e.configuredEndpoints))
+		for _, endpoint := range e.configuredEndpoints {
+			u, err := url.Parse(endpoint)
+			if err != nil || u.Host == "" {
+				continue
+			}
+			origins = append(origins, verifierOrigin{
+				scheme: u.Scheme,
+				host:   u.Hostname(),
+				port:   verifierPort(u),
+			})
+		}
+		clone.Transport = &configuredVerifierTransport{base: transport, origins: origins}
 		client = &clone
 	}
 	if e.verifierAuth != nil {
@@ -99,17 +112,24 @@ func (e *EndpointSetter) VerificationClient(base *http.Client) *http.Client {
 	return client
 }
 
+type verifierOrigin struct {
+	scheme string
+	host   string
+	port   string
+}
+
 type configuredVerifierTransport struct {
-	base      http.RoundTripper
-	endpoints []string
+	base    http.RoundTripper
+	origins []verifierOrigin
 }
 
 func (t *configuredVerifierTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Response == nil {
-		for _, endpoint := range t.endpoints {
-			u, err := url.Parse(endpoint)
-			if err != nil || u.Host == "" || !strings.EqualFold(u.Scheme, req.URL.Scheme) ||
-				!strings.EqualFold(u.Hostname(), req.URL.Hostname()) || verifierPort(u) != verifierPort(req.URL) {
+		host := req.URL.Hostname()
+		port := verifierPort(req.URL)
+		for _, origin := range t.origins {
+			if !strings.EqualFold(origin.scheme, req.URL.Scheme) ||
+				!strings.EqualFold(origin.host, host) || origin.port != port {
 				continue
 			}
 			clone := req.WithContext(context.WithValue(req.Context(), configuredVerifierKey{}, true))
@@ -117,6 +137,12 @@ func (t *configuredVerifierTransport) RoundTrip(req *http.Request) (*http.Respon
 		}
 	}
 	return t.base.RoundTrip(req)
+}
+
+func (t *configuredVerifierTransport) CloseIdleConnections() {
+	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
 }
 
 func verifierPort(u *url.URL) string {
