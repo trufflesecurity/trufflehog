@@ -56,6 +56,7 @@ var (
 	HumioAPITokenDetectorEnabled             atomic.Bool
 	EnableS3UnitProgress                     atomic.Bool // count each S3 bucket during a unit scan to report progress inside it
 	KongKonnectDetectorEnabled               atomic.Bool
+	SonarQubeDetectorEnabled                 atomic.Bool
 )
 
 type AtomicString struct {
