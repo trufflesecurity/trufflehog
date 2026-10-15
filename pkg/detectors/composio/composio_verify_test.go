@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth/verifierauthtest"
 )
 
 // Real production envelopes captured 2026-09-17 with never-minted keys; the
@@ -23,6 +25,7 @@ const (
 	bodyNoPermission     = `{"error":{"message":"This API key does not have read access to toolkits","code":812,"slug":"APIKey_InsufficientPermissions","status":403}}`
 	bodyForbiddenUnknown = `{"error":{"message":"Organization is suspended","code":2206,"slug":"Organization_InsufficientPermissions","status":403}}`
 	bodyHTMLChallenge    = `<!DOCTYPE html><html><head><title>Just a moment...</title></head></html>`
+	bodyRateLimited      = `{"error":{"message":"Too many requests","code":429,"slug":"RateLimit_Exceeded","status":429}}`
 )
 
 type capturedRequest struct {
@@ -127,8 +130,16 @@ func TestComposio_Verification_Outcomes(t *testing.T) {
 		{name: "user: unknown, revoked or expired", key: userKey, status: 401, body: bodyUserInvalid},
 
 		// Live keys the route would not serve.
-		{name: "project: IP allowlist denial is a live key", key: projectKey, status: 401, body: bodyIPAllowlist, wantVerified: true, wantRestriction: "ip_allowlist"},
-		{name: "project: scoped key without permission is a live key", key: projectKey, status: 403, body: bodyNoPermission, wantVerified: true, wantRestriction: "insufficient_permissions"},
+		{
+			name: "project: IP allowlist denial is a live key",
+			key:  projectKey, status: 401, body: bodyIPAllowlist,
+			wantVerified: true, wantRestriction: "ip_allowlist",
+		},
+		{
+			name: "project: scoped key without permission is a live key",
+			key:  projectKey, status: 403, body: bodyNoPermission,
+			wantVerified: true, wantRestriction: "insufficient_permissions",
+		},
 
 		// The API did not judge the key; never guess.
 		{name: "project: banned scanner IP", key: projectKey, status: 401, body: bodyAccessDenied, wantErr: true},
@@ -136,9 +147,17 @@ func TestComposio_Verification_Outcomes(t *testing.T) {
 		{name: "user: membership could not be resolved", key: userKey, status: 401, body: bodyAccessDenied, wantErr: true},
 		{name: "header not recognised", key: projectKey, status: 401, body: bodyNoAuth, wantErr: true},
 		{name: "401 without a Composio envelope", key: projectKey, status: 401, body: bodyHTMLChallenge, wantErr: true},
-		{name: "org: 403 after the key resolved is a live key", key: orgKey, status: 403, body: bodyForbiddenUnknown, wantVerified: true, wantRestriction: "Organization_InsufficientPermissions"},
+		{
+			name: "org: 403 after the key resolved is a live key",
+			key:  orgKey, status: 403, body: bodyForbiddenUnknown,
+			wantVerified: true, wantRestriction: "Organization_InsufficientPermissions",
+		},
 		{name: "403 without a Composio envelope", key: projectKey, status: 403, body: bodyHTMLChallenge, wantErr: true},
-		{name: "rate limited", key: projectKey, status: 429, body: `{"error":{"message":"Too many requests","code":429,"slug":"RateLimit_Exceeded","status":429}}`, wantErr: true},
+		{
+			name: "rate limited",
+			key:  projectKey, status: 429, body: bodyRateLimited,
+			wantErr: true,
+		},
 		{name: "server error", key: projectKey, status: 500, body: ``, wantErr: true},
 		{name: "redirect is not a verdict", key: projectKey, status: 302, body: ``, wantErr: true},
 	}
@@ -280,7 +299,44 @@ func TestComposio_RotationGuideResolves(t *testing.T) {
 	if err != nil || len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d (err %v)", len(results), err)
 	}
-	if got := results[0].ExtraData["rotation_guide"]; got != "https://docs.composio.dev/reference/api-reference/api-keys/postApiKeyRevocation" {
+	wantGuide := "https://docs.composio.dev/reference/api-reference/api-keys/postApiKeyRevocation"
+	if got := results[0].ExtraData["rotation_guide"]; got != wantGuide {
 		t.Errorf("rotation_guide = %q", got)
+	}
+}
+
+// Verifier auth is configured on the scanner, not read from scanned data, so
+// the only thing that attaches the operator's access token is building the
+// verification client with VerificationClient. A detector that skips that
+// wrap still accepts auth and sends the request unauthenticated, which an
+// auth proxy answers as if every key were dead.
+func TestComposio_Verification_AttachesVerifierAuthToken(t *testing.T) {
+	ts, captured, _ := newVerifyServer(t, http.StatusOK, `{}`)
+	idp := verifierauthtest.NewIdP(t)
+
+	s := Scanner{}
+	if err := s.SetConfiguredEndpoints(ts.URL); err != nil {
+		t.Fatalf("SetConfiguredEndpoints: %v", err)
+	}
+	s.SetVerifierAuth(verifierauthtest.Config(t, idp, "X-Auth-Proxy-Token"))
+
+	results, err := s.FromData(context.Background(), true, []byte("key="+projectKey))
+	if err != nil {
+		t.Fatalf("FromData error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if want := "Bearer " + verifierauthtest.AccessToken; captured.headers.Get("X-Auth-Proxy-Token") != want {
+		t.Errorf("X-Auth-Proxy-Token = %q, want %q",
+			captured.headers.Get("X-Auth-Proxy-Token"), want)
+	}
+	// The key itself still travels in its own header, untouched by the wrap.
+	if got := captured.headers.Get("x-api-key"); got != projectKey {
+		t.Errorf("x-api-key = %q, want the key", got)
+	}
+	if !results[0].Verified {
+		t.Error("200 through the auth proxy must verify the key")
 	}
 }

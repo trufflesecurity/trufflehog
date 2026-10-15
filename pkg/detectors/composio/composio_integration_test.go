@@ -149,7 +149,8 @@ func TestComposio_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Errorf("Composio.FromData() error = %v, wantVerificationErr %v", got[i].VerificationError(), tt.wantVerificationErr)
+					t.Errorf("Composio.FromData() error = %v, wantVerificationErr %v",
+						got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
