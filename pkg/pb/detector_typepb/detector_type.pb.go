@@ -164,7 +164,7 @@ const (
 	DetectorType_D7Network                     DetectorType = 138
 	DetectorType_ScrapingBee                   DetectorType = 139
 	DetectorType_KeenIO                        DetectorType = 140
-	DetectorType_Wakatime                      DetectorType = 141 // Not yet implemented
+	DetectorType_Wakatime                      DetectorType = 141
 	DetectorType_Buildkite                     DetectorType = 142
 	DetectorType_Verimail                      DetectorType = 143
 	DetectorType_Zerobounce                    DetectorType = 144
