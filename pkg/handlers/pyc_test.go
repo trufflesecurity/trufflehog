@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"bytes"
+	regexp "github.com/wasilibs/go-re2"
 	"os"
-	"regexp"
 	"testing"
 	"time"
 
