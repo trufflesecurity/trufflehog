@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
@@ -166,6 +167,25 @@ func WithLogger(parent context.Context, logger logr.Logger) Context {
 		log:     logger,
 		Context: context.WithValue(parent, logEntryKey, logger),
 	}
+}
+
+// WithLogLevel returns a Context whose logger writes logs up to level (0 to 5), even when the global log level is
+// lower. Everything else keeps the global level. Use log.DebugLevel to turn on all debug logs for one piece of work,
+// such as one source. Like the other With functions, the logger survives a round trip through a plain
+// context.Context (see AddLogger).
+func WithLogLevel(parent Context, level int8) Context {
+	// Keep the level between 0 and log.DebugLevel. A level of 0 or less has nothing to raise. Clamping also avoids
+	// an int8 overflow below: -(-128) is still -128, which would turn on every level.
+	if level <= 0 {
+		return parent
+	}
+	if level > log.DebugLevel {
+		level = log.DebugLevel
+	}
+
+	// Zap levels get more verbose as the number gets smaller, so V(5) is zap level -5.
+	logger := log.WithLevelOverride(parent.Logger(), zapcore.Level(-level))
+	return WithLogger(parent, logger)
 }
 
 // AddLogger converts a context.Context into a Context. If the underlying type
