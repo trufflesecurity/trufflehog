@@ -1396,8 +1396,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 		err := s.scanComments(ctx, repoURL, repoInfo, reporter)
 		commentsDuration = time.Since(commentsStart)
 		if err != nil {
-			err := fmt.Errorf("error scanning comments: %w", err)
-			if err := reporter.ChunkErr(ctx, err); err != nil {
+			if err := reportCommentErrors(ctx, reporter, err); err != nil {
 				return err
 			}
 		}
@@ -1782,6 +1781,25 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
 
+// reportCommentErrors reports a failed comment scan as chunk errors, one per
+// failed phase. processIssueandPRsWithCommentsREST joins one error per phase
+// that failed, and each phase is a separate listing that failed for its own
+// reason, often a different missing permission. Reporting them separately
+// gives each its own entry and its own "error scanning comments" context,
+// instead of one entry whose later lines have neither.
+func reportCommentErrors(ctx context.Context, reporter sources.ChunkReporter, err error) error {
+	phaseErrs := []error{err}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		phaseErrs = joined.Unwrap()
+	}
+	for _, phaseErr := range phaseErrs {
+		if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning comments: %w", phaseErr)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	urlString, urlParts, err := getRepoURLParts(repoPath)
 	if err != nil {
@@ -2015,8 +2033,9 @@ type commentPhase struct {
 //
 // The phases are independent: a failure in one is collected and the rest
 // still run, so one capped or forbidden endpoint can't hide the others. All
-// failures come back joined into one error, which scanRepo reports as a
-// single ChunkErr for the repo. Chunks emitted before a failure are kept.
+// failures come back joined into one error, which scanRepo splits back apart
+// so each failed phase is its own ChunkErr (see reportCommentErrors). Chunks
+// emitted before a failure are kept.
 //
 // The "Scanning issues" and "Scanning pull requests" V(2) lines are the only
 // log signal for scans on the unit path, whose comment errors go to the scan
