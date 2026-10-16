@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -127,6 +128,12 @@ func TestTwilioAPIKey_VerificationDeterminacy(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
+			name:                "forbidden rejection is determinate",
+			client:              common.ConstantResponseHttpClient(http.StatusForbidden, ""),
+			wantVerified:        false,
+			wantVerificationErr: false,
+		},
+		{
 			name:                "success is determinate",
 			client:              common.ConstantResponseHttpClient(http.StatusOK, `{"services":[{"friendly_name":"n","sid":"s","account_sid":"a"}]}`),
 			wantVerified:        true,
@@ -181,4 +188,166 @@ func TestTwilioAPIKey_VerificationDeterminacy(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTwilioAPIKey_Verification_HappyPath(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	mockBody := `{"services":[{"friendly_name":"Production Service","sid":"VA123","account_sid":"AC123"}]}`
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	got := results[0]
+	if !got.Verified {
+		t.Errorf("Verified = %v, want true", got.Verified)
+	}
+	if got.VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil", got.VerificationError())
+	}
+	if got.ExtraData["account_sid"] != "AC123" {
+		t.Errorf("ExtraData[account_sid] = %q, want 'AC123'", got.ExtraData["account_sid"])
+	}
+	if got.ExtraData["friendly_name"] != "Production Service" {
+		t.Errorf("ExtraData[friendly_name] = %q, want 'Production Service'", got.ExtraData["friendly_name"])
+	}
+}
+
+func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+
+	t.Run("default cloud endpoint", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := "https://verify.twilio.com/v2/Services"
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
+
+	t.Run("configured custom endpoint", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := "https://authproxy.corp.internal/v2/Services"
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
+
+	t.Run("trailing slash normalization", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal/"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := "https://authproxy.corp.internal/v2/Services"
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
+
+	t.Run("multi-endpoint first fails then succeeds clears error", func(t *testing.T) {
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					if strings.Contains(req.URL.Host, "fail-proxy") {
+						return &http.Response{
+							StatusCode: http.StatusInternalServerError,
+							Body:       io.NopCloser(strings.NewReader("server error")),
+						}, nil
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://fail-proxy.internal.net", "https://success-proxy.internal.net"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+		if results[0].VerificationError() != nil {
+			t.Errorf("VerificationError() = %v, want nil on successful subsequent endpoint", results[0].VerificationError())
+		}
+	})
 }
