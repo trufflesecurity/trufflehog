@@ -286,6 +286,10 @@ func transientBackoff(retry int) time.Duration {
 // "giving up after N attempt(s)". Each attempt here is bounded by the
 // client's 60 second timeout, so a page that keeps failing is reported after
 // several minutes rather than retried indefinitely.
+//
+// Every page of every walk returns through here, so this is also where a 403
+// for a missing permission becomes a permissionError naming that permission.
+// It is never retried: the credential's permissions won't change mid-walk.
 func fetchWithRetry[T any](ctx context.Context, p pager, fetch func() ([]T, *github.Response, error)) ([]T, *github.Response, error) {
 	transientRetries := 0
 	for {
@@ -294,7 +298,7 @@ func fetchWithRetry[T any](ctx context.Context, p pager, fetch func() ([]T, *git
 			continue
 		}
 		if err == nil || p.wait == nil || !isTransient(ctx, err) {
-			return items, resp, err
+			return items, resp, asPermissionError(err)
 		}
 		if transientRetries == maxTransientRetries {
 			return items, resp, fmt.Errorf("giving up after %d attempts: %w", transientRetries+1, err)
