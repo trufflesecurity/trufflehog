@@ -10,28 +10,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			auth_type: "Token"
-			in: "Header"
-			discord_id: "17014529625858348"
-			discord_secret: "oHILWmk3qakMYbqAikD9R0nJ.Vhu0LY.FK1U_2L2Of8Bm5ESbD6Cy4VKu2K"
-			base_url: "https://api.example.com/v1/example"
-			response_code: 200
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secret = "oHILWmk3qakMYbqAikD9R0nJ.Vhu0LY.FK1U_2L2Of8Bm5ESbD6Cy4VKu2K17014529625858348"
+const (
+	// Modern token shape: 26.6.38 (longer ID and HMAC segments than legacy tokens).
+	// The token appears on its own, with no separate numeric ID alongside it.
+	modernToken = "MTIzNDU2Nzg5MDEyMzQ1Njc4OQ.G00g7H.ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789AB"
+	// Legacy token shape: 24.6.27.
+	legacyToken = "oHILWmk3qakMYbqAikD9R0nJ.Vhu0LY.FK1U_2L2Of8Bm5ESbD6Cy4VKu2K"
 )
 
 func TestDiscordBotToken_Pattern(t *testing.T) {
@@ -44,9 +28,14 @@ func TestDiscordBotToken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name:  "modern token, no separate id",
+			input: `discord_bot_token = "` + modernToken + `"`,
+			want:  []string{modernToken},
+		},
+		{
+			name:  "legacy token",
+			input: `discord_bot_token = "` + legacyToken + `"`,
+			want:  []string{legacyToken},
 		},
 	}
 
