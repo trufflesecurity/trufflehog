@@ -2,6 +2,11 @@ package hunter
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -82,6 +87,79 @@ func TestHunter_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+type roundTripFunc func(req *http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func statusResponse(status int) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Body:       io.NopCloser(strings.NewReader("{}")),
+		Header:     make(http.Header),
+	}
+}
+
+// TestHunter_VerificationError asserts that an indeterminate verification
+// outcome (transport failure, rate limit, or other unexpected status) is
+// surfaced as a VerificationError rather than being silently reported as an
+// unverified, definitively-invalid key.
+func TestHunter_VerificationError(t *testing.T) {
+	input := fmt.Sprintf("hunter api key = %s", secret)
+
+	tests := []struct {
+		name         string
+		transport    roundTripFunc
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "valid key (2xx)",
+			transport:    func(*http.Request) (*http.Response, error) { return statusResponse(http.StatusOK), nil },
+			wantVerified: true,
+			wantErr:      false,
+		},
+		{
+			name:         "invalid key (401) is definitive",
+			transport:    func(*http.Request) (*http.Response, error) { return statusResponse(http.StatusUnauthorized), nil },
+			wantVerified: false,
+			wantErr:      false,
+		},
+		{
+			name:         "rate limited (429) is indeterminate",
+			transport:    func(*http.Request) (*http.Response, error) { return statusResponse(http.StatusTooManyRequests), nil },
+			wantVerified: false,
+			wantErr:      true,
+		},
+		{
+			name:         "transport error is indeterminate",
+			transport:    func(*http.Request) (*http.Response, error) { return nil, errors.New("dial tcp: connection refused") },
+			wantVerified: false,
+			wantErr:      true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			d := Scanner{client: &http.Client{Transport: test.transport}}
+			results, err := d.FromData(context.Background(), true, []byte(input))
+			if err != nil {
+				t.Fatalf("FromData returned a fatal error: %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+
+			r := results[0]
+			if r.Verified != test.wantVerified {
+				t.Errorf("Verified = %v, want %v", r.Verified, test.wantVerified)
+			}
+			if gotErr := r.VerificationError() != nil; gotErr != test.wantErr {
+				t.Errorf("VerificationError present = %v (%v), want %v", gotErr, r.VerificationError(), test.wantErr)
 			}
 		})
 	}
