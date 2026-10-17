@@ -1,12 +1,14 @@
 package twilioapikey
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -17,11 +19,18 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.CloudProvider      = (*Scanner)(nil)
+)
+
+func (Scanner) CloudEndpoint() string { return "https://verify.twilio.com" }
 
 var (
 	defaultClient = detectors.NewClientWithDedup(common.SaneHttpClient())
@@ -38,11 +47,7 @@ type serviceResponse struct {
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,27 +65,42 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueAPIKeys[k] = struct{}{}
 	}
 	uniqueSecrets := make(map[string]struct{})
-	for _, s := range secretPat.FindAllString(dataStr, -1) {
-		uniqueSecrets[s] = struct{}{}
+	for _, sec := range secretPat.FindAllString(dataStr, -1) {
+		uniqueSecrets[sec] = struct{}{}
+	}
+
+	endpoints := s.Endpoints()
+	if len(endpoints) == 0 {
+		endpoints = []string{s.CloudEndpoint()}
 	}
 
 	for apiKey := range uniqueAPIKeys {
 		for secret := range uniqueSecrets {
 			s1 := detectors.Result{
-				DetectorType: detector_typepb.DetectorType_Twilio,
+				DetectorType: s.Type(),
 				Raw:          []byte(apiKey),
 				RawV2:        []byte(apiKey + secret),
 				Redacted:     secret[:5] + "...",
 				ExtraData:    make(map[string]string),
-				SecretParts:  map[string]string{"key": apiKey, "sid": secret},
+				SecretParts:  map[string]string{"key": apiKey, "secret": secret},
 			}
 
 			if verify {
-				extraData, isVerified, verificationErr := verifyTwilioAPIKey(ctx, s.getClient(), apiKey, secret)
-				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr)
-
-				maps.Copy(s1.ExtraData, extraData)
+				client := s.getClient()
+				var lastErr error
+				for _, baseURL := range endpoints {
+					extraData, isVerified, verificationErr := verifyTwilioAPIKey(ctx, client, apiKey, secret, baseURL)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						lastErr = verificationErr
+					}
+					maps.Copy(s1.ExtraData, extraData)
+					if isVerified {
+						lastErr = nil
+						break
+					}
+				}
+				s1.SetVerificationError(lastErr, secret)
 			}
 
 			results = append(results, s1)
@@ -98,17 +118,18 @@ func (s Scanner) Description() string {
 	return "Twilio is a cloud communications platform that allows software developers to programmatically make and receive phone calls, send and receive text messages, and perform other communication functions using its web service APIs."
 }
 
-func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret string) (map[string]string, bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
+func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret, baseURL string) (map[string]string, bool, error) {
+	baseURL = strings.TrimRight(baseURL, "/")
+	reqURL := fmt.Sprintf("%s/v2/Services", baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, false, err
 	}
 
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Accept", "*/*")
+	req.Header.Add("Accept", "application/json")
 	req.SetBasicAuth(apiKey, secret)
 
-	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_TwilioApiKey, apiKey+secret, req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_TwilioApiKey, apiKey+secret+baseURL, req)
 	if err != nil {
 		return nil, false, err
 	}
@@ -122,7 +143,7 @@ func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret
 		extraData := make(map[string]string)
 		var serviceResponse serviceResponse
 
-		if err := json.NewDecoder(resp.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
+		if err := json.NewDecoder(resp.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 {
 			service := serviceResponse.Services[0]
 			extraData["friendly_name"] = service.FriendlyName
 			extraData["account_sid"] = service.AccountSID

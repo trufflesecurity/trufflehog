@@ -110,8 +110,14 @@ func TestTwilio_VerificationDeterminacy(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
+			name:                "forbidden rejection is determinate",
+			client:              common.ConstantResponseHttpClient(http.StatusForbidden, ""),
+			wantVerified:        false,
+			wantVerificationErr: false,
+		},
+		{
 			name:                "success is determinate",
-			client:              common.ConstantResponseHttpClient(http.StatusOK, `{"services":[{"friendly_name":"n","sid":"s","account_sid":"a"}]}`),
+			client:              common.ConstantResponseHttpClient(http.StatusOK, fmt.Sprintf(`{"sid":"%s","friendly_name":"Prod Account","status":"active","type":"Full"}`, validSid)),
 			wantVerified:        true,
 			wantVerificationErr: false,
 		},
@@ -203,4 +209,194 @@ func TestTwilio_RetryExhaustionIsIndeterminate(t *testing.T) {
 	if results[0].VerificationError() == nil {
 		t.Error("VerificationError() = nil; a throttled credential would be recorded as rotated")
 	}
+}
+
+func TestTwilio_Verification_HappyPath_ActiveAccount(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio sid %s key %s", validSid, validKey))
+	mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Production Account","status":"active","type":"Full"}`, validSid)
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	got := results[0]
+	if !got.Verified {
+		t.Errorf("Verified = %v, want true", got.Verified)
+	}
+	if got.VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil", got.VerificationError())
+	}
+	if got.ExtraData["account_sid"] != validSid {
+		t.Errorf("ExtraData[account_sid] = %q, want %q", got.ExtraData["account_sid"], validSid)
+	}
+	if got.ExtraData["friendly_name"] != "Production Account" {
+		t.Errorf("ExtraData[friendly_name] = %q, want 'Production Account'", got.ExtraData["friendly_name"])
+	}
+	if got.ExtraData["status"] != "active" {
+		t.Errorf("ExtraData[status] = %q, want 'active'", got.ExtraData["status"])
+	}
+	if got.ExtraData["type"] != "Full" {
+		t.Errorf("ExtraData[type] = %q, want 'Full'", got.ExtraData["type"])
+	}
+}
+
+func TestTwilio_Verification_HappyPath_SuspendedAccount(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio sid %s key %s", validSid, validKey))
+	mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Old Sandbox","status":"suspended","type":"Full"}`, validSid)
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	got := results[0]
+	if !got.Verified {
+		t.Errorf("Verified = %v, want true", got.Verified)
+	}
+	if got.ExtraData["status"] != "suspended" {
+		t.Errorf("ExtraData[status] = %q, want 'suspended'", got.ExtraData["status"])
+	}
+}
+
+func TestTwilio_EndpointCustomization(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio sid %s key %s", validSid, validKey))
+
+	t.Run("default cloud endpoint", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(fmt.Sprintf(`{"sid":"%s","status":"active"}`, validSid))),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s.json", validSid)
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
+
+	t.Run("configured custom endpoint", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(fmt.Sprintf(`{"sid":"%s","status":"active"}`, validSid))),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://custom-proxy.internal.net"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := fmt.Sprintf("https://custom-proxy.internal.net/2010-04-01/Accounts/%s.json", validSid)
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
+
+	t.Run("trailing slash normalization", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(fmt.Sprintf(`{"sid":"%s","status":"active"}`, validSid))),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://custom-proxy.internal.net/"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := fmt.Sprintf("https://custom-proxy.internal.net/2010-04-01/Accounts/%s.json", validSid)
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
+
+	t.Run("multi-endpoint first fails then succeeds clears error", func(t *testing.T) {
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					if strings.Contains(req.URL.Host, "fail-proxy") {
+						return &http.Response{
+							StatusCode: http.StatusInternalServerError,
+							Body:       io.NopCloser(strings.NewReader("server error")),
+						}, nil
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(fmt.Sprintf(`{"sid":"%s","status":"active"}`, validSid))),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://fail-proxy.internal.net", "https://success-proxy.internal.net"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+		if results[0].VerificationError() != nil {
+			t.Errorf("VerificationError() = %v, want nil on successful subsequent endpoint", results[0].VerificationError())
+		}
+	})
 }
