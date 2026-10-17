@@ -327,6 +327,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcpapplicationdefaultcredentials"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcshmac"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gengo"
@@ -1243,6 +1244,7 @@ func buildDetectorList() []detectors.Detector {
 		&fxmarket.Scanner{},
 		&gcp.Scanner{},
 		&gcpapplicationdefaultcredentials.Scanner{},
+		&gcshmac.Scanner{},
 		&geckoboard.Scanner{},
 		&gemini.Scanner{},
 		// &generic.Scanner{},
