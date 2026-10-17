@@ -2,11 +2,49 @@ package xai
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
+
+func TestVerifyMatch_KeyState(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		wantVerified bool
+	}{
+		{
+			name:         "active key",
+			body:         `{"api_key_blocked":false,"api_key_disabled":false}`,
+			wantVerified: true,
+		},
+		{
+			name:         "blocked key",
+			body:         `{"api_key_blocked":true,"api_key_disabled":false}`,
+			wantVerified: false,
+		},
+		{
+			name:         "disabled key",
+			body:         `{"api_key_blocked":false,"api_key_disabled":true}`,
+			wantVerified: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verified, _, err := verifyMatch(context.Background(), common.ConstantResponseHttpClient(200, tt.body), "xai-test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if verified != tt.wantVerified {
+				t.Errorf("verified = %v, want %v", verified, tt.wantVerified)
+			}
+		})
+	}
+}
 
 func TestXai_Pattern(t *testing.T) {
 	d := Scanner{}
