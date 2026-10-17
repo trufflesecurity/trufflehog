@@ -613,6 +613,32 @@ func createClonePath(gitURL, clonePath string) (string, error) {
 	return path, nil
 }
 
+// additionalRefsNamespace holds the refs a plain clone leaves behind: tags,
+// notes, and the pull or merge request refs that carry code never merged to a
+// branch. A non-mirror clone asks for them with
+// remote.origin.fetch=+refs/*:refs/trufflehog/*.
+//
+// The destination has to sit outside refs/remotes/origin/ and has to keep each
+// source ref's own path. git clone writes its own
+// +refs/heads/*:refs/remotes/origin/* refspec next to the one given with -c, so
+// any destination under refs/remotes/origin/ can be claimed by a branch as
+// well: a repository holding both refs/heads/<name> and refs/<name> drove two
+// source refs onto refs/remotes/origin/<name> and git refused the entire clone
+// with "multiple updates for ref". Keeping the source path also keeps the
+// source repository's own guarantee that no ref is a directory prefix of
+// another, which flattening refs/heads/<name> onto <name> broke: a branch named
+// foo beside refs/foo/bar used to need both refs/remotes/origin/foo and
+// refs/remotes/origin/foo/bar.
+//
+// Scans walk every ref under refs/, so refs here are scanned like any other.
+//
+// A short name can still be ambiguous, as it is in git itself. A source branch
+// or tag named trufflehog/<path of a ref copied here>, say
+// trufflehog/heads/main, shares a short name with that copy, and git's own
+// expansion order decides which one the short name reaches. Name the full ref
+// to be exact.
+const additionalRefsNamespace = "refs/trufflehog/"
+
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
 // clonePath. It then opens the cloned repository, returning a git.Repository object.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
@@ -651,7 +677,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		if !feature.SkipAdditionalRefs.Load() {
 			gitArgs = append(gitArgs,
 				"-c",
-				"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+				"remote.origin.fetch=+refs/*:"+additionalRefsNamespace+"*")
 		}
 	}
 
@@ -1468,13 +1494,29 @@ func stripPassword(u string) (string, string, error) {
 
 // TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
 func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, error) {
-	revisionPrefixes := []string{
-		"",
-		"refs/heads/",
-		"refs/remotes/origin/",
+	candidates := []string{base}
+	// The additional refs used to land under refs/remotes/origin/, so a scan
+	// can still be configured with a name that points there. Try the same ref
+	// in its current place, ahead of the names below so they cannot answer
+	// first. git's own expansion of the plain name above still runs ahead of
+	// it, so another ref answering to that exact name still wins, as it does
+	// without this.
+	for _, legacy := range []string{"refs/remotes/origin/", "remotes/origin/", "origin/"} {
+		if rest := strings.TrimPrefix(base, legacy); rest != base {
+			candidates = append(candidates, additionalRefsNamespace+rest)
+			break
+		}
 	}
-	for _, prefix := range revisionPrefixes {
-		outHash, err := repo.ResolveRevision(plumbing.Revision(prefix + base))
+	candidates = append(candidates,
+		"refs/heads/"+base,
+		"refs/remotes/origin/"+base,
+		// Last, so anything that already resolved keeps resolving to the same
+		// commit: the additional refs a non-mirror clone fetched, under their
+		// own path.
+		additionalRefsNamespace+base)
+
+	for _, candidate := range candidates {
+		outHash, err := repo.ResolveRevision(plumbing.Revision(candidate))
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
 			continue
 		}
