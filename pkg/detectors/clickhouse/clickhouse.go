@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	seen := make(map[string]struct{})
 
 	for _, m := range append(keyPat.FindAllStringSubmatch(dataStr, -1), cloudPat.FindAllStringSubmatch(dataStr, -1)...) {
-		hostPort := m[3]
+		hostPort := trimHostDots(m[3])
 		isCloud := strings.HasPrefix(m[0], "https://")
 
 		// Only ClickHouse Cloud hostnames are a ClickHouse finding in the HTTPS
@@ -152,6 +152,24 @@ func unescape(s string) string {
 		return s
 	}
 	return decoded
+}
+
+// trimHostDots drops trailing dots from a host.
+//
+// A URL written in prose usually ends on the sentence's full stop, and the host
+// pattern has no way to tell that dot from part of the name. Left on, it defeats
+// the Cloud domain check below and travels into the endpoint we verify against.
+// Trimming is also right for a genuinely absolute name, which resolves the same
+// either way.
+func trimHostDots(hostPort string) string {
+	host, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return strings.TrimRight(hostPort, ".")
+	}
+	if trimmed := strings.TrimRight(host, "."); trimmed != "" {
+		return net.JoinHostPort(trimmed, port)
+	}
+	return hostPort
 }
 
 // isCloudHost reports whether a host belongs to ClickHouse Cloud, matching on the
