@@ -60,6 +60,18 @@ func TestClickHouse_Pattern(t *testing.T) {
 			want:  []string{"ch.example.com:9000" + "team/analytics" + "s3cr3tpassword"},
 		},
 		{
+			// A URL written in prose ends on the sentence's full stop, which the
+			// host pattern cannot tell from part of the name.
+			name:  "valid pattern - cloud url ending a sentence",
+			input: "See https://analytics:s3cr3tpassword@abc123.us-central1.gcp.clickhouse.cloud.",
+			want:  []string{"abc123.us-central1.gcp.clickhouse.cloud" + "analytics" + "s3cr3tpassword"},
+		},
+		{
+			name:  "valid pattern - trailing dot trimmed from native host",
+			input: "dsn = clickhouse://analytics:s3cr3tpassword@ch.example.com.",
+			want:  []string{"ch.example.com" + "analytics" + "s3cr3tpassword"},
+		},
+		{
 			name:  "valid pattern - ignore duplicate",
 			input: "a = 'clickhouse://analytics:s3cr3tpassword@ch.example.com:9000' b = 'clickhouse://analytics:s3cr3tpassword@ch.example.com:9000'",
 			want:  []string{"ch.example.com:9000" + "analytics" + "s3cr3tpassword"},
@@ -220,6 +232,29 @@ func TestClickHouse_Verify(t *testing.T) {
 			}
 			if gotQuery != "SELECT 1" {
 				t.Errorf("query = %q, want %q", gotQuery, "SELECT 1")
+			}
+		})
+	}
+}
+
+func TestClickHouse_TrimHostDots(t *testing.T) {
+	tests := []struct {
+		name     string
+		hostPort string
+		want     string
+	}{
+		{"no dot is untouched", "ch.example.com", "ch.example.com"},
+		{"trailing dot removed", "ch.example.com.", "ch.example.com"},
+		{"trailing dots removed", "ch.example.com...", "ch.example.com"},
+		{"trailing dot removed with port", "ch.example.com.:9000", "ch.example.com:9000"},
+		{"port without dot is untouched", "ch.example.com:9000", "ch.example.com:9000"},
+		{"a host of only dots is left alone", "...", ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := trimHostDots(test.hostPort); got != test.want {
+				t.Errorf("trimHostDots(%q) = %q, want %q", test.hostPort, got, test.want)
 			}
 		})
 	}
