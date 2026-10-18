@@ -199,8 +199,12 @@ const (
 	organization                 // the account is an organization (https://docs.github.com/en/rest/orgs/orgs).
 )
 
-// getReposByOrgOrUser retrieves repositories for an organization or user.
-func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, authenticated bool, reporter sources.UnitReporter) (userType, error) {
+// getReposByOrgOrUser retrieves repositories for the named organization or user.
+// When name is a user, repos are listed for that login (public repos via the
+// authenticated token), not for the token owner — passing authenticated=true to
+// getReposByUser would ignore name and enumerate the caller's own repos instead.
+// See https://github.com/trufflesecurity/trufflehog/issues/4517.
+func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter sources.UnitReporter) (userType, error) {
 	var err error
 
 	// try to get repositories for the organization first.
@@ -215,8 +219,8 @@ func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, authentic
 		return unknown, err
 	}
 
-	// if organization repos aren't found, try user repos.
-	err = s.getReposByUser(ctx, name, authenticated, reporter)
+	// if organization repos aren't found, try the named user's public repos.
+	err = s.getReposByUser(ctx, name, false, reporter)
 	if err == nil {
 		if err := s.addUserGistsToCache(ctx, name, reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to add user to cache")
