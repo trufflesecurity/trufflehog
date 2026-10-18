@@ -1323,7 +1323,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if scanOptions == nil {
 		scanOptions = NewScanOptions()
 	}
-	if err := normalizeConfig(scanOptions, repo); err != nil {
+	if err := normalizeConfig(ctx, scanOptions, repo, repoPath); err != nil {
 		return err
 	}
 	start := time.Now().Unix()
@@ -1377,7 +1377,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 // other non-hash references. This ensures that both the base and head commits are resolved to actual commit hashes.
 // If either commit cannot be resolved, it returns early.
 // If both are resolved, it finds and sets the merge base in scanOptions.
-func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
+func normalizeConfig(ctx context.Context, scanOptions *ScanOptions, repo *git.Repository, repoPath string) error {
 	baseCommit, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
 	if err != nil {
 		return err
@@ -1392,16 +1392,50 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 		return nil
 	}
 
-	// If baseCommit is an ancestor of headCommit, update c.BaseRef to be the common ancestor.
-	mergeBase, err := headCommit.MergeBase(baseCommit)
+	// Use the same Git history and object database as the parser, including shallow grafts.
+	// Keep this environment in sync with gitparse.prepGitArgs.
+	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
+		return fmt.Errorf("unable to resolve repository path: %w", err)
+	}
+	gitDir := filepath.Join(absPath, gitDirName)
+	isBare := isRepoBare(repoPath)
+	if isBare {
+		gitDir = absPath
+	}
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "merge-base", headCommit.Hash.String(), baseCommit.Hash.String())
+	// Replace the process environment so GIT_DIR or GIT_TRACE cannot redirect or pollute this lookup.
+	cmd.Env = []string{"GIT_DIR=" + gitDir}
+	if isBare {
+		for _, key := range []string{"GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"} {
+			if value := os.Getenv(key); value != "" {
+				cmd.Env = append(cmd.Env, key+"="+value)
+			}
+		}
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitCode() == 1 && len(exitErr.Stderr) == 0 {
+				message := "unable to resolve merge base: no merge base found"
+				shallowCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "rev-parse", "--is-shallow-repository")
+				shallowCmd.Env = cmd.Env
+				if shallow, shallowErr := shallowCmd.Output(); shallowErr == nil && strings.TrimSpace(string(shallow)) == "true" {
+					message += " (repository is shallow; fetch more history)"
+				}
+				return errors.New(message)
+			}
+			return fmt.Errorf("unable to resolve merge base: %w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
 		return fmt.Errorf("unable to resolve merge base: %w", err)
 	}
-	if len(mergeBase) == 0 {
-		return fmt.Errorf("unable to resolve merge base: no merge base found")
+	mergeBase := strings.TrimSpace(string(out))
+	if mergeBase == "" {
+		return errors.New("unable to resolve merge base: no merge base found")
 	}
 
-	scanOptions.BaseHash = mergeBase[0].Hash.String()
+	scanOptions.BaseHash = mergeBase
 
 	return nil
 }
