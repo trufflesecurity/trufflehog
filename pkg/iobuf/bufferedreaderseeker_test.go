@@ -153,6 +153,94 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 	}
 }
 
+func TestBufferedReaderSeekerReplaysAcrossDiskAndMemory(t *testing.T) {
+	data := []byte("0123456789abcdefghijklmnopqrstuv")
+	br := NewBufferedReaderSeeker(bytes.NewBuffer(data))
+	br.threshold = 8
+	t.Cleanup(func() { assert.NoError(t, br.Close()) })
+
+	first := make([]byte, 8)
+	if _, err := io.ReadFull(br, first); err != nil {
+		t.Fatal(err)
+	}
+	second := make([]byte, 4)
+	if _, err := io.ReadFull(br, second); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := br.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	replayed := make([]byte, 12)
+	if _, err := io.ReadFull(br, replayed); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, data[:12], replayed)
+}
+
+func TestBufferedReaderSeekerForwardSeekAfterRewind(t *testing.T) {
+	data := []byte("0123456789abcdefghijklmnopqrstuvwxyz")
+	br := NewBufferedReaderSeeker(bytes.NewBuffer(data))
+	br.threshold = 8
+	t.Cleanup(func() { assert.NoError(t, br.Close()) })
+
+	first := make([]byte, 12)
+	if _, err := io.ReadFull(br, first); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := br.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := br.Seek(24, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(24), br.bytesRead)
+
+	if _, err := br.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	replayed := make([]byte, len(data))
+	if _, err := io.ReadFull(br, replayed); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, data, replayed)
+}
+
+func TestBufferedReaderSeekerReplaysAfterSeekPastEnd(t *testing.T) {
+	data := []byte("0123456789abcdefghijklmnopqrstuv")
+	br := NewBufferedReaderSeeker(bytes.NewBuffer(data))
+	br.threshold = 8
+	t.Cleanup(func() { assert.NoError(t, br.Close()) })
+
+	first := make([]byte, 12)
+	if _, err := io.ReadFull(br, first); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := br.Seek(100, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := br.Seek(200, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(len(data)), br.totalSize)
+	assert.True(t, br.sizeKnown)
+	assert.Equal(t, int64(len(data)), br.bytesRead)
+	size, err := br.Size()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(len(data)), size)
+
+	if _, err := br.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	replayed := make([]byte, len(data))
+	if _, err := io.ReadFull(br, replayed); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, data, replayed)
+}
+
 func TestBufferedReaderSeekerSeek(t *testing.T) {
 	tests := []struct {
 		name         string
