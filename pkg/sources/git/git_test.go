@@ -379,6 +379,41 @@ func TestCloneRepo_ConcurrentSameBasename(t *testing.T) {
 	assert.Len(t, dests, len(sources), "each repo should clone into its own directory, got %v", dests)
 }
 
+func TestCloneRepo_IgnoresHookIndexFile(t *testing.T) {
+	ctx := context.Background()
+
+	repoPath := setupTestRepo(t, "repo")
+	addTestFileAndCommit(t, repoPath, "secret.txt", "content")
+
+	// What git commit -a hands its pre-commit hook.
+	indexFile := filepath.Join(t.TempDir(), "index.lock")
+	assert.NoError(t, os.WriteFile(indexFile, []byte("commit in progress"), 0644))
+	t.Setenv("GIT_INDEX_FILE", indexFile)
+
+	path, _, err := CloneRepo(ctx, nil, "file://"+repoPath, t.TempDir(), false)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	got, err := os.ReadFile(indexFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "commit in progress", string(got), "clone overwrote the hook's index file")
+	assert.FileExists(t, filepath.Join(path, ".git", "index"))
+}
+
+func TestCloneEnv(t *testing.T) {
+	t.Setenv("GIT_INDEX_FILE", "/x/index.lock")
+	t.Setenv("GIT_DIR", "/x/.git")
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_PARAMETERS", "'http.extraheader'='x'")
+
+	env := cloneEnv()
+	assert.NotContains(t, env, "GIT_INDEX_FILE=/x/index.lock")
+	assert.NotContains(t, env, "GIT_DIR=/x/.git")
+	assert.Contains(t, env, "GIT_CONFIG_COUNT=1")
+	assert.Contains(t, env, "GIT_CONFIG_PARAMETERS='http.extraheader'='x'")
+}
+
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
