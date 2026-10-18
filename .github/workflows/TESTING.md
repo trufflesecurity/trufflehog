@@ -10,7 +10,7 @@ Fortunately [nektos/act](https://github.com/nektos/act) enables local testing of
 
 ### Instructions
 
-1. Please follow [the installation instructions](http://https://github.com/nektos/act#installation) for your OS.
+1. Please follow [the installation instructions](https://nektosact.com/installation/index.html) for your OS.
 2. The first run of `act` will ask you to specify an image. `Medium` should suffice.
 3. You'll need to configure a personal-access-token(PAT) with: `repo:status`, `repo_deployment`, and `public_repo` permissions.
 4. Set an environment variable named `GITHUB_TOKEN` with the PAT from the previous step as the value: `$ export GITHUB_TOKEN=<your_PAT>`
