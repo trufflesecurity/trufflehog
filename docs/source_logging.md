@@ -43,6 +43,12 @@ through the context: `context.WithLogLevel(ctx, log.DebugLevel)` returns a conte
 to `V(5)`. Any code that logs through `ctx.Logger()` gets this for free, which is one more reason not to store
 loggers.
 
+Users turn it on with `debug: true` on a source in the config file, see the
+[configuration docs](../README.md#configuration). The engine then passes a debug context to both `Init` and the scan.
+
+The rules about stored loggers and new contexts are checked by semgrep (`hack/semgrep-rules/sources.yaml`). For now
+the findings are warnings. If a source really needs a new context, add a `// nosemgrep` comment that says why.
+
 ## Testing
 
 Use `logtest.DebugContext()` to run a source with debug turned on and look at what it logged:

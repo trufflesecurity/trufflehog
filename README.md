@@ -618,6 +618,24 @@ sources:
 You may define multiple connections under the `sources` key (see above), and
 TruffleHog will scan all of the sources concurrently.
 
+To see debug logs for just one source, add `debug: true` to it. That source
+writes all of its debug logs, and every other source keeps the normal log level.
+This is useful when one source out of many is misbehaving:
+
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.GitHub
+    repositories:
+    - https://github.com/trufflesecurity/test_keys.git
+    unauthenticated: {}
+  name: example config scan
+  type: SOURCE_TYPE_GITHUB
+  debug: true
+```
+
+To turn on debug logs for every source, use `--log-level=5` instead.
+
 ## S3
 
 The S3 source supports assuming IAM roles for scanning in addition to IAM users. This makes it easier for users to scan multiple AWS accounts without needing to rely on hardcoded credentials for each account.

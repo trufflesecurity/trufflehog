@@ -123,6 +123,8 @@ func (m *LocalSource) validate(all bool) error {
 
 	// no validation rules for ScanPeriod
 
+	// no validation rules for Debug
+
 	if len(errors) > 0 {
 		return LocalSourceMultiError(errors)
 	}
