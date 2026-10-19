@@ -3,6 +3,7 @@ package github
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -54,10 +55,12 @@ func newFakeGitHub(t *testing.T) *fakeGitHub {
 
 var testRepo = repoInfo{owner: "o", name: "r", fullName: "o/r"}
 
-// collectingReporter records the link of every chunk the scan emits.
+// collectingReporter records the link of every chunk the scan emits, and every
+// chunk error it reports.
 type collectingReporter struct {
 	mu    sync.Mutex
 	links []string
+	errs  []error
 }
 
 func (r *collectingReporter) ChunkOk(_ context.Context, chunk sources.Chunk) error {
@@ -67,7 +70,12 @@ func (r *collectingReporter) ChunkOk(_ context.Context, chunk sources.Chunk) err
 	return nil
 }
 
-func (r *collectingReporter) ChunkErr(context.Context, error) error { return nil }
+func (r *collectingReporter) ChunkErr(_ context.Context, err error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.errs = append(r.errs, err)
+	return nil
+}
 
 func issueRecord(number int, updated time.Time) fakeRecord {
 	return fakeRecord{updated: updated, body: map[string]any{
@@ -309,6 +317,53 @@ func TestCommentScan_FailedPhaseDoesNotStopTheOthers(t *testing.T) {
 		prLink(2),
 		"https://github.com/o/r/pull/2#discussion_r200",
 	}, reporter.links)
+}
+
+// deniedWith returns a fail func that refuses every request the way GitHub
+// refuses a GitHub App that lacks a permission, naming accepted as what the
+// endpoint requires.
+func deniedWith(accepted string) func(int, http.ResponseWriter, *http.Request) bool {
+	return func(_ int, w http.ResponseWriter, _ *http.Request) bool {
+		w.Header().Set(acceptedPermissionsHeader, accepted)
+		writeJSON(w, http.StatusForbidden, map[string]string{"message": appDeniedMessage})
+		return true
+	}
+}
+
+func TestCommentScan_EachFailedPhaseIsReportedAsItsOwnChunkError(t *testing.T) {
+	gh := newFakeGitHub(t)
+	seedRepo(gh)
+	gh.issues.fail = deniedWith("issues=read")
+	gh.issueComments.fail = deniedWith("issues=read; pull_requests=read")
+	gh.prComments.fail = deniedWith("pull_requests=read")
+	s := &Source{includeIssueComments: true, includePRComments: true}
+
+	reporter, err := scanComments(t, s, gh, nil)
+	require.Error(t, err)
+	require.NoError(t, reportCommentErrors(context.Background(), reporter, err))
+
+	require.Len(t, reporter.errs, 3)
+	wantPrefixes := []string{
+		"error scanning comments: issues and pull requests: walk incomplete after 0 items: missing GitHub App permission: the request needs Issues (read);",
+		"error scanning comments: issue comments: walk incomplete after 0 items: missing GitHub App permission: the request needs Issues (read) or Pull requests (read);",
+		"error scanning comments: pull request comments: walk incomplete after 0 items: missing GitHub App permission: the request needs Pull requests (read);",
+	}
+	for i, reported := range reporter.errs {
+		assert.True(t, strings.HasPrefix(reported.Error(), wantPrefixes[i]), "got %q", reported.Error())
+		assert.NotContains(t, reported.Error(), "\n", "each chunk error covers one phase")
+		var permErr *permissionError
+		assert.ErrorAs(t, reported, &permErr)
+	}
+	assert.Empty(t, reporter.links)
+}
+
+func TestReportCommentErrors_UnjoinedErrorIsReportedOnce(t *testing.T) {
+	reporter := &collectingReporter{}
+
+	require.NoError(t, reportCommentErrors(context.Background(), reporter, errors.New("could not get API client")))
+
+	require.Len(t, reporter.errs, 1)
+	assert.EqualError(t, reporter.errs[0], "error scanning comments: could not get API client")
 }
 
 func TestCommentScan_RetryLogNamesTheListing(t *testing.T) {
