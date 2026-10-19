@@ -397,6 +397,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagekit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagga"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/impala"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/infisical"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/infura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/insightly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instabot"
@@ -1315,6 +1316,7 @@ func buildDetectorList() []detectors.Detector {
 		&imagekit.Scanner{},
 		&imagga.Scanner{},
 		&impala.Scanner{},
+		&infisical.Scanner{},
 		&infura.Scanner{},
 		&insightly.Scanner{},
 		&instabot.Scanner{},
@@ -1914,6 +1916,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.KongKonnectDetectorEnabled.Load()
 		case *sonarqube.Scanner:
 			return !feature.SonarQubeDetectorEnabled.Load()
+		case *infisical.Scanner:
+			return !feature.InfisicalDetectorEnabled.Load()
 		default:
 			return false
 		}

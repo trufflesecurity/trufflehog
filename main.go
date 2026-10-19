@@ -605,6 +605,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.HumioAPITokenDetectorEnabled.Store(true)
 	feature.KongKonnectDetectorEnabled.Store(true)
 	feature.SonarQubeDetectorEnabled.Store(true)
+	feature.InfisicalDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
