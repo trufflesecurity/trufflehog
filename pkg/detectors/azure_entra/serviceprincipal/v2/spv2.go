@@ -58,34 +58,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	if len(clientSecrets) == 0 {
 		return results, nil
 	}
-	clientIds := azure_entra.FindClientIdMatches(dataStr)
-	tenantIds := azure_entra.FindTenantIdMatches(dataStr)
+	clientIds := azure_entra.FindClientIdOffsets(dataStr)
+	tenantIds := azure_entra.FindTenantIdOffsets(dataStr)
 
 	client := s.client
 	if client == nil {
 		client = defaultClient
 	}
 
-	results = append(results, ProcessData(ctx, clientSecrets, clientIds, tenantIds, verify, client)...)
+	results = append(results, ProcessData(ctx, dataStr, clientSecrets, clientIds, tenantIds, verify, client)...)
 	return results, nil
 }
 
-func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[string]struct{}, verify bool, client *http.Client) (results []detectors.Result) {
+// ProcessData verifies each secret against the client and tenant IDs found in |data|.
+// |clientIds| and |tenantIds| map each candidate to the offsets it was found at, so the
+// candidates closest to a secret are tried (and reported) first.
+func ProcessData(ctx context.Context, data string, clientSecrets map[string]struct{}, clientIds, tenantIds map[string][]int, verify bool, client *http.Client) (results []detectors.Result) {
 	logCtx := logContext.AddLogger(ctx)
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 
 	for clientSecret := range clientSecrets {
-		var (
-			r        *detectors.Result
-			clientId string
-			tenantId string
-		)
+		var r *detectors.Result
+
+		// Candidates nearest to the secret are the most likely to belong to it.
+		secretPos := strings.Index(data, clientSecret)
+		clientOrder := azure_entra.NearestFirst(clientIds, secretPos)
+		tenantOrder := azure_entra.NearestFirst(tenantIds, secretPos)
 
 	ClientLoop:
-		for cId := range clientIds {
-			clientId = cId
-			for tId := range tenantIds {
-				tenantId = tId
+		for _, clientId := range clientOrder {
+			// Skip candidates removed earlier (e.g., a tenant that was also read as a client).
+			if _, ok := clientIds[clientId]; !ok {
+				continue
+			}
+			for _, tenantId := range tenantOrder {
+				if _, ok := tenantIds[tenantId]; !ok {
+					continue
+				}
 
 				// Skip known invalid tenants.
 				invalidClients := invalidClientsForTenant[tenantId]
@@ -138,12 +147,14 @@ func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[st
 		}
 
 		if r == nil {
-			// Only include the clientId and tenantId if we're confident which one it is.
-			if len(clientIds) != 1 {
-				clientId = ""
+			// Nothing verified. Report the nearest remaining client and tenant so the
+			// result stays the same whether the secret is live or rotated.
+			var clientId, tenantId string
+			if remaining := azure_entra.NearestFirst(clientIds, secretPos); len(remaining) > 0 {
+				clientId = remaining[0]
 			}
-			if len(tenantIds) != 1 {
-				tenantId = ""
+			if remaining := azure_entra.NearestFirst(tenantIds, secretPos); len(remaining) > 0 {
+				tenantId = remaining[0]
 			}
 			r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
 		}

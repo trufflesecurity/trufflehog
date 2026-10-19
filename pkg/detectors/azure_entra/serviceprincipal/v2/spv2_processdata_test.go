@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,10 +103,10 @@ func TestProcessData_VerificationErrors(t *testing.T) {
 			client := newMockAzureClient(tenantID, tc.tokenStatus, tc.tokenResponse)
 
 			secrets := map[string]struct{}{clientSecret: {}}
-			clientIDs := map[string]struct{}{clientID: {}}
-			tenantIDs := map[string]struct{}{tenantID: {}}
+			clientIDs := map[string][]int{clientID: {0}}
+			tenantIDs := map[string][]int{tenantID: {0}}
 
-			results := ProcessData(context.Background(), secrets, clientIDs, tenantIDs, true, client)
+			results := ProcessData(context.Background(), clientSecret, secrets, clientIDs, tenantIDs, true, client)
 
 			require.Len(t, results, tc.wantResultCount)
 			if tc.wantResultCount > 0 {
@@ -132,10 +133,10 @@ func TestProcessData_ExpiredSecretShouldEmitResult(t *testing.T) {
 	})
 
 	secrets := map[string]struct{}{clientSecret: {}}
-	clientIDs := map[string]struct{}{clientID: {}}
-	tenantIDs := map[string]struct{}{tenantID: {}}
+	clientIDs := map[string][]int{clientID: {0}}
+	tenantIDs := map[string][]int{tenantID: {0}}
 
-	results := ProcessData(context.Background(), secrets, clientIDs, tenantIDs, true, client)
+	results := ProcessData(context.Background(), clientSecret, secrets, clientIDs, tenantIDs, true, client)
 
 	require.Len(t, results, 1, "expired secret must still produce a result")
 	r := results[0]
@@ -144,4 +145,44 @@ func TestProcessData_ExpiredSecretShouldEmitResult(t *testing.T) {
 	assert.Equal(t, []byte(clientSecret), r.Raw)
 	assert.NotNil(t, r.RawV2, "RawV2 should be set when clientId and tenantId are known")
 	assert.Nil(t, r.VerificationError(), "expired secret is definitively invalid, not indeterminate")
+}
+
+// Two secrets, each with its own client and tenant. Rotated (verify off) and live
+// secrets must report the same nearest pair, so the result keeps one identity.
+func TestProcessData_NearestClientAndTenantWins(t *testing.T) {
+	const (
+		secretA = "abc4Q~fake-secret-that-is-long-enough1234567"
+		secretB = "xyz4Q~another-fake-secret-long-enough7654321"
+		clientA = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+		tenantA = "f9e8d7c6-1111-2222-3333-ccc000000099"
+		clientB = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+		tenantB = "e8d7c6b5-4444-5555-6666-ddd000000088"
+	)
+	data := "client_id=" + clientA + "\ntenant_id=" + tenantA + "\nsecret=" + secretA + "\n" +
+		strings.Repeat("filler\n", 50) +
+		"client_id=" + clientB + "\ntenant_id=" + tenantB + "\nsecret=" + secretB + "\n"
+
+	clientIDs := map[string][]int{
+		clientA: {strings.Index(data, clientA)},
+		clientB: {strings.Index(data, clientB)},
+	}
+	tenantIDs := map[string][]int{
+		tenantA: {strings.Index(data, tenantA)},
+		tenantB: {strings.Index(data, tenantB)},
+	}
+	secrets := map[string]struct{}{secretA: {}, secretB: {}}
+
+	results := ProcessData(context.Background(), data, secrets, clientIDs, tenantIDs, false, nil)
+
+	require.Len(t, results, 2)
+	for _, r := range results {
+		var want string
+		switch string(r.Raw) {
+		case secretA:
+			want = fmt.Sprintf(`{"clientSecret":"%s","clientId":"%s","tenantId":"%s"}`, secretA, clientA, tenantA)
+		case secretB:
+			want = fmt.Sprintf(`{"clientSecret":"%s","clientId":"%s","tenantId":"%s"}`, secretB, clientB, tenantB)
+		}
+		assert.Equal(t, want, string(r.RawV2))
+	}
 }

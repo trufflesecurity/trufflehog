@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -38,45 +39,93 @@ var (
 
 // FindTenantIdMatches returns a list of potential tenant IDs in the provided |data|.
 func FindTenantIdMatches(data string) map[string]struct{} {
-	uniqueMatches := make(map[string]struct{})
+	return offsetsToSet(FindTenantIdOffsets(data))
+}
 
-	for _, match := range tenantIdPat.FindAllStringSubmatch(data, -1) {
-		var m string
-		if match[1] != "" {
-			m = strings.ToLower(match[1])
-		} else if match[2] != "" {
-			m = strings.ToLower(match[2])
-		} else if match[3] != "" {
-			m = strings.ToLower(match[3])
-		} else if match[4] != "" {
-			m = strings.ToLower(match[4])
+// FindTenantIdOffsets returns potential tenant IDs in |data|, mapped to the byte offsets where each was found.
+func FindTenantIdOffsets(data string) map[string][]int {
+	matches := make(map[string][]int)
+
+	for _, idx := range tenantIdPat.FindAllStringSubmatchIndex(data, -1) {
+		// The pattern has four alternative capture groups; use the one that matched.
+		for group := 1; group <= 4; group++ {
+			start, end := idx[2*group], idx[2*group+1]
+			if start < 0 {
+				continue
+			}
+			m := strings.ToLower(data[start:end])
+			if isLikelyId(m) {
+				matches[m] = append(matches[m], start)
+			}
+			break
 		}
-		if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(m)]; ok {
-			continue
-		} else if detectors.StringShannonEntropy(m) < 3 {
-			continue
-		}
-		uniqueMatches[m] = struct{}{}
 	}
-	for _, match := range tenantOnMicrosoftPat.FindAllStringSubmatch(data, -1) {
-		uniqueMatches[match[1]] = struct{}{}
+	for _, idx := range tenantOnMicrosoftPat.FindAllStringSubmatchIndex(data, -1) {
+		m := data[idx[2]:idx[3]]
+		matches[m] = append(matches[m], idx[2])
 	}
-	return uniqueMatches
+	return matches
 }
 
 // FindClientIdMatches returns a list of potential client UUIDs in the provided |data|.
 func FindClientIdMatches(data string) map[string]struct{} {
-	uniqueMatches := make(map[string]struct{})
-	for _, match := range clientIdPat.FindAllStringSubmatch(data, -1) {
-		m := strings.ToLower(match[1])
-		if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(m)]; ok {
-			continue
-		} else if detectors.StringShannonEntropy(m) < 3 {
-			continue
+	return offsetsToSet(FindClientIdOffsets(data))
+}
+
+// FindClientIdOffsets returns potential client UUIDs in |data|, mapped to the byte offsets where each was found.
+func FindClientIdOffsets(data string) map[string][]int {
+	matches := make(map[string][]int)
+	for _, idx := range clientIdPat.FindAllStringSubmatchIndex(data, -1) {
+		m := strings.ToLower(data[idx[2]:idx[3]])
+		if isLikelyId(m) {
+			matches[m] = append(matches[m], idx[2])
 		}
-		uniqueMatches[m] = struct{}{}
 	}
-	return uniqueMatches
+	return matches
+}
+
+// NearestFirst returns the keys of |candidates| ordered by their distance to |pos|.
+// A candidate's distance is that of its closest occurrence. Ties are broken by value so the order is stable.
+func NearestFirst(candidates map[string][]int, pos int) []string {
+	distances := make(map[string]int, len(candidates))
+	ordered := make([]string, 0, len(candidates))
+	for value, offsets := range candidates {
+		closest := -1
+		for _, offset := range offsets {
+			d := offset - pos
+			if d < 0 {
+				d = -d
+			}
+			if closest < 0 || d < closest {
+				closest = d
+			}
+		}
+		distances[value] = closest
+		ordered = append(ordered, value)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		if distances[ordered[i]] != distances[ordered[j]] {
+			return distances[ordered[i]] < distances[ordered[j]]
+		}
+		return ordered[i] < ordered[j]
+	})
+	return ordered
+}
+
+// isLikelyId filters out well-known placeholder UUIDs and low-entropy values.
+func isLikelyId(m string) bool {
+	if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(m)]; ok {
+		return false
+	}
+	return detectors.StringShannonEntropy(m) >= 3
+}
+
+func offsetsToSet(offsets map[string][]int) map[string]struct{} {
+	set := make(map[string]struct{}, len(offsets))
+	for value := range offsets {
+		set[value] = struct{}{}
+	}
+	return set
 }
 
 var (
