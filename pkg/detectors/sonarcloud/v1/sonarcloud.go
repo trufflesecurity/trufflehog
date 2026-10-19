@@ -141,8 +141,8 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 // endsWithCommitPath reports whether the end of s matches a git commit URL
-// path of the form "...commit/<sha>" (optionally URL-encoded with %2F). This
-// filters SHA-1 commit hashes reported as SonarCloud false positives; see
+// path of the form "...commit/<sha>" with a literal slash. This filters
+// SHA-1 commit hashes reported as SonarCloud false positives; see
 // issue #5000.
 func endsWithCommitPath(s string) bool {
 	idx := lastIndexFoldASCII(s, "commit/")
