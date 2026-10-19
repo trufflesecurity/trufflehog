@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"pgregory.net/rapid"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
@@ -983,12 +984,13 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 
 	// Arrange: Create a Result
 	result := detectors.Result{
-		DetectorType: detector_typepb.DetectorType(-1),
-		ExtraData:    map[string]string{"key": "value"},
-		Raw:          []byte("something"),
-		RawV2:        []byte("something:else"),
-		Redacted:     "someth***",
-		Verified:     true,
+		DetectorType:        detector_typepb.DetectorType(-1),
+		ExtraData:           map[string]string{"key": "value"},
+		Raw:                 []byte("something"),
+		RawV2:               []byte("something:else"),
+		Redacted:            "someth***",
+		Verified:            true,
+		VerificationSkipped: true,
 	}
 
 	// Act
@@ -1005,6 +1007,7 @@ func TestProcessResult_AllFieldsCopied(t *testing.T) {
 	assert.Equal(t, []byte("something:else"), r.RawV2)
 	assert.Equal(t, "someth***", r.Redacted)
 	assert.True(t, r.Verified)
+	assert.True(t, r.VerificationSkipped)
 	assert.Equal(t, detector_typepb.DetectorType(-1), r.DetectorType)
 	assert.Equal(t, sources.SourceID(1), r.SourceID)
 	assert.Equal(t, sources.JobID(2), r.JobID)
@@ -1849,6 +1852,29 @@ func (p passthroughDetector) Keywords() []string                 { return p.keyw
 func (p passthroughDetector) Type() detector_typepb.DetectorType { return p.detectorType }
 func (p passthroughDetector) Description() string                { return "fake detector for testing" }
 
+// fixedVerdictDetector reports the same verdict whether or not verification was requested, so tests can confirm the
+// engine passes verdicts through untouched while recording whether verification was attempted.
+type fixedVerdictDetector struct {
+	verified        bool
+	verificationErr error
+}
+
+func (d fixedVerdictDetector) FromData(_ aCtx.Context, _ bool, data []byte) ([]detectors.Result, error) {
+	result := detectors.Result{
+		DetectorType: detector_typepb.DetectorType(-1),
+		Raw:          data,
+		Verified:     d.verified,
+	}
+	result.SetVerificationError(d.verificationErr)
+	return []detectors.Result{result}, nil
+}
+
+func (d fixedVerdictDetector) Keywords() []string { return []string{"keyword"} }
+func (d fixedVerdictDetector) Type() detector_typepb.DetectorType {
+	return detector_typepb.DetectorType(-1)
+}
+func (d fixedVerdictDetector) Description() string { return "fixed verdict detector for testing" }
+
 type passthroughDecoder struct{}
 
 func (p passthroughDecoder) FromChunk(chunk *sources.Chunk) *decoders.DecodableChunk {
@@ -1907,6 +1933,102 @@ func TestEngine_DetectChunk_UsesVerifyFlag(t *testing.T) {
 				t.Errorf("expected a result but did not get one")
 			}
 		})
+	}
+}
+
+// TestEngine_DetectChunk_MarksVerificationSkippedWithoutChangingVerdict validates that detectChunk marks results
+// produced with verification disabled as VerificationSkipped, leaves results produced with verification enabled
+// unmarked, and in every case preserves the verdict (Verified and the verification error) the detector assigned.
+func TestEngine_DetectChunk_MarksVerificationSkippedWithoutChangingVerdict(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name        string
+		verify      bool
+		detector    fixedVerdictDetector
+		wantSkipped bool
+	}{
+		{name: "verify=false, unverified", verify: false, detector: fixedVerdictDetector{}, wantSkipped: true},
+		{name: "verify=false, detector reports verified", verify: false, detector: fixedVerdictDetector{verified: true}, wantSkipped: true},
+		{name: "verify=false, detector reports error", verify: false, detector: fixedVerdictDetector{verificationErr: fmt.Errorf("boom")}, wantSkipped: true},
+		{name: "verify=true, unverified", verify: true, detector: fixedVerdictDetector{}, wantSkipped: false},
+		{name: "verify=true, verified", verify: true, detector: fixedVerdictDetector{verified: true}, wantSkipped: false},
+		{name: "verify=true, error", verify: true, detector: fixedVerdictDetector{verificationErr: fmt.Errorf("boom")}, wantSkipped: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange: Create a minimal engine with a passthrough verification cache.
+			e := &Engine{
+				results:           make(chan detectors.ResultWithMetadata, 1),
+				verificationCache: verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+			}
+
+			// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+			ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{tc.detector})
+			detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
+			require.Len(t, detectorMatches, 1)
+
+			// Act
+			e.detectChunk(ctx, detectableChunk{
+				detector: detectorMatches[0],
+				verify:   tc.verify,
+				wgDoneFn: func() {},
+			})
+			close(e.results)
+
+			// Assert: The skip marker reflects whether verification was attempted, and the verdict is unchanged.
+			result, ok := <-e.results
+			require.True(t, ok, "expected a result but did not get one")
+			assert.Equal(t, tc.wantSkipped, result.VerificationSkipped)
+			assert.Equal(t, tc.detector.verified, result.Verified)
+			if tc.detector.verificationErr == nil {
+				assert.NoError(t, result.VerificationError())
+			} else {
+				assert.EqualError(t, result.VerificationError(), tc.detector.verificationErr.Error())
+			}
+		})
+	}
+}
+
+// TestEngine_DetectChunk_CacheHitIsNotVerificationSkipped validates that a verdict served from the verification cache
+// is not marked VerificationSkipped: a cache hit replays an earlier real verification rather than skipping it, and
+// consumers distinguish the two cases with VerificationFromCache.
+func TestEngine_DetectChunk_CacheHitIsNotVerificationSkipped(t *testing.T) {
+	ctx := context.Background()
+
+	// Arrange: Create a minimal engine whose verification cache actually stores results.
+	e := &Engine{
+		results:           make(chan detectors.ResultWithMetadata, 2),
+		verificationCache: verificationcache.New(simple.NewCache[detectors.Result](), &verificationcache.InMemoryMetrics{}),
+	}
+
+	// Arrange: Create a detector match. We can't create one directly, so we have to use a minimal A-H core.
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{fixedVerdictDetector{verified: true}})
+	detectorMatches := ahcore.FindDetectorMatches([]byte("keyword"))
+	require.Len(t, detectorMatches, 1)
+	chunk := detectableChunk{
+		detector: detectorMatches[0],
+		verify:   true,
+		wgDoneFn: func() {},
+	}
+
+	// Act: The first pass verifies and populates the cache; the second is served from it.
+	e.detectChunk(ctx, chunk)
+	e.detectChunk(ctx, chunk)
+	close(e.results)
+
+	// Assert
+	first, ok := <-e.results
+	require.True(t, ok, "expected a first result")
+	second, ok := <-e.results
+	require.True(t, ok, "expected a second result")
+
+	assert.False(t, first.VerificationFromCache)
+	assert.True(t, second.VerificationFromCache)
+	for _, result := range []detectors.ResultWithMetadata{first, second} {
+		assert.False(t, result.VerificationSkipped)
+		assert.True(t, result.Verified)
 	}
 }
 
@@ -2022,10 +2144,16 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 		close(e.detectableChunksChan)
 		close(processedDetectableChunks)
 
-		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it).
+		// Assert: Confirm that every generated result is unverified (because overlap detection precluded it), keeps the
+		// overlap error as its verdict, and is marked as never having been verified.
+		var overlapResults int
 		for result := range e.results {
+			overlapResults++
 			assert.False(t, result.Verified)
+			assert.EqualError(t, result.VerificationError(), errOverlap.Error())
+			assert.True(t, result.VerificationSkipped)
 		}
+		assert.NotZero(t, overlapResults, "expected the overlap path to emit at least one result")
 
 		// Assert: Confirm that every generated detectable chunk's Chunk.SourceVerify flag is unchanged and that its
 		// verify flag is correctly set.
