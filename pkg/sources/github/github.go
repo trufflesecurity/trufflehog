@@ -780,12 +780,16 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 				ctx.Logger().Info("Skipping org member repos and gists: githubApp.installationId is required as a fallback installation to scan members together with scanAllInstallations", "org_members", len(s.memberCache))
 				return nil
 			}
-			// TODO: Replace loop below with a call to s.addReposForMembers(ctx, reporter)
+			// Members' gists aren't listed, unlike in addReposForMembers: none
+			// of GitHub's gist endpoints accept an installation access token,
+			// and no app permission changes that, so the listing fails with a
+			// 403 for every member. One line here stands in for those
+			// failures; there's nothing for the customer to grant.
+			if !s.ignoreGists {
+				ctx.Logger().Info("Skipping org member gists: GitHub doesn't allow listing gists with a GitHub App installation token", "org_members", len(s.memberCache))
+			}
 			for member := range s.memberCache {
 				logger := ctx.Logger().WithValues("member", member)
-				if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
-					logger.Error(err, "error fetching gists by user")
-				}
 				// TODO: Add authenticated user list repo for app token. It does support as per docs but need to test it before we enable it here.
 				// docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repositories-for-the-authenticated-user
 				if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
@@ -1830,10 +1834,28 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 			return s.processRepoIssueandPRsWithCommentsGraphql(ctx, graphqlClient, repoInfo, reporter, cutoffTime)
 		}
 
-		return s.processIssueandPRsWithCommentsREST(ctx, apiClient, repoInfo, reporter, cutoffTime)
+		return s.processIssueandPRsWithCommentsREST(ctx, apiClient, repoInfo, s.commentGrantsForRepo(ctx, repoPath), reporter, cutoffTime)
 	}
 
 	return nil
+}
+
+// commentGrantsForRepo returns what the GitHub App installation behind
+// repoURL grants, or nil (unknown) when the source doesn't authenticate as an
+// App. A failure to read the grants also gives nil: the listings then run
+// without the precheck, as they would for a token, and any 403 is still
+// classified from its response.
+func (s *Source) commentGrantsForRepo(ctx context.Context, repoURL string) *installationGrants {
+	app, ok := s.connector.(*appConnector)
+	if !ok {
+		return nil
+	}
+	grants, err := app.grantsForRepo(ctx, repoURL)
+	if err != nil {
+		ctx.Logger().V(2).Info("could not read installation permissions, scanning comments without the permission precheck", "error", err)
+		return nil
+	}
+	return grants
 }
 
 // trimURLAndSplit removes extraneous information from the |url| and splits it into segments.
@@ -2022,10 +2044,18 @@ const (
 // commentPhase is one listing in a repo's comment scan. run returns how many
 // chunks it emitted. startLog, when set, is logged at V(2) before the phase
 // runs.
+//
+// skipped and narrowed carry what the installation's grants cost the phase
+// (see installationGrants). skipped, when set, is why the listing can't
+// succeed; the phase reports it in place of running. narrowed holds one error
+// per kind of item GitHub will leave out of a listing that still runs, each
+// already prefixed with what's missing, and is reported after the run.
 type commentPhase struct {
 	name     string
 	startLog string
 	run      func() (int, error)
+	skipped  error
+	narrowed []error
 }
 
 // processIssueandPRsWithCommentsREST scans a repo's issues, pull requests, and
@@ -2037,13 +2067,20 @@ type commentPhase struct {
 // so each failed phase is its own ChunkErr (see reportCommentErrors). Chunks
 // emitted before a failure are kept.
 //
+// grants, when known, shapes the phases. A mismatch between the comment
+// settings and what the installation grants is a configuration error the
+// customer can fix, so it's always reported: every listing skipped because it
+// can't succeed, and every kind of item GitHub will silently leave out of a
+// listing that does run, gets exactly one permissionError. Items no setting
+// asked for don't count. Skipped listings make no request.
+//
 // The "Scanning issues" and "Scanning pull requests" V(2) lines are the only
 // log signal for scans on the unit path, whose comment errors go to the scan
 // details UI instead of the logs, so they keep their wording. The summary
 // line at the end records how far each phase got.
 func (s *Source) processIssueandPRsWithCommentsREST(
 	ctx context.Context, apiClient *github.Client, repoInfo repoInfo,
-	reporter sources.ChunkReporter, cutoffTime *time.Time,
+	grants *installationGrants, reporter sources.ChunkReporter, cutoffTime *time.Time,
 ) error {
 	p := s.commentPager(ctx, apiClient, reporter)
 	var since time.Time
@@ -2051,46 +2088,101 @@ func (s *Source) processIssueandPRsWithCommentsREST(
 		since = *cutoffTime
 	}
 
+	var installationID int64
+	if grants != nil {
+		installationID = grants.installationID
+	}
+	issuesOK, prsOK := grants.issuesGranted(), grants.pullRequestsGranted()
+	narrowed := func(missing, listing string, needs permission) error {
+		return fmt.Errorf("%s: %w", missing, newNarrowedListingError(installationID, listing, []permission{needs}))
+	}
+	pullsPhase := func(startLog string) commentPhase {
+		return commentPhase{name: "pull requests", startLog: startLog, run: func() (int, error) {
+			return s.processPRs(ctx, p, repoInfo, reporter)
+		}}
+	}
+
 	// /issues returns issues and pull requests together. When issue comments
 	// are enabled, that one walk also emits PR bodies, so /pulls is only
-	// walked for configs that enable PR comments alone.
+	// walked for configs that enable PR comments alone, or when the
+	// installation can list pull requests but not issues.
 	var phases []commentPhase
 	if s.includeIssueComments {
-		bodies := "issues"
+		bodies := commentPhase{name: "issues", startLog: "Scanning issues", run: func() (int, error) {
+			return s.processIssues(ctx, p, repoInfo, reporter, s.includePRComments)
+		}}
+		needs := []permission{issuesRead}
 		if s.includePRComments {
-			bodies = "issues and pull requests"
+			bodies.name = "issues and pull requests"
+			needs = append(needs, pullRequestsRead)
 		}
-		phases = append(phases,
-			commentPhase{name: bodies, startLog: "Scanning issues", run: func() (int, error) {
-				return s.processIssues(ctx, p, repoInfo, reporter, s.includePRComments)
-			}},
-			commentPhase{name: "issue comments", run: func() (int, error) {
-				return s.processIssueComments(ctx, p, repoInfo, reporter, since)
-			}},
-		)
+		switch {
+		case issuesOK:
+			if s.includePRComments && !prsOK {
+				bodies.narrowed = append(bodies.narrowed, narrowed("pull request bodies", "/issues", pullRequestsRead))
+			}
+			phases = append(phases, bodies)
+		case s.includePRComments && prsOK:
+			// /issues is refused without Issues (read), but the PR bodies it
+			// would have carried are still reachable through /pulls.
+			phases = append(phases,
+				commentPhase{name: "issues", skipped: newSkippedListingError(installationID, []permission{issuesRead})},
+				pullsPhase(""))
+		default:
+			bodies.skipped = newSkippedListingError(installationID, needs)
+			phases = append(phases, bodies)
+		}
+
+		// /issues/comments carries comments on issues and on pull requests,
+		// each kind only when its permission is granted. PR conversation
+		// comments are scanned only when PR comments are enabled, so their
+		// absence otherwise isn't a mismatch.
+		comments := commentPhase{name: "issue comments", run: func() (int, error) {
+			return s.processIssueComments(ctx, p, repoInfo, reporter, since)
+		}}
+		switch {
+		case !issuesOK && !prsOK:
+			comments.skipped = newSkippedListingError(installationID, needs)
+		case !issuesOK:
+			comments.narrowed = append(comments.narrowed, narrowed("issue comments", "/issues/comments", issuesRead))
+		case s.includePRComments && !prsOK:
+			comments.narrowed = append(comments.narrowed, narrowed("pull request conversation comments", "/issues/comments", pullRequestsRead))
+		}
+		phases = append(phases, comments)
 	}
 	if s.includePRComments {
+		var prsSkipped error
+		if !prsOK {
+			prsSkipped = newSkippedListingError(installationID, []permission{pullRequestsRead})
+		}
 		prStartLog := "Scanning pull requests"
 		if !s.includeIssueComments {
-			phases = append(phases, commentPhase{name: "pull requests", startLog: prStartLog, run: func() (int, error) {
-				return s.processPRs(ctx, p, repoInfo, reporter)
-			}})
+			pulls := pullsPhase(prStartLog)
+			pulls.skipped = prsSkipped
+			phases = append(phases, pulls)
 			prStartLog = ""
 		}
-		phases = append(phases, commentPhase{name: "pull request comments", startLog: prStartLog, run: func() (int, error) {
+		phases = append(phases, commentPhase{name: "pull request comments", startLog: prStartLog, skipped: prsSkipped, run: func() (int, error) {
 			return s.processPRComments(ctx, p, repoInfo, reporter, since)
 		}})
 	}
 
 	var (
-		errs    []error
-		failed  []string
-		summary []any
+		errs        []error
+		failed      []string
+		skipped     []string
+		narrowedOut []string
+		summary     []any
 	)
 	for _, phase := range phases {
 		if err := ctx.Err(); err != nil {
 			errs = append(errs, err)
 			break
+		}
+		if phase.skipped != nil {
+			skipped = append(skipped, phase.name)
+			errs = append(errs, fmt.Errorf("%s: %w", phase.name, phase.skipped))
+			continue
 		}
 		if phase.startLog != "" {
 			ctx.Logger().V(2).Info(phase.startLog)
@@ -2101,8 +2193,13 @@ func (s *Source) processIssueandPRsWithCommentsREST(
 			failed = append(failed, phase.name)
 			errs = append(errs, fmt.Errorf("%s: %w", phase.name, err))
 		}
+		if len(phase.narrowed) > 0 {
+			narrowedOut = append(narrowedOut, phase.name)
+			errs = append(errs, phase.narrowed...)
+		}
 	}
-	ctx.Logger().V(2).Info("finished scanning comments", append(summary, "failed_phases", failed)...)
+	ctx.Logger().V(2).Info("finished scanning comments", append(summary,
+		"failed_phases", failed, "skipped_phases", skipped, "narrowed_phases", narrowedOut)...)
 
 	return errors.Join(errs...)
 }

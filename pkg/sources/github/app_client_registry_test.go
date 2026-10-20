@@ -53,6 +53,37 @@ func TestAccessTokenForInstallation(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("granted permissions come from the token", func(t *testing.T) {
+		var hits atomic.Int64
+		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":       "test-token",
+				"expires_at":  "2099-01-01T00:00:00Z",
+				"permissions": map[string]string{"issues": "read", "contents": "read"},
+			})
+		})
+		defer server.Close()
+
+		cs, err := GetAppInstallationClients(t.Context(), server.URL, 12345, string(privKey), 100)
+		require.NoError(t, err)
+
+		perms, err := cs.GrantedPermissions(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, "read", perms.GetIssues())
+		require.Empty(t, perms.GetPullRequests())
+
+		_, err = cs.AccessToken(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, int64(1), hits.Load(), "permissions and clone share one token")
+	})
+
+	t.Run("granted permissions without a token", func(t *testing.T) {
+		cs := &AppInstallationClients{InstallationID: 0}
+		_, err := cs.GrantedPermissions(t.Context())
+		require.Error(t, err)
+	})
+
 	t.Run("rate limit", func(t *testing.T) {
 		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("X-RateLimit-Remaining", "0")

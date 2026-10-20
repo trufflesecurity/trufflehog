@@ -124,10 +124,17 @@ func seedRepo(gh *fakeGitHub) {
 	}
 }
 
+// scanComments runs the REST comment scan with unknown installation grants,
+// as a token-authenticated source would.
 func scanComments(t *testing.T, s *Source, gh *fakeGitHub, cutoff *time.Time) (*collectingReporter, error) {
 	t.Helper()
+	return scanCommentsWithGrants(t, s, gh, nil, cutoff)
+}
+
+func scanCommentsWithGrants(t *testing.T, s *Source, gh *fakeGitHub, grants *installationGrants, cutoff *time.Time) (*collectingReporter, error) {
+	t.Helper()
 	reporter := &collectingReporter{}
-	err := s.processIssueandPRsWithCommentsREST(context.Background(), gh.client, testRepo, reporter, cutoff)
+	err := s.processIssueandPRsWithCommentsREST(context.Background(), gh.client, testRepo, grants, reporter, cutoff)
 	return reporter, err
 }
 
@@ -357,6 +364,158 @@ func TestCommentScan_EachFailedPhaseIsReportedAsItsOwnChunkError(t *testing.T) {
 	assert.Empty(t, reporter.links)
 }
 
+// reportedGrantErrors runs reportCommentErrors on err and describes each
+// chunk error it reports as "<prefix>: skip" or "<prefix>: narrow", where
+// prefix names the phase or the content left out. Any reported error that
+// isn't a grants-based permissionError fails the test.
+func reportedGrantErrors(t *testing.T, err error) []string {
+	t.Helper()
+	reporter := &collectingReporter{}
+	require.NoError(t, reportCommentErrors(context.Background(), reporter, err))
+	var got []string
+	for _, reported := range reporter.errs {
+		var permErr *permissionError
+		require.ErrorAs(t, reported, &permErr)
+		prefix, _, _ := strings.Cut(strings.TrimPrefix(reported.Error(), "error scanning comments: "), ": missing")
+		switch {
+		case strings.Contains(permErr.outcome, "skipped"):
+			got = append(got, prefix+": skip")
+		case strings.Contains(permErr.outcome, "left them out"):
+			got = append(got, prefix+": narrow")
+		default:
+			t.Fatalf("unexpected permission error: %v", reported)
+		}
+	}
+	return got
+}
+
+func TestCommentScan_InstallationGrantsShapeTheListings(t *testing.T) {
+	type grant struct{ issues, pullRequests bool }
+	var (
+		neither = grant{}
+		prsOnly = grant{pullRequests: true}
+		issues  = grant{issues: true}
+		both    = grant{issues: true, pullRequests: true}
+	)
+	tests := []struct {
+		name          string
+		issueComments bool
+		prComments    bool
+		grant         grant
+		wantErrs      []string
+		// wantListed names every endpoint the scan requests; the rest must
+		// not be requested.
+		wantListed []string
+	}{
+		{name: "issue comments, nothing granted", issueComments: true, grant: neither,
+			wantErrs: []string{"issues: skip", "issue comments: skip"}},
+		{name: "issue comments, pull requests granted", issueComments: true, grant: prsOnly,
+			wantErrs:   []string{"issues: skip", "issue comments: narrow"},
+			wantListed: []string{"issue comments"}},
+		{name: "issue comments, issues granted", issueComments: true, grant: issues,
+			wantListed: []string{"issues", "issue comments"}},
+		{name: "issue comments, both granted", issueComments: true, grant: both,
+			wantListed: []string{"issues", "issue comments"}},
+
+		{name: "PR comments, nothing granted", prComments: true, grant: neither,
+			wantErrs: []string{"pull requests: skip", "pull request comments: skip"}},
+		{name: "PR comments, pull requests granted", prComments: true, grant: prsOnly,
+			wantListed: []string{"pulls", "pull comments"}},
+		{name: "PR comments, issues granted", prComments: true, grant: issues,
+			wantErrs: []string{"pull requests: skip", "pull request comments: skip"}},
+		{name: "PR comments, both granted", prComments: true, grant: both,
+			wantListed: []string{"pulls", "pull comments"}},
+
+		{name: "both settings, nothing granted", issueComments: true, prComments: true, grant: neither,
+			wantErrs: []string{"issues and pull requests: skip", "issue comments: skip", "pull request comments: skip"}},
+		{name: "both settings, pull requests granted", issueComments: true, prComments: true, grant: prsOnly,
+			wantErrs:   []string{"issues: skip", "issue comments: narrow"},
+			wantListed: []string{"pulls", "issue comments", "pull comments"}},
+		{name: "both settings, issues granted", issueComments: true, prComments: true, grant: issues,
+			wantErrs:   []string{"pull request bodies: narrow", "pull request conversation comments: narrow", "pull request comments: skip"},
+			wantListed: []string{"issues", "issue comments"}},
+		{name: "both settings, both granted", issueComments: true, prComments: true, grant: both,
+			wantListed: []string{"issues", "issue comments", "pull comments"}},
+
+		{name: "comments off, nothing granted", grant: neither},
+		{name: "comments off, pull requests granted", grant: prsOnly},
+		{name: "comments off, issues granted", grant: issues},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gh := newFakeGitHub(t)
+			seedRepo(gh)
+			s := &Source{includeIssueComments: tt.issueComments, includePRComments: tt.prComments}
+			grants := &installationGrants{installationID: 42, issues: tt.grant.issues, pullRequests: tt.grant.pullRequests}
+
+			_, err := scanCommentsWithGrants(t, s, gh, grants, nil)
+
+			if len(tt.wantErrs) == 0 {
+				require.NoError(t, err)
+			} else {
+				assert.Equal(t, tt.wantErrs, reportedGrantErrors(t, err))
+			}
+			endpoints := map[string]*fakeListing{
+				"issues": gh.issues, "issue comments": gh.issueComments,
+				"pulls": gh.pulls, "pull comments": gh.prComments,
+			}
+			var listed []string
+			for name, listing := range endpoints {
+				if listing.requestCount() > 0 {
+					listed = append(listed, name)
+				}
+			}
+			assert.ElementsMatch(t, tt.wantListed, listed)
+		})
+	}
+}
+
+func TestCommentScan_PullRequestBodiesComeFromPullsWithoutIssuesGrant(t *testing.T) {
+	gh := newFakeGitHub(t)
+	seedRepo(gh)
+	s := &Source{includeIssueComments: true, includePRComments: true}
+
+	reporter, _ := scanCommentsWithGrants(t, s, gh, &installationGrants{installationID: 42, pullRequests: true}, nil)
+
+	assert.Contains(t, reporter.links, prLink(2))
+	assert.NotContains(t, reporter.links, "https://github.com/o/r/issues/1")
+	assert.Zero(t, gh.issues.requestCount())
+}
+
+func TestCommentScan_GrantErrorsNameTheInstallationAndPermissions(t *testing.T) {
+	gh := newFakeGitHub(t)
+	seedRepo(gh)
+	s := &Source{includeIssueComments: true, includePRComments: true}
+
+	_, err := scanCommentsWithGrants(t, s, gh, &installationGrants{installationID: 42, issues: true}, nil)
+
+	reporter := &collectingReporter{}
+	require.NoError(t, reportCommentErrors(context.Background(), reporter, err))
+	var got []string
+	for _, reported := range reporter.errs {
+		got = append(got, reported.Error())
+	}
+	fix := "update the app's permissions and accept the change on the installation"
+	assert.Equal(t, []string{
+		"error scanning comments: pull request bodies: missing GitHub App permission: Pull requests (read) is needed; " + fix +
+			" (not granted to installation 42, so GitHub left them out of the /issues listing)",
+		"error scanning comments: pull request conversation comments: missing GitHub App permission: Pull requests (read) is needed; " + fix +
+			" (not granted to installation 42, so GitHub left them out of the /issues/comments listing)",
+		"error scanning comments: pull request comments: missing GitHub App permission: Pull requests (read) is needed; " + fix +
+			" (not granted to installation 42, so the listing was skipped)",
+	}, got)
+}
+
+func TestCommentScan_SkippedListingNeedingBothPermissionsSaysSo(t *testing.T) {
+	gh := newFakeGitHub(t)
+	s := &Source{includeIssueComments: true, includePRComments: true}
+
+	_, err := scanCommentsWithGrants(t, s, gh, &installationGrants{installationID: 42}, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "issues and pull requests: missing GitHub App permission: Issues (read) and Pull requests (read) are needed;")
+}
+
 func TestReportCommentErrors_UnjoinedErrorIsReportedOnce(t *testing.T) {
 	reporter := &collectingReporter{}
 
@@ -380,7 +539,7 @@ func TestCommentScan_RetryLogNamesTheListing(t *testing.T) {
 	logger, _ := log.New("test", log.WithJSONSink(&logs, log.WithLevel(2)))
 	ctx := context.WithLogger(context.Background(), logger)
 
-	err := s.processIssueandPRsWithCommentsREST(ctx, gh.client, testRepo, &collectingReporter{}, nil)
+	err := s.processIssueandPRsWithCommentsREST(ctx, gh.client, testRepo, nil, &collectingReporter{}, nil)
 	require.NoError(t, err)
 
 	var listings []string

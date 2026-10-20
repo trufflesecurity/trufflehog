@@ -149,6 +149,28 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 	return git.CloneRepoUsingToken(ctx, token, repoURL, "", "x-access-token", true, args...)
 }
 
+// grantsForRepo returns what the installation that owns repoURL grants, for
+// the permissions the comment scan needs. Installation permissions apply to
+// every repo the installation can see, so repos on one installation share
+// the answer, and the cached token makes it free after the repo's clone.
+func (c *appConnector) grantsForRepo(ctx context.Context, repoURL string) (*installationGrants, error) {
+	installID, _ := c.installationIDForRepo(repoURL)
+	if installID == 0 {
+		return nil, fmt.Errorf("no GitHub App installation resolved for repo %q", repoURL)
+	}
+
+	cs, err := c.clientsForInstallation(installID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot fetch installation clients for installation %d: %w", installID, err)
+	}
+
+	perms, err := cs.GrantedPermissions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not read permissions for installation %d: %w", installID, err)
+	}
+	return newInstallationGrants(installID, perms), nil
+}
+
 // installationIDForRepo returns the mapped installation ID for repoURL. When no
 // mapping exists, it falls back to the configured installation and returns false.
 //
