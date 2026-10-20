@@ -49,33 +49,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.getemail.io/v1/find-mail?firstname=Larry&lastname=Page&domain=google.com&api_key=%s", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				bodyString := string(bodyBytes)
-				errCode := strings.Contains(bodyString, `"code":"USER_NOT_EXIST"`)
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if errCode {
-						s1.Verified = false
-					} else {
-						s1.Verified = true
-					}
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.getemail.io/v1/find-mail?firstname=Larry&lastname=Page&domain=google.com&api_key=%s", resMatch), nil)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	bodyString := string(bodyBytes)
+	errCode := strings.Contains(bodyString, `"code":"USER_NOT_EXIST"`)
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		if !errCode {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

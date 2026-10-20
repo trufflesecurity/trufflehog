@@ -1,18 +1,20 @@
 package sources
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
@@ -125,6 +127,7 @@ func TestSourceManagerRun(t *testing.T) {
 		// The Chunks channel should be empty now.
 		_, err = tryRead(mgr.Chunks())
 		assert.Error(t, err)
+		assert.ErrorIs(t, ref.Err(), ErrJobDone)
 	}
 }
 
@@ -362,8 +365,9 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	ref.CancelRun(cancelErr)
 	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
-	assert.True(t, errors.Is(ref.Snapshot().FatalError(), returnedErr))
-	assert.True(t, errors.Is(ref.Snapshot().FatalErrors(), cancelErr))
+	assert.ErrorIs(t, ref.Snapshot().FatalError(), returnedErr)
+	assert.ErrorIs(t, ref.Snapshot().FatalErrors(), cancelErr)
+	assert.ErrorIs(t, ref.Err(), cancelErr)
 }
 
 func TestSourceManagerAvailableCapacity(t *testing.T) {
@@ -541,4 +545,112 @@ func TestUnitHookCloseConcurrentWithFinish(t *testing.T) {
 	assert.NoError(t, hook.Close())
 	wg.Wait()
 	<-drained
+}
+
+// TestSourceManagerSemaphoreAcquireError tests what happens when acquiring the
+// semaphore tracking concurrent sources fails.
+func TestSourceManagerSemaphoreAcquireError(t *testing.T) {
+	assertFinishedAfterAcquireError := func(t *testing.T, ref JobProgressRef, err error) {
+		t.Helper()
+		assert.IsType(t, Fatal{}, err)
+
+		// The acquire should fail, so the job should be finished
+		select {
+		case <-ref.Done():
+		default:
+			assert.FailNow(t, "job should have been finished")
+		}
+
+		// Check that the ref has the same error as what the manager returns
+		assert.ErrorIs(t, ref.Err(), err)
+		assert.NotErrorIs(t, ref.Err(), ErrJobDone, "job should not be marked as done on failure to acquire semaphore")
+	}
+
+	// Timeout for the context in these tests.
+	// The duration does not matter since synctest uses a fake clock.
+	const timeoutDuration = time.Hour
+
+	t.Run("EnumerateAndScan", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			mgr := NewManager(WithConcurrentSources(0))
+			source, err := buildDummy(&counterChunker{count: 1})
+			assert.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+			defer cancel()
+			ref, err := mgr.EnumerateAndScan(ctx, "dummy", source)
+			assertFinishedAfterAcquireError(t, ref, err)
+			// No job was started, so Wait should not block or error
+			assert.NoError(t, mgr.Wait())
+		})
+	})
+
+	t.Run("Scan", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			mgr := NewManager(WithConcurrentSources(0))
+			source, err := buildDummy(&counterChunker{count: 1})
+			assert.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+			defer cancel()
+			ref, err := mgr.Scan(ctx, "dummy", source, countChunk(123))
+			assertFinishedAfterAcquireError(t, ref, err)
+			// No job was started, so Wait should not block or error
+			assert.NoError(t, mgr.Wait())
+		})
+	})
+}
+
+// loggingChunker writes one log line through the context it was given, then
+// chunks like counterChunker.
+type loggingChunker struct{ counterChunker }
+
+func (c *loggingChunker) Chunks(ctx context.Context, ch chan *Chunk, targets ...ChunkingTarget) error {
+	ctx.Logger().Info("chunking from source")
+	return c.counterChunker.Chunks(ctx, ch, targets...)
+}
+
+func TestSourceManagerAddsSourceFieldsToLogs(t *testing.T) {
+	// runSource scans one dummy source and returns the line it logged.
+	runSource := func(t *testing.T, ctx context.Context, logs *observer.ObservedLogs) observer.LoggedEntry {
+		mgr := NewManager(WithBufferedOutput(8))
+		source, err := buildDummy(&loggingChunker{counterChunker{count: 1}})
+		assert.NoError(t, err)
+
+		ref, err := mgr.EnumerateAndScan(ctx, "dummy", source)
+		assert.NoError(t, err)
+		<-ref.Done()
+
+		entries := logs.FilterMessage("chunking from source").All()
+		if !assert.Len(t, entries, 1) {
+			t.FailNow()
+		}
+		return entries[0]
+	}
+
+	t.Run("fields are added", func(t *testing.T) {
+		ctx, logs := logtest.DebugContext()
+		fields := runSource(t, ctx, logs).ContextMap()
+
+		assert.Equal(t, "dummy", fields["source_name"])
+		assert.Contains(t, fields, "job_id")
+		assert.Contains(t, fields, "source_id")
+		assert.Contains(t, fields, "source_type")
+	})
+
+	t.Run("fields set by the caller are kept and not repeated", func(t *testing.T) {
+		ctx, logs := logtest.DebugContext()
+		ctx = context.WithValue(ctx, "source_name", "set by caller")
+		entry := runSource(t, ctx, logs)
+
+		// count the raw fields, since ContextMap would hide a duplicate key
+		count := 0
+		for _, field := range entry.Context {
+			if field.Key == "source_name" {
+				count++
+			}
+		}
+		assert.Equal(t, 1, count)
+		assert.Equal(t, "set by caller", entry.ContextMap()["source_name"])
+	})
 }

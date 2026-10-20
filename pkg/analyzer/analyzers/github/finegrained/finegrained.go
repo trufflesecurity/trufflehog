@@ -1447,9 +1447,11 @@ func AnalyzeFineGrainedToken(client *gh.Client, meta *common.TokenMetadata, shal
 		return nil, err
 	}
 
+	// Gist enumeration is supplemental -- a rate-limit or transient failure
+	// should not discard the already-gathered metadata, repos, and permissions.
 	allGists, err := common.GetAllGistsForUser(client)
 	if err != nil {
-		return nil, err
+		allGists = nil
 	}
 	accessibleRepos := make([]*gh.Repository, 0)
 	for _, repo := range allRepos {

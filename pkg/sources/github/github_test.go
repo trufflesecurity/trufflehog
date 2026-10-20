@@ -327,7 +327,8 @@ func TestAddMembersByApp(t *testing.T) {
 				InstallationId: "1337",
 				AppId:          "4141",
 			},
-		}})
+		},
+	})
 	err := s.addMembersByApp(context.Background(), s.connector.(*appConnector), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(s.memberCache))
@@ -375,15 +376,11 @@ func TestAppConnector_EnterpriseBaseURL(t *testing.T) {
 	privateKey := createPrivateKey()
 	enterpriseEndpoint := "https://api.example.ghe.com"
 
-	connector, err := NewAppConnector(
-		context.Background(),
-		enterpriseEndpoint,
-		&credentialspb.GitHubApp{
-			PrivateKey:     privateKey,
-			InstallationId: "1337",
-			AppId:          "4141",
-		},
-		false)
+	connector, err := NewAppConnector(enterpriseEndpoint, &credentialspb.GitHubApp{
+		PrivateKey:     privateKey,
+		InstallationId: "1337",
+		AppId:          "4141",
+	}, false)
 	require.NoError(t, err)
 
 	appConn, ok := connector.(*appConnector)
@@ -438,7 +435,8 @@ func TestValidate_ScanAllInstallationsWithoutDefaultInstallation(t *testing.T) {
 				PrivateKey: createPrivateKey(),
 				AppId:      "4141",
 			},
-		}})
+		},
+	})
 
 	errs := s.Validate(context.Background())
 	assert.Empty(t, errs)
@@ -2334,11 +2332,8 @@ func Test_ScanMultipleTargets_MultipleErrors(t *testing.T) {
 
 func TestScanAllInstallationsTargetMappingErrorIsTargetedScanError(t *testing.T) {
 	s := &Source{
-		conn: &sourcespb.GitHub{ScanAllInstallations: true},
-		connector: &appConnector{
-			clientsByInstallationID: make(map[int64]*appInstallationClients),
-			repoInstallationMap:     make(map[string]int64),
-		},
+		conn:      &sourcespb.GitHub{ScanAllInstallations: true},
+		connector: &appConnector{},
 	}
 	ctx := context.Background()
 	chunksChan := make(chan *sources.Chunk)

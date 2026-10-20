@@ -427,7 +427,7 @@ For every potential credential that is detected, we've painstakingly implemented
 - **unverified**: Credential detected but not confirmed valid (may be invalid, expired, or verification disabled)  
 - **unknown**: Verification attempted but failed due to errors, such as a network or API failure
 
-For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
+For example, the [AWS credential detector](pkg/detectors/aws/access_keys/accesskey.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 # :memo: Usage
 
@@ -618,6 +618,24 @@ sources:
 You may define multiple connections under the `sources` key (see above), and
 TruffleHog will scan all of the sources concurrently.
 
+To see debug logs for just one source, add `debug: true` to it. That source
+writes all of its debug logs, and every other source keeps the normal log level.
+This is useful when one source out of many is misbehaving:
+
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.GitHub
+    repositories:
+    - https://github.com/trufflesecurity/test_keys.git
+    unauthenticated: {}
+  name: example config scan
+  type: SOURCE_TYPE_GITHUB
+  debug: true
+```
+
+To turn on debug logs for every source, use `--log-level=5` instead.
+
 ## S3
 
 The S3 source supports assuming IAM roles for scanning in addition to IAM users. This makes it easier for users to scan multiple AWS accounts without needing to rely on hardcoded credentials for each account.
@@ -684,7 +702,7 @@ Two things to watch when using `--include-extension`. A dotfile counts as all ex
 
 These flags also apply to object keys only, not to files inside an archive. `--exclude-extension=mp4` skips `clip.mp4` sitting in the bucket, but not a `clip.mp4` packed inside `media.zip`. Excluding `zip` skips the archive entirely.
 
-Filtering happens after TruffleHog lists a bucket, so it cuts the cost of downloading objects but not the cost of listing them. A bucket is still paginated in full even when a prefix covers a small part of it.
+TruffleHog asks S3 to list only the keys under the include prefixes, so a prefix that covers a small part of a large bucket is listed quickly. Exclude prefixes and extensions are applied after listing, so they cut the cost of downloading objects but not the cost of listing them.
 
 Prefixes and extensions are applied together. An object has to pass both to be scanned, so the command below scans `src/main.tf` but skips both `src/bundle.zip` and `docs/guide.tf`:
 

@@ -25,6 +25,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -111,6 +112,15 @@ type Config struct {
 	CustomVerifiersOnly           bool
 	VerifierEndpoints             map[string]string
 
+	// VerifierAuth authenticates verification requests to custom verifier
+	// endpoints that sit behind an auth proxy. It is keyed like the parsed
+	// VerifierEndpoints, and every entry must have a matching
+	// VerifierEndpoints entry: auth only ever applies to configured
+	// endpoints. Detectors receive it through VerifierAuthCustomizer and
+	// attach the token inside their own HTTP client, so verification still
+	// runs through each detector's FromData.
+	VerifierAuth map[config.DetectorID]*verifierauth.Config
+
 	// Verify determines whether the scanner will verify candidate secrets.
 	Verify bool
 
@@ -169,6 +179,9 @@ type Config struct {
 	// 1 = single pass (no chaining), 2+ = chained (e.g., base64 inside UTF-16).
 	// Default: 5.
 	MaxDecodeDepth int
+
+	// Max size of the deduplication LRU cache
+	DedupeCacheSize int
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -242,6 +255,8 @@ type Engine struct {
 
 	maxDecodeDepth int
 
+	dedupeCacheSize int
+
 	// runtimeCollector exposes live channel/worker/scan counters to Prometheus
 	// while the engine is running. Set in Start, cleared in Finish.
 	runtimeCollector *runtimeCollector
@@ -271,6 +286,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
 		maxDecodeDepth:                      cfg.MaxDecodeDepth,
+		dedupeCacheSize:                     cfg.DedupeCacheSize,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -306,6 +322,12 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Auth misconfiguration is checked before any filter runs, because a
+	// filter can only keep or drop a detector. Dropping a detector whose auth
+	// can't be applied would silently remove it from the scan.
+	if err := validateVerifierAuth(cfg.VerifierAuth, detectorsWithCustomVerifierEndpoints); err != nil {
+		return nil, err
+	}
 	if len(detectorsWithCustomVerifierEndpoints) > 0 {
 		filters = append(filters, func(d detectors.Detector) bool {
 			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
@@ -324,6 +346,17 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 
 			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
+			}
+
+			// validateVerifierAuth has already confirmed this detector type
+			// supports auth, so the type assertion only fails for a detector
+			// instance that diverges from its registered default.
+			if authCfg, ok := getWithDetectorID(d, cfg.VerifierAuth); ok && authCfg != nil {
+				authCustomizer, ok := d.(detectors.VerifierAuthCustomizer)
+				if !ok {
+					return false
+				}
+				authCustomizer.SetVerifierAuth(authCfg)
 			}
 
 			return true
@@ -453,6 +486,30 @@ func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.Detec
 	return customVerifierEndpoints, nil
 }
 
+// validateVerifierAuth rejects verifier auth that could not take effect:
+// auth for a detector with no custom verifier endpoints (auth only ever
+// applies to configured endpoints) and auth for a detector type that cannot
+// accept it. Either would otherwise send requests to the auth proxy without
+// the token, which typically reads as every secret being unverified.
+func validateVerifierAuth(auth map[config.DetectorID]*verifierauth.Config, endpoints map[config.DetectorID][]string) error {
+	if len(auth) == 0 {
+		return nil
+	}
+	supportsAuth := defaults.DefaultDetectorTypesImplementing[detectors.VerifierAuthCustomizer]()
+	for id, authCfg := range auth {
+		if authCfg == nil {
+			continue
+		}
+		if _, ok := endpoints[id]; !ok {
+			return fmt.Errorf("verifier auth configured for detector %q without custom verifier endpoints", id.String())
+		}
+		if _, ok := supportsAuth[id.ID]; !ok {
+			return fmt.Errorf("verifier auth configured for detector %q, which does not support verifier auth", id.String())
+		}
+	}
+	return nil
+}
+
 // detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
 func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
 	out := make(map[config.DetectorID]struct{}, len(detectors))
@@ -518,14 +575,15 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
-	// The cache size is set to 5000 entries, which is a balance between memory usage and the need for effective deduplication.
-	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
-	const cacheSize = 5000
+	if e.dedupeCacheEnabled() {
+		cache, err := lru.New[string, struct{}](e.dedupeCacheSize)
+		if err != nil {
+			return fmt.Errorf("failed to initialize LRU cache: %w", err)
+		}
 
-	cache, err := lru.New[string, struct{}](cacheSize)
-	if err != nil {
-		return fmt.Errorf("failed to initialize LRU cache: %w", err)
+		e.dedupeCache = cache
 	}
+
 	const (
 		// detectableChunksChanMultiplier is set to accommodate a high number of concurrent worker goroutines.
 		// This multiplier ensures that the detectableChunksChan channel has sufficient buffer capacity
@@ -549,7 +607,6 @@ func (e *Engine) initialize(ctx context.Context) error {
 		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
 	)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer*resultsChanMultiplier)
-	e.dedupeCache = cache
 	ctx.Logger().V(4).Info("engine initialized")
 
 	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
@@ -563,6 +620,10 @@ func (e *Engine) initialize(ctx context.Context) error {
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
+}
+
+func (e *Engine) dedupeCacheEnabled() bool {
+	return e.dedupeCacheSize > 0
 }
 
 const ignoreTag = "trufflehog:ignore"
@@ -1080,6 +1141,10 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						if e.verificationOverlapTracker != nil {
 							e.verificationOverlapTracker.Add(1)
 						}
+						// The overlap error stays the verdict; VerificationSkipped additionally records that no
+						// verifier ran, so consumers counting verifier outcomes don't read errOverlap as a provider
+						// failure.
+						res.VerificationSkipped = true
 						res.SetVerificationError(errOverlap)
 						e.processResult(
 							ctx,
@@ -1186,6 +1251,15 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 		if len(results) > 0 {
 			resultsProduced.WithLabelValues(detectorNameStr).Add(float64(len(results)))
+		}
+
+		// With verification disabled for this chunk and detector, results carry whatever verdict the detector assigned
+		// without contacting the provider (normally unverified). Leave that verdict untouched and only record that the
+		// verifier never ran. Verifying paths, including cache hits, leave VerificationSkipped false.
+		if !data.verify {
+			for i := range results {
+				results[i].VerificationSkipped = true
+			}
 		}
 
 		detectorExecutionCount.WithLabelValues(
@@ -1357,14 +1431,15 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		// This deduplication only applies to results that are *not*
 		// from reverification, since we are expected to see the same
 		// result from reverification and want to Dispatch it below.
-		if result.SecretID == 0 {
+
+		// Notifier workers share this cache; the check and insert must be one atomic step.
+		if e.dedupeCacheEnabled() && result.SecretID == 0 {
 			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
 			key := string(h[:])
-			if _, ok := e.dedupeCache.Get(key); ok {
+			if found, _ := e.dedupeCache.ContainsOrAdd(key, struct{}{}); found {
 				resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
 				continue
 			}
-			e.dedupeCache.Add(key, struct{}{})
 		}
 
 		if result.Verified {
@@ -1431,11 +1506,16 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		}
 	}
 
-	lineNumber := int64(bytes.Count(chunk.Data[:offset], []byte("\n")))
+	data := chunk.Data
+	if originalOffset := sourceOffset(chunk.OriginalData, chunk.Data, offset, len(secretBytes)); originalOffset >= 0 {
+		data, offset = chunk.OriginalData, originalOffset
+	}
+
+	lineNumber := int64(bytes.Count(data[:offset], []byte("\n")))
 	result.SetPrimarySecretLine(lineNumber)
 
 	// If the line containing the secret has the ignore tag, we should ignore the result.
-	after := chunk.Data[offset+len(secretBytes):]
+	after := data[offset+len(secretBytes):]
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
 		endLine = len(after)
@@ -1444,6 +1524,124 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 		return lineNumber, true
 	}
 	return lineNumber, false
+}
+
+// sourceOffset maps an offset in decoded data back onto the pre-decode buffer,
+// returning -1 when the detected value has no counterpart in the source.
+func sourceOffset(originalData, data []byte, offset, length int) int {
+	if len(originalData) == 0 || length == 0 || offset < 0 || offset+length > len(data) {
+		return -1
+	}
+	if bytes.Equal(originalData, data) {
+		return offset
+	}
+
+	secret := data[offset : offset+length]
+	preceding := bytes.Count(data[:offset], secret)
+	sourceIndex, sourceCount := nthOccurrence(originalData, secret, preceding)
+	if sourceCount == 0 {
+		return -1
+	}
+	// Decoders emit the occurrences they keep in source order, so an unchanged
+	// occurrence count makes the nth decoded match the nth source match.
+	if sourceCount == preceding+bytes.Count(data[offset:], secret) {
+		return sourceIndex
+	}
+	// Decoding dropped or merged occurrences, so order alone no longer identifies
+	// the match and the surrounding text has to break the tie.
+	return bestAlignedOccurrence(originalData, data, offset, length)
+}
+
+// nthOccurrence returns the offset of the nth zero-indexed non-overlapping
+// occurrence of sep in data along with the total occurrence count. The offset is
+// -1 when data holds fewer than n+1 occurrences.
+func nthOccurrence(data, sep []byte, n int) (int, int) {
+	index, count, start := -1, 0, 0
+	for {
+		next := bytes.Index(data[start:], sep)
+		if next == -1 {
+			return index, count
+		}
+		if count == n {
+			index = start + next
+		}
+		count++
+		start += next + len(sep)
+	}
+}
+
+// alignedContextBytes bounds the neighbourhood each candidate source occurrence is
+// scored over, keeping the comparison linear in the number of candidates. A kilobyte
+// is far more context than a decoder needs to give itself away.
+const alignedContextBytes = 1024
+
+// bestAlignedOccurrence picks the source occurrence of the detected value whose
+// neighbourhood best survives into the decoded neighbourhood. No rule is exact here:
+// when a decoder drops one copy of a value and keeps another, the copies are only
+// distinguishable by the text around them.
+func bestAlignedOccurrence(originalData, data []byte, offset, length int) int {
+	secret := data[offset : offset+length]
+	best, bestScore := -1, -1
+	for start := 0; ; {
+		next := bytes.Index(originalData[start:], secret)
+		if next == -1 {
+			return best
+		}
+		candidate := start + next
+		if score := alignmentScore(originalData, data, candidate, offset, length); score > bestScore {
+			best, bestScore = candidate, score
+		}
+		start = candidate + length
+	}
+}
+
+// alignmentScore measures how much of the decoded neighbourhood still reads, in
+// order, out of the source around a candidate. Decoders interleave removals with the
+// text they keep, so the source side is allowed gaps that the decoded side is not.
+func alignmentScore(originalData, data []byte, candidate, offset, length int) int {
+	sourceBefore := lastBytes(originalData[:candidate], alignedContextBytes)
+	decodedBefore := lastBytes(data[:offset], alignedContextBytes)
+	sourceAfter := firstBytes(originalData[candidate+length:], alignedContextBytes)
+	decodedAfter := firstBytes(data[offset+length:], alignedContextBytes)
+	return matchBackward(sourceBefore, decodedBefore) + matchForward(sourceAfter, decodedAfter)
+}
+
+// matchBackward returns the length of the longest suffix of decoded that appears as a
+// subsequence of source. Matching greedily from the right is optimal for that.
+func matchBackward(source, decoded []byte) int {
+	matched, j := 0, len(decoded)-1
+	for i := len(source) - 1; i >= 0 && j >= 0; i-- {
+		if source[i] == decoded[j] {
+			matched, j = matched+1, j-1
+		}
+	}
+	return matched
+}
+
+// matchForward returns the length of the longest prefix of decoded that appears as a
+// subsequence of source.
+func matchForward(source, decoded []byte) int {
+	matched := 0
+	for i := 0; i < len(source) && matched < len(decoded); i++ {
+		if source[i] == decoded[matched] {
+			matched++
+		}
+	}
+	return matched
+}
+
+func lastBytes(data []byte, n int) []byte {
+	if len(data) > n {
+		return data[len(data)-n:]
+	}
+	return data
+}
+
+func firstBytes(data []byte, n int) []byte {
+	if len(data) > n {
+		return data[:n]
+	}
+	return data
 }
 
 // AssignDuplicateLineOffsets pre-computes byte offsets for results that share the same

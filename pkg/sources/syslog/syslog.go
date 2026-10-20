@@ -260,14 +260,15 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 		}
 		input := make([]byte, 8096)
 		remote := conn.RemoteAddr()
-		_, err = conn.Read(input)
+		n, err := conn.Read(input)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return
 			}
 			continue
 		}
-		ctx.Logger().V(5).Info(string(input))
+		// Don't log the message itself, it is the data we scan for secrets.
+		ctx.Logger().V(5).Info("received syslog message", "remote", remote.String(), "bytes", n)
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
 			// set metadata as empty to avoid panics in case parsing failed

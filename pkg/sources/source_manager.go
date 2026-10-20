@@ -145,8 +145,10 @@ func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string,
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	if err := sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
-		progress.ReportError(Fatal{err})
-		return progress.Ref(), Fatal{err}
+		fatalErr := Fatal{err}
+		progress.ReportError(fatalErr)
+		progress.finishWithCause(fatalErr)
+		return progress.Ref(), fatalErr
 	}
 	s.wg.Add(1)
 	go func() {
@@ -239,8 +241,10 @@ func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Sour
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	if err := s.sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
-		progress.ReportError(Fatal{err})
-		return progress.Ref(), Fatal{err}
+		fatalErr := Fatal{err}
+		progress.ReportError(fatalErr)
+		progress.finishWithCause(fatalErr)
+		return progress.Ref(), fatalErr
 	}
 	s.wg.Add(1)
 	go func() {
@@ -356,18 +360,7 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 	}()
 
 	report.TrackProgress(source.GetProgress())
-	if ctx.Value("job_id") == "" {
-		ctx = context.WithValue(ctx, "job_id", report.JobID)
-	}
-	if ctx.Value("source_id") == "" {
-		ctx = context.WithValue(ctx, "source_id", report.SourceID)
-	}
-	if ctx.Value("source_name") == "" {
-		ctx = context.WithValue(ctx, "source_name", report.SourceName)
-	}
-	if ctx.Value("source_type") == "" {
-		ctx = context.WithValue(ctx, "source_type", source.Type().String())
-	}
+	ctx = withSourceFields(ctx, source, report)
 
 	// Check if source units are supported and configured.
 	canUseSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil
@@ -383,6 +376,26 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
+// withSourceFields adds the job and source fields to the context, so every log
+// line the source writes says which source and job it came from.
+// A caller (like thog) may have added some of them already. We skip those so a
+// field doesn't show up twice. A missing value is nil, not "", so check for nil.
+func withSourceFields(ctx context.Context, source Source, report *JobProgress) context.Context {
+	if ctx.Value("job_id") == nil {
+		ctx = context.WithValue(ctx, "job_id", report.JobID)
+	}
+	if ctx.Value("source_id") == nil {
+		ctx = context.WithValue(ctx, "source_id", report.SourceID)
+	}
+	if ctx.Value("source_name") == nil {
+		ctx = context.WithValue(ctx, "source_name", report.SourceName)
+	}
+	if ctx.Value("source_type") == nil {
+		ctx = context.WithValue(ctx, "source_type", source.Type().String())
+	}
+	return ctx
+}
+
 // enumerate is a helper method to enumerate a Source.
 func (s *SourceManager) enumerate(ctx context.Context, source Source, report *JobProgress, reporter UnitReporter) error {
 	report.Start(time.Now())
@@ -395,18 +408,7 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 	}()
 
 	report.TrackProgress(source.GetProgress())
-	if ctx.Value("job_id") == "" {
-		ctx = context.WithValue(ctx, "job_id", report.JobID)
-	}
-	if ctx.Value("source_id") == "" {
-		ctx = context.WithValue(ctx, "source_id", report.SourceID)
-	}
-	if ctx.Value("source_name") == "" {
-		ctx = context.WithValue(ctx, "source_name", report.SourceName)
-	}
-	if ctx.Value("source_type") == "" {
-		ctx = context.WithValue(ctx, "source_type", source.Type().String())
-	}
+	ctx = withSourceFields(ctx, source, report)
 
 	// Check if source units are supported and configured.
 	canUseSourceUnits := s.useSourceUnitsFunc != nil
@@ -431,18 +433,7 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 
 	report.ReportUnit(unit)
 	report.TrackProgress(source.GetProgress())
-	if ctx.Value("job_id") == "" {
-		ctx = context.WithValue(ctx, "job_id", report.JobID)
-	}
-	if ctx.Value("source_id") == "" {
-		ctx = context.WithValue(ctx, "source_id", report.SourceID)
-	}
-	if ctx.Value("source_name") == "" {
-		ctx = context.WithValue(ctx, "source_name", report.SourceName)
-	}
-	if ctx.Value("source_type") == "" {
-		ctx = context.WithValue(ctx, "source_type", source.Type().String())
-	}
+	ctx = withSourceFields(ctx, source, report)
 
 	// Check if source units are supported and configured.
 	canUseSourceUnits := s.useSourceUnitsFunc != nil

@@ -3,6 +3,7 @@ package verificationcache
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +18,9 @@ import (
 type testDetector struct {
 	fromDataCallCount int
 	results           []detectors.Result
+	// fromDataErr, when set, is returned by FromData instead of results, so tests can exercise what
+	// happens when remote verification fails rather than merely returning an unverified credential.
+	fromDataErr error
 }
 
 func (t *testDetector) FromData(_ context.Context, verify bool, _ []byte) ([]detectors.Result, error) {
@@ -42,6 +46,12 @@ func (t *testDetector) FromData(_ context.Context, verify bool, _ []byte) ([]det
 	// The metric timing resolution is 1 ms, so the detector needs to artificially slow down so that it can actually be
 	// monitored.
 	time.Sleep(2 * time.Millisecond)
+
+	// Failing after the sleep keeps the elapsed time observable, which is what the error-path timing
+	// test needs to assert.
+	if t.fromDataErr != nil {
+		return nil, t.fromDataErr
+	}
 
 	return results, nil
 }
@@ -86,6 +96,94 @@ var (
 	_ detectors.Detector       = (*testResultVerifier)(nil)
 	_ detectors.ResultVerifier = (*testResultVerifier)(nil)
 )
+
+// typedTestDetector reports a detector type chosen by the test rather than the fixed -1 of
+// testDetector, so tests can prove that verification timing is attributed to the detector that
+// incurred it and not merely recorded.
+type typedTestDetector struct {
+	testDetector
+	detectorType detector_typepb.DetectorType
+}
+
+func (t *typedTestDetector) Type() detector_typepb.DetectorType { return t.detectorType }
+
+var _ detectors.Detector = (*typedTestDetector)(nil)
+
+// detectorVerifySample is one observation handed to DetectorMetricsReporter.
+type detectorVerifySample struct {
+	detectorType detector_typepb.DetectorType
+	wallTime     time.Duration
+}
+
+// detectorMetricsRecorder is an InMemoryMetrics that additionally opts into per-detector
+// verification timing. Keeping the aggregate behavior by embedding is deliberate: these tests have
+// to show that the new per-detector view is added without disturbing the existing counter, so both
+// have to be observable through one reporter, exactly as thog's reporter will see them.
+type detectorMetricsRecorder struct {
+	InMemoryMetrics
+
+	mu sync.Mutex
+	// samples accumulates per-detector observations in call order.
+	samples []detectorVerifySample
+	// aggregateCalls counts calls to AddFromDataVerifyTimeSpent. The sum alone cannot distinguish
+	// one report of an accumulated total from several per-call reports, and that distinction is the
+	// point of the per-remote-call granularity tests.
+	aggregateCalls int
+}
+
+var (
+	_ MetricsReporter         = (*detectorMetricsRecorder)(nil)
+	_ DetectorMetricsReporter = (*detectorMetricsRecorder)(nil)
+)
+
+func (m *detectorMetricsRecorder) AddFromDataVerifyTimeSpent(wallTime time.Duration) {
+	m.mu.Lock()
+	m.aggregateCalls++
+	m.mu.Unlock()
+
+	m.InMemoryMetrics.AddFromDataVerifyTimeSpent(wallTime)
+}
+
+func (m *detectorMetricsRecorder) AddDetectorVerifyTimeSpent(
+	detectorType detector_typepb.DetectorType,
+	wallTime time.Duration,
+) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.samples = append(m.samples, detectorVerifySample{detectorType: detectorType, wallTime: wallTime})
+}
+
+func (m *detectorMetricsRecorder) recordedSamples() []detectorVerifySample {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return append([]detectorVerifySample(nil), m.samples...)
+}
+
+func (m *detectorMetricsRecorder) aggregateReportCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.aggregateCalls
+}
+
+// assertSampleTypes asserts that the recorded samples carry exactly the given detector types, in
+// order, and that each one reports observable wall time. A sample of zero duration would satisfy a
+// count-only assertion while carrying no latency signal at all.
+func assertSampleTypes(t *testing.T, recorder *detectorMetricsRecorder, want ...detector_typepb.DetectorType) {
+	t.Helper()
+
+	samples := recorder.recordedSamples()
+	// Left nil rather than preallocated so that the no-samples case compares equal to a caller that
+	// passed no expected types at all.
+	var gotTypes []detector_typepb.DetectorType
+	for _, sample := range samples {
+		gotTypes = append(gotTypes, sample.detectorType)
+		assert.Greater(t, sample.wallTime, time.Duration(0))
+	}
+	assert.Equal(t, want, gotTypes)
+}
 
 func getResultCacheKey(t *testing.T, cache *VerificationCache, result detectors.Result) string {
 	key, err := cache.getResultCacheKey(result)
@@ -572,4 +670,212 @@ func TestVerificationCache_FromData_DoesNotCacheSecretMaterial(t *testing.T) {
 	assert.Nil(t, cached[0].RawV2)
 	assert.Nil(t, cached[0].SecretParts)
 	assert.Empty(t, cached[0].GetPrimarySecretValue())
+}
+
+// The tests below cover per-detector verification timing, which a reporter receives only by also
+// implementing DetectorMetricsReporter. They exist to catch two classes of regression: a sample
+// attributed to the wrong detector, and a sample recorded for verification that never left the
+// process because the result cache answered it.
+
+func TestVerificationCache_FromData_PerDetectorTiming_Passthrough(t *testing.T) {
+	detector := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+	}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(nil, &metrics)
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, true, nil)
+
+	require.NoError(t, err)
+	assertSampleTypes(t, &metrics, detector.Type())
+	assert.Less(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+}
+
+func TestVerificationCache_FromData_PerDetectorTiming_PassthroughVerifyFalse(t *testing.T) {
+	detector := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+	}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(nil, &metrics)
+
+	_, err := cache.FromData(logContext.Background(), &detector, false, true, nil)
+
+	require.NoError(t, err)
+	assertSampleTypes(t, &metrics)
+	assert.Equal(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+}
+
+func TestVerificationCache_FromData_PerDetectorTiming_CacheMiss(t *testing.T) {
+	detector := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
+	}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, false, nil)
+
+	require.NoError(t, err)
+	// The uncached finding forces one FromData(verify=true) pass over the whole chunk, which is one
+	// verification pass and therefore one sample.
+	assertSampleTypes(t, &metrics, detector.Type())
+}
+
+// A chunk answered entirely from the cache issues no remote request, so recording a duration for it
+// would put fabricated latency into the histogram.
+func TestVerificationCache_FromData_PerDetectorTiming_AllCacheHits(t *testing.T) {
+	detector := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
+	}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[1]),
+		detectors.Result{Redacted: "world", Verified: false})
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, false, nil)
+
+	require.NoError(t, err)
+	assertSampleTypes(t, &metrics)
+	assert.Equal(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+}
+
+func TestVerificationCache_FromData_PerDetectorTiming_ForceCacheUpdate(t *testing.T) {
+	detector := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+	}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[0]),
+		detectors.Result{Redacted: "hello", Verified: false})
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, true, nil)
+
+	require.NoError(t, err)
+	// Targeted rescans bypass the cache to get a fresh answer, so they do make a remote call.
+	assertSampleTypes(t, &metrics, detector.Type())
+}
+
+func TestVerificationCache_FromData_PerDetectorTiming_ResultVerifierPartialCacheHit(t *testing.T) {
+	detector := testResultVerifier{testDetector: testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
+	}}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, false, nil)
+
+	require.NoError(t, err)
+	// Only the miss is verified remotely, so the cache hit contributes no sample.
+	require.Equal(t, 1, detector.verifyResultCallCount)
+	assertSampleTypes(t, &metrics, detector.Type())
+}
+
+func TestVerificationCache_FromData_PerDetectorTiming_ResultVerifierAllCacheHits(t *testing.T) {
+	detector := testResultVerifier{testDetector: testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
+	}}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[0]),
+		detectors.Result{Redacted: "hello", Verified: true})
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[1]),
+		detectors.Result{Redacted: "world", Verified: false})
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, false, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, 0, detector.verifyResultCallCount)
+	assertSampleTypes(t, &metrics)
+	assert.Equal(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+}
+
+// One sample per remote call is what makes the histogram readable as provider latency: a chunk with
+// several misses must not collapse into a single fat observation. The aggregate counter keeps its
+// existing shape of one accumulated report per chunk, because it truncates to whole milliseconds and
+// would lose time if it were reported per call.
+func TestVerificationCache_FromData_PerDetectorTiming_ResultVerifierSamplesPerRemoteCall(t *testing.T) {
+	detector := testResultVerifier{testDetector: testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
+	}}}
+	metrics := detectorMetricsRecorder{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, false, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, 2, detector.verifyResultCallCount)
+	assertSampleTypes(t, &metrics, detector.Type(), detector.Type())
+	assert.Equal(t, 1, metrics.aggregateReportCount())
+}
+
+func TestVerificationCache_FromData_PerDetectorTiming_AttributesToOwnDetectorType(t *testing.T) {
+	const (
+		firstType  detector_typepb.DetectorType = -10
+		secondType detector_typepb.DetectorType = -11
+	)
+	first := typedTestDetector{
+		testDetector: testDetector{results: []detectors.Result{
+			{Redacted: "hello", Raw: []byte("hello"), Verified: true},
+		}},
+		detectorType: firstType,
+	}
+	second := typedTestDetector{
+		testDetector: testDetector{results: []detectors.Result{
+			{Redacted: "world", Raw: []byte("world"), Verified: true},
+		}},
+		detectorType: secondType,
+	}
+	metrics := detectorMetricsRecorder{}
+	cache := New(nil, &metrics)
+
+	_, err := cache.FromData(logContext.Background(), &first, true, true, nil)
+	require.NoError(t, err)
+	_, err = cache.FromData(logContext.Background(), &second, true, true, nil)
+	require.NoError(t, err)
+
+	assertSampleTypes(t, &metrics, firstType, secondType)
+}
+
+// A reporter that predates this interface, or simply does not want the extra series, must keep
+// working: New leaves detectorMetrics nil and the timing sites have to tolerate that.
+func TestVerificationCache_FromData_PerDetectorTiming_ReporterWithoutOptIn(t *testing.T) {
+	detector := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+	}}
+	metrics := InMemoryMetrics{}
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	require.Nil(t, cache.detectorMetrics)
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, false, nil)
+
+	require.NoError(t, err)
+	assert.Less(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+}
+
+// A provider that has started timing out or erroring is precisely the shift this metric exists to
+// surface, so a failed verification still has to contribute its latency.
+func TestVerificationCache_FromData_PerDetectorTiming_RecordsOnVerificationError(t *testing.T) {
+	detector := testDetector{
+		results: []detectors.Result{
+			{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
+		},
+		fromDataErr: errors.New("test verification failure"),
+	}
+	metrics := detectorMetricsRecorder{}
+	cache := New(nil, &metrics)
+
+	_, err := cache.FromData(logContext.Background(), &detector, true, true, nil)
+
+	require.Error(t, err)
+	assertSampleTypes(t, &metrics, detector.Type())
 }

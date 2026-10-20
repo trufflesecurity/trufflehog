@@ -64,15 +64,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	// Process results.
 	for token := range tokens {
-		s1 := detectors.Result{
-			DetectorType: s.Type(),
-			Raw:          []byte(token),
-			SecretParts:  map[string]string{"pat": token},
-		}
-
 		for username := range usernames {
-			s1.RawV2 = []byte(fmt.Sprintf("%s:%s", username, token))
-			s1.SecretParts["username"] = username
+			s1 := detectors.Result{
+				DetectorType: s.Type(),
+				Raw:          []byte(token),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", username, token)),
+				SecretParts: map[string]string{
+					"pat":      token,
+					"username": username,
+				},
+			}
 
 			if verify {
 				if s.client == nil {
@@ -94,7 +95,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		// PAT matches without usernames cannot be verified but might still be useful.
 		if len(usernames) == 0 {
-			results = append(results, s1)
+			results = append(results, detectors.Result{
+				DetectorType: s.Type(),
+				Raw:          []byte(token),
+				SecretParts:  map[string]string{"pat": token},
+			})
 		}
 	}
 	return

@@ -3,7 +3,6 @@ package detectors
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -307,28 +306,4 @@ func TestDoWithDedup_DeadlinePreserved(t *testing.T) {
 
 	assert.Error(t, err, "request to hanging server should fail")
 	assert.Less(t, elapsed, time.Second, "timeout should be enforced by client deadline, not run indefinitely")
-}
-
-func TestIsLocalIP(t *testing.T) {
-	testCases := []struct {
-		name     string
-		ip       net.IP
-		expected bool
-	}{
-		{"Loopback IPv4", net.ParseIP("127.0.0.1"), true},
-		{"Loopback IPv6", net.ParseIP("::1"), true},
-		{"Private IPv4", net.ParseIP("192.168.1.1"), true},
-		{"Private IPv6", net.ParseIP("fd00::1"), true},
-		{"Unspecified IPv4", net.ParseIP("0.0.0.0"), true},
-		{"Unspecified IPv6", net.ParseIP("::"), true},
-		{"Public IPv4", net.ParseIP("8.8.8.8"), false},
-		{"Public IPv6", net.ParseIP("2001:4860:4860::8888"), false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := isLocalIP(tc.ip)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
 }

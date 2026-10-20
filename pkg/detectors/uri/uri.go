@@ -18,6 +18,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
+var errNoSuchHost = errors.New("no such host")
+
 type Scanner struct {
 	allowKnownTestSites bool
 	client              *http.Client
@@ -112,21 +114,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			hostname := parsedURL.Hostname()
 			if hostNotFoundCache.Exists(hostname) {
-				logger.V(3).Info("Skipping uri: no such host", "host", hostname)
-				continue
-			}
-
-			if s.client == nil {
-				s.client = defaultClient
-			}
-			isVerified, vErr := verifyURL(ctx, s.client, parsedURL)
-			r.Verified = isVerified
-			if vErr != nil {
-				var dnsErr *net.DNSError
-				if errors.As(vErr, &dnsErr) && dnsErr.IsNotFound {
-					hostNotFoundCache.Set(hostname, struct{}{})
+				// An earlier candidate already proved this host does not resolve, so the lookup is skipped.
+				// The finding is still reported: dropping it here means the reported secrets depend both on
+				// whether verification was requested and on the order candidates happened to be processed,
+				// since the first candidate for the host was reported and later ones were not.
+				logger.V(3).Info("Skipping uri verification: no such host", "host", hostname)
+				r.SetVerificationError(errNoSuchHost, password)
+			} else {
+				if s.client == nil {
+					s.client = defaultClient
 				}
-				r.SetVerificationError(vErr, password)
+				isVerified, vErr := verifyURL(ctx, s.client, parsedURL)
+				r.Verified = isVerified
+				if vErr != nil {
+					var dnsErr *net.DNSError
+					if errors.As(vErr, &dnsErr) && dnsErr.IsNotFound {
+						hostNotFoundCache.Set(hostname, struct{}{})
+					}
+					r.SetVerificationError(vErr, password)
+				}
 			}
 		}
 

@@ -429,6 +429,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/klaviyo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/klipfolio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/knapsackpro"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kong"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kontent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kraken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
@@ -734,6 +735,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/solarwindsobservability"
 	sonarcloudv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v1"
 	sonarcloudv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarqube"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spectralops"
@@ -1346,6 +1348,7 @@ func buildDetectorList() []detectors.Detector {
 		&klaviyo.Scanner{},
 		&klipfolio.Scanner{},
 		&knapsackpro.Scanner{},
+		&kong.Scanner{},
 		&kontent.Scanner{},
 		&kraken.Scanner{},
 		&kucoin.Scanner{},
@@ -1660,6 +1663,7 @@ func buildDetectorList() []detectors.Detector {
 		&solarwindsobservability.Scanner{},
 		&sonarcloudv1.Scanner{},
 		&sonarcloudv2.Scanner{},
+		&sonarqube.Scanner{},
 		&sourcegraph.Scanner{},
 		&sourcegraphcody.Scanner{},
 		// &sparkpost.Scanner{},
@@ -1906,6 +1910,10 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ResendDetectorEnabled.Load()
 		case *weightsandbiasesv2.Scanner:
 			return !feature.WeightsAndBiasesV2DetectorEnabled.Load()
+		case *kong.Scanner:
+			return !feature.KongKonnectDetectorEnabled.Load()
+		case *sonarqube.Scanner:
+			return !feature.SonarQubeDetectorEnabled.Load()
 		default:
 			return false
 		}
