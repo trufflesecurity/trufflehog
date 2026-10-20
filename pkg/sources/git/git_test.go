@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,6 +66,38 @@ func TestClone_Timeout(t *testing.T) {
 			assert.Contains(t, err.Error(), "timed out")
 		}
 	})
+}
+
+func TestCloneRepoWithRefNamespaceCollision(t *testing.T) {
+	previousUseGitMirror := feature.UseGitMirror.Swap(false)
+	t.Cleanup(func() { feature.UseGitMirror.Store(previousUseGitMirror) })
+	previousSkipAdditionalRefs := feature.SkipAdditionalRefs.Swap(false)
+	t.Cleanup(func() { feature.SkipAdditionalRefs.Store(previousSkipAdditionalRefs) })
+
+	repoPath := setupTestRepo(t, "ref-collision-repo")
+	addTestFileAndCommit(t, repoPath, "first.txt", "first commit")
+	firstCommit := gitRevParse(t, repoPath, "HEAD")
+	addTestFileAndCommit(t, repoPath, "second.txt", "second commit")
+	secondCommit := gitRevParse(t, repoPath, "HEAD")
+
+	// These two refs collide when the extra-ref fetch refspec and Git's default
+	// branch refspec both map into refs/remotes/origin/.
+	runGit(t, repoPath, "update-ref", "refs/heads/remotes/archive/stable", firstCommit)
+	runGit(t, repoPath, "update-ref", "refs/remotes/archive/stable", secondCommit)
+
+	uriPath := filepath.ToSlash(repoPath)
+	if runtime.GOOS == "windows" {
+		uriPath = "/" + uriPath
+	}
+	fileURI := (&url.URL{Scheme: "file", Path: uriPath}).String()
+	clonePath, _, err := CloneRepoUsingUnauthenticated(context.Background(), fileURI, "")
+	if !assert.NoError(t, err, "cloning a local repo with colliding source ref names") {
+		return
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(clonePath) })
+
+	assert.Equal(t, firstCommit, gitRevParse(t, clonePath, "refs/remotes/origin/remotes/archive/stable"))
+	assert.Equal(t, secondCommit, gitRevParse(t, clonePath, "refs/trufflehog/origin/remotes/archive/stable"))
 }
 
 func TestIsRetryableCloneError(t *testing.T) {
