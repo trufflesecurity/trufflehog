@@ -34,8 +34,12 @@ var (
 	// instead of an exact one (the same trade-off the googleoauth2 detector makes
 	// for access tokens): 20 base64url chars weeds out placeholders like
 	// sk-ant-oat01-abc123 while the distinctive 15-char prefix keeps false
-	// positives low.
-	keyPat = regexp.MustCompile(`\b(sk-ant-(?:admin01|api03)-[\w\-]{93}AA|sk-ant-oat01-[\w\-]{20,})\b`)
+	// positives low. The trailing \b applies only to the fixed-length
+	// API/admin-key alternative: the OAuth payload is base64url and may end
+	// in '-', which is a non-word character, so a trailing \b would make the
+	// matcher backtrack and drop a trailing hyphen, truncating the secret
+	// before verification.
+	keyPat = regexp.MustCompile(`\b(sk-ant-(?:admin01|api03)-[\w\-]{93}AA\b|sk-ant-oat01-[\w\-]{20,})`)
 
 	// verification endpoints
 	apiKeyEndpoint   = "https://api.anthropic.com/v1/models"

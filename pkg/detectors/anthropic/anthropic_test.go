@@ -181,6 +181,14 @@ func TestAnthropic_Pattern(t *testing.T) {
 			want: []string{fakeOAuthToken},
 		},
 		{
+			// A base64url payload may end in '-', which is a non-word
+			// character: the match must keep the trailing hyphen instead of
+			// backtracking it away at a word boundary.
+			name:  "OAuth token ending in hyphen is matched in full",
+			input: "export CLAUDE_CODE_OAUTH_TOKEN=" + "sk-ant-oat01-" + strings.Repeat("Aa1", 20) + "-",
+			want:  []string{"sk-ant-oat01-" + strings.Repeat("Aa1", 20) + "-"},
+		},
+		{
 			name: "truncated OAuth token placeholder is ignored",
 			input: `
 				Example config - replace with your own token before deploying.
