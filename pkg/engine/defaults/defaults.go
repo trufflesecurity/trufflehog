@@ -297,6 +297,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/findl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finnhub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/firehydrant"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fireworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fixerio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flatio"
@@ -1213,6 +1214,7 @@ func buildDetectorList() []detectors.Detector {
 		&financialmodelingprep.Scanner{},
 		&findl.Scanner{},
 		&finnhub.Scanner{},
+		&firehydrant.Scanner{},
 		&fireworks.Scanner{},
 		&fixerio.Scanner{},
 		&flatio.Scanner{},
