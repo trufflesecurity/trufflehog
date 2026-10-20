@@ -2412,3 +2412,49 @@ func TestCloneRepo_DoesNotLogToken(t *testing.T) {
 		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), token)
 	}
 }
+
+func TestRedactPasswords(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   string
+		password string
+		want     string
+	}{
+		{
+			name:     "plain token",
+			output:   "fatal: unable to access 'https://user:glpat-abc123@host/r.git/'",
+			password: "glpat-abc123",
+			want:     "fatal: unable to access 'https://user:<secret>@host/r.git/'",
+		},
+		{
+			name:     "base64 token is percent-encoded in the url",
+			output:   "fatal: unable to access 'https://user:abc+%2F=def@host/r.git/'",
+			password: "abc+/=def",
+			want:     "fatal: unable to access 'https://user:<secret>@host/r.git/'",
+		},
+		{
+			name:     "token with @ : and ?",
+			output:   "fatal: unable to access 'https://user:a%40b%3Ac%3Fd@host/r.git/'",
+			password: "a@b:c?d",
+			want:     "fatal: unable to access 'https://user:<secret>@host/r.git/'",
+		},
+		{
+			name:     "plain form printed somewhere else",
+			output:   "token a@b:c?d was rejected",
+			password: "a@b:c?d",
+			want:     "token <secret> was rejected",
+		},
+		{
+			name:     "empty password leaves output alone",
+			output:   "fatal: repository not found",
+			password: "",
+			want:     "fatal: repository not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, redactPasswords(tt.output, tt.password))
+		})
+	}
+}

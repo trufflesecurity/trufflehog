@@ -703,13 +703,8 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	// hide passwords from the git output before it is logged or returned
 	// the password can be inside the url, or passed in separately and added
 	// to the url above when authInUrl is set
-	output := string(outputBytes)
 	userInfoPassword, _ := params.userInfo.Password()
-	for _, secret := range []string{urlPassword, userInfoPassword} {
-		if secret != "" {
-			output = strings.ReplaceAll(output, secret, "<secret>")
-		}
-	}
+	output := redactPasswords(string(outputBytes), urlPassword, userInfoPassword)
 
 	if err != nil {
 		err = fmt.Errorf("error executing git clone: %w, %s", err, output)
@@ -739,6 +734,22 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	metricsInstance.RecordCloneOperation(statusSuccess, cloneSuccess, 0)
 
 	return repo, nil
+}
+
+// redactPasswords replaces each password in output with "<secret>".
+// Git gets the password inside the clone URL, where Go percent-encodes it
+// (a "/" becomes "%2F"), so if git prints the URL we have to hide that form too.
+// The encoded form is built the same way Go builds the clone URL.
+func redactPasswords(output string, passwords ...string) string {
+	for _, password := range passwords {
+		if password == "" {
+			continue
+		}
+		encoded := strings.TrimPrefix(url.UserPassword("", password).String(), ":")
+		output = strings.ReplaceAll(output, password, "<secret>")
+		output = strings.ReplaceAll(output, encoded, "<secret>")
+	}
+	return output
 }
 
 // PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
