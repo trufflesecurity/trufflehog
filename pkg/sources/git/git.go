@@ -667,9 +667,11 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		gitArgs = append(gitArgs, "--mirror")
 	} else {
 		if !feature.SkipAdditionalRefs.Load() {
+			// Keep extra refs outside refs/remotes/origin so they cannot collide
+			// with the default branch refspec during clone.
 			gitArgs = append(gitArgs,
 				"-c",
-				"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+				"remote.origin.fetch=+refs/*:refs/trufflehog/origin/*")
 		}
 	}
 
