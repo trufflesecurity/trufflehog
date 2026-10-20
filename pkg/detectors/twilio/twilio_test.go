@@ -399,4 +399,37 @@ func TestTwilio_EndpointCustomization(t *testing.T) {
 			t.Errorf("VerificationError() = %v, want nil on successful subsequent endpoint", results[0].VerificationError())
 		}
 	})
+
+	t.Run("configured custom endpoint already ending with /2010-04-01/Accounts does not duplicate prefix", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(fmt.Sprintf(`{"sid":"%s","status":"active"}`, validSid))),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://custom-proxy.internal.net/2010-04-01/Accounts"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := fmt.Sprintf("https://custom-proxy.internal.net/2010-04-01/Accounts/%s.json", validSid)
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
 }

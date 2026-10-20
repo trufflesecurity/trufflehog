@@ -11,7 +11,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -218,6 +224,165 @@ func TestTwilioAPIKey_Verification_HappyPath(t *testing.T) {
 	}
 }
 
+func TestTwilioAPIKey_CloudEndpoint_ReturnsFullURI(t *testing.T) {
+	want := "https://verify.twilio.com/v2/Services"
+	got := Scanner{}.CloudEndpoint()
+	if got != want {
+		t.Errorf("Scanner{}.CloudEndpoint() = %q, want %q", got, want)
+	}
+}
+
+func TestTwilioAPIKey_DefaultVerification_HitsFullURI(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	var requestedURL string
+	client := &http.Client{
+		Transport: common.FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				requestedURL = req.URL.String()
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
+				}, nil
+			},
+		},
+	}
+
+	s := Scanner{client: client}
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 || !results[0].Verified {
+		t.Fatalf("expected verified result, got %+v", results)
+	}
+
+	wantURL := "https://verify.twilio.com/v2/Services"
+	if requestedURL != wantURL {
+		t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+	}
+}
+
+func TestTwilioAPIKey_CustomEndpoint_ExactURIPreserved(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	var requestedURL string
+	client := &http.Client{
+		Transport: common.FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				requestedURL = req.URL.String()
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
+				}, nil
+			},
+		},
+	}
+
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal/v2/Services"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 || !results[0].Verified {
+		t.Fatalf("expected verified result, got %+v", results)
+	}
+
+	wantURL := "https://authproxy.corp.internal/v2/Services"
+	if requestedURL != wantURL {
+		t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+	}
+}
+
+func TestTwilioAPIKey_CustomEndpoint_CustomPathPreserved(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	var requestedURL string
+	client := &http.Client{
+		Transport: common.FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				requestedURL = req.URL.String()
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				}, nil
+			},
+		},
+	}
+
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints("https://mock-verifier.internal/api/verify"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 || !results[0].Verified {
+		t.Fatalf("expected verified result, got %+v", results)
+	}
+
+	wantURL := "https://mock-verifier.internal/api/verify"
+	if requestedURL != wantURL {
+		t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+	}
+}
+
+func TestTwilioAPIKey_CustomEndpoint_MissingPathEmitsWarningAndHitsRoot(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+
+	var requestedURL string
+	client := &http.Client{
+		Transport: common.FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				requestedURL = req.URL.String()
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				}, nil
+			},
+		},
+	}
+
+	var loggedMessages []string
+	logger := zapr.NewLogger(zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(func(e zapcore.Entry) error {
+		loggedMessages = append(loggedMessages, e.Message)
+		return nil
+	}))))
+
+	ctx := logContext.WithLogger(context.Background(), logger)
+
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(ctx, true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 || !results[0].Verified {
+		t.Fatalf("expected verified result, got %+v", results)
+	}
+
+	if requestedURL != "https://authproxy.corp.internal" && requestedURL != "https://authproxy.corp.internal/" {
+		t.Errorf("requestedURL = %q, want https://authproxy.corp.internal or https://authproxy.corp.internal/", requestedURL)
+	}
+
+	var foundWarning bool
+	for _, msg := range loggedMessages {
+		if strings.Contains(msg, "missing a path portion") {
+			foundWarning = true
+			break
+		}
+	}
+	if !foundWarning {
+		t.Errorf("expected log containing 'missing a path portion', got: %v", loggedMessages)
+	}
+}
+
 func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
 
@@ -250,7 +415,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 		}
 	})
 
-	t.Run("configured custom endpoint", func(t *testing.T) {
+	t.Run("configured custom endpoint exact uri preserved", func(t *testing.T) {
 		var requestedURL string
 		client := &http.Client{
 			Transport: common.FakeTransport{
@@ -265,40 +430,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 		}
 
 		s := Scanner{client: client}
-		if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal"); err != nil {
-			t.Fatalf("SetConfiguredEndpoints error = %v", err)
-		}
-
-		results, err := s.FromData(context.Background(), true, data)
-		if err != nil {
-			t.Fatalf("FromData() error = %v", err)
-		}
-		if len(results) != 1 || !results[0].Verified {
-			t.Fatalf("expected verified result, got %+v", results)
-		}
-
-		wantURL := "https://authproxy.corp.internal/v2/Services"
-		if requestedURL != wantURL {
-			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
-		}
-	})
-
-	t.Run("trailing slash normalization", func(t *testing.T) {
-		var requestedURL string
-		client := &http.Client{
-			Transport: common.FakeTransport{
-				CreateResponse: func(req *http.Request) (*http.Response, error) {
-					requestedURL = req.URL.String()
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
-					}, nil
-				},
-			},
-		}
-
-		s := Scanner{client: client}
-		if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal/"); err != nil {
+		if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal/v2/Services"); err != nil {
 			t.Fatalf("SetConfiguredEndpoints error = %v", err)
 		}
 
@@ -335,7 +467,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 		}
 
 		s := Scanner{client: client}
-		if err := s.SetConfiguredEndpoints("https://fail-proxy.internal.net", "https://success-proxy.internal.net"); err != nil {
+		if err := s.SetConfiguredEndpoints("https://fail-proxy.internal.net/v2/Services", "https://success-proxy.internal.net/v2/Services"); err != nil {
 			t.Fatalf("SetConfiguredEndpoints error = %v", err)
 		}
 
@@ -348,6 +480,117 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 		}
 		if results[0].VerificationError() != nil {
 			t.Errorf("VerificationError() = %v, want nil on successful subsequent endpoint", results[0].VerificationError())
+		}
+	})
+
+	t.Run("configured custom endpoint with custom path preserved", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://mock-verifier.internal/api/verify"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := "https://mock-verifier.internal/api/verify"
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+	})
+
+	t.Run("configured custom endpoint targeting Core Accounts.json API", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"accounts":[{"sid":"AC12345678901234567890123456789012","friendly_name":"Main Account","status":"active","type":"Full"}]}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://api.twilio.com/2010-04-01/Accounts.json"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		wantURL := "https://api.twilio.com/2010-04-01/Accounts.json"
+		if requestedURL != wantURL {
+			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
+		}
+
+		if results[0].ExtraData["account_sid"] != "AC12345678901234567890123456789012" {
+			t.Errorf("account_sid = %q, want AC12345678901234567890123456789012", results[0].ExtraData["account_sid"])
+		}
+		if results[0].ExtraData["friendly_name"] != "Main Account" {
+			t.Errorf("friendly_name = %q, want Main Account", results[0].ExtraData["friendly_name"])
+		}
+		if results[0].ExtraData["status"] != "active" {
+			t.Errorf("status = %q, want active", results[0].ExtraData["status"])
+		}
+		if results[0].ExtraData["type"] != "Full" {
+			t.Errorf("type = %q, want Full", results[0].ExtraData["type"])
+		}
+	})
+
+	t.Run("configured custom endpoint with trailing slash on custom path", func(t *testing.T) {
+		var requestedURL string
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestedURL = req.URL.String()
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://mock-verifier.internal/api/verify/"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		if !strings.HasPrefix(requestedURL, "https://mock-verifier.internal/api/verify") {
+			t.Errorf("requestedURL = %q, want prefix https://mock-verifier.internal/api/verify", requestedURL)
 		}
 	})
 }

@@ -123,7 +123,15 @@ func (s Scanner) Description() string {
 
 func verifyTwilio(ctx context.Context, client *http.Client, key, sid, baseURL string) (map[string]string, bool, error) {
 	baseURL = strings.TrimRight(baseURL, "/")
-	reqURL := fmt.Sprintf("%s/2010-04-01/Accounts/%s.json", baseURL, sid)
+	var reqURL string
+	switch {
+	case strings.HasSuffix(baseURL, fmt.Sprintf("/2010-04-01/Accounts/%s.json", sid)):
+		reqURL = baseURL
+	case strings.HasSuffix(baseURL, "/2010-04-01/Accounts"):
+		reqURL = fmt.Sprintf("%s/%s.json", baseURL, sid)
+	default:
+		reqURL = fmt.Sprintf("%s/2010-04-01/Accounts/%s.json", baseURL, sid)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, false, err
