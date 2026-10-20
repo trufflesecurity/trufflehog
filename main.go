@@ -464,6 +464,15 @@ func run(state overseer.State, logSync func() error) {
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger, logSync)
 
+	// --debug and --trace still work the same, but in a future release --debug
+	// takes over --trace's level 5 and --trace goes away. Warn users now.
+	if *trace {
+		logger.Info("--trace is deprecated and will be replaced by --debug in a future release. Use --log-level=5 instead.")
+	}
+	if *debug {
+		logger.Info("--debug will switch from log level 2 to 5 (what --trace does today) in a future release. Use --log-level=2 to keep the current output.")
+	}
+
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {

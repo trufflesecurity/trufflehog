@@ -112,6 +112,7 @@ type SourceUnitEnumerator interface {
 // all of the necessary information to call the [Source.Init] method.
 type ConfiguredSource struct {
 	Name       string
+	Debug      bool // turns on debug logging for this source only
 	source     Source
 	initParams struct {
 		verify      bool
@@ -125,6 +126,7 @@ type ConfiguredSource struct {
 func NewConfiguredSource(s Source, config *sourcespb.LocalSource) ConfiguredSource {
 	return ConfiguredSource{
 		Name:   config.GetName(),
+		Debug:  config.GetDebug(),
 		source: s,
 		initParams: struct {
 			verify      bool

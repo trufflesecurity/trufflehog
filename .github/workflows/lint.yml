@@ -50,6 +50,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: semgrep --config=hack/semgrep-rules/detectors.yaml pkg/detectors/
+      # Source logging rules. Findings are warnings only and don't fail the build.
+      - run: semgrep --config=hack/semgrep-rules/sources.yaml pkg/sources/
   checksecretparts:
     # Reports detector packages that construct detectors.Result without
     # populating SecretParts. See hack/checksecretparts/README.md.

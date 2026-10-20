@@ -71,6 +71,8 @@ message LocalSource {
   bool verify = 4;
   google.protobuf.Any connection = 5;
   string scan_period = 6;
+  // debug turns on debug logging for this source only. Other sources keep the global log level.
+  bool debug = 7;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
