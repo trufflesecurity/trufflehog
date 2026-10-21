@@ -76,6 +76,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func ProcessData(ctx context.Context, data string, clientSecrets map[string]struct{}, clientIds, tenantIds map[string][]int, verify bool, client *http.Client) (results []detectors.Result) {
 	logCtx := logContext.AddLogger(ctx)
 	invalidClientsForTenant := make(map[string]map[string]struct{})
+	// Tenants whose lookup failed. Not retried again in this call, so one flaky tenant
+	// costs one request instead of one per secret and client.
+	unknownTenants := make(map[string]struct{})
 
 	for clientSecret := range clientSecrets {
 		var (
@@ -100,6 +103,10 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 					continue
 				}
 
+				if _, unknown := unknownTenants[tenantId]; unknown {
+					continue
+				}
+
 				// Skip known invalid tenants.
 				invalidClients := invalidClientsForTenant[tenantId]
 				if invalidClients == nil {
@@ -115,6 +122,7 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 					if err != nil {
 						// Unknown, not "missing". Skip it for now but keep it as a candidate.
 						// If no pair is recognised, the fallback still picks the nearest tenant.
+						unknownTenants[tenantId] = struct{}{}
 						continue
 					}
 					if !exists {

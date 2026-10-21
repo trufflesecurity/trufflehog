@@ -335,3 +335,29 @@ func TestProcessData_RotatedSecretKeepsTenantThatRecognisedTheApp(t *testing.T) 
 	assert.Contains(t, string(live.RawV2), realTenant)
 	assert.Equal(t, string(live.RawV2), string(rotated.RawV2))
 }
+
+// A tenant lookup that keeps failing must be tried once, not once per secret and client.
+func TestProcessData_FailedTenantLookupIsNotRepeated(t *testing.T) {
+	const (
+		tenant  = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
+		clientA = "8595f61a-109a-497d-8c8f-566b733e95fe"
+		clientB = "d2c1b0a9-8f7e-4d6c-b5a4-3f2e1d0c9b8a"
+	)
+	secrets := map[string]struct{}{
+		"abc4Q~fake-secret-that-is-long-enough1234567": {},
+		"xyz9Q~another-fake-secret-long-enough7654321": {},
+	}
+	data := "tenant_id: " + tenant + "\n"
+	lookups := 0
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		lookups++
+		return tokenErrorResponse(http.StatusTooManyRequests, ""), nil
+	})}
+	clientIDs := map[string][]int{clientA: {0}, clientB: {1}}
+	tenantIDs := map[string][]int{tenant: {len("tenant_id: ")}}
+
+	results := ProcessData(context.Background(), data, secrets, clientIDs, tenantIDs, true, client)
+
+	assert.Len(t, results, 2)
+	assert.Equal(t, 1, lookups)
+}
