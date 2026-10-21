@@ -280,7 +280,8 @@ func TestProcessData_TransientTenantErrorKeepsNearestTenant(t *testing.T) {
 			}
 			return tokenErrorResponse(http.StatusOK, ""), nil
 		}
-		return tokenErrorResponse(http.StatusUnauthorized, "AADSTS7000215: Invalid client secret provided."), nil
+		// The app isn't found in the tenant that could be checked, so nothing is learned.
+		return tokenErrorResponse(http.StatusBadRequest, "AADSTS700016: app not found"), nil
 	})}
 	clientIDs := map[string][]int{app: {0}}
 	tenantIDs := map[string][]int{nearTenant: {strings.Index(data, nearTenant)}, farTenant: {strings.Index(data, farTenant)}}
@@ -289,4 +290,48 @@ func TestProcessData_TransientTenantErrorKeepsNearestTenant(t *testing.T) {
 
 	require.Len(t, results, 1)
 	assert.Contains(t, string(results[0].RawV2), nearTenant)
+}
+
+// An unrelated tenant sits closer to the secret than the real one. A rotated secret is
+// still recognised by the real tenant (secret invalid, not app missing), so the result
+// must match the live one.
+func TestProcessData_RotatedSecretKeepsTenantThatRecognisedTheApp(t *testing.T) {
+	const (
+		secret      = "abc4Q~fake-secret-that-is-long-enough1234567"
+		app         = "8595f61a-109a-497d-8c8f-566b733e95fe"
+		otherTenant = "d1e2f3a4-5b6c-4d7e-8f90-a1b2c3d4e5f6"
+		realTenant  = "e7f8a9b0-2c3d-4e5f-9a1b-6c7d8e9f0a1b"
+	)
+	data := "tenant_id: " + otherTenant + "\nsecret: " + secret + "\n" + strings.Repeat("filler\n", 20) + "tenant_id: " + realTenant + "\n"
+
+	run := func(live bool) detectors.Result {
+		client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if r.Method == http.MethodGet {
+				return tokenErrorResponse(http.StatusOK, ""), nil
+			}
+			switch {
+			case strings.Contains(r.URL.Path, otherTenant):
+				return tokenErrorResponse(http.StatusBadRequest, "AADSTS700016: app not found"), nil
+			case live:
+				rec := httptest.NewRecorder()
+				_ = json.NewEncoder(rec).Encode(map[string]string{"access_token": "x"})
+				return rec.Result(), nil
+			default:
+				return tokenErrorResponse(http.StatusUnauthorized, "AADSTS7000215: Invalid client secret provided."), nil
+			}
+		})}
+		clientIDs := map[string][]int{app: {0}}
+		tenantIDs := map[string][]int{otherTenant: {strings.Index(data, otherTenant)}, realTenant: {strings.Index(data, realTenant)}}
+		results := ProcessData(context.Background(), data, map[string]struct{}{secret: {}}, clientIDs, tenantIDs, true, client)
+		require.Len(t, results, 1)
+		return results[0]
+	}
+
+	live := run(true)
+	rotated := run(false)
+
+	assert.True(t, live.Verified)
+	assert.False(t, rotated.Verified)
+	assert.Contains(t, string(live.RawV2), realTenant)
+	assert.Equal(t, string(live.RawV2), string(rotated.RawV2))
 }

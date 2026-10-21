@@ -78,7 +78,11 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 
 	for clientSecret := range clientSecrets {
-		var r *detectors.Result
+		var (
+			r *detectors.Result
+			// The first client/tenant pair that recognised the app but rejected the secret.
+			knownClientId, knownTenantId string
+		)
 
 		// Candidates nearest to the secret are the most likely to belong to it.
 		secretPos := strings.Index(data, clientSecret)
@@ -109,8 +113,8 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 				if verify {
 					exists, err := azure_entra.TenantExists(logCtx, client, tenantId)
 					if err != nil {
-						// Unknown, not "missing". Keep the tenant as a candidate so a
-						// temporary failure doesn't change which tenant gets reported.
+						// Unknown, not "missing". Skip it for now but keep it as a candidate.
+						// If no pair is recognised, the fallback still picks the nearest tenant.
 						continue
 					}
 					if !exists {
@@ -128,6 +132,11 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 						case errors.Is(verificationErr, serviceprincipal.ErrConditionalAccessPolicy):
 							// Do nothing.
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretInvalid):
+							// The app exists in this tenant, only the secret is wrong (e.g.,
+							// rotated). Remember the pair so the fallback matches the live result.
+							if knownClientId == "" {
+								knownClientId, knownTenantId = clientId, tenantId
+							}
 							continue ClientLoop
 						case errors.Is(verificationErr, serviceprincipal.ErrSecretExpired):
 							r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
@@ -153,19 +162,12 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 		}
 
 		if r == nil {
-			// Nothing verified. Report the nearest tenant, then the nearest client that
-			// isn't ruled out for it, so the result stays the same whether the secret
-			// is live or rotated.
-			var clientId, tenantId string
-			if remaining := azure_entra.NearestFirst(tenantIds, secretPos); len(remaining) > 0 {
-				tenantId = remaining[0]
-			}
-			for _, candidate := range azure_entra.NearestFirst(clientIds, secretPos) {
-				if _, ruledOut := invalidClientsForTenant[tenantId][candidate]; ruledOut || candidate == tenantId {
-					continue
-				}
-				clientId = candidate
-				break
+			// Nothing verified. Use the pair Azure recognised, if any. Otherwise report
+			// the nearest tenant, then the nearest client that isn't ruled out for it.
+			// This keeps the result the same whether the secret is live or rotated.
+			clientId, tenantId := knownClientId, knownTenantId
+			if clientId == "" {
+				clientId, tenantId = nearestPair(clientIds, tenantIds, invalidClientsForTenant, secretPos)
 			}
 			r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
 		}
@@ -173,6 +175,21 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 		results = append(results, *r)
 	}
 	return results
+}
+
+// nearestPair picks the tenant nearest to |pos|, then the nearest client that isn't
+// ruled out for that tenant and isn't the tenant itself.
+func nearestPair(clientIds, tenantIds map[string][]int, invalidClientsForTenant map[string]map[string]struct{}, pos int) (clientId, tenantId string) {
+	if remaining := azure_entra.NearestFirst(tenantIds, pos); len(remaining) > 0 {
+		tenantId = remaining[0]
+	}
+	for _, candidate := range azure_entra.NearestFirst(clientIds, pos) {
+		if _, ruledOut := invalidClientsForTenant[tenantId][candidate]; ruledOut || candidate == tenantId {
+			continue
+		}
+		return candidate, tenantId
+	}
+	return "", tenantId
 }
 
 func createResult(tenantId string, clientId string, clientSecret string, verified bool, extraData map[string]string, err error) *detectors.Result {
