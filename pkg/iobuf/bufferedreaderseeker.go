@@ -119,66 +119,55 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		return n, err
 	}
 
-	// If we have a temp file and the total size is known, we can read directly from it.
-	if br.sizeKnown && br.tempFile != nil {
-		if br.index >= br.totalSize {
-			return 0, io.EOF
-		}
-		if _, err := br.tempFile.Seek(br.index, io.SeekStart); err != nil {
-			return 0, err
-		}
-		n, err := br.tempFile.Read(out)
-		br.index += int64(n)
-		return n, err
+	if len(out) == 0 {
+		return 0, nil
+	}
+	if br.sizeKnown && br.index >= br.totalSize {
+		return 0, io.EOF
 	}
 
 	if br.buf == nil {
 		br.buf = br.bufPool.Get()
 	}
 
-	var (
-		totalBytesRead int
-		err            error
-	)
+	var totalBytesRead int
 
-	// If the current read position is within the in-memory buffer.
-	if br.index < int64(br.buf.Len()) {
-		totalBytesRead = copy(out, br.buf.Bytes()[br.index:])
-		br.index += int64(totalBytesRead)
-		if totalBytesRead == len(out) {
-			return totalBytesRead, nil
-		}
-		out = out[totalBytesRead:]
-	}
-
-	// If we've exceeded the in-memory threshold and have a temp file.
+	// The disk buffer contains the prefix; the memory buffer contains its suffix.
 	if br.tempFile != nil && br.index < br.diskBufferSize {
-		if _, err := br.tempFile.Seek(br.index-int64(br.buf.Len()), io.SeekStart); err != nil {
-			return totalBytesRead, err
-		}
-		m, err := br.tempFile.Read(out)
-		totalBytesRead += m
-		br.index += int64(m)
+		toRead := min(int64(len(out)), br.diskBufferSize-br.index)
+		n, err := br.tempFile.ReadAt(out[:toRead], br.index)
+		totalBytesRead += n
+		br.index += int64(n)
 		if err != nil && !errors.Is(err, io.EOF) {
 			return totalBytesRead, err
 		}
+		if int64(n) != toRead {
+			return totalBytesRead, io.ErrUnexpectedEOF
+		}
 		if totalBytesRead == len(out) {
 			return totalBytesRead, nil
 		}
-		out = out[totalBytesRead:]
 	}
 
-	if len(out) == 0 {
-		return totalBytesRead, nil
+	if br.index < br.bytesRead {
+		offset := br.index - br.diskBufferSize
+		n := copy(out[totalBytesRead:], br.buf.Bytes()[offset:])
+		totalBytesRead += n
+		br.index += int64(n)
+		if totalBytesRead == len(out) {
+			return totalBytesRead, nil
+		}
 	}
 
-	// If we still need to read more data.
-	var readerBytes int
-	readerBytes, err = br.reader.Read(out)
+	if br.index > br.bytesRead {
+		return totalBytesRead, io.EOF
+	}
+
+	readerBytes, err := br.reader.Read(out[totalBytesRead:])
 	totalBytesRead += readerBytes
 	br.index += int64(readerBytes)
 
-	if writeErr := br.writeData(out[:readerBytes]); writeErr != nil {
+	if writeErr := br.writeData(out[totalBytesRead-readerBytes : totalBytesRead]); writeErr != nil {
 		return totalBytesRead, writeErr
 	}
 
@@ -223,18 +212,13 @@ func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	}
 
 	// For non-seekable readers, we need to ensure we've read up to the new index.
-	if br.seeker == nil && newIndex > br.bytesRead {
+	if newIndex > br.bytesRead && !br.sizeKnown {
 		if err := br.readUntil(newIndex); err != nil {
 			return 0, err
 		}
 	}
 
 	br.index = newIndex
-
-	// Update bytesRead only if we've moved beyond what we've read so far.
-	if br.index > br.bytesRead {
-		br.bytesRead = br.index
-	}
 
 	return newIndex, nil
 }
@@ -314,16 +298,22 @@ func (br *BufferedReadSeeker) readUntil(index int64) error {
 			bufSize = remaining
 		}
 
-		n, err := io.CopyN(buf, br, bufSize)
-		if err != nil && !errors.Is(err, io.EOF) {
+		n, err := io.CopyN(buf, br.reader, bufSize)
+		if n > 0 {
+			if writeErr := br.writeData(buf.Bytes()[:n]); writeErr != nil {
+				return writeErr
+			}
+		}
+		buf.Reset()
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 			return err
 		}
 
-		if n == 0 {
+		if err != nil {
+			br.totalSize = br.bytesRead
+			br.sizeKnown = true
 			break
 		}
-
-		buf.Reset()
 	}
 
 	return nil
