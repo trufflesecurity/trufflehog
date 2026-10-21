@@ -535,8 +535,9 @@ func TestCommentScan_RetryLogNamesTheListing(t *testing.T) {
 		includePRComments:    true,
 		commentRetryWait:     func(context.Context, time.Duration) bool { return true },
 	}
+	// retries are logged at V(4), with other API decisions
 	var logs bytes.Buffer
-	logger, _ := log.New("test", log.WithJSONSink(&logs, log.WithLevel(2)))
+	logger, _ := log.New("test", log.WithJSONSink(&logs, log.WithLevel(4)))
 	ctx := context.WithLogger(context.Background(), logger)
 
 	err := s.processIssueandPRsWithCommentsREST(ctx, gh.client, testRepo, nil, &collectingReporter{}, nil)

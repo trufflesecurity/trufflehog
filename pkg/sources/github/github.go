@@ -229,7 +229,8 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			// the bad glob is dropped, so tell the user this filter is not used
+			ctx.Logger().Error(err, "invalid include glob; ignoring it", "include_value", ig)
 			continue
 		}
 		includeGlobs = append(includeGlobs, g)
@@ -237,7 +238,8 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			// the bad glob is dropped, so tell the user this filter is not used
+			ctx.Logger().Error(err, "invalid exclude glob; ignoring it", "exclude_value", eg)
 			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
@@ -335,7 +337,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	for _, repo := range s.repos {
 		r, err := s.normalizeRepo(repo)
 		if err != nil {
-			aCtx.Logger().Error(err, "invalid repository", "repo", repo)
+			// the repo comes from the user's config and may hold a token, so strip it
+			aCtx.Logger().Error(err, "invalid repository", "repo", safeRepoURL(repo))
 			continue
 		}
 		s.filteredRepoCache.Set(repo, r)
@@ -395,6 +398,26 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.git = git.NewGit(cfg)
 
+	// log the config choices so support can see how the source was set up
+	// only counts and flags, never repo URLs, tokens or keys
+	aCtx.Logger().V(1).Info("github source initialized",
+		"auth_type", fmt.Sprintf("%T", s.conn.GetCredential()),
+		"endpoint", safeRepoURL(s.conn.GetEndpoint()),
+		"repo_count", len(s.conn.GetRepositories()),
+		"org_count", len(s.conn.GetOrganizations()),
+		"include_repo_count", len(s.conn.GetIncludeRepos()),
+		"ignore_repo_count", len(s.conn.GetIgnoreRepos()),
+		"include_forks", s.conn.GetIncludeForks(),
+		"exclude_archived", s.conn.GetExcludeArchived(),
+		"scan_users", s.conn.GetScanUsers(),
+		"scan_all_installations", s.conn.GetScanAllInstallations(),
+		"ignore_gists", s.ignoreGists,
+		"include_wikis", s.conn.GetIncludeWikis(),
+		"include_issue_comments", s.includeIssueComments,
+		"include_pr_comments", s.includePRComments,
+		"include_gist_comments", s.includeGistComments,
+		"comments_timeframe_days", s.commentsTimeframeDays,
+	)
 	return nil
 }
 
@@ -743,7 +766,6 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 		}
 
 		if s.conn.ScanUsers && len(s.memberCache) > 0 {
-			ctx.Logger().Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
 			s.addReposForMembers(ctx, reporter)
 		}
 	}
@@ -770,7 +792,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 			if err != nil {
 				return err
 			}
-			ctx.Logger().Info("Scanning repos", "org_members", len(s.memberCache))
+			ctx.Logger().V(1).Info("Scanning repos", "org_members", len(s.memberCache))
 			if !connector.HasDefaultInstallation() {
 				// Member repos/gists live outside any installation's own
 				// listing, so there is no installation token to fetch them
@@ -789,11 +811,12 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 				ctx.Logger().Info("Skipping org member gists: GitHub doesn't allow listing gists with a GitHub App installation token", "org_members", len(s.memberCache))
 			}
 			for member := range s.memberCache {
-				logger := ctx.Logger().WithValues("member", member)
+				// add the member to the error line below so we know whose fetch failed
+				memberCtx := context.WithValues(ctx, "member", member)
 				// TODO: Add authenticated user list repo for app token. It does support as per docs but need to test it before we enable it here.
 				// docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repositories-for-the-authenticated-user
 				if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
-					logger.Error(err, "error fetching repos by user")
+					memberCtx.Logger().Error(err, "error fetching repos by user")
 				}
 			}
 		}
@@ -890,9 +913,9 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 		installID := install.GetID()
 		account := install.GetAccount().GetLogin()
 		installCtx := context.WithValues(ctx, "org", account, "installation_id", installID)
-		installCtx.Logger().Info("Enumerating repos from GitHub App installation")
+		installCtx.Logger().V(2).Info("Enumerating repos from GitHub App installation")
 
-		client, err := connector.APIClientForInstallation(installID)
+		client, err := connector.APIClientForInstallation(installCtx, installID)
 		if err != nil {
 			installCtx.Logger().Error(err, "could not create API client for installation")
 			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", installID, err)); err != nil {
@@ -981,7 +1004,7 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 	installedRepoKeys := make(map[int64]map[string]struct{}, len(installs))
 	for _, install := range installs {
 		installID := install.GetID()
-		client, err := connector.APIClientForInstallation(installID)
+		client, err := connector.APIClientForInstallation(ctx, installID)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("could not create API client for installation %d: %w", installID, err))
 			continue
@@ -1199,8 +1222,9 @@ func (s *Source) mapRemainingAccessibleRepos(
 				continue
 			}
 
+			// requested.original is the repo as the user wrote it, so strip any token
 			ctx.Logger().Info("repo is not owned by any app installation; scanning with the default installation token",
-				"repo", requested.original)
+				"repo", safeRepoURL(requested.original))
 			deleteRepoMappingRequest(wantedRepos, requested)
 			s.recordRepoInstallation(connector, connector.installationID, repo, requested)
 			break
@@ -1314,15 +1338,20 @@ func (s *Source) repoURLFromTargetLink(link string) (string, error) {
 func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error {
 	var scannedCount uint64 = 1
 
-	ctx.Logger().V(2).Info("Found repos to scan", "count", len(s.repos))
+	ctx.Logger().V(1).Info("Found repos to scan", "count", len(s.repos))
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
+	// repos finished by an earlier, interrupted run are left out, so say how many
+	if skipped := len(s.repos) - len(reposToScan); skipped > 0 {
+		ctx.Logger().V(1).Info("resuming scan; skipping repos already scanned", "skipped", skipped, "remaining", len(reposToScan))
+	}
 	s.repos = reposToScan
 
 	for i, repoURL := range s.repos {
 		s.jobPool.Go(func() error {
 			if common.IsDone(ctx) {
+				ctx.Logger().V(4).Info("skipping repo", "repo", repoURL, "reason", "scan cancelled")
 				return nil
 			}
 			ctx := context.WithValue(ctx, "repo", repoURL)
@@ -1373,23 +1402,35 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 	}
 
 	// Scan the wiki, if enabled, and the repo has one.
-	if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
+	// The checks are split up only so each skip can say why.
+	switch {
+	case !s.conn.IncludeWikis:
+		// wikis are off for the whole source, nothing to log per repo
+	case !repoInfo.hasWiki:
+		ctx.Logger().V(4).Info("skipping wiki", "reason", "repo has no wiki")
+	case !s.wikiIsReachable(ctx, repoURL):
+		ctx.Logger().V(4).Info("skipping wiki", "reason", "wiki is not reachable")
+	default:
 		wikiURL, ok := wikiCloneURLForRepoInfo(repoURL, repoInfo)
-		if ok {
-			wikiCtx := context.WithValue(ctx, "repo", wikiURL)
+		if !ok {
+			ctx.Logger().V(4).Info("skipping wiki", "reason", "could not build wiki clone URL")
+			break
+		}
+		wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
-			_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
-			if err != nil {
-				// Ignore "Repository not found" errors.
-				// It's common for GitHub's API to say a repo has a wiki when it doesn't.
-				if !strings.Contains(err.Error(), "not found") {
-					if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
-						return err
-					}
+		_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
+		if err != nil {
+			// Ignore "Repository not found" errors.
+			// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+			if strings.Contains(err.Error(), "not found") {
+				wikiCtx.Logger().V(4).Info("skipping wiki", "reason", "GitHub says the wiki was not found")
+			} else {
+				if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
+					return err
 				}
-
-				// Don't return, it still might be possible to scan comments.
 			}
+
+			// Don't return, it still might be possible to scan comments.
 		}
 	}
 
@@ -1517,7 +1558,7 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 		if retryAfter > 0 {
 			retryAfter = retryAfter + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
-			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			ctx.Logger().Info("exceeded rate limit", "limit_type", limitType, "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 			// Only report the error if a reporter was provided
 			for _, reporter := range reporters {
 				_ = reporter.Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType))
@@ -1567,13 +1608,13 @@ func (s *Source) handleRateLimitWithChunkReporter(ctx context.Context, reporter 
 }
 
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
-	ctx.Logger().Info("Fetching repos from members", "members", len(s.memberCache))
+	ctx.Logger().V(1).Info("Fetching repos from members", "members", len(s.memberCache), "org_count", s.orgsCache.Count())
 	for member := range s.memberCache {
 		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
-			ctx.Logger().Info("Unable to fetch gists by user", "user", member, "error", err)
+			ctx.Logger().Error(err, "Unable to fetch gists by user", "user", member)
 		}
 		if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
-			ctx.Logger().Info("Unable to fetch repos by user", "user", member, "error", err)
+			ctx.Logger().Error(err, "Unable to fetch repos by user", "user", member)
 		}
 	}
 }
@@ -1586,7 +1627,8 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 	}
 
 	gistOpts := &github.GistListOptions{}
-	logger := ctx.Logger().WithValues("user", user)
+	// every log line below is about this user
+	ctx = context.WithValues(ctx, "user", user)
 
 	for {
 		gists, res, err := s.connector.APIClient().Gists.List(ctx, user, gistOpts)
@@ -1608,7 +1650,8 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 		if res == nil || res.NextPage == 0 {
 			break
 		}
-		logger.V(2).Info("Listed gists", "page", gistOpts.Page, "last_page", res.LastPage)
+		// one line per page, with how many API calls we have left before the rate limit
+		ctx.Logger().V(4).Info("Listed gists", "page", gistOpts.Page, "last_page", res.LastPage, "rate_remaining", res.Rate.Remaining)
 		gistOpts.Page = res.NextPage
 	}
 	return nil
@@ -1631,7 +1674,7 @@ func (s *Source) addMembersByApp(ctx context.Context, connector *appConnector, r
 		// Create a per-installation API client so that the token is scoped to
 		// this org. GitHub App installation tokens only bypass IP allowlists for
 		// their own org; using a cross-org token causes 403s.
-		client, err := connector.APIClientForInstallation(install.GetID())
+		client, err := connector.APIClientForInstallation(installCtx, install.GetID())
 		if err != nil {
 			installCtx.Logger().Error(err, "could not create API client for installation")
 			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", install.GetID(), err)); err != nil {
@@ -1678,7 +1721,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, reporter sources.UnitRep
 		}
 
 		lastOrgID := *orgs[len(orgs)-1].ID
-		ctx.Logger().V(2).Info(fmt.Sprintf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID))
+		ctx.Logger().V(4).Info("listed organization IDs", "from_id", orgOpts.Since, "to_id", lastOrgID)
 		orgOpts.Since = lastOrgID
 
 		for _, org := range orgs {
@@ -1701,18 +1744,20 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string, reporter source
 	orgOpts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
-	logger := ctx.Logger().WithValues("user", user)
+	// every log line below is about this user
+	ctx = context.WithValues(ctx, "user", user)
 	for {
 		orgs, resp, err := s.connector.APIClient().Organizations.List(ctx, "", orgOpts)
 		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
-			logger.Error(err, "Could not list organizations")
+			ctx.Logger().Error(err, "Could not list organizations")
 			return
 		}
 
-		logger.V(2).Info("Listed orgs", "page", orgOpts.Page, "last_page", resp.LastPage)
+		// one line per page, with how many API calls we have left before the rate limit
+		ctx.Logger().V(4).Info("Listed orgs", "page", orgOpts.Page, "last_page", resp.LastPage, "rate_remaining", resp.Rate.Remaining)
 		for _, org := range orgs {
 			if org.Login == nil {
 				continue
@@ -1738,7 +1783,8 @@ func (s *Source) addMembersByOrgWithClient(ctx context.Context, client *github.C
 		},
 	}
 
-	logger := ctx.Logger().WithValues("org", org)
+	// every log line below is about this org
+	ctx = context.WithValues(ctx, "org", org)
 	for {
 		members, res, err := client.Organizations.ListMembers(ctx, org, opts)
 		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
@@ -1751,7 +1797,8 @@ func (s *Source) addMembersByOrgWithClient(ctx context.Context, client *github.C
 			return fmt.Errorf("organization (%q) had 0 members: account may not have access to list organization members", org)
 		}
 
-		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", res.LastPage)
+		// one line per page, with how many API calls we have left before the rate limit
+		ctx.Logger().V(4).Info("Listed members", "page", opts.Page, "last_page", res.LastPage, "rate_remaining", res.Rate.Remaining)
 		for _, m := range members {
 			usr := m.Login
 			if usr == nil || *usr == "" {
@@ -2590,7 +2637,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 
 	if meta.GetFile() == "" && meta.GetCommit() != "" {
 		ctx := context.WithValues(ctx, "commit_hash", meta.GetCommit())
-		ctx.Logger().V(2).Info("secret metadata has no file; scanning commit metadata instead")
+		ctx.Logger().V(4).Info("secret metadata has no file; scanning commit metadata instead")
 
 		return s.scanCommitMetadata(ctx, apiClient, segments[1], segments[2], meta, &chunkSkel, reporter)
 	}
