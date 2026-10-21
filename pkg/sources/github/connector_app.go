@@ -33,7 +33,7 @@ var _ Connector = (*appConnector)(nil)
 
 const githubHTTPTimeoutSeconds = 60
 
-func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp, scanAllInstallations bool) (Connector, error) {
+func NewAppConnector(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp, scanAllInstallations bool) (Connector, error) {
 	var installationID int64
 	var err error
 
@@ -53,7 +53,7 @@ func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp, scanAllIn
 		return nil, fmt.Errorf("could not parse app ID %q: %w", app.AppId, err)
 	}
 
-	installationClient, err := GetAppClient(context.Background(), apiEndpoint, appID, app.PrivateKey)
+	installationClient, err := GetAppClient(ctx, apiEndpoint, appID, app.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not create installation client: %w", err)
 	}
@@ -72,7 +72,7 @@ func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp, scanAllIn
 	// clients created lazily per-repo, so there is no default client to
 	// validate up front.
 	if connector.HasDefaultInstallation() {
-		_, err := connector.clientsForInstallation(installationID)
+		_, err := connector.clientsForInstallation(ctx, installationID)
 		if err != nil {
 			return nil, fmt.Errorf("could not create clients for configured installation: %w", err)
 		}
@@ -98,7 +98,7 @@ func (c *appConnector) HasDefaultInstallation() bool {
 // as a fallback client for repos/resources outside any installation listing
 // and call it unconditionally.
 func (c *appConnector) APIClient() *github.Client {
-	client, err := c.APIClientForInstallation(c.installationID)
+	client, err := c.APIClientForInstallation(contextForClientLookup(), c.installationID)
 	if err != nil {
 		return nil
 	}
@@ -107,16 +107,16 @@ func (c *appConnector) APIClient() *github.Client {
 
 func (c *appConnector) APIClientForRepo(repoURL string) (*github.Client, error) {
 	installID, _ := c.installationIDForRepo(repoURL)
-	return c.APIClientForInstallation(installID)
+	return c.APIClientForInstallation(contextForClientLookup(), installID)
 }
 
 func (c *appConnector) GraphQLClientForRepo(ctx context.Context, repoURL string) (*githubv4.Client, error) {
 	installID, _ := c.installationIDForRepo(repoURL)
-	return c.graphqlClientForInstallation(installID)
+	return c.graphqlClientForInstallation(ctx, installID)
 }
 
-func (c *appConnector) graphqlClientForInstallation(installID int64) (*githubv4.Client, error) {
-	clients, err := c.clientsForInstallation(installID)
+func (c *appConnector) graphqlClientForInstallation(ctx context.Context, installID int64) (*githubv4.Client, error) {
+	clients, err := c.clientsForInstallation(ctx, installID)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 		return "", nil, fmt.Errorf("no GitHub App installation resolved for repo %q; set githubApp.installationId to a fallback installation to scan repos outside installation listings (e.g. member repos with scanUsers) together with scanAllInstallations", repoURL)
 	}
 
-	cs, err := c.clientsForInstallation(installID)
+	cs, err := c.clientsForInstallation(ctx, installID)
 	if err != nil {
 		return "", nil, fmt.Errorf("cannot fetch installation clients for installation %d: %w", installID, err)
 	}
@@ -220,7 +220,7 @@ func (c *appConnector) setRepoInstallationForWiki(repoURL string, installationID
 // installation, lazily creating it if needed. See APIClient for why this
 // cannot simply return nil when no default installation is configured.
 func (c *appConnector) GraphQLClient() *githubv4.Client {
-	client, err := c.graphqlClientForInstallation(c.installationID)
+	client, err := c.graphqlClientForInstallation(contextForClientLookup(), c.installationID)
 	if err != nil {
 		return nil
 	}
@@ -235,8 +235,8 @@ func (c *appConnector) InstallationClient() *github.Client {
 // installation. This is needed when a GitHub App is installed across multiple
 // orgs — each org's API calls must use that org's installation token to get
 // proper IP allowlist bypass and permission scoping.
-func (c *appConnector) APIClientForInstallation(installationID int64) (*github.Client, error) {
-	clients, err := c.clientsForInstallation(installationID)
+func (c *appConnector) APIClientForInstallation(ctx context.Context, installationID int64) (*github.Client, error) {
+	clients, err := c.clientsForInstallation(ctx, installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +244,15 @@ func (c *appConnector) APIClientForInstallation(installationID int64) (*github.C
 	return clients.APIClient, nil
 }
 
-func (c *appConnector) clientsForInstallation(installationID int64) (*AppInstallationClients, error) {
-	return GetAppInstallationClients(context.Background(), c.apiEndpoint, c.appID, c.appPrivateKey, installationID)
+func (c *appConnector) clientsForInstallation(ctx context.Context, installationID int64) (*AppInstallationClients, error) {
+	return GetAppInstallationClients(ctx, c.apiEndpoint, c.appID, c.appPrivateKey, installationID)
+}
+
+// contextForClientLookup is only for the Connector methods that don't take a
+// context: APIClient, APIClientForRepo and GraphQLClient. They only build a
+// client or take it from the cache, which makes no network call, so nothing
+// is lost by not having the caller's context. Everything else passes its own.
+// That is why the semgrep rule against new contexts is turned off on this line.
+func contextForClientLookup() context.Context {
+	return context.Background() // nosemgrep
 }

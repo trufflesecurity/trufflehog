@@ -242,7 +242,8 @@ func isGitHub404Error(err error) bool {
 
 // processRepos processes repositories from a source, handling pagination and rate limits.
 func (s *Source) processRepos(ctx context.Context, target string, reporter sources.UnitReporter, listRepos repoLister, listOpts repoListOptions) error {
-	logger := ctx.Logger().WithValues("target", target)
+	// every log line below is about this org or user
+	ctx = context.WithValues(ctx, "target", target)
 	opts := listOpts.getListOptions()
 
 	var (
@@ -261,17 +262,19 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			return err
 		}
 
-		ctx.Logger().V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
+		// one line per page, with how many API calls we have left before the rate limit
+		ctx.Logger().V(4).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage, "rate_remaining", res.Rate.Remaining)
 		for _, r := range someRepos {
 			isFork, isArchived := r.GetFork(), r.GetArchived()
 
 			if isFork && !s.conn.IncludeForks {
+				ctx.Logger().V(4).Info("skipping repository", "repo", r.GetFullName(), "reason", "forks are not included")
 				continue
 			}
 
 			if isArchived && s.conn.ExcludeArchived {
 				numArchivedSkipped++
-				logger.V(3).Info("skipping archived repository", "repo", r.GetFullName())
+				ctx.Logger().V(4).Info("skipping repository", "repo", r.GetFullName(), "reason", "archived repos are excluded")
 				continue
 			}
 
@@ -294,6 +297,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 
 			// Check if we should process this repository based on the filter
 			if !s.filteredRepoCache.wantRepo(repoName) {
+				ctx.Logger().V(4).Info("skipping repository", "repo", repoName, "reason", "excluded by include or ignore filter")
 				continue
 			}
 
@@ -319,7 +323,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 				return err
 			}
 
-			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
+			ctx.Logger().V(2).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
 		if res.NextPage == 0 {
@@ -329,7 +333,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 	}
 
 	// final logging of repository stats.
-	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_archived", numArchived, "num_archived_skipped", numArchivedSkipped, "num_orgs", len(uniqueOrgs))
+	ctx.Logger().V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_archived", numArchived, "num_archived_skipped", numArchivedSkipped, "num_orgs", len(uniqueOrgs))
 	githubOrgsEnumerated.WithLabelValues(s.name).Add(float64(len(uniqueOrgs)))
 
 	return nil
