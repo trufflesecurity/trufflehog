@@ -107,7 +107,13 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 				}
 
 				if verify {
-					if !azure_entra.TenantExists(logCtx, client, tenantId) {
+					exists, err := azure_entra.TenantExists(logCtx, client, tenantId)
+					if err != nil {
+						// Unknown, not "missing". Keep the tenant as a candidate so a
+						// temporary failure doesn't change which tenant gets reported.
+						continue
+					}
+					if !exists {
 						// Tenant doesn't exist
 						delete(tenantIds, tenantId)
 						continue
@@ -147,14 +153,19 @@ func ProcessData(ctx context.Context, data string, clientSecrets map[string]stru
 		}
 
 		if r == nil {
-			// Nothing verified. Report the nearest remaining client and tenant so the
-			// result stays the same whether the secret is live or rotated.
+			// Nothing verified. Report the nearest tenant, then the nearest client that
+			// isn't ruled out for it, so the result stays the same whether the secret
+			// is live or rotated.
 			var clientId, tenantId string
-			if remaining := azure_entra.NearestFirst(clientIds, secretPos); len(remaining) > 0 {
-				clientId = remaining[0]
-			}
 			if remaining := azure_entra.NearestFirst(tenantIds, secretPos); len(remaining) > 0 {
 				tenantId = remaining[0]
+			}
+			for _, candidate := range azure_entra.NearestFirst(clientIds, secretPos) {
+				if _, ruledOut := invalidClientsForTenant[tenantId][candidate]; ruledOut || candidate == tenantId {
+					continue
+				}
+				clientId = candidate
+				break
 			}
 			r = createResult(tenantId, clientId, clientSecret, false, nil, nil)
 		}

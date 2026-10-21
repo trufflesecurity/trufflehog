@@ -1,10 +1,14 @@
 package azure_entra
 
 import (
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type testCase struct {
@@ -390,5 +394,32 @@ func Test_FindIdOffsets(t *testing.T) {
 	wantTenant := map[string][]int{"608e4ac4-2ca8-40dd-a046-4064540a1cde": {strings.Index(data, "608e4ac4")}}
 	if diff := cmp.Diff(wantTenant, tenants); diff != "" {
 		t.Errorf("tenants diff: (-want +got)\n%s", diff)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// A failed lookup must not be remembered as "tenant doesn't exist".
+func Test_TenantExists_DoesNotCacheErrors(t *testing.T) {
+	const tenant = "5e6f7a8b-1c2d-4e3f-8a9b-0c1d2e3f4a5b"
+	fail := true
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if fail {
+			return nil, errors.New("network down")
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+	})}
+
+	exists, err := TenantExists(context.Background(), client, tenant)
+	if err == nil || exists {
+		t.Fatalf("expected an error and no tenant, got exists=%v err=%v", exists, err)
+	}
+
+	fail = false
+	exists, err = TenantExists(context.Background(), client, tenant)
+	if err != nil || !exists {
+		t.Fatalf("expected the tenant to exist after the network recovered, got exists=%v err=%v", exists, err)
 	}
 }

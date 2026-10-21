@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
@@ -185,4 +187,106 @@ func TestProcessData_NearestClientAndTenantWins(t *testing.T) {
 		}
 		assert.Equal(t, want, string(r.RawV2))
 	}
+}
+
+// roundTripFunc lets a test script the HTTP responses directly.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func tokenErrorResponse(status int, description string) *http.Response {
+	rec := httptest.NewRecorder()
+	rec.WriteHeader(status)
+	_ = json.NewEncoder(rec).Encode(map[string]string{"error": "invalid_client", "error_description": description})
+	return rec.Result()
+}
+
+// An unrelated client sits closer to the secret than the real one. Once the unrelated
+// client is ruled out, the live and the rotated secret must report the same client.
+func TestProcessData_RotatedSecretKeepsClientThatVerified(t *testing.T) {
+	const (
+		secret   = "abc4Q~fake-secret-that-is-long-enough1234567"
+		otherApp = "1474bfe8-663c-486e-9daf-f1f580302218"
+		realApp  = "8595f61a-109a-497d-8c8f-566b733e95fe"
+		tenant   = "7a1c2b3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+	)
+	data := "client_id: " + otherApp + "\nsecret: " + secret + "\n" + strings.Repeat("filler\n", 20) + "client_id: " + realApp + "\n"
+
+	run := func(realAppStatus int, realAppDescription string) detectors.Result {
+		client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if r.Method == http.MethodGet {
+				return tokenErrorResponse(http.StatusOK, ""), nil
+			}
+			_ = r.ParseForm()
+			switch {
+			case r.PostForm.Get("client_id") == otherApp:
+				return tokenErrorResponse(http.StatusBadRequest, "AADSTS700016: app not found"), nil
+			case realAppStatus == http.StatusOK:
+				rec := httptest.NewRecorder()
+				_ = json.NewEncoder(rec).Encode(map[string]string{"access_token": "x"})
+				return rec.Result(), nil
+			default:
+				return tokenErrorResponse(realAppStatus, realAppDescription), nil
+			}
+		})}
+		clientIDs := map[string][]int{otherApp: {strings.Index(data, otherApp)}, realApp: {strings.Index(data, realApp)}}
+		tenantIDs := map[string][]int{tenant: {0}}
+		results := ProcessData(context.Background(), data, map[string]struct{}{secret: {}}, clientIDs, tenantIDs, true, client)
+		require.Len(t, results, 1)
+		return results[0]
+	}
+
+	live := run(http.StatusOK, "")
+	rotated := run(http.StatusUnauthorized, "AADSTS7000215: Invalid client secret provided.")
+
+	assert.True(t, live.Verified)
+	assert.False(t, rotated.Verified)
+	assert.Contains(t, string(live.RawV2), realApp)
+	assert.Equal(t, string(live.RawV2), string(rotated.RawV2))
+}
+
+// Without verification nothing removes a tenant ID that also looked like a client ID,
+// so the fallback must not report it as both.
+func TestProcessData_ClientIsNeverTheTenant(t *testing.T) {
+	const (
+		secret = "abc4Q~fake-secret-that-is-long-enough1234567"
+		tenant = "608e4ac4-2ca8-40dd-a046-4064540a1cde"
+		app    = "8595f61a-109a-497d-8c8f-566b733e95fe"
+	)
+	data := secret + " " + tenant + " " + app
+	clientIDs := map[string][]int{tenant: {len(secret) + 1}, app: {1000}}
+	tenantIDs := map[string][]int{tenant: {len(secret) + 1}}
+
+	results := ProcessData(context.Background(), data, map[string]struct{}{secret: {}}, clientIDs, tenantIDs, false, nil)
+
+	require.Len(t, results, 1)
+	assert.JSONEq(t, fmt.Sprintf(`{"clientSecret":%q,"clientId":%q,"tenantId":%q}`, secret, app, tenant), string(results[0].RawV2))
+}
+
+// A failed tenant lookup is "unknown", not "missing". The nearest tenant must stay
+// the reported one even though it couldn't be checked.
+func TestProcessData_TransientTenantErrorKeepsNearestTenant(t *testing.T) {
+	const (
+		secret     = "abc4Q~fake-secret-that-is-long-enough1234567"
+		app        = "8595f61a-109a-497d-8c8f-566b733e95fe"
+		nearTenant = "3b1f0c2e-9d4a-4c6b-a7e8-5f2d1c0b9a87"
+		farTenant  = "c4d5e6f7-1a2b-4c3d-9e8f-0a1b2c3d4e5f"
+	)
+	data := "tenant_id: " + nearTenant + "\nsecret: " + secret + "\n" + strings.Repeat("filler\n", 20) + "tenant_id: " + farTenant + "\n"
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodGet {
+			if strings.Contains(r.URL.Path, nearTenant) {
+				return nil, errors.New("network down")
+			}
+			return tokenErrorResponse(http.StatusOK, ""), nil
+		}
+		return tokenErrorResponse(http.StatusUnauthorized, "AADSTS7000215: Invalid client secret provided."), nil
+	})}
+	clientIDs := map[string][]int{app: {0}}
+	tenantIDs := map[string][]int{nearTenant: {strings.Index(data, nearTenant)}, farTenant: {strings.Index(data, farTenant)}}
+
+	results := ProcessData(context.Background(), data, map[string]struct{}{secret: {}}, clientIDs, tenantIDs, true, client)
+
+	require.Len(t, results, 1)
+	assert.Contains(t, string(results[0].RawV2), nearTenant)
 }

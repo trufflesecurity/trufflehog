@@ -134,35 +134,42 @@ var (
 )
 
 // TenantExists returns whether the tenant exists according to Microsoft's well-known OpenID endpoint.
-func TenantExists(ctx context.Context, client *http.Client, tenant string) bool {
+// A non-nil error means the answer is unknown (e.g., a network failure); it is not cached.
+func TenantExists(ctx context.Context, client *http.Client, tenant string) (bool, error) {
 	// Use cached value where possible.
 	if tenantExists, isCached := tenantCache.Get(tenant); isCached {
-		return tenantExists
+		return tenantExists, nil
 	}
 
 	// https://www.codingexplorations.com/blog/understanding-singleflight-in-golang-a-solution-for-eliminating-redundant-work
-	tenantExists, _, _ := tenantGroup.Do(tenant, func() (interface{}, error) {
-		result := queryTenant(ctx, client, tenant)
-		tenantCache.Set(tenant, result)
-		return result, nil
+	tenantExists, err, _ := tenantGroup.Do(tenant, func() (interface{}, error) {
+		result, err := queryTenant(ctx, client, tenant)
+		// Only remember definite answers, so a transient failure doesn't stick.
+		if err == nil {
+			tenantCache.Set(tenant, result)
+		}
+		return result, err
 	})
+	if err != nil {
+		return false, err
+	}
 
-	return tenantExists.(bool)
+	return tenantExists.(bool), nil
 }
 
-func queryTenant(ctx context.Context, client *http.Client, tenant string) bool {
+func queryTenant(ctx context.Context, client *http.Client, tenant string) (bool, error) {
 	logger := ctx.Logger().WithName("azure").WithValues("tenant", tenant)
 
 	tenantUrl := fmt.Sprintf("https://login.microsoftonline.com/%s/.well-known/openid-configuration", tenant)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tenantUrl, nil)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	res, err := client.Do(req)
 	if err != nil {
 		logger.Error(err, "Failed to check if tenant exists")
-		return false
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -171,13 +178,13 @@ func queryTenant(ctx context.Context, client *http.Client, tenant string) bool {
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true
+		return true, nil
 	case http.StatusBadRequest:
 		logger.V(4).Info("Tenant does not exist.")
-		return false
+		return false, nil
 	default:
 		bodyBytes, _ := io.ReadAll(res.Body)
 		logger.Error(nil, "WARNING: Unexpected response when checking if tenant exists", "status_code", res.StatusCode, "body", string(bodyBytes))
-		return false
+		return false, fmt.Errorf("unexpected status %d checking tenant", res.StatusCode)
 	}
 }
