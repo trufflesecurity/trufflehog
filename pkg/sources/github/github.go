@@ -614,7 +614,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 	if _, ok := s.repoInfoCache.get(repo); ok {
 		return repo, nil
 	}
-	ctx.Logger().V(2).Info("Caching repository info")
+	ctx.Logger().V(2).Info("Caching repository info", "repo", safeRepoURL(repo))
 
 	_, urlParts, err := getRepoURLParts(repo)
 	if err != nil {
