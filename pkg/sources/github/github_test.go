@@ -3156,6 +3156,8 @@ func TestEnumerateWithToken_DebugLogging(t *testing.T) {
 }
 
 func TestScan_LogsResumeAndCancelSkips(t *testing.T) {
+	const testToken = "ghp_TESTTOKENinrepourl1234567890"
+
 	s := initTestSource(&sourcespb.GitHub{
 		Endpoint:   "https://api.github.com",
 		Credential: &sourcespb.GitHub_Token{Token: "token"},
@@ -3163,7 +3165,8 @@ func TestScan_LogsResumeAndCancelSkips(t *testing.T) {
 	s.repos = []string{
 		"https://github.com/org/a.git",
 		"https://github.com/org/b.git",
-		"https://github.com/org/c.git",
+		// a repo from the config with a token in it, which must never be logged
+		"https://user:" + testToken + "@github.com/org/c.git",
 	}
 	// pretend an earlier run stopped while scanning b, so a is already done
 	s.SetProgressComplete(0, 3, "", sources.EncodeResumeInfo([]string{"https://github.com/org/b.git"}))
@@ -3188,4 +3191,9 @@ func TestScan_LogsResumeAndCancelSkips(t *testing.T) {
 		cancelled = append(cancelled, entry.ContextMap()["repo"].(string))
 	}
 	assert.ElementsMatch(t, []string{"https://github.com/org/b.git", "https://github.com/org/c.git"}, cancelled)
+
+	for _, entry := range logs.All() {
+		assert.NotContains(t, entry.Message, testToken)
+		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), testToken)
+	}
 }

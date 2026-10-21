@@ -588,7 +588,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 			// Final filter check - only include repositories that pass the filter
 			if s.filteredRepoCache.wantRepo(repoName) {
-				ctx := context.WithValue(ctx, "repo", repo)
+				ctx := context.WithValue(ctx, "repo", safeRepoURL(repo))
 
 				repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
 				if err != nil {
@@ -1350,11 +1350,13 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 
 	for i, repoURL := range s.repos {
 		s.jobPool.Go(func() error {
+			// repos the user listed in the config are used as-is and may hold a
+			// token, so only the cleaned URL goes into logs
 			if common.IsDone(ctx) {
-				ctx.Logger().V(4).Info("skipping repo", "repo", repoURL, "reason", "scan cancelled")
+				ctx.Logger().V(4).Info("skipping repo", "repo", safeRepoURL(repoURL), "reason", "scan cancelled")
 				return nil
 			}
-			ctx := context.WithValue(ctx, "repo", repoURL)
+			ctx := context.WithValue(ctx, "repo", safeRepoURL(repoURL))
 
 			// TODO: set progress complete is being called concurrently with i
 			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
@@ -1416,7 +1418,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 			ctx.Logger().V(4).Info("skipping wiki", "reason", "could not build wiki clone URL")
 			break
 		}
-		wikiCtx := context.WithValue(ctx, "repo", wikiURL)
+		wikiCtx := context.WithValue(ctx, "repo", safeRepoURL(wikiURL))
 
 		_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
 		if err != nil {
@@ -2824,7 +2826,7 @@ func (s *Source) scanCommitMetadata(ctx context.Context, apiClient *github.Clien
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, kind := unit.SourceUnitID()
-	ctx = context.WithValue(ctx, "repo", repoURL)
+	ctx = context.WithValue(ctx, "repo", safeRepoURL(repoURL))
 
 	// If the unit has an installation ID, use it. Fetching it is slow,
 	// specifically it stalls large multi-org scans on rate limits (INT-790).
