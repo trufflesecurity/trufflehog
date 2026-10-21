@@ -2,6 +2,8 @@ package sumologickey
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -9,6 +11,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 )
+
+// verifyInput names one access ID and key and no regional URL, so the only
+// endpoints verification can reach are the ones a test configures.
+const verifyInput = `sumologic:
+  accessId: suDkVYKjXZAwsz
+  accessKey: Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK70a0LckgRSCL`
 
 func TestSumoLogicKey_Pattern(t *testing.T) {
 	d := Scanner{}
@@ -90,5 +98,131 @@ sumoKey2 = 'Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK21a0LckgRSCL'`,
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+// Exercise verification against a mock server configured as a verifier
+// endpoint, so a request only arrives if FromData verifies through
+// Endpoints(). A verified result keeps the same RawV2 an unverified one
+// would have, and reports the endpoint in ExtraData instead.
+func TestSumoLogicKey_Verification(t *testing.T) {
+	tests := []struct {
+		name         string
+		statusCode   int
+		wantVerified bool
+		wantErr      bool
+	}{
+		{"200 - valid key", http.StatusOK, true, false},
+		{"401 - invalid key", http.StatusUnauthorized, false, false},
+		{"500 - server error", http.StatusInternalServerError, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+			}))
+			defer ts.Close()
+
+			s := Scanner{}
+			_ = s.SetConfiguredEndpoints(ts.URL)
+
+			results, err := s.FromData(context.Background(), true, []byte(verifyInput))
+			if err != nil {
+				t.Fatalf("FromData error: %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+
+			r := results[0]
+			if r.Verified != tt.wantVerified {
+				t.Errorf("Verified = %v, want %v", r.Verified, tt.wantVerified)
+			}
+			if tt.wantErr && r.VerificationError() == nil {
+				t.Error("expected verification error, got nil")
+			}
+			if !tt.wantErr && r.VerificationError() != nil {
+				t.Errorf("unexpected verification error: %v", r.VerificationError())
+			}
+			wantRawV2 := `{"accessId":"suDkVYKjXZAwsz","accessKey":"Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK70a0LckgRSCL"}`
+			if string(r.RawV2) != wantRawV2 {
+				t.Errorf("RawV2 = %s, want %s", r.RawV2, wantRawV2)
+			}
+			if tt.wantVerified && r.ExtraData["endpoint"] != ts.URL {
+				t.Errorf("ExtraData[endpoint] = %q, want %q", r.ExtraData["endpoint"], ts.URL)
+			}
+			if tt.wantVerified && r.ExtraData["access_id"] != "suDkVYKjXZAwsz" {
+				t.Errorf("ExtraData[access_id] = %q, want %q", r.ExtraData["access_id"], "suDkVYKjXZAwsz")
+			}
+		})
+	}
+}
+
+// Verify that a successful verification on a later endpoint clears any
+// error from an earlier failed attempt (e.g. first endpoint returns 500,
+// second returns 200).
+func TestSumoLogicKey_Verification_StaleErrorCleared(t *testing.T) {
+	ts500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts500.Close()
+
+	ts200 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts200.Close()
+
+	s := Scanner{}
+	_ = s.SetConfiguredEndpoints(ts500.URL, ts200.URL)
+
+	results, err := s.FromData(context.Background(), true, []byte(verifyInput))
+	if err != nil {
+		t.Fatalf("FromData error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	r := results[0]
+	if !r.Verified {
+		t.Error("expected Verified = true after second endpoint succeeded")
+	}
+	if r.VerificationError() != nil {
+		t.Errorf("stale verification error not cleared: %v", r.VerificationError())
+	}
+}
+
+// Verify that a clean 401 from the wrong region does not erase a transient
+// error from an earlier endpoint. The verification error should survive so
+// consumers know the result is uncertain, not definitively "not valid."
+func TestSumoLogicKey_Verification_ErrorPreservedAcross401(t *testing.T) {
+	ts500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts500.Close()
+
+	ts401 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts401.Close()
+
+	s := Scanner{}
+	_ = s.SetConfiguredEndpoints(ts500.URL, ts401.URL)
+
+	results, err := s.FromData(context.Background(), true, []byte(verifyInput))
+	if err != nil {
+		t.Fatalf("FromData error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	r := results[0]
+	if r.Verified {
+		t.Error("expected Verified = false")
+	}
+	if r.VerificationError() == nil {
+		t.Error("expected verification error to be preserved after 401 from another endpoint, got nil")
 	}
 }

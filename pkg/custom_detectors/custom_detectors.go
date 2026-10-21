@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -30,6 +32,13 @@ const maxTotalMatches = 100
 // initialization).
 type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
+
+	// verifyClients holds the HTTP client for each entry of Verify, by index.
+	// Verifiers without auth share httpClient; a verifier with auth gets a
+	// copy whose transport attaches an access token to requests for its
+	// endpoint. They are built once here so every verification for an auth
+	// config shares one cached token.
+	verifyClients []*http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -58,6 +67,7 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 		return nil, err
 	}
 
+	verifyClients := make([]*http.Client, 0, len(pb.Verify))
 	for _, verify := range pb.Verify {
 		if err := ValidateVerifyEndpoint(verify.Endpoint, verify.Unsafe); err != nil {
 			return nil, err
@@ -71,13 +81,53 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 		if err := ValidateVerifyRanges(verify.RotatedRanges); err != nil {
 			return nil, err
 		}
+
+		// Auth is validated and built here so a bad config fails at load
+		// time. No token is fetched until the first verification.
+		authCfg, err := verifierauth.FromProto(verify.GetAuth(), verify.Unsafe)
+		if err != nil {
+			return nil, fmt.Errorf("verifier auth for %q: %w", verify.Endpoint, err)
+		}
+		if authCfg == nil {
+			verifyClients = append(verifyClients, httpClient)
+			continue
+		}
+		if err := validateHeadersAvoidTokenHeader(verify.Headers, authCfg.TokenHeader()); err != nil {
+			return nil, err
+		}
+		verifyClients = append(verifyClients, authCfg.WrapClient(httpClient, []string{verify.Endpoint}))
 	}
 
 	// Ensure primary regex name is set.
 	ensurePrimaryRegexNameSet(pb)
 
 	// TODO: Copy only necessary data out of pb.
-	return &CustomRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{CustomRegex: pb, verifyClients: verifyClients}, nil
+}
+
+// validateHeadersAvoidTokenHeader rejects a verify headers entry for the
+// header the access token is written to. The auth transport refuses to
+// overwrite a header the request already carries, so such a verifier could
+// never send a request; failing at load time says so up front.
+func validateHeadersAvoidTokenHeader(headers []string, tokenHeader string) error {
+	for _, header := range headers {
+		key, _, _ := strings.Cut(header, ":")
+		if http.CanonicalHeaderKey(strings.TrimSpace(key)) == tokenHeader {
+			return fmt.Errorf("header %q is the oauth2 tokenHeader; set tokenHeader to a different header or remove this header", header)
+		}
+	}
+	return nil
+}
+
+// verifyClient returns the HTTP client for the Verify entry at index i.
+// A CustomRegexWebhook built without NewWebhookCustomRegex has no
+// per-verifier clients; it falls back to the shared client and never
+// attaches auth.
+func (c *CustomRegexWebhook) verifyClient(i int) *http.Client {
+	if i < len(c.verifyClients) {
+		return c.verifyClients[i]
+	}
+	return httpClient
 }
 
 var httpClient = common.SaneHttpClient()
@@ -235,6 +285,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 
 	var raw string
+	secrets := make([]string, 0, len(match))
 	for _, key := range slices.Sorted(maps.Keys(match)) {
 		values := match[key]
 		// values[0] contains the entire regex match.
@@ -244,6 +295,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			secret = values[1]
 		}
 		raw += secret
+		secrets = append(secrets, secret)
 
 		// We set the full regex match as the primary secret value.
 		// Reasoning:
@@ -286,10 +338,14 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	var (
 		definitive     bool
 		rangesInEffect bool
+		// requestErr is the most recent verifier request that got no
+		// response at all: a network, TLS, or timeout error, or a verifier
+		// auth failure (no access token, or a header collision).
+		requestErr error
 	)
 
 	// Try each config until we get a definitive answer.
-	for _, verifyConfig := range c.GetVerify() {
+	for i, verifyConfig := range c.GetVerify() {
 		if common.IsDone(ctx) {
 			return ctx.Err()
 		}
@@ -307,8 +363,9 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		if req.Header.Get("Content-Type") == "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
-		resp, err := httpClient.Do(req)
+		resp, err := c.verifyClient(i).Do(req)
 		if err != nil {
+			requestErr = err
 			continue
 		}
 		defer func() {
@@ -366,8 +423,18 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		// Both configured but neither matched -- try the next verifier.
 	}
 
-	if rangesInEffect && !definitive {
-		result.SetVerificationError(errors.New("verification response status code did not match any configured successRanges or rotatedRanges"))
+	// Without a definitive answer the result is "unable to verify", never a
+	// silent "not verified". A request that got no response says more about
+	// why than a status code that matched no range, so it is reported first.
+	// A legacy verifier's non-200 counts as an answer, so a later request
+	// error after it does not turn the result into an error.
+	if !definitive {
+		switch {
+		case requestErr != nil:
+			result.SetVerificationError(requestErr, secrets...)
+		case rangesInEffect:
+			result.SetVerificationError(errors.New("verification response status code did not match any configured successRanges or rotatedRanges"))
+		}
 	}
 
 	select {

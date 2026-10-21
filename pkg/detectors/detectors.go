@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -92,6 +93,15 @@ type EndpointCustomizer interface {
 	UseFoundEndpoints(bool)
 }
 
+// VerifierAuthCustomizer is an optional interface for detectors whose
+// configured verification endpoints sit behind an auth proxy. It is separate
+// from EndpointCustomizer so existing implementers are unaffected; detectors
+// that embed EndpointSetter get it for free, and route their verification
+// requests through EndpointSetter.VerificationClient to apply it.
+type VerifierAuthCustomizer interface {
+	SetVerifierAuth(*verifierauth.Config)
+}
+
 type CloudProvider interface {
 	CloudEndpoint() string
 }
@@ -106,6 +116,14 @@ type Result struct {
 	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
 	// than an actual remote request.
 	VerificationFromCache bool
+	// VerificationSkipped indicates that the engine produced this result without attempting remote verification,
+	// either because verification was disabled for the result's source or detector, or because the engine withheld
+	// verification after multiple detectors matched the same secret. It lets consumers that measure verifier activity
+	// tell "the verifier did not run" apart from "the verifier ran and the credential did not verify". It is purely
+	// informational: Verified and the verification error keep whatever the detector or engine assigned, so a skipped
+	// result still reports as unverified (or with an overlap verification error) exactly as it would without this
+	// field.
+	VerificationSkipped bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
