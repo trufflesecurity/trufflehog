@@ -1,8 +1,6 @@
 module github.com/trufflesecurity/trufflehog/v3
 
-go 1.25.0
-
-toolchain go1.25.10
+go 1.26.0
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2.8
 
@@ -98,7 +96,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.1-0.20260423004847-9fc0246c3859
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
-	github.com/trufflesecurity/ldap-verify v0.0.0-20261007045720-4964a20603d4
+	github.com/trufflesecurity/ldap-verify v0.0.0-20261012152128-4a15fafb6e19
 	github.com/wasilibs/go-re2 v1.12.0
 	github.com/xo/dburl v0.23.8
 	gitlab.com/gitlab-org/api/client-go v1.12.0
@@ -106,11 +104,11 @@ require (
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.55.0
-	golang.org/x/net v0.58.0
+	golang.org/x/crypto v0.57.0
+	golang.org/x/net v0.60.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.22.0
-	golang.org/x/text v0.41.0
+	golang.org/x/sync v0.23.0
+	golang.org/x/text v0.42.0
 	golang.org/x/time v0.14.0
 	google.golang.org/api v0.264.0
 	google.golang.org/protobuf v1.36.11
@@ -298,7 +296,7 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	github.com/yuin/goldmark v1.7.8 // indirect
+	github.com/yuin/goldmark v1.7.17 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -315,9 +313,9 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/mod v0.38.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260720211330-0afa2a65878a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720211330-0afa2a65878a // indirect

@@ -1075,4 +1075,5 @@ enum DetectorType {
   Resend = 1071;
   KongKonnect = 1072;
   SonarQube = 1073;
+  LambdaCloud = 1074;
 }
