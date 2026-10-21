@@ -2,6 +2,7 @@ package hashicorpvaultauth
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -95,10 +96,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					client := s.client
-					if client == nil {
-						client = defaultClient
-					}
+					client := s.VerificationClient(cmp.Or(s.client, defaultClient))
 
 					isVerified, verificationErr := verifyMatch(ctx, client, roleId, secretId, vaultUrl)
 					s1.Verified = isVerified

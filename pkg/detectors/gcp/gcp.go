@@ -165,7 +165,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, credBytes []byte) (bool, error) {
-	credentials, err := google.CredentialsFromJSON(ctx, credBytes, "https://www.googleapis.com/auth/cloud-platform")
+	credentials, err := google.CredentialsFromJSONWithType(ctx, credBytes, google.ServiceAccount, "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		return false, err
 	}

@@ -1,0 +1,30 @@
+rules:
+  - id: no-stored-logger-in-sources
+    pattern: |
+      type $T struct {
+        ...
+        $FIELD logr.Logger
+        ...
+      }
+    message: >-
+      Don't store a logr.Logger in a struct. Log with ctx.Logger() from the
+      current call, so the log picks up the context's fields and log level,
+      including per-source debug. See docs/source_logging.md.
+    languages: [go]
+    severity: WARNING
+
+  - id: no-background-context-in-sources
+    patterns:
+      - pattern-either:
+          - pattern: context.Background()
+          - pattern: context.TODO()
+    paths:
+      exclude:
+        - "*_test.go"
+    message: >-
+      Don't create a new context inside a source. Pass on the context you were
+      given, so its fields, cancellation and log level are kept. If a new
+      context is really needed, add a nosemgrep comment that says why. See
+      docs/source_logging.md.
+    languages: [go]
+    severity: WARNING

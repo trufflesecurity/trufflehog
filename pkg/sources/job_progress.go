@@ -74,6 +74,15 @@ func (r *JobProgressRef) Err() error {
 	return r.jobProgress.Err()
 }
 
+// UnitProgress returns the progress the source last reported inside the unit
+// with the provided ID, and whether it reported any.
+func (r *JobProgressRef) UnitProgress(unitID string) (UnitProgress, bool) {
+	if r.jobProgress == nil {
+		return UnitProgress{}, false
+	}
+	return r.jobProgress.UnitProgress(unitID)
+}
+
 // Done returns a channel that will block until the job has completed.
 func (r *JobProgressRef) Done() <-chan struct{} {
 	if r.jobProgress == nil {
@@ -334,6 +343,19 @@ func (jp *JobProgress) Snapshot() JobProgressMetrics {
 	}
 
 	return metrics
+}
+
+// UnitProgress safely gets the progress the source last reported inside the
+// unit with the provided ID.
+func (jp *JobProgress) UnitProgress(unitID string) (UnitProgress, bool) {
+	jp.metricsLock.Lock()
+	progress := jp.progress
+	jp.metricsLock.Unlock()
+
+	if progress == nil {
+		return UnitProgress{}, false
+	}
+	return progress.GetUnitProgressFor(unitID)
 }
 
 // ReportError adds a non-nil error to the aggregate of errors

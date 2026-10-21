@@ -24,8 +24,16 @@ var _ detectors.CustomResultsCleaner = (*Scanner)(nil)
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
-	domainPat     = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b`)
 	tokenPat      = regexp.MustCompile(`\b00[a-zA-Z0-9_-]{40}\b`)
+
+	// Okta tenant domains: okta.com, oktapreview.com, okta-emea.com, okta-gov.com
+	// (FedRAMP), and okta.mil (US Military). Every finding pairs with a matched
+	// domain, so a suffix missing here means zero findings for that tenant.
+	// Custom URL domains (e.g. login.example.com) are deliberately not matched:
+	// they are indistinguishable from any other hostname, and guessing would send
+	// credentials to unvetted hosts during verification. Such tenants are still
+	// found when their original *.okta.com hostname appears in the chunk.
+	domainPat = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.(?:okta(?:preview|-emea|-gov)?\.com|okta\.mil)\b`)
 
 	// Okta app/client IDs: "0oa" + 17 base62 characters.
 	oauthClientIDPat = regexp.MustCompile(`\b0oa[a-zA-Z0-9]{17}\b`)

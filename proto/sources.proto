@@ -71,6 +71,8 @@ message LocalSource {
   bool verify = 4;
   google.protobuf.Any connection = 5;
   string scan_period = 6;
+  // debug turns on debug logging for this source only. Other sources keep the global log level.
+  bool debug = 7;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
@@ -441,6 +443,8 @@ message Gerrit {
   repeated string projects = 4;
   bool skip_binaries = 5;
   bool skip_archives = 6;
+  // Gerrit API request timeout in seconds. Unset or 0 uses the default (20s).
+  int32 api_timeout_seconds = 7 [(validate.rules).int32 = {gte: 0, lte: 3600}];
 }
 
 message Jenkins {

@@ -29,3 +29,7 @@ func SetLevelForControl(control levelSetter, level int8) {
 	// For example setting the level to -2 below, means log.V(2) will be enabled.
 	control.SetLevel(zapcore.Level(-level))
 }
+
+// DebugLevel is the most verbose log level. It is the level used when debug
+// logging is turned on for a single source.
+const DebugLevel int8 = 5
