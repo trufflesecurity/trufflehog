@@ -13,13 +13,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/zapr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -2323,4 +2328,133 @@ func gitRevParse(t *testing.T, repoPath, rev string) string {
 func gitHasObject(t *testing.T, repoPath, rev string) bool {
 	t.Helper()
 	return exec.Command("git", "-C", repoPath, "cat-file", "-e", rev+"^{commit}").Run() == nil
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testSecret = "TESTSECRET-do-not-log-1234567890"
+
+	repoPath := setupTestRepo(t, "debug-log-repo")
+	addTestFileAndCommit(t, repoPath, "config.txt", "password = "+testSecret)
+
+	conn, err := anypb.New(&sourcespb.Git{
+		Credential: &sourcespb.Git_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Repositories: []string{"file://" + repoPath},
+	})
+	assert.NoError(t, err)
+
+	// run the source and drain its chunks, the way the engine does
+	runSource := func(ctx context.Context) {
+		s := Source{}
+		assert.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+
+		chunksCh := make(chan *sources.Chunk, 64)
+		go func() {
+			for range chunksCh {
+			}
+		}()
+		assert.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		ctx, logs := logtest.DebugContext()
+		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
+		runSource(ctx)
+
+		// lines from each level we care about show up
+		for _, msg := range []string{
+			"git source initialized",     // V(1)
+			"successfully cloned repo",   // V(2)
+			"scanning commit",            // V(3)
+			"git subcommand finished",    // V(5)
+			"scanning git repo complete", // V(2)
+		} {
+			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
+		}
+
+		// every line came from the context logger, so it carries the source fields,
+		// and none of them contain the secret
+		for _, entry := range logs.All() {
+			fields := entry.ContextMap()
+			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
+			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
+			assert.NotContains(t, entry.Message, testSecret)
+			assert.NotContains(t, fmt.Sprint(fields), testSecret)
+		}
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
+		runSource(ctx)
+
+		assert.Zero(t, logs.FilterMessage("git subcommand finished").Len())
+		assert.Zero(t, logs.FilterMessage("scanning commit").Len())
+	})
+}
+
+func TestCloneRepo_DoesNotLogToken(t *testing.T) {
+	const token = "TESTTOKEN-do-not-log-1234567890"
+
+	ctx, logs := logtest.DebugContext()
+
+	// nothing listens on port 1, so the clone fails fast and is not retried;
+	// the token is passed separately and only added to the URL inside CloneRepo
+	_, _, err := CloneRepoUsingToken(ctx, token, "http://127.0.0.1:1/org/repo.git", "", "x-access-token", true)
+	assert.Error(t, err)
+	assert.NotContains(t, err.Error(), token)
+
+	assert.NotZero(t, logs.FilterMessage("git clone attempt failed").Len())
+	for _, entry := range logs.All() {
+		assert.NotContains(t, entry.Message, token)
+		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), token)
+	}
+}
+
+func TestRedactPasswords(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   string
+		password string
+		want     string
+	}{
+		{
+			name:     "plain token",
+			output:   "fatal: unable to access 'https://user:glpat-abc123@host/r.git/'",
+			password: "glpat-abc123",
+			want:     "fatal: unable to access 'https://user:<secret>@host/r.git/'",
+		},
+		{
+			name:     "base64 token is percent-encoded in the url",
+			output:   "fatal: unable to access 'https://user:abc+%2F=def@host/r.git/'",
+			password: "abc+/=def",
+			want:     "fatal: unable to access 'https://user:<secret>@host/r.git/'",
+		},
+		{
+			name:     "token with @ : and ?",
+			output:   "fatal: unable to access 'https://user:a%40b%3Ac%3Fd@host/r.git/'",
+			password: "a@b:c?d",
+			want:     "fatal: unable to access 'https://user:<secret>@host/r.git/'",
+		},
+		{
+			name:     "plain form printed somewhere else",
+			output:   "token a@b:c?d was rejected",
+			password: "a@b:c?d",
+			want:     "token <secret> was rejected",
+		},
+		{
+			name:     "empty password leaves output alone",
+			output:   "fatal: repository not found",
+			password: "",
+			want:     "fatal: repository not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, redactPasswords(tt.output, tt.password))
+		})
+	}
 }

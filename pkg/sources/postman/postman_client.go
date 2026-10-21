@@ -297,7 +297,9 @@ func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString st
 		return nil, fmt.Errorf("could not read postman response body: %w", err)
 	}
 
-	ctx.Logger().V(4).Info("postman api response headers are available", "response_header", resp.Header)
+	// Don't log the response headers, they can hold cookies or tokens.
+	// handleRateLimits logs the rate limit we care about.
+	ctx.Logger().V(4).Info("postman api response received", "status_code", resp.StatusCode)
 
 	if err := checkResponseStatus(resp); err != nil {
 		return nil, err
@@ -325,6 +327,7 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 		)
 		return nil
 	}
+	ctx.Logger().V(4).Info("postman api monthly requests remaining", "remaining", rateLimitRemainingMonth)
 	c.Metrics.apiMonthlyRequestsRemaining.WithLabelValues().Set(
 		float64(rateLimitRemainingMonth),
 	)

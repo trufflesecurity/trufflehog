@@ -298,7 +298,8 @@ func (s *Source) GetJenkinsObjectsForPath(ctx context.Context, absolutePath stri
 		params.Set("tree", fmt.Sprintf("jobs[name,url]{%d,%d}", i, i+100))
 		baseUrl.RawQuery = params.Encode()
 
-		ctx.Logger().V(4).Info("executing query", "query_url", baseUrl.String())
+		// The endpoint URL can hold a password, so log the redacted form.
+		ctx.Logger().V(4).Info("executing query", "query_url", baseUrl.Redacted())
 		req, err := s.NewRequest(http.MethodGet, baseUrl.String(), nil)
 		if err != nil {
 			return res, errors.WrapPrefix(err, "Failed to create new request to get jenkins jobs", 0)
@@ -350,7 +351,8 @@ func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (
 			return builds, errors.WrapPrefix(err, "Failed to create new request to get jenkins builds", 0)
 		}
 
-		ctx.Logger().V(4).Info("executing query", "query_url", req.URL.String())
+		// The endpoint URL can hold a password, so log the redacted form.
+		ctx.Logger().V(4).Info("executing query", "query_url", req.URL.Redacted())
 		resp, err := s.client.Do(req)
 		if err != nil {
 			return builds, errors.WrapPrefix(err, "Failed to do get jenkins builds request", 0)

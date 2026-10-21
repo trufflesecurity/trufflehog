@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -34,11 +35,7 @@ var (
 )
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,6 +57,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
+
+		if detectors.StringShannonEntropy(resMatch) < 3.6 {
+			continue
+		}
 
 		for _, endpoint := range s.Endpoints() {
 			s1 := detectors.Result{

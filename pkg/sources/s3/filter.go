@@ -18,6 +18,8 @@ import (
 //
 // The zero value and a nil *objectFilter both include everything.
 type objectFilter struct {
+	// Sorted, and none starts with another, so a scan can list each in turn and
+	// still see keys in order.
 	includePrefixes []string
 	excludePrefixes []string
 
@@ -40,7 +42,7 @@ func newObjectFilter(includePrefixes, excludePrefixes, includeExtensions, exclud
 	}
 
 	return &objectFilter{
-		includePrefixes:   cleanEntries(includePrefixes, strings.TrimSpace),
+		includePrefixes:   outermostPrefixes(cleanEntries(includePrefixes, strings.TrimSpace)),
 		excludePrefixes:   cleanEntries(excludePrefixes, strings.TrimSpace),
 		includeExtensions: include,
 		excludeExtensions: exclude,
@@ -53,6 +55,15 @@ func (f *objectFilter) shouldInclude(key string) bool {
 		return true
 	}
 	return f.passesPrefixes(key) && f.passesExtensions(key)
+}
+
+// listPrefixes returns the include prefixes for S3 to list in place of the whole
+// bucket, or nil when the whole bucket is listed.
+func (f *objectFilter) listPrefixes() []string {
+	if f == nil {
+		return nil
+	}
+	return f.includePrefixes
 }
 
 func (f *objectFilter) passesPrefixes(key string) bool {
@@ -111,6 +122,20 @@ func cleanExtensions(values []string) []string {
 	exts := cleanEntries(values, normalizeExtension)
 	slices.Sort(exts)
 	return slices.Compact(exts)
+}
+
+// outermostPrefixes sorts prefixes and drops each one that starts with another,
+// since the shorter one already covers every key under it. Once sorted, a prefix
+// that starts with any kept prefix starts with the last one kept.
+func outermostPrefixes(prefixes []string) []string {
+	slices.Sort(prefixes)
+	var kept []string
+	for _, prefix := range prefixes {
+		if len(kept) == 0 || !strings.HasPrefix(prefix, kept[len(kept)-1]) {
+			kept = append(kept, prefix)
+		}
+	}
+	return kept
 }
 
 // cleanEntries normalizes each entry and drops the ones that come out empty,

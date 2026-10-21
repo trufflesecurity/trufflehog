@@ -67,9 +67,10 @@ func NewRoundTripper(original http.RoundTripper, opts ...func(*RoundTripper)) *R
 func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	retries := 0
 	for {
+		// Use the redacted URL so a password in it (user:pass@host) is never logged.
 		logger := r.logger.WithValues(
 			"method", req.Method,
-			"url", req.URL,
+			"url", req.URL.Redacted(),
 		)
 
 		if r.BasicAuthRoundTripper != nil {
