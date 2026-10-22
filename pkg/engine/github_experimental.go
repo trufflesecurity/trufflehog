@@ -54,6 +54,7 @@ func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExp
 
 	sourceName := "trufflehog - github experimental (alpha release)"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
+	ctx = withSourceFields(ctx, sourceName, github.SourceType, sourceID, jobID)
 
 	githubExperimentalSource := &github_experimental.Source{}
 	if err := githubExperimentalSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

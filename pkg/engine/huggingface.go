@@ -79,6 +79,7 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sour
 
 	sourceName := "trufflehog - huggingface"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, sourcespb.SourceType_SOURCE_TYPE_HUGGINGFACE)
+	ctx = withSourceFields(ctx, sourceName, sourcespb.SourceType_SOURCE_TYPE_HUGGINGFACE, sourceID, jobID)
 
 	huggingfaceSource := &huggingface.Source{}
 	if err := huggingfaceSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
