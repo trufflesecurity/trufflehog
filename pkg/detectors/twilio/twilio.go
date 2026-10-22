@@ -20,7 +20,8 @@ import (
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 	detectors.EndpointSetter
-	client *http.Client
+	client                *http.Client
+	cloudEndpointDisabled bool
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -29,6 +30,11 @@ var (
 	_ detectors.EndpointCustomizer = (*Scanner)(nil)
 	_ detectors.CloudProvider      = (*Scanner)(nil)
 )
+
+func (s *Scanner) UseCloudEndpoint(enabled bool) {
+	s.EndpointSetter.UseCloudEndpoint(enabled)
+	s.cloudEndpointDisabled = !enabled
+}
 
 func (Scanner) CloudEndpoint() string { return "https://api.twilio.com" }
 
@@ -70,8 +76,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	endpoints := s.Endpoints()
-	if len(endpoints) == 0 {
+	if len(endpoints) == 0 && !s.cloudEndpointDisabled {
 		endpoints = []string{s.CloudEndpoint()}
+	}
+
+	var client *http.Client
+	if verify && len(endpoints) > 0 {
+		client = s.getClient()
 	}
 
 	for sid := range uniqueSIDs {
@@ -88,8 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
 			}
 
-			if verify {
-				client := s.getClient()
+			if verify && client != nil {
 				var lastErr error
 				for _, baseURL := range endpoints {
 					extraData, isVerified, verificationErr := verifyTwilio(ctx, client, key, sid, baseURL)
@@ -154,11 +164,8 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid, baseURL st
 		var account accountResponse
 
 		if err := json.NewDecoder(resp.Body).Decode(&account); err == nil {
-			if account.SID != "" {
-				extraData["account_sid"] = account.SID
-			} else {
-				extraData["account_sid"] = sid
-			}
+			resolvedSID := cmp.Or(account.SID, sid)
+			extraData["account_sid"] = resolvedSID
 			if account.FriendlyName != "" {
 				extraData["friendly_name"] = account.FriendlyName
 			}
@@ -168,7 +175,7 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid, baseURL st
 			if account.Type != "" {
 				extraData["type"] = account.Type
 			}
-			if account.OwnerAccountSID != "" && account.OwnerAccountSID != account.SID {
+			if account.OwnerAccountSID != "" && account.OwnerAccountSID != resolvedSID {
 				extraData["owner_account_sid"] = account.OwnerAccountSID
 				extraData["is_subaccount"] = "true"
 			}

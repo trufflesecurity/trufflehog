@@ -432,4 +432,70 @@ func TestTwilio_EndpointCustomization(t *testing.T) {
 			t.Errorf("requestedURL = %q, want %q", requestedURL, wantURL)
 		}
 	})
+
+	t.Run("subaccount identification when account SID is omitted in JSON response", func(t *testing.T) {
+		// If response omits 'sid' but has owner_account_sid == candidate sid, it must NOT be tagged as a subaccount
+		mockBody := fmt.Sprintf(`{"owner_account_sid":"%s","friendly_name":"Primary Account","status":"active"}`, validSid)
+		client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+
+		s := Scanner{client: client}
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		if results[0].ExtraData["is_subaccount"] == "true" {
+			t.Errorf("is_subaccount = 'true', want not true when owner_account_sid matches candidate sid")
+		}
+	})
+
+	t.Run("useCloudEndpoint false skips verification without outbound network requests", func(t *testing.T) {
+		var requestCount int
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestCount++
+					return nil, errors.New("outbound network call made when cloud disabled")
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		s.SetCloudEndpoint(s.CloudEndpoint())
+		s.UseCloudEndpoint(false)
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false when cloud endpoint is disabled")
+		}
+		if requestCount != 0 {
+			t.Errorf("requestCount = %d, want 0 network calls when cloud endpoint is disabled", requestCount)
+		}
+	})
+
+	t.Run("closed account reports verified with status closed", func(t *testing.T) {
+		mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Closed Project","status":"closed","type":"Full"}`, validSid)
+		client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+
+		s := Scanner{client: client}
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+		if results[0].ExtraData["status"] != "closed" {
+			t.Errorf("status = %q, want 'closed'", results[0].ExtraData["status"])
+		}
+	})
 }

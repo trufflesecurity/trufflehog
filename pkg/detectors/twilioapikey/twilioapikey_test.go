@@ -305,7 +305,7 @@ func TestTwilioAPIKey_CustomEndpoint_CustomPathPreserved(t *testing.T) {
 				requestedURL = req.URL.String()
 				return &http.Response{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
 				}, nil
 			},
 		},
@@ -340,7 +340,7 @@ func TestTwilioAPIKey_CustomEndpoint_MissingPathEmitsWarningAndHitsRoot(t *testi
 				requestedURL = req.URL.String()
 				return &http.Response{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
 				}, nil
 			},
 		},
@@ -491,7 +491,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 					requestedURL = req.URL.String()
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Body:       io.NopCloser(strings.NewReader(`{}`)),
+						Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
 					}, nil
 				},
 			},
@@ -570,7 +570,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 					requestedURL = req.URL.String()
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Body:       io.NopCloser(strings.NewReader(`{}`)),
+						Body:       io.NopCloser(strings.NewReader(`{"services":[]}`)),
 					}, nil
 				},
 			},
@@ -593,4 +593,146 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 			t.Errorf("requestedURL = %q, want prefix https://mock-verifier.internal/api/verify", requestedURL)
 		}
 	})
+
+	t.Run("response body read error returns verification error", func(t *testing.T) {
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(&errReader{err: errors.New("read error: connection reset")}),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false when response body read fails")
+		}
+		if results[0].VerificationError() == nil {
+			t.Errorf("VerificationError() = nil, want non-nil on read error")
+		}
+	})
+
+	t.Run("generic 200 OK without Twilio payload returns unverified", func(t *testing.T) {
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"status":"ok","message":"Welcome to Auth Proxy Portal"}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://proxy.internal/"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false on generic non-Twilio 200 OK response")
+		}
+	})
+
+	t.Run("userinfo password is redacted in warning log", func(t *testing.T) {
+		var loggedMessages []string
+		logger := zapr.NewLogger(zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(func(e zapcore.Entry) error {
+			loggedMessages = append(loggedMessages, e.Message)
+			return nil
+		}))))
+
+		ctx := logContext.WithLogger(context.Background(), logger)
+
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"services":[{"friendly_name":"Test","account_sid":"AC12345"}]}`)),
+					}, nil
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		if err := s.SetConfiguredEndpoints("https://user:secret123@authproxy.corp.internal"); err != nil {
+			t.Fatalf("SetConfiguredEndpoints error = %v", err)
+		}
+
+		results, err := s.FromData(ctx, true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 || !results[0].Verified {
+			t.Fatalf("expected verified result, got %+v", results)
+		}
+
+		var foundRedacted bool
+		for _, msg := range loggedMessages {
+			if strings.Contains(msg, "secret123") {
+				t.Fatalf("found unredacted secret in log message: %q", msg)
+			}
+			if strings.Contains(msg, "xxxxx") {
+				foundRedacted = true
+			}
+		}
+		if !foundRedacted {
+			t.Errorf("expected log message with redacted userinfo, got: %v", loggedMessages)
+		}
+	})
+
+	t.Run("useCloudEndpoint false skips verification without outbound network requests", func(t *testing.T) {
+		var requestCount int
+		client := &http.Client{
+			Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requestCount++
+					return nil, errors.New("outbound network call made when cloud disabled")
+				},
+			},
+		}
+
+		s := Scanner{client: client}
+		s.SetCloudEndpoint(s.CloudEndpoint())
+		s.UseCloudEndpoint(false)
+
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false when cloud endpoint is disabled")
+		}
+		if requestCount != 0 {
+			t.Errorf("requestCount = %d, want 0 network calls when cloud endpoint is disabled", requestCount)
+		}
+	})
+}
+
+type errReader struct {
+	err error
+}
+
+func (e *errReader) Read(p []byte) (n int, err error) {
+	return 0, e.err
 }
