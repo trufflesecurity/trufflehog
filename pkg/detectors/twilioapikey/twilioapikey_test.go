@@ -853,6 +853,67 @@ func TestTwilioAPIKey_Verification_ClosedAccount_CaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestTwilioAPIKey_ClosedAccount_StopsProbingAndClearsPriorError(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	var verifyCalls int
+	client := &http.Client{
+		Transport: common.FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				switch {
+				case strings.Contains(req.URL.Host, "failing"):
+					return &http.Response{
+						StatusCode: http.StatusInternalServerError,
+						Body:       io.NopCloser(strings.NewReader(`{"message":"internal error"}`)),
+					}, nil
+				case strings.Contains(req.URL.Host, "closed"):
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"accounts":[{"sid":"AC12345678901234567890123456789012","status":"closed"}]}`)),
+					}, nil
+				case strings.Contains(req.URL.Host, "verify"):
+					verifyCalls++
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"services":[{"friendly_name":"TestService","sid":"VA123"}]}`)),
+					}, nil
+				default:
+					return nil, fmt.Errorf("unexpected request to %s", req.URL.String())
+				}
+			},
+		},
+	}
+
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints(
+		"https://failing.internal",
+		"https://closed.internal",
+		"https://verify.internal",
+	); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if verifyCalls != 0 {
+		t.Errorf("verifyCalls = %d, want 0 (probing should stop at closed account)", verifyCalls)
+	}
+	if results[0].Verified {
+		t.Errorf("Verified = true, want false for closed account")
+	}
+	if results[0].VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil (prior endpoint error should be cleared)", results[0].VerificationError())
+	}
+	if results[0].ExtraData["status"] != "closed" {
+		t.Errorf("status = %q, want 'closed'", results[0].ExtraData["status"])
+	}
+}
+
 type errReader struct {
 	err error
 }

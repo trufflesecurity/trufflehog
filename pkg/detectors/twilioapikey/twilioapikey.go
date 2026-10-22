@@ -117,6 +117,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						lastErr = nil
 						break
 					}
+					if strings.EqualFold(extraData["status"], "closed") {
+						s1.Verified = false
+						lastErr = nil
+						break
+					}
 				}
 				s1.SetVerificationError(lastErr, secret)
 			}
