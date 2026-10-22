@@ -36,6 +36,7 @@ func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchC
 
 	sourceName := "trufflehog - Elasticsearch"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, elasticsearch.SourceType)
+	ctx = withSourceFields(ctx, sourceName, elasticsearch.SourceType, sourceID, jobID)
 
 	elasticsearchSource := &elasticsearch.Source{}
 	if err := elasticsearchSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

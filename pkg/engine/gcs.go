@@ -46,6 +46,7 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) (sources.JobP
 
 	sourceName := "trufflehog - gcs"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gcs.SourceType)
+	ctx = withSourceFields(ctx, sourceName, gcs.SourceType, sourceID, jobID)
 
 	gcsSource := &gcs.Source{}
 	if err := gcsSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
