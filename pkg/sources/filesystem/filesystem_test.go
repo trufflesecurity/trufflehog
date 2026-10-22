@@ -11,13 +11,18 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -438,7 +443,6 @@ func TestSkipBinaries(t *testing.T) {
 	source := &Source{
 		paths:        []string{textFile, binaryFile}, // Test individual files
 		skipBinaries: true,
-		log:          logr.Discard(),
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
@@ -887,4 +891,93 @@ func createTempDir(dir string, contents ...string) (string, func(), error) {
 		}
 	}
 	return tmpdir, func() { _ = os.RemoveAll(tmpdir) }, nil
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testSecret = "TESTSECRET-do-not-log-1234567890"
+
+	// One file of each kind the source logs about: scanned, binary, excluded by filter, and a symlink.
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.txt"), []byte("password = "+testSecret), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.exe"), []byte{0x4D, 0x5A, 0x90, 0x00}, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "excluded.txt"), []byte("password = "+testSecret), 0644))
+	require.NoError(t, os.Symlink(filepath.Join(dir, "config.txt"), filepath.Join(dir, "link.txt")))
+
+	excludeFile := filepath.Join(t.TempDir(), "exclude.txt")
+	require.NoError(t, os.WriteFile(excludeFile, []byte("excluded\\.txt$\n"), 0644))
+
+	conn, err := anypb.New(&sourcespb.Filesystem{
+		Paths:            []string{dir},
+		SkipBinaries:     true,
+		ExcludePathsFile: excludeFile,
+	})
+	require.NoError(t, err)
+
+	// run the source with both Chunks and ChunkUnit, draining chunks the way the engine does
+	runSource := func(ctx trContext.Context) {
+		s := Source{}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+
+		chunksCh := make(chan *sources.Chunk, 64)
+		go func() {
+			for range chunksCh {
+			}
+		}()
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		reporter := sourcestest.TestReporter{}
+		require.NoError(t, s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: dir}, &reporter))
+		require.Empty(t, reporter.ChunkErrs)
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		ctx, logs := logtest.DebugContext()
+		ctx = trContext.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
+		runSource(ctx)
+
+		// lines from each level show up
+		for _, msg := range []string{
+			"filesystem source initialized", // V(1)
+			"scanning path",                 // V(2)
+			"finished scanning path",        // V(2)
+			"scanning directory",            // V(3)
+			"scanning file",                 // V(3)
+			"finished scanning file",        // V(5)
+		} {
+			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
+		}
+
+		// every skip says why, at V(4)
+		var reasons []string
+		for _, entry := range logs.FilterMessage("skipping file").All() {
+			reasons = append(reasons, fmt.Sprint(entry.ContextMap()["reason"]))
+		}
+		for _, entry := range logs.FilterMessage("skipping symlink").All() {
+			reasons = append(reasons, fmt.Sprint(entry.ContextMap()["reason"]))
+		}
+		assert.Contains(t, reasons, "binary files are skipped")
+		assert.Contains(t, reasons, "excluded by path filter")
+		assert.Contains(t, reasons, "following symlinks is not enabled")
+
+		// every line came from the context logger, so it carries the source fields,
+		// and none of them contain the secret
+		for _, entry := range logs.All() {
+			fields := entry.ContextMap()
+			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
+			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
+			assert.NotContains(t, entry.Message, testSecret)
+			assert.NotContains(t, fmt.Sprint(fields), testSecret)
+		}
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ctx := trContext.WithLogger(trContext.Background(), zapr.NewLogger(zap.New(core)))
+		runSource(ctx)
+
+		assert.Zero(t, logs.FilterMessage("scanning file").Len())
+		assert.Zero(t, logs.FilterMessage("skipping file").Len())
+		assert.Zero(t, logs.FilterMessage("finished scanning file").Len())
+	})
 }
