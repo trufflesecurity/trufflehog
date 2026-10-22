@@ -95,6 +95,22 @@ func (cs *AppInstallationClients) AccessToken(ctx context.Context) (string, erro
 	return token.GetToken(), nil
 }
 
+// GrantedPermissions returns the permissions the installation grants, as
+// listed on its access token. GitHub sends them with every token it issues,
+// so this costs no API call when a token is already cached, which is the
+// usual case: a repo is cloned with the same token before its comments are
+// scanned. The comment scan reads them to skip, or report as incomplete,
+// listings the installation can't fully cover (see installationGrants).
+func (cs *AppInstallationClients) GrantedPermissions(ctx context.Context) (*github.InstallationPermissions, error) {
+	if _, err := cs.AccessToken(ctx); err != nil {
+		return nil, err
+	}
+
+	cs.tokenMu.RLock()
+	defer cs.tokenMu.RUnlock()
+	return cs.token.GetPermissions(), nil
+}
+
 func (cs *AppInstallationClients) accessTokenIfValid() *github.InstallationToken {
 	if cs.token == nil || cs.token.GetExpiresAt().Before(time.Now()) {
 		return nil
