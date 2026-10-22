@@ -1,0 +1,14 @@
+// Extensions must be declared from a proto2 file, matching how a downstream
+// consumer attaches its location messages to MetaData.
+syntax = "proto2";
+
+package source_metadata.testext;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb/internal/testextpb";
+
+import "source_metadata.proto";
+import "testext_types.proto";
+
+extend source_metadata.MetaData {
+  optional Downstream downstream_source = 1000;
+}

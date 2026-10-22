@@ -1,0 +1,23 @@
+// Test fixtures standing in for a downstream consumer that defines its own
+// source location message and attaches it to source_metadata.MetaData.
+syntax = "proto3";
+
+package source_metadata.testext;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb/internal/testextpb";
+
+message Downstream {
+  string path = 1;
+  string link = 2;
+  int64 line = 3;
+}
+
+// LegacyMetaData models an older MetaData that still declared the downstream
+// payload as a oneof arm at the number the extension now uses. Tests decode
+// its bytes as MetaData (and back) to show readers on either side of moving an
+// arm to an extension interoperate.
+message LegacyMetaData {
+  oneof data {
+    Downstream downstream_source = 1000;
+  }
+}
