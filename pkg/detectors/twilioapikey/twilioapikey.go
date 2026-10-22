@@ -245,6 +245,10 @@ func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret
 			return nil, false, fmt.Errorf("unexpected response payload from verifier endpoint")
 		}
 
+		if strings.EqualFold(extraData["status"], "closed") {
+			return extraData, false, nil
+		}
+
 		return extraData, true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return nil, false, nil

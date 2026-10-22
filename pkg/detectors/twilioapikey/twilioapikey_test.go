@@ -729,6 +729,130 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 	})
 }
 
+func TestTwilioAPIKey_Verification_ClosedAccount_AccountsList(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	mockBody := `{"accounts":[{"sid":"AC12345678901234567890123456789012","friendly_name":"Old Account","status":"closed","type":"Full"}]}`
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints("https://api.twilio.com/2010-04-01/Accounts.json"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	got := results[0]
+	if got.Verified {
+		t.Errorf("Verified = %v, want false for closed account", got.Verified)
+	}
+	if got.VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil", got.VerificationError())
+	}
+	if got.ExtraData["account_sid"] != "AC12345678901234567890123456789012" {
+		t.Errorf("account_sid = %q, want 'AC12345678901234567890123456789012'", got.ExtraData["account_sid"])
+	}
+	if got.ExtraData["status"] != "closed" {
+		t.Errorf("status = %q, want 'closed'", got.ExtraData["status"])
+	}
+	if got.ExtraData["friendly_name"] != "Old Account" {
+		t.Errorf("friendly_name = %q, want 'Old Account'", got.ExtraData["friendly_name"])
+	}
+}
+
+func TestTwilioAPIKey_Verification_ClosedAccount_SingleAccount(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	mockBody := `{"sid":"AC12345678901234567890123456789012","friendly_name":"Closed Single Account","status":"closed","type":"Full"}`
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints("https://api.twilio.com/2010-04-01/Accounts/AC12345678901234567890123456789012.json"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	got := results[0]
+	if got.Verified {
+		t.Errorf("Verified = %v, want false for closed single account", got.Verified)
+	}
+	if got.VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil", got.VerificationError())
+	}
+	if got.ExtraData["account_sid"] != "AC12345678901234567890123456789012" {
+		t.Errorf("account_sid = %q, want 'AC12345678901234567890123456789012'", got.ExtraData["account_sid"])
+	}
+	if got.ExtraData["status"] != "closed" {
+		t.Errorf("status = %q, want 'closed'", got.ExtraData["status"])
+	}
+}
+
+func TestTwilioAPIKey_Verification_SuspendedAccount(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	mockBody := `{"accounts":[{"sid":"AC12345678901234567890123456789012","friendly_name":"Suspended Account","status":"suspended","type":"Full"}]}`
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints("https://api.twilio.com/2010-04-01/Accounts.json"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	got := results[0]
+	if !got.Verified {
+		t.Errorf("Verified = %v, want true for suspended account", got.Verified)
+	}
+	if got.VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil", got.VerificationError())
+	}
+	if got.ExtraData["status"] != "suspended" {
+		t.Errorf("status = %q, want 'suspended'", got.ExtraData["status"])
+	}
+}
+
+func TestTwilioAPIKey_Verification_ClosedAccount_CaseInsensitive(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
+	mockBody := `{"sid":"AC12345678901234567890123456789012","status":"CLOSED"}`
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	s := Scanner{client: client}
+	if err := s.SetConfiguredEndpoints("https://api.twilio.com/2010-04-01/Accounts/AC12345678901234567890123456789012.json"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints error = %v", err)
+	}
+
+	results, err := s.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Verified {
+		t.Errorf("Verified = %v, want false for status 'CLOSED'", results[0].Verified)
+	}
+	if results[0].VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil", results[0].VerificationError())
+	}
+}
+
 type errReader struct {
 	err error
 }

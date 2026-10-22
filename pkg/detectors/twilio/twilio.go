@@ -181,6 +181,10 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid, baseURL st
 			}
 		}
 
+		if strings.EqualFold(extraData["status"], "closed") {
+			return extraData, false, nil
+		}
+
 		return extraData, true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return nil, false, nil

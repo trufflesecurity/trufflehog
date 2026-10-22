@@ -482,7 +482,7 @@ func TestTwilio_EndpointCustomization(t *testing.T) {
 		}
 	})
 
-	t.Run("closed account reports verified with status closed", func(t *testing.T) {
+	t.Run("closed account reports unverified with status closed", func(t *testing.T) {
 		mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Closed Project","status":"closed","type":"Full"}`, validSid)
 		client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
 
@@ -491,11 +491,85 @@ func TestTwilio_EndpointCustomization(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FromData() error = %v", err)
 		}
-		if len(results) != 1 || !results[0].Verified {
-			t.Fatalf("expected verified result, got %+v", results)
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false for closed account")
+		}
+		if results[0].VerificationError() != nil {
+			t.Errorf("VerificationError() = %v, want nil", results[0].VerificationError())
 		}
 		if results[0].ExtraData["status"] != "closed" {
 			t.Errorf("status = %q, want 'closed'", results[0].ExtraData["status"])
 		}
 	})
+}
+
+func TestTwilio_Verification_ClosedAccount(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio sid %s key %s", validSid, validKey))
+	mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Closed Project","status":"closed","type":"Full"}`, validSid)
+
+	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	got := results[0]
+	if got.Verified {
+		t.Errorf("Verified = %v, want false for closed account", got.Verified)
+	}
+	if got.VerificationError() != nil {
+		t.Errorf("VerificationError() = %v, want nil", got.VerificationError())
+	}
+	if got.ExtraData["account_sid"] != validSid {
+		t.Errorf("ExtraData[account_sid] = %q, want %q", got.ExtraData["account_sid"], validSid)
+	}
+	if got.ExtraData["friendly_name"] != "Closed Project" {
+		t.Errorf("ExtraData[friendly_name] = %q, want 'Closed Project'", got.ExtraData["friendly_name"])
+	}
+	if got.ExtraData["status"] != "closed" {
+		t.Errorf("ExtraData[status] = %q, want 'closed'", got.ExtraData["status"])
+	}
+	if got.ExtraData["type"] != "Full" {
+		t.Errorf("ExtraData[type] = %q, want 'Full'", got.ExtraData["type"])
+	}
+}
+
+func TestTwilio_Verification_ClosedAccount_CaseInsensitive(t *testing.T) {
+	data := []byte(fmt.Sprintf("twilio sid %s key %s", validSid, validKey))
+	tests := []struct {
+		name       string
+		statusJSON string
+	}{
+		{name: "TitleCase Closed", statusJSON: "Closed"},
+		{name: "UpperCase CLOSED", statusJSON: "CLOSED"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockBody := fmt.Sprintf(`{"sid":"%s","status":"%s"}`, validSid, tt.statusJSON)
+			client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+			results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+			if results[0].Verified {
+				t.Errorf("Verified = %v, want false for status %q", results[0].Verified, tt.statusJSON)
+			}
+			if results[0].VerificationError() != nil {
+				t.Errorf("VerificationError() = %v, want nil", results[0].VerificationError())
+			}
+			if results[0].ExtraData["status"] != tt.statusJSON {
+				t.Errorf("ExtraData[status] = %q, want %q", results[0].ExtraData["status"], tt.statusJSON)
+			}
+		})
+	}
 }
