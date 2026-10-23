@@ -50,6 +50,22 @@ func TestSonarCloud_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s token = '@%s'", keyword, validPattern),
 			want:  []string{},
 		},
+		{
+			// Git commit SHAs in dependabot PR bodies (e.g. sonarqube-scan-action
+			// bump notes) sit on a "/commit/<sha>" URL path and share the 40-char
+			// lowercase hex shape, producing false positives. A real token is never
+			// preceded by a path separator.
+			name: "commit SHA in sonarqube action bump body is ignored",
+			input: "sonarsource/sonarqube-scan-action/commit/" +
+				"56568530eddcb15ab65e7880af318fba5b859e2e",
+			want: []string{},
+		},
+		{
+			name: "commit SHA on https URL path near sonar keyword is ignored",
+			input: "https://github.com/SonarSource/sonarqube-scan-action/commit/" +
+				"e050aa9e699112ca0664dd2a5c694ddab05dc555",
+			want: []string{},
+		},
 	}
 
 	for _, test := range tests {
