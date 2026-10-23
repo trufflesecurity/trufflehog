@@ -17,13 +17,20 @@ func safeRepoURL(repo string) string {
 		return u.String()
 	}
 
-	// anything else is a repo name like "org/repo" or an SCP-style URL like
-	// "user:pass@host:org/repo". url.Parse can't find the user info in those,
-	// but it always sits before an "@" in the part before the first "/",
-	// so drop everything up to that "@"
-	hostPart, _, _ := strings.Cut(repo, "/")
+	// anything else is a repo name like "org/repo", an SCP-style URL like
+	// "user:pass@host:org/repo", or a mix like "https://token@host:org/repo"
+	// that url.Parse rejects. The user info always sits before an "@" in the
+	// part before the first "/" after any scheme, so drop everything up to
+	// that "@" and keep the scheme
+	scheme, rest, found := strings.Cut(repo, "://")
+	if found {
+		scheme += "://"
+	} else {
+		scheme, rest = "", repo
+	}
+	hostPart, _, _ := strings.Cut(rest, "/")
 	if at := strings.LastIndex(hostPart, "@"); at >= 0 {
-		return repo[at+1:]
+		return scheme + rest[at+1:]
 	}
 	return repo
 }
