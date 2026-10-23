@@ -180,6 +180,9 @@ func TestSafeRepoURL(t *testing.T) {
 		"org/repo":                                        "org/repo",
 		"git@github.com:org/repo.git":                     "github.com:org/repo.git",
 		"user:ghp_secret@github.com:org/repo.git":         "github.com:org/repo.git",
+		// mixed HTTPS and SCP style, which url.Parse rejects
+		"https://ghp_secret@github.com:org/repo.git":      "https://github.com:org/repo.git",
+		"https://user:ghp_secret@github.com:org/repo.git": "https://github.com:org/repo.git",
 	}
 	for input, want := range tests {
 		assert.Equal(t, want, safeRepoURL(input), input)
