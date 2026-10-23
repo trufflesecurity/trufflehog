@@ -15,10 +15,12 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
@@ -29,13 +31,15 @@ var (
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
-		return s.client
+		return s.VerificationClient(s.client)
 	}
 
-	return defaultClient
+	return s.VerificationClient(defaultClient)
 }
 
 func (Scanner) Version() int { return 2 }
+
+func (Scanner) CloudEndpoint() string { return "https://circleci.com" }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -72,8 +76,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := v1.VerifyCircleCIToken(ctx, s.getClient(), token)
-			result.Verified = isVerified
+			var verificationErr error
+			for _, endpoint := range s.Endpoints() {
+				isVerified, endpointErr := v1.VerifyCircleCIToken(ctx, s.getClient(), endpoint, token)
+				if isVerified {
+					result.Verified = true
+					verificationErr = nil
+					break
+				}
+				if verificationErr == nil && endpointErr != nil {
+					verificationErr = endpointErr
+				}
+			}
 			result.SetVerificationError(verificationErr, token)
 		}
 
