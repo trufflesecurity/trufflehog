@@ -171,3 +171,20 @@ func TestIsWikiLink(t *testing.T) {
 	assert.False(t, isWikiLink("https://github.com/owner/repo/blob/main/path/to/file"))
 	assert.False(t, isWikiLink("not a url"))
 }
+
+func TestSafeRepoURL(t *testing.T) {
+	tests := map[string]string{
+		"https://user:ghp_secret@github.com/org/repo.git": "https://github.com/org/repo.git",
+		"https://ghp_secret@github.com/org/repo.git":      "https://github.com/org/repo.git",
+		"https://github.com/org/repo.git":                 "https://github.com/org/repo.git",
+		"org/repo":                                        "org/repo",
+		"git@github.com:org/repo.git":                     "github.com:org/repo.git",
+		"user:ghp_secret@github.com:org/repo.git":         "github.com:org/repo.git",
+		// mixed HTTPS and SCP style, which url.Parse rejects
+		"https://ghp_secret@github.com:org/repo.git":      "https://github.com:org/repo.git",
+		"https://user:ghp_secret@github.com:org/repo.git": "https://github.com:org/repo.git",
+	}
+	for input, want := range tests {
+		assert.Equal(t, want, safeRepoURL(input), input)
+	}
+}

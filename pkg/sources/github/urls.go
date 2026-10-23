@@ -6,6 +6,35 @@ import (
 	"strings"
 )
 
+// safeRepoURL removes any username or password from a repo URL so it can be
+// logged.
+func safeRepoURL(repo string) string {
+	// a normal URL like "https://user:pass@host/org/repo": let url.Parse find
+	// the user info and drop it
+	u, err := url.Parse(repo)
+	if err == nil && u.Host != "" {
+		u.User = nil
+		return u.String()
+	}
+
+	// anything else is a repo name like "org/repo", an SCP-style URL like
+	// "user:pass@host:org/repo", or a mix like "https://token@host:org/repo"
+	// that url.Parse rejects. The user info always sits before an "@" in the
+	// part before the first "/" after any scheme, so drop everything up to
+	// that "@" and keep the scheme
+	scheme, rest, found := strings.Cut(repo, "://")
+	if found {
+		scheme += "://"
+	} else {
+		scheme, rest = "", repo
+	}
+	hostPart, _, _ := strings.Cut(rest, "/")
+	if at := strings.LastIndex(hostPart, "@"); at >= 0 {
+		return scheme + rest[at+1:]
+	}
+	return repo
+}
+
 func wikiCloneURLForRepo(repoURL string) (string, bool) {
 	if !strings.HasSuffix(repoURL, ".git") || strings.HasSuffix(repoURL, ".wiki.git") {
 		return "", false
