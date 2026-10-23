@@ -337,8 +337,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	for _, repo := range s.repos {
 		r, err := s.normalizeRepo(repo)
 		if err != nil {
-			// the repo comes from the user's config and may hold a token, so strip it
-			aCtx.Logger().Error(err, "invalid repository", "repo", safeRepoURL(repo))
+			// the repo comes from the user's config and may hold a token, so strip it,
+			// also from the error, which repeats the URL
+			safeErr := errors.New(strings.ReplaceAll(err.Error(), repo, safeRepoURL(repo)))
+			aCtx.Logger().Error(safeErr, "invalid repository", "repo", safeRepoURL(repo))
 			continue
 		}
 		s.filteredRepoCache.Set(repo, r)
@@ -811,11 +813,17 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 				ctx.Logger().Info("Skipping org member gists: GitHub doesn't allow listing gists with a GitHub App installation token", "org_members", len(s.memberCache))
 			}
 			for member := range s.memberCache {
+				// once the scan is cancelled every fetch fails, so stop here
+				// instead of logging an error for each remaining member
+				if common.IsDone(ctx) {
+					ctx.Logger().V(4).Info("skipping remaining members", "reason", "scan cancelled")
+					return nil
+				}
 				// add the member to the error line below so we know whose fetch failed
 				memberCtx := context.WithValues(ctx, "member", member)
 				// TODO: Add authenticated user list repo for app token. It does support as per docs but need to test it before we enable it here.
 				// docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repositories-for-the-authenticated-user
-				if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
+				if err := s.getReposByUser(ctx, member, false, reporter); err != nil && ctx.Err() == nil {
 					memberCtx.Logger().Error(err, "error fetching repos by user")
 				}
 			}
@@ -1612,10 +1620,18 @@ func (s *Source) handleRateLimitWithChunkReporter(ctx context.Context, reporter 
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
 	ctx.Logger().V(1).Info("Fetching repos from members", "members", len(s.memberCache), "org_count", s.orgsCache.Count())
 	for member := range s.memberCache {
-		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
+		// once the scan is cancelled every fetch fails, so stop here
+		// instead of logging an error for each remaining member
+		if common.IsDone(ctx) {
+			ctx.Logger().V(4).Info("skipping remaining members", "reason", "scan cancelled")
+			return
+		}
+		// a fetch that was running when the scan got cancelled fails too,
+		// that is not an error worth logging
+		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil && ctx.Err() == nil {
 			ctx.Logger().Error(err, "Unable to fetch gists by user", "user", member)
 		}
-		if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
+		if err := s.getReposByUser(ctx, member, false, reporter); err != nil && ctx.Err() == nil {
 			ctx.Logger().Error(err, "Unable to fetch repos by user", "user", member)
 		}
 	}
