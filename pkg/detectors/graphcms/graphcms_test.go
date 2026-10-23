@@ -2,6 +2,7 @@ package graphcms
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,6 +12,7 @@ import (
 )
 
 var (
+	secret = "ey" + strings.Repeat("A", 73) + ".ey" + strings.Repeat("B", 365) + "." + strings.Repeat("C", 683)
 	validPattern = `[{
 		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
 		"name": "GraphCMS",
@@ -19,14 +21,13 @@ var (
 		"authentication_type": "",
 		"verification_url": "https://api.example.com/example",
 		"test_secrets": {
-			"secret": "eyQLdHMLjpK5snSPYf6ZCiXXxQRlie2wMITSkTjuzywCiga696mNUt2k2nEL4mv70CKQD9STxcN@eyr4kx6eWKut5zTR6Ei9o94jSCNWjkjQgYoD1pihdbTrr0sHys5uSHOUtiICAtcgsXjewxjyHvro9JYMClVEiGMQoxRC8d1NKfChOjrSO2unumWMsSMSgoA1KQLlHXd0efLuN94KiA3tjLN2Om8SsvLrk29LTPhaQYMvyx02x4IPjLlcHLqSt7cSVUqOe0uGxyIGyzsT7wx9PT56zbieLhRmO697zwyuiN4LpCccP7PuJB9qjz9AofCvgP8TJNsUZdwqcLFiyYTmZQ66Tn9Vpa1IJIdp2oq6izYegl49PDQtuP60A5O7xS7wV5QnFrkqmQkj7WeDUAtRECfTSgfFuXYLPwfYD7cYkfBRC7I1sdnH5tV1R4YEizugtQR5FhVeXHJJkfa-eNjLX9rUsnUNEJTvHOkiyjPvJkUfYzbJMUEVAjIhzny9V04DfnCh7l1mrVM0s_dpUP4fEmAe5fJjDHOMpvtZar0AByzBRpac9Rih0eWpbrMv7sNXh3d9pRPf-AtzCyKqzQ25_FJ6J6wN2evxXnqV4KhSmRTkaaNra4jsF3Sh8cMVYN-jAV6UBeKdSSLcFpjhlnVD6y59PnxFxbL7lj4UxVql3GpqnuKdd3MjN9OOQW2oqI8fd7_I8-vNwowWIuh4K5J0MbBIHCCgvqvdfPEHv4tBKFaj71zcEiDwOQJNxtL-kU_xTpcij9Rq5gnSRufQo1D932wSEe4NrHjZJhJu5qjtR1VC1dujLotyZvYhlyFJ22Lr2Tj5btj-VNjZeCJuv3QcQwR7mSI23O1e1_ESHnYkq4EMd17EIVWucgGZ1jZxGURTAU2bNJMDYUuramusFKAPtaL9i2uVDMQNukiWQI3fIrkOFguGnsCksOSWx80pu2C7CdvhH2SpF0kVnggTcz5W2AR4HPKu4645wBAY_IoirLUcCeKCjWTRJBH2kanqUCweHHU1qRSHncvYdkm0TRGkjpewoZs6JNpxc0WzClIatcVKOAbak3SKLULu28y5b-eIY_x2vqgYmjVZKsjqiQpJblkrRpJsnj3w0-B",
+			"secret": "` + secret + `",
 			"graphcms_id": "trevo1rp5egljk1vwk83enlti"
 		},
 		"expected_response": "200",
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "eyQLdHMLjpK5snSPYf6ZCiXXxQRlie2wMITSkTjuzywCiga696mNUt2k2nEL4mv70CKQD9STxcN@eyr4kx6eWKut5zTR6Ei9o94jSCNWjkjQgYoD1pihdbTrr0sHys5uSHOUtiICAtcgsXjewxjyHvro9JYMClVEiGMQoxRC8d1NKfChOjrSO2unumWMsSMSgoA1KQLlHXd0efLuN94KiA3tjLN2Om8SsvLrk29LTPhaQYMvyx02x4IPjLlcHLqSt7cSVUqOe0uGxyIGyzsT7wx9PT56zbieLhRmO697zwyuiN4LpCccP7PuJB9qjz9AofCvgP8TJNsUZdwqcLFiyYTmZQ66Tn9Vpa1IJIdp2oq6izYegl49PDQtuP60A5O7xS7wV5QnFrkqmQkj7WeDUAtRECfTSgfFuXYLPwfYD7cYkfBRC7I1sdnH5tV1R4YEizugtQR5FhVeXHJJkfa-eNjLX9rUsnUNEJTvHOkiyjPvJkUfYzbJMUEVAjIhzny9V04DfnCh7l1mrVM0s_dpUP4fEmAe5fJjDHOMpvtZar0AByzBRpac9Rih0eWpbrMv7sNXh3d9pRPf-AtzCyKqzQ25_FJ6J6wN2evxXnqV4KhSmRTkaaNra4jsF3Sh8cMVYN-jAV6UBeKdSSLcFpjhlnVD6y59PnxFxbL7lj4UxVql3GpqnuKdd3MjN9OOQW2oqI8fd7_I8-vNwowWIuh4K5J0MbBIHCCgvqvdfPEHv4tBKFaj71zcEiDwOQJNxtL-kU_xTpcij9Rq5gnSRufQo1D932wSEe4NrHjZJhJu5qjtR1VC1dujLotyZvYhlyFJ22Lr2Tj5btj-VNjZeCJuv3QcQwR7mSI23O1e1_ESHnYkq4EMd17EIVWucgGZ1jZxGURTAU2bNJMDYUuramusFKAPtaL9i2uVDMQNukiWQI3fIrkOFguGnsCksOSWx80pu2C7CdvhH2SpF0kVnggTcz5W2AR4HPKu4645wBAY_IoirLUcCeKCjWTRJBH2kanqUCweHHU1qRSHncvYdkm0TRGkjpewoZs6JNpxc0WzClIatcVKOAbak3SKLULu28y5b-eIY_x2vqgYmjVZKsjqiQpJblkrRpJsnj3w0-B"
 )
 
 func TestGraphCMS_Pattern(t *testing.T) {
