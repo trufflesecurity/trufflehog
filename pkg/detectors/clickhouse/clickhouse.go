@@ -44,7 +44,10 @@ var (
 	// Connection strings using ClickHouse's own scheme, which is what the Go,
 	// Python and JDBC clients all accept: clickhouse://user:pass@host:9000/db
 	// (clickhouses:// for TLS). Capture groups: user, password, host[:port], /database.
-	keyPat = regexp.MustCompile(`\bclickhouses?://([^\s:/@]{0,64}):([^\s:/@]{3,100})@([-.\w]+(?::\d{1,5})?)(/[^\s?#"'` + "`" + `]*)?`)
+	// The database group stops at list separators as well as whitespace, so that a
+	// comma- or semicolon-separated list of URLs does not have every later
+	// credential swallowed into the first match's database.
+	keyPat = regexp.MustCompile(`\bclickhouses?://([^\s:/@]{0,64}):([^\s:/@]{3,100})@([-.\w]+(?::\d{1,5})?)(/[^\s,;?#"'` + "`" + `]*)?`)
 
 	// ClickHouse Cloud speaks HTTPS rather than the native protocol, so its
 	// credentials show up as ordinary basic-auth URLs. The domain is what makes
@@ -72,6 +75,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 
 	for _, m := range append(keyPat.FindAllStringSubmatch(dataStr, -1), cloudPat.FindAllStringSubmatch(dataStr, -1)...) {
 		hostPort := trimHostDots(m[3])
+
+		// A truncated or elided URL can leave a host of only dots, which trims to
+		// nothing. Go dials http://:8123 as localhost, so an empty host would be
+		// verified against whatever ClickHouse happens to run on this machine.
+		if hostPort == "" {
+			continue
+		}
 		isCloud := strings.HasPrefix(m[0], "https://")
 
 		// Only ClickHouse Cloud hostnames are a ClickHouse finding in the HTTPS
@@ -126,6 +136,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		if database != "" {
 			r.ExtraData["database"] = database
 		}
+
+		// Raw holds the decoded password, which is not what the source document
+		// contains when the userinfo was percent-encoded. The engine looks for the
+		// primary secret value verbatim to work out line numbers and to honour
+		// trufflehog:ignore, so give it the match exactly as it was written.
+		r.SetPrimarySecretValue(m[0])
 
 		if verify {
 			client := s.client
@@ -263,6 +279,14 @@ func isClickHouseResponse(h http.Header) bool {
 		}
 	}
 	return false
+}
+
+// IsFalsePositive opts out of the default wordlist check. Raw is a user-chosen
+// ClickHouse password, so that check drops unverified findings whose password
+// happens to contain a dictionary word. The other connection-string detectors
+// (postgres, mongodb, jdbc) opt out for the same reason.
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {

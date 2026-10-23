@@ -108,6 +108,23 @@ func TestClickHouse_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s dsn = 'clickhouse://ch.example.com:9000/metrics'", keyword),
 			want:  []string{},
 		},
+		{
+			// The database group used to run to the next whitespace, so every later
+			// credential in a separated list was absorbed into the first database.
+			name:  "valid pattern - comma separated list of connection strings",
+			input: "dsn = 'clickhouse://u1:s3cr3tpassword1@h1.example.com:9000/db1,clickhouse://u2:s3cr3tpassword2@h2.example.com:9000/db2'",
+			want: []string{
+				"h1.example.com:9000" + "u1" + "s3cr3tpassword1",
+				"h2.example.com:9000" + "u2" + "s3cr3tpassword2",
+			},
+		},
+		{
+			// Trimming the prose full stop off a truncated host can leave nothing,
+			// and an empty host is dialled as localhost.
+			name:  "invalid pattern - host of only dots",
+			input: "dsn = 'clickhouse://user:s3cr3tpassword@...'",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -257,5 +274,66 @@ func TestClickHouse_TrimHostDots(t *testing.T) {
 				t.Errorf("trimHostDots(%q) = %q, want %q", test.hostPort, got, test.want)
 			}
 		})
+	}
+}
+
+// The engine locates a finding by searching the source document for the primary
+// secret value, which is also how trufflehog:ignore is honoured. Raw holds the
+// decoded password, so for percent-encoded userinfo that value is absent from the
+// chunk and the match has to be reported as it was written.
+func TestClickHouse_PrimarySecretValueIsPresentInSource(t *testing.T) {
+	d := Scanner{}
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "plain password",
+			input: "dsn = 'clickhouse://analytics:s3cr3tpassword@ch.example.com:9000/metrics'",
+		},
+		{
+			name:  "percent-encoded password",
+			input: "dsn = 'clickhouse://analytics:p%40ssw0rd%21x@ch.example.com:9000/metrics'",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Fatalf("error = %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+
+			primary := results[0].GetPrimarySecretValue()
+			if primary == "" {
+				t.Fatal("primary secret value was not set")
+			}
+			if !strings.Contains(test.input, primary) {
+				t.Errorf("primary secret value %q is not present in the source document", primary)
+			}
+		})
+	}
+}
+
+// Raw is a user-chosen password, so the default wordlist check would drop
+// unverified findings whose password contains a dictionary word.
+func TestClickHouse_IsFalsePositive(t *testing.T) {
+	d := Scanner{}
+
+	results, err := d.FromData(context.Background(), false,
+		[]byte("dsn = 'clickhouse://analytics:correcthorsebattery@ch.example.com:9000/metrics'"))
+	if err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if isFP, reason := d.IsFalsePositive(results[0]); isFP {
+		t.Errorf("dictionary-word password reported as a false positive (%s)", reason)
 	}
 }
