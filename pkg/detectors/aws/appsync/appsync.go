@@ -107,7 +107,32 @@ func verifyAppSyncKey(
 	key string,
 ) (bool, error) {
 
-	query := `{"query":"query { __typename }"}`
+	// Try introspection query first (more comprehensive)
+	queries := []string{
+		`{"query":"{ __schema { queryType { name } } }"}`,
+		`{"query":"{ __typename }"}`,
+	}
+
+	for _, query := range queries {
+		verified, err := tryQuery(ctx, client, endpoint, key, query)
+		if verified || err == nil {
+			// Either verified successfully, or definitively invalid (err == nil means auth failed)
+			return verified, err
+		}
+		// If err != nil, it's an inconclusive error (network, etc), try next query
+	}
+
+	// If both queries failed with errors, return the last error
+	return false, fmt.Errorf("all verification queries failed")
+}
+
+func tryQuery(
+	ctx context.Context,
+	client *http.Client,
+	endpoint string,
+	key string,
+	query string,
+) (bool, error) {
 
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -132,20 +157,42 @@ func verifyAppSyncKey(
 		_ = res.Body.Close()
 	}()
 
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
 	// https://docs.aws.amazon.com/appsync/latest/APIReference/CommonErrors.html
 	switch res.StatusCode {
 
 	case http.StatusOK:
+		// Check if response contains schema/auth errors in JSON body
+
+		// Authentication errors mean invalid key
+		if bytes.Contains(bodyBytes, []byte("UnauthorizedException")) ||
+			bytes.Contains(bodyBytes, []byte("Unauthorized")) {
+			return false, nil
+		}
+
+		// Schema errors mean key is VALID but API has no schema
+		if bytes.Contains(bodyBytes, []byte("GraphQLSchemaException")) ||
+			bytes.Contains(bodyBytes, []byte("No schema definition")) ||
+			bytes.Contains(bodyBytes, []byte("\"errors\"")) && bytes.Contains(bodyBytes, []byte("schema")) {
+			return true, nil
+		}
+
+		// 200 with data means success
+		if bytes.Contains(bodyBytes, []byte("\"data\"")) {
+			return true, nil
+		}
+
 		return true, nil
 
 	case http.StatusBadGateway:
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			return false, err
-		}
 		// Appsync returns 502 with a specific error message in the body when the key is valid but has no schema defined,
 		// so we treat that as a valid key
-		if bytes.Contains(bodyBytes, []byte("No schema definition exists")) {
+		if bytes.Contains(bodyBytes, []byte("No schema definition exists")) ||
+			bytes.Contains(bodyBytes, []byte("GraphQLSchemaException")) {
 			return true, nil
 		}
 		return false, fmt.Errorf("502 Bad Gateway: unexpected response")
@@ -155,12 +202,30 @@ func verifyAppSyncKey(
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 
+	case http.StatusBadRequest:
+		// Check if 400 is due to auth issues
+		if bytes.Contains(bodyBytes, []byte("UnauthorizedException")) ||
+			bytes.Contains(bodyBytes, []byte("Invalid API Key")) {
+			return false, nil
+		}
+		return false, fmt.Errorf("400 Bad Request: %s", string(bodyBytes[:min(100, len(bodyBytes))]))
+
+	case http.StatusNotFound:
+		return false, fmt.Errorf("404 Not Found - check endpoint URL")
+
 	default:
 		return false, fmt.Errorf(
 			"unexpected HTTP response status %d",
 			res.StatusCode,
 		)
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
