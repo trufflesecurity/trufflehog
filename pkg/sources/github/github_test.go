@@ -3197,3 +3197,47 @@ func TestScan_LogsResumeAndCancelSkips(t *testing.T) {
 		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), testToken)
 	}
 }
+
+func TestInit_InvalidRepoErrorDoesNotLogToken(t *testing.T) {
+	const testToken = "ghp_TESTTOKENinvalidrepo1234567890"
+
+	// a repo from the config with a token in it and no repo name, so it fails
+	// to normalize and the error repeats the URL
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:     "https://api.github.com",
+		Credential:   &sourcespb.GitHub_Token{Token: "token"},
+		Repositories: []string{"https://" + testToken + "@github.com/org"},
+	})
+
+	ctx, logs := logtest.DebugContext()
+	assert.NoError(t, s.Init(ctx, "test - github", 0, 1337, false, conn, 1))
+
+	errLines := logs.FilterMessage("invalid repository").All()
+	if assert.Len(t, errLines, 1) {
+		fields := errLines[0].ContextMap()
+		assert.Equal(t, "https://github.com/org", fields["repo"])
+		assert.Contains(t, fields["error"], "missing the repo name")
+	}
+	for _, entry := range logs.All() {
+		assert.NotContains(t, entry.Message, testToken)
+		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), testToken)
+	}
+}
+
+func TestAddReposForMembers_StopsOnCancel(t *testing.T) {
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint:   "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{Token: "token"},
+	})
+	s.memberCache = map[string]struct{}{"member1": {}, "member2": {}}
+
+	// cancel before the loop starts, so no member is fetched and no error is logged
+	debugCtx, logs := logtest.DebugContext()
+	ctx, cancel := context.WithCancel(debugCtx)
+	cancel()
+
+	s.addReposForMembers(ctx, noopReporter())
+
+	assert.Equal(t, 1, logs.FilterMessage("skipping remaining members").Len())
+	assert.Zero(t, logs.FilterLevelExact(zapcore.ErrorLevel).Len())
+}
