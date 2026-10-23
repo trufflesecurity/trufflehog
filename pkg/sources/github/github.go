@@ -2096,9 +2096,20 @@ func (s *Source) processIssueandPRsWithCommentsREST(
 	narrowed := func(missing, listing string, needs permission) error {
 		return fmt.Errorf("%s: %w", missing, newNarrowedListingError(installationID, listing, []permission{needs}))
 	}
+	// noPRs is set when /pulls ran and found nothing. Its state=all listing
+	// then shows the repo has no pull requests, so it has no review comments
+	// either. A 404 or 410 means pull requests are off, which is different:
+	// /pulls/comments still serves review comments from before that.
+	var noPRs bool
 	pullsPhase := func(startLog string) commentPhase {
 		return commentPhase{name: "pull requests", startLog: startLog, run: func() (int, error) {
-			return s.processPRs(ctx, p, repoInfo, reporter)
+			emitted, err := s.processPRs(ctx, p, repoInfo, reporter)
+			if isGitHubListingDisabled(err) {
+				ctx.Logger().V(2).Info("pull requests listing disabled for repo, skipping")
+				return emitted, nil
+			}
+			noPRs = err == nil && emitted == 0
+			return emitted, err
 		}}
 	}
 
@@ -2163,6 +2174,10 @@ func (s *Source) processIssueandPRsWithCommentsREST(
 			prStartLog = ""
 		}
 		phases = append(phases, commentPhase{name: "pull request comments", startLog: prStartLog, skipped: prsSkipped, run: func() (int, error) {
+			if noPRs {
+				ctx.Logger().V(2).Info("no pull requests in repo, skipping pull request comments")
+				return 0, nil
+			}
 			return s.processPRComments(ctx, p, repoInfo, reporter, since)
 		}})
 	}
@@ -2312,8 +2327,12 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 // after since. /issues/comments also returns comments on pull requests, since
 // GitHub treats every pull request as an issue. The endpoint stops at 300
 // pages, so the walk continues past that cap in since windows.
+//
+// When both issues and pull requests are off, GitHub answers 404 here. That
+// is only treated as empty when the repo also reports issues off, so an
+// unexpected 404 is still reported.
 func (s *Source) processIssueComments(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter, since time.Time) (int, error) {
-	return walkUpdatedSince(ctx, p, sinceWalk[*github.IssueComment]{
+	emitted, err := walkUpdatedSince(ctx, p, sinceWalk[*github.IssueComment]{
 		name:  "issue comments",
 		since: since,
 		list: func(ctx context.Context, since time.Time) ([]*github.IssueComment, *github.Response, error) {
@@ -2335,6 +2354,11 @@ func (s *Source) processIssueComments(ctx context.Context, p pager, repoInfo rep
 			return s.chunkIssueComments(ctx, repoInfo, comments, reporter)
 		},
 	})
+	if err != nil && repoInfo.hasNoIssues && isGitHubListingDisabled(err) {
+		ctx.Logger().V(2).Info("issue comments listing disabled for repo, skipping")
+		return emitted, nil
+	}
+	return emitted, err
 }
 
 // chunkIssueComments emits a chunk for each comment. The comments timeframe
