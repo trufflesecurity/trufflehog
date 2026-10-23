@@ -12,8 +12,12 @@ import (
 )
 
 var (
-	validKeyPattern       = "Y49ftoUer6aYZOzdkRzlENnW8PHnD9zf9dP9"
-	invalidKeyPattern     = "=49ftoUer6aYZOzdkRzlENnW8PHnD9zf9dP9"
+	validKeyPattern   = "Y49ftoUer6aYZOzdkRzlENnW8PHnD9zf9dP9"
+	invalidKeyPattern = "=49ftoUer6aYZOzdkRzlENnW8PHnD9zf9dP9"
+	// slugFP is a 36-char URL slug (lowercase words separated by hyphens) that
+	// was falsely reported as a Metabase session token because the old pattern
+	// allowed hyphens. See issue #4633.
+	slugFP                = "-journal-deduplication-id-to-voucher"
 	validBaseUrlPattern   = "https://tiwRdoa.metabase.com"
 	invalidBaseUrlPattern = "https://tiwRdo^.metabase.com"
 	keyword               = "metabase"
@@ -40,6 +44,11 @@ func TestMetabase_Pattern(t *testing.T) {
 		{
 			name:  "invalid pattern",
 			input: fmt.Sprintf("%s key = '%s' url = '%s'", keyword, invalidKeyPattern, invalidBaseUrlPattern),
+			want:  []string{},
+		},
+		{
+			name:  "false positive - URL slug with hyphens is not a session token",
+			input: fmt.Sprintf("metabase query - https://metabase.example.com/question/12345%s?partition_key=202501", slugFP),
 			want:  []string{},
 		},
 	}
