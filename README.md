@@ -570,7 +570,7 @@ jenkins --url=URL [<flags>]
     Scan Jenkins
 
 huggingface [<flags>]
-    Find credentials in HuggingFace datasets, models and spaces.
+    Find credentials in HuggingFace datasets, models, spaces and buckets.
 
 stdin
     Find credentials from stdin.
@@ -617,6 +617,24 @@ sources:
 
 You may define multiple connections under the `sources` key (see above), and
 TruffleHog will scan all of the sources concurrently.
+
+To see debug logs for just one source, add `debug: true` to it. That source
+writes all of its debug logs, and every other source keeps the normal log level.
+This is useful when one source out of many is misbehaving:
+
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.GitHub
+    repositories:
+    - https://github.com/trufflesecurity/test_keys.git
+    unauthenticated: {}
+  name: example config scan
+  type: SOURCE_TYPE_GITHUB
+  debug: true
+```
+
+To turn on debug logs for every source, use `--log-level=5` instead.
 
 ## S3
 

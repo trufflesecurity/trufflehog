@@ -116,6 +116,14 @@ type Result struct {
 	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
 	// than an actual remote request.
 	VerificationFromCache bool
+	// VerificationSkipped indicates that the engine produced this result without attempting remote verification,
+	// either because verification was disabled for the result's source or detector, or because the engine withheld
+	// verification after multiple detectors matched the same secret. It lets consumers that measure verifier activity
+	// tell "the verifier did not run" apart from "the verifier ran and the credential did not verify". It is purely
+	// informational: Verified and the verification error keep whatever the detector or engine assigned, so a skipped
+	// result still reports as unverified (or with an overlap verification error) exactly as it would without this
+	// field.
+	VerificationSkipped bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -215,4 +216,61 @@ func TestBuriedLogger(t *testing.T) {
 	// Grab bag still has both values.
 	assert.Equal(t, "entry", ctx.Value("log"))
 	assert.Equal(t, "entry", ctx.Value("std"))
+}
+
+func TestWithLogLevel(t *testing.T) {
+	var buffer bytes.Buffer
+	logger, sync := log.New("test", log.WithConsoleSink(&buffer, log.WithLevel(0)))
+	ctx := WithLogger(context.Background(), logger)
+	debugCtx := WithLogLevel(ctx, log.DebugLevel)
+
+	ctx.Logger().V(5).Info("normal debug line")
+	debugCtx.Logger().V(5).Info("override debug line")
+
+	// Contexts made from the debug context keep the override.
+	childCtx, cancel := WithCancel(WithValue(debugCtx, "key", "value"))
+	defer cancel()
+	childCtx.Logger().V(5).Info("child debug line")
+
+	// The override survives a round trip through a plain context.Context.
+	stdCtx := context.WithValue(debugCtx, "std", "entry") //nolint:staticcheck
+	AddLogger(stdCtx).Logger().V(5).Info("round trip debug line")
+
+	assert.Nil(t, sync())
+	assert.NotContains(t, buffer.String(), "normal debug line")
+	assert.Contains(t, buffer.String(), "override debug line")
+	assert.Contains(t, buffer.String(), "child debug line")
+	assert.Contains(t, buffer.String(), "round trip debug line")
+}
+
+func TestWithLogLevel_Clamped(t *testing.T) {
+	tests := []struct {
+		level   int8
+		wantV1  bool
+		wantV5  bool
+		wantV6  bool
+		sameCtx bool
+	}{
+		{level: -128, sameCtx: true},
+		{level: -1, sameCtx: true},
+		{level: 0, sameCtx: true},
+		{level: 2, wantV1: true},
+		{level: 5, wantV1: true, wantV5: true},
+		{level: 67, wantV1: true, wantV5: true},
+		{level: 127, wantV1: true, wantV5: true},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprint(tt.level), func(t *testing.T) {
+			logger, _ := log.New("test", log.WithConsoleSink(io.Discard, log.WithLevel(0)))
+			ctx := WithLogger(context.Background(), logger)
+			got := WithLogLevel(ctx, tt.level)
+
+			if tt.sameCtx {
+				assert.Equal(t, ctx, got)
+			}
+			assert.Equal(t, tt.wantV1, got.Logger().V(1).Enabled())
+			assert.Equal(t, tt.wantV5, got.Logger().V(5).Enabled())
+			assert.Equal(t, tt.wantV6, got.Logger().V(6).Enabled())
+		})
+	}
 }

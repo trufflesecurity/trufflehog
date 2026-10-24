@@ -126,7 +126,7 @@ var (
 	githubIncludeForks          = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
 	githubIncludeMembers        = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
 	githubIncludeRepos          = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubIncludeWikis          = githubScan.Flag("include-wikis", "Include repository wikisin scan.").Bool()
+	githubIncludeWikis          = githubScan.Flag("include-wikis", "Include repository wikis in scan.").Bool()
 	githubExcludeRepos          = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths      = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths      = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
@@ -464,6 +464,15 @@ func run(state overseer.State, logSync func() error) {
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger, logSync)
 
+	// --debug and --trace still work the same, but in a future release --debug
+	// takes over --trace's level 5 and --trace goes away. Warn users now.
+	if *trace {
+		logger.Info("--trace is deprecated and will be replaced by --debug in a future release. Use --log-level=5 instead.")
+	}
+	if *debug {
+		logger.Info("--debug will switch from log level 2 to 5 (what --trace does today) in a future release. Use --log-level=2 to keep the current output.")
+	}
+
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
@@ -595,6 +604,8 @@ func run(state overseer.State, logSync func() error) {
 	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
 	feature.HumioAPITokenDetectorEnabled.Store(true)
 	feature.KongKonnectDetectorEnabled.Store(true)
+	feature.SonarQubeDetectorEnabled.Store(true)
+	feature.InfisicalDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

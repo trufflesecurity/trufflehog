@@ -10,9 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/google/go-github/v67/github"
 	"github.com/shurcooL/githubv4"
@@ -58,19 +56,24 @@ func TestAPIClientForInstallation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	connector := &appConnector{
-		appID:                   12345,
-		appPrivateKey:           privKey,
-		apiEndpoint:             server.URL,
-		clientsByInstallationID: make(map[int64]*appInstallationClients),
-	}
+	connector, err := NewAppConnector(
+		server.URL,
+		&credentialspb.GitHubApp{
+			PrivateKey:     string(privKey),
+			AppId:          "12345",
+			InstallationId: "42",
+		},
+		false,
+	)
+	require.NoError(t, err)
+	ac := connector.(*appConnector)
 
 	t.Run("creates distinct clients for different installations", func(t *testing.T) {
-		client1, err := connector.APIClientForInstallation(111)
+		client1, err := ac.APIClientForInstallation(111)
 		require.NoError(t, err)
 		assert.NotNil(t, client1)
 
-		client2, err := connector.APIClientForInstallation(222)
+		client2, err := ac.APIClientForInstallation(222)
 		require.NoError(t, err)
 		assert.NotNil(t, client2)
 
@@ -78,9 +81,9 @@ func TestAPIClientForInstallation(t *testing.T) {
 	})
 
 	t.Run("reuses clients for the same installation", func(t *testing.T) {
-		client1, err := connector.APIClientForInstallation(333)
+		client1, err := ac.APIClientForInstallation(333)
 		require.NoError(t, err)
-		client2, err := connector.APIClientForInstallation(333)
+		client2, err := ac.APIClientForInstallation(333)
 		require.NoError(t, err)
 
 		assert.Same(t, client1, client2)
@@ -91,7 +94,7 @@ func TestAPIClientForInstallation(t *testing.T) {
 		tokenRequestPaths = nil
 		mu.Unlock()
 
-		client, err := connector.APIClientForInstallation(42)
+		client, err := ac.APIClientForInstallation(42)
 		require.NoError(t, err)
 
 		ctx := trContext.Background()
@@ -110,11 +113,11 @@ func TestAPIClientForInstallation(t *testing.T) {
 
 		ctx := trContext.Background()
 
-		client1, err := connector.APIClientForInstallation(100)
+		client1, err := ac.APIClientForInstallation(100)
 		require.NoError(t, err)
 		_, _, _ = client1.Organizations.ListMembers(ctx, "org-a", nil)
 
-		client2, err := connector.APIClientForInstallation(200)
+		client2, err := ac.APIClientForInstallation(200)
 		require.NoError(t, err)
 		_, _, _ = client2.Organizations.ListMembers(ctx, "org-b", nil)
 
@@ -156,6 +159,7 @@ func TestNewAppConnectorDefaultAPIClientUsesConfiguredInstallation(t *testing.T)
 		AppId:          "12345",
 	}, false)
 	require.NoError(t, err)
+
 	require.NotNil(t, connector.APIClient())
 	require.NotNil(t, connector.GraphQLClient())
 
@@ -235,193 +239,13 @@ func TestAPIClientAndGraphQLClientNonNilWithoutDefaultInstallation(t *testing.T)
 // error instead of attempting to use installation ID 0.
 func TestCloneErrorsWithoutResolvedInstallation(t *testing.T) {
 	connector := &appConnector{
-		installationID:          0,
-		clientsByInstallationID: make(map[int64]*appInstallationClients),
-		repoInstallationMap:     make(map[string]int64),
+		installationID:      0,
+		repoInstallationMap: make(map[string]int64),
 	}
 
 	_, _, err := connector.Clone(trContext.Background(), "https://github.com/some-member/personal-repo.git")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no GitHub App installation resolved")
-}
-
-func TestAccessTokenForInstallation(t *testing.T) {
-	privKey := generateTestPrivateKey(t)
-
-	accessTokenServer := func(accessTokenHandler func(w http.ResponseWriter, r *http.Request)) *httptest.Server {
-		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-
-			if r.Method == "POST" && strings.Contains(r.URL.Path, "access_tokens") {
-				accessTokenHandler(w, r)
-				return
-			}
-
-			// Default: return empty JSON array for any list endpoint.
-			_ = json.NewEncoder(w).Encode([]interface{}{})
-		}))
-	}
-
-	t.Run("invalid", func(t *testing.T) {
-		_, err := (&appConnector{}).accessTokenForInstallation(trContext.Background(), 0)
-		require.Error(t, err)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"token":      "test-token",
-				"expires_at": "2099-01-01T00:00:00Z",
-			})
-		})
-		defer server.Close()
-
-		c, err := NewAppConnector(
-			server.URL,
-			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
-			false,
-		)
-		require.NoError(t, err)
-		ac := c.(*appConnector)
-
-		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
-		require.NoError(t, err)
-	})
-
-	t.Run("rate limit", func(t *testing.T) {
-		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Add("X-RateLimit-Remaining", "0")
-			w.WriteHeader(http.StatusForbidden)
-
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
-		})
-		defer server.Close()
-
-		c, err := NewAppConnector(
-			server.URL,
-			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
-			false,
-		)
-		require.NoError(t, err)
-		ac := c.(*appConnector)
-
-		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
-		require.Error(t, err)
-
-		var gherr *github.RateLimitError
-		require.ErrorAs(t, err, &gherr)
-	})
-
-	t.Run("not found / no installation", func(t *testing.T) {
-		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusNotFound)
-
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
-		})
-		defer server.Close()
-
-		c, err := NewAppConnector(
-			server.URL,
-			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
-			false,
-		)
-		require.NoError(t, err)
-		ac := c.(*appConnector)
-
-		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
-		require.Error(t, err)
-	})
-
-	t.Run("reuse", func(t *testing.T) {
-		var hits atomic.Int64
-
-		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
-			hits.Add(1)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"token":      "test-token",
-				"expires_at": "2099-01-01T00:00:00Z",
-			})
-		})
-		defer server.Close()
-
-		c, err := NewAppConnector(
-			server.URL,
-			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
-			false,
-		)
-		require.NoError(t, err)
-		ac := c.(*appConnector)
-
-		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
-		require.NoError(t, err)
-
-		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
-		require.NoError(t, err)
-
-		require.Equal(t, int64(1), hits.Load())
-	})
-
-	t.Run("expire", func(t *testing.T) {
-		var hits atomic.Int64
-		server := accessTokenServer(func(w http.ResponseWriter, r *http.Request) {
-			hits.Add(1)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"token":      "test-token",
-				"expires_at": "2099-01-01T00:00:00Z",
-			})
-		})
-		defer server.Close()
-
-		c, err := NewAppConnector(
-			server.URL,
-			&credentialspb.GitHubApp{PrivateKey: string(privKey), AppId: "12345", InstallationId: "100"},
-			false,
-		)
-		require.NoError(t, err)
-		ac := c.(*appConnector)
-
-		_, err = ac.accessTokenForInstallation(trContext.Background(), 100)
-		require.NoError(t, err)
-
-		cs, err := ac.clientsForInstallation(100)
-		require.NoError(t, err)
-		token := cs.accessTokenIfValid()
-		require.NotNil(t, token)
-
-		token.ExpiresAt = &github.Timestamp{Time: time.Now()}
-
-		token = cs.accessTokenIfValid()
-		require.Nil(t, token)
-
-		// race these for good measure
-		var wg sync.WaitGroup
-		for range 3 {
-			wg.Go(func() {
-				_, err := ac.accessTokenForInstallation(trContext.Background(), 100)
-				require.NoError(t, err)
-			})
-		}
-		wg.Wait()
-
-		token = cs.accessTokenIfValid()
-		require.NotNil(t, token)
-
-		require.Equal(t, int64(2), hits.Load())
-	})
-}
-
-func TestAPIClientForInstallationUsesConfiguredClient(t *testing.T) {
-	defaultClient := github.NewClient(nil)
-	connector := &appConnector{
-		installationID: 100,
-		clientsByInstallationID: map[int64]*appInstallationClients{
-			100: {apiClient: defaultClient},
-		},
-	}
-
-	got, err := connector.APIClientForInstallation(100)
-	require.NoError(t, err)
-	assert.Same(t, defaultClient, got)
 }
 
 func TestCloneUsesRepoInstallationMap(t *testing.T) {
@@ -475,19 +299,23 @@ func TestAPIClientForRepoUsesRepoInstallationMap(t *testing.T) {
 	}))
 	defer server.Close()
 
-	connector := &appConnector{
-		installationID:          100,
-		appID:                   12345,
-		appPrivateKey:           privKey,
-		apiEndpoint:             server.URL,
-		clientsByInstallationID: make(map[int64]*appInstallationClients),
-		repoInstallationMap:     make(map[string]int64),
-	}
-	connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
-
-	client, err := connector.APIClientForRepo("https://github.com/other-org/repo.git")
+	connector, err := NewAppConnector(
+		server.URL,
+		&credentialspb.GitHubApp{
+			PrivateKey:     string(privKey),
+			AppId:          "12345",
+			InstallationId: "100",
+		},
+		false,
+	)
 	require.NoError(t, err)
-	cachedClient, err := connector.APIClientForRepo("https://github.com/other-org/repo.git")
+	ac := connector.(*appConnector)
+
+	ac.setRepoInstallation("https://github.com/other-org/repo.git", 999)
+
+	client, err := ac.APIClientForRepo("https://github.com/other-org/repo.git")
+	require.NoError(t, err)
+	cachedClient, err := ac.APIClientForRepo("https://github.com/other-org/repo.git")
 	require.NoError(t, err)
 	assert.Same(t, client, cachedClient)
 
@@ -509,44 +337,56 @@ func TestGraphQLClientForRepoCachesClients(t *testing.T) {
 	defer server.Close()
 
 	defaultGraphQLClient := &githubv4.Client{}
-	connector := &appConnector{
-		installationID: 100,
-		appID:          12345,
-		appPrivateKey:  privKey,
-		apiEndpoint:    server.URL,
-		clientsByInstallationID: map[int64]*appInstallationClients{
-			100: {graphqlClient: defaultGraphQLClient},
+
+	connector, err := NewAppConnector(
+		server.URL,
+		&credentialspb.GitHubApp{
+			PrivateKey:     string(privKey),
+			AppId:          "12345",
+			InstallationId: "100",
 		},
-		repoInstallationMap: make(map[string]int64),
-	}
-	connector.setRepoInstallation("https://github.com/other-org/repo.git", 999)
+		false,
+	)
+	require.NoError(t, err)
+	ac := connector.(*appConnector)
+
+	clientsByInstallationID.Set(
+		appInstallationClientKey{
+			appClientKey{server.URL, 12345, string(privKey)},
+			100,
+		},
+		&AppInstallationClients{
+			InstallationID: 100,
+			GraphQLClient:  defaultGraphQLClient,
+		},
+	)
+	ac.setRepoInstallation("https://github.com/other-org/repo.git", 999)
 
 	ctx := trContext.Background()
 
 	t.Run("returns default client for default installation repos", func(t *testing.T) {
-		got, err := connector.GraphQLClientForRepo(ctx, "https://github.com/default-org/repo.git")
+		got, err := ac.GraphQLClientForRepo(ctx, "https://github.com/default-org/repo.git")
 		require.NoError(t, err)
 		assert.Same(t, defaultGraphQLClient, got)
 	})
 
 	t.Run("caches clients for non-default installations", func(t *testing.T) {
-		client1, err := connector.GraphQLClientForRepo(ctx, "https://github.com/other-org/repo.git")
+		client1, err := ac.GraphQLClientForRepo(ctx, "https://github.com/other-org/repo.git")
 		require.NoError(t, err)
 		assert.NotSame(t, defaultGraphQLClient, client1)
 
-		client2, err := connector.GraphQLClientForRepo(ctx, "https://github.com/other-org/repo.git")
+		client2, err := ac.GraphQLClientForRepo(ctx, "https://github.com/other-org/repo.git")
 		require.NoError(t, err)
 		assert.Same(t, client1, client2)
 
-		apiClient, err := connector.APIClientForRepo("https://github.com/other-org/repo.git")
+		apiClient, err := ac.APIClientForRepo("https://github.com/other-org/repo.git")
 		require.NoError(t, err)
 
-		connector.mu.RLock()
-		cachedClients := connector.clientsByInstallationID[999]
-		connector.mu.RUnlock()
+		cachedClients, err := GetAppInstallationClients(t.Context(), server.URL, 12345, string(privKey), 999)
+		require.NoError(t, err)
 		require.NotNil(t, cachedClients)
-		assert.Same(t, apiClient, cachedClients.apiClient)
-		assert.Same(t, client1, cachedClients.graphqlClient)
+		assert.Same(t, apiClient, cachedClients.APIClient)
+		assert.Same(t, client1, cachedClients.GraphQLClient)
 	})
 }
 

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/postman"
 )
@@ -15,7 +16,15 @@ func (e *Engine) ScanConfig(ctx context.Context, configuredSources ...sources.Co
 	for _, configuredSource := range configuredSources {
 		sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, configuredSource.Name, configuredSource.SourceType())
 
-		source, err := configuredSource.Init(ctx, sourceID, jobID)
+		// A source with debug on gets a context that writes all of its debug
+		// logs. Both Init and the scan use it, so every log from this source is
+		// covered. Other sources keep the global log level.
+		sourceCtx := ctx
+		if configuredSource.Debug {
+			sourceCtx = context.WithLogLevel(ctx, log.DebugLevel)
+		}
+
+		source, err := configuredSource.Init(sourceCtx, sourceID, jobID)
 		if err != nil {
 			return refs, err
 		}
@@ -26,7 +35,7 @@ func (e *Engine) ScanConfig(ctx context.Context, configuredSources ...sources.Co
 		}
 
 		// Start the scan.
-		ref, err := e.sourceManager.EnumerateAndScan(ctx, configuredSource.Name, source)
+		ref, err := e.sourceManager.EnumerateAndScan(sourceCtx, configuredSource.Name, source)
 		if err != nil {
 			return refs, err
 		}

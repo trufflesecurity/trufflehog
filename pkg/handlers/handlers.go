@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archives"
@@ -52,6 +53,20 @@ var (
 	// allowing processing to continue.
 	ErrProcessingWarning = errors.New("error processing file")
 )
+
+// recoveredPanicError converts a value returned by recover() into an error and
+// logs it with the stack of the panicking goroutine. Recovered panics come from
+// archive and file-format libraries that hit malformed input, and the stack is
+// the only record of which frame failed. The stack holds code locations and raw
+// argument words, not file contents.
+func recoveredPanicError(ctx logContext.Context, r any, msg string) error {
+	panicErr, ok := r.(error)
+	if !ok {
+		panicErr = fmt.Errorf("panic occurred: %v", r)
+	}
+	ctx.Logger().Error(panicErr, msg, "stack", string(debug.Stack()))
+	return panicErr
+}
 
 // mimeTypeReader wraps an io.Reader with MIME type information.
 // This type is used to pass content through the processing pipeline

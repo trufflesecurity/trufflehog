@@ -161,14 +161,7 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 		// Defer a panic recovery to handle any panics that occur during the APK processing.
 		defer func() {
 			if r := recover(); r != nil {
-				// Return the panic as an error.
-				var panicErr error
-				if e, ok := r.(error); ok {
-					panicErr = e
-				} else {
-					panicErr = fmt.Errorf("panic occurred: %v", r)
-				}
-				ctx.Logger().Error(panicErr, "Panic occurred when reading apk archive")
+				_ = recoveredPanicError(ctx, r, "Panic occurred when reading apk archive")
 			}
 		}()
 

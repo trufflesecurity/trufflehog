@@ -154,6 +154,8 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_HumioAPIToken:             {},
 	detector_typepb.DetectorType_Resend:                    {},
 	detector_typepb.DetectorType_KongKonnect:               {},
+	detector_typepb.DetectorType_SonarQube:                 {},
+	detector_typepb.DetectorType_Infisical:                 {},
 
 	// Reserved / special types.
 	detector_typepb.DetectorType_CustomRegex: {}, // added dynamically via engine config, not via buildDetectorList()

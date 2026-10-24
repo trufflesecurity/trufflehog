@@ -1141,6 +1141,10 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						if e.verificationOverlapTracker != nil {
 							e.verificationOverlapTracker.Add(1)
 						}
+						// The overlap error stays the verdict; VerificationSkipped additionally records that no
+						// verifier ran, so consumers counting verifier outcomes don't read errOverlap as a provider
+						// failure.
+						res.VerificationSkipped = true
 						res.SetVerificationError(errOverlap)
 						e.processResult(
 							ctx,
@@ -1247,6 +1251,15 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 		if len(results) > 0 {
 			resultsProduced.WithLabelValues(detectorNameStr).Add(float64(len(results)))
+		}
+
+		// With verification disabled for this chunk and detector, results carry whatever verdict the detector assigned
+		// without contacting the provider (normally unverified). Leave that verdict untouched and only record that the
+		// verifier never ran. Verifying paths, including cache hits, leave VerificationSkipped false.
+		if !data.verify {
+			for i := range results {
+				results[i].VerificationSkipped = true
+			}
 		}
 
 		detectorExecutionCount.WithLabelValues(
