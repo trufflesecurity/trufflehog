@@ -22,6 +22,11 @@ import (
 func TestPrepGitArgs(t *testing.T) {
 	t.Setenv("GIT_OBJECT_DIRECTORY", "")
 	t.Setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", "")
+	// Clear process-local vars that gitProcessEnv forwards so exact env
+	// assertions below stay stable across developer machines / CI.
+	for _, key := range []string{"PATH", "HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR", "SystemRoot", "windir", "COMSPEC"} {
+		t.Setenv(key, "")
+	}
 	repopath := t.TempDir()
 
 	p := Parser{}
@@ -96,6 +101,15 @@ func TestPrepGitArgs(t *testing.T) {
 		"GIT_OBJECT_DIRECTORY=foo",
 		"GIT_ALTERNATE_OBJECT_DIRECTORIES=bar",
 	}, args.env)
+
+	// Windows Git converters (astextplain) need a writable temp dir. Setting
+	// Cmd.Env replaces the process environment, so TEMP must be forwarded (#5379).
+	t.Setenv("TEMP", "C:/Temp")
+	t.Setenv("PATH", "/usr/bin")
+	args = p.prepGitArgs(repopath, "", "", nil, false)
+	assert.Contains(t, args.env, "TEMP=C:/Temp")
+	assert.Contains(t, args.env, "PATH=/usr/bin")
+	assert.Contains(t, args.env, "GIT_DIR="+filepath.Join(repopath, ".git"))
 }
 
 // assertNoRangeExclusion fails if any revision argument excludes commits
