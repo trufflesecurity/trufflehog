@@ -1076,5 +1076,6 @@ enum DetectorType {
   KongKonnect = 1072;
   SonarQube = 1073;
   LambdaCloud = 1074;
+  Infisical = 1075;
   Fireworks = 1076;
 }
