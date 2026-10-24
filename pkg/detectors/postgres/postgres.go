@@ -5,19 +5,20 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/postgresurl"
 )
 
 const (
@@ -36,6 +37,9 @@ const (
 	pgSslmodeRequire = "require"
 	pgUser           = "user"
 	pgDbType         = "db_type"
+
+	sqlStateInvalidPassword    = "28P01"
+	sqlStateInvalidCatalogName = "3D000"
 )
 
 // nonConnectionParams are query-string arguments that ORMs append to
@@ -66,11 +70,7 @@ func isNonConnectionParam(key string) bool {
 
 // Multi-host connection string URIs are currently not supported because pq.ParseURI doesn't parse them correctly. If we
 // happen to run into a case where this matters we can address it then.
-var (
-	_          detectors.Detector = (*Scanner)(nil)
-	uriPattern                    = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
-	connStrPartPattern = regexp.MustCompile(`([[:alpha:]_]+)='(.+?)' ?`)
-)
+var uriPattern = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
@@ -78,10 +78,17 @@ type Scanner struct {
 	ignorePatterns []*regexp.Regexp
 }
 
+var (
+	_ detectors.Detector                   = (*Scanner)(nil)
+	_ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+)
+
 type uriMatch struct {
 	params map[string]string
 	rawURI string
 }
+
+type sqlStateError interface{ SQLState() string }
 
 func New(opts ...func(*Scanner)) *Scanner {
 	scanner := &Scanner{
@@ -108,9 +115,6 @@ func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 		s.ignorePatterns = ignorePatterns
 	}
 }
-
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 func (s Scanner) Keywords() []string {
 	return []string{"postgres"}
@@ -248,15 +252,9 @@ func findUriMatches(data []byte, ignorePatterns []*regexp.Regexp) []uriMatch {
 		}
 		dbType := string(dbTypeMatch[1])
 
-		connStr, err := pq.ParseURL(string(uri))
+		params, err := postgresurl.Parse(string(uri))
 		if err != nil {
 			continue
-		}
-
-		parts := connStrPartPattern.FindAllStringSubmatch(connStr, -1)
-		params := make(map[string]string, len(parts))
-		for _, part := range parts {
-			params[part[1]] = part[2]
 		}
 
 		params[pgDbType] = dbType
@@ -298,33 +296,6 @@ func getDeadlineInSeconds(ctx context.Context) (int, bool) {
 	return int(duration.Seconds()), true
 }
 
-// The server looks the database up only after authenticating, so this confirms the credentials.
-const invalidCatalogName = "3D000"
-
-// Message text is only a fallback, for proxies that relay a failure without a SQLSTATE; the server
-// translates messages per lc_messages. Postgres substitutes the user name, not "postgres", when a
-// connection string names no database (src/backend/tcop/backend_startup.c).
-func isErrorDatabaseNotFound(err error, params map[string]string) bool {
-	var pqErr *pq.Error
-	if errors.As(err, &pqErr) && pqErr.Code == invalidCatalogName {
-		return true
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == invalidCatalogName {
-		return true
-	}
-
-	dbName := params[pgDbname]
-	if dbName == "" {
-		dbName = params[pgUser]
-	}
-	if dbName == "" {
-		return false
-	}
-
-	return strings.Contains(err.Error(), fmt.Sprintf("database %q does not exist", dbName))
-}
-
 func verifyPostgres(ctx context.Context, params map[string]string) (bool, error) {
 	// Neon (managed Postgres) advertises SCRAM-SHA-256 with iteration count i=1.
 	// lib/pq rejects iteration fields shorter than 6 chars, which traps these
@@ -344,9 +315,7 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 	}
 	defer func() {
 		// Best-effort close after verification; the verify outcome is already decided.
-		if closeErr := conn.Close(ctx); closeErr != nil {
-			return
-		}
+		_ = conn.Close(ctx)
 	}()
 
 	if err := conn.Ping(ctx); err != nil {
@@ -359,65 +328,86 @@ func verifyPostgresPgx(ctx context.Context, params map[string]string) (bool, err
 // that are detector-only (db_type) or libpq client options pgx would forward as
 // unrecognized server GUCs (requiressl). sslmode is already normalized in FromData.
 func pgxConnString(params map[string]string) string {
-	var connStr strings.Builder
-	for key, value := range params {
+	params = maps.Clone(params)
+
+	for key := range params {
 		if key == pgDbType || key == pgRequiressl || isNonConnectionParam(key) {
-			continue
+			delete(params, key)
 		}
-		fmt.Fprintf(&connStr, "%s='%s'", key, value)
 	}
-	return connStr.String()
+
+	return postgresurl.ParamsToConnStr(params)
 }
 
 func classifyPostgresVerifyError(err error, params map[string]string) (bool, error) {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "28P01": // invalid_password
-			return false, nil
-		case "3D000": // invalid_catalog_name — authenticated, DB missing
-			return true, nil
-		}
-	}
-	if strings.Contains(err.Error(), "password authentication failed") {
+	switch {
+	case isErrorInvalidPassword(err):
 		return false, nil
-	}
-	if isErrorDatabaseNotFound(err, params) {
+	case isErrorDatabaseNotFound(err, params):
+		// authenticated, but DB is missing
 		return true, nil
 	}
 	return false, err
 }
 
-func verifyPostgresPq(params map[string]string) (bool, error) {
-	if sslmode := params[pgSslmode]; sslmode == pgSslmodeAllow || sslmode == pgSslmodePrefer {
-		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
-		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
-		delete(params, pgSslmode)
-
-		// We still want to save the original sslmode in ExtraData, so we'll re-add it before returning.
-		defer func() {
-			params[pgSslmode] = sslmode
-		}()
+// isErrorInvalidPassword checks for an invalid password error based on
+// SQLSTATE code and by message text.
+func isErrorInvalidPassword(err error) bool {
+	var pgErr sqlStateError
+	if errors.As(err, &pgErr) && pgErr.SQLState() == sqlStateInvalidPassword {
+		return true
 	}
 
-	// db_type is not a valid configuration parameter, so we remove it before connecting.
-	dbType := params[pgDbType]
+	return strings.Contains(err.Error(), "password authentication failed")
+}
+
+// isErrorDatabaseNotFound checks for a database not found error based on
+// SQLSTATE code and by message text. If we see this error, it happens after
+// authentication, which must have been successful.
+func isErrorDatabaseNotFound(err error, params map[string]string) bool {
+	var pgErr sqlStateError
+	if errors.As(err, &pgErr) && pgErr.SQLState() == sqlStateInvalidCatalogName {
+		return true
+	}
+
+	dbName := params[pgDbname]
+
+	if dbName == "" {
+		// If a database name isn't given in the connection, postgres
+		// looks for a database named after the connecting user.
+		dbName = params[pgUser]
+	}
+
+	if dbName == "" {
+		// Can't match nothing at this point (but can we even get here?)
+		return false
+	}
+
+	return strings.Contains(err.Error(), fmt.Sprintf("database %q does not exist", dbName))
+}
+
+func verifyPostgresPq(params map[string]string) (bool, error) {
+	params = maps.Clone(params)
+
+	if params[pgSslmode] == pgSslmodeAllow || params[pgSslmode] == pgSslmodePrefer {
+		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just
+		// ignore it. This will trigger the same logic that is run if no sslmode is set at
+		// all (which mimics 'prefer', which is the default).
+		delete(params, pgSslmode)
+	}
+
+	// db_type is not a valid configuration parameter, so we remove it before connecting. This
+	// key is added for internal use.
 	delete(params, pgDbType)
 
-	// we re-add it before returning to preserve in ExtraData
-	defer func() {
-		params[pgDbType] = dbType
-	}()
-
-	var connStr string
-	for key, value := range params {
+	// now prune any parameters from third parties that may not be recognized by pq
+	for key := range params {
 		if isNonConnectionParam(key) {
-			continue
+			delete(params, key)
 		}
-		connStr += fmt.Sprintf("%s='%s'", key, value)
 	}
 
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", postgresurl.ParamsToConnStr(params))
 	if err != nil {
 		return false, err
 	}
@@ -427,17 +417,16 @@ func verifyPostgresPq(params map[string]string) (bool, error) {
 	switch {
 	case err == nil:
 		return true, nil
-	case strings.Contains(err.Error(), "password authentication failed"):
+	case isErrorInvalidPassword(err):
 		return false, nil
+	case isErrorDatabaseNotFound(err, params):
+		return true, nil // If we know this, we were able to authenticate
 	case errors.Is(err, pq.ErrSSLNotSupported) && params[pgSslmode] == "":
 		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
 		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
 		// connections are acceptable, so now we try a connection without SSL.
 		params[pgSslmode] = pgSslmodeDisable
-		defer delete(params, pgSslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgresPq(params)
-	case isErrorDatabaseNotFound(err, params):
-		return true, nil // If we know this, we were able to authenticate
 	default:
 		return false, err
 	}
