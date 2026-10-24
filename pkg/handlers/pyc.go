@@ -318,7 +318,7 @@ func (c *marshalCursor) parseConstElem() (constItem, bool) {
 			return constItem{}, false
 		}
 		return constItem{elems: elems}, true
-	case 'C', 'f': // set, frozenset
+	case '<', '>': // set, frozenset
 		n, ok := c.u32()
 		if !ok || n > maxMarshalTupleLen {
 			return constItem{}, false
@@ -581,10 +581,14 @@ func spanCovers(spans []span, i int) bool {
 	return i < s.end
 }
 
-// emitStructured writes each code object's identifiers interleaved with the
-// values they name (names[i] before values[i]), then nested code objects,
-// then trailer spans. Flat-scan spans the parse did not claim are appended
-// in file order.
+// emitStructured writes each code object's identifiers as a block followed
+// by that object's values, then nested code objects, then trailer spans.
+// co_names and co_consts are independent arrays, so pairing them by index
+// misaligns as soon as leading names (imports, globals) have no matching
+// value: the real keyword lands after its secret and keyword-prefixed
+// detectors miss it. Emitting every identifier before every value keeps
+// each keyword ahead of its secret within the code object. Flat-scan spans
+// the parse did not claim are appended in file order.
 func emitStructured(data []byte, layout *codeLayout, spans []span) []byte {
 	claimed := make(map[span]bool)
 	var parts [][]byte
@@ -594,16 +598,11 @@ func emitStructured(data []byte, layout *codeLayout, spans []span) []byte {
 	}
 	var walk func(l *codeLayout)
 	walk = func(l *codeLayout) {
-		ni, vi := 0, 0
-		for ni < len(l.names) || vi < len(l.values) {
-			if ni < len(l.names) {
-				emit(l.names[ni])
-				ni++
-			}
-			if vi < len(l.values) {
-				emit(l.values[vi])
-				vi++
-			}
+		for _, s := range l.names {
+			emit(s)
+		}
+		for _, s := range l.values {
+			emit(s)
 		}
 		for _, n := range l.nested {
 			walk(n)

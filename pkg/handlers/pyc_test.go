@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"encoding/hex"
 	regexp "github.com/wasilibs/go-re2"
 	"os"
 	"testing"
@@ -240,4 +241,69 @@ func TestExtractPythonBytecodeStrings(t *testing.T) {
 	assert.Equal(t, "byes\nworld\nhello", string(extractPythonBytecodeStrings(in)))
 	assert.Empty(t, extractPythonBytecodeStrings([]byte("\x00\x01\x02")))
 	assert.Empty(t, extractPythonBytecodeStrings(nil))
+}
+
+// Regression test for the review finding on PR #5434: marshal encodes sets
+// as '<' and frozensets as '>' ('f' is the ASCII float code). Treating any
+// other code as a set aborts the structural parse on frozenset constants
+// and falls back to reverse order. A frozenset constant must parse cleanly
+// and its string elements must be extracted.
+func TestParseSetConstElem(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		hex  string
+		want string
+	}{
+		{"frozenset", "3e01000000fa15736b2d7365742d7365637265742d76616c75652d31", "sk-set-secret-value-1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := hex.DecodeString(tc.hex)
+			require.NoError(t, err)
+			cur := &marshalCursor{data: raw}
+			it, ok := cur.parseConstElem()
+			require.True(t, ok, "set/frozenset constant failed to parse")
+			require.True(t, cur.pos == len(raw), "trailing bytes after set constant")
+			var spans []span
+			collectItemSpans(it, &spans)
+			var got []string
+			for _, s := range spans {
+				got = append(got, string(raw[s.start:s.end]))
+			}
+			assert.Contains(t, got, tc.want)
+		})
+	}
+}
+
+// Fixture: testdata/pyc_imports.pyc was compiled (CPython 3.12) from
+//
+//	import collections
+//	import itertools
+//	mailgun_imported = "aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11"
+//
+// The imports add leading entries to co_names with no matching co_consts
+// entry. Pairing names and values by index puts the real keyword after its
+// secret, so keyword-prefixed detectors miss it. The handler must emit
+// every identifier before its code object's values.
+func TestPythonBytecodeImportedModuleKeywordBeforeSecret(t *testing.T) {
+	raw, err := os.ReadFile("testdata/pyc_imports.pyc")
+	require.NoError(t, err)
+
+	emitted := collectChunks(t, raw)
+	require.NotEmpty(t, emitted, "expected .pyc content to produce chunks, got none")
+
+	pattern := regexp.MustCompile(detectors.PrefixRegex([]string{"mailgun"}) + `\b([a-f0-9]{72})\b`)
+	var secrets []string
+	for _, m := range pattern.FindAllStringSubmatch(string(emitted), -1) {
+		secrets = append(secrets, m[1])
+	}
+	const token = "aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11"
+	require.NotEmpty(t, secrets, "prefix detector missed the secret in import-leading .pyc output")
+	assert.Contains(t, secrets, token)
+
+	kwIdx := bytes.Index(emitted, []byte("mailgun_imported"))
+	secIdx := bytes.Index(emitted, []byte(token))
+	require.NotEqual(t, -1, kwIdx)
+	require.NotEqual(t, -1, secIdx)
+	require.Less(t, kwIdx, secIdx, "keyword must precede the secret in handler output")
+	assert.Less(t, secIdx-kwIdx, 40, "keyword/secret gap must fit PrefixRegex's window")
 }
