@@ -31,7 +31,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connStrPat = regexp.MustCompile(`\b(mongodb(?:\+srv)?://(?P<username>\S{3,50}):(?P<password>\S{3,88})@(?P<host>[-.%\w]+(?::\d{1,5})?(?:,[-.%\w]+(?::\d{1,5})?)*)(?:/(?P<authdb>[\w-]+)?(?P<options>\?\w+=[\w@/.$-]+(?:&(?:amp;)?\w+=[\w@/.$-]+)*)?)?)(?:\b|$)`)
 	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.
-	placeholderPasswordPat = regexp.MustCompile(`^[xX]+|\*+$`)
+	placeholderPasswordPat = regexp.MustCompile(`^(?:[xX]+|\*+)$`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
