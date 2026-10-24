@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -88,6 +89,16 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
+	case http.StatusForbidden:
+		// Alchemy returns 403 for keys whose app has been deactivated.
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, nil, err
+		}
+		if strings.Contains(string(body), "App is inactive") {
+			return false, nil, nil
+		}
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
