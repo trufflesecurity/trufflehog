@@ -100,7 +100,7 @@ func TestFireworks_FromChunk(t *testing.T) {
 				}
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "SecretParts", "verificationError")
-			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, opts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Scanner.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
