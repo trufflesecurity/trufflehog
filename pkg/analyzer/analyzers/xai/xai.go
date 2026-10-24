@@ -86,8 +86,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	if len(info.UnknownACLs) > 0 {
 		color.Yellow("\n[i] Unrecognized ACLs: %s", strings.Join(info.UnknownACLs, ", "))
 	}
-
-	color.Yellow("\n[i] Expires: Never")
 }
 
 func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*SecretInfo, error) {
