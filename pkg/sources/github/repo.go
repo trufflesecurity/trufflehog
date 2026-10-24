@@ -58,6 +58,10 @@ type repoInfo struct {
 	size       int                          // size of the repository in kilobytes.
 	visibility source_metadatapb.Visibility // visibility of the repository (public/private).
 	hasWiki    bool                         // whether the repository is likely to have a wiki.
+	// hasNoIssues is true only when GitHub said issues are off. The zero
+	// value means scan as usual, so a missing has_issues never turns
+	// anything off.
+	hasNoIssues bool
 }
 
 // cloneRepo clones a repository given its URL, returns the path and the repository object.
@@ -240,6 +244,17 @@ func isGitHub404Error(err error) bool {
 	return ghErr.Response.StatusCode == http.StatusNotFound
 }
 
+// isGitHubListingDisabled reports whether a listing failed because the repo
+// has the feature turned off. GitHub answers with 404 or 410 for that.
+func isGitHubListingDisabled(err error) bool {
+	var ghErr *github.ErrorResponse
+	if !errors.As(err, &ghErr) || ghErr.Response == nil {
+		return false
+	}
+	code := ghErr.Response.StatusCode
+	return code == http.StatusNotFound || code == http.StatusGone
+}
+
 // processRepos processes repositories from a source, handling pagination and rate limits.
 func (s *Source) processRepos(ctx context.Context, target string, reporter sources.UnitReporter, listRepos repoLister, listOpts repoListOptions) error {
 	logger := ctx.Logger().WithValues("target", target)
@@ -338,11 +353,12 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 // cacheRepoInfo caches basic information about a repository for later use.
 func (s *Source) cacheRepoInfo(r *github.Repository) {
 	info := repoInfo{
-		owner:    r.GetOwner().GetLogin(),
-		name:     r.GetName(),
-		fullName: r.GetFullName(),
-		hasWiki:  r.GetHasWiki(),
-		size:     r.GetSize(),
+		owner:       r.GetOwner().GetLogin(),
+		name:        r.GetName(),
+		fullName:    r.GetFullName(),
+		hasWiki:     r.GetHasWiki(),
+		hasNoIssues: r.HasIssues != nil && !*r.HasIssues,
+		size:        r.GetSize(),
 	}
 	if r.GetPrivate() {
 		info.visibility = source_metadatapb.Visibility_private
