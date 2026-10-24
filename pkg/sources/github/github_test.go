@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1069,6 +1070,61 @@ func TestEnumerateWithAppScanAllInstallationsIncludesConfiguredInstallation(t *t
 	assert.Equal(t, int64(2448), connector.repoInstallationMap["https://github.com/other-org/repo.git"])
 	assert.True(t, s.filteredRepoCache.Exists("default-org/repo"))
 	assert.True(t, s.filteredRepoCache.Exists("other-org/repo"))
+}
+
+func TestEnumerateWithAppScanUsersListsMemberReposButNotGists(t *testing.T) {
+	privateKey := createPrivateKey()
+
+	var (
+		mu    sync.Mutex
+		paths []string
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/access_tokens"):
+			_, _ = w.Write([]byte(`{"token":"token","expires_at":"2099-01-01T00:00:00Z"}`))
+		case strings.HasSuffix(r.URL.Path, "/installation/repositories"):
+			_, _ = w.Write([]byte(`{"total_count":0,"repositories":[]}`))
+		case strings.HasSuffix(r.URL.Path, "/app/installations"):
+			_, _ = w.Write([]byte(`[{"id":1337,"account":{"login":"default-org","type":"Organization"}}]`))
+		case strings.HasSuffix(r.URL.Path, "/orgs/default-org/members"):
+			_, _ = w.Write([]byte(`[{"login":"alice"}]`))
+		case strings.HasSuffix(r.URL.Path, "/users/alice/repos"):
+			_, _ = w.Write([]byte(`[]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:  server.URL,
+		ScanUsers: true,
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		},
+	})
+	require.NoError(t, s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1))
+	require.False(t, s.ignoreGists)
+
+	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector), noopReporter())
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Contains(t, paths, "/api/v3/users/alice/repos")
+	for _, path := range paths {
+		assert.NotContains(t, path, "gists")
+	}
 }
 
 func TestEnumerateWithAppScanAllInstallationsMapsExplicitReposBeforeMetadataFetch(t *testing.T) {

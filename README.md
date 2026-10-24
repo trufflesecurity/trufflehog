@@ -570,7 +570,7 @@ jenkins --url=URL [<flags>]
     Scan Jenkins
 
 huggingface [<flags>]
-    Find credentials in HuggingFace datasets, models and spaces.
+    Find credentials in HuggingFace datasets, models, spaces and buckets.
 
 stdin
     Find credentials from stdin.

@@ -2,9 +2,12 @@ package anypointoauth2
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -108,6 +111,64 @@ func TestAnypoint_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestAnypoint_Verification(t *testing.T) {
+	tests := []struct {
+		name         string
+		status       int
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "200 is verified",
+			status:       http.StatusOK,
+			wantVerified: true,
+		},
+		{
+			name:         "401 is not verified",
+			status:       http.StatusUnauthorized,
+			wantVerified: false,
+		},
+		{
+			name:         "422 is not verified",
+			status:       http.StatusUnprocessableEntity,
+			wantVerified: false,
+		},
+		{
+			name:    "500 returns error",
+			status:  http.StatusInternalServerError,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+			}))
+			defer server.Close()
+
+			orig := verificationUrl
+			verificationUrl = server.URL
+			t.Cleanup(func() { verificationUrl = orig })
+
+			s := Scanner{client: server.Client()}
+			results, err := s.FromData(context.Background(), true, []byte(
+				`anypoint id e3cd10a87f53b2dfa4b5fd606e7d9eca anypoint secret ACE9d7E606Df5B4AFD2B35f78A01DC3E`,
+			))
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+
+			if tt.wantErr {
+				assert.False(t, results[0].Verified)
+				assert.Error(t, results[0].VerificationError())
+			} else {
+				assert.Equal(t, tt.wantVerified, results[0].Verified)
+				assert.NoError(t, results[0].VerificationError())
 			}
 		})
 	}

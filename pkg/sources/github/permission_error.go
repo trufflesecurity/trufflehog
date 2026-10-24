@@ -46,11 +46,18 @@ const (
 	credentialFineGrainedToken
 )
 
-// permissionError reports a request GitHub refused because the credential
-// lacks a permission. accepted holds the permission sets that would satisfy
-// the endpoint: any one set is enough, and a set needs every permission in it.
-// method and path identify the request, and message is GitHub's own error
-// text, kept so the error still reads like the 403 it replaces.
+// permissionError reports comment-scan coverage lost because the credential
+// lacks a permission. accepted holds the permission sets that would restore
+// it: any one set is enough, and a set needs every permission in it.
+//
+// Most come from a request GitHub refused, built by asPermissionError: method
+// and path identify the request, and message is GitHub's own error text, kept
+// so the error still reads like the 403 it replaces.
+//
+// The rest come from a GitHub App installation's grants, read before any
+// request (see installationGrants): installationID names the installation,
+// and outcome says what the scan did about the missing permission. These
+// have no request and wrap no error.
 type permissionError struct {
 	accepted   [][]permission
 	credential credentialKind
@@ -58,6 +65,35 @@ type permissionError struct {
 	path       string
 	message    string
 	err        error
+
+	installationID int64
+	outcome        string
+}
+
+// newSkippedListingError reports a listing the scan skipped without calling
+// GitHub, because the installation grants none of the permission sets that
+// would let it succeed.
+func newSkippedListingError(installationID int64, accepted ...[]permission) *permissionError {
+	return &permissionError{
+		accepted:       accepted,
+		credential:     credentialApp,
+		installationID: installationID,
+		outcome:        "the listing was skipped",
+	}
+}
+
+// newNarrowedListingError reports items GitHub leaves out of a listing
+// because the installation doesn't grant the permission that covers them.
+// The listing itself succeeds and returns everything else, with nothing in
+// the response to say items are missing, so this error is the only record of
+// the gap.
+func newNarrowedListingError(installationID int64, listing string, accepted ...[]permission) *permissionError {
+	return &permissionError{
+		accepted:       accepted,
+		credential:     credentialApp,
+		installationID: installationID,
+		outcome:        "GitHub left them out of the " + listing + " listing",
+	}
 }
 
 func (e *permissionError) Error() string {
@@ -72,6 +108,15 @@ func (e *permissionError) Error() string {
 	default:
 		subject = "missing GitHub permission"
 		fix = "update the credential's permissions"
+	}
+
+	if e.outcome != "" {
+		verb := "is"
+		if len(e.accepted) == 1 && len(e.accepted[0]) > 1 {
+			verb = "are"
+		}
+		return fmt.Sprintf("%s: %s %s needed; %s (not granted to installation %d, so %s)",
+			subject, describeAccepted(e.accepted), verb, fix, e.installationID, e.outcome)
 	}
 
 	request := "request"
