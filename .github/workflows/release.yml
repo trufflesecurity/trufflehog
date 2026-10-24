@@ -70,6 +70,12 @@ jobs:
           version: latest
           args: release --clean
         env:
+          # Ubuntu 26.04 runner images can mount /tmp as a RAM-backed tmpfs
+          # with a per-user quota of about 6 GB. The Go build work directories
+          # for the release targets exceed it and fail with "disk quota
+          # exceeded". Keep temporary files on the runner's disk instead.
+          # https://github.com/actions/runner-images/issues/14777
+          TMPDIR: ${{ runner.temp }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
