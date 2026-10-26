@@ -272,9 +272,13 @@ func (c *appConnector) clientsForInstallation(ctx context.Context, installationI
 
 // contextForClientLookup is only for the Connector methods that don't take a
 // context: APIClient, APIClientForRepo and GraphQLClient. They only build a
-// client or take it from the cache, which makes no network call, so nothing
-// is lost by not having the caller's context. Everything else passes its own.
-// That is why the semgrep rule against new contexts is turned off on this line.
+// client or take it from the cache, which makes no network call. On a cache
+// miss, though, the "Creating GraphQL client" line is logged without the
+// source fields and ignores per-source debug. The fix is to pass a context
+// through the Connector interface, which is left for a separate change since
+// it touches every connector and its callers. Everything else passes its own
+// context. That is why the semgrep rule against new contexts is turned off on
+// this line.
 func contextForClientLookup() context.Context {
 	return context.Background() // nosemgrep
 }

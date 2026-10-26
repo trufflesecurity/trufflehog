@@ -32,6 +32,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -335,6 +336,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	)
 	s.repos = s.conn.Repositories
 	for _, repo := range s.repos {
+		// safeRepoURL keeps the credential out of the lines we write, this
+		// also catches it in any string field logged elsewhere
+		log.RedactGlobally(repoCredential(repo))
 		r, err := s.normalizeRepo(repo)
 		if err != nil {
 			// the repo comes from the user's config and may hold a token, so strip it,

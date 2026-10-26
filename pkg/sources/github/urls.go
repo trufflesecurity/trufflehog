@@ -35,6 +35,25 @@ func safeRepoURL(repo string) string {
 	return repo
 }
 
+// repoCredential returns the secret in a repo URL's user info, or "" if it has
+// none, so it can be redacted from logs. That is the password, or for an
+// http(s) URL with no password the username, since "https://TOKEN@host" puts
+// the token there. Other usernames are not secret, and redacting one like
+// "git" would hide that word in every log line.
+func repoCredential(repo string) string {
+	u, err := url.Parse(repo)
+	if err != nil || u.User == nil {
+		return ""
+	}
+	if password, ok := u.User.Password(); ok {
+		return password
+	}
+	if u.Scheme == "http" || u.Scheme == "https" {
+		return u.User.Username()
+	}
+	return ""
+}
+
 func wikiCloneURLForRepo(repoURL string) (string, bool) {
 	if !strings.HasSuffix(repoURL, ".git") || strings.HasSuffix(repoURL, ".wiki.git") {
 		return "", false
