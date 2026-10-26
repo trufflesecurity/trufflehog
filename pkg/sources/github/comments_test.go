@@ -516,6 +516,101 @@ func TestCommentScan_SkippedListingNeedingBothPermissionsSaysSo(t *testing.T) {
 	assert.Contains(t, err.Error(), "issues and pull requests: missing GitHub App permission: Issues (read) and Pull requests (read) are needed;")
 }
 
+// respondWith returns a fail func that answers every request with status,
+// the way GitHub answers listings for a feature the repo has turned off.
+func respondWith(status int) func(int, http.ResponseWriter, *http.Request) bool {
+	return func(_ int, w http.ResponseWriter, _ *http.Request) bool {
+		writeJSON(w, status, map[string]string{"message": http.StatusText(status)})
+		return true
+	}
+}
+
+func TestCommentScan_IssueCommentsDisabledWhenRepoHasNoIssues(t *testing.T) {
+	for _, status := range []int{http.StatusNotFound, http.StatusGone} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			// Issues and pull requests are both off: /issues is empty and
+			// /issues/comments refuses, but old review comments remain.
+			gh := newFakeGitHub(t)
+			gh.issueComments.fail = respondWith(status)
+			gh.prComments.records = []fakeRecord{
+				commentRecord(200, testEpoch, "https://github.com/o/r/pull/2#discussion_r200"),
+			}
+			s := &Source{includeIssueComments: true, includePRComments: true}
+			repo := testRepo
+			repo.hasNoIssues = true
+			reporter := &collectingReporter{}
+
+			err := s.processIssueandPRsWithCommentsREST(context.Background(), gh.client, repo, nil, reporter, nil)
+
+			require.NoError(t, err)
+			assert.Equal(t, []string{"https://github.com/o/r/pull/2#discussion_r200"}, reporter.links)
+		})
+	}
+}
+
+func TestCommentScan_IssueCommentsNotFoundIsReportedWhenIssuesAreOn(t *testing.T) {
+	gh := newFakeGitHub(t)
+	gh.issueComments.fail = respondWith(http.StatusNotFound)
+	s := &Source{includeIssueComments: true}
+
+	_, err := scanComments(t, s, gh, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "issue comments:")
+	assert.Contains(t, err.Error(), "404")
+}
+
+func TestCommentScan_PullsDisabledStillListsReviewComments(t *testing.T) {
+	gh := newFakeGitHub(t)
+	gh.pulls.fail = respondWith(http.StatusNotFound)
+	gh.prComments.records = []fakeRecord{
+		commentRecord(200, testEpoch, "https://github.com/o/r/pull/2#discussion_r200"),
+	}
+	s := &Source{includePRComments: true}
+
+	reporter, err := scanComments(t, s, gh, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://github.com/o/r/pull/2#discussion_r200"}, reporter.links)
+	assert.Equal(t, 1, gh.prComments.requestCount())
+}
+
+func TestCommentScan_NoPullRequestsSkipsReviewComments(t *testing.T) {
+	gh := newFakeGitHub(t)
+	s := &Source{includePRComments: true}
+
+	reporter, err := scanComments(t, s, gh, nil)
+
+	require.NoError(t, err)
+	assert.Empty(t, reporter.links)
+	assert.Equal(t, 1, gh.pulls.requestCount())
+	assert.Zero(t, gh.prComments.requestCount())
+}
+
+func TestCacheRepoInfo_HasNoIssues(t *testing.T) {
+	off, on := false, true
+	tests := []struct {
+		name      string
+		hasIssues *bool
+		want      bool
+	}{
+		{name: "issues off", hasIssues: &off, want: true},
+		{name: "issues on", hasIssues: &on, want: false},
+		{name: "field missing", hasIssues: nil, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Source{repoInfoCache: newRepoInfoCache()}
+			cloneURL := "https://github.com/o/r.git"
+			s.cacheRepoInfo(&github.Repository{CloneURL: &cloneURL, HasIssues: tt.hasIssues})
+
+			info, ok := s.repoInfoCache.get(cloneURL)
+			require.True(t, ok)
+			assert.Equal(t, tt.want, info.hasNoIssues)
+		})
+	}
+}
+
 func TestReportCommentErrors_UnjoinedErrorIsReportedOnce(t *testing.T) {
 	reporter := &collectingReporter{}
 
