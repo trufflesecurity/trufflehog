@@ -67,6 +67,18 @@ If a filter excludes every object in a bucket, the scan logs `Scanned no objects
 - Extensions in the shared deny list in `pkg/common/vars.go`, which already covers images, audio, and video
 - Keys ending in `/`, which are directory markers
 
+## Debug logs
+
+With debug on for this source (`debug: true` in the config), the scan logs:
+
+- `V(1)`: `S3 source initialized` with the config choices (the endpoint's host only, never credentials), and `Found buckets to scan` for each role.
+- `V(2)`: `Scanning bucket` and `Finished scanning bucket`, with the objects scanned, pages and duration.
+- `V(3)`: `Scanning object` for each object downloaded.
+- `V(4)`: `Skipping bucket` and `Skipping object` with a `reason`, `Listed page` for each page, and `AWS SDK` lines for retries, including S3 throttling (`SlowDown`).
+- `V(5)`: `Finished scanning object` with its duration, and the region used for a bucket outside the default region.
+
+Lines carry `role`, `bucket`, `page_number` and `key` where they apply. An object skipped for one of the reasons above shows its reason here, so a missing finding can be traced to the object it would have come from.
+
 ## Custom endpoints
 
 `--endpoint` points the scan at an S3-compatible service instead of AWS S3. Setting it changes three things:

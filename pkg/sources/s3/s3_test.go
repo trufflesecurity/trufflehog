@@ -4,24 +4,34 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/go-logr/zapr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func TestSource_Init_IncludeAndIgnoreBucketsError(t *testing.T) {
@@ -647,4 +657,122 @@ func TestSource_SkipReason(t *testing.T) {
 			assert.Equal(t, tt.want, s.skipReason(tt.obj))
 		})
 	}
+}
+
+// slowDownOnce answers the first GET of key with S3's throttling error, so the client retries it.
+type slowDownOnce struct {
+	next http.Handler
+	key  string
+	done atomic.Bool
+}
+
+func (h *slowDownOnce) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/"+h.key) && h.done.CompareAndSwap(false, true) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`<Error><Code>SlowDown</Code><Message>Please reduce your request rate.</Message></Error>`))
+		return
+	}
+	h.next.ServeHTTP(w, r)
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testSecret = "TESTSECRET-do-not-log-1234567890"
+
+	// One object of each kind the source logs about: scanned, empty, excluded by the filter, and a directory.
+	fake := &fakeS3{buckets: map[string]fakeBucket{"bucket": {objects: map[string]string{
+		"config.txt":      "aws_secret = " + testSecret,
+		"empty.txt":       "",
+		"archive/old.txt": "aws_secret = " + testSecret,
+		"dir/":            "x",
+	}}}}
+
+	// run the source with both Chunks and ChunkUnit, draining chunks the way the engine does
+	runSource := func(t *testing.T, ctx context.Context) {
+		server := httptest.NewServer(&slowDownOnce{next: fake, key: "config.txt"})
+		t.Cleanup(server.Close)
+		conn, err := anypb.New(&sourcespb.S3{
+			Credential:      &sourcespb.S3_Unauthenticated{},
+			Endpoint:        server.URL,
+			Buckets:         []string{"bucket"},
+			ExcludePrefixes: []string{"archive/"},
+		})
+		require.NoError(t, err)
+
+		s := Source{}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+
+		chunksCh := make(chan *sources.Chunk, 64)
+		go func() {
+			for range chunksCh {
+			}
+		}()
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		reporter := sourcestest.TestReporter{}
+		require.NoError(t, s.ChunkUnit(ctx, S3SourceUnit{Bucket: "bucket"}, &reporter))
+		require.Empty(t, reporter.ChunkErrs)
+		require.NotEmpty(t, reporter.Chunks)
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		ctx, logs := logtest.DebugContext()
+		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
+		runSource(t, ctx)
+
+		// lines from each level show up
+		for _, msg := range []string{
+			"S3 source initialized",    // V(1)
+			"Found buckets to scan",    // V(1)
+			"Scanning bucket",          // V(2)
+			"Finished scanning bucket", // V(2)
+			"Scanning object",          // V(3)
+			"Listed page",              // V(4)
+			"Finished scanning object", // V(5)
+		} {
+			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
+		}
+
+		// every skip says why, at V(4)
+		var reasons []string
+		for _, entry := range logs.FilterMessage("Skipping object").All() {
+			reasons = append(reasons, fmt.Sprint(entry.ContextMap()["reason"]))
+		}
+		assert.Contains(t, reasons, skipReasonEmptyFile)
+		assert.Contains(t, reasons, skipReasonObjectFilter)
+		assert.Contains(t, reasons, "directory")
+
+		// the throttled GET was retried, and the retry was logged through the request's context
+		var retried bool
+		for _, entry := range logs.FilterMessage("AWS SDK").All() {
+			fields := entry.ContextMap()
+			if strings.Contains(fmt.Sprint(fields["detail"]), "retrying request") {
+				retried = true
+				assert.Equal(t, "config.txt", fields["key"])
+			}
+		}
+		assert.True(t, retried, "missing retry log line")
+
+		// every line came from the context logger, so it carries the source fields,
+		// and none of them contain the secret
+		for _, entry := range logs.All() {
+			fields := entry.ContextMap()
+			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
+			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
+			assert.NotContains(t, entry.Message, testSecret)
+			assert.NotContains(t, fmt.Sprint(fields), testSecret)
+		}
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
+		runSource(t, ctx)
+
+		assert.Zero(t, logs.FilterMessage("Scanning object").Len())
+		assert.Zero(t, logs.FilterMessage("Skipping object").Len())
+		assert.Zero(t, logs.FilterMessage("Finished scanning object").Len())
+		assert.Zero(t, logs.FilterMessage("AWS SDK").Len())
+	})
 }
