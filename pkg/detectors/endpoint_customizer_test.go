@@ -1,10 +1,14 @@
 package detectors
 
 import (
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -201,4 +205,146 @@ func TestEndpointSetter_VerifierAuthFailuresSurviveSetVerificationError(t *testi
 	})
 
 	assert.Zero(t, hits.Load(), "neither failure sends the request")
+}
+
+func TestEndpointSetter_ConfiguredPrivateEndpoint(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, "/api", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	base := NewDetectorHttpClient(WithNoLocalIP())
+	var setter EndpointSetter
+	require.NoError(t, setter.SetConfiguredEndpoints(server.URL))
+	client := setter.VerificationClient(base)
+
+	resp, err := client.Get(server.URL + "/api")
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.EqualValues(t, 1, hits.Load())
+
+	// An unconfigured request cannot reuse the trusted connection pool.
+	_, err = base.Get(server.URL + "/api")
+	require.ErrorIs(t, err, ErrNoLocalIP)
+	require.EqualValues(t, 1, hits.Load())
+
+	// Even a redirect to the same configured origin must go through the guard.
+	_, err = client.Get(server.URL + "/redirect")
+	require.ErrorIs(t, err, ErrNoLocalIP)
+	require.EqualValues(t, 2, hits.Load())
+
+	var other EndpointSetter
+	require.NoError(t, other.SetConfiguredEndpoints("http://localhost:1"))
+	_, err = other.VerificationClient(base).Get(server.URL + "/api")
+	require.ErrorIs(t, err, ErrNoLocalIP)
+	require.EqualValues(t, 2, hits.Load())
+}
+
+func TestEndpointSetter_VerificationClientClosesIdleConnections(t *testing.T) {
+	for _, mode := range []string{"base", "guarded", "authenticated"} {
+		t.Run(mode, func(t *testing.T) {
+			idle := make(chan struct{}, 1)
+			closed := make(chan struct{}, 1)
+			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = io.WriteString(w, "ok")
+			}))
+			server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+				switch state {
+				case http.StateIdle:
+					select {
+					case idle <- struct{}{}:
+					default:
+					}
+				case http.StateClosed:
+					select {
+					case closed <- struct{}{}:
+					default:
+					}
+				}
+			}
+			server.StartTLS()
+			t.Cleanup(server.Close)
+
+			transport := server.Client().Transport.(*http.Transport).Clone()
+			base := &http.Client{Transport: transport}
+			if mode != "base" {
+				base = NewDetectorHttpClient(WithTransport(NewDetectorTransport(transport)), WithNoLocalIP())
+			}
+			t.Cleanup(base.CloseIdleConnections)
+			var setter EndpointSetter
+			require.NoError(t, setter.SetConfiguredEndpoints(server.URL))
+			if mode == "authenticated" {
+				setter.SetVerifierAuth(newTestVerifierAuth(t, "X-Auth-Proxy-Token"))
+			}
+			client := setter.VerificationClient(base)
+			response, err := client.Get(server.URL)
+			require.NoError(t, err)
+			_, err = io.Copy(io.Discard, response.Body)
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			select {
+			case <-idle:
+			case <-time.After(3 * time.Second):
+				t.Fatal("TLS connection never became idle")
+			}
+
+			client.CloseIdleConnections()
+			select {
+			case <-closed:
+			case <-time.After(3 * time.Second):
+				t.Fatal("verification client left its idle TLS connection open")
+			}
+		})
+	}
+}
+
+func TestEndpointSetter_ConfiguredOriginBoundaries(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+	localhost := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
+	for _, tc := range []struct {
+		name      string
+		endpoints []string
+		request   string
+		allowed   bool
+	}{
+		{"exact origin", []string{server.URL}, server.URL, true},
+		{"origin ignores configured path", []string{server.URL + "/configured?query=value"}, server.URL + "/request", true},
+		{"case insensitive scheme and host", []string{strings.ToUpper(localhost)}, localhost, true},
+		{"different scheme", []string{strings.Replace(server.URL, "http:", "https:", 1)}, server.URL, false},
+		{"different host", []string{localhost}, server.URL, false},
+		{"different port", []string{"http://127.0.0.1:1"}, server.URL, false},
+		{"malformed endpoint", []string{"https://[::1"}, server.URL, false},
+		{"endpoint without host", []string{"https:localhost"}, server.URL, false},
+		{"endpoint without scheme", []string{strings.TrimPrefix(server.URL, "http:")}, server.URL, false},
+		{"valid endpoint after malformed", []string{"https://[::1", server.URL}, server.URL, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := NewDetectorHttpClient(WithNoLocalIP())
+			t.Cleanup(base.CloseIdleConnections)
+			var setter EndpointSetter
+			require.NoError(t, setter.SetConfiguredEndpoints(tc.endpoints...))
+			before := hits.Load()
+			response, err := setter.VerificationClient(base).Get(tc.request)
+			if !tc.allowed {
+				require.ErrorIs(t, err, ErrNoLocalIP)
+				require.Equal(t, before, hits.Load())
+				return
+			}
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			require.Equal(t, before+1, hits.Load())
+		})
+	}
 }

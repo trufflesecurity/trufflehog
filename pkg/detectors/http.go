@@ -77,6 +77,12 @@ func (t *detectorTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	return t.T.RoundTrip(req)
 }
 
+func (t *detectorTransport) CloseIdleConnections() {
+	if closer, ok := t.T.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+}
+
 var defaultDialer = &net.Dialer{
 	Timeout:   2 * time.Second,
 	KeepAlive: 5 * time.Second,
@@ -95,6 +101,30 @@ func NewDetectorTransport(T http.RoundTripper) http.RoundTripper {
 		}
 	}
 	return &detectorTransport{T: T}
+}
+
+type configuredVerifierKey struct{}
+
+// Keep separate connection pools so an untrusted request cannot reuse a
+// connection opened for an operator-configured private endpoint.
+type guardedTransport struct {
+	guarded http.RoundTripper
+	trusted http.RoundTripper
+}
+
+func (t *guardedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if trusted, _ := req.Context().Value(configuredVerifierKey{}).(bool); trusted && req.Response == nil {
+		return t.trusted.RoundTrip(req)
+	}
+	return t.guarded.RoundTrip(req)
+}
+
+func (t *guardedTransport) CloseIdleConnections() {
+	for _, transport := range []http.RoundTripper{t.guarded, t.trusted} {
+		if closer, ok := transport.(interface{ CloseIdleConnections() }); ok {
+			closer.CloseIdleConnections()
+		}
+	}
 }
 
 // ErrNoLocalIP is returned when a client configured with WithNoLocalIP
@@ -137,10 +167,17 @@ func WithNoLocalIP() ClientOption {
 			}
 		}
 
+		trusted := transport.Clone()
+		var trustedTransport http.RoundTripper = trusted
+		if _, ok := c.Transport.(*detectorTransport); ok {
+			trustedTransport = &detectorTransport{T: trusted}
+		}
+
 		// The guarded dialer replaces any existing DialContext; within this
 		// package that is only ever nil or defaultDialer, whose settings the
 		// guard preserves.
 		transport.DialContext = ssrf.GuardDialer(defaultDialer).DialContext
+		c.Transport = &guardedTransport{guarded: c.Transport, trusted: trustedTransport}
 	}
 }
 
