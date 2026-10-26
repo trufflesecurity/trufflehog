@@ -17,22 +17,32 @@ func safeRepoURL(repo string) string {
 		return u.String()
 	}
 
-	// anything else is a repo name like "org/repo", an SCP-style URL like
-	// "user:pass@host:org/repo", or a mix like "https://token@host:org/repo"
-	// that url.Parse rejects. The user info always sits before an "@" in the
-	// part before the first "/" after any scheme, so drop everything up to
-	// that "@" and keep the scheme
-	scheme, rest, found := strings.Cut(repo, "://")
-	if found {
-		scheme += "://"
-	} else {
-		scheme, rest = "", repo
-	}
-	hostPart, _, _ := strings.Cut(rest, "/")
-	if at := strings.LastIndex(hostPart, "@"); at >= 0 {
-		return scheme + rest[at+1:]
+	// anything else is a repo name like "org/repo", or a URL that url.Parse
+	// rejects, so drop the user info by hand
+	if prefix, _, rest, found := splitUserInfo(repo); found {
+		return prefix + rest
 	}
 	return repo
+}
+
+// splitUserInfo splits a repo that url.Parse rejects, like an SCP-style URL
+// "user:pass@host:org/repo" or a mix like "https://token@host:org/repo", into
+// the scheme prefix ("https://" or ""), the user info and the rest. The user
+// info always sits before an "@" in the part before the first "/" after any
+// scheme. found is false when there is no such "@".
+func splitUserInfo(repo string) (prefix, userInfo, rest string, found bool) {
+	scheme, afterScheme, hasScheme := strings.Cut(repo, "://")
+	if hasScheme {
+		prefix = scheme + "://"
+	} else {
+		afterScheme = repo
+	}
+	hostPart, _, _ := strings.Cut(afterScheme, "/")
+	at := strings.LastIndex(hostPart, "@")
+	if at < 0 {
+		return prefix, "", afterScheme, false
+	}
+	return prefix, afterScheme[:at], afterScheme[at+1:], true
 }
 
 // repoCredential returns the secret in a repo URL's user info, or "" if it has
@@ -41,15 +51,30 @@ func safeRepoURL(repo string) string {
 // the token there. Other usernames are not secret, and redacting one like
 // "git" would hide that word in every log line.
 func repoCredential(repo string) string {
-	u, err := url.Parse(repo)
-	if err != nil || u.User == nil {
-		return ""
+	var prefix, username, password string
+	if u, err := url.Parse(repo); err == nil && u.Host != "" {
+		if u.User == nil {
+			return ""
+		}
+		prefix = u.Scheme + "://"
+		username = u.User.Username()
+		password, _ = u.User.Password()
+	} else {
+		var userInfo string
+		var found bool
+		prefix, userInfo, _, found = splitUserInfo(repo)
+		if !found {
+			return ""
+		}
+		username, password, _ = strings.Cut(userInfo, ":")
 	}
-	if password, ok := u.User.Password(); ok {
+
+	// a password can be present but empty, as in "https://TOKEN:@host"
+	if password != "" {
 		return password
 	}
-	if u.Scheme == "http" || u.Scheme == "https" {
-		return u.User.Username()
+	if prefix == "http://" || prefix == "https://" {
+		return username
 	}
 	return ""
 }

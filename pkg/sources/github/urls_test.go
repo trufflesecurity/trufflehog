@@ -199,6 +199,12 @@ func TestRepoCredential(t *testing.T) {
 		"https://github.com/org/repo.git":   "",
 		"org/repo":                          "",
 		"git@github.com:org/repo.git":       "",
+		// the password is present but empty, so the username is the token
+		"https://ghp_secret:@github.com/org/repo.git": "ghp_secret",
+		// SCP style and mixed URLs, which url.Parse rejects
+		"user:ghp_secret@github.com:org/repo.git":         "ghp_secret",
+		"https://ghp_secret@github.com:org/repo.git":      "ghp_secret",
+		"https://user:ghp_secret@github.com:org/repo.git": "ghp_secret",
 	}
 	for input, want := range tests {
 		assert.Equal(t, want, repoCredential(input), input)
