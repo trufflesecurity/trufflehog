@@ -653,6 +653,11 @@ func (s *Source) getAllProjectRepos(
 	for page := 1; ; page++ {
 		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions, gitlab.WithContext(ctx))
 		if err != nil {
+			// a cancelled scan fails every call left, so stop instead of
+			// reporting each one as a listing error
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			err = fmt.Errorf("received error on listing user projects: %w", err)
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
@@ -689,6 +694,9 @@ func (s *Source) getAllProjectRepos(
 	for page := 1; ; page++ {
 		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions, gitlab.WithContext(ctx))
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			err = fmt.Errorf("received error on listing groups, you probably don't have permissions to do that: %w", err)
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
@@ -717,6 +725,9 @@ func (s *Source) getAllProjectRepos(
 		for page := 1; ; page++ {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions, gitlab.WithContext(ctx))
 			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				err = fmt.Errorf(
 					"received error on listing group projects for %q, you probably don't have permissions to do that: %w",
 					group.FullPath, err,
@@ -903,6 +914,9 @@ func (s *Source) getAllProjectReposInGroups(
 		for page := 1; ; page++ {
 			projects, res, err := apiClient.Groups.ListGroupProjects(groupID, projectOpts, gitlab.WithContext(groupCtx))
 			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				err = fmt.Errorf("received error on listing projects for group %s: %w", groupID, err)
 				if err := reporter.UnitErr(ctx, err); err != nil {
 					return err

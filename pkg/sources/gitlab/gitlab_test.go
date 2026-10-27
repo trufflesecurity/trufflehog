@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	stdctx "context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -328,4 +329,33 @@ func TestSource_DebugLogging(t *testing.T) {
 		assert.Zero(t, logs.FilterMessage("Retrying GitLab API request").Len())
 		assert.Zero(t, logs.FilterMessage("cache set: added project metadata in the cache").Len())
 	})
+}
+
+func TestSource_EnumerateCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// the first request cancels the scan and hangs until the client gives up
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cancel()
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+
+	conn, err := anypb.New(&sourcespb.GitLab{
+		Credential: &sourcespb.GitLab_Token{Token: "glpat-cancelledtestsecret"},
+		Endpoint:   "https://gitlab.example.com",
+		GroupIds:   []string{"1", "2", "3"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "test cancelled", 1, 1, false, conn, 1))
+	s.url = srv.URL + "/"
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.ErrorIs(t, err, stdctx.Canceled)
+	// the groups left are not reported as listing errors
+	assert.Empty(t, reporter.UnitErrs)
 }
