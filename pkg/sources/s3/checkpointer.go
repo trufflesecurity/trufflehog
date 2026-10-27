@@ -71,8 +71,6 @@ const defaultMaxObjectsPerPage = 1000
 // NewCheckpointer creates a new checkpointer for S3 scanning operations.
 // The progress provides the underlying mechanism for persisting scan state.
 func NewCheckpointer(ctx context.Context, progress *sources.Progress, isUnitScan bool) *Checkpointer {
-	ctx.Logger().Info("Creating checkpointer")
-
 	return &Checkpointer{
 		// We are resuming if we have completed objects from a previous scan.
 		completedObjects: make([]bool, defaultMaxObjectsPerPage),
@@ -119,7 +117,7 @@ func (p *Checkpointer) ResumePoint(ctx context.Context) (ResumeInfo, error) {
 	}
 
 	if resumeInfo.CurrentBucket == "" {
-		ctx.Logger().V(2).Info("resume info is missing current bucket, resuming from the beginning")
+		ctx.Logger().V(4).Info("resume info is missing current bucket, resuming from the beginning")
 		return resume, nil
 	}
 
