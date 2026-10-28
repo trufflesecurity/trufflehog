@@ -1,16 +1,37 @@
 package docker
 
 import (
+	"archive/tar"
+	"bytes"
+	"fmt"
 	"io"
+	stdlog "log"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/go-logr/zapr"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	dockerClient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -426,4 +447,169 @@ func TestDockerScanWithExclusions(t *testing.T) {
 	wg.Wait()
 
 	assert.False(t, foundExcludedPath, "Found a chunk that should have been excluded")
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testSecret = "dockerdebuglogtestsecret"
+
+	// newFakeRegistry pushes an image with one layer holding a secret file and an
+	// excluded file. After the push, the first manifest GET fails with a 503, so
+	// the scan has to retry it.
+	newFakeRegistry := func(t *testing.T) string {
+		var tarBuf bytes.Buffer
+		tw := tar.NewWriter(&tarBuf)
+		for name, content := range map[string]string{
+			"secret.txt":  "token=" + testSecret,
+			"skip/me.txt": "nothing to see",
+		} {
+			require.NoError(t, tw.WriteHeader(&tar.Header{Name: name, Mode: 0o600, Size: int64(len(content))}))
+			_, err := tw.Write([]byte(content))
+			require.NoError(t, err)
+		}
+		require.NoError(t, tw.Close())
+
+		layer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(tarBuf.Bytes())), nil
+		})
+		require.NoError(t, err)
+		img, err := mutate.Append(empty.Image, mutate.Addendum{
+			Layer:   layer,
+			History: v1.History{CreatedBy: "COPY . /"},
+		})
+		require.NoError(t, err)
+
+		var armed, failed atomic.Bool
+		reg := registry.New(registry.Logger(stdlog.New(io.Discard, "", 0)))
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if armed.Load() && r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/") && !failed.Swap(true) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			reg.ServeHTTP(w, r)
+		}))
+		t.Cleanup(srv.Close)
+
+		ref := strings.TrimPrefix(srv.URL, "http://") + "/test/image:v1"
+		tag, err := name.NewTag(ref)
+		require.NoError(t, err)
+		require.NoError(t, remote.Write(tag, img))
+		armed.Store(true)
+		return ref
+	}
+
+	runSource := func(t *testing.T, ctx context.Context) {
+		conn, err := anypb.New(&sourcespb.Docker{
+			Credential: &sourcespb.Docker_Unauthenticated{
+				Unauthenticated: &credentialspb.Unauthenticated{},
+			},
+			Images:       []string{newFakeRegistry(t)},
+			ExcludePaths: []string{"/skip/*"},
+		})
+		require.NoError(t, err)
+
+		s := &Source{}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+
+		chunksChan := make(chan *sources.Chunk, 8)
+		require.NoError(t, s.Chunks(ctx, chunksChan))
+		close(chunksChan)
+
+		var files []string
+		for chunk := range chunksChan {
+			files = append(files, chunk.SourceMetadata.GetDocker().GetFile())
+		}
+		assert.ElementsMatch(t, []string{"image-metadata:history:0:created-by", "/secret.txt"}, files)
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		ctx, logs := logtest.DebugContext()
+		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
+		runSource(t, ctx)
+
+		// lines from each level show up
+		for _, msg := range []string{
+			"Docker source initialized",    // V(1)
+			"Scanning image",               // V(2)
+			"Finished scanning image",      // V(2)
+			"Scanning image history entry", // V(3)
+			"Scanning layer",               // V(3)
+			"Finished scanning layer",      // V(3)
+			"Skipping file",                // V(4)
+			"Registry request failed",      // V(4)
+			"Loading image",                // V(5)
+			"Scanning file",                // V(5)
+		} {
+			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
+		}
+
+		// the skip says why, and carries the layer
+		skips := logs.FilterMessage("Skipping file").All()
+		require.Len(t, skips, 1)
+		assert.Equal(t, "/skip/me.txt", skips[0].ContextMap()["file"])
+		assert.Equal(t, "matches exclude pattern", skips[0].ContextMap()["reason"])
+		assert.Contains(t, skips[0].ContextMap(), "layer")
+
+		layerDone := logs.FilterMessage("Finished scanning layer").All()
+		require.Len(t, layerDone, 1)
+		assert.EqualValues(t, 2, layerDone[0].ContextMap()["files"])
+		assert.EqualValues(t, 1, layerDone[0].ContextMap()["skipped"])
+
+		// the failed manifest request says what failed
+		var manifestFailed bool
+		for _, entry := range logs.FilterMessage("Registry request failed").All() {
+			if entry.ContextMap()["status"] == int64(http.StatusServiceUnavailable) {
+				manifestFailed = true
+				assert.Equal(t, "/v2/test/image/manifests/v1", entry.ContextMap()["path"])
+			}
+		}
+		assert.True(t, manifestFailed, "missing 503 registry line")
+
+		// every line came from the context logger, so it carries the source fields,
+		// and none of them contain the secret
+		for _, entry := range logs.All() {
+			fields := entry.ContextMap()
+			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
+			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
+			assert.NotContains(t, entry.Message, testSecret)
+			assert.NotContains(t, fmt.Sprint(fields), testSecret)
+		}
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
+		runSource(t, ctx)
+
+		assert.Zero(t, logs.Len(), "unexpected lines: %v", logs.All())
+	})
+}
+
+func TestDockerHub_ListImagesDebugLogging(t *testing.T) {
+	ctx, logs := logtest.DebugContext()
+
+	hub := &DockerHub{Client: &http.Client{Transport: common.FakeTransport{
+		CreateResponse: func(req *http.Request) (*http.Response, error) {
+			body := `{"next": "/v2/namespaces/acme/repositories?page=2", "results": [{"name": "one"}, {"name": "two"}]}`
+			if req.URL.Query().Get("page") == "2" {
+				body = `{"results": [{"name": "three"}]}`
+			}
+			return &http.Response{
+				Request:    req,
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(body)),
+			}, nil
+		},
+	}}}
+
+	images, err := hub.ListImages(ctx, "acme")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"acme/one", "acme/two", "acme/three"}, images)
+
+	pages := logs.FilterMessage("Listed registry page").All()
+	require.Len(t, pages, 2)
+	for i, want := range []int{2, 1} {
+		assert.EqualValues(t, i+1, pages[i].ContextMap()["page"])
+		assert.EqualValues(t, want, pages[i].ContextMap()["images"])
+		assert.Equal(t, "Dockerhub", pages[i].ContextMap()["registry"])
+	}
 }
