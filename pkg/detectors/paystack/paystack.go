@@ -2,9 +2,7 @@ package paystack
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -13,56 +11,45 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{}
-
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-
-var (
-	client = common.SaneHttpClient()
-	// TODO: support live key
-	keyPat = regexp.MustCompile(`\b(sk\_[a-z]{1,}\_[A-Za-z0-9]{40})\b`)
-)
-
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"paystack"}
+type Scanner struct {
+	client *http.Client
 }
 
-// FromData will find and optionally verify Paystack secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+var _ detectors.Detector = Scanner{}
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+var (
+	defaultClient = common.SaneHttpClient()
+	keyPat        = regexp.MustCompile(`\bsk_(?:test|live)_[A-Za-z0-9]{40}\b`)
+	verifyURL     = "https://api.paystack.co/balance"
+)
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+func (s Scanner) Keywords() []string {
+	return []string{"sk_test_", "sk_live_"}
+}
 
-		s1 := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_Paystack,
-			Raw:          []byte(resMatch),
-			SecretParts:  map[string]string{"key": resMatch},
-		}
-
-		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.paystack.co/customer", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() { _ = res.Body.Close() }()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
-		}
-
-		results = append(results, s1)
+func (s Scanner) httpClient() *http.Client {
+	if s.client != nil {
+		return s.client
 	}
+	return defaultClient
+}
 
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	for _, key := range keyPat.FindAllString(string(data), -1) {
+		result := detectors.Result{
+			DetectorType: detector_typepb.DetectorType_Paystack,
+			Raw:          []byte(key),
+			SecretParts:  map[string]string{"key": key},
+		}
+		if verify {
+			verified, verifyErr := common.VerifyBearerToken(ctx, s.httpClient(), verifyURL, key)
+			result.Verified = verified
+			if verifyErr != nil {
+				result.SetVerificationError(verifyErr, key)
+			}
+		}
+		results = append(results, result)
+	}
 	return results, nil
 }
 
@@ -71,5 +58,5 @@ func (s Scanner) Type() detector_typepb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Paystack is a payment processing service. Paystack API keys can be used to access and manage payment transactions and customer data."
+	return "Detects Paystack secret API keys"
 }
