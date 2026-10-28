@@ -16,12 +16,21 @@ func (e *Engine) ScanConfig(ctx context.Context, configuredSources ...sources.Co
 	for _, configuredSource := range configuredSources {
 		sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, configuredSource.Name, configuredSource.SourceType())
 
+		// Add the source fields here, before Init, so lines logged during Init
+		// say which source and job they came from too. The source manager adds
+		// the same fields later for the scan, but skips any already set here.
+		sourceCtx := context.WithValues(ctx,
+			"source_name", configuredSource.Name,
+			"source_type", configuredSource.SourceType().String(),
+			"source_id", sourceID,
+			"job_id", jobID,
+		)
+
 		// A source with debug on gets a context that writes all of its debug
 		// logs. Both Init and the scan use it, so every log from this source is
 		// covered. Other sources keep the global log level.
-		sourceCtx := ctx
 		if configuredSource.Debug {
-			sourceCtx = context.WithLogLevel(ctx, log.DebugLevel)
+			sourceCtx = context.WithLogLevel(sourceCtx, log.DebugLevel)
 		}
 
 		source, err := configuredSource.Init(sourceCtx, sourceID, jobID)

@@ -171,3 +171,42 @@ func TestIsWikiLink(t *testing.T) {
 	assert.False(t, isWikiLink("https://github.com/owner/repo/blob/main/path/to/file"))
 	assert.False(t, isWikiLink("not a url"))
 }
+
+func TestSafeRepoURL(t *testing.T) {
+	tests := map[string]string{
+		"https://user:ghp_secret@github.com/org/repo.git": "https://github.com/org/repo.git",
+		"https://ghp_secret@github.com/org/repo.git":      "https://github.com/org/repo.git",
+		"https://github.com/org/repo.git":                 "https://github.com/org/repo.git",
+		"org/repo":                                        "org/repo",
+		"git@github.com:org/repo.git":                     "github.com:org/repo.git",
+		"user:ghp_secret@github.com:org/repo.git":         "github.com:org/repo.git",
+		// mixed HTTPS and SCP style, which url.Parse rejects
+		"https://ghp_secret@github.com:org/repo.git":      "https://github.com:org/repo.git",
+		"https://user:ghp_secret@github.com:org/repo.git": "https://github.com:org/repo.git",
+	}
+	for input, want := range tests {
+		assert.Equal(t, want, safeRepoURL(input), input)
+	}
+}
+
+func TestRepoCredential(t *testing.T) {
+	tests := map[string]string{
+		"https://user:ghp_secret@github.com/org/repo.git": "ghp_secret",
+		"https://ghp_secret@github.com/org/repo.git":      "ghp_secret",
+		"ssh://git:ghp_secret@github.com/org/repo.git":    "ghp_secret",
+		// a plain SSH user is not a secret
+		"ssh://git@github.com/org/repo.git": "",
+		"https://github.com/org/repo.git":   "",
+		"org/repo":                          "",
+		"git@github.com:org/repo.git":       "",
+		// the password is present but empty, so the username is the token
+		"https://ghp_secret:@github.com/org/repo.git": "ghp_secret",
+		// SCP style and mixed URLs, which url.Parse rejects
+		"user:ghp_secret@github.com:org/repo.git":         "ghp_secret",
+		"https://ghp_secret@github.com:org/repo.git":      "ghp_secret",
+		"https://user:ghp_secret@github.com:org/repo.git": "ghp_secret",
+	}
+	for input, want := range tests {
+		assert.Equal(t, want, repoCredential(input), input)
+	}
+}

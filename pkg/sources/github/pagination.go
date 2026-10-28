@@ -251,7 +251,7 @@ func walkUpdatedSince[T any](ctx context.Context, p pager, w sinceWalk[T]) (int,
 		}
 
 		windowStart = latest
-		ctx.Logger().V(2).Info("listing capped, continuing from last update time",
+		ctx.Logger().V(4).Info("listing capped, continuing from last update time",
 			"listing", w.name, "since", windowStart.UTC().Format(time.RFC3339), "items_so_far", total)
 	}
 }
@@ -305,8 +305,8 @@ func fetchWithRetry[T any](ctx context.Context, p pager, fetch func() ([]T, *git
 		}
 		delay := transientBackoff(transientRetries)
 		transientRetries++
-		ctx.Logger().V(2).Info("retrying GitHub API request after transient error",
-			"listing", p.listing, "retry", transientRetries, "max_retries", maxTransientRetries, "retry_in", delay.String(), "error", err.Error())
+		ctx.Logger().V(4).Info("retrying GitHub API request after transient error",
+			"listing", p.listing, "retry", transientRetries, "max_retries", maxTransientRetries, "retry_in", delay.String(), "reason", err.Error())
 		if !p.wait(ctx, delay) {
 			return items, resp, err
 		}
