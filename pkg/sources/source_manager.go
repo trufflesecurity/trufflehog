@@ -470,10 +470,10 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUnitEnumerator, report *JobProgress, reporter UnitReporter) error {
 	// Create a function that will save the first error encountered (if
 	// any) and discard the rest.
-	fatalErr := make(chan error, 1)
-	catchFirstFatal := func(err error) {
+	firstErr := make(chan error, 1)
+	catchFirstError := func(err error) {
 		select {
-		case fatalErr <- err:
+		case firstErr <- err:
 		default:
 		}
 	}
@@ -485,16 +485,16 @@ func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUni
 		ctx.Logger().V(2).Info("enumerating source with units")
 		defer common.RecoverWithHandler(ctx, func(err error) {
 			report.ReportError(Fatal{err})
-			catchFirstFatal(Fatal{err})
+			catchFirstError(Fatal{err})
 		})
 		if err := source.Enumerate(ctx, reporter); err != nil {
 			report.ReportError(jobErr(ctx, err))
-			catchFirstFatal(jobErr(ctx, err))
+			catchFirstError(jobErr(ctx, err))
 		}
 	}()
 
 	select {
-	case err := <-fatalErr:
+	case err := <-firstErr:
 		return err
 	default:
 		return nil
@@ -542,10 +542,10 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 	}
 	// Create a function that will save the first error encountered (if
 	// any) and discard the rest.
-	fatalErr := make(chan error, 1)
-	catchFirstFatal := func(err error) {
+	firstErr := make(chan error, 1)
+	catchFirstError := func(err error) {
 		select {
-		case fatalErr <- err:
+		case firstErr <- err:
 		default:
 		}
 	}
@@ -558,11 +558,11 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 		ctx.Logger().V(2).Info("enumerating source")
 		defer common.RecoverWithHandler(ctx, func(err error) {
 			report.ReportError(Fatal{err})
-			catchFirstFatal(Fatal{err})
+			catchFirstError(Fatal{err})
 		})
 		if err := source.Enumerate(ctx, unitReporter); err != nil {
 			report.ReportError(jobErr(ctx, err))
-			catchFirstFatal(jobErr(ctx, err))
+			catchFirstError(jobErr(ctx, err))
 		}
 	}()
 	var wg sync.WaitGroup
@@ -587,11 +587,11 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 			ctx.Logger().V(3).Info("chunking unit")
 			defer common.RecoverWithHandler(ctx, func(err error) {
 				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
-				catchFirstFatal(Fatal{err})
+				catchFirstError(Fatal{err})
 			})
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 				report.ReportError(jobErr(ctx, ChunkError{Unit: unit, Err: err}))
-				catchFirstFatal(jobErr(ctx, err))
+				catchFirstError(jobErr(ctx, err))
 			}
 			return nil
 		})
@@ -610,7 +610,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 	}
 	wg.Wait()
 	select {
-	case err := <-fatalErr:
+	case err := <-firstErr:
 		return err
 	default:
 		return nil
