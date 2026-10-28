@@ -45,6 +45,8 @@ var errOverlap = errors.New(
 		"You can override this behavior by using the --allow-verification-overlap flag",
 )
 
+var errDetectorPanic = errors.New("detector panicked")
+
 // Metrics for the scan engine for external consumption.
 type Metrics struct {
 	BytesScanned           uint64
@@ -1075,119 +1077,133 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
-	// Reuse the same map and slice to avoid allocations.
+	for chunk := range e.verificationOverlapChunksChan {
+		e.processVerificationOverlapChunk(ctx, chunk, &wgDetect)
+	}
+
+	wgDetect.Wait()
+}
+
+func (e *Engine) processVerificationOverlapChunk(
+	ctx context.Context,
+	chunk verificationOverlapChunk,
+	wgDetect *sync.WaitGroup,
+) {
+	sourceTypeStr := chunk.chunk.SourceType.String()
+
+	defer chunk.verificationOverlapWgDoneFn()
+	defer common.RecoverWithHandler(ctx, func(error) {
+		chunksDropped.WithLabelValues("verification_overlap", "panic", sourceTypeStr).Inc()
+	})
+
 	const avgSecretsPerDetector = 8
 	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]*ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
-	for chunk := range e.verificationOverlapChunksChan {
-		sourceTypeStr := chunk.chunk.SourceType.String()
-		chunksEnteredStage.WithLabelValues("verification_overlap", sourceTypeStr).Inc()
-		for _, detector := range chunk.detectors {
-			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
-			detectorNameStr := detector.Key.Type().String()
+	chunksEnteredStage.WithLabelValues("verification_overlap", sourceTypeStr).Inc()
+	for _, detector := range chunk.detectors {
+		isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
+		detectorNameStr := detector.Key.Type().String()
 
-			// DO NOT VERIFY at this stage of the pipeline.
-			matchedBytes := detector.Matches()
-			for _, match := range matchedBytes {
-				ctx, cancel := context.WithTimeout(ctx, time.Second*2)
-				results, err := detector.FromData(ctx, false, match)
-				cancel()
-				if err != nil {
-					ctx.Logger().Error(
-						err, "error finding results in chunk during verification overlap",
-						"detector", detectorNameStr,
-					)
-					chunksDropped.WithLabelValues("verification_overlap", "detector_error", sourceTypeStr).Inc()
+		// DO NOT VERIFY at this stage of the pipeline.
+		matchedBytes := detector.Matches()
+		for _, match := range matchedBytes {
+			ctx, cancel := context.WithTimeout(context.WithValue(ctx, "detector", detectorNameStr), time.Second*2)
+			results, err := fromDataWithoutVerifyRecoveringPanic(ctx, detector.Detector, match)
+			cancel()
+			if err != nil {
+				if !errors.Is(err, errDetectorPanic) {
+					ctx.Logger().Error(err, "error finding results in chunk during verification overlap")
+				}
+				chunksDropped.WithLabelValues("verification_overlap", "detector_error", sourceTypeStr).Inc()
+			}
+
+			if len(results) == 0 {
+				continue
+			}
+			if _, ok := detectorKeysWithResults[detector.Key]; !ok {
+				detectorKeysWithResults[detector.Key] = detector
+			}
+
+			// If results filtration eliminates a rotated secret, then that rotation will never be reported. This
+			// problem can theoretically occur for any scan, but we've only actually seen it in practice during
+			// targeted scans. (The reason for this discrepancy is unclear.) The simplest fix is therefore to
+			// disable filtration for targeted scans, but if you're here because this problem surfaced for a
+			// non-targeted scan then we'll have to solve it correctly.
+			if chunk.chunk.SecretID == 0 {
+				results = e.filterResults(ctx, "verification_overlap", detector, results)
+			}
+
+			for _, res := range results {
+				var val []byte
+				if res.RawV2 != nil {
+					val = res.RawV2
+				} else {
+					val = res.Raw
 				}
 
-				if len(results) == 0 {
+				// Use levenstein distance to determine if the secret is likely the same.
+				// Ex:
+				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+				key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
+				if _, ok := chunkSecrets[key]; ok {
+					resultsDropped.WithLabelValues("verification_overlap", "intra_chunk_duplicate", detectorNameStr).Inc()
 					continue
 				}
-				if _, ok := detectorKeysWithResults[detector.Key]; !ok {
-					detectorKeysWithResults[detector.Key] = detector
-				}
 
-				// If results filtration eliminates a rotated secret, then that rotation will never be reported. This
-				// problem can theoretically occur for any scan, but we've only actually seen it in practice during
-				// targeted scans. (The reason for this discrepancy is unclear.) The simplest fix is therefore to
-				// disable filtration for targeted scans, but if you're here because this problem surfaced for a
-				// non-targeted scan then we'll have to solve it correctly.
-				if chunk.chunk.SecretID == 0 {
-					results = e.filterResults(ctx, "verification_overlap", detector, results)
-				}
-
-				for _, res := range results {
-					var val []byte
-					if res.RawV2 != nil {
-						val = res.RawV2
-					} else {
-						val = res.Raw
+				if likelyDuplicate(ctx, key, chunkSecrets) {
+					// This indicates that the same secret was found by multiple detectors.
+					// We should NOT VERIFY this chunk's data.
+					if e.verificationOverlapTracker != nil {
+						e.verificationOverlapTracker.Add(1)
 					}
+					// The overlap error stays the verdict; VerificationSkipped additionally records that no
+					// verifier ran, so consumers counting verifier outcomes don't read errOverlap as a provider
+					// failure.
+					res.VerificationSkipped = true
+					res.SetVerificationError(errOverlap)
+					e.processResult(
+						ctx,
+						res,
+						chunk.chunk,
+						chunk.decoder,
+						detector.Description(),
+						isFalsePositive,
+					)
 
-					// Use levenstein distance to determine if the secret is likely the same.
-					// Ex:
-					// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-					// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-					key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
-					if _, ok := chunkSecrets[key]; ok {
-						resultsDropped.WithLabelValues("verification_overlap", "intra_chunk_duplicate", detectorNameStr).Inc()
-						continue
-					}
-
-					if likelyDuplicate(ctx, key, chunkSecrets) {
-						// This indicates that the same secret was found by multiple detectors.
-						// We should NOT VERIFY this chunk's data.
-						if e.verificationOverlapTracker != nil {
-							e.verificationOverlapTracker.Add(1)
-						}
-						// The overlap error stays the verdict; VerificationSkipped additionally records that no
-						// verifier ran, so consumers counting verifier outcomes don't read errOverlap as a provider
-						// failure.
-						res.VerificationSkipped = true
-						res.SetVerificationError(errOverlap)
-						e.processResult(
-							ctx,
-							res,
-							chunk.chunk,
-							chunk.decoder,
-							detector.Description(),
-							isFalsePositive,
-						)
-
-						// Remove the detector key from the list of detector keys with results.
-						// This is to ensure that the chunk is not reprocessed with verification enabled
-						// for this detector.
-						delete(detectorKeysWithResults, detector.Key)
-					}
-					chunkSecrets[key] = struct{}{}
+					// Remove the detector key from the list of detector keys with results.
+					// This is to ensure that the chunk is not reprocessed with verification enabled
+					// for this detector.
+					delete(detectorKeysWithResults, detector.Key)
 				}
+				chunkSecrets[key] = struct{}{}
 			}
 		}
-
-		for _, detector := range detectorKeysWithResults {
-			wgDetect.Add(1)
-			e.detectableChunksChan <- detectableChunk{
-				chunk:    chunk.chunk,
-				detector: detector,
-				decoder:  chunk.decoder,
-				verify:   e.shouldVerifyChunk(chunk.chunk.SourceVerify, detector, e.detectorVerificationOverrides),
-				wgDoneFn: wgDetect.Done,
-			}
-		}
-
-		// Empty the dupes and detectors slice
-		for k := range chunkSecrets {
-			delete(chunkSecrets, k)
-		}
-		for k := range detectorKeysWithResults {
-			delete(detectorKeysWithResults, k)
-		}
-
-		chunk.verificationOverlapWgDoneFn()
 	}
 
-	wgDetect.Wait()
+	for _, detector := range detectorKeysWithResults {
+		verify := e.shouldVerifyChunk(chunk.chunk.SourceVerify, detector, e.detectorVerificationOverrides)
+		wgDetect.Add(1)
+		e.detectableChunksChan <- detectableChunk{
+			chunk:    chunk.chunk,
+			detector: detector,
+			decoder:  chunk.decoder,
+			verify:   verify,
+			wgDoneFn: wgDetect.Done,
+		}
+	}
+}
+
+func fromDataWithoutVerifyRecoveringPanic(
+	ctx context.Context,
+	d detectors.Detector,
+	data []byte,
+) (results []detectors.Result, err error) {
+	defer common.RecoverWithHandler(ctx, func(panicErr error) {
+		err = fmt.Errorf("%w: %w", errDetectorPanic, panicErr)
+	})
+	return d.FromData(ctx, false, data)
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {

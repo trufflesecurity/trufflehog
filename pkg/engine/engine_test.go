@@ -1852,6 +1852,14 @@ func (p passthroughDetector) Keywords() []string                 { return p.keyw
 func (p passthroughDetector) Type() detector_typepb.DetectorType { return p.detectorType }
 func (p passthroughDetector) Description() string                { return "fake detector for testing" }
 
+// panicDetector panics on every FromData call, so tests can check that the verification overlap worker keeps running
+// and still releases chunk wait groups.
+type panicDetector struct{ passthroughDetector }
+
+func (panicDetector) FromData(aCtx.Context, bool, []byte) ([]detectors.Result, error) {
+	panic("panicDetector always panics")
+}
+
 // fixedVerdictDetector reports the same verdict whether or not verification was requested, so tests can confirm the
 // engine passes verdicts through untouched while recording whether verification was attempted.
 type fixedVerdictDetector struct {
@@ -2216,6 +2224,63 @@ func TestEngine_VerificationOverlapWorker_DetectableChunkHasCorrectVerifyFlag(t 
 			assert.True(t, detectableChunk.verify)
 		}
 	})
+}
+
+// TestEngine_VerificationOverlapWorker_SurvivesFromDataPanic checks that a detector panicking in FromData neither kills
+// the verification overlap worker nor leaves the sender's wait group unreleased, and that the other detectors on the
+// same chunk are still forwarded for verification.
+func TestEngine_VerificationOverlapWorker_SurvivesFromDataPanic(t *testing.T) {
+	ctx := context.Background()
+	data := []byte("keyword ;oahpow8heg;blaisd")
+
+	e := &Engine{
+		detectableChunksChan:          make(chan detectableChunk, 4),
+		results:                       make(chan detectors.ResultWithMetadata, 4),
+		retainFalsePositives:          true,
+		verificationOverlapChunksChan: make(chan verificationOverlapChunk, 2),
+	}
+
+	// Stand in for the detector workers: record what was forwarded and release the overlap worker's wgDetect so its
+	// final Wait returns.
+	forwarded := make(chan detector_typepb.DetectorType, 4)
+	go func() {
+		for c := range e.detectableChunksChan {
+			forwarded <- c.detector.Type()
+			c.wgDoneFn()
+		}
+		close(forwarded)
+	}()
+
+	// Queue two chunks so the test also shows the worker keeps going after the first panic.
+	ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{
+		panicDetector{passthroughDetector{detectorType: detector_typepb.DetectorType(-1), keywords: []string{"keyw"}}},
+		passthroughDetector{detectorType: detector_typepb.DetectorType(-2), keywords: []string{"keyword"}},
+	})
+	var chunksDone atomic.Int32
+	for range 2 {
+		matches := ahcore.FindDetectorMatches(data)
+		require.Len(t, matches, 2)
+		e.verificationOverlapChunksChan <- verificationOverlapChunk{
+			chunk:                       sources.Chunk{Data: data},
+			detectors:                   matches,
+			verificationOverlapWgDoneFn: func() { chunksDone.Add(1) },
+		}
+	}
+	close(e.verificationOverlapChunksChan)
+
+	e.verificationOverlapWorker(ctx)
+	close(e.detectableChunksChan)
+
+	var forwardedTypes []detector_typepb.DetectorType
+	for typ := range forwarded {
+		forwardedTypes = append(forwardedTypes, typ)
+	}
+
+	assert.EqualValues(t, 2, chunksDone.Load(), "every chunk must release its wait group")
+	assert.Equal(t,
+		[]detector_typepb.DetectorType{-2, -2}, forwardedTypes,
+		"the non-panicking detector should still be forwarded for both chunks",
+	)
 }
 
 func TestEngine_IterativeDecoding(t *testing.T) {
