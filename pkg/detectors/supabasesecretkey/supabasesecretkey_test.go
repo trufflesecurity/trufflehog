@@ -113,6 +113,16 @@ func TestSupabaseSecretKey_Pattern(t *testing.T) {
 			want:  nil,
 		},
 		{
+			name:  "Supabase CLI local development key",
+			input: "SUPABASE_SECRET_KEY=" + localDevKey,
+			want:  nil,
+		},
+		{
+			name:  "publishable key next to a placeholder secret key",
+			input: "SUPABASE_PUBLISHABLE_KEY=sb_" + "publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH\nSUPABASE_SECRET_KEY=sb_secret_xxx",
+			want:  nil,
+		},
+		{
 			name:  "placeholder from the docs",
 			input: "SUPABASE_SECRET_KEY=sb_secret_xxx",
 			want:  nil,
@@ -315,12 +325,8 @@ func TestSupabaseSecretKey_VerifyWithoutProject(t *testing.T) {
 		t.Fatalf("got %d results, want 1", len(results))
 	}
 	r := results[0]
-	if r.Verified {
-		t.Errorf("Verified = true, want false")
-	}
-	// SetVerificationError rewraps the error to redact secrets, so compare messages.
-	if err := r.VerificationError(); err == nil || err.Error() != errNoProject.Error() {
-		t.Errorf("verification error = %v, want %v", r.VerificationError(), errNoProject)
+	if r.Verified || r.VerificationError() != nil {
+		t.Errorf("Verified = %v, verification error = %v; want false, nil", r.Verified, r.VerificationError())
 	}
 	if diff := cmp.Diff(map[string]string{"key": key1}, r.SecretParts); diff != "" {
 		t.Errorf("SecretParts diff: (-want +got)\n%s", diff)

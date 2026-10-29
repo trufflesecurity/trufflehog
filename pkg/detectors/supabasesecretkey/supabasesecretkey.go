@@ -2,7 +2,6 @@ package supabasesecretkey
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,7 +33,10 @@ var (
 	// Verification needs the project URL, https://<project ref>.supabase.co, from the same chunk.
 	projectPat = regexp.MustCompile(`\b([a-z0-9]{20})\.supabase\.co\b`)
 
-	errNoProject = errors.New("no Supabase project URL found to verify the key against")
+	// The Supabase CLI gives every local development stack the same secret key, published in
+	// supabase/cli (apps/cli-go/pkg/config/apikeys.go). It only works against localhost, so it isn't reported.
+	// The prefix is split so secret scanners don't flag this file.
+	localDevKey = "sb_" + "secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -57,7 +59,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if end < len(dataStr) && isKeyChar(dataStr[end]) {
 			continue
 		}
-		uniqueKeys[dataStr[start:end]] = struct{}{}
+		if key := dataStr[start:end]; key != localDevKey {
+			uniqueKeys[key] = struct{}{}
+		}
 	}
 
 	uniqueProjects := make(map[string]struct{})
@@ -75,9 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					"rotation_guide": "https://supabase.com/docs/guides/api/api-keys",
 				},
 			}
-			if verify {
-				s1.SetVerificationError(errNoProject, key)
-			}
+			// Without its project the key can't be checked, so it's reported unverified.
 			results = append(results, s1)
 			continue
 		}
@@ -113,7 +115,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // verifyMatch asks the project's Auth service for its public settings. The API gateway answers 200 when the key
-// belongs to the project and 401 when it doesn't, or has been revoked. The response body is never read.
+// belongs to the project and 401 when it doesn't. The response body is never read.
 // Redirects aren't followed: Go would resend the apikey header to the new location.
 func verifyMatch(ctx context.Context, client *http.Client, url, key string) (bool, error) {
 	noRedirectClient := *client

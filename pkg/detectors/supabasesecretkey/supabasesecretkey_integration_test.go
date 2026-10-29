@@ -110,7 +110,7 @@ func TestSupabaseSecretKey_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
-			name: "found without a project URL, verification error",
+			name: "found without a project URL, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -124,7 +124,7 @@ func TestSupabaseSecretKey_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
