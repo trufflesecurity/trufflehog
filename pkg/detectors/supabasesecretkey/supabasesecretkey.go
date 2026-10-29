@@ -15,10 +15,16 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	// The project URL is often several lines from the key in an env file, so widen the window
+	// the engine passes to FromData.
+	detectors.DefaultMultiPartCredentialProvider
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+// Ensure the Scanner satisfies the interfaces at compile time.
+var (
+	_ detectors.Detector                    = (*Scanner)(nil)
+	_ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
+)
 
 var (
 	defaultClient = common.SaneHttpClient()

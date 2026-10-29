@@ -168,6 +168,37 @@ func TestSupabaseSecretKey_Pattern(t *testing.T) {
 	}
 }
 
+func TestSupabaseSecretKey_ProjectURLFarFromKey(t *testing.T) {
+	// An env file where the project URL sits above two long JWT lines, more than the engine's default
+	// 512 byte window away from the key.
+	jwt := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." + strings.Repeat("a", 320) + ".signature"
+	input := fmt.Sprintf("SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\nSUPABASE_SERVICE_ROLE_KEY=%s\nSUPABASE_SECRET_KEY=%s\n",
+		project1URL, jwt, jwt, key1)
+	if gap := strings.Index(input, key1) - strings.Index(input, project1URL); gap <= 512 {
+		t.Fatalf("test input too short: URL is only %d bytes before the key", gap)
+	}
+
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	got := make(map[string]struct{})
+	for _, match := range ahoCorasickCore.FindDetectorMatches([]byte(input)) {
+		for _, window := range match.Matches() {
+			results, err := d.FromData(context.Background(), false, window)
+			if err != nil {
+				t.Fatalf("FromData error = %v", err)
+			}
+			for _, r := range results {
+				got[string(r.RawV2)] = struct{}{}
+			}
+		}
+	}
+
+	want := map[string]struct{}{key1 + project1URL: {}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("results diff: (-want +got)\n%s", diff)
+	}
+}
+
 func TestSupabaseSecretKey_Verify(t *testing.T) {
 	errTransport := errors.New("transport failure")
 
