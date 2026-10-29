@@ -60,6 +60,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 
 	sourceName := "trufflehog - github"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
+	ctx = withSourceFields(ctx, sourceName, github.SourceType, sourceID, jobID)
 
 	githubSource := &github.Source{}
 	if err := githubSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {

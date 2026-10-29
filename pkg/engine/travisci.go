@@ -29,6 +29,7 @@ func (e *Engine) ScanTravisCI(ctx context.Context, token string) (sources.JobPro
 
 	sourceName := "trufflehog - Travis CI"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, travisci.SourceType)
+	ctx = withSourceFields(ctx, sourceName, travisci.SourceType, sourceID, jobID)
 
 	travisSource := &travisci.Source{}
 	if err := travisSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
