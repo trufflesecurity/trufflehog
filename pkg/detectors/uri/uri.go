@@ -34,6 +34,18 @@ var _ interface {
 var (
 	keyPat = regexp.MustCompile(`\bhttps?:\/\/[\w!#$%&()*+,\-./;<=>?@[\\\]^_{|}~]{0,50}:([\w!#$%&()*+,\-./:;<=>?[\\\]^_{|}~]{3,50})@[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})?(?::\d{1,5})?[\w/]+\b`)
 
+	// RFC 2606 reserves the example/test hostnames, and RFC 6762 reserves .local.
+	reservedHostnameSuffixes = []string{
+		"local",
+		"localhost",
+		"test",
+		"invalid",
+		"example",
+		"example.com",
+		"example.net",
+		"example.org",
+	}
+
 	// TODO: make local addr opt-out
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
@@ -91,6 +103,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if _, ok := parsedURL.User.Password(); !ok {
 			continue
 		}
+		hostname := parsedURL.Hostname()
+		if isReservedHostname(hostname) {
+			continue
+		}
 
 		// Safe, I think? (https://github.com/golang/go/issues/38351)
 		rawUrl := *parsedURL
@@ -112,7 +128,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			hostname := parsedURL.Hostname()
 			if hostNotFoundCache.Exists(hostname) {
 				// An earlier candidate already proved this host does not resolve, so the lookup is skipped.
 				// The finding is still reported: dropping it here means the reported secrets depend both on
@@ -147,6 +162,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func isReservedHostname(hostname string) bool {
+	hostname = strings.TrimSuffix(strings.ToLower(hostname), ".")
+	for _, suffix := range reservedHostnameSuffixes {
+		if hostname == suffix || strings.HasSuffix(hostname, "."+suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
