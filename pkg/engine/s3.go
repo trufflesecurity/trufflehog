@@ -71,6 +71,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 
 	sourceName := "trufflehog - s3"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, s3.SourceType)
+	ctx = withSourceFields(ctx, sourceName, s3.SourceType, sourceID, jobID)
 
 	s3Source := &s3.Source{}
 	if err := s3Source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
