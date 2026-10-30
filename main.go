@@ -607,6 +607,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.KongKonnectDetectorEnabled.Store(true)
 	feature.SonarQubeDetectorEnabled.Store(true)
 	feature.InfisicalDetectorEnabled.Store(true)
+	feature.SupabaseSecretKeyDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
