@@ -20,10 +20,12 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b(b10_[A-Za-z0-9]{8}\.[A-Za-z0-9]{32})\b`)
+	// Key format as of 2026-10-01: https://docs.baseten.co/organization/api-keys#api-key-format
+	keyPat = regexp.MustCompile(`\b(b10_[A-Za-z0-9]{8}\.[A-Za-z0-9]{32})\b`)
 )
 
 type userInfo struct {
@@ -31,6 +33,10 @@ type userInfo struct {
 	Email         string `json:"email"`
 	Name          string `json:"name"`
 	WorkspaceName string `json:"workspace_name"`
+}
+
+func (s Scanner) Version() int {
+	return 2
 }
 
 func (s Scanner) Keywords() []string {
