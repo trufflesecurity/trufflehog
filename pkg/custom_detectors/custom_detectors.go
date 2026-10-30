@@ -202,7 +202,7 @@ MatchLoop:
 
 			// check for exclude words
 			for _, excludeWord := range c.GetExcludeWords() {
-				if strings.Contains(strings.ToLower(secret), excludeWord) {
+				if strings.Contains(strings.ToLower(secret), strings.ToLower(excludeWord)) {
 					continue MatchLoop
 				}
 			}
