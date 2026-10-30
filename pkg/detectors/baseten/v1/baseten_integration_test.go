@@ -24,7 +24,7 @@ func TestBaseten_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BASETEN_V1")
+	// No active pre-prefix key can be issued anymore, so only a revoked one is tested.
 	inactiveSecret := testSecrets.MustGetField("BASETEN_V1_INACTIVE")
 
 	type args struct {
@@ -40,23 +40,6 @@ func TestBaseten_FromChunk(t *testing.T) {
 		wantErr             bool
 		wantVerificationErr bool
 	}{
-		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a baseten secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detector_typepb.DetectorType_Baseten,
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
 		{
 			name: "found, unverified",
 			s:    Scanner{},
@@ -87,11 +70,11 @@ func TestBaseten_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, would be verified if not for timeout",
+			name: "found, verification error on timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a baseten secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a baseten secret %s within", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -104,11 +87,11 @@ func TestBaseten_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, verified but unexpected api surface",
+			name: "found, verification error on unexpected api surface",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a baseten secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a baseten secret %s within", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
