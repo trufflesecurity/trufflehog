@@ -112,6 +112,9 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 			}
 		}
 		return true, extraData, nil
+	case http.StatusForbidden:
+		// Valid credentials lacking permission for this endpoint; the key is still live.
+		return true, nil, nil
 	case http.StatusUnauthorized:
 		return false, nil, nil
 	default:

@@ -126,7 +126,7 @@ func TestBaseten_VerifyMatch(t *testing.T) {
 		},
 		{name: "200 OK with unparseable body - verified", responseCode: http.StatusOK, responseBody: "not json", wantVerified: true},
 		{name: "401 Unauthorized - unverified", responseCode: http.StatusUnauthorized},
-		{name: "403 Forbidden - verification error", responseCode: http.StatusForbidden, wantErr: "unexpected HTTP response status 403"},
+		{name: "403 Forbidden - verified", responseCode: http.StatusForbidden, wantVerified: true},
 		{name: "429 Too Many Requests - verification error", responseCode: http.StatusTooManyRequests, wantErr: "unexpected HTTP response status 429"},
 		{name: "500 Internal Server Error - verification error", responseCode: http.StatusInternalServerError, wantErr: "unexpected HTTP response status 500"},
 		{name: "transport failure - verification error", transportErr: errTransport, wantErr: errTransport.Error()},
