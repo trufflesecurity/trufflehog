@@ -141,19 +141,13 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		err            error
 	)
 
-	// If the current read position is within the in-memory buffer.
-	if br.index < int64(br.buf.Len()) {
-		totalBytesRead = copy(out, br.buf.Bytes()[br.index:])
-		br.index += int64(totalBytesRead)
-		if totalBytesRead == len(out) {
-			return totalBytesRead, nil
-		}
-		out = out[totalBytesRead:]
-	}
-
-	// If we've exceeded the in-memory threshold and have a temp file.
+	// Once the in-memory threshold is crossed, buffered data lives in two
+	// places: bytes [0, diskBufferSize) were flushed to the temp file, and
+	// bytes [diskBufferSize, diskBufferSize+buf.Len()) are still in memory.
+	// The read position is a global offset into that combined stream, so
+	// each region must be addressed relative to its own start.
 	if br.tempFile != nil && br.index < br.diskBufferSize {
-		if _, err := br.tempFile.Seek(br.index-int64(br.buf.Len()), io.SeekStart); err != nil {
+		if _, err := br.tempFile.Seek(br.index, io.SeekStart); err != nil {
 			return totalBytesRead, err
 		}
 		m, err := br.tempFile.Read(out)
@@ -162,6 +156,16 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		if err != nil && !errors.Is(err, io.EOF) {
 			return totalBytesRead, err
 		}
+		if totalBytesRead == len(out) {
+			return totalBytesRead, nil
+		}
+		out = out[totalBytesRead:]
+	}
+
+	// If the current read position is within the in-memory buffer.
+	if memStart := br.diskBufferSize; br.index >= memStart && br.index < memStart+int64(br.buf.Len()) {
+		totalBytesRead = copy(out, br.buf.Bytes()[br.index-memStart:])
+		br.index += int64(totalBytesRead)
 		if totalBytesRead == len(out) {
 			return totalBytesRead, nil
 		}
@@ -304,26 +308,38 @@ func (br *BufferedReadSeeker) writeData(data []byte) error {
 }
 
 func (br *BufferedReadSeeker) readUntil(index int64) error {
-	buf := br.bufPool.Get()
-	defer br.bufPool.Put(buf)
+	// Read straight from the underlying reader instead of driving reads
+	// through br itself. The old approach (io.CopyN into br) re-entered
+	// Read, which served already-buffered bytes and advanced the read
+	// position without advancing bytesRead, so the loop's view of how much
+	// data was actually buffered drifted from reality. Every byte ever
+	// taken from the underlying reader is appended via writeData, so its
+	// position is exactly bytesRead and fresh reads land at the end of
+	// the buffered stream.
+	scratch := make([]byte, defaultBufferSize)
 
 	for br.bytesRead < index {
 		remaining := index - br.bytesRead
-		bufSize := int64(defaultBufferSize)
-		if remaining < bufSize {
-			bufSize = remaining
+		n := int64(len(scratch))
+		if remaining < n {
+			n = remaining
 		}
 
-		n, err := io.CopyN(buf, br, bufSize)
-		if err != nil && !errors.Is(err, io.EOF) {
+		m, err := br.reader.Read(scratch[:n])
+		if m > 0 {
+			if writeErr := br.writeData(scratch[:m]); writeErr != nil {
+				return writeErr
+			}
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
 			return err
 		}
-
-		if n == 0 {
+		if m == 0 {
 			break
 		}
-
-		buf.Reset()
 	}
 
 	return nil
