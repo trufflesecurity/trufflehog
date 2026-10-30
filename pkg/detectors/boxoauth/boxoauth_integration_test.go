@@ -28,6 +28,29 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("BOXOAUTH_SECRET")
 	invalidSecret := testSecrets.MustGetField("BOXOAUTH_INVALID_SECRET")
 
+	// The analyzer test app shares the Box test tenant and comes with a subject
+	// ID it is authorized for, which is the only input Box will issue a token
+	// for. The detectors5 pair has no subject ID, so it can only ever be unknown.
+	analyzerSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "analyzers1")
+	if err != nil {
+		t.Fatalf("could not get analyzer test secrets from GCP: %s", err)
+	}
+	subjectClientID := analyzerSecrets.MustGetField("BOX_CLIENT_ID")
+	subjectClientSecret := analyzerSecrets.MustGetField("BOX_CLIENT_SECRET")
+	subjectID := analyzerSecrets.MustGetField("BOX_SUBJECT_ID")
+
+	unknownResult := detectors.Result{
+		DetectorType: detector_typepb.DetectorType_BoxOauth,
+		Verified:     false,
+		Raw:          []byte(id),
+		RawV2:        []byte(id + secret),
+		SecretParts: map[string]string{
+			"client_id":     id,
+			"client_secret": secret,
+		},
+	}
+	unknownResult.SetVerificationError(errUnauthorizedClient)
+
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -41,25 +64,37 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, verified with nearby subject ID",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a box id %s with secret %s", id, secret)),
+				data:   []byte(fmt.Sprintf("You can find a box id %s with secret %s and enterprise_id %s", subjectClientID, subjectClientSecret, subjectID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detector_typepb.DetectorType_BoxOauth,
 					Verified:     true,
-					Raw:          []byte(id),
-					RawV2:        []byte(id + secret),
+					Raw:          []byte(subjectClientID),
+					RawV2:        []byte(subjectClientID + subjectClientSecret),
 					SecretParts: map[string]string{
-						"client_id":     id,
-						"client_secret": secret,
+						"client_id":     subjectClientID,
+						"client_secret": subjectClientSecret,
+						"subject_id":    subjectID,
 					},
 				},
 			},
+			wantErr: false,
+		},
+		{
+			name: "found, real credentials without subject ID are unknown",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a box id %s with secret %s", id, secret)),
+				verify: true,
+			},
+			want:    []detectors.Result{unknownResult},
 			wantErr: false,
 		},
 		{
@@ -109,7 +144,7 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 
-				if len(got[i].Raw) == 0 {
+				if len(got[i].RawV2) == 0 {
 					t.Fatalf("no rawV2 secret present: \n %+v", got[i])
 				}
 			}
