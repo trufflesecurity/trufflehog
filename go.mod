@@ -99,6 +99,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.1-0.20260423004847-9fc0246c3859
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/trufflesecurity/ldap-verify v0.0.0-20261012152128-4a15fafb6e19
+	github.com/ulikunitz/xz v0.5.15
 	github.com/wasilibs/go-re2 v1.12.0
 	github.com/xo/dburl v0.23.8
 	gitlab.com/gitlab-org/api/client-go v1.12.0
@@ -287,7 +288,6 @@ require (
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/trufflesecurity/touchfile v0.1.1 // indirect
-	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
 	github.com/wasilibs/wazero-helpers v0.0.0-20250123031827-cd30c44769bb // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
