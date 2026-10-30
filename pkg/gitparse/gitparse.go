@@ -512,6 +512,13 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 		// does.
 		// https://git-scm.com/docs/git-show#Documentation/git-show.txt---diff-filterACDMRTUXB
 		args.show = append(args.show, "--diff-filter=AM")
+		// A rename carries status R, which the filter above drops, and with
+		// rename detection on, git prints no patch for one either, so a file
+		// that only moved would never be scanned at its new path (#4672).
+		// Turning rename detection off reports the move as a delete plus an
+		// add, and the add carries the full content at the new path.
+		// https://git-scm.com/docs/diff-options#Documentation/diff-options.txt---no-renames
+		args.show = append(args.show, "--no-renames")
 	}
 
 	// The positive end of the walk, kept last before the -- (not required but
@@ -566,7 +573,11 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 // Staged parses the output of the `git diff` command for the `source` path.
 func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) {
 	// Provide the --cached flag to diff to get the diff of the staged changes.
-	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--date=iso-strict"}
+	// --no-renames: renames carry status R, which --diff-filter=AM drops, and git
+	// prints no patch for them, so a staged rename would never be scanned at its
+	// new path (#4672). Without rename detection the move is a delete plus an
+	// add, and the add carries the full content at the new path.
+	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--no-renames", "--date=iso-strict"}
 
 	cmd := exec.CommandContext(ctx, "git", args...)
 
