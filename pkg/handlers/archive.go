@@ -203,7 +203,10 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 
 		f, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
+			lCtx.Logger().V(2).Info("skipping unreadable archive member", "filename", file.Name(), "error", err)
+			dataOrErrChan <- DataOrErr{Err: fmt.Errorf("%w: opening %s: %v", ErrProcessingWarning, file.Name(), err)}
+			h.metrics.incFilesSkipped()
+			return nil
 		}
 		defer func() { _ = f.Close() }()
 
@@ -223,7 +226,10 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
+			lCtx.Logger().V(2).Info("skipping unreadable archive member", "filename", file.Name(), "error", err)
+			dataOrErrChan <- DataOrErr{Err: fmt.Errorf("%w: reading %s: %v", ErrProcessingWarning, file.Name(), err)}
+			h.metrics.incFilesSkipped()
+			return nil
 		}
 		defer func() { _ = rdr.Close() }()
 
