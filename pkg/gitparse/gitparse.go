@@ -546,6 +546,7 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 
 	absPath, err := filepath.Abs(source)
 	if err == nil {
+		// Keep this restricted environment in sync with the merge-base lookup in git.normalizeConfig.
 		if !isBare {
 			args.env = append(args.env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 		} else {
