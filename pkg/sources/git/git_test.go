@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/go-logr/zapr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
@@ -2455,6 +2456,41 @@ func TestRedactPasswords(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, redactPasswords(tt.output, tt.password))
+		})
+	}
+}
+
+func TestGetSafeRemoteURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		configs [][]string
+		want    string
+	}{
+		{name: "no remotes", want: ""},
+		{
+			name:    "origin with credentials",
+			configs: [][]string{{"remote.origin.url", "https://user:secret@example.com/repo.git"}},
+			want:    "https://example.com/repo.git",
+		},
+		{
+			name:    "origin without URL",
+			configs: [][]string{{"remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"}},
+			want:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoPath := t.TempDir()
+			assert.NoError(t, exec.Command("git", "init", repoPath).Run())
+			for _, kv := range tt.configs {
+				assert.NoError(t, exec.Command("git", "-C", repoPath, "config", kv[0], kv[1]).Run())
+			}
+
+			repo, err := git.PlainOpen(repoPath)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.want, GetSafeRemoteURL(repo, "origin"))
 		})
 	}
 }
