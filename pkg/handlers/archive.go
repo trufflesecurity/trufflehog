@@ -201,9 +201,17 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 			return nil
 		}
 
+		// Opening an entry can fail for a reason confined to that entry, such as
+		// a 7z coder that is unsupported or declares more memory than the limit
+		// in sevenzip_coders.go allows. Returning the error would make the
+		// extractor stop and skip every entry after this one, so report it as a
+		// warning and move on to the next entry.
 		f, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
+			h.metrics.incErrors()
+			return common.CancellableWrite(ctx, dataOrErrChan, DataOrErr{
+				Err: fmt.Errorf("%w: error opening file %s: %v", ErrProcessingWarning, file.Name(), err),
+			})
 		}
 		defer func() { _ = f.Close() }()
 
