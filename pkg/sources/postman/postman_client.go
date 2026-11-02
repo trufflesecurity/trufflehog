@@ -225,7 +225,7 @@ func NewClient(postmanToken string, metrics *metrics) *Client {
 		// Requests for large objects (usually collections) take a long time.  While we don't think that _every_
 		// request will take this long, some might take 5 seconds or more.  This seems reasonable, but we should
 		// be very cautious about bumping it further
-		HTTPClient:                        common.RetryableHTTPClientTimeout(30),
+		HTTPClient:                        common.RetryableHTTPClientTimeout(30, withAPILogHooks()),
 		Headers:                           bh,
 		WorkspaceAndCollectionRateLimiter: rate.NewLimiter(rate.Every(time.Second), 1),
 		GeneralRateLimiter:                rate.NewLimiter(rate.Every(time.Second/5), 1),
@@ -299,7 +299,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString st
 
 	// Don't log the response headers, they can hold cookies or tokens.
 	// handleRateLimits logs the rate limit we care about.
-	ctx.Logger().V(4).Info("postman api response received", "status_code", resp.StatusCode)
+	ctx.Logger().V(5).Info("Postman API response", "status_code", resp.StatusCode)
 
 	if err := checkResponseStatus(resp); err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 		rateLimitRemainingMonthValue = resp.Header.Get("X-RateLimit-Remaining-Month")
 	}
 	if rateLimitRemainingMonthValue == "" {
-		ctx.Logger().V(2).Info("RateLimit-Remaining-Month header not found in response")
+		ctx.Logger().V(5).Info("RateLimit-Remaining-Month header not found in response")
 		return nil
 	}
 
@@ -337,7 +337,7 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 		rateLimitTotalMonthValue = resp.Header.Get("X-RateLimit-Limit-Month")
 	}
 	if rateLimitTotalMonthValue == "" {
-		ctx.Logger().V(2).Info("RateLimit-Limit-Month header not found in response")
+		ctx.Logger().V(5).Info("RateLimit-Limit-Month header not found in response")
 		return nil
 	}
 	rateLimitTotalMonth, err := strconv.Atoi(rateLimitTotalMonthValue)
@@ -353,13 +353,14 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 	)
 
 	if rateLimitTotalMonth == 0 {
-		ctx.Logger().V(2).Info("RateLimit-Limit-Month is zero, cannot compute usage percentage")
+		ctx.Logger().V(4).Info("RateLimit-Limit-Month is zero, cannot compute usage percentage")
 		return nil
 	}
 
 	// failsafe to abandon scan if we are over the threshold of monthly API requests used
 	percentageUsed := float64(rateLimitTotalMonth-rateLimitRemainingMonth) / float64(rateLimitTotalMonth)
 	if percentageUsed > abortScanAPIReqLimitThreshold {
+		ctx.Logger().V(1).Info("Monthly API limit threshold reached, aborting scan", "percent_used", percentageUsed*100)
 		return errAbortScanDueToAPIRateLimit
 	}
 
@@ -369,7 +370,7 @@ func (c *Client) handleRateLimits(ctx trContext.Context, resp *http.Response) er
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
 // Consider adding additional flags to support filtering.
 func (c *Client) EnumerateWorkspaces(ctx trContext.Context) ([]Workspace, error) {
-	ctx.Logger().V(2).Info("enumerating workspaces")
+	ctx.Logger().V(1).Info("Enumerating workspaces")
 	workspacesObj := struct {
 		Workspaces []Workspace `json:"workspaces"`
 	}{}
@@ -390,12 +391,10 @@ func (c *Client) EnumerateWorkspaces(ctx trContext.Context) ([]Workspace, error)
 		if err != nil {
 			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
-			ctx.Logger().Error(err, "could not get workspace %q (%s) during enumeration", workspace.Name, workspace.Id)
+			ctx.Logger().Error(err, "Could not get workspace during enumeration", "workspace_id", workspace.Id, "workspace_name", workspace.Name)
 			continue
 		}
 		workspacesObj.Workspaces[i] = tempWorkspace
-
-		ctx.Logger().V(3).Info("individual workspace getting added to the slice", "workspace", workspacesObj.Workspaces[i])
 	}
 
 	return workspacesObj.Workspaces, nil
@@ -403,7 +402,7 @@ func (c *Client) EnumerateWorkspaces(ctx trContext.Context) ([]Workspace, error)
 
 // GetWorkspace returns the workspace for a given workspace
 func (c *Client) GetWorkspace(ctx trContext.Context, workspaceUUID string) (Workspace, error) {
-	ctx.Logger().V(2).Info("getting workspace", "workspace", workspaceUUID)
+	ctx.Logger().V(5).Info("Fetching workspace", "workspace_id", workspaceUUID)
 	obj := struct {
 		Workspace Workspace `json:"workspace"`
 	}{}
@@ -425,7 +424,7 @@ func (c *Client) GetWorkspace(ctx trContext.Context, workspaceUUID string) (Work
 
 // GetEnvironmentVariables returns the environment variables for a given environment
 func (c *Client) GetEnvironmentVariables(ctx trContext.Context, environment_uuid string) (VariableData, error) {
-	ctx.Logger().V(3).Info("getting environment variables", "environment_uuid", environment_uuid)
+	ctx.Logger().V(5).Info("Fetching environment", "environment_uuid", environment_uuid)
 	obj := struct {
 		VariableData VariableData `json:"environment"`
 	}{}
@@ -447,7 +446,7 @@ func (c *Client) GetEnvironmentVariables(ctx trContext.Context, environment_uuid
 
 // GetCollection returns the collection for a given collection
 func (c *Client) GetCollection(ctx trContext.Context, collection_uuid string) (Collection, error) {
-	ctx.Logger().V(3).Info("getting collection", "collection_uuid", collection_uuid)
+	ctx.Logger().V(5).Info("Fetching collection", "collection_uuid", collection_uuid)
 	obj := struct {
 		Collection Collection `json:"collection"`
 	}{}
