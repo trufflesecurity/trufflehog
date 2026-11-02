@@ -201,9 +201,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
 
-	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
-	ctx.Logger().V(3).Info("setting include repos patterns", "patterns", s.includeRepos)
-
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.GitLab_Token:
 		s.authMethod = "TOKEN"
@@ -229,6 +226,22 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	if err != nil {
 		return err
 	}
+
+	// log only the endpoint's host, since the URL can hold user info
+	var endpointHost string
+	if u, err := url.Parse(s.url); err == nil {
+		endpointHost = u.Host
+	}
+	ctx.Logger().V(1).Info("GitLab source initialized",
+		"auth_method", s.authMethod,
+		"endpoint_host", endpointHost,
+		"repo_count", len(s.repos),
+		"group_count", len(s.groupIds),
+		"include_repos", s.includeRepos,
+		"ignore_repos", s.ignoreRepos,
+		"enumerate_shared_projects", s.enumerateSharedProjects,
+		"projects_per_page", s.projectsPerPage,
+	)
 
 	cfg := &git.Config{
 		SourceName:   s.name,
@@ -292,7 +305,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	// Start client.
-	apiClient, err := s.newClient()
+	apiClient, err := s.newClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -308,7 +321,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// Get repo within target.
 	repos, errs := normalizeRepos(s.repos)
 	for _, repoErr := range errs {
-		ctx.Logger().Info("error normalizing repo", "error", repoErr)
+		ctx.Logger().Error(repoErr, "error normalizing repo")
 	}
 
 	// End early if we had errors getting specified repos but none were validated.
@@ -318,7 +331,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	// Get all repos if not specified.
 	if len(repos) == 0 {
-		ctx.Logger().Info("no repositories configured, enumerating")
+		ctx.Logger().V(1).Info("no repositories configured, enumerating")
 		ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
 			ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
 		})
@@ -427,12 +440,12 @@ func (s *Source) Validate(ctx context.Context) []error {
 	// The client is only used to query Gitlab for a repo list - it's not used to actually clone anything. Thus, we
 	// don't use it if there is a list of explicitly configured repos. However, constructing it validates that the
 	// configured authentication method is sensible, so we'll do it here.
-	apiClient, err := s.newClient()
+	apiClient, err := s.newClient(ctx)
 	if err != nil {
 		return []error{err}
 	}
 
-	_, _, err = apiClient.Users.CurrentUser()
+	_, _, err = apiClient.Users.CurrentUser(gitlab.WithContext(ctx))
 	if err != nil {
 		return []error{fmt.Errorf("gitlab authentication failed using method %v: %w", s.authMethod, err)}
 	}
@@ -493,7 +506,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 	return errs
 }
 
-func (s *Source) newClient() (*gitlab.Client, error) {
+func (s *Source) newClient(ctx context.Context) (*gitlab.Client, error) {
 	// Initialize a new api instance.
 	switch s.authMethod {
 	case "OAUTH":
@@ -503,6 +516,8 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
+			gitlab.WithRequestLogHook(logAPIRequest),
+			gitlab.WithResponseLogHook(logAPIResponse),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
@@ -514,6 +529,8 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
+			gitlab.WithRequestLogHook(logAPIRequest),
+			gitlab.WithResponseLogHook(logAPIResponse),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %q: %w", s.url, err)
@@ -522,7 +539,7 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 		// will not work. In this case, we test to see if basic auth would work, and if it does not,
 		// we proceed with an OAuth client using the access_token (s.password) as the token.
 		// At this point, s.token is already set to s.password
-		if s.basicAuthSuccessful(apiClient) {
+		if s.basicAuthSuccessful(ctx, apiClient) {
 			return apiClient, nil
 		}
 		fallthrough
@@ -533,6 +550,8 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
+			gitlab.WithRequestLogHook(logAPIRequest),
+			gitlab.WithResponseLogHook(logAPIResponse),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
@@ -544,8 +563,8 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	}
 }
 
-func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
-	user, resp, err := apiClient.Users.CurrentUser()
+func (s *Source) basicAuthSuccessful(ctx context.Context, apiClient *gitlab.Client) bool {
+	user, resp, err := apiClient.Users.CurrentUser(gitlab.WithContext(ctx))
 	if err != nil {
 		return false
 	}
@@ -568,7 +587,7 @@ func (s *Source) getAllProjectRepos(
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
-	user, _, err := apiClient.Users.CurrentUser()
+	user, _, err := apiClient.Users.CurrentUser(gitlab.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("unable to authenticate using %s: %w", s.authMethod, err)
 	}
@@ -585,19 +604,19 @@ func (s *Source) getAllProjectRepos(
 				"project_name", proj.NameWithNamespace)
 			// Skip projects we've already seen.
 			if _, exists := uniqueProjects[proj.ID]; exists {
-				ctx.Logger().V(3).Info("skipping project", "reason", "ID already seen")
+				ctx.Logger().V(4).Info("skipping project", "reason", "ID already seen")
 				continue
 			}
 			// Skip projects configured to be ignored.
 			if ignoreRepo(proj.PathWithNamespace) {
-				ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+				ctx.Logger().V(4).Info("skipping project", "reason", "ignored in config")
 				continue
 			}
 			// Record that we've seen this project.
 			uniqueProjects[proj.ID] = proj
 			// Report an error if we could not convert the project into a URL.
 			if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
-				ctx.Logger().V(3).Info("skipping project",
+				ctx.Logger().V(4).Info("skipping project",
 					"reason", "URL parse failure",
 					"url", proj.HTTPURLToRepo,
 					"parse_error", err)
@@ -631,16 +650,21 @@ func (s *Source) getAllProjectRepos(
 	listOpts := gitlab.ListOptions{PerPage: s.projectsPerPage}
 
 	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
-	for {
-		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions)
+	for page := 1; ; page++ {
+		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions, gitlab.WithContext(ctx))
 		if err != nil {
+			// a cancelled scan fails every call left, so stop instead of
+			// reporting each one as a listing error
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			err = fmt.Errorf("received error on listing user projects: %w", err)
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
 			break
 		}
-		ctx.Logger().V(3).Info("listed user projects", "count", len(userProjects))
+		ctx.Logger().V(4).Info("listed user projects", "page", page, "count", len(userProjects))
 		if err := processProjects(ctx, userProjects); err != nil {
 			return err
 		}
@@ -661,22 +685,25 @@ func (s *Source) getAllProjectRepos(
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
-	ctx.Logger().Info("beginning group enumeration",
+	ctx.Logger().V(1).Info("beginning group enumeration",
 		"list_options", listOpts,
 		"all_available", *listGroupsOptions.AllAvailable)
 	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
 
 	var groups []*gitlab.Group
-	for {
-		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
+	for page := 1; ; page++ {
+		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions, gitlab.WithContext(ctx))
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			err = fmt.Errorf("received error on listing groups, you probably don't have permissions to do that: %w", err)
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
 			break
 		}
-		ctx.Logger().V(3).Info("listed groups", "count", len(groupList))
+		ctx.Logger().V(4).Info("listed groups", "page", page, "count", len(groupList))
 		groups = append(groups, groupList...)
 		gitlabGroupsEnumerated.WithLabelValues(s.name).Add(float64(len(groupList)))
 		listGroupsOptions.Page = res.NextPage
@@ -685,19 +712,22 @@ func (s *Source) getAllProjectRepos(
 		}
 	}
 
-	ctx.Logger().Info("got groups", "group_count", len(groups))
+	ctx.Logger().V(1).Info("got groups", "group_count", len(groups))
 
 	for _, group := range groups {
-		ctx := context.WithValue(ctx, "group_id", group.ID)
+		ctx := context.WithValues(ctx, "group_id", group.ID)
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
 			ListOptions:      listOpts,
 			OrderBy:          gitlab.Ptr(orderBy),
 			IncludeSubGroups: gitlab.Ptr(true),
 			WithShared:       gitlab.Ptr(s.enumerateSharedProjects),
 		}
-		for {
-			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
+		for page := 1; ; page++ {
+			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions, gitlab.WithContext(ctx))
 			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				err = fmt.Errorf(
 					"received error on listing group projects for %q, you probably don't have permissions to do that: %w",
 					group.FullPath, err,
@@ -707,7 +737,7 @@ func (s *Source) getAllProjectRepos(
 				}
 				break
 			}
-			ctx.Logger().V(3).Info("listed group projects", "count", len(grpPrjs))
+			ctx.Logger().V(4).Info("listed group projects", "page", page, "count", len(grpPrjs))
 			if err := processProjects(ctx, grpPrjs); err != nil {
 				return err
 			}
@@ -753,7 +783,7 @@ func (s *Source) getAllProjectReposV2(
 		projectQueryOptions.Membership = gitlab.Ptr(true)
 	}
 
-	ctx.Logger().Info("starting projects enumeration",
+	ctx.Logger().V(1).Info("starting projects enumeration",
 		"list_options", listOpts)
 
 	// totalCount tracks the total number of projects processed by this enumeration.
@@ -763,7 +793,7 @@ func (s *Source) getAllProjectReposV2(
 	requestOptions := []gitlab.RequestOptionFunc{gitlab.WithContext(ctx)}
 
 	// Pagination loop: Continue fetching pages until the API indicates there are no more.
-	for {
+	for page := 1; ; page++ {
 		// Fetch a page of projects from the GitLab API using the current query options.
 		projects, resp, err := apiClient.Projects.ListProjects(projectQueryOptions, requestOptions...)
 		if err != nil {
@@ -776,7 +806,7 @@ func (s *Source) getAllProjectReposV2(
 		}
 
 		// Log the batch size for debugging and monitoring.
-		ctx.Logger().V(3).Info("listed projects batch", "batch_size", len(projects), "running_total", totalCount)
+		ctx.Logger().V(4).Info("listed projects batch", "page", page, "batch_size", len(projects), "running_total", totalCount)
 		// Process each project in the current page.
 		for _, project := range projects {
 			projCtx := context.WithValues(ctx,
@@ -787,14 +817,14 @@ func (s *Source) getAllProjectReposV2(
 
 			// skip projects configured to be ignored.
 			if ignoreRepo(project.PathWithNamespace) {
-				projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+				projCtx.Logger().V(4).Info("skipping project", "reason", "ignored in config")
 
 				continue
 			}
 
 			// report an error if we could not convert the project into a URL.
 			if _, err := url.Parse(project.HTTPURLToRepo); err != nil {
-				projCtx.Logger().V(3).Info("skipping project",
+				projCtx.Logger().V(4).Info("skipping project",
 					"reason", "URL parse failure",
 					"url", project.HTTPURLToRepo,
 					"parse_error", err)
@@ -870,7 +900,7 @@ func (s *Source) getAllProjectReposInGroups(
 		projectOpts.MinAccessLevel = gitlab.Ptr(gitlab.GuestPermissions)
 	}
 
-	ctx.Logger().Info("starting group projects enumeration",
+	ctx.Logger().V(1).Info("starting group projects enumeration",
 		"group_ids", s.groupIds,
 		"include_subgroups", true,
 		"list_options", listOpts)
@@ -879,11 +909,14 @@ func (s *Source) getAllProjectReposInGroups(
 		groupCtx := context.WithValues(ctx, "group_id", groupID)
 
 		projectOpts.Page = 0
-		groupCtx.Logger().V(2).Info("processing group", "group_id", groupID)
+		groupCtx.Logger().V(2).Info("processing group")
 
-		for {
-			projects, res, err := apiClient.Groups.ListGroupProjects(groupID, projectOpts)
+		for page := 1; ; page++ {
+			projects, res, err := apiClient.Groups.ListGroupProjects(groupID, projectOpts, gitlab.WithContext(groupCtx))
 			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				err = fmt.Errorf("received error on listing projects for group %s: %w", groupID, err)
 				if err := reporter.UnitErr(ctx, err); err != nil {
 					return err
@@ -891,29 +924,28 @@ func (s *Source) getAllProjectReposInGroups(
 				break
 			}
 
-			groupCtx.Logger().V(3).Info("listed group projects", "count", len(projects))
+			groupCtx.Logger().V(4).Info("listed group projects", "page", page, "count", len(projects))
 
 			for _, proj := range projects {
-				projCtx := context.WithValues(ctx,
+				projCtx := context.WithValues(groupCtx,
 					"project_id", proj.ID,
-					"project_name", proj.NameWithNamespace,
-					"group_id", groupID)
+					"project_name", proj.NameWithNamespace)
 
 				if processedProjects[proj.HTTPURLToRepo] {
-					projCtx.Logger().V(3).Info("skipping project", "reason", "already processed")
+					projCtx.Logger().V(4).Info("skipping project", "reason", "already processed")
 					continue
 				}
 				processedProjects[proj.HTTPURLToRepo] = true
 
 				// skip projects configured to be ignored.
 				if ignoreRepo(proj.PathWithNamespace) {
-					projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+					projCtx.Logger().V(4).Info("skipping project", "reason", "ignored in config")
 					continue
 				}
 
 				// report an error if we could not convert the project into a URL.
 				if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
-					projCtx.Logger().V(3).Info("skipping project",
+					projCtx.Logger().V(4).Info("skipping project",
 						"reason", "URL parse failure",
 						"url", proj.HTTPURLToRepo,
 						"parse_error", err)
@@ -963,16 +995,18 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	for i, repo := range s.repos {
 		repoURL := repo
 		s.jobPool.Go(func() error {
-			logger := ctx.Logger().WithValues("repo", repoURL)
+			// only for this source's own lines: the git calls below get ctx,
+			// since git adds its own repo field with any password stripped
+			repoCtx := context.WithValues(ctx, "repo", repoURL)
 			if common.IsDone(ctx) {
 				// We are returning nil instead of the scanErrors slice here because
 				// we don't want to mark this scan as errored if we cancelled it.
-				logger.V(2).Info("Skipping repo because context was cancelled")
+				repoCtx.Logger().V(4).Info("Skipping repo", "reason", "scan cancelled")
 				return nil
 			}
 
 			if len(repoURL) == 0 {
-				logger.V(2).Info("Skipping empty repo")
+				repoCtx.Logger().V(4).Info("Skipping repo", "reason", "empty repo URL")
 				return nil
 			}
 
@@ -1017,14 +1051,15 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			// large orgs, longer than the cache's TTL.
 			s.ensureProjectInCache(ctx, repoURL)
 
-			logger.V(2).Info("starting scan", "num", i+1, "total", len(s.repos))
+			repoCtx.Logger().V(2).Info("starting scan", "num", i+1, "total", len(s.repos))
+			start := time.Now()
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
 			gitlabReposScanned.WithLabelValues(s.name).Inc()
 
-			logger.V(2).Info("completed scan", "num", i+1, "total", len(s.repos))
+			repoCtx.Logger().V(2).Info("completed scan", "num", i+1, "total", len(s.repos), "duration", time.Since(start))
 			return nil
 		})
 	}
@@ -1064,7 +1099,7 @@ func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 // rules.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	// Start client.
-	apiClient, err := s.newClient()
+	apiClient, err := s.newClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -1072,7 +1107,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// Get repos within target.
 	repos, errs := normalizeRepos(s.repos)
 	for _, repoErr := range errs {
-		ctx.Logger().Info("error normalizing repo", "error", repoErr)
+		ctx.Logger().Error(repoErr, "error normalizing repo")
 		if err := reporter.UnitErr(ctx, repoErr); err != nil {
 			return err
 		}
@@ -1113,12 +1148,15 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, _ := unit.SourceUnitID()
+	// only for this source's own lines: the git calls below get ctx, since git
+	// adds its own repo field with any password stripped
+	repoCtx := context.WithValues(ctx, "repo", repoURL)
 
 	ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
 		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
 	})
 	if ignoreRepo(repoURL) {
-		ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+		repoCtx.Logger().V(4).Info("skipping project", "reason", "ignored in config")
 		return nil
 	}
 
@@ -1127,9 +1165,11 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	// project details below.
 	normalizedRepoURL, err := giturl.NormalizeGitlabRepo(repoURL)
 	if err != nil {
-		ctx.Logger().Error(err, "failed to normalize GitLab Repo", "repo", repoURL)
 		return err
 	}
+
+	repoCtx.Logger().V(2).Info("Scanning repo")
+	start := time.Now()
 
 	var path string
 	var repo *gogit.Repository
@@ -1161,7 +1201,11 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	// this is required to populate metadata during chunking
 	s.ensureProjectInCache(ctx, normalizedRepoURL)
 
-	return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
+	if err := s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter); err != nil {
+		return err
+	}
+	repoCtx.Logger().V(2).Info("Finished scanning repo", "duration", time.Since(start))
+	return nil
 }
 
 // ensureProjectInCache ensures that the project for the given repository URL
@@ -1186,7 +1230,7 @@ func (s *Source) ensureProjectInCache(ctx context.Context, repoURL string) {
 }
 
 func (s *Source) getGitlabProject(ctx context.Context, repoUrl string) (*gitlab.Project, error) {
-	apiClient, err := s.newClient()
+	apiClient, err := s.newClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not create api client: %w", err)
 	}
