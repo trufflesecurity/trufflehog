@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -21,7 +22,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"golang.org/x/oauth2/google"
 )
 
@@ -31,6 +31,9 @@ const (
 )
 
 var defaultConcurrency = runtime.NumCPU()
+
+// errObjectSkipped means the object was skipped on purpose, not that reading it failed.
+var errObjectSkipped = errors.New("object skipped")
 
 // bucketManager is a simplified *storage.Client wrapper.
 // It provides only a subset of methods that are needed by the gcsManager.
@@ -177,8 +180,8 @@ func withDefaultADC(ctx context.Context) gcsManagerOption {
 
 // withoutAuthentication uses an unauthenticated client when creating a new GCS client.
 // This can ONLY be used for public buckets.
-func withoutAuthentication() gcsManagerOption {
-	client, err := storage.NewClient(aCtx.Background(), option.WithoutAuthentication(), option.WithScopes(storage.ScopeReadOnly))
+func withoutAuthentication(ctx context.Context) gcsManagerOption {
+	client, err := storage.NewClient(ctx, option.WithoutAuthentication(), option.WithScopes(storage.ScopeReadOnly))
 	return func(m *gcsManager) error {
 		if err != nil {
 			return err
@@ -328,7 +331,7 @@ func withBucketOffsets(offsets map[string]offsetInfo) gcsManagerOption {
 	}
 }
 
-func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, error) {
+func newGCSManager(ctx context.Context, projectID string, opts ...gcsManagerOption) (*gcsManager, error) {
 	// Default values for the manager.
 	gcs := &gcsManager{
 		projectID:     projectID,
@@ -350,7 +353,7 @@ func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, err
 	// If no client was provided, use the default application credentials.
 	// A client is required to perform any operations.
 	if gcs.client == nil {
-		c, err := defaultADC(context.Background())
+		c, err := defaultADC(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -395,40 +398,43 @@ func (g *gcsManager) Attributes(ctx context.Context) (*attributes, error) {
 }
 
 func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes, error) {
-	logger := ctx.Logger().WithValues("phase", "enumeration")
+	ctx = context.WithValues(ctx, "phase", "enumeration")
 
-	logger.V(5).Info("enumerating buckets", "numBuckets", len(bkts))
+	ctx.Logger().V(1).Info("Enumerating buckets", "buckets", len(bkts))
 	stats := newStats(len(bkts))
 
 	defer func(start time.Time) {
-		logger.V(5).Info("finished enumerating buckets", "duration-seconds", fmt.Sprintf("%.1f", time.Since(start).Seconds()), "num-buckets", len(bkts), "num-objects", stats.numObjects)
+		ctx.Logger().V(1).Info("Finished enumerating buckets", "buckets", len(bkts), "objects", stats.numObjects, "duration", time.Since(start))
 	}(time.Now())
 
 	for _, bkt := range bkts {
 		g.workerPool.Go(func() error {
+			bktCtx := context.WithValues(ctx, "bucket", bkt.name)
 			// List all the objects in the bucket and calculate attributes.
-			g.setupBktHandle(&bkt)
+			g.setupBktHandle(bktCtx, &bkt)
 
 			q, err := setObjectQuery(&bkt)
 			if err != nil {
-				logger.Error(err, "failed to set object query", "bucket", bkt.name)
+				bktCtx.Logger().Error(err, "failed to set object query")
 				return nil
 			}
 
 			var count uint64
-			objs := bkt.Objects(ctx, q)
+			objs := bkt.Objects(bktCtx, q)
 			for {
 				obj, err := objs.Next()
 				if errors.Is(err, iterator.Done) {
-					logger.V(5).Info("finished listing objects in bucket")
+					bktCtx.Logger().V(2).Info("Enumerated bucket", "objects", count)
 					break
 				}
 				if err != nil {
-					logger.V(1).Info("failed to list objects", "bucket", bkt.name, "error", err)
+					if bktCtx.Err() == nil {
+						bktCtx.Logger().Error(err, "Failed to list objects in bucket")
+					}
 					return nil
 				}
 				if obj == nil {
-					logger.V(5).Info("object is nil")
+					bktCtx.Logger().V(5).Info("object is nil")
 					continue
 				}
 
@@ -470,7 +476,6 @@ func (g *gcsManager) ListObjects(ctx context.Context) (chan io.Reader, error) {
 	}
 
 	go func() {
-		gcsErrs := sources.NewScanErrors()
 		for _, bucket := range g.buckets {
 			g.numBuckets++
 			g.workerPool.Go(func() error {
@@ -483,7 +488,9 @@ func (g *gcsManager) ListObjects(ctx context.Context) (chan io.Reader, error) {
 						}
 						ch <- obj
 					case err := <-errCh:
-						gcsErrs.Add(err)
+						if ctx.Err() == nil {
+							ctx.Logger().Error(err, "Failed to list bucket objects", "bucket", bucket.name)
+						}
 						return nil
 					}
 				}
@@ -491,9 +498,6 @@ func (g *gcsManager) ListObjects(ctx context.Context) (chan io.Reader, error) {
 		}
 
 		_ = g.workerPool.Wait()
-		if gcsErrs.Count() > 0 {
-			ctx.Logger().V(2).Info("encountered gcsErrs while scanning GCS buckets", "error-count", gcsErrs.Count(), "gcsErrs", gcsErrs.String())
-		}
 		close(ch)
 	}()
 
@@ -506,6 +510,7 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]bucket, error) {
 		for name := range g.includeBuckets {
 			buckets = append(buckets, bucket{name: name})
 		}
+		ctx.Logger().V(1).Info("Using configured buckets, listing needs auth", "buckets", len(buckets))
 		return buckets, nil
 	}
 
@@ -513,7 +518,7 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]bucket, error) {
 	for {
 		bkt, err := bkts.Next()
 		if errors.Is(err, iterator.Done) {
-			ctx.Logger().V(5).Info("finished listing buckets", "num_buckets", len(buckets))
+			ctx.Logger().V(1).Info("Listed buckets", "buckets", len(buckets))
 			break
 		}
 		if err != nil {
@@ -523,9 +528,11 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]bucket, error) {
 		// If the bucket is already in the map, skip it, it's already accounted for.
 		// This is used to resume listing objects for a bucket.
 		if _, ok := g.buckets[bkt.Name]; ok {
+			ctx.Logger().V(4).Info("Skipping bucket", "bucket", bkt.Name, "reason", "already queued from saved progress")
 			continue
 		}
 		if !g.shouldIncludeBucket(ctx, bkt.Name) || g.shouldExcludeBucket(ctx, bkt.Name) {
+			ctx.Logger().V(4).Info("Skipping bucket", "bucket", bkt.Name, "reason", "matches filter")
 			continue
 		}
 		buckets = append(buckets, bucket{name: bkt.Name})
@@ -541,10 +548,10 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan i
 	go func() {
 		defer close(ch)
 
-		logger := ctx.Logger().WithValues("bucket", bkt.name)
-		logger.V(5).Info("listing object(s) in bucket")
+		ctx := context.WithValues(ctx, "bucket", bkt.name)
+		ctx.Logger().V(2).Info("Listing objects in bucket", "start_offset", bkt.startOffset)
 
-		g.setupBktHandle(bkt)
+		g.setupBktHandle(ctx, bkt)
 
 		// TODO (ahrav): Look to extend gcsManager to allow for exact buckets/objects
 		// include filters. This will increase performance substantially
@@ -556,7 +563,7 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan i
 	return ch, errCh
 }
 
-func (g *gcsManager) setupBktHandle(bkt *bucket) {
+func (g *gcsManager) setupBktHandle(ctx context.Context, bkt *bucket) {
 	b := g.client.Bucket(bkt.name).Retryer(
 		storage.WithBackoff(gax.Backoff{
 			Initial:    2 * time.Second,
@@ -564,8 +571,25 @@ func (g *gcsManager) setupBktHandle(bkt *bucket) {
 			Multiplier: 1.5,
 		}),
 		storage.WithPolicy(storage.RetryAlways),
+		storage.WithErrorFunc(func(err error) bool {
+			retry := storage.ShouldRetry(err)
+			if retry {
+				ctx.Logger().V(4).Info("Retrying GCS request", "error", retryError(err))
+			}
+			return retry
+		}),
 	)
 	bkt.BucketHandle = b
+}
+
+// retryError returns the error text without the request URL, since an API key is
+// sent in the URL query.
+func retryError(err error) string {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err.Error()
+	}
+	return err.Error()
 }
 
 func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- io.Reader) error {
@@ -574,11 +598,12 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- i
 		return fmt.Errorf("failed to set object query: %w", err)
 	}
 
+	var listed, skipped int
 	objs := bkt.Objects(ctx, q)
 	for {
 		obj, err := objs.Next()
 		if errors.Is(err, iterator.Done) {
-			ctx.Logger().V(5).Info("finished listing objects in bucket")
+			ctx.Logger().V(2).Info("Finished listing objects in bucket", "objects", listed, "skipped", skipped)
 			break
 		}
 		if err != nil {
@@ -589,15 +614,25 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- i
 			continue
 		}
 
+		objCtx := context.WithValues(ctx, "object", obj.Name)
 		if !g.shouldIncludeObject(ctx, obj.Name) || g.shouldExcludeObject(ctx, obj.Name) {
+			objCtx.Logger().V(4).Info("Skipping object", "reason", "matches filter")
+			skipped++
 			continue
 		}
 
-		o, err := g.constructObject(ctx, bkt.Object(obj.Name))
-		if err != nil {
-			ctx.Logger().V(1).Info("failed to create object", "object-name", obj.Name, "error", err)
+		o, err := g.constructObject(objCtx, bkt.Object(obj.Name))
+		if errors.Is(err, errObjectSkipped) {
+			skipped++
 			continue
 		}
+		if err != nil {
+			if objCtx.Err() == nil {
+				objCtx.Logger().Error(err, "Failed to read object")
+			}
+			continue
+		}
+		listed++
 		ch <- o
 	}
 	return nil
@@ -636,7 +671,7 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 	}
 
 	if !isObjectTypeValid(ctx, attrs.Name) || !g.isObjectSizeValid(ctx, attrs.Size) {
-		return o, fmt.Errorf("object is not valid")
+		return o, errObjectSkipped
 	}
 
 	rc, err := obj.NewReader(ctx)
@@ -672,7 +707,7 @@ func objectACLs(acl []storage.ACLRule) []string {
 func isObjectTypeValid(ctx context.Context, name string) bool {
 	isValid := !common.SkipFile(name)
 	if !isValid {
-		ctx.Logger().V(2).Info("object type is invalid", "object-name", name)
+		ctx.Logger().V(4).Info("Skipping object", "reason", "file type is skipped")
 		return false
 	}
 	return true
@@ -681,7 +716,7 @@ func isObjectTypeValid(ctx context.Context, name string) bool {
 func (g *gcsManager) isObjectSizeValid(ctx context.Context, size int64) bool {
 	isValid := size > 0 && size <= g.maxObjectSize
 	if !isValid {
-		ctx.Logger().V(2).Info("object size is invalid", "object-size", size)
+		ctx.Logger().V(4).Info("Skipping object", "reason", "size out of range", "size", size, "max_size", g.maxObjectSize)
 		return false
 	}
 	return true
