@@ -479,21 +479,10 @@ func (g *gcsManager) ListObjects(ctx context.Context) (chan io.Reader, error) {
 		for _, bucket := range g.buckets {
 			g.numBuckets++
 			g.workerPool.Go(func() error {
-				objCh, errCh := g.listBucketObjects(ctx, &bucket)
-				for {
-					select {
-					case obj, ok := <-objCh:
-						if !ok {
-							return nil
-						}
-						ch <- obj
-					case err := <-errCh:
-						if ctx.Err() == nil {
-							ctx.Logger().Error(err, "Failed to list bucket objects", "bucket", bucket.name)
-						}
-						return nil
-					}
+				for obj := range g.listBucketObjects(ctx, &bucket) {
+					ch <- obj
 				}
+				return nil
 			})
 		}
 
@@ -541,9 +530,10 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]bucket, error) {
 	return buckets, nil
 }
 
-func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan io.Reader, chan error) {
+// listBucketObjects streams the bucket's objects. A listing error is logged here,
+// before the channel closes, so the caller can't miss it.
+func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) chan io.Reader {
 	ch := make(chan io.Reader, 100)
-	errCh := make(chan error, 1)
 
 	go func() {
 		defer close(ch)
@@ -556,11 +546,11 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan i
 		// TODO (ahrav): Look to extend gcsManager to allow for exact buckets/objects
 		// include filters. This will increase performance substantially
 
-		if err := g.bucketObjects(ctx, bkt, ch); err != nil {
-			errCh <- fmt.Errorf("failed to list bucket objects: %w", err)
+		if err := g.bucketObjects(ctx, bkt, ch); err != nil && ctx.Err() == nil {
+			ctx.Logger().Error(err, "Failed to list bucket objects")
 		}
 	}()
-	return ch, errCh
+	return ch
 }
 
 func (g *gcsManager) setupBktHandle(ctx context.Context, bkt *bucket) {
