@@ -243,12 +243,13 @@ func (c *Client) NewRequest(ctx trContext.Context, urlStr string, headers map[st
 		return nil, err
 	}
 
-	var h = c.Headers
-	for k, v := range headers {
-		h[k] = v
+	// Set the per-request headers on the request only. Writing them into c.Headers
+	// would send them on every later request too, and the client is shared by
+	// requests that can run at the same time.
+	for k, v := range c.Headers {
+		req.Header.Set(k, v)
 	}
-
-	for k, v := range h {
+	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 
@@ -389,6 +390,11 @@ func (c *Client) EnumerateWorkspaces(ctx trContext.Context) ([]Workspace, error)
 	for i, workspace := range workspacesObj.Workspaces {
 		tempWorkspace, err := c.GetWorkspace(ctx, workspace.Id)
 		if err != nil {
+			// Stop at the monthly API limit, like every other loop. Moving on would
+			// spend more of the limit on the workspaces left.
+			if errors.Is(err, errAbortScanDueToAPIRateLimit) {
+				return nil, err
+			}
 			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
 			ctx.Logger().Error(err, "Could not get workspace during enumeration", "workspace_id", workspace.Id, "workspace_name", workspace.Name)

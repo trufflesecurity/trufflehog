@@ -1166,3 +1166,50 @@ func TestSource_DebugLogging(t *testing.T) {
 		assert.Zero(t, logs.Len(), "unexpected lines: %v", logs.All())
 	})
 }
+
+func TestClient_NewRequestKeepsSharedHeaders(t *testing.T) {
+	c := NewClient("token", newMetrics("test"))
+
+	req, err := c.NewRequest(context.Background(), "https://api.getpostman.com/workspaces", map[string]string{"X-Extra": "one"})
+	require.NoError(t, err)
+	assert.Equal(t, "one", req.Header.Get("X-Extra"))
+	assert.Equal(t, "token", req.Header.Get("X-API-Key"))
+
+	// the extra header must not leak into the next request
+	assert.NotContains(t, c.Headers, "X-Extra")
+	req, err = c.NewRequest(context.Background(), "https://api.getpostman.com/workspaces", nil)
+	require.NoError(t, err)
+	assert.Empty(t, req.Header.Get("X-Extra"))
+}
+
+func TestSource_EnumerateWorkspacesStopsAtMonthlyLimit(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		BodyString(`{"workspaces":[{"id":"0","name":"workspace-0"},{"id":"1","name":"workspace-1"}]}`)
+	// 90% of the monthly limit is used, which is over the abort threshold
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces/0").
+		Reply(200).
+		SetHeader("RateLimit-Remaining-Month", "10").
+		SetHeader("RateLimit-Limit-Month", "100").
+		BodyString(`{"workspace":{"id":"0","name":"workspace-0"}}`)
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces/1").
+		Reply(200).
+		BodyString(`{"workspace":{"id":"1","name":"workspace-1"}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{Token: "super-secret-token"},
+	})
+	require.NoError(t, s.Init(ctx, "test - postman", 0, 1, false, conn, 1))
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	_, err := s.client.EnumerateWorkspaces(ctx)
+	assert.ErrorIs(t, err, errAbortScanDueToAPIRateLimit)
+	// the second workspace was never requested
+	assert.Len(t, gock.Pending(), 1)
+}
