@@ -69,7 +69,7 @@ var (
 	// carrying only the client ID and secret. Box defines it as "Client is not
 	// authorized for requested grant type" and treats it as inconclusive: it
 	// doesn't confirm the secret, so only a token issued for a subject can.
-	errUnauthorizedClient = errors.New("unauthorized_client: Box only confirms these credentials by issuing a token for a nearby enterprise or user ID")
+	errUnauthorizedClient = errors.New("unauthorized_client: cannot verify incomplete Box credentials without an enterprise, user, or subject id found nearby")
 
 	// errInvalidClient is Box's invalid_client response, which Box defines as
 	// an invalid client ID or secret. It's a definite rejection, so it never
