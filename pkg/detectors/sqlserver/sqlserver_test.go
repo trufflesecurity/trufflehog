@@ -149,3 +149,78 @@ func TestSQLServer_PasswordSpecialChars5501(t *testing.T) {
 		})
 	}
 }
+
+func TestSQLServer_WrappedConnectionString5502(t *testing.T) {
+	s := Scanner{}
+	tests := []struct {
+		name    string
+		input   string
+		wantRaw string // empty means: expect no result
+	}{
+		{
+			name:    "apostrophe-wrapped password last no semicolon",
+			input:   `'Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=abc'`,
+			wantRaw: `abc`,
+		},
+		{
+			name:    "backtick-wrapped password last no semicolon",
+			input:   "`Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=abc`",
+			wantRaw: `abc`,
+		},
+		{
+			name:    "apostrophe-wrapped password not last",
+			input:   `'Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=abc;TrustServerCertificate=True'`,
+			wantRaw: `abc`,
+		},
+		{
+			name:    "double-quote-wrapped password last no semicolon",
+			input:   `"Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=abc"`,
+			wantRaw: `abc`,
+		},
+		{
+			name:    "apostrophe-wrapped with trailing semicolon inside wrapper",
+			input:   `'Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=abc;'`,
+			wantRaw: `abc`,
+		},
+		{
+			name:    "unquoted password genuinely ending in apostrophe is kept",
+			input:   `Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=ab'`,
+			wantRaw: `ab'`,
+		},
+		{
+			name:    "unquoted password genuinely ending in backtick is kept",
+			input:   "Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=ab`",
+			wantRaw: "ab`",
+		},
+		{
+			name:    "wrapped password genuinely ending in wrapper loses exactly one",
+			input:   `'Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=ab''`,
+			wantRaw: `ab'`,
+		},
+		{
+			name:    "mismatched wrappers are not stripped",
+			input:   "`Server=TEST-SQL;Database=Demo;User Id=demo_user;Password=abc'",
+			wantRaw: `abc'`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := s.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if test.wantRaw == "" {
+				if len(results) != 0 {
+					t.Fatalf("expected no results, got %d", len(results))
+				}
+				return
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+			if got := string(results[0].Raw); got != test.wantRaw {
+				t.Errorf("Raw = %q, want %q", got, test.wantRaw)
+			}
+		})
+	}
+}

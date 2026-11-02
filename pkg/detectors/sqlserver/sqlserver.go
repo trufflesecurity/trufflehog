@@ -84,7 +84,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if shouldIgnore(match[1], s.ignorePatterns) {
 			continue
 		}
-		paramsUnsafe, err := msdsn.Parse(match[1])
+		params := match[1]
+		// The greedy value class terminates only on ';' and '"', so when a
+		// connection string is wrapped in ' or ` and the final field has no
+		// trailing semicolon, the closing wrapper is absorbed into that
+		// field's value (e.g. Password=abc' yields Raw "abc'"). Strip at
+		// most one trailing wrapper char, and only when the overall match
+		// opened with that same wrapper: an unquoted value that genuinely
+		// ends in ' or ` (see #5501) is left untouched.
+		if len(match[0]) > 0 && len(params) > 0 {
+			if wrapper := match[0][0]; wrapper == '\'' || wrapper == '`' {
+				if params[len(params)-1] == wrapper {
+					params = params[:len(params)-1]
+				}
+			}
+		}
+		paramsUnsafe, err := msdsn.Parse(params)
 		if err != nil {
 			continue
 		}
