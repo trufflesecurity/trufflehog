@@ -47,12 +47,15 @@ var (
 	clientIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"id"}) + `\b([a-zA-Z0-9]{32})\b`)
 	clientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"secret"}) + `\b([a-zA-Z0-9]{32})\b`)
 
-	// Box enterprise and user IDs are numeric strings. The pattern mirrors
-	// detectors.PrefixRegex(subjectKeywords) exactly, except that the keyword
-	// group captures, so candidates can be ranked by which label they sit next
-	// to without changing which numbers match.
+	// Box enterprise and user IDs are numeric strings.
 	subjectKeywords = []string{"enterprise", "enterprise_id", "user", "user_id", "subject", "box_subject"}
-	subjectIdPat    = regexp.MustCompile(`(?i:(` + strings.Join(subjectKeywords, "|") + `))(?:.|[\n\r]){0,40}?\b([0-9]{6,20})\b`)
+	subjectIdPat    = regexp.MustCompile(detectors.PrefixRegex(subjectKeywords) + `\b([0-9]{6,20})\b`)
+
+	// subjectLabelPat finds the subject keywords inside a subjectIdPat match.
+	// A match starts at the leftmost keyword, which can be a different label
+	// than the one beside the number when two labels fall within the 40
+	// characters before it, so ranking reads the last keyword instead.
+	subjectLabelPat = regexp.MustCompile(`(?i)` + strings.Join(subjectKeywords, "|"))
 )
 
 // strongSubjectKeywords are labels that name a Box subject specifically.
@@ -292,16 +295,21 @@ func verifySubjectID(ctx context.Context, client *http.Client, clientID, clientS
 }
 
 // rankSubjectIDs returns the unique subject ID candidates in data, ordered so
-// the ones most likely to be a real Box subject come first. Numbers labeled
-// with a strong keyword (see strongSubjectKeywords) go ahead of numbers next to
-// generic labels. Within each group, numbers keep the order they appear in the
-// text, which keeps the result deterministic and keeps a config's own ID near
-// the front. A number seen under both kinds of label counts as strong.
+// the ones most likely to be a real Box subject come first. A number's label
+// is the keyword closest before it; numbers labeled with a strong keyword (see
+// strongSubjectKeywords) go ahead of numbers next to generic labels, so a real
+// enterprise ID survives maxSubjectIDCandidates even after several user IDs.
+// Within each group, numbers keep the order they appear in the text, which
+// keeps the result deterministic and keeps a config's own ID near the front. A
+// number seen under both kinds of label counts as strong.
 func rankSubjectIDs(data string) []string {
 	var order []string
 	strong := make(map[string]bool)
 	for _, match := range subjectIdPat.FindAllStringSubmatch(data, -1) {
-		keyword, subjectId := strings.ToLower(match[1]), match[2]
+		subjectId := match[1]
+		// The match always begins with a keyword, so labels is never empty.
+		labels := subjectLabelPat.FindAllString(match[0][:len(match[0])-len(subjectId)], -1)
+		keyword := strings.ToLower(labels[len(labels)-1])
 		_, isStrong := strongSubjectKeywords[keyword]
 		if seenStrong, seen := strong[subjectId]; seen {
 			strong[subjectId] = seenStrong || isStrong

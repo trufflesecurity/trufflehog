@@ -318,6 +318,16 @@ func TestRankSubjectIDs(t *testing.T) {
 			input: "user = '7777777' user = '7777777'",
 			want:  []string{"7777777"},
 		},
+		{
+			name:  "label beside the number wins over an earlier label in the same window",
+			input: "user = '8888888' owner user: bob enterprise_id: 1234567",
+			want:  []string{"1234567", "8888888"},
+		},
+		{
+			name:  "box_subject is not read as subject",
+			input: "user = '8888888' box_subject: 2345678",
+			want:  []string{"2345678", "8888888"},
+		},
 	}
 
 	for _, tt := range tests {
