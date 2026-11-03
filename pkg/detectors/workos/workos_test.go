@@ -19,18 +19,29 @@ import (
 // Fake keys are built at runtime so the source contains no key-shaped strings for secret scanners to flag.
 // They aren't real WorkOS credentials.
 var (
-	testKey  = fakeKey("test", "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB,FakeSecretValue0123456789")
-	testKey2 = fakeKey("test", "key_01J0M2P4R6T8V0X2Z4B6D8F0HK,NotARealSecretForTests123")
-	liveKey  = fakeKey("live", "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB,FakeSecretValue0123456789")
-	// Starts with base64("key_01") but doesn't decode to a key ID.
-	badShapeKey = fakeKey("test", "key_01not-a-ulid-at-all-here!!,secretvaluesecretvalue")
+	sandboxKey    = fakeKey("sk_test_", "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB,FakeSecretValue0123456789")
+	sandboxKey2   = fakeKey("sk_test_", "key_01J0M2P4R6T8V0X2Z4B6D8F0HK,NotARealSecretForTests123")
+	productionKey = fakeKey("sk_", "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB,FakeSecretValue0123456789")
+	// ULIDs created after 2039 start with "02", and later ones with a letter in the second position.
+	futureKey  = fakeKey("sk_", "key_02HZX4K8J2Q9N3V5T7W6Y8Z0AB,FakeSecretValue0123456789")
+	futureKey2 = fakeKey("sk_", "key_0ZHZX4K8J2Q9N3V5T7W6Y8Z0AB,FakeSecretValue0123456789")
+	// Same length and prefix as a real key, but the ID isn't a ULID.
+	badShapeKey = fakeKey("sk_test_", "key_01"+strings.Repeat("z", 24)+",FakeSecretValue0123456789")
+	// WorkOS never issues sk_live_ keys in this format.
+	liveShapeKey = fakeKey("sk_live_", "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB,FakeSecretValue0123456789")
+
+	issuedKey = "sk_" + "FakeOrgKeyValue12345" + "w3rk0s" + "NotARealUserKey67890"
 )
 
-func fakeKey(environment, payload string) string {
-	return "sk_" + environment + "_" + base64.RawStdEncoding.EncodeToString([]byte(payload))
+func fakeKey(prefix, payload string) string {
+	return prefix + base64.RawStdEncoding.EncodeToString([]byte(payload))
 }
 
 func TestWorkOS_Pattern(t *testing.T) {
+	if !environmentKeyPat.MatchString(badShapeKey) {
+		t.Fatal("badShapeKey must match the regex so the decode check is what rejects it")
+	}
+
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -39,28 +50,38 @@ func TestWorkOS_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "env file",
-			input: "WORKOS_API_KEY=" + testKey,
-			want:  []string{testKey},
+			name:  "sandbox key in env file",
+			input: "WORKOS_API_KEY=" + sandboxKey,
+			want:  []string{sandboxKey},
 		},
 		{
-			name:  "live key in json",
-			input: `{"workosApiKey": "` + liveKey + `"}`,
-			want:  []string{liveKey},
+			name:  "production key in json",
+			input: `{"workosApiKey": "` + productionKey + `"}`,
+			want:  []string{productionKey},
 		},
 		{
 			name:  "launchSettings with two keys",
-			input: `"WORKOS_API_KEY": "` + testKey + `", "OTHER": "` + testKey2 + `"`,
-			want:  []string{testKey, testKey2},
+			input: `"WORKOS_API_KEY": "` + sandboxKey + `", "OTHER": "` + sandboxKey2 + `"`,
+			want:  []string{sandboxKey, sandboxKey2},
 		},
 		{
-			name:  "padded key",
-			input: "export WORKOS_API_KEY='" + testKey + "='",
-			want:  []string{testKey + "="},
+			name:  "keys with future ULIDs",
+			input: "A=" + futureKey + "\nB=" + futureKey2,
+			want:  []string{futureKey, futureKey2},
+		},
+		{
+			name:  "organization or user API key",
+			input: "Authorization: Bearer " + issuedKey,
+			want:  []string{issuedKey},
 		},
 		{
 			name:  "invalid pattern: wrong decoded shape",
 			input: "WORKOS_API_KEY=" + badShapeKey,
+			want:  nil,
+		},
+		{
+			name:  "invalid pattern: sk_live_ prefix",
+			input: "WORKOS_API_KEY=" + liveShapeKey,
 			want:  nil,
 		},
 		{
@@ -116,19 +137,61 @@ func TestWorkOS_Pattern(t *testing.T) {
 }
 
 func TestWorkOS_ExtraData(t *testing.T) {
-	results, err := Scanner{}.FromData(context.Background(), false, []byte("WORKOS_API_KEY="+liveKey))
+	tests := []struct {
+		name  string
+		input string
+		want  map[string]string
+	}{
+		{
+			name:  "production key",
+			input: productionKey,
+			want:  map[string]string{"key_type": "environment_api_key", "key_id": "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB", "environment": "production"},
+		},
+		{
+			name:  "sandbox key",
+			input: sandboxKey,
+			want:  map[string]string{"key_type": "environment_api_key", "key_id": "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB", "environment": "sandbox"},
+		},
+		{
+			name:  "organization or user API key",
+			input: issuedKey,
+			want:  map[string]string{"key_type": "organization_or_user_api_key"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results, err := Scanner{}.FromData(context.Background(), false, []byte("KEY="+tt.input))
+			if err != nil {
+				t.Fatalf("FromData error = %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("got %d results, want 1", len(results))
+			}
+			if diff := cmp.Diff(tt.want, results[0].ExtraData); diff != "" {
+				t.Errorf("ExtraData diff: (-want +got)\n%s", diff)
+			}
+			if got := results[0].SecretParts["key"]; got != tt.input {
+				t.Errorf("SecretParts[key] = %q, want %q", got, tt.input)
+			}
+		})
+	}
+}
+
+func TestWorkOS_IssuedKeyIsNotVerified(t *testing.T) {
+	s := Scanner{client: &http.Client{Transport: common.FakeTransport{
+		CreateResponse: func(req *http.Request) (*http.Response, error) {
+			t.Errorf("unexpected request to %s", req.URL)
+			return nil, errors.New("unexpected request")
+		},
+	}}}
+
+	results, err := s.FromData(context.Background(), true, []byte("KEY="+issuedKey))
 	if err != nil {
 		t.Fatalf("FromData error = %v", err)
 	}
-	if len(results) != 1 {
-		t.Fatalf("got %d results, want 1", len(results))
-	}
-	want := map[string]string{"key_id": "key_01HZX4K8J2Q9N3V5T7W6Y8Z0AB", "environment": "live"}
-	if diff := cmp.Diff(want, results[0].ExtraData); diff != "" {
-		t.Errorf("ExtraData diff: (-want +got)\n%s", diff)
-	}
-	if got := results[0].SecretParts["key"]; got != liveKey {
-		t.Errorf("SecretParts[key] = %q, want %q", got, liveKey)
+	if len(results) != 1 || results[0].Verified || results[0].VerificationError() != nil {
+		t.Errorf("want one unverified result without a verification error, got %+v", results)
 	}
 }
 
@@ -160,7 +223,7 @@ func TestWorkOS_VerifyMatch(t *testing.T) {
 					if got := req.URL.String(); got != "https://api.workos.com/organizations?limit=1" {
 						t.Errorf("url = %s", got)
 					}
-					if got := req.Header.Get("Authorization"); got != "Bearer "+testKey {
+					if got := req.Header.Get("Authorization"); got != "Bearer "+sandboxKey {
 						t.Errorf("Authorization = %q", got)
 					}
 					if tt.transportErr != nil {
@@ -174,7 +237,7 @@ func TestWorkOS_VerifyMatch(t *testing.T) {
 				},
 			}}}
 
-			results, err := s.FromData(context.Background(), true, []byte("WORKOS_API_KEY="+testKey))
+			results, err := s.FromData(context.Background(), true, []byte("WORKOS_API_KEY="+sandboxKey))
 			if err != nil {
 				t.Fatalf("FromData error = %v", err)
 			}

@@ -28,15 +28,18 @@ var (
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// WorkOS API keys are sk_test_ or sk_live_ followed by base64 of "key_<ULID>,<secret>".
-	// "a2V5XzAx" is base64 for "key_01", which separates them from Stripe and Clerk keys that share the prefix.
-	keyPat = regexp.MustCompile(`\b(sk_(?:test|live)_a2V5XzAx[A-Za-z0-9+/_-]{60,100}={0,2})(?:[^A-Za-z0-9+/=_-]|$)`)
+	// Environment API keys are sk_ (production) or sk_test_ (sandbox) followed by unpadded base64 of
+	// "key_<ULID>,<25 base62 chars>". "a2V5Xz" plus A or B is base64 for "key_0" followed by any ULID character,
+	// which holds for every ULID until the year 3084 and separates these keys from Stripe and Clerk keys.
+	environmentKeyPat = regexp.MustCompile(`\b(sk_(?:test_)?a2V5Xz[AB][A-Za-z0-9+/]{68})\b`)
+	decodedPat        = regexp.MustCompile(`^(key_[0-9A-Z]{26}),[A-Za-z0-9]{25}$`)
 
-	decodedPat = regexp.MustCompile(`^(key_[0-9A-Z]{26}),\S{16,}$`)
+	// Organization and user API keys, issued through the WorkOS API Keys feature, have a fixed "w3rk0s" in the middle.
+	issuedKeyPat = regexp.MustCompile(`\b(sk_[A-Za-z0-9]{20}w3rk0s[A-Za-z0-9]{20})\b`)
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"sk_test_a2V5XzAx", "sk_live_a2V5XzAx"}
+	return []string{"sk_a2V5Xz", "sk_test_a2V5Xz", "w3rk0s"}
 }
 
 // FromData will find and optionally verify WorkOS secrets in a given set of bytes.
@@ -44,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	uniqueMatches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+	for _, match := range environmentKeyPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueMatches[match[1]] = struct{}{}
 	}
 
@@ -54,9 +57,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		environment := "test"
-		if strings.HasPrefix(match, "sk_live_") {
-			environment = "live"
+		environment := "production"
+		if strings.HasPrefix(match, "sk_test_") {
+			environment = "sandbox"
 		}
 
 		s1 := detectors.Result{
@@ -64,6 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(match),
 			SecretParts:  map[string]string{"key": match},
 			ExtraData: map[string]string{
+				"key_type":    "environment_api_key",
 				"key_id":      keyID,
 				"environment": environment,
 			},
@@ -83,18 +87,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
+	// These keys can only be validated with the issuing environment's own API key, so they are reported unverified.
+	issuedMatches := make(map[string]struct{})
+	for _, match := range issuedKeyPat.FindAllStringSubmatch(dataStr, -1) {
+		issuedMatches[match[1]] = struct{}{}
+	}
+	for match := range issuedMatches {
+		results = append(results, detectors.Result{
+			DetectorType: detector_typepb.DetectorType_WorkOS,
+			Raw:          []byte(match),
+			SecretParts:  map[string]string{"key": match},
+			ExtraData:    map[string]string{"key_type": "organization_or_user_api_key"},
+		})
+	}
+
 	return
 }
 
 // decodeKeyID returns the key ID embedded in a WorkOS API key, and false if the key doesn't decode to the expected shape.
 func decodeKeyID(key string) (string, bool) {
-	body := strings.TrimRight(key[len("sk_test_"):], "=")
+	body := strings.TrimPrefix(strings.TrimPrefix(key, "sk_"), "test_")
 	decoded, err := base64.RawStdEncoding.DecodeString(body)
 	if err != nil {
-		decoded, err = base64.RawURLEncoding.DecodeString(body)
-		if err != nil {
-			return "", false
-		}
+		return "", false
 	}
 
 	m := decodedPat.FindStringSubmatch(string(decoded))
@@ -131,8 +146,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-// IsFalsePositive skips the default wordlist check. Every match has already decoded to a WorkOS key ID, and the
-// wordlist would otherwise flag every sk_test_ key because it contains "test".
+// IsFalsePositive skips the default wordlist check. Every match either decoded to a WorkOS key ID or contains the
+// fixed "w3rk0s" marker, and the wordlist would otherwise flag every sk_test_ key because it contains "test".
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
