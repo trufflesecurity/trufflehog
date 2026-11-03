@@ -2,7 +2,6 @@ package roundtripper
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -65,10 +64,17 @@ func NewRoundTripper(original http.RoundTripper, opts ...func(*RoundTripper)) *R
 }
 
 func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Log with the request's context when it has a logger, so the lines get the caller's fields and log level
+	// (including per-source debug). r.logger is the fallback for requests made without one.
+	baseLogger := r.logger
+	if ctx, ok := req.Context().(context.Context); ok {
+		baseLogger = ctx.Logger()
+	}
+
 	retries := 0
 	for {
 		// Use the redacted URL so a password in it (user:pass@host) is never logged.
-		logger := r.logger.WithValues(
+		logger := baseLogger.WithValues(
 			"method", req.Method,
 			"url", req.URL.Redacted(),
 		)
@@ -77,17 +83,11 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			req.SetBasicAuth(r.username, r.password)
 		}
 
-		authMethod := determineAuth(req)
 		if r.LoggingRoundtripper != nil {
-			logger.V(5).Info(fmt.Sprintf("sending request with %s", authMethod))
+			logger.V(5).Info("sending request", "auth", determineAuth(req))
 		}
 
 		response, err := r.original.RoundTrip(req)
-		if err != nil {
-			logger.V(5).Info("got error while sending request",
-				"error", err,
-			)
-		}
 
 		if r.LoggingRoundtripper != nil && response != nil {
 			logger.V(5).Info("got response",
@@ -98,21 +98,25 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		reason, shouldRetry, duration := r.shouldRetryRequest(response, err)
 		if shouldRetry {
 			if retries >= int(r.maxRetries) {
-				r.logger.V(2).Info("max retries reached",
-					"host", req.Host,
+				logger.V(4).Info("max retries reached",
 					"reason", reason,
 					"retries", retries,
 				)
 				return response, err
 			}
-			r.logger.V(2).Info("retrying request",
-				"host", req.Host,
+			logger.V(4).Info("retrying request",
 				"reason", reason,
 				"retries", retries,
+				"wait", duration,
 			)
 
 			retries++
-			time.Sleep(duration)
+			// Stop waiting if the caller gives up, a retry wait can be 30 seconds or more.
+			select {
+			case <-req.Context().Done():
+				return response, err
+			case <-time.After(duration):
+			}
 			continue
 		}
 
