@@ -878,6 +878,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wiz"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/workos"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worksnaps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/workstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldcoinindex"
@@ -1813,6 +1814,7 @@ func buildDetectorList() []detectors.Detector {
 		&wistia.Scanner{},
 		&wit.Scanner{},
 		&wiz.Scanner{},
+		&workos.Scanner{},
 		&worksnaps.Scanner{},
 		&workstack.Scanner{},
 		&worldcoinindex.Scanner{},
