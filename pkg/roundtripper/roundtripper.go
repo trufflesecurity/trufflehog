@@ -114,7 +114,12 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			// Stop waiting if the caller gives up, a retry wait can be 30 seconds or more.
 			select {
 			case <-req.Context().Done():
-				return response, err
+				// Return the cancel, not the last attempt's result, so the caller sees an interrupt
+				// rather than an HTTP failure.
+				if response != nil {
+					_ = response.Body.Close()
+				}
+				return nil, req.Context().Err()
 			case <-time.After(duration):
 			}
 			continue

@@ -1,11 +1,13 @@
 package roundtripper
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,4 +35,30 @@ func TestRoundTripper_DebugLogsHidePasswordInURL(t *testing.T) {
 		assert.Contains(t, fields, "user:xxxxx@")
 		assert.NotContains(t, fields, "hunter2")
 	}
+}
+
+func TestRoundTripper_CancelDuringRetryWait(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := &http.Client{Transport: NewRoundTripper(nil,
+		WithRetryable(WithShouldRetry5XXDuration(30*time.Second)),
+	)}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+
+	start := time.Now()
+	resp, err := client.Do(req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	assert.Nil(t, resp)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(start), 5*time.Second)
 }
