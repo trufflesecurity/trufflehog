@@ -264,6 +264,37 @@ type gitArgs struct {
 	paths  []string
 }
 
+// gitProcessEnv builds the environment for git subprocesses.
+//
+// Setting exec.Cmd.Env replaces the process environment entirely, so a bare
+// GIT_DIR=... list drops PATH/HOME/TEMP. On Windows, Git for Windows routes
+// Office/PDF diffs through the astextplain converter, which needs a writable
+// temp directory (TEMP/TMP) and a usable PATH. Without those variables git
+// aborts mid-history with "unable to create temp-file", and the scan silently
+// truncates (see #5379).
+//
+// Only a small allowlist of process-local variables is forwarded so the rest of
+// the parent environment (including secrets) is not inherited by git.
+func gitProcessEnv(extra ...string) []string {
+	env := make([]string, 0, len(extra)+8)
+	for _, key := range []string{
+		"PATH",
+		"HOME",
+		"USERPROFILE",
+		"TEMP",
+		"TMP",
+		"TMPDIR",
+		"SystemRoot",
+		"windir",
+		"COMSPEC",
+	} {
+		if v := os.Getenv(key); v != "" {
+			env = append(env, key+"="+v)
+		}
+	}
+	return append(env, extra...)
+}
+
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log,
 // though the diffs are generated using `git show` in groups.
@@ -546,19 +577,21 @@ func (c *Parser) prepGitArgs(source string, head string, base string, excludedGl
 
 	absPath, err := filepath.Abs(source)
 	if err == nil {
+		var gitEnv []string
 		if !isBare {
-			args.env = append(args.env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+			gitEnv = append(gitEnv, "GIT_DIR="+filepath.Join(absPath, ".git"))
 		} else {
-			args.env = append(args.env, "GIT_DIR="+absPath)
+			gitEnv = append(gitEnv, "GIT_DIR="+absPath)
 			// We need those variables to handle incoming commits
 			// while using trufflehog in pre-receive hooks
 			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
-				args.env = append(args.env, "GIT_OBJECT_DIRECTORY="+dir)
+				gitEnv = append(gitEnv, "GIT_OBJECT_DIRECTORY="+dir)
 			}
 			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
-				args.env = append(args.env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+				gitEnv = append(gitEnv, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
 			}
 		}
+		args.env = gitProcessEnv(gitEnv...)
 	}
 	return args
 }
@@ -572,7 +605,7 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 
 	absPath, err := filepath.Abs(source)
 	if err == nil {
-		cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+		cmd.Env = gitProcessEnv("GIT_DIR=" + filepath.Join(absPath, ".git"))
 	}
 
 	return c.executeCommand(ctx, cmd, true)
