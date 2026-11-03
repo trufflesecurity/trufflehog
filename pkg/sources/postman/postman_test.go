@@ -2,6 +2,7 @@ package postman
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -9,9 +10,16 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
+	"github.com/go-logr/zapr"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"gopkg.in/h2non/gock.v1"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -997,4 +1005,211 @@ func TestSource_AbortScanRateLimitBelowThreshold(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const (
+		testToken  = "postmandebuglogtesttoken"
+		testSecret = "postmandebuglogtestsecret"
+	)
+
+	mockAPI := func() {
+		// the first workspace request fails, so the retry lines show up
+		gock.New("https://api.getpostman.com").
+			Get("/workspaces/ws1").
+			Reply(503)
+		gock.New("https://api.getpostman.com").
+			Get("/workspaces/ws1").
+			Reply(200).
+			JSON(map[string]any{"workspace": map[string]any{
+				"id":   "ws1",
+				"name": "Debug Workspace",
+				"collections": []map[string]any{
+					{"id": "col1", "name": "Keep", "uid": "u-col1"},
+					{"id": "col2", "name": "Skip", "uid": "u-col2"},
+				},
+				"environments": []map[string]any{
+					{"id": "env1", "name": "Keep", "uid": "u-env1"},
+					{"id": "env2", "name": "Skip", "uid": "u-env2"},
+				},
+			}})
+		gock.New("https://api.getpostman.com").
+			Get("/environments/u-env1").
+			Reply(200).
+			JSON(map[string]any{"environment": map[string]any{
+				"id":     "env1",
+				"name":   "Keep",
+				"values": []map[string]any{{"key": "api_key", "value": testSecret, "enabled": true}},
+			}})
+		gock.New("https://api.getpostman.com").
+			Get("/collections/u-col1").
+			Reply(200).
+			JSON(map[string]any{"collection": map[string]any{
+				"info": map[string]any{"_postman_id": "col1", "name": "Keep", "uid": "u-col1"},
+				"item": []map[string]any{{
+					"id":   "i1",
+					"uid":  "u-i1",
+					"name": "folder",
+					"item": []map[string]any{
+						// a folder that points back at itself is skipped, not scanned again
+						{"id": "i1", "uid": "u-i1", "name": "folder"},
+						{
+							"id":   "i2",
+							"uid":  "u-i2",
+							"name": "request",
+							"request": map[string]any{
+								"method": "GET",
+								"url": map[string]any{
+									"raw":      "https://example.com/v1/users",
+									"protocol": "https",
+									"host":     []string{"example", "com"},
+									"path":     []string{"v1", "users"},
+								},
+							},
+						},
+					},
+				}},
+			}})
+	}
+
+	runSource := func(t *testing.T, ctx context.Context) {
+		t.Helper()
+		defer gock.Off()
+		mockAPI()
+
+		s, conn := createTestSource(&sourcespb.Postman{
+			Credential:          &sourcespb.Postman_Token{Token: testToken},
+			Workspaces:          []string{"ws1"},
+			ExcludeCollections:  []string{"u-col2"},
+			ExcludeEnvironments: []string{"u-env2"},
+		})
+		// data is only sent with a detector keyword next to it, the engine sets these
+		s.DetectorKeywords = map[string]struct{}{"api_key": {}}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+
+		// intercept the client inside the retryable client, so the retry and response
+		// hooks still run
+		inner := s.client.HTTPClient.Transport.(*retryablehttp.RoundTripper).Client.HTTPClient
+		gock.InterceptClient(inner)
+		defer gock.RestoreClient(inner)
+
+		chunksCh := make(chan *sources.Chunk, 100)
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		var found bool
+		for chunk := range chunksCh {
+			if strings.Contains(string(chunk.Data), testSecret) {
+				found = true
+			}
+		}
+		assert.True(t, found, "secret was not scanned")
+		assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		ctx, logs := logtest.DebugContext()
+		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
+		runSource(t, ctx)
+
+		// lines from each level show up
+		for _, msg := range []string{
+			"Postman source initialized",   // V(1)
+			"Scanning workspace",           // V(2)
+			"Scanning collection",          // V(2)
+			"Scanning environment",         // V(3)
+			"Scanning item",                // V(3)
+			"Skipping collection",          // V(4)
+			"Skipping environment",         // V(4)
+			"Skipping item",                // V(4)
+			"Postman API request failed",   // V(4)
+			"Retrying Postman API request", // V(4)
+			"Fetching workspace",           // V(5)
+			"Postman API response",         // V(5)
+			"Sending chunk",                // V(5)
+		} {
+			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
+		}
+
+		failed := logs.FilterMessage("Postman API request failed").All()
+		require.Len(t, failed, 1)
+		assert.Equal(t, "/workspaces/ws1", failed[0].ContextMap()["path"])
+		assert.EqualValues(t, http.StatusServiceUnavailable, failed[0].ContextMap()["status"])
+
+		for _, msg := range []string{"Skipping collection", "Skipping environment"} {
+			skips := logs.FilterMessage(msg).All()
+			require.Len(t, skips, 1, msg)
+			assert.Equal(t, "matches filter", skips[0].ContextMap()["reason"])
+		}
+		skips := logs.FilterMessage("Skipping item").All()
+		require.Len(t, skips, 1)
+		assert.Equal(t, "already seen", skips[0].ContextMap()["reason"])
+
+		// every line came from the context logger, so it carries the source fields,
+		// and none of them contain the token or the secret
+		for _, entry := range logs.All() {
+			fields := entry.ContextMap()
+			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
+			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
+			for _, value := range []string{testToken, testSecret} {
+				assert.NotContains(t, entry.Message, value)
+				assert.NotContains(t, fmt.Sprint(fields), value)
+			}
+		}
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		core, logs := observer.New(zapcore.InfoLevel)
+		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
+		runSource(t, ctx)
+
+		assert.Zero(t, logs.Len(), "unexpected lines: %v", logs.All())
+	})
+}
+
+func TestClient_NewRequestKeepsSharedHeaders(t *testing.T) {
+	c := NewClient("token", newMetrics("test"))
+
+	req, err := c.NewRequest(context.Background(), "https://api.getpostman.com/workspaces", map[string]string{"X-Extra": "one"})
+	require.NoError(t, err)
+	assert.Equal(t, "one", req.Header.Get("X-Extra"))
+	assert.Equal(t, "token", req.Header.Get("X-API-Key"))
+
+	// the extra header must not leak into the next request
+	assert.NotContains(t, c.Headers, "X-Extra")
+	req, err = c.NewRequest(context.Background(), "https://api.getpostman.com/workspaces", nil)
+	require.NoError(t, err)
+	assert.Empty(t, req.Header.Get("X-Extra"))
+}
+
+func TestSource_EnumerateWorkspacesStopsAtMonthlyLimit(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		BodyString(`{"workspaces":[{"id":"0","name":"workspace-0"},{"id":"1","name":"workspace-1"}]}`)
+	// 90% of the monthly limit is used, which is over the abort threshold
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces/0").
+		Reply(200).
+		SetHeader("RateLimit-Remaining-Month", "10").
+		SetHeader("RateLimit-Limit-Month", "100").
+		BodyString(`{"workspace":{"id":"0","name":"workspace-0"}}`)
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces/1").
+		Reply(200).
+		BodyString(`{"workspace":{"id":"1","name":"workspace-1"}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{Token: "super-secret-token"},
+	})
+	require.NoError(t, s.Init(ctx, "test - postman", 0, 1, false, conn, 1))
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	_, err := s.client.EnumerateWorkspaces(ctx)
+	assert.ErrorIs(t, err, errAbortScanDueToAPIRateLimit)
+	// the second workspace was never requested
+	assert.Len(t, gock.Pending(), 1)
 }

@@ -222,6 +222,18 @@ trufflehog postman --token PMAK-xxxxxxxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxx
 trufflehog postman --collection-paths /path/to/collection.json --environment-paths /path/to/environment.json
 ```
 
+## Debug Logs
+
+With debug on for this source (`debug: true` in the config), the scan logs:
+
+- `V(1)`: `Postman source initialized` with the config choices (the credential type only, never the token), the start and end of workspace enumeration, and `Monthly API limit threshold reached, aborting scan` when the monthly API limit stops a scan.
+- `V(2)`: `Scanning workspace`, `Scanning collection` and `Scanning local file`, with their counts.
+- `V(3)`: `Scanning environment` and `Scanning item` for each environment and each folder or request.
+- `V(4)`: `Skipping collection`, `Skipping environment`, `Skipping item` and `Skipping basic auth` with a `reason`, `Postman API request failed` for any API response of 400 or above (with the status, path and `Retry-After` header), `Retrying Postman API request` for each retry, and `Limited recursion depth` when variable substitution stops early.
+- `V(5)`: each API request and response status, the IDs inside a workspace or collection, request details, and `Sending chunk` for each chunk sent to the detectors.
+
+Lines carry `workspace_id`, `collection_uuid`, `item_uid` and `event_listen` where they apply. Data is only sent to the detectors when a detector keyword is found nearby, so a field with no keyword logs `Data string is empty` at `V(5)`.
+
 ## Troubleshooting
 
 ### Common Issues
