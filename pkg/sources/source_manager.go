@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"runtime"
@@ -145,10 +146,10 @@ func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string,
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	if err := sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
-		fatalErr := Fatal{err}
-		progress.ReportError(fatalErr)
-		progress.finishWithCause(fatalErr)
-		return progress.Ref(), fatalErr
+		interruptErr := Interrupt{err}
+		progress.ReportError(interruptErr)
+		progress.finishWithCause(interruptErr)
+		return progress.Ref(), interruptErr
 	}
 	s.wg.Add(1)
 	go func() {
@@ -217,7 +218,7 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 			case s.firstErr <- err:
 			default:
 			}
-			progress.ReportError(Fatal{err})
+			progress.ReportError(jobErr(ctx, err))
 		}
 	}()
 	return progress.Ref(), nil
@@ -241,10 +242,10 @@ func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Sour
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	if err := s.sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
-		fatalErr := Fatal{err}
-		progress.ReportError(fatalErr)
-		progress.finishWithCause(fatalErr)
-		return progress.Ref(), fatalErr
+		interruptErr := Interrupt{err}
+		progress.ReportError(interruptErr)
+		progress.finishWithCause(interruptErr)
+		return progress.Ref(), interruptErr
 	}
 	s.wg.Add(1)
 	go func() {
@@ -264,7 +265,7 @@ func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Sour
 			case s.firstErr <- err:
 			default:
 			}
-			progress.ReportError(Fatal{err})
+			progress.ReportError(jobErr(ctx, err))
 		}
 	}()
 	return progress.Ref(), nil
@@ -346,16 +347,34 @@ func (s *SourceManager) preflightChecks(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// jobErr classifies an error that ended a job, or part of one. It is an
+// Interrupt if the job's context is done and err came from that, for example a
+// source returning ctx.Err() after CancelRun. Otherwise it is Fatal. An error
+// that is already an Interrupt or Fatal is returned unchanged.
+func jobErr(ctx context.Context, err error) error {
+	if _, ok := errors.AsType[Interrupt](err); ok {
+		return err
+	}
+	if _, ok := errors.AsType[Fatal](err); ok {
+		return err
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil && (errors.Is(err, ctxErr) || errors.Is(err, context.Cause(ctx))) {
+		return Interrupt{err}
+	}
+	return Fatal{err}
+}
+
 // run is a helper method to synchronously run the source. It does not check for
-// acquired resources. An error is returned if there was a fatal error during
-// the run. This information is also recorded in the JobProgress.
+// acquired resources. An error is returned if there was a fatal error or an
+// interruption during the run. This information is also recorded in the
+// JobProgress.
 func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
 
 	defer func() {
 		if err := context.Cause(ctx); err != nil {
-			report.ReportError(Fatal{err})
+			report.ReportError(Interrupt{err})
 		}
 	}()
 
@@ -403,7 +422,7 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 
 	defer func() {
 		if err := context.Cause(ctx); err != nil {
-			report.ReportError(Fatal{err})
+			report.ReportError(Interrupt{err})
 		}
 	}()
 
@@ -427,7 +446,7 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 
 	defer func() {
 		if err := context.Cause(ctx); err != nil {
-			report.ReportError(Fatal{err})
+			report.ReportError(Interrupt{err})
 		}
 	}()
 
@@ -451,10 +470,10 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUnitEnumerator, report *JobProgress, reporter UnitReporter) error {
 	// Create a function that will save the first error encountered (if
 	// any) and discard the rest.
-	fatalErr := make(chan error, 1)
-	catchFirstFatal := func(err error) {
+	firstErr := make(chan error, 1)
+	catchFirstError := func(err error) {
 		select {
-		case fatalErr <- err:
+		case firstErr <- err:
 		default:
 		}
 	}
@@ -466,16 +485,16 @@ func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUni
 		ctx.Logger().V(2).Info("enumerating source with units")
 		defer common.RecoverWithHandler(ctx, func(err error) {
 			report.ReportError(Fatal{err})
-			catchFirstFatal(Fatal{err})
+			catchFirstError(Fatal{err})
 		})
 		if err := source.Enumerate(ctx, reporter); err != nil {
-			report.ReportError(Fatal{err})
-			catchFirstFatal(Fatal{err})
+			report.ReportError(jobErr(ctx, err))
+			catchFirstError(jobErr(ctx, err))
 		}
 	}()
 
 	select {
-	case err := <-fatalErr:
+	case err := <-firstErr:
 		return err
 	default:
 		return nil
@@ -506,8 +525,9 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 	defer wg.Wait()
 	defer close(ch)
 	if err := source.Chunks(ctx, ch, targets...); err != nil {
-		report.ReportError(Fatal{err})
-		return Fatal{err}
+		err = jobErr(ctx, err)
+		report.ReportError(err)
+		return err
 	}
 	return nil
 }
@@ -522,10 +542,10 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 	}
 	// Create a function that will save the first error encountered (if
 	// any) and discard the rest.
-	fatalErr := make(chan error, 1)
-	catchFirstFatal := func(err error) {
+	firstErr := make(chan error, 1)
+	catchFirstError := func(err error) {
 		select {
-		case fatalErr <- err:
+		case firstErr <- err:
 		default:
 		}
 	}
@@ -538,11 +558,11 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 		ctx.Logger().V(2).Info("enumerating source")
 		defer common.RecoverWithHandler(ctx, func(err error) {
 			report.ReportError(Fatal{err})
-			catchFirstFatal(Fatal{err})
+			catchFirstError(Fatal{err})
 		})
 		if err := source.Enumerate(ctx, unitReporter); err != nil {
-			report.ReportError(Fatal{err})
-			catchFirstFatal(Fatal{err})
+			report.ReportError(jobErr(ctx, err))
+			catchFirstError(jobErr(ctx, err))
 		}
 	}()
 	var wg sync.WaitGroup
@@ -567,11 +587,11 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 			ctx.Logger().V(3).Info("chunking unit")
 			defer common.RecoverWithHandler(ctx, func(err error) {
 				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
-				catchFirstFatal(Fatal{err})
+				catchFirstError(Fatal{err})
 			})
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
-				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
-				catchFirstFatal(Fatal{err})
+				report.ReportError(jobErr(ctx, ChunkError{Unit: unit, Err: err}))
+				catchFirstError(jobErr(ctx, err))
 			}
 			return nil
 		})
@@ -590,7 +610,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 	}
 	wg.Wait()
 	select {
-	case err := <-fatalErr:
+	case err := <-firstErr:
 		return err
 	default:
 		return nil
@@ -619,8 +639,8 @@ func (s *SourceManager) scanWithUnit(ctx context.Context, source SourceUnitChunk
 			chunkErr = Fatal{err}
 		})
 		if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
-			report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
-			chunkErr = Fatal{err}
+			report.ReportError(jobErr(ctx, ChunkError{Unit: unit, Err: err}))
+			chunkErr = jobErr(ctx, err)
 		}
 	}()
 	// Consume chunks and export chunks.

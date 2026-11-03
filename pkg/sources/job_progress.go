@@ -113,12 +113,38 @@ func (r *JobProgressRef) CancelRun(cause error) {
 }
 
 // Fatal is a wrapper around error to differentiate non-fatal errors from fatal
-// ones. A fatal error is typically from a finished context or any error
-// returned from a source's Init, Chunks, Enumerate, or ChunkUnit methods.
+// ones. A fatal error is one that leads to a complete failure of job,
+// typically indicated by an error from a source's Init, Chunks, Enumerate, or
+// ChunkUnit methods.
 type Fatal struct{ error }
 
 func (f Fatal) Error() string { return fmt.Sprintf("fatal: %s", f.error.Error()) }
 func (f Fatal) Unwrap() error { return f.error }
+
+// Interrupt is a wrapper around error to indicate a job ended early without
+// failing, typically because its context was cancelled, such as by CancelRun.
+type Interrupt struct{ error }
+
+func (i Interrupt) Error() string { return fmt.Sprintf("interrupted: %s", i.error.Error()) }
+func (i Interrupt) Unwrap() error { return i.error }
+
+// UserActionable is a wrapper around error to indicate a user can resolve it,
+// for example by fixing credentials or granting access. It does not determine
+// whether the error is fatal: a source can return it to fail the job, or
+// report it and continue scanning.
+type UserActionable struct{ error }
+
+// NewUserActionableError wraps err to mark it as resolvable by a user. It returns
+// nil if err is nil.
+func NewUserActionableError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return UserActionable{err}
+}
+
+func (u UserActionable) Error() string { return u.error.Error() }
+func (u UserActionable) Unwrap() error { return u.error }
 
 // ChunkError is a custom error type for errors encountered during chunking of
 // a specific unit.
@@ -420,6 +446,17 @@ func (m JobProgressMetrics) FatalErrors() error {
 		}
 	}
 	return errors.Join(aggregate...)
+}
+
+// InterruptError returns the first Interrupt error, if any, encountered in the
+// scan.
+func (m JobProgressMetrics) InterruptError() error {
+	for _, err := range m.Errors {
+		if interruptErr, found := errors.AsType[Interrupt](err); found {
+			return interruptErr
+		}
+	}
+	return nil
 }
 
 func (m JobProgressMetrics) PercentComplete() int {
