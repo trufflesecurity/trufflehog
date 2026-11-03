@@ -76,6 +76,31 @@ func TestBox_Pattern(t *testing.T) {
 			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
 		},
 		{
+			name:  "prefixed camel case token label",
+			input: "myBoxToken=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "prefixed camel case key label",
+			input: "prodBoxKey=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "Pascal case token label",
+			input: "MyBoxToken=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "lowercase embedded keyword",
+			input: "icebox=0123456789abcdef0123456789abcdef",
+			want:  nil,
+		},
+		{
+			name:  "uppercase embedded keyword",
+			input: "DROPBOX_TOKEN=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  nil,
+		},
+		{
 			name:  "hexadecimal token with explicit Box context",
 			input: "BOX_TOKEN=0123456789abcdef0123456789abcdef",
 			want:  []string{"0123456789abcdef0123456789abcdef"},
