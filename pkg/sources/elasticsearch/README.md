@@ -217,6 +217,18 @@ trufflehog elasticsearch --nodes https://localhost:9200 --index-pattern "logs-*"
 trufflehog elasticsearch --nodes https://localhost:9200 --best-effort-scan
 ```
 
+## Debug Logs
+
+With debug on for this source, the scan logs:
+
+- `V(1)`: `Elasticsearch source initialized` with the config choices (the auth method only, never the credentials, and only whether a query is set, not the query), `Listed indices` with index and document counts for each pass, and the scan coverage line when best effort scan skips documents to catch up.
+- `V(2)`: `Counted documents in index`, and `Scanning index` and `Finished scanning index` for each index a worker scans.
+- `V(3)`: `Scanning document` for each document, with its id.
+- `V(4)`: `Skipping document` with a `reason` (already scanned, no message field, no @timestamp field, no source, no document id), `Elasticsearch request failed` for every failed response including the ones the client retries, `Scanned document count differs from expected`, and `No new documents, waiting` in best effort scan.
+- `V(5)`: `Elasticsearch request` for every request, and `Fetched search page` for each page of search results.
+
+Lines carry `worker` and `index` where they apply. A failure to scan documents is logged as an error at the default level.
+
 ## Troubleshooting
 
 ### Common Issues
