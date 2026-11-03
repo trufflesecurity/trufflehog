@@ -19,12 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 	"golang.org/x/sync/errgroup"
@@ -3084,8 +3082,12 @@ func TestEnumerateWithToken_DebugLogging(t *testing.T) {
 			JSON(`[]`)
 	}
 
-	// init the source with the given context and list the repos
-	runEnumerate := func(t *testing.T, ctx context.Context) *Source {
+	// init the source and list the repos
+	runEnumerate := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		defer gock.Off()
+		mockAPI()
+
+		ctx, logs := logtest.SourceContext(debug)
 		s, conn := createTestSource(&sourcespb.GitHub{
 			Endpoint:        "https://api.github.com",
 			Credential:      &sourcespb.GitHub_Token{Token: testToken},
@@ -3093,65 +3095,22 @@ func TestEnumerateWithToken_DebugLogging(t *testing.T) {
 			IgnoreRepos:     []string{"test-user/ignored-repo"},
 		})
 		assert.NoError(t, s.Init(ctx, "test - github", 1, 1337, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
 		gock.InterceptClient(s.connector.APIClient().Client())
 
 		assert.NoError(t, s.enumerateWithToken(ctx, false, noopReporter()))
 		assert.True(t, gock.IsDone())
-		return s
+		return logs.All()
 	}
 
 	t.Run("debug on", func(t *testing.T) {
-		defer gock.Off()
-		mockAPI()
-
-		ctx, logs := logtest.DebugContext()
-		ctx = context.WithValues(ctx, "source_name", "test - github", "job_id", 1)
-		s := runEnumerate(t, ctx)
-		assert.True(t, s.filteredRepoCache.Exists("test-user/kept-repo"))
-
-		// the config line from Init shows the auth type and filters, not the token
-		initLines := logs.FilterMessage("github source initialized").All()
-		if assert.Len(t, initLines, 1) {
-			fields := initLines[0].ContextMap()
-			assert.Equal(t, "*sourcespb.GitHub_Token", fields["auth_type"])
-			assert.Equal(t, int64(1), fields["ignore_repo_count"])
-			assert.Equal(t, true, fields["exclude_archived"])
-		}
-
-		// the page line and one skip line for each skipped repo, with the reason
-		assert.Equal(t, 1, logs.FilterMessage("Listed repos").Len())
-		reasons := map[string]string{}
-		for _, entry := range logs.FilterMessage("skipping repository").All() {
-			fields := entry.ContextMap()
-			reasons[fields["repo"].(string)] = fields["reason"].(string)
-		}
-		assert.Equal(t, map[string]string{
-			"test-user/forked-repo":   "forks are not included",
-			"test-user/archived-repo": "archived repos are excluded",
-			"test-user/ignored-repo":  "excluded by include or ignore filter",
-		}, reasons)
-
-		// every line came from the context logger, so it has the source fields,
-		// and no line contains the token
-		for _, entry := range logs.All() {
-			fields := entry.ContextMap()
-			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
-			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
-			assert.NotContains(t, entry.Message, testToken)
-			assert.NotContains(t, fmt.Sprint(fields), testToken)
-		}
+		logtest.CheckSourceLines(t, runEnumerate(t, true), testToken)
 	})
 
 	t.Run("debug off", func(t *testing.T) {
-		defer gock.Off()
-		mockAPI()
-
-		core, logs := observer.New(zapcore.InfoLevel)
-		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
-		runEnumerate(t, ctx)
-
-		assert.Zero(t, logs.FilterMessage("Listed repos").Len())
-		assert.Zero(t, logs.FilterMessage("skipping repository").Len())
+		logtest.CheckNoDebugLines(t, runEnumerate(t, false))
 	})
 }
 
@@ -3173,7 +3132,7 @@ func TestScan_LogsResumeAndCancelSkips(t *testing.T) {
 
 	// cancel before the scan starts, so no repo is cloned and each one is
 	// skipped with a log line instead
-	debugCtx, logs := logtest.DebugContext()
+	debugCtx, logs := logtest.SourceContext(true)
 	ctx, cancel := context.WithCancel(debugCtx)
 	cancel()
 
@@ -3185,17 +3144,7 @@ func TestScan_LogsResumeAndCancelSkips(t *testing.T) {
 		assert.Equal(t, int64(2), resumeLines[0].ContextMap()["remaining"])
 	}
 
-	var cancelled []string
-	for _, entry := range logs.FilterMessage("skipping repo").All() {
-		assert.Equal(t, "scan cancelled", entry.ContextMap()["reason"])
-		cancelled = append(cancelled, entry.ContextMap()["repo"].(string))
-	}
-	assert.ElementsMatch(t, []string{"https://github.com/org/b.git", "https://github.com/org/c.git"}, cancelled)
-
-	for _, entry := range logs.All() {
-		assert.NotContains(t, entry.Message, testToken)
-		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), testToken)
-	}
+	logtest.CheckSourceLines(t, logs.All(), testToken)
 }
 
 func TestInit_InvalidRepoErrorDoesNotLogToken(t *testing.T) {
@@ -3209,19 +3158,11 @@ func TestInit_InvalidRepoErrorDoesNotLogToken(t *testing.T) {
 		Repositories: []string{"https://" + testToken + "@github.com/org"},
 	})
 
-	ctx, logs := logtest.DebugContext()
+	ctx, logs := logtest.SourceContext(true)
 	assert.NoError(t, s.Init(ctx, "test - github", 0, 1337, false, conn, 1))
 
-	errLines := logs.FilterMessage("invalid repository").All()
-	if assert.Len(t, errLines, 1) {
-		fields := errLines[0].ContextMap()
-		assert.Equal(t, "https://github.com/org", fields["repo"])
-		assert.Contains(t, fields["error"], "missing the repo name")
-	}
-	for _, entry := range logs.All() {
-		assert.NotContains(t, entry.Message, testToken)
-		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), testToken)
-	}
+	logtest.CheckInitLine(t, logs.All())
+	logtest.CheckSourceLines(t, logs.All(), testToken)
 }
 
 func TestAddReposForMembers_StopsOnCancel(t *testing.T) {
@@ -3232,12 +3173,12 @@ func TestAddReposForMembers_StopsOnCancel(t *testing.T) {
 	s.memberCache = map[string]struct{}{"member1": {}, "member2": {}}
 
 	// cancel before the loop starts, so no member is fetched and no error is logged
-	debugCtx, logs := logtest.DebugContext()
+	debugCtx, logs := logtest.SourceContext(true)
 	ctx, cancel := context.WithCancel(debugCtx)
 	cancel()
 
 	s.addReposForMembers(ctx, noopReporter())
 
-	assert.Equal(t, 1, logs.FilterMessage("skipping remaining members").Len())
 	assert.Zero(t, logs.FilterLevelExact(zapcore.ErrorLevel).Len())
+	logtest.CheckSourceLines(t, logs.All())
 }

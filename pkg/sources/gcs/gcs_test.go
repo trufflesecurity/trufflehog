@@ -15,13 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -537,8 +534,9 @@ func TestSource_DebugLogging(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("STORAGE_EMULATOR_HOST", srv.Listener.Addr().String())
 
-	runSource := func(t *testing.T, ctx context.Context) {
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
 		t.Helper()
+		ctx, logs := logtest.SourceContext(debug)
 		s, conn := createTestSource(&sourcespb.GCS{
 			IncludeBuckets: []string{bkt},
 			ExcludeObjects: []string{"skip/*"},
@@ -546,78 +544,21 @@ func TestSource_DebugLogging(t *testing.T) {
 			Credential:     &sourcespb.GCS_Unauthenticated{},
 		})
 		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
 
 		chunksCh := make(chan *sources.Chunk, 10)
 		require.NoError(t, s.Chunks(ctx, chunksCh))
 		close(chunksCh)
-
-		var files []string
-		for chunk := range chunksCh {
-			files = append(files, chunk.SourceMetadata.GetGcs().GetFilename())
-		}
-		assert.Equal(t, []string{"secret.txt"}, files)
+		return logs.All()
 	}
 
 	t.Run("debug on", func(t *testing.T) {
-		ctx, logs := logtest.DebugContext()
-		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
-		runSource(t, ctx)
-
-		// lines from each level show up
-		for _, msg := range []string{
-			"GCS source finished processing objects",       // V(0)
-			"GCS source initialized",                       // V(1)
-			"Enumerating buckets",                          // V(1)
-			"Finished enumerating buckets",                 // V(1)
-			"Using configured buckets, listing needs auth", // V(1)
-			"Enumerated bucket",                            // V(2)
-			"Listing objects in bucket",                    // V(2)
-			"Finished listing objects in bucket",           // V(2)
-			"Scanning object",                              // V(3)
-			"Skipping object",                              // V(4)
-			"Retrying GCS request",                         // V(4)
-		} {
-			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
-		}
-
-		// each skip says why, and carries the bucket and object
-		reasons := map[string]string{}
-		for _, entry := range logs.FilterMessage("Skipping object").All() {
-			fields := entry.ContextMap()
-			assert.Equal(t, bkt, fields["bucket"])
-			reasons[fmt.Sprint(fields["object"])] = fmt.Sprint(fields["reason"])
-		}
-		assert.Equal(t, map[string]string{
-			"video.mp4":  "file type is skipped",
-			"big.txt":    "size out of range",
-			"skip/x.txt": "matches filter",
-		}, reasons)
-
-		listed := logs.FilterMessage("Finished listing objects in bucket").All()
-		require.Len(t, listed, 1)
-		assert.EqualValues(t, 1, listed[0].ContextMap()["objects"])
-		assert.EqualValues(t, 3, listed[0].ContextMap()["skipped"])
-
-		// skipped objects are not errors
-		assert.Zero(t, logs.FilterLevelExact(zapcore.ErrorLevel).Len(), "unexpected errors: %v", logs.FilterLevelExact(zapcore.ErrorLevel).All())
-
-		// every line came from the context logger, so it carries the source fields,
-		// and none of them contain the secret
-		for _, entry := range logs.All() {
-			fields := entry.ContextMap()
-			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
-			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
-			assert.NotContains(t, entry.Message, testSecret)
-			assert.NotContains(t, fmt.Sprint(fields), testSecret)
-		}
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
 	})
 
 	t.Run("debug off", func(t *testing.T) {
-		core, logs := observer.New(zapcore.InfoLevel)
-		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
-		runSource(t, ctx)
-
-		require.Equal(t, 1, logs.Len(), "unexpected lines: %v", logs.All())
-		assert.Equal(t, "GCS source finished processing objects", logs.All()[0].Message)
+		logtest.CheckNoDebugLines(t, runSource(t, false))
 	})
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -754,4 +755,20 @@ func TestSourceManagerAddsSourceFieldsToLogs(t *testing.T) {
 		assert.Equal(t, 1, count)
 		assert.Equal(t, "set by caller", entry.ContextMap()["source_name"])
 	})
+}
+
+// logtest.SourceFields must match the fields withSourceFields adds, since source
+// tests check every line for them.
+func TestSourceFieldsMatchLogtest(t *testing.T) {
+	ctx, logs := logtest.DebugContext()
+	source, err := buildDummy(&counterChunker{count: 1})
+	require.NoError(t, err)
+
+	withSourceFields(ctx, source, NewJobProgress(1, 2, "dummy")).Logger().Info("line")
+
+	var keys []string
+	for key := range logs.All()[0].ContextMap() {
+		keys = append(keys, key)
+	}
+	assert.ElementsMatch(t, logtest.SourceFields, keys)
 }

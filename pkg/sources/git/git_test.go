@@ -13,12 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/zapr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -2345,9 +2342,13 @@ func TestSource_DebugLogging(t *testing.T) {
 	assert.NoError(t, err)
 
 	// run the source and drain its chunks, the way the engine does
-	runSource := func(ctx context.Context) {
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		ctx, logs := logtest.SourceContext(debug)
 		s := Source{}
 		assert.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
 
 		chunksCh := make(chan *sources.Chunk, 64)
 		go func() {
@@ -2356,49 +2357,22 @@ func TestSource_DebugLogging(t *testing.T) {
 		}()
 		assert.NoError(t, s.Chunks(ctx, chunksCh))
 		close(chunksCh)
+		return logs.All()
 	}
 
 	t.Run("debug on", func(t *testing.T) {
-		ctx, logs := logtest.DebugContext()
-		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
-		runSource(ctx)
-
-		// lines from each level we care about show up
-		for _, msg := range []string{
-			"git source initialized",     // V(1)
-			"successfully cloned repo",   // V(2)
-			"scanning commit",            // V(3)
-			"git subcommand finished",    // V(5)
-			"scanning git repo complete", // V(2)
-		} {
-			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
-		}
-
-		// every line came from the context logger, so it carries the source fields,
-		// and none of them contain the secret
-		for _, entry := range logs.All() {
-			fields := entry.ContextMap()
-			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
-			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
-			assert.NotContains(t, entry.Message, testSecret)
-			assert.NotContains(t, fmt.Sprint(fields), testSecret)
-		}
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
 	})
 
 	t.Run("debug off", func(t *testing.T) {
-		core, logs := observer.New(zapcore.InfoLevel)
-		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
-		runSource(ctx)
-
-		assert.Zero(t, logs.FilterMessage("git subcommand finished").Len())
-		assert.Zero(t, logs.FilterMessage("scanning commit").Len())
+		logtest.CheckNoDebugLines(t, runSource(t, false))
 	})
 }
 
 func TestCloneRepo_DoesNotLogToken(t *testing.T) {
 	const token = "TESTTOKEN-do-not-log-1234567890"
 
-	ctx, logs := logtest.DebugContext()
+	ctx, logs := logtest.SourceContext(true)
 
 	// nothing listens on port 1, so the clone fails fast and is not retried;
 	// the token is passed separately and only added to the URL inside CloneRepo
@@ -2406,11 +2380,7 @@ func TestCloneRepo_DoesNotLogToken(t *testing.T) {
 	assert.Error(t, err)
 	assert.NotContains(t, err.Error(), token)
 
-	assert.NotZero(t, logs.FilterMessage("git clone attempt failed").Len())
-	for _, entry := range logs.All() {
-		assert.NotContains(t, entry.Message, token)
-		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), token)
-	}
+	logtest.CheckSourceLines(t, logs.All(), token)
 }
 
 func TestRedactPasswords(t *testing.T) {

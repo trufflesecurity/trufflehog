@@ -2,7 +2,6 @@ package postman
 
 import (
 	"fmt"
-	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -10,12 +9,9 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"github.com/go-logr/zapr"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -1072,8 +1068,9 @@ func TestSource_DebugLogging(t *testing.T) {
 			}})
 	}
 
-	runSource := func(t *testing.T, ctx context.Context) {
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
 		t.Helper()
+		ctx, logs := logtest.SourceContext(debug)
 		defer gock.Off()
 		mockAPI()
 
@@ -1086,6 +1083,9 @@ func TestSource_DebugLogging(t *testing.T) {
 		// data is only sent with a detector keyword next to it, the engine sets these
 		s.DetectorKeywords = map[string]struct{}{"api_key": {}}
 		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
 
 		// intercept the client inside the retryable client, so the retry and response
 		// hooks still run
@@ -1097,73 +1097,16 @@ func TestSource_DebugLogging(t *testing.T) {
 		require.NoError(t, s.Chunks(ctx, chunksCh))
 		close(chunksCh)
 
-		var found bool
-		for chunk := range chunksCh {
-			if strings.Contains(string(chunk.Data), testSecret) {
-				found = true
-			}
-		}
-		assert.True(t, found, "secret was not scanned")
 		assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
+		return logs.All()
 	}
 
 	t.Run("debug on", func(t *testing.T) {
-		ctx, logs := logtest.DebugContext()
-		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
-		runSource(t, ctx)
-
-		// lines from each level show up
-		for _, msg := range []string{
-			"Postman source initialized",   // V(1)
-			"Scanning workspace",           // V(2)
-			"Scanning collection",          // V(2)
-			"Scanning environment",         // V(3)
-			"Scanning item",                // V(3)
-			"Skipping collection",          // V(4)
-			"Skipping environment",         // V(4)
-			"Skipping item",                // V(4)
-			"Postman API request failed",   // V(4)
-			"Retrying Postman API request", // V(4)
-			"Fetching workspace",           // V(5)
-			"Postman API response",         // V(5)
-			"Sending chunk",                // V(5)
-		} {
-			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
-		}
-
-		failed := logs.FilterMessage("Postman API request failed").All()
-		require.Len(t, failed, 1)
-		assert.Equal(t, "/workspaces/ws1", failed[0].ContextMap()["path"])
-		assert.EqualValues(t, http.StatusServiceUnavailable, failed[0].ContextMap()["status"])
-
-		for _, msg := range []string{"Skipping collection", "Skipping environment"} {
-			skips := logs.FilterMessage(msg).All()
-			require.Len(t, skips, 1, msg)
-			assert.Equal(t, "matches filter", skips[0].ContextMap()["reason"])
-		}
-		skips := logs.FilterMessage("Skipping item").All()
-		require.Len(t, skips, 1)
-		assert.Equal(t, "already seen", skips[0].ContextMap()["reason"])
-
-		// every line came from the context logger, so it carries the source fields,
-		// and none of them contain the token or the secret
-		for _, entry := range logs.All() {
-			fields := entry.ContextMap()
-			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
-			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
-			for _, value := range []string{testToken, testSecret} {
-				assert.NotContains(t, entry.Message, value)
-				assert.NotContains(t, fmt.Sprint(fields), value)
-			}
-		}
+		logtest.CheckSourceLines(t, runSource(t, true), testToken, testSecret)
 	})
 
 	t.Run("debug off", func(t *testing.T) {
-		core, logs := observer.New(zapcore.InfoLevel)
-		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
-		runSource(t, ctx)
-
-		assert.Zero(t, logs.Len(), "unexpected lines: %v", logs.All())
+		logtest.CheckNoDebugLines(t, runSource(t, false))
 	})
 }
 
