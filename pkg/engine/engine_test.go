@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,12 +17,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 	"pgregory.net/rapid"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
@@ -2037,6 +2040,96 @@ func TestEngine_DetectChunk_CacheHitIsNotVerificationSkipped(t *testing.T) {
 	for _, result := range []detectors.ResultWithMetadata{first, second} {
 		assert.False(t, result.VerificationSkipped)
 		assert.True(t, result.Verified)
+	}
+}
+
+// slowDetectorType is used only by slowDetector, so its detectorExecutionDuration series isn't shared with other tests.
+const slowDetectorType = detector_typepb.DetectorType(-1001)
+
+// slowDetector takes a fixed time on every FromData call and returns no results, so tests can check what
+// detectorExecutionDuration records for each detector run.
+type slowDetector struct {
+	delay time.Duration
+}
+
+func (d slowDetector) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	time.Sleep(d.delay)
+	return nil, nil
+}
+func (d slowDetector) Keywords() []string                 { return []string{"keyword"} }
+func (d slowDetector) Type() detector_typepb.DetectorType { return slowDetectorType }
+func (d slowDetector) Description() string                { return "slow detector for testing" }
+
+// detectorExecutionDurationSnapshot reads one detector's detectorExecutionDuration series from the default gatherer.
+// It returns the observation count and the cumulative count for each bucket upper bound.
+func detectorExecutionDurationSnapshot(t *testing.T, detectorName string) (uint64, map[float64]uint64) {
+	t.Helper()
+
+	families, err := prometheus.DefaultGatherer.Gather()
+	require.NoError(t, err)
+
+	name := prometheus.BuildFQName(common.MetricsNamespace, common.MetricsSubsystem, "detector_execution_duration")
+	buckets := map[float64]uint64{}
+	for _, family := range families {
+		if family.GetName() != name {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			for _, label := range metric.GetLabel() {
+				if label.GetName() != "detector_name" || label.GetValue() != detectorName {
+					continue
+				}
+				for _, bucket := range metric.GetHistogram().GetBucket() {
+					buckets[bucket.GetUpperBound()] = bucket.GetCumulativeCount()
+				}
+				return metric.GetHistogram().GetSampleCount(), buckets
+			}
+		}
+	}
+	return 0, buckets
+}
+
+// TestEngine_DetectChunk_RecordsDurationPerDetectorRun validates that detectorExecutionDuration records one
+// observation per keyword match, each timing only that match's FromData call, whether or not the
+// printAvgDetectorTime report is enabled.
+func TestEngine_DetectChunk_RecordsDurationPerDetectorRun(t *testing.T) {
+	ctx := context.Background()
+	const delay = 80 * time.Millisecond
+
+	for _, printAvgDetectorTime := range []bool{false, true} {
+		t.Run(fmt.Sprintf("printAvgDetectorTime=%v", printAvgDetectorTime), func(t *testing.T) {
+			// Arrange: Create a minimal engine with a passthrough verification cache.
+			e := &Engine{
+				verificationCache:    verificationcache.New(nil, &verificationcache.InMemoryMetrics{}),
+				printAvgDetectorTime: printAvgDetectorTime,
+			}
+
+			// Arrange: Place two keywords far enough apart that their match windows don't merge, so the detector runs
+			// twice on one chunk.
+			data := []byte("keyword" + strings.Repeat(" ", 4096) + "keyword")
+			ahcore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{slowDetector{delay: delay}})
+			detectorMatches := ahcore.FindDetectorMatches(data)
+			require.Len(t, detectorMatches, 1)
+			require.Len(t, detectorMatches[0].Matches(), 2)
+
+			detectorName := slowDetectorType.String()
+			countBefore, bucketsBefore := detectorExecutionDurationSnapshot(t, detectorName)
+
+			// Act
+			e.detectChunk(ctx, detectableChunk{
+				detector: detectorMatches[0],
+				verify:   true,
+				wgDoneFn: func() {},
+			})
+
+			// Assert: Each run takes about 80ms, so per-run timing puts both observations above the 25ms bound and at
+			// or below the 125ms bound. Timing from the start of the chunk would put the second run near 160ms, and
+			// an unset start time would put both past the largest bound.
+			countAfter, bucketsAfter := detectorExecutionDurationSnapshot(t, detectorName)
+			assert.Equal(t, uint64(2), countAfter-countBefore)
+			assert.Equal(t, uint64(0), bucketsAfter[25]-bucketsBefore[25])
+			assert.Equal(t, uint64(2), bucketsAfter[125]-bucketsBefore[125])
+		})
 	}
 }
 
