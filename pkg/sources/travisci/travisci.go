@@ -80,7 +80,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3, common.WithAPILogHooks("travisci"))
 		log.RedactGlobally(conn.GetToken())
 
-		user, _, err := s.client.User.Current(ctx, nil)
+		user, _, err := s.client.User.Current(ctx, nil) //nolint:bodyclose // go-travis closes the body in Client.Do
 		if err != nil {
 			return errors.WrapPrefix(err, "error getting testing travis client", 0)
 		}
@@ -100,7 +100,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	ctx.Logger().V(1).Info("Enumerating repositories")
 	count := 0
 	for repoPage := 0; ; repoPage++ {
-		repositories, _, err := s.client.Repositories.List(ctx, &travis.RepositoriesOption{
+		repositories, _, err := s.client.Repositories.List(ctx, &travis.RepositoriesOption{ //nolint:bodyclose // go-travis closes the body in Client.Do
 			Limit:  pageSize,
 			Offset: repoPage * pageSize,
 		})
@@ -140,7 +140,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 // ChunkUnit implements SourceUnitChunker interface.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, _ := unit.SourceUnitID()
-	repo, _, err := s.client.Repositories.Find(ctx, repoURL, nil)
+	repo, _, err := s.client.Repositories.Find(ctx, repoURL, nil) //nolint:bodyclose // go-travis closes the body in Client.Do
 	if err != nil {
 		return fmt.Errorf("error finding repository: %w", err)
 	}
@@ -151,7 +151,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	// case the API always returns an error.
 	var buildPageErrs int
 	for buildPage := 0; ; buildPage++ {
-		builds, _, err := s.client.Builds.ListByRepoSlug(repoCtx, *repo.Slug, &travis.BuildsByRepoOption{
+		builds, _, err := s.client.Builds.ListByRepoSlug(repoCtx, *repo.Slug, &travis.BuildsByRepoOption{ //nolint:bodyclose // go-travis closes the body in Client.Do
 			Limit:  pageSize,
 			Offset: buildPage * pageSize,
 		})
@@ -176,7 +176,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 
 		for _, build := range builds {
 			buildCtx := context.WithValues(repoCtx, "build", stringValue(build.Number))
-			jobs, _, err := s.client.Jobs.ListByBuild(buildCtx, *build.Id)
+			jobs, _, err := s.client.Jobs.ListByBuild(buildCtx, *build.Id) //nolint:bodyclose // go-travis closes the body in Client.Do
 			if err != nil {
 				buildCtx.Logger().Error(err, "Failed to list jobs for build")
 				if err := reporter.ChunkErr(buildCtx, err); err != nil {
@@ -194,7 +194,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 
 			for _, job := range jobs {
 				jobCtx := context.WithValues(buildCtx, "job_number", stringValue(job.Number))
-				log, _, err := s.client.Logs.FindByJobId(jobCtx, *job.Id)
+				log, _, err := s.client.Logs.FindByJobId(jobCtx, *job.Id) //nolint:bodyclose // go-travis closes the body in Client.Do
 				if err != nil {
 					jobCtx.Logger().Error(err, "Failed to get job log")
 					if err := reporter.ChunkErr(jobCtx, err); err != nil {
