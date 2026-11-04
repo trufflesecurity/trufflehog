@@ -67,8 +67,8 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Log with the request's context when it has a logger, so the lines get the caller's fields and log level
 	// (including per-source debug). r.logger is the fallback for requests made without one.
 	baseLogger := r.logger
-	if ctx, ok := req.Context().(context.Context); ok {
-		baseLogger = ctx.Logger()
+	if logger, ok := context.LoggerFromContext(req.Context()); ok {
+		baseLogger = logger
 	}
 
 	retries := 0
@@ -111,14 +111,16 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			)
 
 			retries++
+			// This response is dropped for the retry or the cancel below, so close it here or the
+			// connection leaks.
+			if response != nil {
+				_ = response.Body.Close()
+			}
 			// Stop waiting if the caller gives up, a retry wait can be 30 seconds or more.
 			select {
 			case <-req.Context().Done():
 				// Return the cancel, not the last attempt's result, so the caller sees an interrupt
 				// rather than an HTTP failure.
-				if response != nil {
-					_ = response.Body.Close()
-				}
 				return nil, req.Context().Err()
 			case <-time.After(duration):
 			}
