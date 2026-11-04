@@ -21,10 +21,11 @@ import (
 const (
 	SourceType = sourcespb.SourceType_SOURCE_TYPE_TRAVISCI
 
-	baseURL = "https://api.travis-ci.com/"
-
 	pageSize = 100
 )
+
+// baseURL is a var so tests can point it at a fake server.
+var baseURL = "https://api.travis-ci.com/"
 
 type Source struct {
 	name     string
@@ -76,14 +77,18 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			return errors.New("token is empty")
 		}
 		s.client = travis.NewClient(baseURL, conn.GetToken())
-		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
+		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3, common.WithAPILogHooks("travisci"))
 		log.RedactGlobally(conn.GetToken())
 
 		user, _, err := s.client.User.Current(ctx, nil)
 		if err != nil {
 			return errors.WrapPrefix(err, "error getting testing travis client", 0)
 		}
-		ctx.Logger().V(2).Info("authenticated to Travis CI with user", "username", user.Login)
+		ctx.Logger().V(1).Info("Travis CI source initialized",
+			"username", stringValue(user.Login),
+			"auth_type", "token",
+			"concurrency", concurrency,
+		)
 	default:
 		return errors.New("credential type not implemented for Travis CI")
 	}
@@ -92,6 +97,8 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+	ctx.Logger().V(1).Info("Enumerating repositories")
+	count := 0
 	for repoPage := 0; ; repoPage++ {
 		repositories, _, err := s.client.Repositories.List(ctx, &travis.RepositoriesOption{
 			Limit:  pageSize,
@@ -101,11 +108,13 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			if repoPage == 0 {
 				return fmt.Errorf("error listing repositories: %w", err)
 			}
+			ctx.Logger().Error(err, "Failed to list repositories page", "page", repoPage)
 			err = reporter.UnitErr(ctx, err)
 			if err != nil {
 				return fmt.Errorf("error reporting error: %w", err)
 			}
 		}
+		ctx.Logger().V(4).Info("Fetched repository page", "page", repoPage, "count", len(repositories))
 
 		if len(repositories) == 0 {
 			break
@@ -119,9 +128,11 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			if err != nil {
 				return fmt.Errorf("error reporting unit: %w", err)
 			}
-			ctx.Logger().V(2).Info("enumerated repository", "id", repo.Id, "name", repo.Name)
+			count++
+			ctx.Logger().V(2).Info("Enumerated repository", "id", *repo.Id, "name", stringValue(repo.Name))
 		}
 	}
+	ctx.Logger().V(1).Info("Finished enumerating repositories", "count", count)
 
 	return nil
 }
@@ -133,19 +144,20 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	if err != nil {
 		return fmt.Errorf("error finding repository: %w", err)
 	}
-	logger := ctx.Logger().WithValues("repo", *repo.Name)
-	logger.V(2).Info("scanning repository")
+	repoCtx := context.WithValues(ctx, "repo", *repo.Name)
+	repoCtx.Logger().V(2).Info("Scanning repository")
 
 	// Counts continuous errors from ListByRepoSlug. Used to quit early in
 	// case the API always returns an error.
 	var buildPageErrs int
 	for buildPage := 0; ; buildPage++ {
-		builds, _, err := s.client.Builds.ListByRepoSlug(ctx, *repo.Slug, &travis.BuildsByRepoOption{
+		builds, _, err := s.client.Builds.ListByRepoSlug(repoCtx, *repo.Slug, &travis.BuildsByRepoOption{
 			Limit:  pageSize,
 			Offset: buildPage * pageSize,
 		})
 		if err != nil {
-			if err := reporter.ChunkErr(ctx, err); err != nil {
+			repoCtx.Logger().Error(err, "Failed to list builds page", "page", buildPage)
+			if err := reporter.ChunkErr(repoCtx, err); err != nil {
 				return err
 			}
 			buildPageErrs++
@@ -156,35 +168,52 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 		// Reset the page error counter.
 		buildPageErrs = 0
+		repoCtx.Logger().V(4).Info("Fetched builds page", "page", buildPage, "count", len(builds))
 
 		if len(builds) == 0 {
 			break
 		}
 
 		for _, build := range builds {
-			jobs, _, err := s.client.Jobs.ListByBuild(ctx, *build.Id)
+			buildCtx := context.WithValues(repoCtx, "build", stringValue(build.Number))
+			jobs, _, err := s.client.Jobs.ListByBuild(buildCtx, *build.Id)
 			if err != nil {
-				if err := reporter.ChunkErr(ctx, err); err != nil {
+				buildCtx.Logger().Error(err, "Failed to list jobs for build")
+				if err := reporter.ChunkErr(buildCtx, err); err != nil {
 					return err
 				}
 				continue
 			}
 
+			// A build with no jobs used to stop the rest of the page.
 			if len(jobs) == 0 {
-				break
+				buildCtx.Logger().V(4).Info("Skipping build", "reason", "no jobs")
+				continue
 			}
+			buildCtx.Logger().V(3).Info("Scanning build", "jobs", len(jobs))
 
 			for _, job := range jobs {
-				log, _, err := s.client.Logs.FindByJobId(ctx, *job.Id)
+				jobCtx := context.WithValues(buildCtx, "job_number", stringValue(job.Number))
+				log, _, err := s.client.Logs.FindByJobId(jobCtx, *job.Id)
 				if err != nil {
-					if err := reporter.ChunkErr(ctx, err); err != nil {
+					jobCtx.Logger().Error(err, "Failed to get job log")
+					if err := reporter.ChunkErr(jobCtx, err); err != nil {
 						return err
 					}
 					continue
 				}
+				// A job that has not started yet has no log.
+				if log.Content == nil {
+					jobCtx.Logger().V(4).Info("Skipping job", "reason", "no log content")
+					continue
+				}
 
-				logger.V(3).Info("scanning job", "id", *job.Id, "number", *job.Number)
+				jobCtx.Logger().V(3).Info("Scanning job", "id", *job.Id)
 
+				var owner string
+				if job.Owner != nil {
+					owner = stringValue(job.Owner.Login)
+				}
 				chunk := sources.Chunk{
 					SourceType: s.Type(),
 					SourceName: s.name,
@@ -194,11 +223,11 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 					SourceMetadata: &source_metadatapb.MetaData{
 						Data: &source_metadatapb.MetaData_TravisCI{
 							TravisCI: &source_metadatapb.TravisCI{
-								Username:    *job.Owner.Login,
+								Username:    owner,
 								Repository:  *repo.Name,
-								BuildNumber: *build.Number,
-								JobNumber:   *job.Number,
-								Link:        fmt.Sprintf("https://app.travis-ci.com/github/%s/%s/jobs/%d", *job.Owner.Login, *repo.Name, *job.Id),
+								BuildNumber: stringValue(build.Number),
+								JobNumber:   stringValue(job.Number),
+								Link:        fmt.Sprintf("https://app.travis-ci.com/github/%s/%s/jobs/%d", owner, *repo.Name, *job.Id),
 								Public:      !*repo.Private,
 							},
 						},
@@ -206,7 +235,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 					SourceVerify: s.verify,
 				}
 
-				if err := reporter.ChunkOk(ctx, chunk); err != nil {
+				if err := reporter.ChunkOk(jobCtx, chunk); err != nil {
 					return err
 				}
 
@@ -218,6 +247,14 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 
 	return nil
+}
+
+// stringValue returns the string a go-travis field points to, or "" if it is nil.
+func stringValue(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // Chunks emits chunks of bytes over a channel.

@@ -101,6 +101,18 @@ export CIRCLECI_TOKEN=cci_xxxxxxxxxxxxxxxxxxxx
 trufflehog circleci
 ```
 
+## Debug Logs
+
+With debug on for this source, the scan logs:
+
+- `V(1)`: `CircleCI source initialized` with the auth type (never the token), and `Listing projects` and `Listed projects` with the project count.
+- `V(2)`: `Scanning project` and `Finished scanning project` for each project, and `Listed builds` with its build count.
+- `V(3)`: `Scanning build` with its step count.
+- `V(4)`: `Scanning step output` for each step, `Skipping project` with a `reason` (no builds), `API request failed` (with `api=circleci`) for any response of 400 or above, and `Retrying API request` for each retry.
+- `V(5)`: `Listing project builds` and `Fetching build`.
+
+Lines carry `repository_name` and `build_number` where they apply. Step output URLs are signed, so they are never logged, only their path in the API lines. Failures to list builds, fetch a build, or get a step output (including an expired output URL) are logged as errors at the default level.
+
 ## Troubleshooting
 
 ### Common Issues
