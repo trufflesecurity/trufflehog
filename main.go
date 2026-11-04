@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -718,8 +719,24 @@ func run(state overseer.State, logSync func() error) {
 		)
 	}
 
+	// Write out and close every --output file, even when the scan fails, so they hold whatever
+	// was found (SARIF in particular is only written on close).
+	closeOutputFiles := func() error {
+		var errs []error
+		for _, o := range outputFiles {
+			if err := o.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("%s output %s: %w", o.Spec.Format, o.Spec.Path, err))
+			}
+		}
+		return errors.Join(errs...)
+	}
+
 	if *compareDetectionStrategies {
-		if err := compareScans(ctx, cmd, engConf); err != nil {
+		err := compareScans(ctx, cmd, engConf)
+		if closeErr := closeOutputFiles(); closeErr != nil {
+			logger.Error(closeErr, "error writing output files")
+		}
+		if err != nil {
 			logFatal(err, "error comparing detection strategies")
 		}
 		return
@@ -727,21 +744,23 @@ func run(state overseer.State, logSync func() error) {
 
 	metrics, err := runSingleScan(ctx, cmd, engConf)
 	if err != nil {
+		if closeErr := closeOutputFiles(); closeErr != nil {
+			logger.Error(closeErr, "error writing output files")
+		}
 		logFatal(err, "error running scan")
 	}
 
 	// SARIF can't be streamed like the other output formats: it's a single JSON document
 	// wrapping every result, so it's buffered by the printer and written out here, once
 	// scanning has fully finished.
+	var flushErr error
 	if sarifPrinter, ok := printer.(*output.SarifPrinter); ok {
 		if err := sarifPrinter.Flush(os.Stdout); err != nil {
-			logFatal(err, "error writing SARIF output")
+			flushErr = fmt.Errorf("error writing SARIF output: %w", err)
 		}
 	}
-	for _, o := range outputFiles {
-		if err := o.Close(); err != nil {
-			logFatal(err, "error writing output file", "format", o.Spec.Format, "path", o.Spec.Path)
-		}
+	if err := errors.Join(flushErr, closeOutputFiles()); err != nil {
+		logFatal(err, "error writing output")
 	}
 
 	verificationCacheMetricsSnapshot := struct {
@@ -897,7 +916,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ctx.Logger().Error(err, "error cleaning temp artifacts")
 		}
 
-		if *jsonLegacy {
+		if printLegacyJSON() {
 			// If JSON legacy is enabled, that means the cloned repos are not deleted yet
 			// because they were needed for outputting legacy JSON.
 			// We only clean them up here if the user did not request to persist them.
@@ -928,7 +947,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ExcludeGlobs:        *gitScanExcludeGlobs,
 			ClonePath:           *gitClonePath,
 			NoCleanup:           *gitNoCleanup,
-			PrintLegacyJSON:     *jsonLegacy,
+			PrintLegacyJSON:     printLegacyJSON(),
 			TrustLocalGitConfig: *gitTrustLocalGitConfig,
 		}
 
@@ -1003,7 +1022,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			NoCleanup:                  *githubNoCleanup,
 			IgnoreGists:                *githubIgnoreGists,
 			ExcludeArchived:            *githubExcludeArchived,
-			PrintLegacyJSON:            *jsonLegacy,
+			PrintLegacyJSON:            printLegacyJSON(),
 		}
 
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
@@ -1050,7 +1069,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			AuthInUrl:       *gitlabAuthInUrl,
 			ClonePath:       *gitlabClonePath,
 			NoCleanup:       *gitlabNoCleanup,
-			PrintLegacyJSON: *jsonLegacy,
+			PrintLegacyJSON: printLegacyJSON(),
 		}
 
 		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {
@@ -1361,6 +1380,20 @@ func parseResults(input *string) (map[string]struct{}, error) {
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
 // function will terminate the program without cleanup.
+// printLegacyJSON reports whether any output, stdout or a --output file, uses the legacy JSON
+// format. Git-based sources keep their clones around for it, since it reads commit details from them.
+func printLegacyJSON() bool {
+	if *jsonLegacy {
+		return true
+	}
+	for _, value := range *fileOutputs {
+		if spec, err := output.ParseFileOutputSpec(value); err == nil && spec.Format == output.FormatLegacyJSON {
+			return true
+		}
+	}
+	return false
+}
+
 func logFatalFunc(logger logr.Logger, logSync func() error) func(error, string, ...any) {
 	return func(err error, message string, keyAndVals ...any) {
 		logger.Error(err, message, keyAndVals...)

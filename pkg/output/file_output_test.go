@@ -94,6 +94,23 @@ func TestPrintersWriteToOut(t *testing.T) {
 	assert.NotContains(t, plainBuf.String(), "\x1b[", "NoColor output must not contain ANSI escape codes")
 }
 
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("no space left on device") }
+
+func TestPrintersReturnWriteErrors(t *testing.T) {
+	ctx := context.Background()
+	for name, p := range map[string]ResultPrinter{
+		"plain":          &PlainPrinter{Out: failingWriter{}, NoColor: true},
+		"json":           &JSONPrinter{Out: failingWriter{}},
+		"github-actions": &GitHubActionsPrinter{Out: failingWriter{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.ErrorContains(t, p.Print(ctx, gitResult(true)), "no space left on device")
+		})
+	}
+}
+
 func TestGitHubActionsPrinter_DeduplicatesPerPrinter(t *testing.T) {
 	ctx := context.Background()
 	var first, second bytes.Buffer
@@ -112,8 +129,8 @@ func TestOpenFileOutputs_WritesEachFormat(t *testing.T) {
 	dir := t.TempDir()
 	path := func(name string) string { return filepath.Join(dir, name) }
 
-	// a stale file is truncated rather than appended to
-	require.NoError(t, os.WriteFile(path("results.json"), []byte("stale\n"), 0o600))
+	// a stale, world-readable file is truncated rather than appended to, and locked down
+	require.NoError(t, os.WriteFile(path("results.json"), []byte("stale\n"), 0o644))
 
 	outputs, err := OpenFileOutputs([]string{
 		"json:" + path("results.json"),

@@ -141,6 +141,12 @@ func OpenFileOutputs(values []string) ([]*FileOutput, error) {
 			closeAll()
 			return nil, fmt.Errorf("could not open output file: %w", err)
 		}
+		// the mode above only applies to new files; tighten an existing one before writing secrets to it
+		if err := file.Chmod(0o600); err != nil {
+			_ = file.Close()
+			closeAll()
+			return nil, fmt.Errorf("could not restrict permissions on output file %s: %w", spec.Path, err)
+		}
 		outputs = append(outputs, &FileOutput{Spec: spec, printer: newPrinter(spec.Format, file), file: file})
 	}
 	return outputs, nil
