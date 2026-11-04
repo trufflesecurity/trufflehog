@@ -1,6 +1,5 @@
 .idea
 dist
-.env
 *.test
 [._]*.sw[a-p]
 
@@ -13,8 +12,9 @@ tmp/go-test.json
 .captain/detectors/timings.yaml
 .captain/detectors/quarantines.yaml
 .captain/detectors/flakes.yaml
-.vscode
 
 # Python
 __pycache__/
 *.pyc
+config.bat
+node_modules
