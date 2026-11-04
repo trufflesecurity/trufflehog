@@ -41,6 +41,9 @@ Output in GitHub Actions format.
 \fB--sarif\fR
 Output in SARIF format for upload to GitHub code scanning (e.g. via github/codeql-action/upload-sarif).
 .TP
+\fB--output=FORMAT:PATH\fR
+Also write results to a file, as FORMAT:PATH. FORMAT is one of plain, json, json-legacy, github-actions, sarif. Results still go to stdout in the format chosen by the other flags. You can repeat this flag. Example: --output json:results.json --output sarif:results.sarif
+.TP
 \fB--concurrency=N\fR
 Number of concurrent workers.
 .TP

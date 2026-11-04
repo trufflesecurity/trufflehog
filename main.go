@@ -56,6 +56,7 @@ var (
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
 	sarifOut            = cli.Flag("sarif", "Output in SARIF format for upload to GitHub code scanning (e.g. via github/codeql-action/upload-sarif).").Bool()
+	fileOutputs         = cli.Flag("output", "Also write results to a file, as FORMAT:PATH. FORMAT is one of "+strings.Join(output.Formats, ", ")+". Results still go to stdout in the format chosen by the other flags. You can repeat this flag. Example: --output json:results.json --output sarif:results.sarif").PlaceHolder("FORMAT:PATH").Strings()
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").PlaceHolder("N").Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
@@ -651,6 +652,20 @@ func run(state overseer.State, logSync func() error) {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
+	// --output adds file outputs alongside the stdout printer.
+	outputFiles, err := output.OpenFileOutputs(*fileOutputs)
+	if err != nil {
+		logFatal(err, "failed to configure --output")
+	}
+	dispatchPrinter := printer
+	if len(outputFiles) > 0 {
+		printers := []output.ResultPrinter{printer}
+		for _, o := range outputFiles {
+			printers = append(printers, o)
+		}
+		dispatchPrinter = output.NewMultiPrinter(printers...)
+	}
+
 	// Parse --results flag.
 	if *onlyVerified {
 		r := "verified"
@@ -676,7 +691,7 @@ func run(state overseer.State, logSync func() error) {
 		ExcludeDetectors:         *excludeDetectors,
 		CustomVerifiersOnly:      *customVerifiersOnly,
 		VerifierEndpoints:        *verifiers,
-		Dispatcher:               engine.NewPrinterDispatcher(printer),
+		Dispatcher:               engine.NewPrinterDispatcher(dispatchPrinter),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
 		NoIgnoreTag:              *noIgnoreTag,
@@ -721,6 +736,11 @@ func run(state overseer.State, logSync func() error) {
 	if sarifPrinter, ok := printer.(*output.SarifPrinter); ok {
 		if err := sarifPrinter.Flush(os.Stdout); err != nil {
 			logFatal(err, "error writing SARIF output")
+		}
+	}
+	for _, o := range outputFiles {
+		if err := o.Close(); err != nil {
+			logFatal(err, "error writing output file", "format", o.Spec.Format, "path", o.Spec.Path)
 		}
 	}
 

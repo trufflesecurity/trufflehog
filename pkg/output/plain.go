@@ -3,6 +3,7 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -26,7 +27,22 @@ var (
 )
 
 // PlainPrinter is a printer that prints results in plain text format.
-type PlainPrinter struct{ mu sync.Mutex }
+type PlainPrinter struct {
+	mu sync.Mutex
+	// Out is where results are written. Defaults to os.Stdout.
+	Out io.Writer
+	// NoColor disables ANSI colors for this printer only, e.g. when writing to a file.
+	NoColor bool
+}
+
+// fprintf writes a formatted line in the given color, or uncolored if the printer has colors off.
+func (p *PlainPrinter) fprintf(w io.Writer, c *color.Color, format string, a ...any) {
+	if p.NoColor {
+		_, _ = fmt.Fprintf(w, format, a...)
+		return
+	}
+	_, _ = c.Fprintf(w, format, a...)
+}
 
 func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
@@ -47,26 +63,32 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	printer := greenPrinter
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// color.Output is stdout, wrapped so ANSI colors also render on Windows consoles
+	w := p.Out
+	if w == nil {
+		w = color.Output
+	}
 
 	if out.Verified {
-		_, _ = boldGreenPrinter.Print("✅ Found verified result 🐷🔑\n")
+		p.fprintf(w, boldGreenPrinter, "✅ Found verified result 🐷🔑\n")
 	} else {
 		printer = whitePrinter
-		_, _ = boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
+		p.fprintf(w, boldWhitePrinter, "Found unverified result 🐷🔑❓\n")
 		if out.VerificationError != nil {
-			_, _ = yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
+			p.fprintf(w, yellowPrinter, "Verification issue: %s\n", out.VerificationError)
 		}
 	}
 
 	if r.VerificationFromCache {
-		_, _ = cyanPrinter.Print("(🔍 Using cached verification)\n")
+		p.fprintf(w, cyanPrinter, "(🔍 Using cached verification)\n")
 	}
-	_, _ = printer.Printf("Detector Type: %s\n", out.DetectorType)
-	_, _ = printer.Printf("Decoder Type: %s\n", out.DecoderType)
-	_, _ = printer.Printf("Raw result: %s\n", whitePrinter.Sprint(out.Raw))
+	p.fprintf(w, printer, "Detector Type: %s\n", out.DetectorType)
+	p.fprintf(w, printer, "Decoder Type: %s\n", out.DecoderType)
+	p.fprintf(w, printer, "Raw result: %s\n", p.sprint(whitePrinter, out.Raw))
 
 	for k, v := range r.ExtraData {
-		_, _ = printer.Printf(
+		p.fprintf(
+			w, printer,
 			"%s: %v\n",
 			cases.Title(language.AmericanEnglish).String(k),
 			v)
@@ -74,17 +96,17 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 
 	if r.StructuredData != nil {
 		for idx, v := range r.StructuredData.GithubSshKey {
-			_, _ = printer.Printf("GithubSshKey %d User: %s\n", idx, v.User)
+			p.fprintf(w, printer, "GithubSshKey %d User: %s\n", idx, v.User)
 
 			if v.PublicKeyFingerprint != "" {
-				_, _ = printer.Printf("GithubSshKey %d Fingerprint: %s\n", idx, v.PublicKeyFingerprint)
+				p.fprintf(w, printer, "GithubSshKey %d Fingerprint: %s\n", idx, v.PublicKeyFingerprint)
 			}
 		}
 
 		for idx, v := range r.StructuredData.TlsPrivateKey {
-			_, _ = printer.Printf("TlsPrivateKey %d Fingerprint: %s\n", idx, v.CertificateFingerprint)
-			_, _ = printer.Printf("TlsPrivateKey %d Verification URL: %s\n", idx, v.VerificationUrl)
-			_, _ = printer.Printf("TlsPrivateKey %d Expiration: %d\n", idx, v.ExpirationTimestamp)
+			p.fprintf(w, printer, "TlsPrivateKey %d Fingerprint: %s\n", idx, v.CertificateFingerprint)
+			p.fprintf(w, printer, "TlsPrivateKey %d Verification URL: %s\n", idx, v.VerificationUrl)
+			p.fprintf(w, printer, "TlsPrivateKey %d Expiration: %d\n", idx, v.ExpirationTimestamp)
 		}
 	}
 
@@ -99,16 +121,24 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	}
 	sort.Strings(aggregateDataKeys)
 	for _, k := range aggregateDataKeys {
-		_, _ = printer.Printf("%s: %v\n", cases.Title(language.AmericanEnglish).String(k), aggregateData[k])
+		p.fprintf(w, printer, "%s: %v\n", cases.Title(language.AmericanEnglish).String(k), aggregateData[k])
 	}
 
 	// if analysis info is not nil, means the detector added key for analyzer and result is verified
 	if r.SecretParts != nil && r.Verified {
-		_, _ = printer.Printf("Analyze: Run `trufflehog analyze` to analyze this key's permissions\n")
+		p.fprintf(w, printer, "Analyze: Run `trufflehog analyze` to analyze this key's permissions\n")
 	}
 
-	fmt.Println("")
+	_, _ = fmt.Fprintln(w, "")
 	return nil
+}
+
+// sprint colors a value inline, or returns it as is if the printer has colors off.
+func (p *PlainPrinter) sprint(c *color.Color, a ...any) string {
+	if p.NoColor {
+		return fmt.Sprint(a...)
+	}
+	return c.Sprint(a...)
 }
 
 func structToMap(obj any) (m map[string]map[string]any, err error) {
