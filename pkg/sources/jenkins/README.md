@@ -149,6 +149,18 @@ trufflehog jenkins --url https://jenkins.example.com
 trufflehog jenkins --url https://jenkins.example.com --username my-username --password my-password --insecure-skip-verify-tls
 ```
 
+## Debug Logs
+
+With debug on for this source (`debug: true` in the config), the scan logs:
+
+- `V(1)`: `initialized Jenkins source` with the auth method (never the credentials), the endpoint with any password redacted, and whether TLS verification is skipped, then the number of jobs found.
+- `V(2)`: `got builds` for each job, with its build count.
+- `V(3)`: the objects listed in each folder, each object as it is processed, and `chunking build` for each build.
+- `V(4)`: each Jenkins API page request, `Skipping object` with a `reason` for objects that are not a supported job type, and each retry of a request.
+- `V(5)`: each HTTP request with its auth type, and each response status code.
+
+Lines carry `job_name`, `build_number` and the other job and build fields where they apply. Failures to get a job's builds or a build log are logged as errors at the default level.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -174,4 +186,4 @@ trufflehog jenkins --url https://jenkins.example.com --username my-username --pa
 ---
 
 **Issue**: Some jobs are missing from the scan
-**Solution**: TruffleHog only scans Freestyle projects and Pipeline jobs, and only recurses into the plain Jenkins folder type. A job of another type, or one nested inside a different kind of container, is silently skipped.
+**Solution**: TruffleHog only scans Freestyle projects and Pipeline jobs, and only recurses into the plain Jenkins folder type. A job of another type, or one nested inside a different kind of container, is skipped. With debug on, the scan logs `Skipping object` for each one.

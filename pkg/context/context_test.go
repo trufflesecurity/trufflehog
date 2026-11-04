@@ -274,3 +274,26 @@ func TestWithLogLevel_Clamped(t *testing.T) {
 		})
 	}
 }
+
+func TestLoggerFromContext(t *testing.T) {
+	logger := logr.Discard().WithName("test")
+
+	t.Run("Context", func(t *testing.T) {
+		got, ok := LoggerFromContext(WithLogger(context.Background(), logger))
+		assert.True(t, ok)
+		assert.Equal(t, logger, got)
+	})
+
+	t.Run("Context wrapped in a plain context", func(t *testing.T) {
+		wrapped, cancel := context.WithTimeout(WithLogger(context.Background(), logger), time.Minute)
+		defer cancel()
+		got, ok := LoggerFromContext(wrapped)
+		assert.True(t, ok)
+		assert.Equal(t, logger, got)
+	})
+
+	t.Run("plain context without a logger", func(t *testing.T) {
+		_, ok := LoggerFromContext(context.Background())
+		assert.False(t, ok)
+	})
+}
