@@ -1,13 +1,20 @@
 package huggingface
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -984,3 +991,97 @@ func TestValidateIgnoreIncludeReposSpaces(t *testing.T) {
 }
 
 // repeat this with all skip flags, and then include/ignore flags
+
+// fakeHF serves the parts of the Hugging Face API the debug logging test needs:
+// one org with two models (one ignored) and one bucket whose file listing has two
+// pages. User "ghost" has no models, and listing its buckets returns a 404. The
+// model clone fails too, so the failure lines show up.
+func fakeHF(t *testing.T, secretFile string) *httptest.Server {
+	t.Helper()
+	var srv *httptest.Server
+	write := func(w http.ResponseWriter, body any) {
+		_ = json.NewEncoder(w).Encode(body)
+	}
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/models":
+			if r.URL.Query().Get("author") != "org1" {
+				write(w, []map[string]any{})
+				return
+			}
+			write(w, []map[string]any{
+				{"id": "org1/model-a", "author": "org1"},
+				{"id": "org1/ignored", "author": "org1"},
+			})
+		case "/api/models/org1/model-a":
+			write(w, map[string]any{"id": "org1/model-a", "author": "org1"})
+		case "/api/buckets/org1":
+			write(w, []map[string]any{{"id": "org1/bkt", "private": true}})
+		case "/api/buckets/org1/bkt":
+			write(w, map[string]any{"id": "org1/bkt", "private": true})
+		case "/api/buckets/org1/bkt/tree":
+			if r.URL.Query().Get("cursor") == "" {
+				w.Header().Set("Link", "<"+srv.URL+"/api/buckets/org1/bkt/tree?cursor=2>; rel=\"next\"")
+				write(w, []map[string]any{
+					{"type": "file", "path": "secret.txt", "size": len(secretFile)},
+					{"type": "directory", "path": "dir"},
+				})
+				return
+			}
+			write(w, []map[string]any{{"type": "file", "path": "big.bin", "size": maxBucketFileSize + 1}})
+		case "/buckets/org1/bkt/resolve/secret.txt":
+			_, _ = w.Write([]byte(secretFile))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			write(w, map[string]any{"error": "not found"})
+		}
+	}))
+	return srv
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const (
+		testSecret = "hfdebuglogtestsecret"
+		testToken  = "hfdebuglogtesttoken"
+	)
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		t.Helper()
+		srv := fakeHF(t, "token = "+testSecret)
+		defer srv.Close()
+
+		ctx, logs := logtest.SourceContext(debug)
+		s, conn := createTestSource(&sourcespb.Huggingface{
+			Endpoint:        srv.URL,
+			Credential:      &sourcespb.Huggingface_Token{Token: testToken},
+			Organizations:   []string{"org1"},
+			IgnoreModels:    []string{"org1/ignored"},
+			Users:           []string{"ghost"},
+			SkipAllSpaces:   true,
+			SkipAllDatasets: true,
+		})
+		require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		chunksCh := make(chan *sources.Chunk, 10)
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		var files []string
+		for chunk := range chunksCh {
+			files = append(files, chunk.SourceMetadata.GetHuggingface().GetFile())
+		}
+		assert.Equal(t, []string{"secret.txt"}, files)
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret, testToken)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
+}

@@ -181,10 +181,13 @@ func (c *HFClient) get(ctx context.Context, url string, target interface{}) erro
 
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
+	start := time.Now()
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to make request to HuggingFace API: %w", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
+	logResponse(ctx, resp, start)
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return errors.New("invalid API key")
@@ -193,8 +196,6 @@ func (c *HFClient) get(ctx context.Context, url string, target interface{}) erro
 	if resp.StatusCode == http.StatusForbidden {
 		return errors.New("access to this repo is restricted and you are not in the authorized list. Visit the repository to ask for access")
 	}
-
-	defer func() { _ = resp.Body.Close() }()
 
 	return json.NewDecoder(resp.Body).Decode(target)
 }
@@ -237,7 +238,7 @@ func (c *HFClient) GetDiscussionByID(ctx context.Context, repoInfo repoInfo, dis
 // Note: not addressing pagination b/c allow by default 1000 results, which should be enough for 99.99% of cases
 func (c *HFClient) ListReposByAuthor(ctx context.Context, resourceType string, author string) ([]Repo, error) {
 	var repos []Repo
-	url := fmt.Sprintf("%s/%s/%s?limit=1000&author=%s", c.BaseURL, APIRoute, getResourceAPIPath(resourceType), author)
+	url := fmt.Sprintf("%s/%s/%s?limit=%d&author=%s", c.BaseURL, APIRoute, getResourceAPIPath(resourceType), listReposLimit, author)
 	err := c.get(ctx, url, &repos)
 	return repos, err
 }
@@ -264,6 +265,7 @@ func (c *HFClient) ListBucketsByAuthor(ctx context.Context, author string) ([]Bu
 			return buckets, err
 		}
 		buckets = append(buckets, page...)
+		ctx.Logger().V(4).Info("Fetched page", "items", len(page), "has_next", next != "")
 		url = next
 	}
 	return buckets, nil
@@ -281,6 +283,7 @@ func (c *HFClient) ListBucketFiles(ctx context.Context, bucketID string) ([]Buck
 			return files, err
 		}
 		files = append(files, page...)
+		ctx.Logger().V(4).Info("Fetched page", "items", len(page), "has_next", next != "")
 		url = next
 	}
 	return files, nil
@@ -299,10 +302,12 @@ func (c *HFClient) DownloadBucketFile(ctx context.Context, bucketID string, path
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
+	start := time.Now()
 	resp, err := c.downloadClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download bucket file %s: %w", path, err)
 	}
+	logResponse(ctx, resp, start)
 	if resp.StatusCode != http.StatusOK {
 		_ = resp.Body.Close()
 		return nil, fmt.Errorf("failed to download bucket file %s: status %d", path, resp.StatusCode)
@@ -322,11 +327,13 @@ func (c *HFClient) getPage(ctx context.Context, url string, target interface{}) 
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
+	start := time.Now()
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to make request to HuggingFace API: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	logResponse(ctx, resp, start)
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return "", errors.New("invalid API key")
@@ -342,6 +349,26 @@ func (c *HFClient) getPage(ctx context.Context, url string, target interface{}) 
 		return "", err
 	}
 	return parseNextLink(resp.Header.Get("Link")), nil
+}
+
+// logResponse logs one API response. Failed ones go at V(4) so support can see
+// 404s, rate limits and server errors, which the callers often turn into vague
+// errors or empty results. Only the path is logged: headers hold the token, and
+// the query can hold cursors and names that add nothing.
+func logResponse(ctx context.Context, resp *http.Response, start time.Time) {
+	if resp.StatusCode >= 400 {
+		ctx.Logger().V(4).Info("Hugging Face API request failed",
+			"path", resp.Request.URL.Path,
+			"status", resp.StatusCode,
+			"retry_after", resp.Header.Get("Retry-After"),
+		)
+		return
+	}
+	ctx.Logger().V(5).Info("Hugging Face API request",
+		"path", resp.Request.URL.Path,
+		"status", resp.StatusCode,
+		"duration", time.Since(start),
+	)
 }
 
 // escapePathSegments URL-encodes each slash-separated segment of a path while
