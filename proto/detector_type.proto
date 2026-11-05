@@ -1079,4 +1079,5 @@ enum DetectorType {
   Infisical = 1075;
   Fireworks = 1076;
   Composio = 1077;
+  SupabaseSecretKey = 1078;
 }

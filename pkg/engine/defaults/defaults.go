@@ -770,6 +770,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stytch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sugester"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sumologickey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supabasesecretkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supabasetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supernotesapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/surveyanyplace"
@@ -1703,6 +1704,7 @@ func buildDetectorList() []detectors.Detector {
 		&stytch.Scanner{},
 		&sugester.Scanner{},
 		&sumologickey.Scanner{},
+		&supabasesecretkey.Scanner{},
 		&supabasetoken.Scanner{},
 		&supernotesapi.Scanner{},
 		&surveyanyplace.Scanner{},
@@ -1924,6 +1926,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SonarQubeDetectorEnabled.Load()
 		case *infisical.Scanner:
 			return !feature.InfisicalDetectorEnabled.Load()
+		case *supabasesecretkey.Scanner:
+			return !feature.SupabaseSecretKeyDetectorEnabled.Load()
 		default:
 			return false
 		}
