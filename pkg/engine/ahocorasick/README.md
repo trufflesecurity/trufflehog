@@ -25,31 +25,39 @@ thousand.
 
 `FindDetectorMatches` does the work:
 
-1. Make a lowercased copy of the chunk, so matching ignores case.
-2. Walk the copy once and collect every keyword hit.
-3. For each hit, work out a **span**: a window of bytes around it, cut from the
-   original chunk. Detectors get this window rather than the whole chunk, which
-   keeps their regexes fast. Some detectors ask for a wider window, for example
-   when a credential comes in two parts that may sit on separate lines.
-4. Return one entry per matching detector, with its spans merged.
+1. Walk the chunk once and collect every keyword hit, ignoring case.
+2. For each hit, work out a **span**: a window of bytes around it, cut from the
+   chunk. Detectors get this window rather than the whole chunk, which keeps
+   their regexes fast. Some detectors ask for a wider window, for example when a
+   credential comes in two parts that may sit on separate lines.
+3. Return one entry per matching detector, with its spans merged.
 
-## Lowercasing only A-Z
+## The keyword trie
 
-Step 1 lowercases `A-Z` by hand and leaves every other byte untouched, rather
-than using `bytes.ToLower`.
+`keywordTrie` builds the Aho-Corasick table with every transition worked out up
+front, so the walk reads exactly one table entry per byte.
 
-The reason is step 3. Positions come from the lowercased copy, but the bytes are
-cut from the original chunk. That only lines up while both are the same length.
+Each byte that appears in some keyword gets its own column in the table. Every
+other byte shares a single column. With the built-in keywords that is about 50
+columns instead of 256, so the table stays small enough to sit in the CPU cache.
 
-Full Unicode lowercasing does not promise that. Some characters need a different
-number of bytes once lowercased — `İ` takes two bytes, `i` takes one. A single
-one of those makes the copy shorter, so every position after it points slightly
-too far back, and a detector is handed text that is not the text that matched.
+`A-Z` share the columns of `a-z`. That is how matching ignores case: there is no
+lowercased copy of the chunk, so positions always point into the chunk itself.
 
-Changing only `A-Z` always keeps the same length, so positions stay correct.
+Two details keep the walk short. Each cell stores the next state as the offset
+of its row (state number times the number of columns), so no multiply is needed
+per byte. And states that end a keyword are numbered after all the others, so
+checking for a match is one comparison rather than a lookup per byte.
 
-Keywords are folded through the same function when they are registered, so both
-sides of the search always agree.
+## Folding only A-Z
+
+Only `A-Z` is folded, on both sides. Keywords are folded by `appendASCIILower`
+when they are registered, and the trie folds chunk bytes the same way as it
+reads them, so the two sides always agree.
+
+Every other byte must match exactly. Full Unicode lowercasing is not used: some
+characters change byte length when lowercased (`İ` takes two bytes, `i` takes
+one), and nothing would be gained, since every built-in keyword is plain ASCII.
 
 ### Known limitation
 
@@ -61,40 +69,8 @@ Every built-in detector keyword is plain ASCII, so this cannot affect them, and
 a test checks that assumption still holds. It only applies to a custom detector
 using a non-ASCII keyword.
 
-## The buffer pool
-
-Every chunk needs its own lowercased copy, and each copy is discarded moments
-later. Allocating a fresh one each time would mean throwing away a chunk-sized
-buffer on every call, for every chunk in a scan.
-
-Instead the copies come from `lowerBufPool`, a small pool of reusable buffers:
-
-- `getLowerBuf` borrows one, growing it only if the chunk does not fit.
-- `putLowerBuf` hands it back once the chunk is done with.
-
-In a steady scan the pool already holds a buffer large enough, so making the copy
-costs **no allocation at all**. Buffers larger than `maxPooledLowerBuf` are
-dropped rather than kept, so one unusually big chunk cannot leave a large buffer
-parked in the pool for the rest of the run.
-
-## What it costs
-
-`BenchmarkLowerBuf` compares borrowing a buffer from the pool against building a
-fresh lowercased copy each time. On an Apple M3 Pro:
-
-```
-BenchmarkLowerBuf/pooled-11       245199   4929 ns/op   1866.34 MB/s      0 B/op   0 allocs/op
-BenchmarkLowerBuf/unpooled-11     225938   5097 ns/op   1805.07 MB/s   9472 B/op   1 allocs/op
-```
-
-The time difference is small enough to be run-to-run noise. What the pool
-actually removes is the allocation: **9472 B and 1 allocation per chunk, down to
-zero**. That copy would otherwise be made and thrown away for every chunk in a
-scan, so the saving grows with the amount of data scanned rather than showing up
-on the clock here.
-
-Reproduce with:
+## Measuring it
 
 ```sh
-go test ./pkg/engine/ahocorasick/ -bench=BenchmarkLowerBuf -benchmem
+go test ./pkg/engine/ahocorasick/ -run '^$' -bench BenchmarkFindDetectorMatches -benchmem
 ```
