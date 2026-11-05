@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/microsoft/go-mssqldb/msdsn"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -106,5 +108,64 @@ func TestSqlServer_FromDataWithIgnorePattern(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no results, but got %d", len(got))
+	}
+}
+
+func TestSqlServer_PreDialAddress(t *testing.T) {
+	tests := []struct {
+		name        string
+		connStr     string
+		wantAddress string
+		wantOK      bool
+	}{
+		{
+			name:        "server without port uses default port",
+			connStr:     "Server=db01;Database=master;User ID=sa;Password=P@ssw0rd!;",
+			wantAddress: "db01:1433",
+			wantOK:      true,
+		},
+		{
+			name:        "data source without port uses default port",
+			connStr:     "Data Source=db01;Database=master;User ID=sa;Password=P@ssw0rd!;",
+			wantAddress: "db01:1433",
+			wantOK:      true,
+		},
+		{
+			name:        "port in server value",
+			connStr:     "Server=db01,1444;Database=master;User ID=sa;Password=P@ssw0rd!;",
+			wantAddress: "db01:1444",
+			wantOK:      true,
+		},
+		{
+			name:        "port parameter",
+			connStr:     "Server=db01;Port=1444;Database=master;User ID=sa;Password=P@ssw0rd!;",
+			wantAddress: "db01:1444",
+			wantOK:      true,
+		},
+		{
+			name:    "named instance without port is resolved by the driver",
+			connStr: `Server=db01\SALES;Database=master;User ID=sa;Password=P@ssw0rd!;`,
+			wantOK:  false,
+		},
+		{
+			name:        "named instance with port",
+			connStr:     `Server=db01\SALES,1444;Database=master;User ID=sa;Password=P@ssw0rd!;`,
+			wantAddress: "db01:1444",
+			wantOK:      true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config, err := msdsn.Parse(test.connStr)
+			if err != nil {
+				t.Fatalf("msdsn.Parse() error = %v", err)
+			}
+
+			address, ok := preDialAddress(config)
+			if ok != test.wantOK || address != test.wantAddress {
+				t.Errorf("preDialAddress() = (%q, %v), want (%q, %v)", address, ok, test.wantAddress, test.wantOK)
+			}
+		})
 	}
 }
