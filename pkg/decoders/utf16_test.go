@@ -51,6 +51,18 @@ func TestUTF16Decoder(t *testing.T) {
 			expected:  []byte("Hello Worl"),
 			expectNil: false,
 		},
+		{
+			name:      "UTF-16LE input keeps line breaks and tabs",
+			input:     []byte{'a', 0, '=', 0, '1', 0, '\r', 0, '\n', 0, 'b', 0, '\t', 0, '2', 0, '\n', 0},
+			expected:  []byte("a=1\r\nb\t2\n"),
+			expectNil: false,
+		},
+		{
+			name:      "UTF-16BE input keeps line breaks and tabs",
+			input:     []byte{0, 'a', 0, '=', 0, '1', 0, '\r', 0, '\n', 0, 'b', 0, '\t', 0, '2', 0, '\n'},
+			expected:  []byte("a=1\r\nb\t2\n"),
+			expectNil: false,
+		},
 	}
 
 	for _, tc := range testCases {

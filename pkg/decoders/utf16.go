@@ -37,16 +37,24 @@ func utf16ToUTF8(b []byte) ([]byte, error) {
 	var bufBE, bufLE bytes.Buffer
 	for i := 0; i < len(b)-1; i += 2 {
 		if r := rune(binary.BigEndian.Uint16(b[i:])); b[i] == 0 && utf8.ValidRune(r) {
-			if isPrintableByte(byte(r)) {
+			if isPrintableOrWhitespace(byte(r)) {
 				bufBE.WriteRune(r)
 			}
 		}
 		if r := rune(binary.LittleEndian.Uint16(b[i:])); b[i+1] == 0 && utf8.ValidRune(r) {
-			if isPrintableByte(byte(r)) {
+			if isPrintableOrWhitespace(byte(r)) {
 				bufLE.WriteRune(r)
 			}
 		}
 	}
 
 	return append(bufLE.Bytes(), bufBE.Bytes()...), nil
+}
+
+// isPrintableOrWhitespace is isPrintableByte plus tab, newline and carriage
+// return. Dropping line breaks would join the end of one line onto the start
+// of the next, so a secret at the end of a line could be missed or picked up
+// with extra characters.
+func isPrintableOrWhitespace(c byte) bool {
+	return isPrintableByte(c) || c == '\t' || c == '\n' || c == '\r'
 }
