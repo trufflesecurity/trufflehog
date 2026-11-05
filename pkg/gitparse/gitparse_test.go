@@ -34,6 +34,8 @@ func TestPrepGitArgs(t *testing.T) {
 	// diff option, so it lives in show and never reaches rev-list via args.log.
 	assert.NotContains(t, args.log, "--diff-filter=AM")
 	assert.Contains(t, args.show, "--diff-filter=AM")
+	assert.NotContains(t, args.log, "--no-renames")
+	assert.Contains(t, args.show, "--no-renames")
 	assertNoRangeExclusion(t, args.log)
 	assert.Equal(t, []string{"GIT_DIR=" + filepath.Join(repopath, ".git")}, args.env)
 	assert.Empty(t, args.paths)
@@ -48,6 +50,7 @@ func TestPrepGitArgs(t *testing.T) {
 	// lower-memory scan gives to `git rev-list`, which rejects diff options.
 	assert.NotContains(t, args.log, "--diff-filter=AM")
 	assert.Contains(t, args.show, "--diff-filter=AM")
+	assert.Contains(t, args.show, "--no-renames")
 	assertNoRangeExclusion(t, args.log)
 	// excludedGlobs
 	assert.Contains(t, args.paths, "--")
@@ -65,6 +68,7 @@ func TestPrepGitArgs(t *testing.T) {
 	// git show is run per explicit hash in the low-memory path and must never
 	// be handed a range.
 	assert.NotContains(t, args.show, "--diff-filter=AM")
+	assert.NotContains(t, args.show, "--no-renames")
 	assert.NotContains(t, args.show, "^basesha")
 	// Revision args follow the flags; the exclusion belongs with the revisions.
 	assert.Greater(t, indexOf(args.log, "^basesha"), indexOf(args.log, "headsha"))
