@@ -112,6 +112,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, r)
+
+			// A secret belongs to exactly one client ID, so once a pair
+			// verifies, trying the remaining IDs only spends rate limit.
+			if r.Verified {
+				break
+			}
 		}
 	}
 

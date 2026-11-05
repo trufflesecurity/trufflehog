@@ -244,3 +244,69 @@ func TestServal_FromDataVerification(t *testing.T) {
 		})
 	}
 }
+
+func TestServal_StopsAfterVerifiedPair(t *testing.T) {
+	var hits atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		if id, secret, _ := r.BasicAuth(); id == clientID && secret == publicSecret {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	input := "serval client_secret=" + publicSecret + "\n" +
+		"client_id=11111111-1111-4111-8111-111111111111\n" +
+		"client_id=22222222-2222-4222-8222-222222222222\n" +
+		"client_id=33333333-3333-4333-8333-333333333333\n" +
+		"client_id=44444444-4444-4444-8444-444444444444\n" +
+		"client_id=" + clientID + "\n"
+
+	// Client IDs come out of a map in random order, so repeat to make a
+	// missing early exit show up as a verified result that is not last.
+	d := Scanner{client: ts.Client(), endpoint: ts.URL}
+	for i := 0; i < 20; i++ {
+		hits.Store(0)
+		results, err := d.FromData(context.Background(), true, []byte(input))
+		if err != nil {
+			t.Fatalf("FromData: %v", err)
+		}
+		if got := hits.Load(); got != int32(len(results)) {
+			t.Fatalf("requests = %d, want one per result (%d)", got, len(results))
+		}
+		last := results[len(results)-1]
+		if !last.Verified || last.SecretParts["client_id"] != clientID {
+			t.Fatalf("last result = verified %v for %q, want the verified pair for %q",
+				last.Verified, last.SecretParts["client_id"], clientID)
+		}
+		for _, r := range results[:len(results)-1] {
+			if r.Verified || r.VerificationError() != nil {
+				t.Fatalf("pair for %q: verified %v, error %v; want determinately invalid",
+					r.SecretParts["client_id"], r.Verified, r.VerificationError())
+			}
+		}
+	}
+}
+
+func TestServal_NetworkErrorIsIndeterminate(t *testing.T) {
+	ts := httptest.NewServer(http.NotFoundHandler())
+	endpoint := ts.URL
+	ts.Close()
+
+	verified, err := verifyKey(context.Background(), ts.Client(), endpoint, clientID, publicSecret)
+	if verified || err == nil {
+		t.Errorf("verifyKey = (%v, %v), want (false, non-nil error)", verified, err)
+	}
+
+	d := Scanner{client: ts.Client(), endpoint: endpoint}
+	results, err := d.FromData(context.Background(), true,
+		[]byte("serval client_id="+clientID+" client_secret="+publicSecret))
+	if err != nil {
+		t.Fatalf("FromData: %v", err)
+	}
+	if len(results) != 1 || results[0].Verified || results[0].VerificationError() == nil {
+		t.Fatalf("want one unverified result with a verification error, got %+v", results)
+	}
+}
