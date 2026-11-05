@@ -1,0 +1,6 @@
+permissions:
+  - full_access
+  - manage_all
+  - invoke
+  - export_metrics
+  - manage_api_keys

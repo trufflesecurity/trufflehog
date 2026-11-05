@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtable/airtablepat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/baseten"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/databricks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/datadog"
@@ -155,5 +156,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 
 	case "xai":
 		xai.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "baseten":
+		baseten.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
