@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -21,7 +22,11 @@ import (
 )
 
 // LegacyJSONPrinter is a printer that prints results in legacy JSON format for backwards compatibility.
-type LegacyJSONPrinter struct{ mu sync.Mutex }
+type LegacyJSONPrinter struct {
+	mu sync.Mutex
+	// Out is where results are written. Defaults to os.Stdout.
+	Out io.Writer
+}
 
 func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
 	var repoPath string
@@ -46,8 +51,10 @@ func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMe
 	}
 
 	p.mu.Lock()
-	fmt.Println(string(out))
-	p.mu.Unlock()
+	defer p.mu.Unlock()
+	if _, err := fmt.Fprintln(writerOrStdout(p.Out), string(out)); err != nil {
+		return fmt.Errorf("could not write result: %w", err)
+	}
 	return nil
 }
 
