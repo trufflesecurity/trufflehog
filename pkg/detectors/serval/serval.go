@@ -19,14 +19,20 @@ import (
 
 type Scanner struct {
 	client *http.Client
-	// endpoint overrides defaultEndpoint in tests.
-	endpoint string
+	// endpoints overrides regionEndpoints in tests.
+	endpoints []string
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-const defaultEndpoint = "https://public.api.serval.com"
+// regionEndpoints are the public API hosts of Serval's cloud regions. Regions
+// are isolated, so a key issued in one is unknown to the other and every
+// region must be tried before a key is called invalid.
+var regionEndpoints = []string{
+	"https://public.api.serval.com",
+	"https://public.eu1.serval.com",
+}
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -105,9 +111,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// invalid.
 			if verify && tag == "pk" {
 				client := cmp.Or(s.client, defaultClient)
-				endpoint := cmp.Or(s.endpoint, defaultEndpoint)
-				isVerified, vErr := verifyKey(ctx, client, endpoint, id, secret)
+				endpoints := s.endpoints
+				if len(endpoints) == 0 {
+					endpoints = regionEndpoints
+				}
+				isVerified, endpoint, vErr := verifyInRegions(ctx, client, endpoints, id, secret)
 				r.Verified = isVerified
+				if isVerified {
+					r.ExtraData["endpoint"] = endpoint
+				}
 				r.SetVerificationError(vErr, secret)
 			}
 
@@ -134,6 +146,23 @@ func secretChecksum(tag, random string) string {
 		sum /= 62
 	}
 	return string(out)
+}
+
+// verifyInRegions tries each region until one verifies the key and returns
+// the endpoint that did. A 401 from one region does not override an
+// indeterminate error from another, since that region may own the key.
+func verifyInRegions(ctx context.Context, client *http.Client, endpoints []string, id, secret string) (bool, string, error) {
+	var lastErr error
+	for _, endpoint := range endpoints {
+		isVerified, err := verifyKey(ctx, client, endpoint, id, secret)
+		if isVerified {
+			return true, endpoint, nil
+		}
+		if err != nil {
+			lastErr = err
+		}
+	}
+	return false, "", lastErr
 }
 
 // verifyKey exchanges the credentials for an access token with the OAuth2

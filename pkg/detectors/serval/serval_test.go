@@ -223,7 +223,7 @@ func TestServal_FromDataVerification(t *testing.T) {
 			ts, hits := tokenServer(t, test.status)
 			defer ts.Close()
 
-			d := Scanner{client: ts.Client(), endpoint: ts.URL}
+			d := Scanner{client: ts.Client(), endpoints: []string{ts.URL}}
 			results, err := d.FromData(context.Background(), true, []byte(test.input))
 			if err != nil {
 				t.Fatalf("FromData: %v", err)
@@ -266,7 +266,7 @@ func TestServal_StopsAfterVerifiedPair(t *testing.T) {
 
 	// Client IDs come out of a map in random order, so repeat to make a
 	// missing early exit show up as a verified result that is not last.
-	d := Scanner{client: ts.Client(), endpoint: ts.URL}
+	d := Scanner{client: ts.Client(), endpoints: []string{ts.URL}}
 	for i := 0; i < 20; i++ {
 		hits.Store(0)
 		results, err := d.FromData(context.Background(), true, []byte(input))
@@ -300,7 +300,7 @@ func TestServal_NetworkErrorIsIndeterminate(t *testing.T) {
 		t.Errorf("verifyKey = (%v, %v), want (false, non-nil error)", verified, err)
 	}
 
-	d := Scanner{client: ts.Client(), endpoint: endpoint}
+	d := Scanner{client: ts.Client(), endpoints: []string{endpoint}}
 	results, err := d.FromData(context.Background(), true,
 		[]byte("serval client_id="+clientID+" client_secret="+publicSecret))
 	if err != nil {
@@ -308,5 +308,59 @@ func TestServal_NetworkErrorIsIndeterminate(t *testing.T) {
 	}
 	if len(results) != 1 || results[0].Verified || results[0].VerificationError() == nil {
 		t.Fatalf("want one unverified result with a verification error, got %+v", results)
+	}
+}
+
+func TestServal_RegionFallback(t *testing.T) {
+	tests := []struct {
+		name         string
+		usStatus     int
+		euStatus     int
+		wantVerified bool
+		wantErr      bool
+	}{
+		{name: "EU key verifies after US 401", usStatus: http.StatusUnauthorized, euStatus: http.StatusOK, wantVerified: true},
+		{name: "invalid in both regions", usStatus: http.StatusUnauthorized, euStatus: http.StatusUnauthorized},
+		{name: "US rate limit stays indeterminate after EU 401", usStatus: http.StatusTooManyRequests, euStatus: http.StatusUnauthorized, wantErr: true},
+		{name: "US key verifies without trying EU", usStatus: http.StatusOK, euStatus: http.StatusInternalServerError, wantVerified: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			us, usHits := tokenServer(t, test.usStatus)
+			defer us.Close()
+			eu, euHits := tokenServer(t, test.euStatus)
+			defer eu.Close()
+
+			d := Scanner{client: us.Client(), endpoints: []string{us.URL, eu.URL}}
+			results, err := d.FromData(context.Background(), true,
+				[]byte("serval client_id="+clientID+" client_secret="+publicSecret))
+			if err != nil {
+				t.Fatalf("FromData: %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d", len(results))
+			}
+			r := results[0]
+			if r.Verified != test.wantVerified {
+				t.Errorf("Verified = %v, want %v", r.Verified, test.wantVerified)
+			}
+			if (r.VerificationError() != nil) != test.wantErr {
+				t.Errorf("VerificationError = %v, wantErr = %v", r.VerificationError(), test.wantErr)
+			}
+			if test.usStatus == http.StatusOK {
+				if euHits.Load() != 0 {
+					t.Errorf("EU requests = %d, want 0 after the US verified", euHits.Load())
+				}
+				if r.ExtraData["endpoint"] != us.URL {
+					t.Errorf("ExtraData[endpoint] = %q, want %q", r.ExtraData["endpoint"], us.URL)
+				}
+			} else if test.wantVerified && r.ExtraData["endpoint"] != eu.URL {
+				t.Errorf("ExtraData[endpoint] = %q, want %q", r.ExtraData["endpoint"], eu.URL)
+			}
+			if usHits.Load() != 1 {
+				t.Errorf("US requests = %d, want 1", usHits.Load())
+			}
+		})
 	}
 }
