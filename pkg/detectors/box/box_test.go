@@ -2,11 +2,15 @@ package box
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -45,6 +49,61 @@ func TestBox_Pattern(t *testing.T) {
 				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
 			`,
 			want: []string{"Dxb2zNdFF2QTSMwrZJnoeD54Dc4zZAIW"},
+		},
+		{
+			name:  "company name in CSV",
+			input: "company,tenant_id\nEXAMPLE ICEBOX COMPANY,0123456789abcdef0123456789abcdef\n",
+			want:  nil,
+		},
+		{
+			name:  "company name in Markdown",
+			input: "| company | tenant_id |\n| EXAMPLE ICEBOX COMPANY | `0123456789abcdef0123456789abcdef` |\n",
+			want:  nil,
+		},
+		{
+			name:  "unrelated provider",
+			input: "dropbox_token=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  nil,
+		},
+		{
+			name:  "snake case token label",
+			input: "my_box_token=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "camel case token label",
+			input: "boxToken=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "prefixed camel case token label",
+			input: "myBoxToken=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "prefixed camel case key label",
+			input: "prodBoxKey=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "Pascal case token label",
+			input: "MyBoxToken=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+		},
+		{
+			name:  "lowercase embedded keyword",
+			input: "icebox=0123456789abcdef0123456789abcdef",
+			want:  nil,
+		},
+		{
+			name:  "uppercase embedded keyword",
+			input: "DROPBOX_TOKEN=Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ",
+			want:  nil,
+		},
+		{
+			name:  "hexadecimal token with explicit Box context",
+			input: "BOX_TOKEN=0123456789abcdef0123456789abcdef",
+			want:  []string{"0123456789abcdef0123456789abcdef"},
 		},
 		{
 			name: "invalid pattern",
@@ -92,6 +151,27 @@ func TestBox_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+
+			requests := 0
+			verifier := Scanner{client: &http.Client{Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					requests++
+					require.Equal(t, "https://api.box.com/2.0/users/me", req.URL.String())
+					return &http.Response{
+						StatusCode: http.StatusUnauthorized,
+						Body:       io.NopCloser(strings.NewReader("")),
+						Header:     make(http.Header),
+					}, nil
+				},
+			}}}
+			verifiedResults, err := verifier.FromData(context.Background(), true, []byte(test.input))
+			require.NoError(t, err)
+			require.Len(t, verifiedResults, len(test.want))
+			require.Equal(t, len(test.want), requests)
+			for _, result := range verifiedResults {
+				require.Contains(t, expected, string(result.Raw))
+				require.False(t, result.Verified)
 			}
 		})
 	}
