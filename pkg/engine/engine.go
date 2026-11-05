@@ -1215,6 +1215,10 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 }
 
 func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
+	// start feeds only the printAvgDetectorTime report, so it is left at its zero value when that option is off and
+	// must not be read outside that report's code. It is taken once per chunk, so each duration the report records
+	// spans every match processed so far. detectorExecutionDuration times each match on its own instead; see
+	// matchStart below.
 	var start time.Time
 	if e.printAvgDetectorTime {
 		start = time.Now()
@@ -1251,12 +1255,16 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
+		// detectorExecutionDuration covers one detector run, which is this single FromData call, so it is timed here
+		// regardless of printAvgDetectorTime.
+		matchStart := time.Now()
 		results, err := e.verificationCache.FromData(
 			ctx,
 			data.detector.Detector,
 			data.verify,
 			data.chunk.SecretID != 0,
 			matchBytes)
+		matchElapsed := time.Since(matchStart)
 		t.Stop()
 		cancel()
 		if err != nil {
@@ -1285,7 +1293,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		).Inc()
 		detectorExecutionDuration.WithLabelValues(
 			detectorNameStr,
-		).Observe(float64(time.Since(start).Milliseconds()))
+		).Observe(float64(matchElapsed.Milliseconds()))
 
 		if e.printAvgDetectorTime && len(results) > 0 {
 			elapsed := time.Since(start)
