@@ -127,6 +127,22 @@ func (h *defaultHandler) handleNonArchiveContent(
 		return nil
 	}
 
+	// Python bytecode (.pyc/.pyo) stores secrets as plaintext strings inside
+	// marshal data, but marshal serializes a code object's co_consts before
+	// its co_names, so keyword-prefixed detectors (which require the keyword
+	// to precede the secret) can never match the raw bytes. Scan the embedded
+	// strings in reverse order instead, which restores the
+	// keyword-before-secret arrangement those detectors expect.
+	// See https://github.com/trufflesecurity/trufflehog/issues/5430.
+	if isPythonBytecodeExt(mimeExt) {
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			h.metrics.incErrors()
+			return fmt.Errorf("%w: error reading python bytecode: %v", ErrProcessingWarning, err)
+		}
+		reader.Reader = bytes.NewReader(extractPythonBytecodeStrings(data))
+	}
+
 	// Track the current line number (1-indexed) across chunks.
 	// This allows accurate line number reporting for secrets found in later chunks.
 	currentLine := int64(1)
