@@ -85,3 +85,36 @@ func TestURI_Pattern(t *testing.T) {
 		})
 	}
 }
+
+func TestURI_ReservedHostnames(t *testing.T) {
+	tests := []struct {
+		name     string
+		hostname string
+		want     int
+	}{
+		{name: "local", hostname: "service.local", want: 0},
+		{name: "localhost", hostname: "service.localhost", want: 0},
+		{name: "test", hostname: "service.test", want: 0},
+		{name: "invalid", hostname: "service.invalid", want: 0},
+		{name: "example", hostname: "service.example", want: 0},
+		{name: "example com", hostname: "proxy.example.com", want: 0},
+		{name: "example net", hostname: "proxy.example.net", want: 0},
+		{name: "example org", hostname: "proxy.example.org", want: 0},
+		{name: "case insensitive", hostname: "Service.LOCAL", want: 0},
+		{name: "trailing dot", hostname: "service.local.", want: 0},
+		{name: "non reserved", hostname: "service.locality.example.dev", want: 1},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			input := fmt.Sprintf("http://username:password@%s/path", test.hostname)
+			results, err := (Scanner{}).FromData(context.Background(), false, []byte(input))
+			if err != nil {
+				t.Fatalf("FromData() error = %v", err)
+			}
+			if len(results) != test.want {
+				t.Fatalf("FromData() returned %d results, want %d", len(results), test.want)
+			}
+		})
+	}
+}
