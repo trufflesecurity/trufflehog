@@ -3,6 +3,8 @@ package privatekey
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -135,5 +137,42 @@ func TestPrivatekey_EncryptedKeyReported(t *testing.T) {
 	}
 	if r.ExtraData["encrypted"] != "true" {
 		t.Errorf("expected ExtraData[\"encrypted\"] = \"true\", got %q", r.ExtraData["encrypted"])
+	}
+}
+
+// TestPrivatekey_KnownTestKeysFiltered asserts that well-known, publicly committed
+// test/example keys (the Node.js core TLS test fixtures vendored by the `tunnel` npm
+// package) are not reported as findings, even though they are valid, parseable private
+// keys. See https://github.com/trufflesecurity/trufflehog/issues/5299.
+func TestPrivatekey_KnownTestKeysFiltered(t *testing.T) {
+	d := Scanner{}
+
+	keyFiles, err := filepath.Glob(filepath.Join("testdata", "keys", "*-key.pem"))
+	if err != nil {
+		t.Fatalf("glob testdata keys: %v", err)
+	}
+	if len(keyFiles) == 0 {
+		t.Fatal("no test key files found under testdata/keys")
+	}
+
+	for _, path := range keyFiles {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			keyBytes, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read %s: %v", path, err)
+			}
+
+			// Prepend the detector keyword so this mirrors a real scan where the chunk
+			// passes the Aho-Corasick pre-filter before FromData is invoked.
+			input := append([]byte(keyword+" "), keyBytes...)
+
+			results, err := d.FromData(context.Background(), false, input)
+			if err != nil {
+				t.Fatalf("FromData error = %v", err)
+			}
+			if len(results) != 0 {
+				t.Errorf("expected 0 results for known test key %s, got %d", path, len(results))
+			}
+		})
 	}
 }
