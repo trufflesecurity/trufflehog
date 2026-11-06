@@ -516,8 +516,8 @@ func (s *Source) newClient(ctx context.Context) (*gitlab.Client, error) {
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
-			gitlab.WithRequestLogHook(logAPIRequest),
-			gitlab.WithResponseLogHook(logAPIResponse),
+			gitlab.WithRequestLogHook(common.APIRequestLogHook("gitlab")),
+			gitlab.WithResponseLogHook(common.APIResponseLogHook("gitlab")),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
@@ -529,8 +529,8 @@ func (s *Source) newClient(ctx context.Context) (*gitlab.Client, error) {
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
-			gitlab.WithRequestLogHook(logAPIRequest),
-			gitlab.WithResponseLogHook(logAPIResponse),
+			gitlab.WithRequestLogHook(common.APIRequestLogHook("gitlab")),
+			gitlab.WithResponseLogHook(common.APIResponseLogHook("gitlab")),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %q: %w", s.url, err)
@@ -550,8 +550,8 @@ func (s *Source) newClient(ctx context.Context) (*gitlab.Client, error) {
 			gitlab.WithBaseURL(s.url),
 			gitlab.WithCustomRetryWaitMinMax(time.Second, 5*time.Second),
 			gitlab.WithCustomRetryMax(3),
-			gitlab.WithRequestLogHook(logAPIRequest),
-			gitlab.WithResponseLogHook(logAPIResponse),
+			gitlab.WithRequestLogHook(common.APIRequestLogHook("gitlab")),
+			gitlab.WithResponseLogHook(common.APIResponseLogHook("gitlab")),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)

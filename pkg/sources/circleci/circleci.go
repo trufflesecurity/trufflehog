@@ -25,11 +25,12 @@ import (
 
 const (
 	SourceType = sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
-
-	// CircleCI has released API v2, but we're continuing to use v1.1
-	// Because v1.1 still supports listing endpoints and remains officially supported.
-	baseURL = "https://circleci.com/api/v1.1"
 )
+
+// CircleCI has released API v2, but we're continuing to use v1.1
+// Because v1.1 still supports listing endpoints and remains officially supported.
+// It is a var so tests can point it at a fake server.
+var baseURL = "https://circleci.com/api/v1.1"
 
 type Source struct {
 	name     string
@@ -88,25 +89,29 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized CircleCI source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
-	s.client = common.RetryableHTTPClientTimeout(3)
+	s.client = common.RetryableHTTPClientTimeout(3, common.WithAPILogHooks("circleci"))
 
 	var conn sourcespb.CircleCI
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
+	authType := "none"
 	switch conn.Credential.(type) {
 	case *sourcespb.CircleCI_Token:
 		s.token = conn.GetToken()
 		log.RedactGlobally(s.token)
+		authType = "token"
 	}
+
+	ctx.Logger().V(1).Info("CircleCI source initialized", "auth_type", authType, "concurrency", concurrency)
 
 	return nil
 }
@@ -121,57 +126,57 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	var countOfProjectsScanned atomic.Uint64
-	var errors []error
+	scanErrs := sources.NewScanErrors()
 
 	for _, project := range projects {
-		ctx = context.WithValues(ctx,
-			"repository_name", project.Reponame,
-		)
+		projectCtx := context.WithValues(ctx, "repository_name", project.Reponame)
 
 		s.jobPool.Go(func() error {
-			projectBuilds, err := s.listProjectBuilds(ctx, &project)
+			projectCtx.Logger().V(2).Info("Scanning project")
+			projectBuilds, err := s.listProjectBuilds(projectCtx, &project)
 			if err != nil {
-				ctx.Logger().Error(err, "error getting builds for project")
-				errors = append(errors, err)
+				projectCtx.Logger().Error(err, "Failed to list builds for project")
+				scanErrs.Add(err)
 
 				return nil
 			}
 
 			for _, buildNum := range projectBuilds {
-				ctx = context.WithValues(ctx,
-					"build_number", buildNum,
-				)
+				buildCtx := context.WithValues(projectCtx, "build_number", buildNum)
 
-				projBuildJobs, err := s.listProjBuildJobs(ctx, &project, buildNum)
+				projBuildJobs, err := s.listProjBuildJobs(buildCtx, &project, buildNum)
 				if err != nil {
-					ctx.Logger().Error(err, "error getting steps for build")
-					errors = append(errors, err)
+					buildCtx.Logger().Error(err, "Failed to get steps for build")
+					scanErrs.Add(err)
 
 					continue
 				}
+				buildCtx.Logger().V(3).Info("Scanning build", "steps", len(projBuildJobs.Steps))
 
 				for _, step := range projBuildJobs.Steps {
 					for _, action := range step.Actions {
-						data, err := s.getOutputUrlResponse(action.OutputUrl)
+						// The output URL is signed, so it is never logged.
+						buildCtx.Logger().V(4).Info("Scanning step output", "step", step.Name)
+						data, err := s.getOutputUrlResponse(buildCtx, action.OutputUrl)
 						if err != nil {
-							ctx.Logger().Error(err, "error getting action output url response")
-							errors = append(errors, err)
+							buildCtx.Logger().Error(err, "Failed to get step output", "step", step.Name)
+							scanErrs.Add(err)
 
 							continue
 						}
 
-						if err = s.chunk(ctx, project, buildNum, step.Name, data, chunksChan); err != nil {
-							ctx.Logger().Error(err, "error chunking action")
-							errors = append(errors, err)
+						if err = s.chunk(buildCtx, project, buildNum, step.Name, data, chunksChan); err != nil {
+							buildCtx.Logger().Error(err, "Failed to chunk step output", "step", step.Name)
+							scanErrs.Add(err)
 
 							continue
 						}
 					}
 				}
 
-				if err = s.chunk(ctx, project, buildNum, "", projBuildJobs.CircleYaml.YamlString, chunksChan); err != nil {
-					ctx.Logger().Error(err, "error chunking build yaml")
-					errors = append(errors, err)
+				if err = s.chunk(buildCtx, project, buildNum, "", projBuildJobs.CircleYaml.YamlString, chunksChan); err != nil {
+					buildCtx.Logger().Error(err, "Failed to chunk build yaml")
+					scanErrs.Add(err)
 
 					continue
 				}
@@ -185,7 +190,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 				"", // this would be for resumption, but we're not currently using it
 			)
 
-			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", countOfProjectsScanned.Load(), len(projects)))
+			projectCtx.Logger().V(2).Info("Finished scanning project", "scanned", scanCount, "total", len(projects))
 
 			return nil
 		})
@@ -193,8 +198,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	_ = s.jobPool.Wait()
 
-	if len(errors) > 0 {
-		ctx.Logger().Info("encountered errors during scanning", "count", len(errors), "errors", errors)
+	if scanErrs.Count() > 0 {
+		ctx.Logger().Error(scanErrs.Errors(), "Failed to scan some projects", "error_count", scanErrs.Count())
 	}
 
 	return nil
@@ -202,8 +207,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 // listAllProjects lists all the projects the token can access
 func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
-	ctx.Logger().V(5).Info("listing projects")
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/projects", baseURL), http.NoBody)
+	ctx.Logger().V(1).Info("Listing projects")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/projects", baseURL), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +232,7 @@ func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
 			return nil, fmt.Errorf("cannot decode CircleCI projects JSON: %w", err)
 		}
 
-		ctx.Logger().V(2).Info("successfully listed projects", "project_count", len(projects))
+		ctx.Logger().V(1).Info("Listed projects", "count", len(projects))
 
 		return projects, nil
 	case http.StatusUnauthorized:
@@ -249,9 +254,9 @@ func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]BuildN
 	// update clean vcs url in the project for later use
 	proj.VcsUrl = vcsURL
 
-	ctx.Logger().V(5).Info("listing project builds with URL", "repo_name", proj.Reponame, "vcs_url", proj.VcsUrl)
+	ctx.Logger().V(5).Info("Listing project builds", "vcs_url", proj.VcsUrl)
 
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s", baseURL, vcsURL), http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/project/%s", baseURL, vcsURL), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -282,20 +287,22 @@ func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]BuildN
 			}
 		}
 
-		ctx.Logger().V(2).Info("successfully listed builds for project", "repo_name", proj.Reponame, "build_count", len(buildNums))
+		ctx.Logger().V(2).Info("Listed builds", "count", len(buildNums))
 
 		return buildNums, nil
 	case http.StatusNotFound:
-		return nil, fmt.Errorf("no builds found for project: %s", proj.Reponame)
+		// A project with no builds is not an error, there is just nothing to scan.
+		ctx.Logger().V(4).Info("Skipping project", "reason", "no builds")
+		return nil, nil
 	default:
-		return nil, fmt.Errorf("unexpected status code while fetching builds for project: %s", proj.Reponame)
+		return nil, fmt.Errorf("unexpected status code: %d while fetching builds for project: %s", resp.StatusCode, proj.Reponame)
 	}
 }
 
 func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, buildNum BuildNum) (*buildJobs, error) {
-	ctx.Logger().V(5).Info(fmt.Sprintf("listing project: %s build: %d jobs", proj.Reponame, buildNum))
+	ctx.Logger().V(5).Info("Fetching build")
 	// /project/circleci/org-id/proj-id/1
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s/%d", baseURL, proj.VcsUrl, buildNum), http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/project/%s/%d", baseURL, proj.VcsUrl, buildNum), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -320,16 +327,14 @@ func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, buildNum 
 			return nil, fmt.Errorf("cannot decode CircleCI project build jobs JSON: %w", err)
 		}
 
-		ctx.Logger().V(2).Info("successfully listed project build jobs", "repo_name", proj.Reponame, "build_num", buildNum)
-
 		return &buildResp, nil
 	default:
 		return nil, fmt.Errorf("unexpected status code: %d while fetching project: %s build: %d jobs", resp.StatusCode, proj.Reponame, buildNum)
 	}
 }
 
-func (s *Source) getOutputUrlResponse(outputUrl string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, outputUrl, nil)
+func (s *Source) getOutputUrlResponse(ctx context.Context, outputUrl string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, outputUrl, nil)
 	if err != nil {
 		return "", err
 	}
@@ -342,6 +347,12 @@ func (s *Source) getOutputUrlResponse(outputUrl string) (string, error) {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
+
+	// An expired or forbidden signed URL returns an error page, which must not be
+	// scanned as build output.
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d while fetching step output", resp.StatusCode)
+	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
