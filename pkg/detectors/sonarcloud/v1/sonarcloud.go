@@ -28,7 +28,10 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sonar"}) + `(?:^|[^@])\b([0-9a-z]{40})\b`)
+	// The lookbehind rejects tokens preceded by '@' (action refs like org/repo@<sha>),
+	// '/' or '\' (URL or filesystem path segments, e.g. github.com/.../commit/<sha>),
+	// which are the most common source of 40-char SHA false positives.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sonar"}) + `(?:^|[^@/\\])\b([0-9a-z]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
