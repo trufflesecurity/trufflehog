@@ -22,7 +22,7 @@ var (
 		api:
 			auth_type: ""
 			in: "Header"
-			copper_email: "s0ovh@P8I~p3"
+			copper_email: "s0ovh@p8i.p3"
 			copper_token: "noqs39jzqaegbam2k6mai9ov1uwsl21y"
 			base_url: "https://api.example.com/v1/user"
 
@@ -30,7 +30,7 @@ var (
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
-	secret = "noqs39jzqaegbam2k6mai9ov1uwsl21ys0ovh@P8I~p3"
+	secret = "noqs39jzqaegbam2k6mai9ov1uwsl21ys0ovh@p8i.p3"
 )
 
 func TestCopper_Pattern(t *testing.T) {
