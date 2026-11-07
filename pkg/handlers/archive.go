@@ -231,7 +231,10 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
+			h.metrics.incErrors()
+			return common.CancellableWrite(ctx, dataOrErrChan, DataOrErr{
+				Err: fmt.Errorf("%w: error creating reader for file %s: %v", ErrProcessingWarning, file.Name(), err),
+			})
 		}
 		defer func() { _ = rdr.Close() }()
 
