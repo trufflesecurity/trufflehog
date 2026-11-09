@@ -3214,11 +3214,91 @@ func TestGetReposByOrgOrUser_UserWithTokenScansNamedUser(t *testing.T) {
 			Token: "super secret token",
 		},
 	})
-	_, err := s.getReposByOrgOrUser(context.Background(), "alice", noopReporter())
+	_, err := s.getReposByOrgOrUser(context.Background(), "alice", false, noopReporter())
 	require.NoError(t, err)
 
 	assert.True(t, s.filteredRepoCache.Exists("alice/owned-repo"))
 	assert.False(t, s.filteredRepoCache.Exists("tokenowner/secret-repo"))
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+func TestGetReposByOrgOrUser_SelfWithTokenUsesAuthenticatedListing(t *testing.T) {
+	defer gock.Off()
+
+	// When the named account IS the token owner, ListByAuthenticatedUser is the
+	// right call: it keeps private repos in scope. ListByUser would silently
+	// downgrade a self-scan to public-only.
+	gock.New("https://api.github.com").
+		Get("/orgs/alice/repos").
+		Reply(404).
+		JSON(map[string]string{"message": "Not Found"})
+
+	gock.New("https://api.github.com").
+		Get("/user/repos").
+		Reply(200).
+		JSON([]map[string]string{
+			{"full_name": "alice/private-repo", "clone_url": "https://github.com/alice/private-repo.git"},
+		})
+
+	gock.New("https://api.github.com").
+		Get("/users/alice/gists").
+		Reply(200).
+		JSON([]map[string]string{})
+
+	// /users/alice/repos is intentionally NOT mocked: falling back to the public
+	// listing would leave an unmatched request and fail the test.
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+	})
+	_, err := s.getReposByOrgOrUser(context.Background(), "alice", true, noopReporter())
+	require.NoError(t, err)
+
+	assert.True(t, s.filteredRepoCache.Exists("alice/private-repo"))
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+func TestEnumerateWithToken_SelfOrgUsesAuthenticatedListing(t *testing.T) {
+	defer gock.Off()
+
+	// End-to-end guard for the wiring: --org <token-owner> must take the
+	// authenticated path, while --org <someone-else> must not.
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "alice"})
+
+	gock.New("https://api.github.com").
+		Get("/orgs/alice/repos").
+		Reply(404).
+		JSON(map[string]string{"message": "Not Found"})
+
+	gock.New("https://api.github.com").
+		Get("/user/repos").
+		Reply(200).
+		JSON([]map[string]string{
+			{"full_name": "alice/private-repo", "clone_url": "https://github.com/alice/private-repo.git"},
+		})
+
+	gock.New("https://api.github.com").
+		Get("/users/alice/gists").
+		Reply(200).
+		JSON([]map[string]string{})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+		Organizations: []string{"alice"},
+	})
+
+	require.NoError(t, s.enumerateWithToken(context.Background(), false, noopReporter()))
+	assert.True(t, s.filteredRepoCache.Exists("alice/private-repo"))
 	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }

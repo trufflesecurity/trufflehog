@@ -683,7 +683,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+		userType, err := s.getReposByOrgOrUser(ctx, org, false, reporter)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
@@ -708,7 +708,7 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, reporter sources.
 
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+		userType, err := s.getReposByOrgOrUser(ctx, org, false, reporter)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
@@ -758,7 +758,11 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
 			orgCtx := context.WithValue(ctx, "account", org)
-			userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+			// Authenticated listing ignores the name and returns the token
+			// owner's repos, so only use it when that is actually the named
+			// account; other users are listed publicly so we never scan the
+			// wrong account.
+			userType, err := s.getReposByOrgOrUser(ctx, org, strings.EqualFold(org, ghUser.GetLogin()), reporter)
 			if err != nil {
 				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
 				continue
