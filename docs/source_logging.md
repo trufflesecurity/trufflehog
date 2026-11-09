@@ -51,15 +51,22 @@ the findings are warnings. If a source really needs a new context, add a `// nos
 
 ## Testing
 
-Use `logtest.DebugContext()` to run a source with debug turned on and look at what it logged:
+Use the `logtest` helpers to run a source and check what it logged. They check what must hold for every source, not
+the text or the number of lines, so renaming a log message never breaks a test:
 
 ```go
-ctx, logs := logtest.DebugContext()
-err := s.Init(ctx, "test source", 0, 0, false, conn, 1)
-require.NoError(t, err)
+ctx, logs := logtest.SourceContext(true) // false for a normal run
+require.NoError(t, s.Init(ctx, "test source", 0, 0, false, conn, 1))
+logtest.CheckInitLine(t, logs.All()) // Init logged a V(1) line
 
-assert.Equal(t, 1, logs.FilterMessage("listing repositories").Len())
-for _, entry := range logs.All() {
-	assert.NotContains(t, entry.Message, testSecret)
-}
+// scan with Chunks, Enumerate or ChunkUnit
+
+logtest.CheckSourceLines(t, logs.All(), testSecret) // every line has the source fields, and no secret
 ```
+
+With debug off, call `logtest.CheckNoDebugLines` to check that nothing below `V(0)` was written. A normal run may
+log nothing, and the debug run already checks its lines, so it needs no other check.
+
+Give the source fake data that makes it log the lines support relies on, like an API error, a retry and a skipped
+item, so those lines get checked too. Check real behavior, such as a skipped item not being scanned, through the
+chunks the source sends, not through log lines.

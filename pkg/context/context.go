@@ -198,13 +198,24 @@ func AddLogger(parent context.Context) Context {
 	}
 	// If the logger exists in the grab bag (and is the correct type),
 	// return that.
-	if logEntryVal := parent.Value(logEntryKey); logEntryVal != nil {
-		if logger, ok := logEntryVal.(logr.Logger); ok {
-			return WithLogger(parent, logger)
-		}
+	if logger, ok := LoggerFromContext(parent); ok {
+		return WithLogger(parent, logger)
 	}
 	// Otherwise, add the default logger.
 	return WithLogger(parent, defaultLogger)
+}
+
+// LoggerFromContext returns the logger carried by ctx, and false if it has none.
+// Unlike AddLogger, it tells the caller when there is no logger, so the caller can
+// fall back to its own logger instead of the default one. It also finds the logger
+// when ctx is a Context wrapped in a plain context.Context, for example by net/http
+// when a client has a Timeout.
+func LoggerFromContext(ctx context.Context) (logr.Logger, bool) {
+	if loggerCtx, ok := ctx.(Context); ok {
+		return loggerCtx.Logger(), true
+	}
+	logger, ok := ctx.Value(logEntryKey).(logr.Logger)
+	return logger, ok
 }
 
 // SetDefaultLogger sets the package-level global default logger that will be

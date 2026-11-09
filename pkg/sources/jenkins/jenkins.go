@@ -93,7 +93,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	const retryDelay = time.Second * 30
 	opts = append(opts,
-		roundtripper.WithLogger(aCtx.Logger()),
 		roundtripper.WithLogging(),
 		roundtripper.WithRetryable(
 			roundtripper.WithShouldRetry5XXDuration(retryDelay),
@@ -134,21 +133,29 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return errors.Errorf("unknown or unspecified authentication method provided for Jenkins source %q (unauthenticated scans must be explicitly configured)", name)
 	}
 
+	if unparsedURL == "" {
+		return errors.New("Jenkins source requires an endpoint URL")
+	}
 	s.url, err = url.Parse(unparsedURL)
-	if err != nil || unparsedURL == "" {
-		return errors.WrapPrefix(err, fmt.Sprintf("Invalid endpoint URL given for Jenkins source: %s", unparsedURL), 0)
+	if err != nil {
+		// A *url.Error repeats the raw URL, which can hold a password, so keep only the cause.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return errors.WrapPrefix(err, "Invalid endpoint URL given for Jenkins source", 0)
 	}
 
 	aCtx.Logger().V(1).Info("initialized Jenkins source",
 		"auth_method", authMethod,
-		"url_raw", unparsedURL,
-		"url_parsed", s.url.String())
+		"endpoint", s.url.Redacted(),
+		"insecure_skip_verify_tls", conn.GetInsecureSkipVerifyTls())
 
 	return nil
 }
 
-func (s *Source) NewRequest(method, url string, body io.Reader) (*http.Request, error) {
-	request, err := http.NewRequest(method, url, body)
+func (s *Source) NewRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
+	request, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -231,9 +238,6 @@ func (c *jobCollector) UnitErr(_ context.Context, err error) error { return err 
 // the reporter returns an error, which aborts the walk and is returned to the
 // caller.
 func (s *Source) walkJobs(ctx context.Context, absolutePath string, reporter sources.UnitReporter) error {
-	ctx.Logger().V(3).Info("getting objects",
-		"path", absolutePath)
-
 	objects, err := s.GetJenkinsObjectsForPath(ctx, absolutePath)
 	if err != nil {
 		return reporter.UnitErr(ctx, errors.WrapPrefix(err, fmt.Sprintf("failed to get Jenkins objects for path %q", absolutePath), 0))
@@ -269,6 +273,7 @@ func (s *Source) walkJobs(ctx context.Context, absolutePath string, reporter sou
 
 		if job.Class != "hudson.model.FreeStyleProject" &&
 			job.Class != "org.jenkinsci.plugins.workflow.job.WorkflowJob" {
+			ctx.Logger().V(4).Info("Skipping object", "reason", "unsupported class")
 			continue
 		}
 
@@ -300,7 +305,7 @@ func (s *Source) GetJenkinsObjectsForPath(ctx context.Context, absolutePath stri
 
 		// The endpoint URL can hold a password, so log the redacted form.
 		ctx.Logger().V(4).Info("executing query", "query_url", baseUrl.Redacted())
-		req, err := s.NewRequest(http.MethodGet, baseUrl.String(), nil)
+		req, err := s.NewRequest(ctx, http.MethodGet, baseUrl.String(), nil)
 		if err != nil {
 			return res, errors.WrapPrefix(err, "Failed to create new request to get jenkins jobs", 0)
 		}
@@ -337,8 +342,6 @@ func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (
 	ctx = context.WithValues(ctx,
 		"job_path", jobAbsolutePath)
 
-	ctx.Logger().V(2).Info("getting builds")
-
 	builds := JenkinsBuildResponse{}
 	buildsUrl := *s.url
 	for i := 0; true; i += 100 {
@@ -346,7 +349,7 @@ func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (
 		params := url.Values{}
 		params.Set("tree", fmt.Sprintf("builds[number,url]{%d,%d}", i, i+100))
 		buildsUrl.RawQuery = params.Encode()
-		req, err := s.NewRequest(http.MethodGet, buildsUrl.String(), nil)
+		req, err := s.NewRequest(ctx, http.MethodGet, buildsUrl.String(), nil)
 		if err != nil {
 			return builds, errors.WrapPrefix(err, "Failed to create new request to get jenkins builds", 0)
 		}
@@ -440,7 +443,7 @@ func (s *Source) chunkBuild(
 	projectName string,
 	chunksChan chan *sources.Chunk,
 ) error {
-	ctx.Logger().V(2).Info("chunking build")
+	ctx.Logger().V(3).Info("chunking build")
 
 	parsedUrl, err := url.Parse(build.Url)
 	if err != nil {
@@ -449,23 +452,23 @@ func (s *Source) chunkBuild(
 	buildLogURL := *s.url
 	buildLogURL.Path = path.Join(parsedUrl.Path, "consoleText")
 	ctx = context.WithValues(ctx,
-		"build_log_url", buildLogURL.String())
+		"build_log_url", buildLogURL.Redacted())
 
-	req, err := s.NewRequest(http.MethodGet, buildLogURL.String(), nil)
+	req, err := s.NewRequest(ctx, http.MethodGet, buildLogURL.String(), nil)
 	if err != nil {
-		return fmt.Errorf("failed to create HTTP request to %q: %w", buildLogURL.String(), err)
+		return fmt.Errorf("failed to create HTTP request to %q: %w", buildLogURL.Redacted(), err)
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("could not retrieve build log from %q: %w", buildLogURL.String(), err)
+		return fmt.Errorf("could not retrieve build log from %q: %w", buildLogURL.Redacted(), err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("got unexpected HTTP status code %v when trying to retrieve build log from %q",
 			resp.StatusCode,
-			buildLogURL.String())
+			buildLogURL.Redacted())
 	}
 
 	chunkSkel := &sources.Chunk{
@@ -485,7 +488,6 @@ func (s *Source) chunkBuild(
 		SourceVerify: s.verify,
 	}
 
-	ctx.Logger().V(4).Info("scanning build log")
 	return handlers.HandleFile(ctx, resp.Body, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 

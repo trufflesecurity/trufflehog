@@ -126,19 +126,34 @@ func shouldIgnore(uri string, ignorePatterns []*regexp.Regexp) bool {
 	return false
 }
 
+const defaultSQLServerPort = 1433
+
+// preDialAddress returns the host:port the driver will dial, or false when the
+// port is resolved through SQL Browser and can't be checked ahead of time.
+func preDialAddress(config msdsn.Config) (string, bool) {
+	port := config.Port
+	if port == 0 {
+		if config.Instance != "" {
+			return "", false
+		}
+		port = defaultSQLServerPort
+	}
+	return net.JoinHostPort(config.Host, strconv.Itoa(int(port))), true
+}
+
 var ping = func(ctx context.Context, config msdsn.Config) (bool, error) {
 	// TCP connectivity check to prevent indefinite hangs
-	address := net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port)))
+	if address, ok := preDialAddress(config); ok {
+		dialer := &net.Dialer{
+			Timeout: 3 * time.Second,
+		}
 
-	dialer := &net.Dialer{
-		Timeout: 3 * time.Second,
+		tcpConn, err := dialer.DialContext(ctx, "tcp", address) // respects context timeout
+		if err != nil {
+			return false, err
+		}
+		defer func() { _ = tcpConn.Close() }()
 	}
-
-	tcpConn, err := dialer.DialContext(ctx, "tcp", address) // respects context timeout
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = tcpConn.Close() }()
 
 	cleanConfig := msdsn.Config{}
 	cleanConfig.Host = config.Host

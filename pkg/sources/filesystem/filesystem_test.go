@@ -11,12 +11,9 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -914,9 +911,13 @@ func TestSource_DebugLogging(t *testing.T) {
 	require.NoError(t, err)
 
 	// run the source with both Chunks and ChunkUnit, draining chunks the way the engine does
-	runSource := func(ctx trContext.Context) {
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		ctx, logs := logtest.SourceContext(debug)
 		s := Source{}
 		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
 
 		chunksCh := make(chan *sources.Chunk, 64)
 		go func() {
@@ -929,55 +930,14 @@ func TestSource_DebugLogging(t *testing.T) {
 		reporter := sourcestest.TestReporter{}
 		require.NoError(t, s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: dir}, &reporter))
 		require.Empty(t, reporter.ChunkErrs)
+		return logs.All()
 	}
 
 	t.Run("debug on", func(t *testing.T) {
-		ctx, logs := logtest.DebugContext()
-		ctx = trContext.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
-		runSource(ctx)
-
-		// lines from each level show up
-		for _, msg := range []string{
-			"filesystem source initialized", // V(1)
-			"scanning path",                 // V(2)
-			"finished scanning path",        // V(2)
-			"scanning directory",            // V(3)
-			"scanning file",                 // V(3)
-			"finished scanning file",        // V(5)
-		} {
-			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
-		}
-
-		// every skip says why, at V(4)
-		var reasons []string
-		for _, entry := range logs.FilterMessage("skipping file").All() {
-			reasons = append(reasons, fmt.Sprint(entry.ContextMap()["reason"]))
-		}
-		for _, entry := range logs.FilterMessage("skipping symlink").All() {
-			reasons = append(reasons, fmt.Sprint(entry.ContextMap()["reason"]))
-		}
-		assert.Contains(t, reasons, "binary files are skipped")
-		assert.Contains(t, reasons, "excluded by path filter")
-		assert.Contains(t, reasons, "following symlinks is not enabled")
-
-		// every line came from the context logger, so it carries the source fields,
-		// and none of them contain the secret
-		for _, entry := range logs.All() {
-			fields := entry.ContextMap()
-			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
-			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
-			assert.NotContains(t, entry.Message, testSecret)
-			assert.NotContains(t, fmt.Sprint(fields), testSecret)
-		}
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
 	})
 
 	t.Run("debug off", func(t *testing.T) {
-		core, logs := observer.New(zapcore.InfoLevel)
-		ctx := trContext.WithLogger(trContext.Background(), zapr.NewLogger(zap.New(core)))
-		runSource(ctx)
-
-		assert.Zero(t, logs.FilterMessage("scanning file").Len())
-		assert.Zero(t, logs.FilterMessage("skipping file").Len())
-		assert.Zero(t, logs.FilterMessage("finished scanning file").Len())
+		logtest.CheckNoDebugLines(t, runSource(t, false))
 	})
 }

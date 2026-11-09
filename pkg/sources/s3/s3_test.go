@@ -16,12 +16,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/go-logr/zapr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -688,7 +685,8 @@ func TestSource_DebugLogging(t *testing.T) {
 	}}}}
 
 	// run the source with both Chunks and ChunkUnit, draining chunks the way the engine does
-	runSource := func(t *testing.T, ctx context.Context) {
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		ctx, logs := logtest.SourceContext(debug)
 		server := httptest.NewServer(&slowDownOnce{next: fake, key: "config.txt"})
 		t.Cleanup(server.Close)
 		conn, err := anypb.New(&sourcespb.S3{
@@ -701,6 +699,9 @@ func TestSource_DebugLogging(t *testing.T) {
 
 		s := Source{}
 		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
 
 		chunksCh := make(chan *sources.Chunk, 64)
 		go func() {
@@ -714,65 +715,14 @@ func TestSource_DebugLogging(t *testing.T) {
 		require.NoError(t, s.ChunkUnit(ctx, S3SourceUnit{Bucket: "bucket"}, &reporter))
 		require.Empty(t, reporter.ChunkErrs)
 		require.NotEmpty(t, reporter.Chunks)
+		return logs.All()
 	}
 
 	t.Run("debug on", func(t *testing.T) {
-		ctx, logs := logtest.DebugContext()
-		ctx = context.WithValues(ctx, "source_name", "test debug logging", "job_id", 1)
-		runSource(t, ctx)
-
-		// lines from each level show up
-		for _, msg := range []string{
-			"S3 source initialized",    // V(1)
-			"Found buckets to scan",    // V(1)
-			"Scanning bucket",          // V(2)
-			"Finished scanning bucket", // V(2)
-			"Scanning object",          // V(3)
-			"Listed page",              // V(4)
-			"Finished scanning object", // V(5)
-		} {
-			assert.NotZero(t, logs.FilterMessage(msg).Len(), "missing log line %q", msg)
-		}
-
-		// every skip says why, at V(4)
-		var reasons []string
-		for _, entry := range logs.FilterMessage("Skipping object").All() {
-			reasons = append(reasons, fmt.Sprint(entry.ContextMap()["reason"]))
-		}
-		assert.Contains(t, reasons, skipReasonEmptyFile)
-		assert.Contains(t, reasons, skipReasonObjectFilter)
-		assert.Contains(t, reasons, "directory")
-
-		// the throttled GET was retried, and the retry was logged through the request's context
-		var retried bool
-		for _, entry := range logs.FilterMessage("AWS SDK").All() {
-			fields := entry.ContextMap()
-			if strings.Contains(fmt.Sprint(fields["detail"]), "retrying request") {
-				retried = true
-				assert.Equal(t, "config.txt", fields["key"])
-			}
-		}
-		assert.True(t, retried, "missing retry log line")
-
-		// every line came from the context logger, so it carries the source fields,
-		// and none of them contain the secret
-		for _, entry := range logs.All() {
-			fields := entry.ContextMap()
-			assert.Contains(t, fields, "source_name", "line %q", entry.Message)
-			assert.Contains(t, fields, "job_id", "line %q", entry.Message)
-			assert.NotContains(t, entry.Message, testSecret)
-			assert.NotContains(t, fmt.Sprint(fields), testSecret)
-		}
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
 	})
 
 	t.Run("debug off", func(t *testing.T) {
-		core, logs := observer.New(zapcore.InfoLevel)
-		ctx := context.WithLogger(context.Background(), zapr.NewLogger(zap.New(core)))
-		runSource(t, ctx)
-
-		assert.Zero(t, logs.FilterMessage("Scanning object").Len())
-		assert.Zero(t, logs.FilterMessage("Skipping object").Len())
-		assert.Zero(t, logs.FilterMessage("Finished scanning object").Len())
-		assert.Zero(t, logs.FilterMessage("AWS SDK").Len())
+		logtest.CheckNoDebugLines(t, runSource(t, false))
 	})
 }
