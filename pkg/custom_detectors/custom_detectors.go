@@ -282,6 +282,8 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		DetectorType: detector_typepb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
 		ExtraData:    map[string]string{},
+		// Each entry is named after a regex in the user's config.
+		SecretParts: make(map[string]string, len(match)),
 	}
 
 	var raw string
@@ -296,6 +298,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		}
 		raw += secret
 		secrets = append(secrets, secret)
+		result.SecretParts[key] = secret
 
 		// We set the full regex match as the primary secret value.
 		// Reasoning:

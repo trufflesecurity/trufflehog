@@ -127,7 +127,7 @@ func (s *Source) countBucket(
 		if err != nil {
 			// A cancelled count means the unit has finished, and finish settles the totals.
 			if ctx.Err() == nil {
-				ctx.Logger().V(2).Info("could not count objects for progress", "bucket", bucket, "err", err)
+				ctx.Logger().V(4).Info("could not count objects for progress", "error", err)
 				progress.setState(sources.UnitProgressUnavailable)
 			}
 			return

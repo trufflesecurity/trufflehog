@@ -23,12 +23,15 @@ import (
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -377,7 +380,7 @@ func TestAppConnector_EnterpriseBaseURL(t *testing.T) {
 	privateKey := createPrivateKey()
 	enterpriseEndpoint := "https://api.example.ghe.com"
 
-	connector, err := NewAppConnector(enterpriseEndpoint, &credentialspb.GitHubApp{
+	connector, err := NewAppConnector(context.Background(), enterpriseEndpoint, &credentialspb.GitHubApp{
 		PrivateKey:     privateKey,
 		InstallationId: "1337",
 		AppId:          "4141",
@@ -3046,4 +3049,136 @@ func TestCreateAPIClient_CloudGitHub(t *testing.T) {
 	if client.BaseURL.String() != "https://api.github.com/" {
 		t.Errorf("expected https://api.github.com/, got: %s", client.BaseURL.String())
 	}
+}
+
+func TestEnumerateWithToken_DebugLogging(t *testing.T) {
+	const testToken = "ghp_TESTTOKENdonotlog1234567890abcdef"
+
+	// mock one page of repos: one to scan, plus one of each kind we skip
+	mockAPI := func() {
+		gock.New("https://api.github.com").
+			Get("/user").
+			Reply(200).
+			JSON(map[string]string{"login": "test-user"})
+
+		gock.New("https://api.github.com").
+			Get("/user/repos").
+			Reply(200).
+			JSON([]map[string]any{
+				{"full_name": "test-user/kept-repo", "clone_url": "https://github.com/test-user/kept-repo.git"},
+				{"full_name": "test-user/forked-repo", "clone_url": "https://github.com/test-user/forked-repo.git", "fork": true},
+				{"full_name": "test-user/archived-repo", "clone_url": "https://github.com/test-user/archived-repo.git", "archived": true},
+				{"full_name": "test-user/ignored-repo", "clone_url": "https://github.com/test-user/ignored-repo.git"},
+			})
+
+		gock.New("https://api.github.com").
+			Get("/user/orgs").
+			Reply(200).
+			JSON(`[]`)
+
+		gock.New("https://api.github.com").
+			Get("/users/test-user/gists").
+			Reply(200).
+			JSON(`[]`)
+	}
+
+	// init the source and list the repos
+	runEnumerate := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		defer gock.Off()
+		mockAPI()
+
+		ctx, logs := logtest.SourceContext(debug)
+		s, conn := createTestSource(&sourcespb.GitHub{
+			Endpoint:        "https://api.github.com",
+			Credential:      &sourcespb.GitHub_Token{Token: testToken},
+			ExcludeArchived: true,
+			IgnoreRepos:     []string{"test-user/ignored-repo"},
+		})
+		assert.NoError(t, s.Init(ctx, "test - github", 1, 1337, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+		gock.InterceptClient(s.connector.APIClient().Client())
+
+		assert.NoError(t, s.enumerateWithToken(ctx, false, noopReporter()))
+		assert.True(t, gock.IsDone())
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runEnumerate(t, true), testToken)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runEnumerate(t, false))
+	})
+}
+
+func TestScan_LogsResumeAndCancelSkips(t *testing.T) {
+	const testToken = "ghp_TESTTOKENinrepourl1234567890"
+
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint:   "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{Token: "token"},
+	})
+	s.repos = []string{
+		"https://github.com/org/a.git",
+		"https://github.com/org/b.git",
+		// a repo from the config with a token in it, which must never be logged
+		"https://user:" + testToken + "@github.com/org/c.git",
+	}
+	// pretend an earlier run stopped while scanning b, so a is already done
+	s.SetProgressComplete(0, 3, "", sources.EncodeResumeInfo([]string{"https://github.com/org/b.git"}))
+
+	// cancel before the scan starts, so no repo is cloned and each one is
+	// skipped with a log line instead
+	debugCtx, logs := logtest.SourceContext(true)
+	ctx, cancel := context.WithCancel(debugCtx)
+	cancel()
+
+	assert.NoError(t, s.scan(ctx, &collectingReporter{}))
+
+	resumeLines := logs.FilterMessage("resuming scan; skipping repos already scanned").All()
+	if assert.Len(t, resumeLines, 1) {
+		assert.Equal(t, int64(1), resumeLines[0].ContextMap()["skipped"])
+		assert.Equal(t, int64(2), resumeLines[0].ContextMap()["remaining"])
+	}
+
+	logtest.CheckSourceLines(t, logs.All(), testToken)
+}
+
+func TestInit_InvalidRepoErrorDoesNotLogToken(t *testing.T) {
+	const testToken = "ghp_TESTTOKENinvalidrepo1234567890"
+
+	// a repo from the config with a token in it and no repo name, so it fails
+	// to normalize and the error repeats the URL
+	s, conn := createTestSource(&sourcespb.GitHub{
+		Endpoint:     "https://api.github.com",
+		Credential:   &sourcespb.GitHub_Token{Token: "token"},
+		Repositories: []string{"https://" + testToken + "@github.com/org"},
+	})
+
+	ctx, logs := logtest.SourceContext(true)
+	assert.NoError(t, s.Init(ctx, "test - github", 0, 1337, false, conn, 1))
+
+	logtest.CheckInitLine(t, logs.All())
+	logtest.CheckSourceLines(t, logs.All(), testToken)
+}
+
+func TestAddReposForMembers_StopsOnCancel(t *testing.T) {
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint:   "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{Token: "token"},
+	})
+	s.memberCache = map[string]struct{}{"member1": {}, "member2": {}}
+
+	// cancel before the loop starts, so no member is fetched and no error is logged
+	debugCtx, logs := logtest.SourceContext(true)
+	ctx, cancel := context.WithCancel(debugCtx)
+	cancel()
+
+	s.addReposForMembers(ctx, noopReporter())
+
+	assert.Zero(t, logs.FilterLevelExact(zapcore.ErrorLevel).Len())
+	logtest.CheckSourceLines(t, logs.All())
 }

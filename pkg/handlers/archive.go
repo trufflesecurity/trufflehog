@@ -72,17 +72,11 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 	go func() {
 		defer close(dataOrErrChan)
 
-		// The underlying 7zip library may panic when attempting to open an archive.
-		// This is due to an Index Out Of Range (IOOR) error when reading the archive header.
-		// See: https://github.com/bodgit/sevenzip/blob/74bff0da9b233317e4ea7dd8c184a315db71af2a/types.go#L846
+		// Archive libraries can panic on malformed input. Recover so that only
+		// this file is skipped, and log the stack so the failing frame is known.
 		defer func() {
 			if r := recover(); r != nil {
-				var panicErr error
-				if e, ok := r.(error); ok {
-					panicErr = e
-				} else {
-					panicErr = fmt.Errorf("panic occurred: %v", r)
-				}
+				panicErr := recoveredPanicError(ctx, r, "Panic occurred when handling archive")
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
 				}
@@ -207,9 +201,17 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 			return nil
 		}
 
+		// Opening an entry can fail for a reason confined to that entry, such as
+		// a 7z coder that is unsupported or declares more memory than the limit
+		// in sevenzip_coders.go allows. Returning the error would make the
+		// extractor stop and skip every entry after this one, so report it as a
+		// warning and move on to the next entry.
 		f, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
+			h.metrics.incErrors()
+			return common.CancellableWrite(ctx, dataOrErrChan, DataOrErr{
+				Err: fmt.Errorf("%w: error opening file %s: %v", ErrProcessingWarning, file.Name(), err),
+			})
 		}
 		defer func() { _ = f.Close() }()
 
@@ -219,13 +221,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		// https://github.com/nwaples/rardecode/issues/30.
 		defer func() {
 			if r := recover(); r != nil {
-				// Return the panic as an error.
-				if e, ok := r.(error); ok {
-					err = e
-				} else {
-					err = fmt.Errorf("panic occurred: %v", r)
-				}
-				lCtx.Logger().Error(err, "Panic occurred when reading archive")
+				err = recoveredPanicError(lCtx, r, "Panic occurred when reading archive")
 			}
 		}()
 

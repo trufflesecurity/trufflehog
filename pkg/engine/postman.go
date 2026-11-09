@@ -48,6 +48,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sour
 
 	sourceName := "trufflehog - postman"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, postman.SourceType)
+	ctx = withSourceFields(ctx, sourceName, postman.SourceType, sourceID, jobID)
 
 	postmanSource := &postman.Source{
 		DetectorKeywords: e.AhoCorasickCoreKeywords(),

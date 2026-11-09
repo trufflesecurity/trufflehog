@@ -78,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					isVerified, verificationErr := verifyCouchBase(username, password, connString)
+					isVerified, verificationErr := verifyCouchBase(ctx, username, password, connString)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr)
 					s1.SetPrimarySecretValue(connString)
@@ -91,7 +91,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyCouchBase(username, password, connString string) (bool, error) {
+// verifyCouchBase reports whether the credentials reach a healthy endpoint on the cluster.
+//
+// Every gocb.Cluster owns background goroutines and sockets until Close is called, so the
+// cluster is closed on every return path; otherwise each verification leaks a client for the
+// life of the process. The caller's ctx bounds the ping, which is where verification spends
+// nearly all of its time, so the engine's detector timeout actually stops verification.
+func verifyCouchBase(ctx context.Context, username, password, connString string) (bool, error) {
 	options := gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
 			Username: username,
@@ -106,17 +112,25 @@ func verifyCouchBase(username, password, connString string) (bool, error) {
 		return false, err
 	}
 
-	// Initialize the Connection
+	// gocb.Connect takes no context, so check ctx before building a client. FromData verifies
+	// candidates serially, and once ctx ends there is no point connecting for the rest.
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+
 	cluster, err := gocb.Connect(connString, options)
 	if err != nil {
 		return false, err
 	}
+	defer func() { _ = cluster.Close(nil) }()
 
-	// We'll ping the KV nodes in our cluster.
+	// Ping the cluster's services. The ping ends at whichever comes first: its own timeout or
+	// the caller's ctx. Either way gocb reports the outcome per endpoint rather than as an
+	// error, so a ping cut short by ctx looks like a cluster with no healthy endpoint.
 	pings, err := cluster.Ping(&gocb.PingOptions{
 		Timeout: time.Second * 5,
+		Context: ctx,
 	})
-
 	if err != nil {
 		return false, err
 	}
@@ -129,6 +143,11 @@ func verifyCouchBase(username, password, connString string) (bool, error) {
 		}
 	}
 
+	// No healthy endpoint is only a determinate "unverified" if the ping ran to completion.
+	// When ctx ended first, report its error so the result is marked indeterminate instead.
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	return false, nil
 }
 

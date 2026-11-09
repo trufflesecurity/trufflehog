@@ -82,4 +82,21 @@ func TestScanConfig_DebugOnlyForOneSource(t *testing.T) {
 	assert.Equal(t, 1, countLines("chunks debug", "debug"))
 	assert.Zero(t, countLines("init debug", "normal"))
 	assert.Zero(t, countLines("chunks debug", "normal"))
+
+	// Lines from Init and from the scan both carry the source fields, and
+	// each field shows up once even though the source manager adds them too.
+	for _, message := range []string{"init info", "chunks info"} {
+		for _, entry := range logs.FilterMessage(message).FilterField(zap.String("source", "debug")).All() {
+			for _, key := range []string{"source_name", "source_type", "source_id", "job_id"} {
+				count := 0
+				for _, field := range entry.Context {
+					if field.Key == key {
+						count++
+					}
+				}
+				assert.Equal(t, 1, count, "%s on %q", key, message)
+			}
+			assert.Equal(t, "debug", entry.ContextMap()["source_name"], message)
+		}
+	}
 }

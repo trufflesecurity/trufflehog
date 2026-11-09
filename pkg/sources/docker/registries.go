@@ -11,12 +11,13 @@ import (
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"golang.org/x/time/rate"
 )
 
 // defaultHTTPClient defines a shared HTTP client with timeout for all registry requests.
-var defaultHTTPClient = common.RetryableHTTPClientTimeout(10)
+var defaultHTTPClient = common.RetryableHTTPClientTimeout(10, withRegistryLogHooks())
 
 // registryRateLimiter limits how quickly we make registry API calls across all registries.
 // We allow roughly 1 event every 1.5s, with a burst of 2 as a simple safeguard against overloading upstream APIs.
@@ -100,7 +101,7 @@ func (d *DockerHub) ListImages(ctx context.Context, namespace string) ([]string,
 	allImages := []string{}
 	nextURL := baseURL.String()
 
-	for {
+	for pageNum := 1; ; pageNum++ {
 		if err := registryRateLimiter.Wait(ctx); err != nil {
 			return nil, err
 		}
@@ -141,6 +142,7 @@ func (d *DockerHub) ListImages(ctx context.Context, namespace string) ([]string,
 		for _, image := range page.Results {
 			allImages = append(allImages, fmt.Sprintf("%s/%s", namespace, image.Name)) // <namespace>/<image_name>
 		}
+		logRegistryPage(ctx, d.Name(), pageNum, len(page.Results))
 
 		if page.Next == "" {
 			break
@@ -203,7 +205,7 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 	allImages := []string{}
 	nextPageToken := ""
 
-	for {
+	for pageNum := 1; ; pageNum++ {
 		if err := registryRateLimiter.Wait(ctx); err != nil {
 			return nil, err
 		}
@@ -256,6 +258,7 @@ func (q *Quay) ListImages(ctx context.Context, namespace string) ([]string, erro
 		for _, image := range page.Repositories {
 			allImages = append(allImages, fmt.Sprintf("%s/%s", namespace, image.Name)) // quay.io/<namespace>/<image_name>
 		}
+		logRegistryPage(ctx, q.Name(), pageNum, len(page.Repositories))
 
 		if !page.HasAdditional || page.NextPage == "" {
 			break
@@ -352,7 +355,7 @@ func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, erro
 		return u.String()
 	}()
 
-	for nextURL != "" {
+	for pageNum := 1; nextURL != ""; pageNum++ {
 		if err := registryRateLimiter.Wait(ctx); err != nil {
 			return nil, err
 		}
@@ -398,12 +401,22 @@ func (g *GHCR) ListImages(ctx context.Context, namespace string) ([]string, erro
 		for _, image := range page {
 			allImages = append(allImages, fmt.Sprintf("%s/%s", namespace, image.Name)) // ghcr.io/<namespace>/<image_name>
 		}
+		logRegistryPage(ctx, g.Name(), pageNum, len(page))
 
 		// Determine if there's another page via the Link header.
 		nextURL = parseNextLinkURL(resp.Header.Get("Link"))
 	}
 
 	return allImages, nil
+}
+
+// logRegistryPage logs one page of a namespace listing.
+func logRegistryPage(ctx context.Context, registry string, page, images int) {
+	logContext.AddLogger(ctx).Logger().V(4).Info("Listed registry page",
+		"registry", registry,
+		"page", page,
+		"images", images,
+	)
 }
 
 // Function to discard response body

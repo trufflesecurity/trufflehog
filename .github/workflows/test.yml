@@ -38,7 +38,7 @@ jobs:
         if: ${{ success() || failure() }} # always run this step, even if there were previous errors
       - name: Upload test results to BuildPulse for flaky test detection
         if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
-        uses: buildpulse/buildpulse-action@76dbedc6585e8731b40a19da1ebc3f6609dbbb83 # v3
+        uses: buildpulse/buildpulse-action@e27b872c41b56c6b24b39068ef93ec15d5de0dc3 # v3
         with:
           account: 79229934
           repository: 77726177
@@ -48,7 +48,7 @@ jobs:
           secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
           tags: integration
       - name: Annotate test results
-        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6
+        uses: mikepenz/action-junit-report@a16be3a69023e9bd7e748ede768b3282ea7b30ce # v6
         if: success() || failure() # always run even if the previous step fails
         with:
           report_paths: "tmp/test-results/*.xml"

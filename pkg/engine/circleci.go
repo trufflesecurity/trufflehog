@@ -29,6 +29,7 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) (sources.JobPro
 
 	sourceName := "trufflehog - Circle CI"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, circleci.SourceType)
+	ctx = withSourceFields(ctx, sourceName, circleci.SourceType, sourceID, jobID)
 
 	circleSource := &circleci.Source{}
 	if err := circleSource.Init(ctx, "trufflehog - Circle CI", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

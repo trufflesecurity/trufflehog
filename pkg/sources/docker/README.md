@@ -291,6 +291,18 @@ docker login my-registry.io
 trufflehog docker --image my-registry.io/private-app:v1.0.0
 ```
 
+## Debug Logs
+
+With debug on for this source (`debug: true` in the config), the scan logs:
+
+- `V(1)`: `Docker source initialized` with the config choices (the credential type only, never the credentials), and the start and end of a namespace listing with its image count.
+- `V(2)`: `Scanning image` with its layer and history entry counts, and `Finished scanning image` with its duration.
+- `V(3)`: `Scanning image history entry` for each history entry, and the start and end of each layer, with how many files it held, how many were skipped, and its duration.
+- `V(4)`: `Skipping file` with a `reason` (too large, or matches an exclude pattern), `Listed registry page` for each page of a namespace listing, `Registry request failed` for any registry response of 400 or above or any network error (with the status, host, path and `Retry-After` header), and `Retrying registry API request` for each namespace listing retry.
+- `V(5)`: `Loading image` with where it comes from (remote, daemon or tarball), and `Scanning file` for each file.
+
+Lines carry `image`, `tag`, `layer` and `file` where they apply. A `401` on `/v2/` is the normal auth challenge a registry sends before a token request, not an error on its own.
+
 ## Troubleshooting
 
 ### Common Issues

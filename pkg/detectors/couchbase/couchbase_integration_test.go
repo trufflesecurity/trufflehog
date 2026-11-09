@@ -99,8 +99,8 @@ func TestCouchbase_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "SecretParts")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Couchbase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

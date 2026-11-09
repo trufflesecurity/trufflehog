@@ -16,12 +16,13 @@ func (e *Engine) ScanConfig(ctx context.Context, configuredSources ...sources.Co
 	for _, configuredSource := range configuredSources {
 		sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, configuredSource.Name, configuredSource.SourceType())
 
+		sourceCtx := withSourceFields(ctx, configuredSource.Name, configuredSource.SourceType(), sourceID, jobID)
+
 		// A source with debug on gets a context that writes all of its debug
 		// logs. Both Init and the scan use it, so every log from this source is
 		// covered. Other sources keep the global log level.
-		sourceCtx := ctx
 		if configuredSource.Debug {
-			sourceCtx = context.WithLogLevel(ctx, log.DebugLevel)
+			sourceCtx = context.WithLogLevel(sourceCtx, log.DebugLevel)
 		}
 
 		source, err := configuredSource.Init(sourceCtx, sourceID, jobID)

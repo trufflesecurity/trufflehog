@@ -241,6 +241,7 @@ func TestDetector(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, results[0].Raw, []byte(`123456`))
+	assert.Equal(t, map[string]string{"regex": "123456"}, results[0].SecretParts)
 }
 
 func TestDetectorPrimarySecret(t *testing.T) {
@@ -260,6 +261,10 @@ func TestDetectorPrimarySecret(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
+	assert.Equal(t, map[string]string{
+		"id":     "id_ALPHA10100_yy",
+		"secret": "secret_YI7C90ACY1_yy",
+	}, results[0].SecretParts)
 }
 
 func TestDetectorPrimarySecretFullMatch(t *testing.T) {
@@ -313,7 +318,75 @@ func TestDetectorPrimarySecretFullMatch(t *testing.T) {
 			assert.Equal(t, tt.want, results[0].GetPrimarySecretValue())
 		})
 	}
+}
 
+// TestDetectorSecretParts checks that each named regex becomes one entry in SecretParts.
+func TestDetectorSecretParts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("capture group", func(t *testing.T) {
+		t.Parallel()
+		detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+			Name:     "test",
+			Keywords: []string{"secret"},
+			Regex:    map[string]string{"secret": `secret *= *"([^"\r\n]+)"`},
+		})
+		require.NoError(t, err)
+
+		results, err := detector.FromData(context.Background(), false, []byte(`secret="mysecret"`))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, map[string]string{"secret": "mysecret"}, results[0].SecretParts)
+		assert.Equal(t, `secret="mysecret"`, results[0].GetPrimarySecretValue())
+	})
+
+	t.Run("no capture group", func(t *testing.T) {
+		t.Parallel()
+		detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+			Name:     "test",
+			Keywords: []string{"hog"},
+			Regex:    map[string]string{"token": `hog_[A-Za-z0-9]{8}`},
+		})
+		require.NoError(t, err)
+
+		results, err := detector.FromData(context.Background(), false, []byte("prefix hog_abcd1234 suffix"))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, map[string]string{"token": "hog_abcd1234"}, results[0].SecretParts)
+		assert.Equal(t, []byte("hog_abcd1234"), results[0].Raw)
+	})
+
+	t.Run("verified multi-part", func(t *testing.T) {
+		t.Parallel()
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		t.Cleanup(ts.Close)
+
+		detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+			Name:     "test",
+			Keywords: []string{"secret"},
+			Regex: map[string]string{
+				"id":     `id_([A-Z]{4})`,
+				"secret": `secret_([A-Z]{4})`,
+			},
+			Verify: []*custom_detectorspb.VerifierConfig{{
+				Endpoint: ts.URL,
+				Unsafe:   true,
+			}},
+		})
+		require.NoError(t, err)
+
+		results, err := detector.FromData(context.Background(), true, []byte("id_ABCD secret_WXYZ"))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.True(t, results[0].Verified)
+		assert.Equal(t, map[string]string{
+			"id":     "ABCD",
+			"secret": "WXYZ",
+		}, results[0].SecretParts)
+		assert.Equal(t, []byte("ABCDWXYZ"), results[0].Raw)
+	})
 }
 
 func TestDetectorValidations(t *testing.T) {
@@ -351,6 +424,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStr0ngP@ssword!"),
+					SecretParts:  map[string]string{"password": "MyStr0ngP@ssword!"},
 				},
 			},
 		},
@@ -398,6 +472,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongPassword!"),
+					SecretParts:  map[string]string{"password": "MyStrongPassword!"},
 				},
 			},
 		},
@@ -445,6 +520,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongPassword!"),
+					SecretParts:  map[string]string{"password": "MyStrongPassword!"},
 				},
 			},
 		},
@@ -492,6 +568,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStr@ngP@ssword!"),
+					SecretParts:  map[string]string{"password": "MyStr@ngP@ssword!"},
 				},
 			},
 		},
@@ -540,6 +617,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongP@ssword"),
+					SecretParts:  map[string]string{"password": "MyStrongP@ssword"},
 				},
 			},
 		},
@@ -588,6 +666,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("mystrongp@ssword"),
+					SecretParts:  map[string]string{"password": "mystrongp@ssword"},
 				},
 			},
 		},
@@ -624,6 +703,10 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("c392c9837d69b44c764cbf260b-e6184MyStrongP@ssword"),
+					SecretParts: map[string]string{
+						"api_key":  "c392c9837d69b44c764cbf260b-e6184",
+						"password": "MyStrongP@ssword",
+					},
 				},
 			},
 		},
@@ -876,12 +959,12 @@ func TestVerificationWithConfigurableRanges(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		serverStatus      int
-		successRanges     []string
-		rotatedRanges     []string
-		wantVerified      bool
-		wantVerifyErr     bool
+		name          string
+		serverStatus  int
+		successRanges []string
+		rotatedRanges []string
+		wantVerified  bool
+		wantVerifyErr bool
 	}{
 		{
 			name:          "backward compat: no ranges, 200 -> verified",

@@ -19,7 +19,7 @@ var (
 		[]string{"detector_name", "source_type", "source_name"},
 	)
 
-	// Note this is the time taken to call FromData on each detector, not necessarily the time taken
+	// Note this is the time taken by one FromData call, made once per keyword match, not necessarily the time taken
 	// to verify a credential via an API call. If the regex match within FromData does not match, the
 	// detector will return early. For now this is a good proxy for the time taken to verify a credential.
 	// TODO (ahrav)

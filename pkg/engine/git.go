@@ -38,6 +38,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobP
 
 	sourceName := "trufflehog - git"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, git.SourceType)
+	ctx = withSourceFields(ctx, sourceName, git.SourceType, sourceID, jobID)
 
 	gitSource := &git.Source{}
 	if err := gitSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

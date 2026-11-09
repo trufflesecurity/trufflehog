@@ -211,6 +211,18 @@ trufflehog gitlab --token glpat-xxxxxxxxxxxxxxxxxxxx --group-id 12345678
 trufflehog gitlab --token glpat-xxxxxxxxxxxxxxxxxxxx --endpoint https://gitlab.mycompany.com
 ```
 
+## Debug Logs
+
+With debug on for this source (`debug: true` in the config), the scan logs:
+
+- `V(1)`: `GitLab source initialized` with the config choices (the endpoint's host only, never the token or credentials), and the start of enumeration.
+- `V(2)`: `processing group` for each group, and the start and end of each repo scan, with its duration.
+- `V(3)`: `accepting project` for each project found.
+- `V(4)`: `skipping project` and `Skipping repo` with a `reason`, a line for each page of projects or groups, `GitLab API request failed` for any API response that is not a 2xx (with the status, path and rate limit headers), and `Retrying GitLab API request` for each retry.
+- `V(5)`: project metadata cache hits and misses.
+
+Lines carry `group_id`, `project_id`, `project_name`, `page` and `repo` where they apply. Clone and scan lines from the git source carry their own `repo` field, with any password removed from the URL.
+
 ## Troubleshooting
 
 ### Common Issues

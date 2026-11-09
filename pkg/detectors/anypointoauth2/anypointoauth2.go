@@ -115,10 +115,9 @@ func verifyMatch(ctx context.Context, client *http.Client, id, secret string) (b
 	}()
 
 	switch res.StatusCode {
-	// The endpoint responds with status 200 for valid Organization credentials and 422 for Client credentials.
-	case http.StatusOK, http.StatusUnprocessableEntity:
+	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized:
+	case http.StatusUnauthorized, http.StatusUnprocessableEntity:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)

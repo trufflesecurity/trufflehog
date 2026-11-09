@@ -33,6 +33,7 @@ func (e *Engine) ScanJSONEnumeratorInput(
 		ctx.Logger().Error(err, "failed to get IDs from source manager")
 		return sources.JobProgressRef{}, err
 	}
+	ctx = withSourceFields(ctx, sourceName, json_enumerator.SourceType, sourceID, jobID)
 
 	source := &json_enumerator.Source{}
 	err = source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU())
