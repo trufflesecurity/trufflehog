@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -58,6 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(match),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://docs.baseten.co/reference/management-api/api-keys/delete-an-api-key",
+				"version":        fmt.Sprintf("%d", s.Version()),
 			},
 			SecretParts: map[string]string{"key": match},
 		}
@@ -70,9 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			for k, v := range extraData {
-				s1.ExtraData[k] = v
-			}
+			maps.Copy(s1.ExtraData, extraData)
 			s1.SetVerificationError(verificationErr, match)
 		}
 

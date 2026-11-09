@@ -183,6 +183,9 @@ func TestBaseten_VerifyMatch(t *testing.T) {
 			if got := r.ExtraData["rotation_guide"]; got != "https://docs.baseten.co/reference/management-api/api-keys/delete-an-api-key" {
 				t.Errorf("rotation_guide = %q", got)
 			}
+			if got := r.ExtraData["version"]; got != "2" {
+				t.Errorf("version = %q, want 2", got)
+			}
 			for k, want := range tt.wantExtraData {
 				if got := r.ExtraData[k]; got != want {
 					t.Errorf("ExtraData[%s] = %q, want %q", k, got, want)
