@@ -734,7 +734,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - name: Secret Scanning
@@ -758,7 +758,7 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
           elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             echo "depth=$(jq '.pull_request.commits + 2' "$GITHUB_EVENT_PATH")" >> $GITHUB_ENV
           fi
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           fetch-depth: ${{env.depth}}
       - uses: trufflesecurity/trufflehog@main
