@@ -1,6 +1,7 @@
 package huggingface
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,16 +28,21 @@ func (s *Source) cacheBucketInfo(ctx context.Context, bucketID string) error {
 		bucketCtx.Logger().V(2).Info("Caching bucket info")
 		bucket, err := s.apiClient.GetBucket(bucketCtx, bucketID)
 		if err != nil {
-			bucketCtx.Logger().Error(err, "failed to fetch bucket")
+			bucketCtx.Logger().Error(err, "Failed to fetch bucket info")
 			return err
 		}
 		if bucket.BucketID == "" {
-			bucketCtx.Logger().Error(fmt.Errorf("no bucket found for bucket"), bucketID)
+			bucketCtx.Logger().Error(errors.New("bucket not found"), "Skipping bucket")
 			return nil
 		}
+		// Don't index past the slash, an ID without one would panic.
+		owner, name, ok := strings.Cut(bucket.BucketID, "/")
+		if !ok {
+			owner, name = "", bucket.BucketID
+		}
 		s.repoInfoCache.put(bucketID, repoInfo{
-			owner:        strings.Split(bucket.BucketID, "/")[0],
-			name:         strings.Split(bucket.BucketID, "/")[1],
+			owner:        owner,
+			name:         name,
 			fullName:     bucket.BucketID,
 			visibility:   getVisibility(bucket.IsPrivate),
 			resourceType: BUCKET,
@@ -53,12 +59,13 @@ func (s *Source) fetchAndCacheBuckets(ctx context.Context, author string) error 
 	if err != nil {
 		return err
 	}
+	ctx.Logger().V(2).Info("Listed buckets", "count", len(buckets))
 	for _, bucket := range buckets {
-		s.filteredBucketsCache.Set(bucket.BucketID, bucket.BucketID)
-		// Set is a no-op for buckets excluded by include/ignore globs.
-		if _, ok := s.filteredBucketsCache.Get(bucket.BucketID); !ok {
+		if reason := s.filteredBucketsCache.skipReason(bucket.BucketID); reason != "" {
+			ctx.Logger().V(4).Info("Skipping bucket", "bucket", bucket.BucketID, "reason", reason)
 			continue
 		}
+		s.filteredBucketsCache.Set(bucket.BucketID, bucket.BucketID)
 		if err := s.cacheBucketInfo(ctx, bucket.BucketID); err != nil {
 			continue
 		}
@@ -70,7 +77,7 @@ func (s *Source) fetchAndCacheBuckets(ctx context.Context, author string) error 
 // are object storage rather than git repos, so files are downloaded
 // individually and chunked directly.
 func (s *Source) scanBuckets(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	ctx.Logger().V(2).Info("Found buckets to scan", "count", len(s.buckets))
+	ctx.Logger().V(1).Info("Scanning buckets", "count", len(s.buckets))
 
 	scanErrs := sources.NewScanErrors()
 	reporter := sources.ChanReporter{Ch: chunksChan}
@@ -80,7 +87,7 @@ func (s *Source) scanBuckets(ctx context.Context, chunksChan chan *sources.Chunk
 		if !ok {
 			// This should never happen.
 			err := fmt.Errorf("no bucketInfo for bucket: %s", bucketID)
-			ctx.Logger().Error(err, "failed to scan bucket")
+			ctx.Logger().Error(err, "Failed to scan bucket")
 			continue
 		}
 		bucketCtx := context.WithValues(ctx, BUCKET, bucketID)
@@ -90,6 +97,7 @@ func (s *Source) scanBuckets(ctx context.Context, chunksChan chan *sources.Chunk
 			scanErrs.Add(fmt.Errorf("error listing files in bucket %s: %w", bucketID, err))
 			continue
 		}
+		bucketCtx.Logger().V(2).Info("Scanning bucket", "files", len(files))
 
 		for _, file := range files {
 			s.jobPool.Go(func() error {
@@ -100,9 +108,10 @@ func (s *Source) scanBuckets(ctx context.Context, chunksChan chan *sources.Chunk
 					return nil
 				}
 				if file.Size > maxBucketFileSize {
-					bucketCtx.Logger().V(2).Info("Skipping bucket file: exceeds max size", "path", file.Path, "size", file.Size)
+					bucketCtx.Logger().V(4).Info("Skipping bucket file", "path", file.Path, "size", file.Size, "reason", "too large")
 					return nil
 				}
+				bucketCtx.Logger().V(3).Info("Scanning bucket file", "path", file.Path, "size", file.Size)
 				if err := s.scanBucketFile(bucketCtx, bucketID, bucketInfo, file, reporter); err != nil {
 					scanErrs.Add(fmt.Errorf("error scanning file %s in bucket %s: %w", file.Path, bucketID, err))
 				}
@@ -113,7 +122,7 @@ func (s *Source) scanBuckets(ctx context.Context, chunksChan chan *sources.Chunk
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		ctx.Logger().V(0).Info("failed to scan some buckets", "error_count", scanErrs.Count(), "errors", scanErrs.String())
+		ctx.Logger().Error(scanErrs.Errors(), "Failed to scan some buckets", "error_count", scanErrs.Count())
 	}
 	s.SetProgressComplete(len(s.buckets), len(s.buckets), "Completed HuggingFace bucket scan", "")
 	return nil

@@ -172,6 +172,19 @@ trufflehog huggingface --org my-org --skip-all-models --skip-all-spaces --skip-a
 trufflehog huggingface --model my-org/public-model
 ```
 
+## Debug Logs
+
+With debug on for this source, the scan logs:
+
+- `V(0)`: `Repo listing hit the API limit, some repos may be missing` when an organization or user listing returns 1000 repos, since that listing is not paged.
+- `V(1)`: `Hugging Face source initialized` with the config choices (the auth type only, never the token), `Scanning repos` and `Scanning buckets` with counts, and `Resuming from saved progress` when a scan resumes.
+- `V(2)`: `Listed repos` and `Listed buckets` per organization or user, `Caching repo info` and `Caching bucket info`, `Scanning repo` and `Finished scanning repo` with its duration, and `Scanning bucket` with its file count.
+- `V(3)`: `Cloning repo` with the auth type, `Cloned repo`, `Listed discussions`, `Scanning discussion`, and `Scanning bucket file` with its size.
+- `V(4)`: `Skipping repo`, `Skipping bucket`, `Skipping discussion` and `Skipping bucket file` with a `reason` (matches ignore filter, not in include filter, PRs not included, discussions not included, too large), `Fetched page` for bucket listings, and `Hugging Face API request failed` with the status and `Retry-After` for every failed API call.
+- `V(5)`: `Hugging Face API request` for every API call, with its status and duration.
+
+Lines carry `organization` or `user`, and `model`, `space`, `dataset` or `bucket`, where they apply. Failures to fetch or scan a repo or bucket, and invalid include or ignore globs, are logged as errors at the default level.
+
 ## Troubleshooting
 
 ### Common Issues
