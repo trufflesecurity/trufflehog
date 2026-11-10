@@ -294,13 +294,8 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 	s.skipAllDatasets = s.conn.SkipAllDatasets
 	s.skipAllBuckets = s.conn.SkipAllBuckets
 
-	// A custom endpoint could carry user:pass, so log it redacted.
-	endpoint := s.conn.Endpoint
-	if u, err := url.Parse(endpoint); err == nil {
-		endpoint = u.Redacted()
-	}
 	ctx.Logger().V(1).Info("Hugging Face source initialized",
-		"endpoint", endpoint,
+		"endpoint", redactURL(s.conn.Endpoint),
 		"auth_type", authType(s.conn),
 		"organizations", len(s.conn.Organizations),
 		"users", len(s.conn.Users),
@@ -318,6 +313,18 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 	)
 
 	return nil
+}
+
+// redactURL hides the password in a URL before it is logged. Repo URLs are
+// built from the configured endpoint, which could carry user:pass. Log fields
+// and error values are not covered by global redaction, so this is the only
+// guard.
+func redactURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "<invalid URL>"
+	}
+	return u.Redacted()
 }
 
 // authType names the credential type for logs, never the credential.
@@ -387,7 +394,7 @@ func (s *Source) getResourceType(ctx context.Context, repoURL string) string {
 	repoInfo, ok := s.repoInfoCache.get(repoURL)
 	if !ok {
 		// This should never happen.
-		err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
+		err := fmt.Errorf("no repoInfo for URL: %s", redactURL(repoURL))
 		ctx.Logger().Error(err, "failed to get repository resource type")
 		return ""
 	}
@@ -399,7 +406,7 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metada
 	repoInfo, ok := s.repoInfoCache.get(repoURL)
 	if !ok {
 		// This should never happen.
-		err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
+		err := fmt.Errorf("no repoInfo for URL: %s", redactURL(repoURL))
 		ctx.Logger().Error(err, "failed to get repository visibility")
 		return source_metadatapb.Visibility_unknown
 	}
@@ -459,7 +466,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 
 func (s *Source) cacheRepoInfo(ctx context.Context, repo string, repoType string, repoCache *filteredRepoCache) error {
 	repoURL, _ := repoCache.Get(repo)
-	repoCtx := context.WithValue(ctx, repoType, repoURL)
+	repoCtx := context.WithValue(ctx, repoType, redactURL(repoURL))
 
 	if _, ok := s.repoInfoCache.get(repoURL); !ok {
 		repoCtx.Logger().V(2).Info("Caching repo info")
@@ -652,11 +659,11 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			repoInfo, ok := s.repoInfoCache.get(repoURL)
 			if !ok {
 				// This should never happen.
-				err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
+				err := fmt.Errorf("no repoInfo for URL: %s", redactURL(repoURL))
 				ctx.Logger().Error(err, "Failed to scan repo", "resource_type", resourceType)
 				return nil
 			}
-			repoCtx := context.WithValues(ctx, resourceType, repoURL)
+			repoCtx := context.WithValues(ctx, resourceType, redactURL(repoURL))
 			repoCtx.Logger().V(2).Info("Scanning repo")
 			duration, err := s.cloneAndScanRepo(repoCtx, repoURL, repoInfo, chunksChan)
 			if err != nil {
@@ -667,7 +674,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			// Scan discussions and PRs, if enabled.
 			if s.includeDiscussions || s.includePrs {
 				if err = s.scanDiscussions(repoCtx, repoInfo, chunksChan); err != nil {
-					scanErrs.Add(fmt.Errorf("error scanning discussions/PRs in repo %s: %w", repoURL, err))
+					scanErrs.Add(fmt.Errorf("error scanning discussions/PRs in repo %s: %w", redactURL(repoURL), err))
 					return nil
 				}
 			}
@@ -731,7 +738,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 
 	start := time.Now()
 	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
-		return 0, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
+		return 0, fmt.Errorf("error scanning repo %s: %w", redactURL(repoURL), err)
 	}
 	return time.Since(start), nil
 }
@@ -747,7 +754,7 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 	// Make the resume info string from the slice.
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
-	s.SetProgressComplete(index+offset, len(repos)+offset, fmt.Sprintf("%ss: %s", resourceType, repoURL), encodedResumeInfo)
+	s.SetProgressComplete(index+offset, len(repos)+offset, fmt.Sprintf("%ss: %s", resourceType, redactURL(repoURL)), encodedResumeInfo)
 }
 
 func (s *Source) scanDiscussions(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {

@@ -68,7 +68,7 @@ func (s *Source) cloneRepo(
 			return "", nil, err
 		}
 	default:
-		return "", nil, fmt.Errorf("unhandled credential type for repo %s: %T", repoURL, s.conn.GetCredential())
+		return "", nil, fmt.Errorf("unhandled credential type for repo %s: %T", redactURL(repoURL), s.conn.GetCredential())
 	}
 	return path, repo, nil
 }

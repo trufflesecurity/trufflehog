@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1041,8 +1042,9 @@ func fakeHF(t *testing.T, secretFile string) *httptest.Server {
 
 func TestSource_DebugLogging(t *testing.T) {
 	const (
-		testSecret = "hfdebuglogtestsecret"
-		testToken  = "hfdebuglogtesttoken"
+		testSecret   = "hfdebuglogtestsecret"
+		testToken    = "hfdebuglogtesttoken"
+		testPassword = "hfdebuglogtestpass"
 	)
 
 	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
@@ -1052,7 +1054,9 @@ func TestSource_DebugLogging(t *testing.T) {
 
 		ctx, logs := logtest.SourceContext(debug)
 		s, conn := createTestSource(&sourcespb.Huggingface{
-			Endpoint:        srv.URL,
+			// A password in the endpoint ends up in every repo URL, so no line
+			// may show it.
+			Endpoint:        strings.Replace(srv.URL, "http://", "http://user:"+testPassword+"@", 1),
 			Credential:      &sourcespb.Huggingface_Token{Token: testToken},
 			Organizations:   []string{"org1"},
 			IgnoreModels:    []string{"org1/ignored"},
@@ -1078,7 +1082,7 @@ func TestSource_DebugLogging(t *testing.T) {
 	}
 
 	t.Run("debug on", func(t *testing.T) {
-		logtest.CheckSourceLines(t, runSource(t, true), testSecret, testToken)
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret, testToken, testPassword)
 	})
 
 	t.Run("debug off", func(t *testing.T) {
