@@ -107,26 +107,14 @@ func (k DetectorKey) Loggable() map[string]any {
 // Type returns the detector type of the key.
 func (k DetectorKey) Type() detector_typepb.DetectorType { return k.detectorType }
 
-// compare orders built-in detectors before custom ones, then by type, version, and custom detector name. Built-in
-// first is a deliberate policy: the verification overlap stage lets the earlier detector keep verification, and a
-// provider-specific built-in detector is preferred over a user-supplied regex for that. The type order after that is
-// the protobuf enum value, which is assignment history, not priority.
+// compare orders keys by detector type, version, and custom detector name so that the result order does not depend on
+// map iteration. The type order is the protobuf enum value, which is assignment history, not priority.
 func (k DetectorKey) compare(other DetectorKey) int {
 	return cmp.Or(
-		cmp.Compare(k.isCustom(), other.isCustom()),
 		cmp.Compare(k.detectorType, other.detectorType),
 		cmp.Compare(k.version, other.version),
 		cmp.Compare(k.customDetectorName, other.customDetectorName),
 	)
-}
-
-// isCustom reports 1 for custom regex detectors and 0 for built-in detectors so built-ins sort first. It checks the
-// type rather than the name because a custom detector's name may be empty.
-func (k DetectorKey) isCustom() int {
-	if k.detectorType == detector_typepb.DetectorType_CustomRegex {
-		return 1
-	}
-	return 0
 }
 
 // spanCalculator is an interface that defines a method for calculating a match span
@@ -381,9 +369,7 @@ func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 		uniqueDetectors = append(uniqueDetectors, detectorMatch)
 	}
 
-	// When two detectors of different types find a similar secret, the verification overlap stage lets whichever came
-	// first in this slice keep verification, so the order must not depend on map iteration. See DetectorKey.compare for
-	// the policy.
+	// Sort so the order of the returned matches does not depend on map iteration.
 	slices.SortFunc(uniqueDetectors, func(a, b *DetectorMatch) int { return a.Key.compare(b.Key) })
 
 	return uniqueDetectors

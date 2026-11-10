@@ -723,14 +723,12 @@ func TestFindDetectorMatches_OrderIsDeterministic(t *testing.T) {
 		Name: "alpha", Keywords: []string{"shared"}, Regex: map[string]string{"": ""},
 	})
 	assert.Nil(t, err)
-	// An unnamed custom detector must still sort after every built-in.
+	// An unnamed custom detector must sort deterministically alongside named ones.
 	customUnnamed, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
 		Keywords: []string{"shared"}, Regex: map[string]string{"": ""},
 	})
 	assert.Nil(t, err)
 
-	// Snowflake's enum value (927) is above CustomRegex (904), so it only sorts before the custom detectors if the
-	// built-in-first policy is applied, not by enum order alone.
 	dets := []detectors.Detector{
 		testDetectorSharedKeyword{detector_typepb.DetectorType_Snowflake},
 		testDetectorSharedKeyword{detector_typepb.DetectorType_Slack},
@@ -752,10 +750,10 @@ func TestFindDetectorMatches_OrderIsDeterministic(t *testing.T) {
 		{detectorType: detector_typepb.DetectorType_AWS},
 		{detectorType: detector_typepb.DetectorType_Github},
 		{detectorType: detector_typepb.DetectorType_Slack},
-		{detectorType: detector_typepb.DetectorType_Snowflake},
 		{detectorType: detector_typepb.DetectorType_CustomRegex, customDetectorName: ""},
 		{detectorType: detector_typepb.DetectorType_CustomRegex, customDetectorName: "alpha"},
 		{detectorType: detector_typepb.DetectorType_CustomRegex, customDetectorName: "zeta"},
+		{detectorType: detector_typepb.DetectorType_Snowflake},
 	}
 
 	for i := 0; i < 200; i++ {
