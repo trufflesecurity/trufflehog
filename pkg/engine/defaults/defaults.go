@@ -539,6 +539,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nugetapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nuntiq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nvapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
@@ -1467,6 +1468,7 @@ func buildDetectorList() []detectors.Detector {
 		&npmtokenv2.Scanner{},
 		&nugetapikey.Scanner{},
 		&numverify.Scanner{},
+		&nuntiq.Scanner{},
 		&nutritionix.Scanner{},
 		&nvapi.Scanner{},
 		&nylas.Scanner{},
