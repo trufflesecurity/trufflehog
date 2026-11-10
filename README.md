@@ -755,15 +755,12 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
         run: |
           if [ "$GITHUB_EVENT_NAME" == "push" ]; then
             echo "depth=$(($(jq '.commits | length' "$GITHUB_EVENT_PATH") + 2))" >> $GITHUB_ENV
-            echo "branch=$GITHUB_REF_NAME" >> $GITHUB_ENV
           fi
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
             echo "depth=$(($(jq .pull_request.commits "$GITHUB_EVENT_PATH") +2))" >> $GITHUB_ENV
-            echo "branch=$GITHUB_HEAD_REF" >> $GITHUB_ENV
           fi
       - uses: actions/checkout@v3
         with:
-          ref: ${{env.branch}}
           fetch-depth: ${{env.depth}}
       - uses: trufflesecurity/trufflehog@main
         with:
