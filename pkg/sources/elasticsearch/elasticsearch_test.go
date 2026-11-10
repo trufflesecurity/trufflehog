@@ -2,10 +2,12 @@ package elasticsearch
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,4 +126,19 @@ func TestMakeElasticSearchRequest_ErrorResponse(t *testing.T) {
 	names, err := fetchIndexNames(context.Background(), s.client, "*")
 	assert.Nil(t, names)
 	assert.EqualError(t, err, "elasticsearch returned 401 Unauthorized: security_exception: missing authentication credentials")
+}
+
+// The transport passes an empty response, not nil, when an attempt got no
+// response at all, so a network error must still log as a failed request.
+func TestAPILogger_NetworkError(t *testing.T) {
+	ctx, logs := logtest.SourceContext(true)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:9200/_search", nil)
+	require.NoError(t, err)
+
+	require.NoError(t, apiLogger{}.LogRoundTrip(req, &http.Response{}, errors.New("connection refused"), time.Now(), time.Millisecond))
+
+	failed := logs.FilterMessage("Elasticsearch request failed").All()
+	require.Len(t, failed, 1)
+	assert.Equal(t, "connection refused", failed[0].ContextMap()["error"])
+	assert.Zero(t, logs.FilterMessage("Elasticsearch request").Len())
 }
