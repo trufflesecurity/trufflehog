@@ -112,8 +112,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 					got.AnalyzerType, analyzers.AnalyzerTypeDatadog)
 			}
 
-			// Bindings need to be in the same order to be comparable
+			// Bindings and resources need to be in the same order to be comparable
 			sortBindings(got.Bindings)
+			sortResources(got.UnboundedResources)
 
 			// Marshal the actual result to JSON
 			gotJSON, err := json.Marshal(got)
@@ -127,8 +128,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Fatalf("could not unmarshal want JSON string: %s", err)
 			}
 
-			// Bindings need to be in the same order to be comparable
+			// Bindings and resources need to be in the same order to be comparable
 			sortBindings(wantObj.Bindings)
+			sortResources(wantObj.UnboundedResources)
 
 			// Marshal the expected result to JSON (to normalize)
 			wantJSON, err := json.Marshal(wantObj)
@@ -193,8 +195,9 @@ func TestAnalyzer_Analyze_ApiKeyOnly(t *testing.T) {
 			got.AnalyzerType, analyzers.AnalyzerTypeDatadog)
 	}
 
-	// Bindings need to be in the same order to be comparable
+	// Bindings and resources need to be in the same order to be comparable
 	sortBindings(got.Bindings)
+	sortResources(got.UnboundedResources)
 
 	// Marshal the actual result to JSON
 	gotJSON, err := json.Marshal(got)
@@ -208,8 +211,9 @@ func TestAnalyzer_Analyze_ApiKeyOnly(t *testing.T) {
 		t.Fatalf("could not unmarshal want JSON string: %s", err)
 	}
 
-	// Bindings need to be in the same order to be comparable
+	// Bindings and resources need to be in the same order to be comparable
 	sortBindings(wantObj.Bindings)
+	sortResources(wantObj.UnboundedResources)
 
 	// Marshal the expected result to JSON (to normalize)
 	wantJSON, err := json.Marshal(wantObj)
@@ -241,4 +245,87 @@ func sortBindings(bindings []analyzers.Binding) {
 		}
 		return bindings[i].Resource.Name < bindings[j].Resource.Name
 	})
+}
+
+// sortResources orders resources by name. Resources are collected
+// concurrently, so their order in a live result isn't stable.
+func sortResources(resources []analyzers.Resource) {
+	sort.SliceStable(resources, func(i, j int) bool {
+		return resources[i].Name < resources[j].Name
+	})
+}
+
+// Test_secretInfoToAnalyzerResult_ResourcesAreUnbounded verifies that
+// dashboards and monitors land in UnboundedResources rather than producing
+// bindings with an empty Permission.Value, and that each one keeps the key's
+// user as its parent when the user is known.
+func Test_secretInfoToAnalyzerResult_ResourcesAreUnbounded(t *testing.T) {
+	user := User{Id: "user-1", Name: "Test User", Email: "test@example.com"}
+	permissions := []Permission{{Title: "Dashboards Read"}, {Title: "Monitors Read"}}
+	resources := []Resource{
+		{ID: "abc-def-ghi", Name: "My Dashboard", Type: ResourceTypeDashboard, MetaData: map[string]string{"URL": "/dashboard/abc-def-ghi"}},
+		{ID: "12345", Name: "My Monitor", Type: ResourceTypeMonitor},
+	}
+
+	tests := []struct {
+		name           string
+		user           User
+		wantBindingFQN string
+		wantParentFQN  string
+	}{
+		{
+			name:           "known user is the parent of permissions and resources",
+			user:           user,
+			wantBindingFQN: "user-1",
+			wantParentFQN:  "user-1",
+		},
+		{
+			name:           "unknown user leaves resources without a parent",
+			wantBindingFQN: "Unknown User",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := secretInfoToAnalyzerResult(&SecretInfo{
+				User:        tt.user,
+				Permissions: permissions,
+				Resources:   resources,
+			})
+
+			if len(result.Bindings) != len(permissions) {
+				t.Fatalf("got %d bindings, want one per permission (%d)", len(result.Bindings), len(permissions))
+			}
+			for _, b := range result.Bindings {
+				if b.Permission.Value == "" {
+					t.Errorf("binding for %q has empty Permission.Value (would fail proto validation)", b.Resource.Name)
+				}
+				if b.Resource.FullyQualifiedName != tt.wantBindingFQN {
+					t.Errorf("binding for %q is bound to %q, want %q", b.Permission.Value, b.Resource.FullyQualifiedName, tt.wantBindingFQN)
+				}
+			}
+
+			if len(result.UnboundedResources) != len(resources) {
+				t.Fatalf("got %d unbounded resources, want %d", len(result.UnboundedResources), len(resources))
+			}
+			for i, r := range result.UnboundedResources {
+				if r.FullyQualifiedName != resources[i].ID || r.Type != resources[i].Type {
+					t.Errorf("unbounded resource %d = %q (%s), want %q (%s)", i, r.FullyQualifiedName, r.Type, resources[i].ID, resources[i].Type)
+				}
+				gotParentFQN := ""
+				if r.Parent != nil {
+					gotParentFQN = r.Parent.FullyQualifiedName
+				}
+				if gotParentFQN != tt.wantParentFQN {
+					t.Errorf("unbounded resource %q has parent %q, want %q", r.Name, gotParentFQN, tt.wantParentFQN)
+				}
+			}
+		})
+	}
+}
+
+func Test_secretInfoToAnalyzerResult_NilInfo(t *testing.T) {
+	if got := secretInfoToAnalyzerResult(nil); got != nil {
+		t.Errorf("secretInfoToAnalyzerResult(nil) = %+v, want nil", got)
+	}
 }
