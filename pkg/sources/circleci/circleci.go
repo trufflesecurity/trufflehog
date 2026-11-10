@@ -32,6 +32,11 @@ const (
 // It is a var so tests can point it at a fake server.
 var baseURL = "https://circleci.com/api/v1.1"
 
+// errOutputExpired means a step's output is gone. CircleCI deletes step output
+// after its retention period, so old builds return 403 or 404 for it. That is
+// expected, so the step is skipped instead of reported as an error.
+var errOutputExpired = errors.New("step output expired")
+
 type Source struct {
 	name     string
 	token    string
@@ -158,6 +163,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 						// The output URL is signed, so it is never logged.
 						buildCtx.Logger().V(4).Info("Scanning step output", "step", step.Name)
 						data, err := s.getOutputUrlResponse(buildCtx, action.OutputUrl)
+						if errors.Is(err, errOutputExpired) {
+							buildCtx.Logger().V(4).Info("Skipping step output", "step", step.Name, "reason", "output expired")
+
+							continue
+						}
 						if err != nil {
 							buildCtx.Logger().Error(err, "Failed to get step output", "step", step.Name)
 							scanErrs.Add(err)
@@ -348,8 +358,10 @@ func (s *Source) getOutputUrlResponse(ctx context.Context, outputUrl string) (st
 		_ = resp.Body.Close()
 	}()
 
-	// An expired or forbidden signed URL returns an error page, which must not be
-	// scanned as build output.
+	// An error page must never be scanned as build output.
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
+		return "", errOutputExpired
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("unexpected status code: %d while fetching step output", resp.StatusCode)
 	}
