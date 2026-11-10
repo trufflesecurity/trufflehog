@@ -225,7 +225,7 @@ func NewClient(postmanToken string, metrics *metrics) *Client {
 		// Requests for large objects (usually collections) take a long time.  While we don't think that _every_
 		// request will take this long, some might take 5 seconds or more.  This seems reasonable, but we should
 		// be very cautious about bumping it further
-		HTTPClient:                        common.RetryableHTTPClientTimeout(30, withAPILogHooks()),
+		HTTPClient:                        common.RetryableHTTPClientTimeout(30, common.WithAPILogHooks("postman")),
 		Headers:                           bh,
 		WorkspaceAndCollectionRateLimiter: rate.NewLimiter(rate.Every(time.Second), 1),
 		GeneralRateLimiter:                rate.NewLimiter(rate.Every(time.Second/5), 1),

@@ -1,15 +1,22 @@
 package circleci
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -180,4 +187,94 @@ func TestSource_EdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)
 	}
+}
+
+// fakeCircleCI serves the parts of the CircleCI v1.1 API the source uses: one
+// project with no builds (404), and one with a build of two steps. One step's
+// signed output URL has expired (403). The first /projects call returns a 503,
+// which the client retries.
+func fakeCircleCI(t *testing.T, secretOutput string) *httptest.Server {
+	t.Helper()
+	var projectCalls atomic.Int32
+	var srv *httptest.Server
+	write := func(w http.ResponseWriter, body any) {
+		_ = json.NewEncoder(w).Encode(body)
+	}
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/projects":
+			if projectCalls.Add(1) == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			write(w, []map[string]any{
+				{"vcs_type": "github", "username": "org", "reponame": "empty", "vcs_url": "//circleci.com/org/empty"},
+				{"vcs_type": "github", "username": "org", "reponame": "app", "vcs_url": "//circleci.com/org/app"},
+			})
+		case "/project/circleci/org/app":
+			write(w, []map[string]any{{"build_num": 1}})
+		case "/project/circleci/org/app/1":
+			write(w, map[string]any{
+				"circle_yml": map[string]any{"string": "version: 2"},
+				"steps": []map[string]any{
+					{"name": "build", "actions": []map[string]any{{"output_url": srv.URL + "/output/build?sig=circledebuglogtestsig"}}},
+					{"name": "deploy", "actions": []map[string]any{{"output_url": srv.URL + "/output/expired?sig=circledebuglogtestsig"}}},
+				},
+			})
+		case "/output/build":
+			_, _ = w.Write([]byte(secretOutput))
+		case "/output/expired":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("<Error>AccessDenied</Error>"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	return srv
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const (
+		testSecret = "circledebuglogtestsecret"
+		testSig    = "circledebuglogtestsig"
+	)
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		t.Helper()
+		srv := fakeCircleCI(t, "token = "+testSecret)
+		defer srv.Close()
+		oldBaseURL := baseURL
+		baseURL = srv.URL
+		defer func() { baseURL = oldBaseURL }()
+
+		ctx, logs := logtest.SourceContext(debug)
+		conn, err := anypb.New(&sourcespb.CircleCI{Credential: &sourcespb.CircleCI_Token{Token: "circledebuglogtesttoken"}})
+		require.NoError(t, err)
+
+		s := Source{}
+		require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		chunksCh := make(chan *sources.Chunk, 10)
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		// the expired step output is not scanned, only the good step and the yaml
+		var steps []string
+		for chunk := range chunksCh {
+			steps = append(steps, chunk.SourceMetadata.GetCircleci().GetBuildStep())
+		}
+		assert.Equal(t, []string{"build", ""}, steps)
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret, testSig)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
 }

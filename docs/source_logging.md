@@ -35,6 +35,9 @@ paths, and URLs, so think about what a line could contain before adding it.
 - Use key/value pairs, not format strings. Add fields that apply to a whole block of work with
   `context.WithValues`.
 - If building a debug line is expensive, check `ctx.Logger().V(5).Enabled()` first.
+- For a retryable HTTP client (`common.RetryableHTTPClient*`), pass `common.WithAPILogHooks("<api>")` so retries and
+  failed responses are logged at `V(4)`. Clients that take hooks one by one can use `common.APIRequestLogHook` and
+  `common.APIResponseLogHook`. Send every request with the scan ctx, or the lines lose the source fields.
 
 ## Per-source debug
 

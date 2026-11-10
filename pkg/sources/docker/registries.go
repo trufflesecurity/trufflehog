@@ -17,7 +17,7 @@ import (
 )
 
 // defaultHTTPClient defines a shared HTTP client with timeout for all registry requests.
-var defaultHTTPClient = common.RetryableHTTPClientTimeout(10, withRegistryLogHooks())
+var defaultHTTPClient = common.RetryableHTTPClientTimeout(10, common.WithAPILogHooks("registry"))
 
 // registryRateLimiter limits how quickly we make registry API calls across all registries.
 // We allow roughly 1 event every 1.5s, with a burst of 2 as a simple safeguard against overloading upstream APIs.

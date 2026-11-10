@@ -130,6 +130,17 @@ trufflehog travisci --token YOUR_TRAVIS_CI_TOKEN --concurrency 8
 trufflehog travisci --token YOUR_TRAVIS_CI_TOKEN --json --results=verified
 ```
 
+## Debug Logs
+
+With debug on for this source, the scan logs:
+
+- `V(1)`: `Travis CI source initialized` with the user name and auth type (never the token), and `Enumerating repositories` and `Finished enumerating repositories` with the repository count.
+- `V(2)`: `Enumerated repository` for each repository, and `Scanning repository` when its builds are scanned.
+- `V(3)`: `Scanning build` with its job count, and `Scanning job` for each job log.
+- `V(4)`: `Fetched repository page` and `Fetched builds page`, `Skipping build` and `Skipping job` with a `reason` (no jobs, no log content), `API request failed` (with `api=travisci`) for any response of 400 or above, and `Retrying API request` for each retry.
+
+Lines carry `repo`, `build` and `job_number` where they apply. Failures to list repositories, builds or jobs, or to get a job log, are logged as errors at the default level.
+
 ## Troubleshooting
 
 ### Common Issues
