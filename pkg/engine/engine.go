@@ -6,6 +6,7 @@ package engine
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"runtime"
@@ -1351,8 +1352,13 @@ func (e *Engine) filterResults(
 		if !e.filterUnverified && ignoreConfig {
 			reason = "custom_cleaner"
 		}
+		// Cleaners keep unverified results by position, so the input order must not vary between scans. Custom cleaners
+		// (for example aws.CleanResults) also build their output from a map, so the output is sorted again to hand the
+		// caller a stable slice.
+		detectors.SortResults(results)
 		before := len(results)
 		results = clean(results, e.verify)
+		detectors.SortResults(results)
 		if dropped := before - len(results); dropped > 0 {
 			resultsDropped.WithLabelValues(stage, reason, detectorNameStr).Add(float64(dropped))
 		}
@@ -1413,6 +1419,26 @@ func (e *Engine) processResult(
 	e.results <- secret
 }
 
+// dedupeKey hashes the fields that identify one finding at one location within one job. Every field is written
+// with its byte length first, so fields that contain NUL bytes or share a prefix (JobID 1 + name "2x" versus JobID
+// 12 + name "x") cannot run together into the same hash input.
+func dedupeKey(result detectors.ResultWithMetadata) string {
+	h := md5.New()
+	var lenBuf [8]byte
+	write := func(field []byte) {
+		binary.BigEndian.PutUint64(lenBuf[:], uint64(len(field)))
+		h.Write(lenBuf[:])
+		h.Write(field)
+	}
+	write([]byte(strconv.FormatInt(int64(result.JobID), 10)))
+	write([]byte(result.DetectorName))
+	write([]byte(result.DetectorType.String()))
+	write(result.Raw)
+	write(result.RawV2)
+	write([]byte(fmt.Sprintf("%+v", result.SourceMetadata)))
+	return string(h.Sum(nil))
+}
+
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
 		startTime := time.Now()
@@ -1442,15 +1468,22 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
 
-		// Dedupe results by comparing the detector type, raw result, and source metadata.
+		// Dedupe results by comparing the job, detector type, raw result, and source metadata.
 		// The key includes SourceMetadata (file path, line numbers, etc.) so genuinely
 		// different occurrences of the same credential at different locations are not
 		// suppressed. Only exact duplicates — same credential at the same location — are
 		// filtered, which handles peek-overlap re-scans and cross-decoder duplicates alike.
 		// The key also include the DetectorName to prevent deduping the results for
 		// custom detectors which have the same type.
-		// MD5 hash of the key is used to reduce memory usage of the dedupe cache,
-		// since the raw result and source metadata can be large.
+		//
+		// The key includes the JobID on purpose: dedupe is scoped to a single job. Each job
+		// is expected to report every secret it finds, even when an earlier job in the same
+		// engine run (a long-running engine re-scanning a target, or a CLI run whose sources
+		// overlap) already reported the same secret at the same location. Without the JobID
+		// a later job's finding would be silently dropped until the cache evicted the entry.
+		// See dedupeKey for how the fields are encoded. MD5 hash of the key is used to
+		// reduce memory usage of the dedupe cache, since the raw result and source
+		// metadata can be large.
 		//
 		// This deduplication only applies to results that are *not*
 		// from reverification, since we are expected to see the same
@@ -1458,8 +1491,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 
 		// Notifier workers share this cache; the check and insert must be one atomic step.
 		if e.dedupeCacheEnabled() && result.SecretID == 0 {
-			h := md5.Sum([]byte(fmt.Sprintf("%s%s%s%s%+v", result.DetectorName, result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)))
-			key := string(h[:])
+			key := dedupeKey(result)
 			if found, _ := e.dedupeCache.ContainsOrAdd(key, struct{}{}); found {
 				resultsDropped.WithLabelValues("notifier", "dedupe_cache_hit", detectorNameStr).Inc()
 				continue

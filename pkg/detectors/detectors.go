@@ -1,6 +1,8 @@
 package detectors
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -8,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -296,12 +299,27 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 	}
 }
 
+// SortResults stably orders results by Redacted, then RawV2, then Raw. Detectors that build results from a map return
+// them in random order; callers that select results by position (CleanResults, and engine.filterResults on behalf of
+// custom cleaners) sort first so the survivors do not change between scans.
+func SortResults(results []Result) {
+	slices.SortStableFunc(results, func(a, b Result) int {
+		return cmp.Or(
+			cmp.Compare(a.Redacted, b.Redacted),
+			bytes.Compare(a.RawV2, b.RawV2),
+			bytes.Compare(a.Raw, b.Raw),
+		)
+	})
+}
+
 // CleanResults returns all verified secrets, and if there are no verified secrets,
 // just one unverified secret if there are any.
 func CleanResults(results []Result, _ bool) []Result {
 	if len(results) == 0 {
 		return results
 	}
+	// Sort before selecting so that both the single unverified survivor and the verified set come out in a fixed order.
+	SortResults(results)
 
 	var cleaned = make(map[string]Result, 0)
 
@@ -319,6 +337,7 @@ func CleanResults(results []Result, _ bool) []Result {
 	for _, r := range cleaned {
 		results = append(results, r)
 	}
+	SortResults(results)
 
 	return results
 }
