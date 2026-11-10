@@ -254,6 +254,18 @@ trufflehog gcs --project-id my-gcp-project --cloud-environment --include-buckets
 trufflehog gcs --project-id my-gcp-project --service-account /path/to/service-account.json --max-object-size 5MB
 ```
 
+## Debug Logs
+
+With debug on for this source (`debug: true` in the config), the scan logs:
+
+- `V(1)`: `GCS source initialized` with the config choices (the credential type only, never the credentials), the start and end of enumeration with bucket and object counts, the bucket list, and `Resuming from saved progress` when a scan resumes.
+- `V(2)`: `Enumerated bucket` with its object count, and the start and end of listing each bucket's objects, with how many were queued and how many were skipped.
+- `V(3)`: `Scanning object` for each object, with its size.
+- `V(4)`: `Skipping bucket` and `Skipping object` with a `reason` (matches filter, file type is skipped, size out of range, already scanned), and `Retrying GCS request` for each retry.
+- `V(5)`: internal state, such as an empty entry in an object listing.
+
+Lines carry `bucket` and `object` where they apply. Failures to list a bucket or read an object are logged as errors at the default level.
+
 ## Troubleshooting
 
 ### Common Issues

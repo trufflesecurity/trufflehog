@@ -156,6 +156,7 @@ var excludedFromDefaultList = map[detector_typepb.DetectorType]struct{}{
 	detector_typepb.DetectorType_KongKonnect:               {},
 	detector_typepb.DetectorType_SonarQube:                 {},
 	detector_typepb.DetectorType_Infisical:                 {},
+	detector_typepb.DetectorType_Serval:                    {},
 	detector_typepb.DetectorType_Composio:                  {},
 
 	// Reserved / special types.

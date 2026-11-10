@@ -704,6 +704,7 @@ import (
 	sentrytokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serphouse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serpstack"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serval"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sheety"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sherpadesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shipday"
@@ -1637,6 +1638,7 @@ func buildDetectorList() []detectors.Detector {
 		&sentryorgtoken.Scanner{},
 		&serphouse.Scanner{},
 		&serpstack.Scanner{},
+		&serval.Scanner{},
 		&sheety.Scanner{},
 		&sherpadesk.Scanner{},
 		&shipday.Scanner{},
@@ -1928,6 +1930,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.SonarQubeDetectorEnabled.Load()
 		case *infisical.Scanner:
 			return !feature.InfisicalDetectorEnabled.Load()
+		case *serval.Scanner:
+			return !feature.ServalDetectorEnabled.Load()
 		default:
 			return false
 		}

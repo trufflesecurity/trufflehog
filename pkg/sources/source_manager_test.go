@@ -1,6 +1,8 @@
 package sources
 
 import (
+	stdctx "context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -320,7 +323,8 @@ func TestSourceManagerContextCancelled(t *testing.T) {
 	cancel()
 	<-ref.Done()
 	report := ref.Snapshot()
-	assert.Error(t, report.FatalError())
+	assert.NoError(t, report.FatalError())
+	assert.ErrorIs(t, report.InterruptError(), stdctx.Canceled)
 }
 
 type DummyAPI struct {
@@ -364,10 +368,108 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	cancelErr := fmt.Errorf("abort! abort!")
 	ref.CancelRun(cancelErr)
 	<-ref.Done()
-	assert.Error(t, ref.Snapshot().FatalError())
-	assert.ErrorIs(t, ref.Snapshot().FatalError(), returnedErr)
-	assert.ErrorIs(t, ref.Snapshot().FatalErrors(), cancelErr)
+	assert.NoError(t, ref.Snapshot().FatalError())
+	assert.ErrorIs(t, ref.Snapshot().InterruptError(), returnedErr)
+	assert.ErrorIs(t, errors.Join(ref.Snapshot().Errors...), cancelErr)
 	assert.ErrorIs(t, ref.Err(), cancelErr)
+}
+
+// blockingUnitChunker blocks in each method until its context is cancelled,
+// then returns the context's error.
+type blockingUnitChunker struct{}
+
+func (blockingUnitChunker) Chunks(ctx context.Context, _ chan *Chunk, _ ...ChunkingTarget) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (blockingUnitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
+	if err := rep.UnitOk(ctx, CommonSourceUnit{ID: "one"}); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	return fmt.Errorf("enumerating: %w", ctx.Err())
+}
+
+func (blockingUnitChunker) ChunkUnit(ctx context.Context, _ SourceUnit, _ ChunkReporter) error {
+	<-ctx.Done()
+	return fmt.Errorf("chunking: %w", ctx.Err())
+}
+
+func TestSourceManagerCancelRunWithUnits(t *testing.T) {
+	noopReporter := visitorUnitReporter{
+		ok:  func(context.Context, SourceUnit) error { return nil },
+		err: func(context.Context, error) error { return nil },
+	}
+	tests := []struct {
+		name  string
+		start func(*SourceManager, Source) (JobProgressRef, error)
+	}{
+		{"EnumerateAndScan", func(mgr *SourceManager, source Source) (JobProgressRef, error) {
+			return mgr.EnumerateAndScan(context.Background(), "dummy", source)
+		}},
+		{"Enumerate", func(mgr *SourceManager, source Source) (JobProgressRef, error) {
+			return mgr.Enumerate(context.Background(), "dummy", source, noopReporter)
+		}},
+		{"Scan", func(mgr *SourceManager, source Source) (JobProgressRef, error) {
+			return mgr.Scan(context.Background(), "dummy", source, CommonSourceUnit{ID: "one"})
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+			source, err := buildDummy(blockingUnitChunker{})
+			assert.NoError(t, err)
+
+			ref, err := tt.start(mgr, source)
+			assert.NoError(t, err)
+
+			cancelErr := fmt.Errorf("abort! abort!")
+			ref.CancelRun(cancelErr)
+			<-ref.Done()
+			assert.NoError(t, ref.Snapshot().FatalError())
+			assert.ErrorIs(t, ref.Snapshot().InterruptError(), stdctx.Canceled)
+			assert.ErrorIs(t, errors.Join(ref.Snapshot().Errors...), cancelErr)
+			assert.ErrorIs(t, ref.Err(), cancelErr)
+		})
+	}
+}
+
+// TestSourceManagerCancelRunUnrelatedError tests that an error a source returns
+// after being cancelled is still Fatal if it did not come from the cancellation.
+func TestSourceManagerCancelRunUnrelatedError(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8))
+	unrelatedErr := fmt.Errorf("connection reset")
+	source, err := buildDummy(callbackChunker{func(ctx context.Context, _ chan *Chunk) error {
+		<-ctx.Done()
+		return unrelatedErr
+	}})
+	assert.NoError(t, err)
+
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
+	assert.NoError(t, err)
+
+	cancelErr := fmt.Errorf("abort! abort!")
+	ref.CancelRun(cancelErr)
+	<-ref.Done()
+	assert.ErrorIs(t, ref.Snapshot().FatalError(), unrelatedErr)
+	assert.ErrorIs(t, ref.Snapshot().InterruptError(), cancelErr)
+}
+
+func TestSourceManagerUserActionableError(t *testing.T) {
+	mgr := NewManager()
+	actionableErr := NewUserActionableError(fmt.Errorf("bad credentials"))
+	source, err := buildDummy(errorChunker{func() error { return actionableErr }})
+	assert.NoError(t, err)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
+	assert.NoError(t, err)
+	<-ref.Done()
+
+	fatalErr := ref.Snapshot().FatalError()
+	assert.ErrorIs(t, fatalErr, actionableErr)
+	_, ok := errors.AsType[UserActionable](fatalErr)
+	assert.True(t, ok)
+	assert.NoError(t, NewUserActionableError(nil))
 }
 
 func TestSourceManagerAvailableCapacity(t *testing.T) {
@@ -552,7 +654,7 @@ func TestUnitHookCloseConcurrentWithFinish(t *testing.T) {
 func TestSourceManagerSemaphoreAcquireError(t *testing.T) {
 	assertFinishedAfterAcquireError := func(t *testing.T, ref JobProgressRef, err error) {
 		t.Helper()
-		assert.IsType(t, Fatal{}, err)
+		assert.IsType(t, Interrupt{}, err)
 
 		// The acquire should fail, so the job should be finished
 		select {
@@ -653,4 +755,20 @@ func TestSourceManagerAddsSourceFieldsToLogs(t *testing.T) {
 		assert.Equal(t, 1, count)
 		assert.Equal(t, "set by caller", entry.ContextMap()["source_name"])
 	})
+}
+
+// logtest.SourceFields must match the fields withSourceFields adds, since source
+// tests check every line for them.
+func TestSourceFieldsMatchLogtest(t *testing.T) {
+	ctx, logs := logtest.DebugContext()
+	source, err := buildDummy(&counterChunker{count: 1})
+	require.NoError(t, err)
+
+	withSourceFields(ctx, source, NewJobProgress(1, 2, "dummy")).Logger().Info("line")
+
+	var keys []string
+	for key := range logs.All()[0].ContextMap() {
+		keys = append(keys, key)
+	}
+	assert.ElementsMatch(t, logtest.SourceFields, keys)
 }

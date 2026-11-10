@@ -1,7 +1,9 @@
 package huggingface
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -9,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -44,6 +45,10 @@ const (
 	// bucketsPagination is the page size for bucket listing endpoints,
 	// which default to 100 items per page (5000 max).
 	bucketsPagination = 5000
+
+	// listReposLimit is the page size ListReposByAuthor asks for. The listing is
+	// not paged, so a full page may mean repos were missed.
+	listReposLimit = 1000
 )
 
 type resourceType string
@@ -126,7 +131,7 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			ctx.Logger().Error(err, "Invalid include glob, ignoring it", "glob", ig)
 			continue
 		}
 		includeGlobs = append(includeGlobs, g)
@@ -134,7 +139,7 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			ctx.Logger().Error(err, "Invalid exclude glob, ignoring it", "glob", eg)
 			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
@@ -145,13 +150,22 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 // Set overrides the cache.Cache Set method to filter out repos based on
 // include and exclude globs.
 func (c *filteredRepoCache) Set(key, val string) {
-	if c.ignoreRepo(key) {
-		return
-	}
-	if !c.includeRepo(key) {
+	if c.skipReason(key) != "" {
 		return
 	}
 	c.Cache.Set(key, val)
+}
+
+// skipReason says why the include and exclude globs filter out a repo, or ""
+// if they keep it.
+func (c *filteredRepoCache) skipReason(key string) string {
+	if c.ignoreRepo(key) {
+		return "matches ignore filter"
+	}
+	if !c.includeRepo(key) {
+		return "not in include filter"
+	}
+	return ""
 }
 
 func (c *filteredRepoCache) ignoreRepo(s string) bool {
@@ -234,11 +248,11 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 		s.conn.GetIgnoreBuckets(),
 	)
 
-	s.models = initializeRepos(s.filteredModelsCache, s.conn.Models, fmt.Sprintf("%s/%s.git", s.conn.Endpoint, "%s"))
-	s.spaces = initializeRepos(s.filteredSpacesCache, s.conn.Spaces, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, SpacesRoute, "%s"))
-	s.datasets = initializeRepos(s.filteredDatasetsCache, s.conn.Datasets, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, DatasetsRoute, "%s"))
+	s.models = initializeRepos(ctx, s.filteredModelsCache, s.conn.Models, fmt.Sprintf("%s/%s.git", s.conn.Endpoint, "%s"))
+	s.spaces = initializeRepos(ctx, s.filteredSpacesCache, s.conn.Spaces, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, SpacesRoute, "%s"))
+	s.datasets = initializeRepos(ctx, s.filteredDatasetsCache, s.conn.Datasets, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, DatasetsRoute, "%s"))
 	// Buckets are not git repos; they are keyed by their plain "namespace/name" ID.
-	s.buckets = initializeRepos(s.filteredBucketsCache, s.conn.Buckets, "%s")
+	s.buckets = initializeRepos(ctx, s.filteredBucketsCache, s.conn.Buckets, "%s")
 	s.repoInfoCache = newRepoInfoCache()
 
 	s.includeDiscussions = s.conn.IncludeDiscussions
@@ -280,7 +294,49 @@ func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sou
 	s.skipAllDatasets = s.conn.SkipAllDatasets
 	s.skipAllBuckets = s.conn.SkipAllBuckets
 
+	ctx.Logger().V(1).Info("Hugging Face source initialized",
+		"endpoint", redactURL(s.conn.Endpoint),
+		"auth_type", authType(s.conn),
+		"organizations", len(s.conn.Organizations),
+		"users", len(s.conn.Users),
+		"models", len(s.models),
+		"spaces", len(s.spaces),
+		"datasets", len(s.datasets),
+		"buckets", len(s.buckets),
+		"skip_all_models", s.skipAllModels,
+		"skip_all_spaces", s.skipAllSpaces,
+		"skip_all_datasets", s.skipAllDatasets,
+		"skip_all_buckets", s.skipAllBuckets,
+		"include_discussions", s.includeDiscussions,
+		"include_prs", s.includePrs,
+		"concurrency", concurrency,
+	)
+
 	return nil
+}
+
+// redactURL hides the password in a URL before it is logged. Repo URLs are
+// built from the configured endpoint, which could carry user:pass. Log fields
+// and error values are not covered by global redaction, so this is the only
+// guard.
+func redactURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "<invalid URL>"
+	}
+	return u.Redacted()
+}
+
+// authType names the credential type for logs, never the credential.
+func authType(conn *sourcespb.Huggingface) string {
+	switch conn.GetCredential().(type) {
+	case *sourcespb.Huggingface_Token:
+		return "token"
+	case *sourcespb.Huggingface_Unauthenticated:
+		return "unauthenticated"
+	default:
+		return "none"
+	}
 }
 
 func (s *Source) validateIgnoreIncludeRepos() error {
@@ -320,14 +376,16 @@ func verifySlashSeparatedStrings(s []string) error {
 	return nil
 }
 
-func initializeRepos(cache *filteredRepoCache, repos []string, urlPattern string) []string {
+func initializeRepos(ctx context.Context, cache *filteredRepoCache, repos []string, urlPattern string) []string {
 	returnRepos := make([]string, 0)
 	for _, repo := range repos {
-		if !cache.ignoreRepo(repo) {
-			url := fmt.Sprintf(urlPattern, repo)
-			cache.Set(repo, url)
-			returnRepos = append(returnRepos, repo)
+		if cache.ignoreRepo(repo) {
+			ctx.Logger().V(4).Info("Skipping repo", "repo", repo, "reason", "matches ignore filter")
+			continue
 		}
+		url := fmt.Sprintf(urlPattern, repo)
+		cache.Set(repo, url)
+		returnRepos = append(returnRepos, repo)
 	}
 	return returnRepos
 }
@@ -336,7 +394,7 @@ func (s *Source) getResourceType(ctx context.Context, repoURL string) string {
 	repoInfo, ok := s.repoInfoCache.get(repoURL)
 	if !ok {
 		// This should never happen.
-		err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
+		err := fmt.Errorf("no repoInfo for URL: %s", redactURL(repoURL))
 		ctx.Logger().Error(err, "failed to get repository resource type")
 		return ""
 	}
@@ -348,7 +406,7 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metada
 	repoInfo, ok := s.repoInfoCache.get(repoURL)
 	if !ok {
 		// This should never happen.
-		err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
+		err := fmt.Errorf("no repoInfo for URL: %s", redactURL(repoURL))
 		ctx.Logger().Error(err, "failed to get repository visibility")
 		return source_metadatapb.Visibility_unknown
 	}
@@ -408,23 +466,28 @@ func (s *Source) enumerate(ctx context.Context) error {
 
 func (s *Source) cacheRepoInfo(ctx context.Context, repo string, repoType string, repoCache *filteredRepoCache) error {
 	repoURL, _ := repoCache.Get(repo)
-	repoCtx := context.WithValue(ctx, repoType, repoURL)
+	repoCtx := context.WithValue(ctx, repoType, redactURL(repoURL))
 
 	if _, ok := s.repoInfoCache.get(repoURL); !ok {
-		repoCtx.Logger().V(2).Info("Caching " + repoType + " info")
+		repoCtx.Logger().V(2).Info("Caching repo info")
 		repo, err := s.apiClient.GetRepo(repoCtx, repo, repoType)
 		if err != nil {
-			repoCtx.Logger().Error(err, "failed to fetch "+repoType)
+			repoCtx.Logger().Error(err, "Failed to fetch repo info")
 			return err
 		}
 		// check if repo empty
 		if repo.RepoID == "" {
-			repoCtx.Logger().Error(fmt.Errorf("no repo found for repo"), repoURL)
+			repoCtx.Logger().Error(errors.New("repo not found"), "Skipping repo")
 			return nil
+		}
+		// Legacy model IDs like "gpt2" have no owner part, so don't index past the slash.
+		name := repo.RepoID
+		if _, after, ok := strings.Cut(repo.RepoID, "/"); ok {
+			name = after
 		}
 		s.repoInfoCache.put(repoURL, repoInfo{
 			owner:        repo.Owner,
-			name:         strings.Split(repo.RepoID, "/")[1],
+			name:         name,
 			fullName:     repo.RepoID,
 			visibility:   getVisibility(repo.IsPrivate),
 			resourceType: resourceType(repoType),
@@ -474,8 +537,19 @@ func (s *Source) fetchAndCacheRepos(ctx context.Context, resourceType string, or
 	if err != nil {
 		return err
 	}
+	ctx.Logger().V(2).Info("Listed repos", "resource_type", resourceType, "count", len(repos))
+	if len(repos) >= listReposLimit {
+		ctx.Logger().Info("Repo listing hit the API limit, some repos may be missing",
+			"resource_type", resourceType,
+			"limit", listReposLimit,
+		)
+	}
 
 	for _, repo := range repos {
+		if reason := filteredCache.skipReason(repo.RepoID); reason != "" {
+			ctx.Logger().V(4).Info("Skipping repo", "repo", repo.RepoID, "reason", reason)
+			continue
+		}
 		repoURL := fmt.Sprintf(url, repo.RepoID)
 		filteredCache.Set(repo.RepoID, repoURL)
 		if err := s.cacheRepoInfo(ctx, repo.RepoID, resourceType, filteredCache); err != nil {
@@ -543,15 +617,22 @@ func (s *Source) enumerateAuthors(ctx context.Context) {
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, resourceType string) error {
-	var scannedCount uint64 = 1
+	var scannedCount uint64
 
 	repos := s.getReposListByType(resourceType)
 
-	ctx.Logger().V(2).Info("Found "+resourceType+" to scan", "count", len(repos))
+	ctx.Logger().V(1).Info("Scanning repos", "resource_type", resourceType, "count", len(repos))
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(repos, s.GetProgress().EncodedResumeInfo)
 	repos = reposToScan
+	if progressIndexOffset > 0 {
+		ctx.Logger().V(1).Info("Resuming from saved progress",
+			"resource_type", resourceType,
+			"already_scanned", progressIndexOffset,
+			"remaining", len(repos),
+		)
+	}
 
 	scanErrs := sources.NewScanErrors()
 
@@ -578,11 +659,12 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			repoInfo, ok := s.repoInfoCache.get(repoURL)
 			if !ok {
 				// This should never happen.
-				err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
-				ctx.Logger().Error(err, "failed to scan "+resourceType)
+				err := fmt.Errorf("no repoInfo for URL: %s", redactURL(repoURL))
+				ctx.Logger().Error(err, "Failed to scan repo", "resource_type", resourceType)
 				return nil
 			}
-			repoCtx := context.WithValues(ctx, resourceType, repoURL)
+			repoCtx := context.WithValues(ctx, resourceType, redactURL(repoURL))
+			repoCtx.Logger().V(2).Info("Scanning repo")
 			duration, err := s.cloneAndScanRepo(repoCtx, repoURL, repoInfo, chunksChan)
 			if err != nil {
 				scanErrs.Add(err)
@@ -592,20 +674,26 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			// Scan discussions and PRs, if enabled.
 			if s.includeDiscussions || s.includePrs {
 				if err = s.scanDiscussions(repoCtx, repoInfo, chunksChan); err != nil {
-					scanErrs.Add(fmt.Errorf("error scanning discussions/PRs in repo %s: %w", repoURL, err))
+					scanErrs.Add(fmt.Errorf("error scanning discussions/PRs in repo %s: %w", redactURL(repoURL), err))
 					return nil
 				}
 			}
 
-			repoCtx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d "+resourceType+"s", scannedCount, len(s.models)), "duration_seconds", duration)
-			atomic.AddUint64(&scannedCount, 1)
+			repoCtx.Logger().V(2).Info("Finished scanning repo",
+				"scanned", atomic.AddUint64(&scannedCount, 1),
+				"total", len(repos),
+				"duration", duration,
+			)
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		ctx.Logger().V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
+		ctx.Logger().Error(scanErrs.Errors(), "Failed to scan some repos",
+			"resource_type", resourceType,
+			"error_count", scanErrs.Count(),
+		)
 	}
 	s.SetProgressComplete(len(repos), len(repos), "Completed HuggingFace "+resourceType+" scan", "")
 	return nil
@@ -640,19 +728,17 @@ func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk) error
 }
 
 func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo repoInfo, chunksChan chan *sources.Chunk) (time.Duration, error) {
-	ctx.Logger().V(2).Info("attempting to clone %s", repoInfo.resourceType)
 	path, repo, err := s.cloneRepo(ctx, repoURL)
 	if err != nil {
 		return 0, err
 	}
 	defer func() { _ = os.RemoveAll(path) }()
 
-	var logger logr.Logger
-	logger.V(2).Info("scanning %s", repoInfo.resourceType)
+	ctx.Logger().V(3).Info("Cloned repo")
 
 	start := time.Now()
 	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
-		return 0, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
+		return 0, fmt.Errorf("error scanning repo %s: %w", redactURL(repoURL), err)
 	}
 	return time.Since(start), nil
 }
@@ -668,7 +754,7 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 	// Make the resume info string from the slice.
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
-	s.SetProgressComplete(index+offset, len(repos)+offset, fmt.Sprintf("%ss: %s", resourceType, repoURL), encodedResumeInfo)
+	s.SetProgressComplete(index+offset, len(repos)+offset, fmt.Sprintf("%ss: %s", resourceType, redactURL(repoURL)), encodedResumeInfo)
 }
 
 func (s *Source) scanDiscussions(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
@@ -676,16 +762,28 @@ func (s *Source) scanDiscussions(ctx context.Context, repoInfo repoInfo, chunksC
 	if err != nil {
 		return err
 	}
+	ctx.Logger().V(3).Info("Listed discussions", "count", len(discussions.Discussions))
 	for _, discussion := range discussions.Discussions {
-		if (discussion.IsPR && s.includePrs) || (!discussion.IsPR && s.includeDiscussions) {
-			d, err := s.apiClient.GetDiscussionByID(ctx, repoInfo, discussion.GetID())
-			if err != nil {
-				return err
-			}
-			// Note: there is no discussion "description" or similar to chunk, only comments
-			if err = s.chunkDiscussionComments(ctx, repoInfo, d, chunksChan); err != nil {
-				return err
-			}
+		if discussion.IsPR && !s.includePrs {
+			ctx.Logger().V(4).Info("Skipping discussion", "discussion", discussion.GetID(), "is_pr", true, "reason", "PRs not included")
+			continue
+		}
+		if !discussion.IsPR && !s.includeDiscussions {
+			ctx.Logger().V(4).Info("Skipping discussion", "discussion", discussion.GetID(), "is_pr", false, "reason", "discussions not included")
+			continue
+		}
+		d, err := s.apiClient.GetDiscussionByID(ctx, repoInfo, discussion.GetID())
+		if err != nil {
+			return err
+		}
+		ctx.Logger().V(3).Info("Scanning discussion",
+			"discussion", discussion.GetID(),
+			"is_pr", discussion.IsPR,
+			"comments", len(d.Events),
+		)
+		// Note: there is no discussion "description" or similar to chunk, only comments
+		if err = s.chunkDiscussionComments(ctx, repoInfo, d, chunksChan); err != nil {
+			return err
 		}
 	}
 	return nil
