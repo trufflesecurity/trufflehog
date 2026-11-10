@@ -13,6 +13,8 @@ import (
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 const PAGE_SIZE = 10
@@ -154,12 +156,41 @@ func makeElasticSearchRequest(
 
 	data := make(map[string]any)
 
+	// An error response is JSON too, so without this check its keys were read as
+	// results, for example as index names.
+	if res.IsError() {
+		return nil, fmt.Errorf("elasticsearch returned %s: %s", res.Status(), errorReason(rawData))
+	}
+
 	err = json.Unmarshal(rawData, &data)
 	if err != nil {
 		return nil, err
 	}
 
 	return data, nil
+}
+
+// errorReason returns the reason from an Elasticsearch error response, or "unknown
+// error" if the body has none. Only the reason is kept, not the whole body.
+func errorReason(body []byte) string {
+	var errResp struct {
+		Error json.RawMessage `json:"error"`
+	}
+	if json.Unmarshal(body, &errResp) != nil || len(errResp.Error) == 0 {
+		return "unknown error"
+	}
+	var detail struct {
+		Type   string `json:"type"`
+		Reason string `json:"reason"`
+	}
+	if json.Unmarshal(errResp.Error, &detail) == nil && detail.Reason != "" {
+		return detail.Type + ": " + detail.Reason
+	}
+	var reason string
+	if json.Unmarshal(errResp.Error, &reason) == nil && reason != "" {
+		return reason
+	}
+	return "unknown error"
 }
 
 func fetchIndexNames(
@@ -263,6 +294,8 @@ func processSearchedDocuments(
 	docSearch *DocumentSearch,
 	processDocument func(document *Document) error,
 ) (int, error) {
+	logger := logContext.AddLogger(ctx).Logger()
+
 	pitID, err := createPITForSearch(ctx, client, docSearch)
 	if err != nil {
 		return 0, err
@@ -272,7 +305,7 @@ func processSearchedDocuments(
 	documentsProcessed := 0
 	sort := []int{}
 
-	for documentsProcessed < docSearch.documentCount {
+	for page := 1; documentsProcessed < docSearch.documentCount; page++ {
 		searchReqBody := SearchRequestBody{
 			PIT: PointInTime{
 				ID:        pitID,
@@ -317,19 +350,26 @@ func processSearchedDocuments(
 			return 0, err
 		}
 
+		// A response without hits used to retry the same page forever.
 		topLevelHits, ok := searchResults["hits"].(map[string]any)
 		if !ok {
 			apiErr, ok := searchResults["error"].(map[string]any)
 			if ok {
 				return 0, fmt.Errorf("error fetching search results: %v", apiErr)
 			}
-			continue
+			return 0, errors.New("no hits in search response")
 		}
 
 		hits, ok := topLevelHits["hits"].([]any)
 		if !ok {
-			continue
+			return 0, errors.New("no hits list in search response")
 		}
+
+		logger.V(5).Info("Fetched search page",
+			"page", page,
+			"hits", len(hits),
+			"fetch_bodies", processingDocuments,
+		)
 
 		if len(hits) == 0 {
 			break
@@ -340,11 +380,13 @@ func processSearchedDocuments(
 
 			hit, ok := jsonHit.(map[string]any)
 			if !ok {
+				logger.V(4).Info("Skipping document", "reason", "hit is not an object")
 				continue
 			}
 
 			jsonSort, ok := hit["sort"].([]any)
 			if !ok {
+				logger.V(4).Info("Skipping document", "document_id", hit["_id"], "reason", "no sort values")
 				continue
 			}
 
@@ -359,21 +401,25 @@ func processSearchedDocuments(
 
 			id, ok := hit["_id"].(string)
 			if !ok {
+				logger.V(4).Info("Skipping document", "reason", "no document id")
 				continue
 			}
 
 			source, ok := hit["_source"].(map[string]any)
 			if !ok {
+				logger.V(4).Info("Skipping document", "document_id", id, "reason", "no source")
 				continue
 			}
 
 			timestamp, ok := source["@timestamp"].(string)
 			if !ok {
+				logger.V(4).Info("Skipping document", "document_id", id, "reason", "no @timestamp field")
 				continue
 			}
 
 			message, ok := source["message"].(string)
 			if !ok {
+				logger.V(4).Info("Skipping document", "document_id", id, "reason", "no message field")
 				continue
 			}
 
@@ -384,7 +430,7 @@ func processSearchedDocuments(
 			}
 
 			if err = processDocument(&document); err != nil {
-				return 0, nil
+				return documentsProcessed, err
 			}
 
 			documentsProcessed++
@@ -457,6 +503,10 @@ func (indices *Indices) Update(
 		}
 
 		index.documentCount = documentCount
+		logContext.AddLogger(ctx).Logger().V(2).Info("Counted documents in index",
+			"index", indexName,
+			"documents", documentCount,
+		)
 	}
 
 	indices.indices = make([]*Index, 0, len(newIndicesByName))
