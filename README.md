@@ -753,11 +753,10 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
 ...
       - shell: bash
         run: |
-          if [ "$GITHUB_EVENT_NAME" == "push" ]; then
-            echo "depth=$(($(jq '.commits | length' "$GITHUB_EVENT_PATH") + 2))" >> $GITHUB_ENV
-          fi
-          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            echo "depth=$(($(jq .pull_request.commits "$GITHUB_EVENT_PATH") +2))" >> $GITHUB_ENV
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "depth=$(jq '.commits | length + 2' "$GITHUB_EVENT_PATH")" >> $GITHUB_ENV
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "depth=$(jq '.pull_request.commits + 2' "$GITHUB_EVENT_PATH")" >> $GITHUB_ENV
           fi
       - uses: actions/checkout@v3
         with:
