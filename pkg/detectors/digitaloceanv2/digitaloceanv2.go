@@ -128,9 +128,10 @@ func verifyRefreshToken(ctx context.Context, client *http.Client, token string) 
 // If the token is invalid, it returns false and no error.
 // If an error is encountered, it returns false along with the error.
 func verifyAccessToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	// Ref: https://docs.digitalocean.com/reference/api/digitalocean/#tag/Account
+	// Use the same token validation endpoint as doctl for API tokens and model access keys.
+	// Ref: https://github.com/digitalocean/doctl/blob/main/do/oauth.go
 
-	url := "https://api.digitalocean.com/v2/account"
+	url := "https://cloud.digitalocean.com/v1/oauth/token/info"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false, fmt.Errorf("failed to create request: %w", err)
