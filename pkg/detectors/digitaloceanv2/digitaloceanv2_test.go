@@ -129,6 +129,8 @@ func TestDigitalOceanV2_AccessTokenVerification(t *testing.T) {
 			wantVerified: true,
 		},
 		{name: "success without metadata", token: secrets[0], status: http.StatusOK, wantVerified: true},
+		{name: "invalid OAuth token", token: secrets[0], status: http.StatusBadRequest, body: `{"error":"invalid_request"}`},
+		{name: "invalid personal access token", token: secrets[1], status: http.StatusBadRequest, body: `{"error":"invalid_request"}`},
 		{name: "unauthorized", token: secrets[0], status: http.StatusUnauthorized},
 		{name: "forbidden", token: secrets[1], status: http.StatusForbidden, wantVerificationError: true},
 		{name: "rate limited", token: secrets[0], status: http.StatusTooManyRequests, wantVerificationError: true},

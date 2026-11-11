@@ -147,7 +147,8 @@ func verifyAccessToken(ctx context.Context, client *http.Client, token string) (
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized:
+	case http.StatusBadRequest, http.StatusUnauthorized:
+		// The token-info endpoint can reject invalid tokens with either status.
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
