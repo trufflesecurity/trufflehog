@@ -1,9 +1,10 @@
 package stdin
 
 import (
+	"io"
 	"os"
+	"time"
 
-	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -20,7 +21,6 @@ type Source struct {
 	sourceId sources.SourceID
 	jobId    sources.JobID
 	verify   bool
-	log      logr.Logger
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -46,12 +46,25 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	s.jobId = jobId
 	s.sourceId = sourceId
 	s.verify = verify
-	s.log = aCtx.Logger()
+	aCtx.Logger().V(1).Info("Stdin source initialized", "verify", verify)
 	return nil
 }
 
+// byteCounter counts the bytes read through it, so the scan can log how much input
+// came in. It never looks at the data.
+type byteCounter struct {
+	r io.Reader
+	n int64
+}
+
+func (b *byteCounter) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	b.n += int64(n)
+	return n, err
+}
+
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	stdin := os.Stdin
+	stdin := &byteCounter{r: os.Stdin}
 	chunkSkel := &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
@@ -64,7 +77,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	ctx.Logger().Info("scanning stdin for secrets")
-	return handlers.HandleFile(ctx, stdin, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	start := time.Now()
+	err := handlers.HandleFile(ctx, stdin, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	ctx.Logger().V(1).Info("Finished scanning stdin", "bytes_read", stdin.n, "duration", time.Since(start))
+	return err
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
@@ -74,9 +90,10 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	ch := make(chan *sources.Chunk)
+	var chunksErr error
 	go func() {
 		defer close(ch)
-		_ = s.Chunks(ctx, ch)
+		chunksErr = s.Chunks(ctx, ch)
 	}()
 	for chunk := range ch {
 		if chunk != nil {
@@ -85,5 +102,6 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			}
 		}
 	}
-	return nil
+	// ch is closed only after Chunks returns, so chunksErr is set by now.
+	return chunksErr
 }

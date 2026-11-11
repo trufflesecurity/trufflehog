@@ -89,6 +89,16 @@ docker logs my-container 2>&1 | trufflehog stdin
 cat config.yaml | trufflehog stdin --json
 ```
 
+## Debug Logs
+
+With debug on for this source, the scan logs:
+
+- `V(0)`: `scanning stdin for secrets` when the scan starts.
+- `V(1)`: `Stdin source initialized` with whether verification is on, and `Finished scanning stdin` with `bytes_read` and its `duration`. A `bytes_read` of 0 means nothing was piped in.
+- `V(5)`: `empty reader, skipping file` when the input is empty, and `skipping archive file` when an archive is piped in with `--force-skip-archives`.
+
+A failure to read or process the input is returned as an error and stops the scan.
+
 ## Troubleshooting
 
 ### Common Issues
