@@ -29,6 +29,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 
 	sourceName := "trufflehog - filesystem"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, filesystem.SourceType)
+	ctx = withSourceFields(ctx, sourceName, filesystem.SourceType, sourceID, jobID)
 
 	fileSystemSource := &filesystem.Source{}
 	if err := fileSystemSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

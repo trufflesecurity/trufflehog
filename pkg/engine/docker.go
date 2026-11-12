@@ -39,6 +39,7 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (source
 
 	sourceName := "trufflehog - docker"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, docker.SourceType)
+	ctx = withSourceFields(ctx, sourceName, docker.SourceType, sourceID, jobID)
 
 	dockerSource := &docker.Source{}
 	if err := dockerSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

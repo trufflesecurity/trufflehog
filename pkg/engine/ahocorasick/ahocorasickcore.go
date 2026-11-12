@@ -1,8 +1,7 @@
 package ahocorasick
 
 import (
-	"bytes"
-	"strings"
+	"sync"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
 
@@ -10,6 +9,74 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
+
+// lowerBuf is a reusable buffer holding the lowercased copy of one chunk.
+//
+// Every chunk needs such a copy, and each one is thrown away moments later, so
+// rather than allocate a new buffer every time we borrow one from a pool and
+// hand it back afterwards. In a steady scan the pool already holds a buffer big
+// enough, so the copy costs no allocation at all.
+//
+// The pool stores pointers rather than plain slices. Putting a slice into a
+// sync.Pool would allocate on every Put, which is the very thing being avoided.
+type lowerBuf struct{ b []byte }
+
+var lowerBufPool = sync.Pool{New: func() any { return new(lowerBuf) }}
+
+// maxPooledLowerBuf is the largest buffer worth keeping for reuse.
+//
+// One unusually large chunk would otherwise leave a matching buffer sitting in
+// the pool for the rest of the run, once per worker goroutine. Past this size
+// it is cheaper to let the buffer go and allocate again next time.
+const maxPooledLowerBuf = 1 << 20 // 1 MiB
+
+// getLowerBuf borrows a buffer able to hold size bytes.
+func getLowerBuf(size int) *lowerBuf {
+	buf := lowerBufPool.Get().(*lowerBuf)
+	if cap(buf.b) < size {
+		buf.b = make([]byte, 0, size)
+	}
+	return buf
+}
+
+// putLowerBuf returns a buffer for reuse, unless it is too big to be worth
+// holding on to.
+func putLowerBuf(buf *lowerBuf) {
+	if cap(buf.b) > maxPooledLowerBuf {
+		return
+	}
+	buf.b = buf.b[:0]
+	lowerBufPool.Put(buf)
+}
+
+// appendASCIILower copies src onto dst, turning A-Z into a-z and leaving every
+// other byte exactly as it was.
+//
+// Only A-Z is changed, for two reasons.
+//
+// It keeps the copy the same length as the original. Lowercasing a character
+// can change how many bytes it takes: "İ" needs two bytes, "i" needs one.
+// FindDetectorMatches searches the lowercased copy but then cuts bytes out of
+// the original chunk, so if the copy were a different length every position
+// would point somewhere slightly wrong, and the text handed to a detector would
+// not be the text that matched.
+//
+// Nothing is lost by leaving other bytes alone. Every built-in detector keyword
+// is plain ASCII, so a non-ASCII byte can never be part of a match either way.
+//
+// Keywords are folded through this same function when they are registered, so
+// both sides of the search always agree. The one gap is a custom detector whose
+// keyword contains a cased non-ASCII letter: that letter is left as written on
+// both sides, so the keyword matches only text spelling it the same way.
+func appendASCIILower(dst, src []byte) []byte {
+	for _, c := range src {
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		dst = append(dst, c)
+	}
+	return dst
+}
 
 // DetectorKey is used to identify a detector in the keywordsToDetectors map.
 // Multiple detectors can have the same detector type but different versions.
@@ -146,9 +213,11 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...CoreOption) *
 		key := CreateDetectorKey(d)
 		detectorsByKey[key] = d
 		for _, kw := range d.Keywords() {
-			kwLower := strings.ToLower(kw)
-			keywords = append(keywords, kwLower)
-			keywordsToDetectors[kwLower] = append(keywordsToDetectors[kwLower], key)
+			// Fold the keyword exactly the way FindDetectorMatches folds the
+			// chunk it searches, so the two sides can never disagree.
+			kwFolded := string(appendASCIILower(nil, []byte(kw)))
+			keywords = append(keywords, kwFolded)
+			keywordsToDetectors[kwFolded] = append(keywordsToDetectors[kwFolded], key)
 		}
 	}
 
@@ -239,7 +308,14 @@ func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 //
 // The matches field contains the actual byte slices of the matched portions from the chunk data.
 func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
-	matches := ac.prefilter.Match(bytes.ToLower(chunkData))
+	// Search a lowercased copy so matching ignores case, but keep reporting
+	// positions against the original chunk, which is what the spans below cut
+	// from. The copy is borrowed and returned so it costs no allocation.
+	lowered := getLowerBuf(len(chunkData))
+	defer putLowerBuf(lowered)
+	lowered.b = appendASCIILower(lowered.b[:0], chunkData)
+
+	matches := ac.prefilter.Match(lowered.b)
 
 	matchCount := len(matches)
 	if matchCount == 0 {

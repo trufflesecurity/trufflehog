@@ -53,18 +53,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	if len(clientSecrets) == 0 {
 		return
 	}
-	clientIds := azure_entra.FindClientIdMatches(dataStr)
+	clientIds := azure_entra.FindClientIdOffsets(dataStr)
 	if len(clientIds) == 0 {
 		return
 	}
-	tenantIds := azure_entra.FindTenantIdMatches(dataStr)
+	tenantIds := azure_entra.FindTenantIdOffsets(dataStr)
 
 	client := s.client
 	if client == nil {
 		client = defaultClient
 	}
 	// The handling logic is identical for both versions.
-	results = append(results, v2.ProcessData(ctx, clientSecrets, clientIds, tenantIds, verify, client)...)
+	results = append(results, v2.ProcessData(ctx, dataStr, clientSecrets, clientIds, tenantIds, verify, client)...)
 	return results, nil
 }
 

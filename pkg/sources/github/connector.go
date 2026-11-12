@@ -117,7 +117,7 @@ func newConnector(ctx context.Context, source *Source) (Connector, error) {
 	switch cred := source.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:
 		log.RedactGlobally(cred.GithubApp.GetPrivateKey())
-		return NewAppConnector(ctx, apiEndpoint, cred.GithubApp)
+		return NewAppConnector(ctx, apiEndpoint, cred.GithubApp, source.conn.GetScanAllInstallations())
 	case *sourcespb.GitHub_BasicAuth:
 		log.RedactGlobally(cred.BasicAuth.GetPassword())
 		return NewBasicAuthConnector(ctx, apiEndpoint, source.conn.GetClonePath(), cred.BasicAuth)

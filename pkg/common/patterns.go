@@ -2,7 +2,7 @@ package common
 
 import (
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strconv"
 	"strings"
 )

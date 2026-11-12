@@ -2,7 +2,7 @@ package postman
 
 import (
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -89,7 +89,7 @@ func (s *Source) buildSubstitution(
 ) {
 	// Limit recursion depth to prevent stack overflow
 	if depth > maxRecursionDepth {
-		ctx.Logger().V(2).Info("Limited recursion depth",
+		ctx.Logger().V(4).Info("Limited recursion depth",
 			"depth", depth,
 		)
 		combos[data] = struct{}{}

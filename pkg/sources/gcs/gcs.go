@@ -11,7 +11,6 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/go-errors/errors"
-	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
@@ -69,7 +68,6 @@ type Source struct {
 
 	gcsManager objectManager
 	stats      *attributes
-	log        logr.Logger
 	chunksCh   chan *sources.Chunk
 
 	mu               sync.Mutex
@@ -112,8 +110,6 @@ func (c *persistableCache) shouldPersist() (bool, string) {
 
 // Init returns an initialized GCS source.
 func (s *Source) Init(aCtx context.Context, name string, id sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	s.log = aCtx.Logger()
-
 	s.name = name
 	s.verify = verify
 	s.sourceId = sourceID
@@ -132,12 +128,42 @@ func (s *Source) Init(aCtx context.Context, name string, id sources.JobID, sourc
 	}
 	s.gcsManager = gcsManager
 
-	s.log.V(2).Info("enumerating buckets and objects")
+	aCtx.Logger().V(1).Info("GCS source initialized",
+		"auth_method", authMethod(&conn),
+		"project_id", conn.ProjectId,
+		"include_buckets", len(conn.GetIncludeBuckets()),
+		"exclude_buckets", len(conn.GetExcludeBuckets()),
+		"include_objects", len(conn.GetIncludeObjects()),
+		"exclude_objects", len(conn.GetExcludeObjects()),
+		"max_object_size", gcsManager.maxObjectSize,
+		"concurrency", gcsManager.concurrency,
+	)
+
 	if err := s.enumerate(aCtx); err != nil {
 		return fmt.Errorf("error enumerating buckets and objects: %w", err)
 	}
 
 	return nil
+}
+
+// authMethod names the credential type for logs. It never returns the credential.
+func authMethod(conn *sourcespb.GCS) string {
+	switch conn.Credential.(type) {
+	case *sourcespb.GCS_ApiKey:
+		return "api_key"
+	case *sourcespb.GCS_ServiceAccountFile:
+		return "service_account_file"
+	case *sourcespb.GCS_JsonServiceAccount:
+		return "json_service_account"
+	case *sourcespb.GCS_Adc:
+		return "adc"
+	case *sourcespb.GCS_Unauthenticated:
+		return "unauthenticated"
+	case *sourcespb.GCS_Oauth:
+		return "oauth"
+	default:
+		return "unknown"
+	}
 }
 
 func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency int) (*gcsManager, error) {
@@ -162,7 +188,7 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 	case *sourcespb.GCS_Adc:
 		gcsManagerAuthOption = withDefaultADC(aCtx)
 	case *sourcespb.GCS_Unauthenticated:
-		gcsManagerAuthOption = withoutAuthentication()
+		gcsManagerAuthOption = withoutAuthentication(aCtx)
 	case *sourcespb.GCS_Oauth:
 		client, err := oauth2Client(aCtx, conn.GetOauth())
 		if err != nil {
@@ -186,7 +212,7 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerObjectOptions(conn))
 	}
 
-	gcsManager, err := newGCSManager(conn.ProjectId, gcsManagerOpts...)
+	gcsManager, err := newGCSManager(aCtx, conn.ProjectId, gcsManagerOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating GCS manager: %w", err)
 	}
@@ -267,12 +293,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	for obj := range objectCh {
 		o, ok := obj.(object)
 		if !ok {
-			ctx.Logger().Error(fmt.Errorf("unexpected object type: %T", obj), "GCS source unexpected object type", "name", s.name)
+			ctx.Logger().Error(fmt.Errorf("unexpected object type: %T", obj), "GCS source unexpected object type")
 			continue
 		}
 
 		if persistableCache.Exists(o.md5) {
-			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
+			ctx.Logger().V(4).Info("Skipping object", "bucket", o.bucket, "object", o.name, "reason", "already scanned")
 			continue
 		}
 
@@ -280,11 +306,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		go func(obj object) {
 			defer wg.Done()
 
-			if err := s.processObject(ctx, o); err != nil {
-				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
+			objCtx := context.WithValues(ctx, "bucket", o.bucket, "object", o.name)
+			objCtx.Logger().V(3).Info("Scanning object", "size", o.size)
+			if err := s.processObject(objCtx, o); err != nil {
+				if objCtx.Err() == nil {
+					objCtx.Logger().Error(err, "Error scanning object")
+				}
 				return
 			}
-			s.setProgress(ctx, o.md5, o.name, persistableCache)
+			s.setProgress(o.md5, persistableCache)
 		}(o)
 	}
 	wg.Wait()
@@ -303,7 +333,7 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 		}
 
 		c = simple.NewCacheWithData[string](entries)
-		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
+		ctx.Logger().V(1).Info("Resuming from saved progress", "num_entries", len(entries))
 	} else {
 		c = simple.NewCache[string]()
 	}
@@ -313,11 +343,10 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	return persistCache
 }
 
-func (s *Source) setProgress(ctx context.Context, md5, objName string, cache cache.Cache[string]) {
+func (s *Source) setProgress(md5 string, cache cache.Cache[string]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
 	s.SectionsCompleted++
 
 	cache.Set(md5, md5)
@@ -326,9 +355,8 @@ func (s *Source) setProgress(ctx context.Context, md5, objName string, cache cac
 }
 
 func (s *Source) completeProgress(ctx context.Context) {
-	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
-	ctx.Logger().Info(msg)
-	s.Message = msg
+	ctx.Logger().Info("GCS source finished processing objects", "objects", s.stats.numObjects)
+	s.Message = fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {

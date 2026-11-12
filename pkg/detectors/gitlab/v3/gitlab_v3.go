@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -35,11 +36,7 @@ var (
 )
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -62,6 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
 
+		if detectors.StringShannonEntropy(resMatch) < 3.6 {
+			continue
+		}
+
 		for _, endpoint := range s.Endpoints() {
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Gitlab,
@@ -83,7 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				maps.Copy(s1.ExtraData, extraData)
 
-				s1.SetVerificationError(verificationErr)
+				s1.SetVerificationError(verificationErr, resMatch)
 
 				// for verified keys break out of the endpoint loop to continue to next secret
 				if s1.Verified {

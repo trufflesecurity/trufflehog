@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"regexp"
+	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"strings"
 	"time"
 
@@ -16,12 +16,12 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
-	ignorePatterns []regexp.Regexp
+	ignorePatterns []*regexp.Regexp
 }
 
 func New(opts ...func(*Scanner)) *Scanner {
 	scanner := &Scanner{
-		ignorePatterns: []regexp.Regexp{},
+		ignorePatterns: []*regexp.Regexp{},
 	}
 	for _, opt := range opts {
 		opt(scanner)
@@ -32,13 +32,13 @@ func New(opts ...func(*Scanner)) *Scanner {
 
 func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 	return func(s *Scanner) {
-		var ignorePatterns []regexp.Regexp
+		var ignorePatterns []*regexp.Regexp
 		for _, ignoreString := range ignoreStrings {
 			ignorePattern, err := regexp.Compile(ignoreString)
 			if err != nil {
 				panic(fmt.Sprintf("%s is not a valid regex, error received: %v", ignoreString, err))
 			}
-			ignorePatterns = append(ignorePatterns, *ignorePattern)
+			ignorePatterns = append(ignorePatterns, ignorePattern)
 		}
 
 		s.ignorePatterns = ignorePatterns
@@ -117,7 +117,11 @@ matchLoop:
 				}
 			}
 		} else if verify {
-			continue
+			// The connection string could not be parsed, so the credential was never tested.
+			// That is an indeterminate outcome, not a rejection: we report it as unverified carrying the parse error.
+			// Dropping it here made the reported findings depend on whether verification was requested,
+			// since the unparseable match is kept when verify is false.
+			result.SetVerificationError(parseErr, jdbcConn)
 		}
 
 		results = append(results, result)
