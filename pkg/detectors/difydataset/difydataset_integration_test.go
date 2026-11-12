@@ -6,6 +6,7 @@ package difydataset
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -16,6 +17,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
+
+// newTestScanner mirrors what DefaultDetectors() does at startup: without the
+// cloud endpoint, Endpoints() is empty and verification never runs.
+func newTestScanner(client *http.Client) Scanner {
+	s := Scanner{client: client}
+	s.SetCloudEndpoint((Scanner{}).CloudEndpoint())
+	s.UseCloudEndpoint(true)
+	return s
+}
 
 func TestDifydataset_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -42,7 +52,7 @@ func TestDifydataset_FromChunk(t *testing.T) {
 	}{
 		{
 			name: "found, verified",
-			s:    Scanner{},
+			s:    newTestScanner(nil),
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a difydataset secret %s within", secret)),
@@ -60,7 +70,7 @@ func TestDifydataset_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified",
-			s:    Scanner{},
+			s:    newTestScanner(nil),
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a difydataset secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
@@ -78,7 +88,7 @@ func TestDifydataset_FromChunk(t *testing.T) {
 		},
 		{
 			name: "not found",
-			s:    Scanner{},
+			s:    newTestScanner(nil),
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte("You cannot find the secret within"),
@@ -90,7 +100,7 @@ func TestDifydataset_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			s:    newTestScanner(common.SaneHttpClientTimeOut(1 * time.Microsecond)),
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a difydataset secret %s within", secret)),
@@ -108,7 +118,7 @@ func TestDifydataset_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
+			s:    newTestScanner(common.ConstantResponseHttpClient(404, "")),
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a difydataset secret %s within", secret)),
@@ -140,7 +150,7 @@ func TestDifydataset_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData")
 			ignoreUnexported := cmpopts.IgnoreUnexported(detectors.Result{})
 			if diff := cmp.Diff(got, tt.want, ignoreOpts, ignoreUnexported); diff != "" {
 				t.Errorf("Difydataset.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

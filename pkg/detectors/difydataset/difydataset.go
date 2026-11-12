@@ -1,10 +1,13 @@
 package difydataset
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -15,10 +18,22 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.EndpointSetter
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+
+// CloudEndpoint returns Dify Cloud's API host. Dify is open source and often
+// self-hosted; a key from a self-hosted instance is unknown to Dify Cloud, so
+// such instances are verified only when an operator configures their URL as a
+// custom verification endpoint.
+func (Scanner) CloudEndpoint() string { return "https://api.dify.ai" }
+
+const keyPrefix = "dataset-"
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -29,7 +44,7 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
-	return []string{"dataset-"}
+	return []string{keyPrefix}
 }
 
 // FromData will find and optionally verify Dify Knowledge Base (dataset) API keys in a given set of bytes.
@@ -49,24 +64,50 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
+			client := s.VerificationClient(cmp.Or(s.client, defaultClient))
 
-			isVerified, verificationErr := verifyMatch(ctx, client, match)
-			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, match)
+			// Verification targets Dify Cloud plus any operator-configured
+			// endpoints, such as self-hosted instances. URLs found in the
+			// scanned data are never called. Only non-nil errors overwrite
+			// lastErr so that a clean 401 from one instance does not erase a
+			// transient failure from an instance that might be authoritative.
+			var lastErr error
+			for _, baseURL := range s.Endpoints() {
+				isVerified, vErr := verifyMatch(ctx, client, baseURL, match)
+				s1.Verified = isVerified
+				if vErr != nil {
+					lastErr = vErr
+				}
+				if isVerified {
+					lastErr = nil
+					s1.ExtraData = map[string]string{"endpoint": baseURL}
+					break
+				}
+			}
+			s1.SetVerificationError(lastErr, match)
 		}
 
 		results = append(results, s1)
 	}
 
-	return
+	return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.dify.ai/v1/datasets", nil)
+// datasetsURL builds the knowledge-base list URL for a Dify instance. Dify
+// documents its API base as <host>/v1, so a configured endpoint may be given
+// with or without the /v1 suffix.
+func datasetsURL(baseURL string) (string, error) {
+	base := strings.TrimSuffix(strings.TrimRight(baseURL, "/"), "/v1")
+	return url.JoinPath(base, "/v1/datasets")
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, baseURL, token string) (bool, error) {
+	endpoint, err := datasetsURL(baseURL)
+	if err != nil {
+		return false, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
 	}
@@ -85,13 +126,26 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	case http.StatusOK:
 		// Determinate success: key is live and can list the account's knowledge bases.
 		return true, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
-		// Determinate failure: key is invalid/revoked. No error object.
+	case http.StatusUnauthorized:
+		// Determinate failure: this instance does not recognize the key.
 		return false, nil
+	case http.StatusForbidden:
+		// Ambiguous: Dify answers a bad key with 401. A 403 can come from a
+		// workspace or permission problem, or from a proxy in front of the
+		// instance, while the key itself is still valid.
+		return false, fmt.Errorf("forbidden response (HTTP 403): key validity could not be determined")
 	default:
 		// Indeterminate: unexpected status (rate limit, 5xx, etc).
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+}
+
+// IsFalsePositive runs the default false-positive check on the random part of
+// the key only. The fixed dataset- prefix contains the dictionary word "data",
+// so checking the whole key would discard every unverified Dify key.
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	body := strings.TrimPrefix(string(result.Raw), keyPrefix)
+	return detectors.IsKnownFalsePositive(body, detectors.DefaultFalsePositives, true)
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
