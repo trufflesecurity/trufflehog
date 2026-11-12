@@ -1,14 +1,25 @@
 package gitlab
 
 import (
+	stdctx "context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
@@ -186,4 +197,107 @@ func Test_normalizeGitlabEndpoint(t *testing.T) {
 			assert.Equal(t, tc.wantErr, err != nil)
 		})
 	}
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testToken = "glpat-debuglogtestsecret"
+
+	// fakeGitLab serves two pages of group projects. The first request for
+	// page 1 fails with a 503, so the client retries it.
+	newFakeGitLab := func(t *testing.T) *httptest.Server {
+		var failed atomic.Bool
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/api/v4/groups/1/projects" {
+				http.NotFound(w, r)
+				return
+			}
+			if !failed.Swap(true) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			project := func(id int, path string) map[string]any {
+				return map[string]any{
+					"id":                  id,
+					"name_with_namespace": path,
+					"path_with_namespace": path,
+					"http_url_to_repo":    "https://gitlab.example.com/" + path + ".git",
+				}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Query().Get("page") == "2" {
+				_ = json.NewEncoder(w).Encode([]any{project(3, "org/third")})
+				return
+			}
+			w.Header().Set("X-Next-Page", "2")
+			_ = json.NewEncoder(w).Encode([]any{project(1, "org/first"), project(2, "org/ignored")})
+		}))
+		t.Cleanup(srv.Close)
+		return srv
+	}
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		ctx, logs := logtest.SourceContext(debug)
+		srv := newFakeGitLab(t)
+		conn, err := anypb.New(&sourcespb.GitLab{
+			Credential:  &sourcespb.GitLab_Token{Token: testToken},
+			Endpoint:    "https://gitlab.example.com",
+			GroupIds:    []string{"1"},
+			IgnoreRepos: []string{"*ignored*"},
+		})
+		require.NoError(t, err)
+
+		s := Source{}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+		// Init only accepts https, so point the client at the fake server afterwards.
+		s.url = srv.URL + "/"
+
+		reporter := sourcestest.TestReporter{}
+		require.NoError(t, s.Enumerate(ctx, &reporter))
+		require.Empty(t, reporter.UnitErrs)
+
+		// an ignored unit returns before cloning
+		ignored := git.SourceUnit{Kind: git.UnitRepo, ID: "https://gitlab.example.com/org/ignored.git"}
+		require.NoError(t, s.ChunkUnit(ctx, ignored, &reporter))
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testToken)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
+}
+
+func TestSource_EnumerateCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// the first request cancels the scan and hangs until the client gives up
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cancel()
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+
+	conn, err := anypb.New(&sourcespb.GitLab{
+		Credential: &sourcespb.GitLab_Token{Token: "glpat-cancelledtestsecret"},
+		Endpoint:   "https://gitlab.example.com",
+		GroupIds:   []string{"1", "2", "3"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "test cancelled", 1, 1, false, conn, 1))
+	s.url = srv.URL + "/"
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.ErrorIs(t, err, stdctx.Canceled)
+	// the groups left are not reported as listing errors
+	assert.Empty(t, reporter.UnitErrs)
 }

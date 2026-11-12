@@ -112,7 +112,7 @@ func (s Scanner) processMatches(ctx context.Context, refreshTokens, clientIds, t
 					}
 
 					if _, ok := validTenants[tenantId]; !ok {
-						if azure_entra.TenantExists(logCtx, client, tenantId) {
+						if exists, err := azure_entra.TenantExists(logCtx, client, tenantId); err == nil && exists {
 							validTenants[tenantId] = struct{}{}
 						} else {
 							delete(tenantIds, tenantId)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"sort"
 	"strconv"
@@ -107,13 +108,28 @@ func ParseVerifierEndpoints(verifierURLs map[string]string) (map[DetectorID][]st
 			verifierURLs[i] = rawEndpoint
 			if endpoint, err := url.Parse(rawEndpoint); err != nil {
 				return nil, fmt.Errorf("invalid verifier url %q: %w", rawEndpoint, err)
-			} else if endpoint.Scheme != "https" {
+			} else if endpoint.Scheme != "https" && !isLoopbackHTTP(endpoint) {
 				return nil, fmt.Errorf("verifier url must be https: %q", rawEndpoint)
 			}
 		}
 		verifiers[key] = append(verifiers[key], verifierURLs...)
 	}
 	return verifiers, nil
+}
+
+// isLoopbackHTTP reports whether the url is plain http to this machine.
+// That is safe to allow, the secret never leaves the machine. It lets
+// people verify against a local server, for example http://localhost:9000.
+func isLoopbackHTTP(endpoint *url.URL) bool {
+	if endpoint.Scheme != "http" {
+		return false
+	}
+	host := endpoint.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (id DetectorID) String() string {

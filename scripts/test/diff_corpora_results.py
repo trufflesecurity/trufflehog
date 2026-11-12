@@ -13,8 +13,10 @@ The diff measures regex match changes only.
 
 When --changed-detectors is provided, the report focuses on the detectors
 changed by the PR. Detectors flagged via --new-detectors are rendered with 🆕
-status and absolute density (no main baseline). When --corpus-bytes is
-provided, a blast-radius column projects matches per 10 GB of scanned content.
+status and absolute density (no main baseline). A scoped detector that is not
+new and has zero matches on both sides renders with ⚪: the corpus holds no
+material for it. When --corpus-bytes is provided, a blast-radius column projects matches
+per 10 GB of scanned content.
 
 Usage:
     diff_corpora_results.py <main.jsonl> <pr.jsonl>
@@ -39,6 +41,7 @@ STATUS_KEY = (
     "- 🔴 regression: >5 new, >20% increase over main, or any removed\n"
     "- ⚠️ warning: 1–5 new and ≤20% increase over main\n"
     "- ✅ clean\n"
+    "- ⚪ no data: 0 matches on main and PR; no comparison possible\n"
     "- 🆕 new detector (no baseline)"
 )
 
@@ -106,6 +109,7 @@ def build_top_line_summary(rows, changed):
     warned = sum(1 for r in rows if not r["is_new"] and r["emoji"] == "⚠️")
     new_count = sum(1 for r in rows if r["is_new"])
     clean = sum(1 for r in rows if r["emoji"] == "✅")
+    no_data = sum(1 for r in rows if r["emoji"] == "⚪")
     scoped = ", ".join(f"`{d}`" for d in sorted(changed)) if changed else ""
     parts = []
     if regressed:
@@ -113,6 +117,8 @@ def build_top_line_summary(rows, changed):
     if warned:
         parts.append(f"{warned} warned")
     parts += [f"{new_count} new", f"{clean} clean"]
+    if no_data:
+        parts.append(f"{no_data} no data")
     summary = f"**{' · '.join(parts)}**"
     if scoped:
         summary += f" \u00a0|\u00a0 Scoped to: {scoped}"
@@ -149,6 +155,9 @@ def render(main, pr, changed=None, new_detectors=None):
 
         if is_new:
             emoji = "🆕"
+        elif not m["identities"] and not p["identities"]:
+            # Zero matches on both sides means the corpus had nothing to compare
+            emoji = "⚪"
         else:
             emoji = status_emoji(len(new_ids), len(removed_ids), len(m["identities"]))
 
@@ -220,6 +229,16 @@ def render(main, pr, changed=None, new_detectors=None):
             ]
         parts.append("| " + " | ".join(cells) + " |")
     parts.append("")
+
+    no_data = [r["detector"] for r in rows if r["emoji"] == "⚪"]
+    if no_data:
+        names = ", ".join(f"`{d}`" for d in no_data)
+        subject = "this detector" if len(no_data) == 1 else "these detectors"
+        parts.append(
+            f"No comparison possible for: {names} (0 matches on main and PR; "
+            f"the corpus has no material for {subject})."
+        )
+        parts.append("")
     parts.append(STATUS_KEY)
     parts.append("")
 

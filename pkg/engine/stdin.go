@@ -24,6 +24,7 @@ func (e *Engine) ScanStdinInput(ctx context.Context, c sources.StdinConfig) (sou
 
 	sourceName := "trufflehog - stdin"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, stdin.SourceType)
+	ctx = withSourceFields(ctx, sourceName, stdin.SourceType, sourceID, jobID)
 
 	stdinSource := &stdin.Source{}
 	if err := stdinSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -92,6 +93,15 @@ type EndpointCustomizer interface {
 	UseFoundEndpoints(bool)
 }
 
+// VerifierAuthCustomizer is an optional interface for detectors whose
+// configured verification endpoints sit behind an auth proxy. It is separate
+// from EndpointCustomizer so existing implementers are unaffected; detectors
+// that embed EndpointSetter get it for free, and route their verification
+// requests through EndpointSetter.VerificationClient to apply it.
+type VerifierAuthCustomizer interface {
+	SetVerifierAuth(*verifierauth.Config)
+}
+
 type CloudProvider interface {
 	CloudEndpoint() string
 }
@@ -106,6 +116,14 @@ type Result struct {
 	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
 	// than an actual remote request.
 	VerificationFromCache bool
+	// VerificationSkipped indicates that the engine produced this result without attempting remote verification,
+	// either because verification was disabled for the result's source or detector, or because the engine withheld
+	// verification after multiple detectors matched the same secret. It lets consumers that measure verifier activity
+	// tell "the verifier did not run" apart from "the verifier ran and the credential did not verify". It is purely
+	// informational: Verified and the verification error keep whatever the detector or engine assigned, so a skipped
+	// result still reports as unverified (or with an overlap verification error) exactly as it would without this
+	// field.
+	VerificationSkipped bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -179,6 +197,17 @@ func (r *Result) SetPrimarySecretLine(line int64) {
 // GetPrimarySecretValue return primary secret match value
 func (r *Result) GetPrimarySecretValue() string {
 	return r.primarySecret.Value
+}
+
+// ClearSecrets removes fields that may contain raw secret material.
+func (r *Result) ClearSecrets() {
+	r.Raw = nil
+	r.RawV2 = nil
+	r.SecretParts = nil
+	r.primarySecret = struct {
+		Value string
+		Line  int64
+	}{}
 }
 
 // SetChunkOffset records the byte position of this result's secret within the chunk data.
@@ -374,4 +403,11 @@ func withDedupKey(ctx context.Context, detType detector_typepb.DetectorType, cre
 // with NewClientWithDedup or WithDedup — it is the only way to activate deduplication.
 func DoWithDedup(client *http.Client, detType detector_typepb.DetectorType, credential string, req *http.Request) (*http.Response, error) {
 	return client.Do(req.WithContext(withDedupKey(req.Context(), detType, credential)))
+}
+
+// ResultVerifier is an optional interface that a detector can implement to verify a single
+// previously-extracted result independently of the chunk it came from, which lets the
+// verification cache verify only cache misses instead of re-verifying an entire chunk.
+type ResultVerifier interface {
+	VerifyResult(ctx context.Context, result *Result)
 }

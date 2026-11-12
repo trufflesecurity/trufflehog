@@ -9,9 +9,13 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"gopkg.in/h2non/gock.v1"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -997,4 +1001,158 @@ func TestSource_AbortScanRateLimitBelowThreshold(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const (
+		testToken  = "postmandebuglogtesttoken"
+		testSecret = "postmandebuglogtestsecret"
+	)
+
+	mockAPI := func() {
+		// the first workspace request fails, so the retry lines show up
+		gock.New("https://api.getpostman.com").
+			Get("/workspaces/ws1").
+			Reply(503)
+		gock.New("https://api.getpostman.com").
+			Get("/workspaces/ws1").
+			Reply(200).
+			JSON(map[string]any{"workspace": map[string]any{
+				"id":   "ws1",
+				"name": "Debug Workspace",
+				"collections": []map[string]any{
+					{"id": "col1", "name": "Keep", "uid": "u-col1"},
+					{"id": "col2", "name": "Skip", "uid": "u-col2"},
+				},
+				"environments": []map[string]any{
+					{"id": "env1", "name": "Keep", "uid": "u-env1"},
+					{"id": "env2", "name": "Skip", "uid": "u-env2"},
+				},
+			}})
+		gock.New("https://api.getpostman.com").
+			Get("/environments/u-env1").
+			Reply(200).
+			JSON(map[string]any{"environment": map[string]any{
+				"id":     "env1",
+				"name":   "Keep",
+				"values": []map[string]any{{"key": "api_key", "value": testSecret, "enabled": true}},
+			}})
+		gock.New("https://api.getpostman.com").
+			Get("/collections/u-col1").
+			Reply(200).
+			JSON(map[string]any{"collection": map[string]any{
+				"info": map[string]any{"_postman_id": "col1", "name": "Keep", "uid": "u-col1"},
+				"item": []map[string]any{{
+					"id":   "i1",
+					"uid":  "u-i1",
+					"name": "folder",
+					"item": []map[string]any{
+						// a folder that points back at itself is skipped, not scanned again
+						{"id": "i1", "uid": "u-i1", "name": "folder"},
+						{
+							"id":   "i2",
+							"uid":  "u-i2",
+							"name": "request",
+							"request": map[string]any{
+								"method": "GET",
+								"url": map[string]any{
+									"raw":      "https://example.com/v1/users",
+									"protocol": "https",
+									"host":     []string{"example", "com"},
+									"path":     []string{"v1", "users"},
+								},
+							},
+						},
+					},
+				}},
+			}})
+	}
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		t.Helper()
+		ctx, logs := logtest.SourceContext(debug)
+		defer gock.Off()
+		mockAPI()
+
+		s, conn := createTestSource(&sourcespb.Postman{
+			Credential:          &sourcespb.Postman_Token{Token: testToken},
+			Workspaces:          []string{"ws1"},
+			ExcludeCollections:  []string{"u-col2"},
+			ExcludeEnvironments: []string{"u-env2"},
+		})
+		// data is only sent with a detector keyword next to it, the engine sets these
+		s.DetectorKeywords = map[string]struct{}{"api_key": {}}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		// intercept the client inside the retryable client, so the retry and response
+		// hooks still run
+		inner := s.client.HTTPClient.Transport.(*retryablehttp.RoundTripper).Client.HTTPClient
+		gock.InterceptClient(inner)
+		defer gock.RestoreClient(inner)
+
+		chunksCh := make(chan *sources.Chunk, 100)
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testToken, testSecret)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
+}
+
+func TestClient_NewRequestKeepsSharedHeaders(t *testing.T) {
+	c := NewClient("token", newMetrics("test"))
+
+	req, err := c.NewRequest(context.Background(), "https://api.getpostman.com/workspaces", map[string]string{"X-Extra": "one"})
+	require.NoError(t, err)
+	assert.Equal(t, "one", req.Header.Get("X-Extra"))
+	assert.Equal(t, "token", req.Header.Get("X-API-Key"))
+
+	// the extra header must not leak into the next request
+	assert.NotContains(t, c.Headers, "X-Extra")
+	req, err = c.NewRequest(context.Background(), "https://api.getpostman.com/workspaces", nil)
+	require.NoError(t, err)
+	assert.Empty(t, req.Header.Get("X-Extra"))
+}
+
+func TestSource_EnumerateWorkspacesStopsAtMonthlyLimit(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		BodyString(`{"workspaces":[{"id":"0","name":"workspace-0"},{"id":"1","name":"workspace-1"}]}`)
+	// 90% of the monthly limit is used, which is over the abort threshold
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces/0").
+		Reply(200).
+		SetHeader("RateLimit-Remaining-Month", "10").
+		SetHeader("RateLimit-Limit-Month", "100").
+		BodyString(`{"workspace":{"id":"0","name":"workspace-0"}}`)
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces/1").
+		Reply(200).
+		BodyString(`{"workspace":{"id":"1","name":"workspace-1"}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{Token: "super-secret-token"},
+	})
+	require.NoError(t, s.Init(ctx, "test - postman", 0, 1, false, conn, 1))
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	_, err := s.client.EnumerateWorkspaces(ctx)
+	assert.ErrorIs(t, err, errAbortScanDueToAPIRateLimit)
+	// the second workspace was never requested
+	assert.Len(t, gock.Pending(), 1)
 }

@@ -1,21 +1,29 @@
 package gcs
 
 import (
+	"crypto/md5"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -461,4 +469,96 @@ func TestSource_CachePersistence(t *testing.T) {
 	assert.Equal(t, int32(wantObjCnt), source.SectionsCompleted)
 	assert.Equal(t, int64(100), source.PercentComplete)
 	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", wantObjCnt), source.Message)
+}
+
+// fakeGCS serves the parts of the GCS JSON and XML APIs the source uses. The first
+// object listing returns a 503, so the retry line shows up.
+func fakeGCS(t *testing.T, bkt string, objects map[string]string, sizes map[string]int64) *httptest.Server {
+	t.Helper()
+
+	var listCalls atomic.Int32
+	attrs := func(name string) map[string]any {
+		size, ok := sizes[name]
+		if !ok {
+			size = int64(len(objects[name]))
+		}
+		sum := md5.Sum([]byte(name))
+		return map[string]any{
+			"name":        name,
+			"bucket":      bkt,
+			"size":        strconv.FormatInt(size, 10),
+			"md5Hash":     base64.StdEncoding.EncodeToString(sum[:]),
+			"contentType": "text/plain",
+		}
+	}
+
+	listPath := "/storage/v1/b/" + bkt + "/o"
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == listPath:
+			if listCalls.Add(1) == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			items := make([]map[string]any, 0, len(objects))
+			for name := range objects {
+				items = append(items, attrs(name))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"items": items})
+		case strings.HasPrefix(r.URL.Path, listPath+"/"):
+			_ = json.NewEncoder(w).Encode(attrs(strings.TrimPrefix(r.URL.Path, listPath+"/")))
+		case strings.HasPrefix(r.URL.Path, "/"+bkt+"/"):
+			body := objects[strings.TrimPrefix(r.URL.Path, "/"+bkt+"/")]
+			w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+			_, _ = io.WriteString(w, body)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const (
+		bkt        = "debug-bkt"
+		testSecret = "gcsdebuglogtestsecret"
+	)
+	srv := fakeGCS(t, bkt,
+		map[string]string{
+			"secret.txt": "token = " + testSecret,
+			"video.mp4":  "not scanned",
+			"big.txt":    "not scanned",
+			"skip/x.txt": "not scanned",
+		},
+		map[string]int64{"big.txt": 500},
+	)
+	defer srv.Close()
+	t.Setenv("STORAGE_EMULATOR_HOST", srv.Listener.Addr().String())
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		t.Helper()
+		ctx, logs := logtest.SourceContext(debug)
+		s, conn := createTestSource(&sourcespb.GCS{
+			IncludeBuckets: []string{bkt},
+			ExcludeObjects: []string{"skip/*"},
+			MaxObjectSize:  100,
+			Credential:     &sourcespb.GCS_Unauthenticated{},
+		})
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		chunksCh := make(chan *sources.Chunk, 10)
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
 }

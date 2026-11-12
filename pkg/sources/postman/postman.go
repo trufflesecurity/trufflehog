@@ -128,7 +128,32 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		return errors.New("credential type not implemented for Postman")
 	}
 
+	ctx.Logger().V(1).Info("Postman source initialized",
+		"auth_method", authMethod(&conn),
+		"workspaces", len(conn.Workspaces),
+		"collections", len(conn.Collections),
+		"environments", len(conn.Environments),
+		"include_collections", len(conn.IncludeCollections),
+		"exclude_collections", len(conn.ExcludeCollections),
+		"include_environments", len(conn.IncludeEnvironments),
+		"exclude_environments", len(conn.ExcludeEnvironments),
+		"local_workspaces", len(conn.WorkspacePaths),
+		"local_collections", len(conn.CollectionPaths),
+		"local_environments", len(conn.EnvironmentPaths),
+	)
 	return nil
+}
+
+// authMethod names the credential type for logs. It never returns the credential.
+func authMethod(conn *sourcespb.Postman) string {
+	switch conn.Credential.(type) {
+	case *sourcespb.Postman_Token:
+		return "token"
+	case *sourcespb.Postman_Unauthenticated:
+		return "unauthenticated"
+	default:
+		return "unknown"
+	}
 }
 
 // Chunks scans the Postman source and sends the data to the chunks chan.
@@ -142,6 +167,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan local environments
 	for _, envPath := range s.conn.EnvironmentPaths {
+		ctx.Logger().V(2).Info("Scanning local file", "kind", "environment", "path", envPath)
 		env := VariableData{}
 		contents, err := os.ReadFile(envPath)
 		if err != nil {
@@ -155,6 +181,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan local collections
 	for _, collectionPath := range s.conn.CollectionPaths {
+		ctx.Logger().V(2).Info("Scanning local file", "kind", "collection", "path", collectionPath)
 		collection := Collection{}
 		contents, err := os.ReadFile(collectionPath)
 		if err != nil {
@@ -168,6 +195,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan local workspaces
 	for _, workspacePath := range s.conn.WorkspacePaths {
+		ctx.Logger().V(2).Info("Scanning local file", "kind", "workspace", "path", workspacePath)
 		// check if zip file
 		workspace := Workspace{}
 		if strings.HasSuffix(workspacePath, ".zip") {
@@ -191,11 +219,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			}
 			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
-			ctx.Logger().Error(err, "error getting workspace %s", workspaceID)
+			ctx.Logger().Error(err, "Error getting workspace", "workspace_id", workspaceID)
 			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspaceID), "")
-		ctx.Logger().V(2).Info("scanning workspace from workspaces given", "workspace", workspaceID)
 		if err = s.scanWorkspace(ctx, chunksChan, w); err != nil {
 			return fmt.Errorf("error scanning workspace %s: %w", workspaceID, err)
 		}
@@ -204,6 +231,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	// Scan collections
 	for _, collectionID := range s.conn.Collections {
 		if shouldSkip(collectionID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
+			ctx.Logger().V(4).Info("Skipping collection", "collection_uuid", collectionID, "reason", "matches filter")
 			continue
 		}
 
@@ -214,7 +242,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			}
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
-			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			ctx.Logger().Error(err, "Error getting collection", "collection_uuid", collectionID)
 			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning collection %s", collectionID), "")
@@ -227,7 +255,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err != nil {
 			return fmt.Errorf("error enumerating postman workspaces: %w", err)
 		}
-		ctx.Logger().V(2).Info("enumerated workspaces", "workspaces", workspaces)
+		ctx.Logger().V(1).Info("Enumerated workspaces", "count", len(workspaces))
 		for _, workspace := range workspaces {
 			s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspace.Id), "")
 			if err = s.scanWorkspace(ctx, chunksChan, workspace); err != nil {
@@ -262,13 +290,19 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 }
 
 func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) error {
-	ctx.Logger().V(4).Info("scanning workspace",
-		"workspace_id", workspace.Id,
-		"collection_uids", fp.Map(func(i IdNameUid) string { return i.Uid })(workspace.Collections),
-		"environment_uids", fp.Map(func(i IdNameUid) string { return i.Uid })(workspace.Environments),
-		"collection_raw_uids", fp.Map(func(c Collection) string { return c.Info.Uid })(workspace.CollectionsRaw),
-		"environment_raw_ids", fp.Map(func(v VariableData) string { return v.Id })(workspace.EnvironmentsRaw),
+	ctx = context.WithValues(ctx, "workspace_id", workspace.Id)
+	ctx.Logger().V(2).Info("Scanning workspace",
+		"collection_count", len(workspace.Collections),
+		"environment_count", len(workspace.Environments),
 	)
+	if ctx.Logger().V(5).Enabled() {
+		ctx.Logger().V(5).Info("Workspace contents",
+			"collection_uids", fp.Map(func(i IdNameUid) string { return i.Uid })(workspace.Collections),
+			"environment_uids", fp.Map(func(i IdNameUid) string { return i.Uid })(workspace.Environments),
+			"collection_raw_uids", fp.Map(func(c Collection) string { return c.Info.Uid })(workspace.CollectionsRaw),
+			"environment_raw_ids", fp.Map(func(v VariableData) string { return v.Id })(workspace.EnvironmentsRaw),
+		)
+	}
 	// reset keywords for each workspace
 	s.resetKeywords()
 	s.attemptToAddKeyword(workspace.Name)
@@ -283,6 +317,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
+		if shouldSkip(envID.Uid, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
+			ctx.Logger().V(4).Info("Skipping environment", "environment_uuid", envID.Uid, "reason", "matches filter")
+			continue
+		}
 		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.Uid)
 		if err != nil {
 			if errors.Is(err, errAbortScanDueToAPIRateLimit) {
@@ -291,16 +329,13 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.Uid)
 			continue
 		}
-		if shouldSkip(envID.Uid, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
-			continue
-		}
 		metadata.Type = ENVIRONMENT_TYPE
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.Uid
 		metadata.FullID = envVars.Id
 		metadata.EnvironmentID = envID.Uid
 		metadata.EnvironmentName = envVars.Name
 
-		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
+		ctx.Logger().V(3).Info("Scanning environment", "environment_uuid", envID.Uid, "variable_count", len(envVars.KeyValues))
 		for _, word := range strings.Split(envVars.Name, " ") {
 			s.attemptToAddKeyword(word)
 		}
@@ -312,15 +347,14 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.FullID = ""
 		metadata.EnvironmentID = ""
 		metadata.EnvironmentName = ""
-		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
 	}
-	ctx.Logger().V(2).Info("finished scanning environments")
 
 	// scan all the collections in the workspace.
 	// at this point we have all the possible
 	// substitutions from Environment variables
 	for _, collectionID := range workspace.Collections {
 		if shouldSkip(collectionID.Uid, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
+			ctx.Logger().V(4).Info("Skipping collection", "collection_uuid", collectionID.Uid, "reason", "matches filter")
 			continue
 		}
 		collection, err := s.client.GetCollection(ctx, collectionID.Uid)
@@ -330,7 +364,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 			}
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
-			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			ctx.Logger().Error(err, "Error getting collection", "collection_uuid", collectionID.Uid)
 			continue
 		}
 		s.scanCollection(ctx, chunksChan, metadata, collection)
@@ -345,9 +379,16 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 		"collection_name", collection.Info.Name,
 		"collection_uuid", collection.Info.Uid,
 	)
-	ctx.Logger().V(2).Info("starting to scan collection",
+	ctx.Logger().V(2).Info("Scanning collection",
 		"variable_count", len(collection.Variables),
+		"event_count", len(collection.Events),
+		"item_count", len(collection.Items),
 	)
+	if ctx.Logger().V(5).Enabled() {
+		ctx.Logger().V(5).Info("Collection items",
+			"item_ids", fp.Map(func(i Item) string { return i.Id })(collection.Items),
+		)
+	}
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
@@ -368,16 +409,10 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	// collections don't have URLs in the Postman API, but we can scan the Authorization section without it.
 	s.scanAuth(ctx, chunksChan, metadata, collection.Auth, URL{})
 
-	ctx.Logger().V(3).Info("Scanning events in collection",
-		"event_count", len(collection.Events),
-	)
 	for _, event := range collection.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
-	ctx.Logger().V(3).Info("Scanning items in collection",
-		"item_ids", fp.Map(func(i Item) string { return i.Id })(collection.Items),
-	)
 	for _, item := range collection.Items {
 		seenItemIds := make(map[string]struct{})
 		s.scanItem(ctx, chunksChan, collection, metadata, item, "", seenItemIds)
@@ -385,11 +420,11 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 }
 
 func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item, parentItemId string, seenItemIds map[string]struct{}) {
-	ctx = context.WithValue(ctx, "item_uid", item.Uid)
+	ctx = context.WithValues(ctx, "item_uid", item.Uid)
 
-	ctx.Logger().V(3).Info("Starting to scan item",
+	ctx.Logger().V(3).Info("Scanning item",
 		"item_parent_item_id", parentItemId,
-		"item_descendent_item_uids", fp.Map(func(i Item) string { return i.Uid })(item.Items),
+		"item_count", len(item.Items),
 		"item_event_count", len(item.Events),
 		"item_response_count", len(item.Response),
 		"item_variable_count", len(item.Variable),
@@ -415,8 +450,9 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	// recurse through the folders
 	for _, subItem := range item.Items {
 		if _, ok := seenItemIds[subItem.Uid]; ok {
-			ctx.Logger().Info("Skipping already-seen item",
+			ctx.Logger().V(4).Info("Skipping item",
 				"seen_item_id", subItem.Uid,
+				"reason", "already seen",
 			)
 			continue
 		}
@@ -461,7 +497,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 
-	ctx.Logger().V(3).Info("Finished scanning item", "item_uid", item.Uid)
+	ctx.Logger().V(5).Info("Finished scanning item")
 }
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
@@ -486,7 +522,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_SCRIPT
 	}
 
-	ctx = context.WithValue(ctx, "event_listen", event.Listen)
+	ctx = context.WithValues(ctx, "event_listen", event.Listen)
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, metadata, data, DefaultMaxRecursionDepth)), metadata)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
@@ -540,14 +576,15 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		if u.Raw != "" {
 			parsedURL, err := url.Parse(u.Raw)
 			if err != nil {
-				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
+				// the URL is not logged, it can hold credentials
+				ctx.Logger().V(4).Info("Skipping basic auth", "reason", "URL could not be parsed")
 				return
 			}
 
 			parsedURL.User = url.User(username + ":" + password)
 			decodedURL, err := url.PathUnescape(parsedURL.String())
 			if err != nil {
-				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
+				ctx.Logger().V(4).Info("Skipping basic auth", "reason", "URL could not be decoded")
 				return
 			}
 			authData += decodedURL
@@ -590,9 +627,9 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
-	ctx.Logger().V(3).Info("scanning http request",
+	ctx.Logger().V(5).Info("Scanning HTTP request",
 		"request_header_count", len(r.HeaderKeyValue),
-		"request_has_string_header", r.HeaderString == nil,
+		"request_has_string_header", r.HeaderString != nil,
 		"request_url_query_param_count", len(r.URL.Query),
 		"request_url_path_param_count", len(r.URL.Path),
 	)
@@ -650,7 +687,8 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 }
 
 func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
-	ctx.Logger().V(3).Info("scanning request body",
+	ctx.Logger().V(5).Info("Scanning request body",
+		"mode", b.Mode,
 		"request_body_form_data_count", len(b.FormData),
 		"request_body_url_encoded_param_count", len(b.URLEncoded),
 	)
@@ -733,7 +771,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, variableData VariableData) {
 	if len(variableData.KeyValues) == 0 {
-		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "item_uuid", m.FullID)
+		ctx.Logger().V(5).Info("No variables to scan", "type", m.Type, "item_uuid", m.FullID)
 		return
 	}
 
@@ -769,14 +807,14 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
 	if data == "" {
-		ctx.Logger().V(3).Info("Data string is empty", "workspace_id", metadata.WorkspaceUUID)
+		ctx.Logger().V(5).Info("Data string is empty", "type", metadata.Type)
 		return
 	}
 	if metadata.FieldType == "" {
 		metadata.FieldType = metadata.Type
 	}
 
-	ctx.Logger().V(3).Info("Generating chunk and passing it to the channel", "link", metadata.Link)
+	ctx.Logger().V(5).Info("Sending chunk", "link", metadata.Link, "field_type", metadata.FieldType)
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,

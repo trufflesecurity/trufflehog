@@ -1,16 +1,33 @@
 package docker
 
 import (
+	"archive/tar"
+	"bytes"
 	"io"
+	stdlog "log"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	dockerClient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -426,4 +443,107 @@ func TestDockerScanWithExclusions(t *testing.T) {
 	wg.Wait()
 
 	assert.False(t, foundExcludedPath, "Found a chunk that should have been excluded")
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testSecret = "dockerdebuglogtestsecret"
+
+	// newFakeRegistry pushes an image with one layer holding a secret file and an
+	// excluded file. After the push, the first manifest GET fails with a 503, so
+	// the scan has to retry it.
+	newFakeRegistry := func(t *testing.T) string {
+		var tarBuf bytes.Buffer
+		tw := tar.NewWriter(&tarBuf)
+		for name, content := range map[string]string{
+			"secret.txt":  "token=" + testSecret,
+			"skip/me.txt": "nothing to see",
+		} {
+			require.NoError(t, tw.WriteHeader(&tar.Header{Name: name, Mode: 0o600, Size: int64(len(content))}))
+			_, err := tw.Write([]byte(content))
+			require.NoError(t, err)
+		}
+		require.NoError(t, tw.Close())
+
+		layer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(tarBuf.Bytes())), nil
+		})
+		require.NoError(t, err)
+		img, err := mutate.Append(empty.Image, mutate.Addendum{
+			Layer:   layer,
+			History: v1.History{CreatedBy: "COPY . /"},
+		})
+		require.NoError(t, err)
+
+		var armed, failed atomic.Bool
+		reg := registry.New(registry.Logger(stdlog.New(io.Discard, "", 0)))
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if armed.Load() && r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/") && !failed.Swap(true) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			reg.ServeHTTP(w, r)
+		}))
+		t.Cleanup(srv.Close)
+
+		ref := strings.TrimPrefix(srv.URL, "http://") + "/test/image:v1"
+		tag, err := name.NewTag(ref)
+		require.NoError(t, err)
+		require.NoError(t, remote.Write(tag, img))
+		armed.Store(true)
+		return ref
+	}
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		ctx, logs := logtest.SourceContext(debug)
+		conn, err := anypb.New(&sourcespb.Docker{
+			Credential: &sourcespb.Docker_Unauthenticated{
+				Unauthenticated: &credentialspb.Unauthenticated{},
+			},
+			Images:       []string{newFakeRegistry(t)},
+			ExcludePaths: []string{"/skip/*"},
+		})
+		require.NoError(t, err)
+
+		s := &Source{}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		chunksChan := make(chan *sources.Chunk, 8)
+		require.NoError(t, s.Chunks(ctx, chunksChan))
+		close(chunksChan)
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
+}
+
+func TestDockerHub_ListImagesDebugLogging(t *testing.T) {
+	ctx, logs := logtest.SourceContext(true)
+
+	hub := &DockerHub{Client: &http.Client{Transport: common.FakeTransport{
+		CreateResponse: func(req *http.Request) (*http.Response, error) {
+			body := `{"next": "/v2/namespaces/acme/repositories?page=2", "results": [{"name": "one"}, {"name": "two"}]}`
+			if req.URL.Query().Get("page") == "2" {
+				body = `{"results": [{"name": "three"}]}`
+			}
+			return &http.Response{
+				Request:    req,
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(body)),
+			}, nil
+		},
+	}}}
+
+	_, err := hub.ListImages(ctx, "acme")
+	require.NoError(t, err)
+
+	logtest.CheckSourceLines(t, logs.All())
 }

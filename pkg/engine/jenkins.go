@@ -72,6 +72,7 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) (
 
 	sourceName := "trufflehog - Jenkins"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, jenkins.SourceType)
+	ctx = withSourceFields(ctx, sourceName, jenkins.SourceType, sourceID, jobID)
 
 	jenkinsSource := &jenkins.Source{}
 	if err := jenkinsSource.Init(ctx, "trufflehog - Jenkins", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

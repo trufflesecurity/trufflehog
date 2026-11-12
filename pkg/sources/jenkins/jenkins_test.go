@@ -11,9 +11,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -296,4 +298,90 @@ func TestJenkinsChunkBuildDirect(t *testing.T) {
 
 	expectedLink := server.URL + "/job/test-project/123/consoleText"
 	assert.Equal(t, expectedLink, jenkinsMetadata.Link)
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const (
+		testSecret  = "jenkinsdebuglogtestsecret"
+		urlPassword = "jenkinsdebuglogurlpassword"
+		password    = "jenkinsdebuglogpassword"
+	)
+
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	mux.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"jobs":[`+
+			`{"_class":"org.jenkinsci.plugins.workflow.job.WorkflowJob","name":"good","url":"%[1]s/job/good/"},`+
+			`{"_class":"hudson.model.ExternalJob","name":"external","url":"%[1]s/job/external/"},`+
+			`{"_class":"hudson.model.FreeStyleProject","name":"missing","url":"%[1]s/job/missing/"}]}`, server.URL)
+	})
+	mux.HandleFunc("/job/good/api/json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"builds":[{"number":1,"url":"%s/job/good/1/"}]}`, server.URL)
+	})
+	mux.HandleFunc("/job/good/1/consoleText", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "token = "+testSecret)
+	})
+	// Builds for "missing" are not handled, so the mux returns 404 and the source logs an error.
+
+	endpoint := strings.Replace(server.URL, "http://", "http://user:"+urlPassword+"@", 1)
+	conn, err := anypb.New(&sourcespb.Jenkins{
+		Endpoint: endpoint,
+		Credential: &sourcespb.Jenkins_BasicAuth{
+			BasicAuth: &credentialspb.BasicAuth{Username: "user", Password: password},
+		},
+	})
+	require.NoError(t, err)
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		t.Helper()
+		ctx, logs := logtest.SourceContext(debug)
+		s := new(Source)
+		require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		chunksCh := make(chan *sources.Chunk, 10)
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+		require.NotEmpty(t, chunksCh)
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret, urlPassword, password)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
+}
+
+func TestInit_EndpointErrors(t *testing.T) {
+	const urlPassword = "jenkinsinittesturlpassword"
+
+	tests := []struct {
+		name     string
+		endpoint string
+	}{
+		{name: "empty endpoint", endpoint: ""},
+		{name: "invalid endpoint", endpoint: "http://user:" + urlPassword + "@host:badport"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conn, err := anypb.New(&sourcespb.Jenkins{
+				Endpoint:   tc.endpoint,
+				Credential: &sourcespb.Jenkins_Unauthenticated{},
+			})
+			require.NoError(t, err)
+
+			err = new(Source).Init(context.Background(), "test source", 1, 1, false, conn, 1)
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), urlPassword)
+		})
+	}
 }

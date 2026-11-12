@@ -56,19 +56,19 @@ func (s *Source) cloneRepo(
 
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.Huggingface_Unauthenticated:
-		ctx.Logger().V(2).Info("cloning repo without authentication", "repo_url", repoURL)
+		ctx.Logger().V(3).Info("Cloning repo", "auth", "unauthenticated")
 		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL, "")
 		if err != nil {
 			return "", nil, err
 		}
 	case *sourcespb.Huggingface_Token:
-		ctx.Logger().V(2).Info("cloning repo with token authentication", "repo_url", repoURL)
+		ctx.Logger().V(3).Info("Cloning repo", "auth", "token")
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.huggingfaceToken, repoURL, "", "", true)
 		if err != nil {
 			return "", nil, err
 		}
 	default:
-		return "", nil, fmt.Errorf("unhandled credential type for repo %s: %T", repoURL, s.conn.GetCredential())
+		return "", nil, fmt.Errorf("unhandled credential type for repo %s: %T", redactURL(repoURL), s.conn.GetCredential())
 	}
 	return path, repo, nil
 }
