@@ -560,7 +560,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
 	feature.GitlabProjectsPerPage.Store(100)
 
-	// OSS Default using github graphql api for issues, pr's and comments
+	// OSS Default GitHub GraphQL API off, issues, PRs and comments use REST
 	feature.UseGithubGraphQLAPI.Store(false)
 
 	// OSS Default Use HTML Decoder on
