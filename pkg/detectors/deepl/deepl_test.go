@@ -44,6 +44,16 @@ func TestDeepl_Pattern(t *testing.T) {
 			want:  []string{adminKey},
 		},
 		{
+			name:  "free key without deepl identifier",
+			input: "TRANSLATION_API_KEY=" + freeKey,
+			want:  []string{freeKey},
+		},
+		{
+			name:  "admin key without deepl identifier",
+			input: `{"translator_admin": "` + adminKey + `"}`,
+			want:  []string{adminKey},
+		},
+		{
 			name: "valid pattern - xml",
 			input: `
 				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>

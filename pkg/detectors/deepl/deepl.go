@@ -44,8 +44,10 @@ var (
 	proKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"deepl"}) + `\b(` + uuidBody + `)\b`)
 )
 
+// Keywords are used for efficiently pre-filtering chunks. The :fx and :adm
+// suffixes let suffixed keys be found even when "deepl" is not nearby.
 func (s Scanner) Keywords() []string {
-	return []string{"deepl"}
+	return []string{"deepl", ":fx", ":adm"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
