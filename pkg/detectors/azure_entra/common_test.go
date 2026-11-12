@@ -1,9 +1,14 @@
 package azure_entra
 
 import (
+	"errors"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type testCase struct {
@@ -359,4 +364,62 @@ subscription_id = "47ab1364-000d-4a53-838d-1537b1e3b49f"
 	}
 
 	runPatTest(t, cases, FindClientIdMatches)
+}
+
+func Test_NearestFirst(t *testing.T) {
+	candidates := map[string][]int{
+		"far":      {500},
+		"near":     {95, 900},
+		"tie-b":    {110},
+		"tie-a":    {90},
+		"adjacent": {101},
+	}
+	got := NearestFirst(candidates, 100)
+	want := []string{"adjacent", "near", "tie-a", "tie-b", "far"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("diff: (-want +got)\n%s", diff)
+	}
+}
+
+func Test_FindIdOffsets(t *testing.T) {
+	data := "pad\nclient_id: 1474bfe8-663c-486e-9daf-f1f580302218\ntenant_id: 608e4ac4-2ca8-40dd-a046-4064540a1cde\n"
+
+	clients := FindClientIdOffsets(data)
+	wantClient := map[string][]int{"1474bfe8-663c-486e-9daf-f1f580302218": {strings.Index(data, "1474bfe8")}}
+	if diff := cmp.Diff(wantClient, clients); diff != "" {
+		t.Errorf("clients diff: (-want +got)\n%s", diff)
+	}
+
+	tenants := FindTenantIdOffsets(data)
+	wantTenant := map[string][]int{"608e4ac4-2ca8-40dd-a046-4064540a1cde": {strings.Index(data, "608e4ac4")}}
+	if diff := cmp.Diff(wantTenant, tenants); diff != "" {
+		t.Errorf("tenants diff: (-want +got)\n%s", diff)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// A failed lookup must not be remembered as "tenant doesn't exist".
+func Test_TenantExists_DoesNotCacheErrors(t *testing.T) {
+	const tenant = "5e6f7a8b-1c2d-4e3f-8a9b-0c1d2e3f4a5b"
+	fail := true
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if fail {
+			return nil, errors.New("network down")
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+	})}
+
+	exists, err := TenantExists(context.Background(), client, tenant)
+	if err == nil || exists {
+		t.Fatalf("expected an error and no tenant, got exists=%v err=%v", exists, err)
+	}
+
+	fail = false
+	exists, err = TenantExists(context.Background(), client, tenant)
+	if err != nil || !exists {
+		t.Fatalf("expected the tenant to exist after the network recovered, got exists=%v err=%v", exists, err)
+	}
 }

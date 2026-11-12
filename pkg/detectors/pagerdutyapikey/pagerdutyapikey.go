@@ -86,8 +86,35 @@ func verifyPagerdutyapikey(ctx context.Context, client *http.Client, token strin
 	case http.StatusOK:
 		return true, nil
 	case http.StatusUnauthorized:
+		// Token is missing, malformed, or invalid.
+		// Note that revoked (disabled) keys are treated as invalid.
+		return false, nil
+	case http.StatusForbidden:
+		// PagerDuty returns 403 when the token authenticated successfully but
+		// lacks permission for the requested resource -- e.g. a user token for
+		// a restricted-role user, or a scoped OAuth token missing users.read.
+		// This confirms the credential is live.
+		return true, nil
+	case http.StatusTooManyRequests:
+		// Rate-limited. Can't determine validity; keep indeterminate for retry.
+		return false, fmt.Errorf("PagerDuty rate limit reached")
+	case http.StatusBadRequest:
+		// Malformed request parameters. Shouldn't happen for our simple GET.
+		// Not transient -- the same request will always produce the same result.
+		return false, nil
+	case http.StatusPaymentRequired:
+		// Account lacks the pricing-plan abilities for this endpoint. PagerDuty
+		// must have authenticated the token before checking plan features, so
+		// the credential is live.
+		return true, nil
+	case http.StatusNotFound:
+		// Resource not found. Unusual on the /users collection endpoint.
+		// Not transient -- retrying won't make the endpoint appear.
+		// Shouldn't happen in practice.
 		return false, nil
 	default:
+		// Unknown status codes (including 5xx server errors) are potentially
+		// transient, so return an error to keep the result indeterminate.
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }

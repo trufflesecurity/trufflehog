@@ -60,12 +60,18 @@ var (
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.").String()
-	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
-	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
+
+	// The default cache size is 5000 entries, which is a balance between memory usage and the need for effective deduplication.
+	// Since the cache entries are md5 hashes so each entry would be 16 bytes, so in total this would be aorund 80KB of memory usage.
+	dedupeCacheSize = cli.Flag("deduplication-cache-size", "Max size of the results deduplication cache, setting to 0 disables").Default("5000").Int()
+
+	noColor  = cli.Flag("no-color", "Disable colorized output").Bool()
+	noColour = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	noIgnoreTag                = cli.Flag("no-ignore-tag", "Report results even if the line has a 'trufflehog:ignore' comment.").Bool()
 	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
 	maxDecodeDepth             = cli.Flag("max-decode-depth", "Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).").Default("5").Int()
 	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
@@ -91,6 +97,7 @@ var (
 	forceSkipBinaries        = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
 	forceSkipArchives        = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
 	gitCloneTimeout          = cli.Flag("git-clone-timeout", "Maximum time to spend cloning a repository, as a duration.").Hidden().Duration()
+	gitLowMemoryScan         = cli.Flag("git-low-memory-scan", "Reduce memory use for git scanning.").Hidden().Bool()
 	skipAdditionalRefs       = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
 	userAgentSuffix          = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 	dropUnverifiedJWTResults = cli.Flag("drop-unverified-jwt-results", "Drop unverified results without any verification errors from the JWT detector.").Bool()
@@ -119,7 +126,7 @@ var (
 	githubIncludeForks          = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
 	githubIncludeMembers        = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
 	githubIncludeRepos          = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubIncludeWikis          = githubScan.Flag("include-wikis", "Include repository wikisin scan.").Bool()
+	githubIncludeWikis          = githubScan.Flag("include-wikis", "Include repository wikis in scan.").Bool()
 	githubExcludeRepos          = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths      = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths      = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
@@ -178,6 +185,11 @@ var (
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
 	s3ScanEndpoint      = s3Scan.Flag("endpoint", "Endpoint of an S3-compatible service to scan instead of AWS S3. (eg. https://s3.internal.example.com)").String()
 	s3ScanRegion        = s3Scan.Flag("region", "Region used to sign requests. Defaults to us-east-1.").String()
+
+	s3ScanIncludePrefixes   = s3Scan.Flag("include-prefix", "Only scan objects whose key starts with this prefix. You can repeat this flag.").Strings()
+	s3ScanExcludePrefixes   = s3Scan.Flag("exclude-prefix", "Skip objects whose key starts with this prefix. You can repeat this flag. Takes precedence over --include-prefix.").Strings()
+	s3ScanIncludeExtensions = s3Scan.Flag("include-extension", "Only scan objects with this file extension, written without a leading dot (eg. tf). You can repeat this flag. Incompatible with --exclude-extension.").Strings()
+	s3ScanExcludeExtensions = s3Scan.Flag("exclude-extension", "Skip objects with this file extension, written without a leading dot (eg. zip). You can repeat this flag. Incompatible with --include-extension.").Strings()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
 	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
@@ -452,6 +464,15 @@ func run(state overseer.State, logSync func() error) {
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger, logSync)
 
+	// --debug and --trace still work the same, but in a future release --debug
+	// takes over --trace's level 5 and --trace goes away. Warn users now.
+	if *trace {
+		logger.Info("--trace is deprecated and will be replaced by --debug in a future release. Use --log-level=5 instead.")
+	}
+	if *debug {
+		logger.Info("--debug will switch from log level 2 to 5 (what --trace does today) in a future release. Use --log-level=2 to keep the current output.")
+	}
+
 	killSignal := make(chan os.Signal, 1)
 	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
@@ -511,6 +532,10 @@ func run(state overseer.State, logSync func() error) {
 
 	if gitCloneTimeout != nil {
 		feature.GitCloneTimeoutDuration.Store(int64(*gitCloneTimeout))
+	}
+
+	if *gitLowMemoryScan {
+		feature.UseGitLowMemoryScan.Store(true)
 	}
 
 	if *skipAdditionalRefs {
@@ -575,6 +600,14 @@ func run(state overseer.State, logSync func() error) {
 	feature.NewRelicMobileAppTokenDetectorEnabled.Store(true)
 	feature.MSTeamsWebhookV2DetectorEnabled.Store(true)
 	feature.SolarwindsDetectorEnabled.Store(true)
+	feature.ResendDetectorEnabled.Store(true)
+	feature.ComposioDetectorEnabled.Store(true)
+	feature.WeightsAndBiasesV2DetectorEnabled.Store(true)
+	feature.HumioAPITokenDetectorEnabled.Store(true)
+	feature.KongKonnectDetectorEnabled.Store(true)
+	feature.SonarQubeDetectorEnabled.Store(true)
+	feature.InfisicalDetectorEnabled.Store(true)
+	feature.ServalDetectorEnabled.Store(true)
 	feature.CozeDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
@@ -648,12 +681,14 @@ func run(state overseer.State, logSync func() error) {
 		Dispatcher:               engine.NewPrinterDispatcher(printer),
 		FilterUnverified:         *filterUnverified,
 		FilterEntropy:            *filterEntropy,
+		NoIgnoreTag:              *noIgnoreTag,
 		VerificationOverlap:      *allowVerificationOverlap,
 		Results:                  parsedResults,
 		PrintAvgDetectorTime:     *printAvgDetectorTime,
 		ShouldScanEntireChunk:    *scanEntireChunk,
 		MaxDecodeDepth:           *maxDecodeDepth,
 		VerificationCacheMetrics: &verificationCacheMetrics,
+		DedupeCacheSize:          *dedupeCacheSize,
 	}
 
 	if !*noVerificationCache {
@@ -885,7 +920,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 
 			// Override git configuration for pre-commit hook context
 			gitCfg.TrustLocalGitConfig = true
-			gitCfg.BaseRef = "HEAD" // Only scan staged changes
+			// Only scan staged changes. Both ends are HEAD so the commit range is
+			// HEAD..HEAD, which is empty; a base with no head would instead walk
+			// every ref not reachable from HEAD (see gitparse.Parser.RepoPath).
+			gitCfg.BaseRef = "HEAD"
+			gitCfg.HeadRef = "HEAD"
 
 			// Override result filters for pre-commit hook context
 			// In hook mode, we only want to show verified secrets and unknown findings
@@ -1021,16 +1060,20 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
-			Key:           *s3ScanKey,
-			Secret:        *s3ScanSecret,
-			SessionToken:  *s3ScanSessionToken,
-			Buckets:       *s3ScanBuckets,
-			IgnoreBuckets: *s3ScanIgnoreBuckets,
-			Roles:         *s3ScanRoleArns,
-			CloudCred:     *s3ScanCloudEnv,
-			MaxObjectSize: int64(*s3ScanMaxObjectSize),
-			Endpoint:      *s3ScanEndpoint,
-			Region:        *s3ScanRegion,
+			Key:               *s3ScanKey,
+			Secret:            *s3ScanSecret,
+			SessionToken:      *s3ScanSessionToken,
+			Buckets:           *s3ScanBuckets,
+			IgnoreBuckets:     *s3ScanIgnoreBuckets,
+			Roles:             *s3ScanRoleArns,
+			CloudCred:         *s3ScanCloudEnv,
+			MaxObjectSize:     int64(*s3ScanMaxObjectSize),
+			Endpoint:          *s3ScanEndpoint,
+			Region:            *s3ScanRegion,
+			IncludePrefixes:   *s3ScanIncludePrefixes,
+			ExcludePrefixes:   *s3ScanExcludePrefixes,
+			IncludeExtensions: *s3ScanIncludeExtensions,
+			ExcludeExtensions: *s3ScanExcludeExtensions,
 		}
 		if ref, err := eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)

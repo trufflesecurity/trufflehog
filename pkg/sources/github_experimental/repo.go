@@ -2,7 +2,7 @@ package github_experimental
 
 import (
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"sync"
 

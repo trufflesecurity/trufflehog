@@ -47,12 +47,7 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 		// Defer a panic recovery to handle any panics that occur during the RPM processing.
 		defer func() {
 			if r := recover(); r != nil {
-				var panicErr error
-				if e, ok := r.(error); ok {
-					panicErr = e
-				} else {
-					panicErr = fmt.Errorf("panic occurred: %v", r)
-				}
+				panicErr := recoveredPanicError(ctx, r, "Panic occurred when handling rpm archive")
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
 				}

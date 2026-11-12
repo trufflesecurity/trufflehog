@@ -1,6 +1,7 @@
 package datadogapikey
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -41,10 +42,7 @@ func (s Scanner) Keywords() []string {
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return client
+	return s.VerificationClient(cmp.Or(s.client, client))
 }
 
 // FromData will find and optionally verify DatadogToken secrets in a given set of bytes.

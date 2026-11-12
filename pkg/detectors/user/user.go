@@ -1,6 +1,7 @@
 package user
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -44,10 +45,7 @@ func (s Scanner) Keywords() []string {
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // FromData will find and optionally verify User secrets in a given set of bytes.

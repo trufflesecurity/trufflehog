@@ -50,6 +50,9 @@ Don't verify the results.
 \fB--results=RESULTS\fR
 Specifies which type(s) of results to output: verified (confirmed valid by API), unknown (verification failed due to error), unverified (detected but not verified), filtered_unverified (unverified but would have been filtered out). Defaults to verified,unverified,unknown.
 .TP
+\fB--deduplication-cache-size=5000\fR
+Max size of the results deduplication cache, setting to 0 disables
+.TP
 \fB--no-color\fR
 Disable colorized output
 .TP
@@ -61,6 +64,9 @@ Only output first unverified result per chunk per detector if there are more tha
 .TP
 \fB--filter-entropy=FILTER-ENTROPY\fR
 Filter unverified results with Shannon entropy. Start with 3.0.
+.TP
+\fB--no-ignore-tag\fR
+Report results even if the line has a 'trufflehog:ignore' comment.
 .TP
 \fB--max-decode-depth=5\fR
 Maximum depth of iterative decoding. Each decoder's output is fed back through all decoders, up to this limit. 1 = single pass, 2+ = chained decoding (e.g., base64 inside utf16).
@@ -196,7 +202,7 @@ Include organization member repositories in scan.
 Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"
 .TP
 \fB--include-wikis\fR
-Include repository wikisin scan.
+Include repository wikis in scan.
 .TP
 \fB--exclude-repos=EXCLUDE-REPOS\fR
 Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"
@@ -335,6 +341,18 @@ Endpoint of an S3-compatible service to scan instead of AWS S3. (eg. https://s3.
 .TP
 \fB--region=REGION\fR
 Region used to sign requests. Defaults to us-east-1.
+.TP
+\fB--include-prefix=INCLUDE-PREFIX\fR
+Only scan objects whose key starts with this prefix. You can repeat this flag.
+.TP
+\fB--exclude-prefix=EXCLUDE-PREFIX\fR
+Skip objects whose key starts with this prefix. You can repeat this flag. Takes precedence over --include-prefix.
+.TP
+\fB--include-extension=INCLUDE-EXTENSION\fR
+Only scan objects with this file extension, written without a leading dot (eg. tf). You can repeat this flag. Incompatible with --exclude-extension.
+.TP
+\fB--exclude-extension=EXCLUDE-EXTENSION\fR
+Skip objects with this file extension, written without a leading dot (eg. zip). You can repeat this flag. Incompatible with --include-extension.
 .SS
 \fBgcs [<flags>]\fR
 Find credentials in GCS buckets.

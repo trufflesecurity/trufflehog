@@ -45,3 +45,27 @@ func TestDetectorParsing(t *testing.T) {
 		})
 	}
 }
+
+func TestParseVerifierEndpointsScheme(t *testing.T) {
+	tests := []struct {
+		url     string
+		wantErr bool
+	}{
+		{url: "https://sonar.example.com"},
+		{url: "http://localhost:9000"},
+		{url: "http://127.0.0.1:9000"},
+		{url: "http://[::1]:9000"},
+		{url: "http://sonar.example.com", wantErr: true},
+		{url: "http://localhost.evil.com", wantErr: true},
+		{url: "http://10.0.0.5:9000", wantErr: true},
+		{url: "ftp://localhost", wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.url, func(t *testing.T) {
+			_, err := ParseVerifierEndpoints(map[string]string{"SonarQube": test.url})
+			if (err != nil) != test.wantErr {
+				t.Errorf("url %q: got err %v, wantErr %v", test.url, err, test.wantErr)
+			}
+		})
+	}
+}

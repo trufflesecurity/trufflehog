@@ -57,9 +57,10 @@ func TestGHCRListImages(t *testing.T) {
 
 	ghcrImages, err := ghcr.ListImages(context.Background(), "ghcr.io/mongodb")
 	assert.NoError(t, err)
-	assert.Equal(t, len(ghcrImages), 1)
-
-	assert.Equal(t, ghcrImages, []string{"ghcr.io/mongodb/kingfisher"})
+	// mongodb is a third-party namespace whose package list changes over time,
+	// so only assert on a known package rather than the exact set.
+	assert.NotEmpty(t, ghcrImages)
+	assert.Contains(t, ghcrImages, "ghcr.io/mongodb/kingfisher")
 }
 
 func TestDockerHubListImages_RateLimitError(t *testing.T) {

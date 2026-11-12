@@ -50,9 +50,10 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 	result := &analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeGitHub,
 		Metadata: map[string]any{
-			"owner":      info.Metadata.User.Login,
-			"type":       info.Metadata.Type,
-			"expiration": info.Metadata.Expiration,
+			"owner":           info.Metadata.User.Login,
+			"type":            info.Metadata.Type,
+			"expiration":      info.Metadata.Expiration,
+			"is_fine_grained": info.Metadata.FineGrained,
 		},
 	}
 	result.Bindings = append(result.Bindings, secretInfoToUserBindings(info)...)

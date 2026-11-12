@@ -45,7 +45,7 @@ func (s *Source) processIssuesWithComments(
 
 		totalIssues += len(query.GetIssues())
 
-		ctx.Logger().V(5).Info("Scanning Issues",
+		ctx.Logger().V(4).Info("Scanning Issues",
 			"total_issues", len(query.GetIssues()))
 
 		if err := s.chunkGraphqlIssues(ctx, repoInfo, query.Repository.Issues.Nodes, reporter); err != nil {
@@ -54,7 +54,7 @@ func (s *Source) processIssuesWithComments(
 
 		// process each issue comments
 		for _, issue := range query.GetIssues() {
-			ctx.Logger().V(5).Info("Scanning Issue Comments",
+			ctx.Logger().V(3).Info("Scanning Issue Comments",
 				"issue_id", issue.Number,
 				"total_comments", len(issue.GetIssueComments()),
 			)
@@ -84,7 +84,7 @@ func (s *Source) processIssuesWithComments(
 					return fmt.Errorf("error fetching issue: %w", err)
 				}
 
-				ctx.Logger().V(5).Info("Scanning additional issue comments",
+				ctx.Logger().V(4).Info("Scanning additional issue comments",
 					"issue_id", issue.Number,
 					"total_comments", len(commentsQuery.GetIssueComments()))
 
@@ -137,7 +137,7 @@ func (s *Source) processPRWithComments(ctx context.Context, graphqlClient *githu
 
 		totalPRs += len(query.GetPullRequests())
 
-		ctx.Logger().V(5).Info("Scanning pull requests",
+		ctx.Logger().V(4).Info("Scanning pull requests",
 			"total_pull_requests", len(query.GetPullRequests()))
 
 		if err := s.chunkGraphqlPullRequests(ctx, repoInfo, query.GetPullRequests(), reporter); err != nil {
@@ -146,7 +146,7 @@ func (s *Source) processPRWithComments(ctx context.Context, graphqlClient *githu
 
 		// process each pr comments
 		for _, pr := range query.GetPullRequests() {
-			ctx.Logger().V(5).Info("Scanning pull request comments",
+			ctx.Logger().V(3).Info("Scanning pull request comments",
 				"pull_request_no", pr.Number,
 				"total_comments", len(pr.Comments.Nodes))
 
@@ -175,7 +175,7 @@ func (s *Source) processPRWithComments(ctx context.Context, graphqlClient *githu
 					return fmt.Errorf("error fetching pull request with comments: %w", err)
 				}
 
-				ctx.Logger().V(5).Info("Scanning additional comments",
+				ctx.Logger().V(4).Info("Scanning additional comments",
 					"pull_request_no", pr.Number,
 					"total_comments", len(commentQuery.GetPRComments()))
 
@@ -247,7 +247,7 @@ func (s *Source) processReviewThreads(ctx context.Context, graphqlClient *github
 	if len(threadIDs) > 0 {
 		// process in batches of max 100
 		for _, batch := range chunkIDs(threadIDs, 100) {
-			ctx.Logger().V(5).Info("Processing Thread comments in Batches", "batch_length", len(batch))
+			ctx.Logger().V(4).Info("Processing Thread comments in Batches", "batch_length", len(batch))
 			// fetch comments for the batch of threads
 			if err := s.fetchThreadComments(ctx, graphqlClient, batch, repoInfo, reporter, cutoffTime); err != nil {
 				return fmt.Errorf("error fetching thread review comments: %w", err)

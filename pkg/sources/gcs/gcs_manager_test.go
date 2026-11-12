@@ -53,7 +53,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, without auth",
 			projID: "",
-			opts:   []gcsManagerOption{withoutAuthentication()},
+			opts:   []gcsManagerOption{withoutAuthentication(ctx)},
 			want: &gcsManager{
 				concurrency:   defaultConcurrency,
 				maxObjectSize: defaultMaxObjectSize,
@@ -341,7 +341,7 @@ func TestNewGcsManager(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := newGCSManager(tc.projID, tc.opts...)
+			got, err := newGCSManager(ctx, tc.projID, tc.opts...)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("newGCSManager() error = %v, wantErr %v", err, tc.wantErr)
 				return
@@ -417,7 +417,7 @@ func TestGCSManagerStats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			gm, err := newGCSManager(tc.projectID, tc.opts...)
+			gm, err := newGCSManager(ctx, tc.projectID, tc.opts...)
 			if err != nil {
 				t.Fatalf("newGCSManager() error = %v", err)
 			}
@@ -438,7 +438,7 @@ func TestGCSManagerStats_Time(t *testing.T) {
 	ctx := context.Background()
 
 	opts := []gcsManagerOption{withDefaultADC(ctx)}
-	gm, err := newGCSManager(testProjectID, opts...)
+	gm, err := newGCSManager(ctx, testProjectID, opts...)
 	if err != nil {
 		t.Fatalf("newGCSManager() error = %v", err)
 	}
@@ -692,7 +692,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mgr, err := newGCSManager(tc.projectID, tc.opts...)
+			mgr, err := newGCSManager(ctx, tc.projectID, tc.opts...)
 			assert.Nil(t, err)
 
 			got, err := mgr.ListObjects(ctx)
@@ -780,7 +780,7 @@ func TestGCSManagerListObjects_Resuming(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mgr, err := newGCSManager(tc.projectID, tc.opts...)
+			mgr, err := newGCSManager(ctx, tc.projectID, tc.opts...)
 			assert.Nil(t, err)
 
 			got, err := mgr.ListObjects(ctx)
