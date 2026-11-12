@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -241,7 +241,7 @@ func TestGraphQLScan_FollowsEveryPage(t *testing.T) {
 	// takes the type from the Go value, so a plain int slips in as "int!".
 	lowercaseType := regexp.MustCompile(`\$\w+:\[?[a-z]`)
 	for _, q := range sent {
-		assert.NotRegexp(t, lowercaseType, q)
+		assert.False(t, lowercaseType.MatchString(q), "lowercase variable type in query: %s", q)
 	}
 }
 

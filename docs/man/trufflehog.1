@@ -225,6 +225,9 @@ Include gist comments in scan.
 \fB--comments-timeframe=COMMENTS-TIMEFRAME\fR
 Number of days in the past to review when scanning issue, PR, and gist comments.
 .TP
+\fB--use-graphql\fR
+Use the GitHub GraphQL API to scan issue and PR comments. Faster on large repositories. Needs a token and --issue-comments or --pr-comments.
+.TP
 \fB--auth-in-url\fR
 Embed authentication credentials in repository URLs instead of using secure HTTP headers
 .TP
