@@ -1252,20 +1252,46 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
 
 		ctx, cancel := context.WithTimeout(ctx, detectionTimeout)
+		// The callback and the deferred release below hand the worker off through fired. t.Stop() returning false
+		// means the callback started, not that it finished counting, so the release waits for the channel to close
+		// before it decrements the gauge. The release is deferred inside the closure that owns the FromData call,
+		// so it runs on normal return and on panic unwind alike (the common.Recover at the top of detectChunk
+		// catches panics) and a panic inside FromData cannot leave the gauge high. The overrun histogram and the
+		// return log stay on the normal-return path only: a panicked call never returns, so it has no duration to
+		// record.
+		fired := make(chan struct{})
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
+			detectorTimeoutIgnoredTotal.WithLabelValues(detectorNameStr).Inc()
+			detectorWorkersOverTimeout.WithLabelValues(detectorNameStr).Inc()
+			close(fired) // before the log: a slow log sink must not extend the worker hold
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
 		// detectorExecutionDuration covers one detector run, which is this single FromData call, so it is timed here
 		// regardless of printAvgDetectorTime.
 		matchStart := time.Now()
-		results, err := e.verificationCache.FromData(
-			ctx,
-			data.detector.Detector,
-			data.verify,
-			data.chunk.SecretID != 0,
-			matchBytes)
-		matchElapsed := time.Since(matchStart)
-		t.Stop()
+		var timerFired bool
+		results, matchElapsed, err := func() (results []detectors.Result, matchElapsed time.Duration, err error) {
+			defer func() {
+				timerFired = !t.Stop()
+				if timerFired {
+					<-fired
+					detectorWorkersOverTimeout.WithLabelValues(detectorNameStr).Dec()
+				}
+			}()
+			results, err = e.verificationCache.FromData(
+				ctx,
+				data.detector.Detector,
+				data.verify,
+				data.chunk.SecretID != 0,
+				matchBytes)
+			matchElapsed = time.Since(matchStart)
+			return results, matchElapsed, err
+		}()
+		if timerFired {
+			detectorOverrunDuration.WithLabelValues(detectorNameStr).Observe(matchElapsed.Seconds())
+			ctx.Logger().V(2).Info("detector returned after overrunning the context timeout",
+				"duration", matchElapsed.String())
+		}
 		cancel()
 		if err != nil {
 			ctx.Logger().Error(err, "error finding results in chunk")
