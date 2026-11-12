@@ -297,6 +297,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/findl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finnhub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/firecrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fireworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fixerio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flatio"
@@ -1214,6 +1215,7 @@ func buildDetectorList() []detectors.Detector {
 		&financialmodelingprep.Scanner{},
 		&findl.Scanner{},
 		&finnhub.Scanner{},
+		&firecrawl.Scanner{},
 		&fireworks.Scanner{},
 		&fixerio.Scanner{},
 		&flatio.Scanner{},
@@ -1928,6 +1930,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InfisicalDetectorEnabled.Load()
 		case *serval.Scanner:
 			return !feature.ServalDetectorEnabled.Load()
+		case *firecrawl.Scanner:
+			return !feature.FirecrawlDetectorEnabled.Load()
 		default:
 			return false
 		}
