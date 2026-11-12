@@ -123,6 +123,17 @@ trufflehog syslog --protocol tcp --address 0.0.0.0:514 --format rfc5424
 trufflehog syslog --protocol tcp --address 0.0.0.0:6514 --format rfc5424 --cert /path/to/server.crt --key /path/to/server.key
 ```
 
+## Debug Logs
+
+With debug on for this source, the scan logs:
+
+- `V(1)`: `Syslog source initialized` with the protocol, listen address, format and whether TLS is on (never the TLS cert or key), and `Listening for syslog messages` once the listener is up.
+- `V(2)`: `Accepted connection` and `Connection closed` for each TCP client.
+- `V(3)`: `Received syslog message` for each message, with its size. The message itself is never logged.
+- `V(4)`: `Could not parse syslog metadata, scanning without it` with the configured format, for a message that does not match it. The message is still scanned.
+
+Lines carry `remote` where it applies. A failure to accept a connection, read from one, or set a read deadline is logged as an error at the default level.
+
 ## Troubleshooting
 
 ### Common Issues

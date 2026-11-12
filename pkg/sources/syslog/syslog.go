@@ -123,7 +123,7 @@ func (s *Source) InjectConnection(conn *sourcespb.Syslog) {
 }
 
 // Init returns an initialized Syslog source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 
 	s.name = name
 	s.sourceId = sourceId
@@ -158,11 +158,23 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 				},
 			}
 		})
+
+	// The TLS cert and key are config values, only whether TLS is on is logged.
+	ctx.Logger().V(1).Info("Syslog source initialized",
+		"protocol", s.conn.Protocol,
+		"listen_address", s.conn.ListenAddress,
+		"format", s.conn.Format,
+		"tls", s.tlsEnabled(),
+	)
 	return nil
 }
 
+func (s *Source) tlsEnabled() bool {
+	return s.conn.TlsCert != nilString || s.conn.TlsKey != nilString
+}
+
 func (s *Source) verifyConnectionConfig() error {
-	tlsEnabled := s.conn.TlsCert != nilString || s.conn.TlsKey != nilString
+	tlsEnabled := s.tlsEnabled()
 	if s.conn.Protocol == nilString {
 		if tlsEnabled {
 			s.conn.Protocol = "tcp"
@@ -187,8 +199,15 @@ func (s *Source) verifyConnectionConfig() error {
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	listening := func() {
+		ctx.Logger().V(1).Info("Listening for syslog messages",
+			"protocol", s.conn.Protocol,
+			"listen_address", s.conn.ListenAddress,
+			"tls", s.tlsEnabled(),
+		)
+	}
 	switch {
-	case s.conn.TlsCert != nilString || s.conn.TlsKey != nilString:
+	case s.tlsEnabled():
 		cert, err := tls.X509KeyPair([]byte(s.conn.TlsCert), []byte(s.conn.TlsKey))
 		if err != nil {
 			return errors.WrapPrefix(err, "could not load key pair", 0)
@@ -199,6 +218,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			return errors.WrapPrefix(err, "error creating TLS listener", 0)
 		}
 		defer func() { _ = lis.Close() }()
+		listening()
 
 		return s.acceptTCPConnections(ctx, lis, chunksChan)
 	case s.conn.Protocol == "tcp":
@@ -207,6 +227,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			return errors.WrapPrefix(err, "error creating TCP listener", 0)
 		}
 		defer func() { _ = lis.Close() }()
+		listening()
 
 		return s.acceptTCPConnections(ctx, lis, chunksChan)
 	case s.conn.Protocol == "udp":
@@ -219,6 +240,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			return errors.WrapPrefix(err, "could not set UDP deadline", 0)
 		}
 		defer func() { _ = lis.Close() }()
+		listening()
 
 		return s.acceptUDPConnections(ctx, lis, chunksChan)
 	default:
@@ -248,35 +270,59 @@ func (s *Source) parseSyslogMetadata(input []byte, remote string) (*source_metad
 	return metadata, nil
 }
 
+// logParseFailure notes a message whose metadata could not be parsed. The message
+// is still scanned. The parse error is not logged, it can repeat part of the
+// message.
+func (s *Source) logParseFailure(ctx context.Context) {
+	ctx.Logger().V(4).Info("Could not parse syslog metadata, scanning without it", "format", s.conn.Format)
+}
+
+// isTimeout reports whether err is a read deadline passing, which happens every
+// second while a connection is idle.
+func isTimeout(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
 func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksChan chan *sources.Chunk) {
 	defer common.RecoverWithExit(ctx)
+	defer func() { _ = conn.Close() }()
+	remote := conn.RemoteAddr().String()
+	ctx = context.WithValues(ctx, "remote", remote)
+	ctx.Logger().V(2).Info("Accepted connection")
+	defer ctx.Logger().V(2).Info("Connection closed")
 	for {
 		if common.IsDone(ctx) {
 			return
 		}
 		err := conn.SetDeadline(time.Now().Add(time.Second))
 		if err != nil {
-			ctx.Logger().V(2).Info("could not set connection deadline", "error", err)
+			ctx.Logger().Error(err, "Could not set connection deadline")
 		}
 		input := make([]byte, 8096)
-		remote := conn.RemoteAddr()
 		n, err := conn.Read(input)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return
+			if isTimeout(err) {
+				continue
 			}
-			continue
+			// Any other error, like a reset, would fail on every read and spin the
+			// loop, so stop reading this connection.
+			if !errors.Is(err, io.EOF) {
+				ctx.Logger().Error(err, "Failed to read from connection")
+			}
+			return
 		}
+		input = input[:n]
 		// Don't log the message itself, it is the data we scan for secrets.
-		ctx.Logger().V(5).Info("received syslog message", "remote", remote.String(), "bytes", n)
-		metadata, err := s.parseSyslogMetadata(input, remote.String())
+		ctx.Logger().V(3).Info("Received syslog message", "bytes", n)
+		metadata, err := s.parseSyslogMetadata(input, remote)
 		if err != nil {
 			// set metadata as empty to avoid panics in case parsing failed
 			metadata = &source_metadatapb.MetaData{}
-			ctx.Logger().V(2).Error(err, "failed to generate metadata")
+			s.logParseFailure(ctx)
 		}
 
-		chunksChan <- &sources.Chunk{
+		if err := common.CancellableWrite(ctx, chunksChan, &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
 			SourceType:     s.syslog.sourceType,
@@ -284,18 +330,26 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 			SourceMetadata: metadata,
 			Data:           input,
 			SourceVerify:   s.verify,
+		}); err != nil {
+			return
 		}
 	}
 }
 
 func (s *Source) acceptTCPConnections(ctx context.Context, netListener net.Listener, chunksChan chan *sources.Chunk) error {
+	// Accept blocks until a client connects, so close the listener on cancel to
+	// stop the scan.
+	go func() {
+		<-ctx.Done()
+		_ = netListener.Close()
+	}()
 	for {
-		if common.IsDone(ctx) {
-			return nil
-		}
 		conn, err := netListener.Accept()
 		if err != nil {
-			ctx.Logger().V(2).Info("failed to accept TCP connection", "error", err)
+			if common.IsDone(ctx) {
+				return nil
+			}
+			ctx.Logger().Error(err, "Failed to accept TCP connection")
 			continue
 		}
 		go s.monitorConnection(ctx, conn, chunksChan)
@@ -309,24 +363,31 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 		}
 		err := netListener.SetDeadline(time.Now().Add(time.Second))
 		if err != nil {
-			ctx.Logger().V(2).Info("could not update connection deadline", "error", err)
+			ctx.Logger().Error(err, "Could not set connection deadline")
 		}
 		input := make([]byte, 65535)
-		_, remote, err := netListener.ReadFrom(input)
+		n, remote, err := netListener.ReadFrom(input)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
+			if isTimeout(err) {
+				continue
 			}
-			continue
+			// Any other error would fail on every read and spin the loop.
+			if !errors.Is(err, io.EOF) {
+				ctx.Logger().Error(err, "Failed to read UDP message")
+			}
+			return nil
 		}
+		input = input[:n]
+		// Don't log the message itself, it is the data we scan for secrets.
+		ctx.Logger().V(3).Info("Received syslog message", "remote", remote.String(), "bytes", n)
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
 			// set metadata as empty to avoid panics in case parsing failed
 			metadata = &source_metadatapb.MetaData{}
-			ctx.Logger().V(2).Info("failed to parse metadata", "error", err)
+			s.logParseFailure(ctx)
 		}
 
-		chunksChan <- &sources.Chunk{
+		if err := common.CancellableWrite(ctx, chunksChan, &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
 			JobID:          s.JobID(),
@@ -334,6 +395,8 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 			SourceMetadata: metadata,
 			Data:           input,
 			SourceVerify:   s.verify,
+		}); err != nil {
+			return nil
 		}
 	}
 }
