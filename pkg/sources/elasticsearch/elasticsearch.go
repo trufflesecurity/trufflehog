@@ -6,7 +6,6 @@ import (
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-errors/errors"
-	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
@@ -30,9 +29,7 @@ type Source struct {
 	esConfig       es.Config
 	filterParams   FilterParams
 	bestEffortScan bool
-	ctx            context.Context
 	client         *es.TypedClient
-	log            logr.Logger
 	sources.Progress
 }
 
@@ -57,10 +54,7 @@ func (s *Source) Init(
 	s.concurrency = concurrency
 	s.verify = verify
 
-	s.ctx = aCtx
-	s.log = aCtx.Logger()
-
-	esConfig := es.Config{}
+	esConfig := es.Config{Logger: apiLogger{}}
 
 	if len(conn.Nodes) > 0 {
 		esConfig.Addresses = conn.Nodes
@@ -109,7 +103,32 @@ func (s *Source) Init(
 
 	s.client = client
 
+	aCtx.Logger().V(1).Info("Elasticsearch source initialized",
+		"nodes", len(conn.Nodes),
+		"cloud_id_set", conn.CloudId != "",
+		"auth_method", authMethod(&conn),
+		"index_pattern", s.filterParams.indexPattern,
+		"query_set", conn.QueryJson != "",
+		"since_timestamp", conn.SinceTimestamp,
+		"best_effort_scan", s.bestEffortScan,
+		"concurrency", s.concurrency,
+	)
+
 	return nil
+}
+
+// authMethod names the credential type for logs, never the credential.
+func authMethod(conn *sourcespb.Elasticsearch) string {
+	switch {
+	case conn.ServiceToken != "":
+		return "service_token"
+	case conn.ApiKey != "":
+		return "api_key"
+	case conn.Username != "" || conn.Password != "":
+		return "basic"
+	default:
+		return "none"
+	}
 }
 
 func (s *Source) Type() sourcespb.SourceType {
@@ -132,19 +151,25 @@ func (s *Source) Chunks(
 ) error {
 	indices := Indices{filterParams: &s.filterParams}
 
-	for {
+	for pass := 1; ; pass++ {
 		workerPool := new(errgroup.Group)
 		workerPool.SetLimit(s.concurrency)
 
 		previousDocumentCount := indices.documentCount
-		err := indices.Update(s.ctx, s.client)
+		err := indices.Update(ctx, s.client)
 		if err != nil {
 			return err
 		}
+		ctx.Logger().V(1).Info("Listed indices",
+			"pass", pass,
+			"indices", len(indices.indices),
+			"documents", indices.documentCount,
+		)
 
 		// Don't burn up the ES API with rapid requests if there's no work to do
 		if previousDocumentCount > 0 && indices.documentCount == 0 {
 			duration, _ := time.ParseDuration("5s")
+			ctx.Logger().V(4).Info("No new documents, waiting", "wait", duration)
 			time.Sleep(duration)
 			continue
 		}
@@ -155,12 +180,11 @@ func (s *Source) Chunks(
 		if previousDocumentCount > 0 && indices.documentCount > 0 && previousDocumentCount < indices.documentCount {
 			scanCoverageRate =
 				float64(previousDocumentCount) / float64(indices.documentCount)
-			s.log.V(1).Info(fmt.Sprintf(
-				"Scan coverage rate is %f%% (%d/%d); skipping documents to catch up",
-				scanCoverageRate,
-				previousDocumentCount,
-				indices.documentCount,
-			))
+			ctx.Logger().V(1).Info("Scan coverage below 100%, skipping documents to catch up",
+				"coverage_rate", scanCoverageRate,
+				"previous_documents", previousDocumentCount,
+				"documents", indices.documentCount,
+			)
 		}
 
 		unitsOfWork := distributeDocumentScans(&indices, s.concurrency, scanCoverageRate)
@@ -170,6 +194,8 @@ func (s *Source) Chunks(
 			uow := outerUOW
 
 			workerPool.Go(func() error {
+				workerCtx := context.WithValues(ctx, "worker", uowIndex)
+
 				// Give each worker its own client
 				client, err := es.NewTypedClient(s.esConfig)
 				if err != nil {
@@ -179,14 +205,26 @@ func (s *Source) Chunks(
 				uowDocumentsProcessed := 0
 
 				for _, docSearch := range uow.documentSearches {
+					indexCtx := context.WithValues(workerCtx, "index", docSearch.index.name)
+					indexCtx.Logger().V(2).Info("Scanning index",
+						"offset", docSearch.offset,
+						"documents", docSearch.documentCount,
+						"skip", docSearch.skipCount,
+					)
+
 					documentsProcessed, err := processSearchedDocuments(
-						s.ctx,
+						indexCtx,
 						client,
 						&docSearch,
 						func(document *Document) error {
 							if docSearch.index.DocumentAlreadySeen(document) {
+								indexCtx.Logger().V(4).Info("Skipping document",
+									"document_id", document.id,
+									"reason", "already scanned",
+								)
 								return nil
 							}
+							indexCtx.Logger().V(3).Info("Scanning document", "document_id", document.id)
 
 							chunk := sources.Chunk{
 								SourceType: s.Type(),
@@ -214,19 +252,13 @@ func (s *Source) Chunks(
 						return err
 					}
 
-					s.log.V(2).Info(fmt.Sprintf(
-						"[Worker %d] Scanned %d documents from index %s",
-						uowIndex,
-						documentsProcessed,
-						docSearch.index.name,
-					))
+					indexCtx.Logger().V(2).Info("Finished scanning index", "scanned", documentsProcessed)
 
-					if documentsProcessed != docSearch.documentCount-docSearch.skipCount {
-						s.log.V(1).Info(fmt.Sprintf(
-							"documentsProcessed != docSearch.documentCount = docSearch.skipCount (%d != %d)",
-							documentsProcessed,
-							docSearch.documentCount-docSearch.skipCount,
-						))
+					if expected := docSearch.documentCount - docSearch.skipCount; documentsProcessed != expected {
+						indexCtx.Logger().V(4).Info("Scanned document count differs from expected",
+							"expected", expected,
+							"scanned", documentsProcessed,
+						)
 					}
 
 					uowDocumentsProcessed += documentsProcessed
@@ -265,8 +297,9 @@ func (s *Source) Chunks(
 		}
 
 		err = workerPool.Wait()
-		if err != nil {
-			s.log.V(2).Info(fmt.Sprintf("Error waiting on worker pool: %s\n", err))
+		// A cancelled scan fails its workers too, that is not an error to report.
+		if err != nil && ctx.Err() == nil {
+			ctx.Logger().Error(err, "Failed to scan documents", "pass", pass)
 		}
 
 		if !s.bestEffortScan {

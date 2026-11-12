@@ -2,16 +2,20 @@ package custom_detectors
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth/verifierauthtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/protoyaml"
@@ -137,7 +141,7 @@ func TestCustomDetectorsParsing(t *testing.T) {
 
 func TestFromData_InvalidRegEx(t *testing.T) {
 	c := &CustomRegexWebhook{
-		&custom_detectorspb.CustomRegex{
+		CustomRegex: &custom_detectorspb.CustomRegex{
 			Name:     "Internal bi tool",
 			Keywords: []string{"secret_v1_", "pat_v2_"},
 			Regex: map[string]string{
@@ -237,6 +241,7 @@ func TestDetector(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, results[0].Raw, []byte(`123456`))
+	assert.Equal(t, map[string]string{"regex": "123456"}, results[0].SecretParts)
 }
 
 func TestDetectorPrimarySecret(t *testing.T) {
@@ -256,6 +261,10 @@ func TestDetectorPrimarySecret(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
+	assert.Equal(t, map[string]string{
+		"id":     "id_ALPHA10100_yy",
+		"secret": "secret_YI7C90ACY1_yy",
+	}, results[0].SecretParts)
 }
 
 func TestDetectorPrimarySecretFullMatch(t *testing.T) {
@@ -309,7 +318,75 @@ func TestDetectorPrimarySecretFullMatch(t *testing.T) {
 			assert.Equal(t, tt.want, results[0].GetPrimarySecretValue())
 		})
 	}
+}
 
+// TestDetectorSecretParts checks that each named regex becomes one entry in SecretParts.
+func TestDetectorSecretParts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("capture group", func(t *testing.T) {
+		t.Parallel()
+		detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+			Name:     "test",
+			Keywords: []string{"secret"},
+			Regex:    map[string]string{"secret": `secret *= *"([^"\r\n]+)"`},
+		})
+		require.NoError(t, err)
+
+		results, err := detector.FromData(context.Background(), false, []byte(`secret="mysecret"`))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, map[string]string{"secret": "mysecret"}, results[0].SecretParts)
+		assert.Equal(t, `secret="mysecret"`, results[0].GetPrimarySecretValue())
+	})
+
+	t.Run("no capture group", func(t *testing.T) {
+		t.Parallel()
+		detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+			Name:     "test",
+			Keywords: []string{"hog"},
+			Regex:    map[string]string{"token": `hog_[A-Za-z0-9]{8}`},
+		})
+		require.NoError(t, err)
+
+		results, err := detector.FromData(context.Background(), false, []byte("prefix hog_abcd1234 suffix"))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, map[string]string{"token": "hog_abcd1234"}, results[0].SecretParts)
+		assert.Equal(t, []byte("hog_abcd1234"), results[0].Raw)
+	})
+
+	t.Run("verified multi-part", func(t *testing.T) {
+		t.Parallel()
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		t.Cleanup(ts.Close)
+
+		detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+			Name:     "test",
+			Keywords: []string{"secret"},
+			Regex: map[string]string{
+				"id":     `id_([A-Z]{4})`,
+				"secret": `secret_([A-Z]{4})`,
+			},
+			Verify: []*custom_detectorspb.VerifierConfig{{
+				Endpoint: ts.URL,
+				Unsafe:   true,
+			}},
+		})
+		require.NoError(t, err)
+
+		results, err := detector.FromData(context.Background(), true, []byte("id_ABCD secret_WXYZ"))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.True(t, results[0].Verified)
+		assert.Equal(t, map[string]string{
+			"id":     "ABCD",
+			"secret": "WXYZ",
+		}, results[0].SecretParts)
+		assert.Equal(t, []byte("ABCDWXYZ"), results[0].Raw)
+	})
 }
 
 func TestDetectorValidations(t *testing.T) {
@@ -347,6 +424,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStr0ngP@ssword!"),
+					SecretParts:  map[string]string{"password": "MyStr0ngP@ssword!"},
 				},
 			},
 		},
@@ -394,6 +472,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongPassword!"),
+					SecretParts:  map[string]string{"password": "MyStrongPassword!"},
 				},
 			},
 		},
@@ -441,6 +520,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongPassword!"),
+					SecretParts:  map[string]string{"password": "MyStrongPassword!"},
 				},
 			},
 		},
@@ -488,6 +568,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStr@ngP@ssword!"),
+					SecretParts:  map[string]string{"password": "MyStr@ngP@ssword!"},
 				},
 			},
 		},
@@ -536,6 +617,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("MyStrongP@ssword"),
+					SecretParts:  map[string]string{"password": "MyStrongP@ssword"},
 				},
 			},
 		},
@@ -584,6 +666,7 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("mystrongp@ssword"),
+					SecretParts:  map[string]string{"password": "mystrongp@ssword"},
 				},
 			},
 		},
@@ -620,6 +703,10 @@ func TestDetectorValidations(t *testing.T) {
 					DetectorName: "test",
 					Verified:     false,
 					Raw:          []byte("c392c9837d69b44c764cbf260b-e6184MyStrongP@ssword"),
+					SecretParts: map[string]string{
+						"api_key":  "c392c9837d69b44c764cbf260b-e6184",
+						"password": "MyStrongP@ssword",
+					},
 				},
 			},
 		},
@@ -787,6 +874,46 @@ func TestNewWebhookCustomRegex_Validation(t *testing.T) {
 			wantErr:       true,
 			wantErrSubstr: "invalid http status code",
 		},
+		{
+			name: "VerifierAuth: valid with a tokenHeader the headers do not use",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify[0].Auth = ropcAuth("https://idp.example.com/token", "X-Auth-Proxy-Token")
+			},
+		},
+		{
+			name: "VerifierAuth: http token endpoint without unsafe=true",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify[0].Auth = ropcAuth("http://idp.example.com/token", "X-Auth-Proxy-Token")
+			},
+			wantErr:       true,
+			wantErrSubstr: "oauth2 tokenEndpoint: http endpoint must have unsafe=true",
+		},
+		{
+			name: "VerifierAuth: incomplete ropc credentials",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify[0].Auth = ropcAuth("https://idp.example.com/token", "X-Auth-Proxy-Token")
+				pb.Verify[0].Auth.GetOauth2().GetRopc().Username = ""
+			},
+			wantErr:       true,
+			wantErrSubstr: "oauth2 ropc username is required",
+		},
+		{
+			name: "VerifierAuth: headers entry for the default token header",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify[0].Auth = ropcAuth("https://idp.example.com/token", "")
+			},
+			wantErr:       true,
+			wantErrSubstr: `header "Authorization: Bearer x" is the oauth2 tokenHeader`,
+		},
+		{
+			name: "VerifierAuth: headers entry for a custom token header in another case",
+			mutate: func(pb *custom_detectorspb.CustomRegex) {
+				pb.Verify[0].Headers = []string{"x-auth-proxy-token: static"}
+				pb.Verify[0].Auth = ropcAuth("https://idp.example.com/token", "X-Auth-Proxy-Token")
+			},
+			wantErr:       true,
+			wantErrSubstr: "is the oauth2 tokenHeader",
+		},
 	}
 
 	for _, tt := range tests {
@@ -832,12 +959,12 @@ func TestVerificationWithConfigurableRanges(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		serverStatus      int
-		successRanges     []string
-		rotatedRanges     []string
-		wantVerified      bool
-		wantVerifyErr     bool
+		name          string
+		serverStatus  int
+		successRanges []string
+		rotatedRanges []string
+		wantVerified  bool
+		wantVerifyErr bool
 	}{
 		{
 			name:          "backward compat: no ranges, 200 -> verified",
@@ -987,6 +1114,203 @@ func TestVerificationMixedRangedAndLegacyVerifiers(t *testing.T) {
 	assert.Equal(t, 1, len(results))
 	assert.True(t, results[0].Verified, "expected Verified=true from legacy fallback")
 	assert.Nil(t, results[0].VerificationError(), "legacy success must not produce a spurious verification error")
+}
+
+// ropcAuth builds a verify auth config for the ROPC grant against
+// tokenEndpoint. An empty tokenHeader means the default, Authorization.
+func ropcAuth(tokenEndpoint, tokenHeader string) *custom_detectorspb.VerifierAuth {
+	return &custom_detectorspb.VerifierAuth{
+		AuthConfig: &custom_detectorspb.VerifierAuth_Oauth2{
+			Oauth2: &custom_detectorspb.OAuth2Config{
+				TokenEndpoint: tokenEndpoint,
+				TokenHeader:   tokenHeader,
+				GrantConfig: &custom_detectorspb.OAuth2Config_Ropc{
+					Ropc: &custom_detectorspb.ROPCConfig{
+						Username: "svc-scanner",
+						Password: "svc-password",
+						ClientId: "scanner-client",
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestCustomRegexParsingWithVerifierAuth(t *testing.T) {
+	testYaml := `name: test
+keywords:
+- secret
+regex:
+  token: ([a-zA-Z0-9]{32})
+verify:
+- endpoint: https://verify.example.com/
+  auth:
+    oauth2:
+      tokenEndpoint: https://idp.example.com/oauth2/token
+      tokenHeader: X-Auth-Proxy-Token
+      ropc:
+        username: svc-scanner
+        password: svc-password
+        clientId: scanner-client
+        clientSecret: client-secret
+        scope: verify openid`
+
+	var got custom_detectorspb.CustomRegex
+	require.NoError(t, protoyaml.UnmarshalStrict([]byte(testYaml), &got))
+	require.Len(t, got.Verify, 1)
+	oauth2 := got.Verify[0].GetAuth().GetOauth2()
+	require.NotNil(t, oauth2)
+	assert.Equal(t, "https://idp.example.com/oauth2/token", oauth2.GetTokenEndpoint())
+	assert.Equal(t, "X-Auth-Proxy-Token", oauth2.GetTokenHeader())
+	assert.Equal(t, "svc-scanner", oauth2.GetRopc().GetUsername())
+	assert.Equal(t, "svc-password", oauth2.GetRopc().GetPassword())
+	assert.Equal(t, "scanner-client", oauth2.GetRopc().GetClientId())
+	assert.Equal(t, "client-secret", oauth2.GetRopc().GetClientSecret())
+	assert.Equal(t, "verify openid", oauth2.GetRopc().GetScope())
+}
+
+// newVerifyDetector builds a single-regex custom detector with the given
+// verify configs; the data "secret_ABCDEFGHIJ" produces one match.
+func newVerifyDetector(t *testing.T, verify ...*custom_detectorspb.VerifierConfig) *CustomRegexWebhook {
+	t.Helper()
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "test",
+		Keywords: []string{"secret"},
+		Regex:    map[string]string{"token": `(secret_[a-zA-Z0-9]{10})`},
+		Verify:   verify,
+	})
+	require.NoError(t, err)
+	return detector
+}
+
+func verifyOne(t *testing.T, detector *CustomRegexWebhook) detectors.Result {
+	t.Helper()
+	results, err := detector.FromData(context.Background(), true, []byte("secret_ABCDEFGHIJ"))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	return results[0]
+}
+
+// closedServerURL returns the URL of a server that is no longer listening,
+// so requests to it fail with a connection error.
+func closedServerURL(t *testing.T) string {
+	t.Helper()
+	ts := httptest.NewServer(http.NotFoundHandler())
+	ts.Close()
+	return ts.URL
+}
+
+func TestVerification_VerifierAuthSendsTokenAlongsideConfiguredHeaders(t *testing.T) {
+	t.Parallel()
+	idp := verifierauthtest.NewIdP(t)
+
+	var gotAuthorization, gotToken, gotBody string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get("Authorization")
+		gotToken = r.Header.Get("X-Auth-Proxy-Token")
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	auth := ropcAuth(idp.URL, "X-Auth-Proxy-Token")
+	result := verifyOne(t, newVerifyDetector(t, &custom_detectorspb.VerifierConfig{
+		Endpoint: ts.URL,
+		Unsafe:   true,
+		Headers:  []string{"Authorization: Bearer static"},
+		Auth:     auth,
+	}))
+
+	assert.True(t, result.Verified)
+	assert.NoError(t, result.VerificationError())
+	assert.Equal(t, "Bearer "+verifierauthtest.AccessToken, gotToken)
+	assert.Equal(t, "Bearer static", gotAuthorization, "configured headers are sent unchanged")
+	assert.JSONEq(t, `{"test": {"token": ["secret_ABCDEFGHIJ", "secret_ABCDEFGHIJ"]}}`, gotBody, "the standard body is unchanged")
+}
+
+func TestVerification_VerifierAuthTokenFailureIsAVerificationError(t *testing.T) {
+	t.Parallel()
+	idp := verifierauthtest.NewIdP(t)
+	idp.RejectCredentials()
+
+	var hits atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	result := verifyOne(t, newVerifyDetector(t, &custom_detectorspb.VerifierConfig{
+		Endpoint: ts.URL,
+		Unsafe:   true,
+		Auth:     ropcAuth(idp.URL, ""),
+	}))
+
+	assert.False(t, result.Verified)
+	assert.ErrorContains(t, result.VerificationError(), "verifier auth: could not obtain access token")
+	assert.Zero(t, hits.Load(), "nothing is sent without a token")
+}
+
+func TestVerification_RequestErrorRule(t *testing.T) {
+	t.Parallel()
+
+	status := func(code int) string {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(code)
+		}))
+		t.Cleanup(ts.Close)
+		return ts.URL
+	}
+
+	tests := []struct {
+		name          string
+		verify        []*custom_detectorspb.VerifierConfig
+		wantVerified  bool
+		wantVerifyErr bool
+	}{
+		{
+			name:          "only verifier unreachable -> verification error",
+			verify:        []*custom_detectorspb.VerifierConfig{{Endpoint: closedServerURL(t), Unsafe: true}},
+			wantVerifyErr: true,
+		},
+		{
+			name: "unreachable, then legacy 200 -> verified, no error",
+			verify: []*custom_detectorspb.VerifierConfig{
+				{Endpoint: closedServerURL(t), Unsafe: true},
+				{Endpoint: status(http.StatusOK), Unsafe: true},
+			},
+			wantVerified: true,
+		},
+		{
+			name: "legacy 401, then unreachable -> the 401 is the answer, no error",
+			verify: []*custom_detectorspb.VerifierConfig{
+				{Endpoint: status(http.StatusUnauthorized), Unsafe: true},
+				{Endpoint: closedServerURL(t), Unsafe: true},
+			},
+		},
+		{
+			name: "ranged non-match, then unreachable -> verification error",
+			verify: []*custom_detectorspb.VerifierConfig{
+				{Endpoint: status(http.StatusInternalServerError), Unsafe: true, SuccessRanges: []string{"200"}, RotatedRanges: []string{"401"}},
+				{Endpoint: closedServerURL(t), Unsafe: true},
+			},
+			wantVerifyErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := verifyOne(t, newVerifyDetector(t, tt.verify...))
+			assert.Equal(t, tt.wantVerified, result.Verified)
+			if tt.wantVerifyErr {
+				assert.Error(t, result.VerificationError())
+			} else {
+				assert.NoError(t, result.VerificationError())
+			}
+		})
+	}
 }
 
 func BenchmarkProductIndices(b *testing.B) {

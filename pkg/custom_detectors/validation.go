@@ -2,9 +2,11 @@ package custom_detectors
 
 import (
 	"fmt"
-	"regexp"
+	"regexp" //nolint:depguard // used instead of github.com/wasilibs/go-re2 due to differences in utf-8 handling
 	"strconv"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
 )
 
 func ValidateKeywords(keywords []string) error {
@@ -52,15 +54,10 @@ func ValidatePrimaryRegexName(primaryRegexName string, regexes map[string]string
 	return nil
 }
 
+// ValidateVerifyEndpoint checks a verify endpoint with the same rule that
+// verifier auth applies to token endpoints, so the two cannot drift.
 func ValidateVerifyEndpoint(endpoint string, unsafe bool) error {
-	if len(endpoint) == 0 {
-		return fmt.Errorf("no endpoint")
-	}
-
-	if strings.HasPrefix(endpoint, "http://") && !unsafe {
-		return fmt.Errorf("http endpoint must have unsafe=true")
-	}
-	return nil
+	return verifierauth.ValidateEndpoint(endpoint, unsafe)
 }
 
 func ValidateVerifyHeaders(headers []string) error {

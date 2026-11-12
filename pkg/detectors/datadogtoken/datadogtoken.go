@@ -1,6 +1,7 @@
 package datadogtoken
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -97,10 +98,7 @@ func setOrganizationInfo(opt []*options, s1 *detectors.Result) {
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.

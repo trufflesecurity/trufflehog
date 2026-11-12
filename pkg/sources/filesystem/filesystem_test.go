@@ -14,10 +14,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -438,7 +440,6 @@ func TestSkipBinaries(t *testing.T) {
 	source := &Source{
 		paths:        []string{textFile, binaryFile}, // Test individual files
 		skipBinaries: true,
-		log:          logr.Discard(),
 	}
 
 	chunks := make(chan *sources.Chunk, 10)
@@ -761,6 +762,29 @@ func TestComparePathsForResume(t *testing.T) {
 	}
 }
 
+func TestInit_MaxSymlinkDepthWithinLimit(t *testing.T) {
+	ctx := trContext.Background()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{MaxSymlinkDepth: defaultMaxSymlinkDepth})
+	require.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(ctx, "test max symlink depth within limit", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+	assert.Equal(t, defaultMaxSymlinkDepth, s.maxSymlinkDepth)
+}
+
+func TestInit_MaxSymlinkDepthExceedsLimit(t *testing.T) {
+	ctx := trContext.Background()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{MaxSymlinkDepth: defaultMaxSymlinkDepth + 1})
+	require.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(ctx, "test max symlink depth exceeds limit", 0, 0, true, conn, 1)
+	assert.Error(t, err)
+}
+
 func TestResumptionWithOutOfSubtreeResumePoint(t *testing.T) {
 	ctx := trContext.Background()
 
@@ -864,4 +888,56 @@ func createTempDir(dir string, contents ...string) (string, func(), error) {
 		}
 	}
 	return tmpdir, func() { _ = os.RemoveAll(tmpdir) }, nil
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testSecret = "TESTSECRET-do-not-log-1234567890"
+
+	// One file of each kind the source logs about: scanned, binary, excluded by filter, and a symlink.
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.txt"), []byte("password = "+testSecret), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.exe"), []byte{0x4D, 0x5A, 0x90, 0x00}, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "excluded.txt"), []byte("password = "+testSecret), 0644))
+	require.NoError(t, os.Symlink(filepath.Join(dir, "config.txt"), filepath.Join(dir, "link.txt")))
+
+	excludeFile := filepath.Join(t.TempDir(), "exclude.txt")
+	require.NoError(t, os.WriteFile(excludeFile, []byte("excluded\\.txt$\n"), 0644))
+
+	conn, err := anypb.New(&sourcespb.Filesystem{
+		Paths:            []string{dir},
+		SkipBinaries:     true,
+		ExcludePathsFile: excludeFile,
+	})
+	require.NoError(t, err)
+
+	// run the source with both Chunks and ChunkUnit, draining chunks the way the engine does
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		ctx, logs := logtest.SourceContext(debug)
+		s := Source{}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		chunksCh := make(chan *sources.Chunk, 64)
+		go func() {
+			for range chunksCh {
+			}
+		}()
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		reporter := sourcestest.TestReporter{}
+		require.NoError(t, s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: dir}, &reporter))
+		require.Empty(t, reporter.ChunkErrs)
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
 }

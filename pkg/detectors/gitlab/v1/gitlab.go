@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -37,14 +38,18 @@ var (
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
+
+	// GitLab's forbidden! helper formats every reasoned 403 as "403 Forbidden - <reason>".
+	forbiddenWithReasonPrefix = "403 Forbidden - "
 )
 
-func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
+type gitlabErrorResponse struct {
+	Message string `json:"message"`
+	Error   string `json:"error"`
+}
 
-	return defaultClient
+func (s Scanner) getClient() *http.Client {
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -99,7 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				maps.Copy(s1.ExtraData, extraData)
 
-				s1.SetVerificationError(verificationErr)
+				s1.SetVerificationError(verificationErr, resMatch)
 
 				// for verified keys break out of the endpoint loop to continue to next secret
 				if s1.Verified {
@@ -140,22 +145,34 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 	}
 
 	// 200 means good key and has `read_user` scope
-	// 403 means good key but not the right scope
+	// 403 from GitLab means good key, but either the scope or the account state denies access
 	// 401 is bad key
 	switch res.StatusCode {
 	case http.StatusOK:
 		return json.Valid(bodyBytes), nil, nil
 	case http.StatusForbidden:
-		// check if the user account is blocked or not
-		stringBody := string(bodyBytes)
-		if strings.Contains(stringBody, BlockedUserMessage) {
-			return true, map[string]string{
-				"blocked": "True",
-			}, nil
+		var errResp gitlabErrorResponse
+		if err := json.Unmarshal(bodyBytes, &errResp); err != nil {
+			return false, nil, fmt.Errorf("unexpected 403 response, unable to verify token")
 		}
 
-		// Good key but not the right scope
-		return true, nil, nil
+		switch {
+		// GitLab only rejects an account (blocked, deactivated, password expired, unconfirmed
+		// email, etc.) after the token has resolved to a user.
+		case strings.HasPrefix(errResp.Message, forbiddenWithReasonPrefix):
+			extraData := map[string]string{
+				"access_denied_reason": strings.TrimPrefix(errResp.Message, forbiddenWithReasonPrefix),
+			}
+			if strings.HasPrefix(errResp.Message, BlockedUserMessage) {
+				extraData["blocked"] = "True"
+			}
+			return true, extraData, nil
+		case errResp.Error == "insufficient_scope", errResp.Error == "insufficient_granular_scope":
+			// Good key but not the right scope
+			return true, nil, nil
+		}
+
+		return false, nil, fmt.Errorf("unexpected 403 response, unable to verify token")
 	case http.StatusUnauthorized:
 		// Nothing to do; zero values are the ones we want
 		return false, nil, nil

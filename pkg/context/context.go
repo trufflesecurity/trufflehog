@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
@@ -168,6 +169,25 @@ func WithLogger(parent context.Context, logger logr.Logger) Context {
 	}
 }
 
+// WithLogLevel returns a Context whose logger writes logs up to level (0 to 5), even when the global log level is
+// lower. Everything else keeps the global level. Use log.DebugLevel to turn on all debug logs for one piece of work,
+// such as one source. Like the other With functions, the logger survives a round trip through a plain
+// context.Context (see AddLogger).
+func WithLogLevel(parent Context, level int8) Context {
+	// Keep the level between 0 and log.DebugLevel. A level of 0 or less has nothing to raise. Clamping also avoids
+	// an int8 overflow below: -(-128) is still -128, which would turn on every level.
+	if level <= 0 {
+		return parent
+	}
+	if level > log.DebugLevel {
+		level = log.DebugLevel
+	}
+
+	// Zap levels get more verbose as the number gets smaller, so V(5) is zap level -5.
+	logger := log.WithLevelOverride(parent.Logger(), zapcore.Level(-level))
+	return WithLogger(parent, logger)
+}
+
 // AddLogger converts a context.Context into a Context. If the underlying type
 // is already a Context, that will be returned, otherwise a default logger will
 // be added.
@@ -178,13 +198,24 @@ func AddLogger(parent context.Context) Context {
 	}
 	// If the logger exists in the grab bag (and is the correct type),
 	// return that.
-	if logEntryVal := parent.Value(logEntryKey); logEntryVal != nil {
-		if logger, ok := logEntryVal.(logr.Logger); ok {
-			return WithLogger(parent, logger)
-		}
+	if logger, ok := LoggerFromContext(parent); ok {
+		return WithLogger(parent, logger)
 	}
 	// Otherwise, add the default logger.
 	return WithLogger(parent, defaultLogger)
+}
+
+// LoggerFromContext returns the logger carried by ctx, and false if it has none.
+// Unlike AddLogger, it tells the caller when there is no logger, so the caller can
+// fall back to its own logger instead of the default one. It also finds the logger
+// when ctx is a Context wrapped in a plain context.Context, for example by net/http
+// when a client has a Timeout.
+func LoggerFromContext(ctx context.Context) (logr.Logger, bool) {
+	if loggerCtx, ok := ctx.(Context); ok {
+		return loggerCtx.Logger(), true
+	}
+	logger, ok := ctx.Value(logEntryKey).(logr.Logger)
+	return logger, ok
 }
 
 // SetDefaultLogger sets the package-level global default logger that will be

@@ -123,6 +123,8 @@ func (m *LocalSource) validate(all bool) error {
 
 	// no validation rules for ScanPeriod
 
+	// no validation rules for Debug
+
 	if len(errors) > 0 {
 		return LocalSourceMultiError(errors)
 	}
@@ -4879,6 +4881,17 @@ func (m *Gerrit) validate(all bool) error {
 	// no validation rules for SkipBinaries
 
 	// no validation rules for SkipArchives
+
+	if val := m.GetApiTimeoutSeconds(); val < 0 || val > 3600 {
+		err := GerritValidationError{
+			field:  "ApiTimeoutSeconds",
+			reason: "value must be inside range [0, 3600]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	switch v := m.Credential.(type) {
 	case *Gerrit_BasicAuth:

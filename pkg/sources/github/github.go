@@ -1,6 +1,7 @@
 package github
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -79,9 +81,12 @@ type Source struct {
 	ignoreGists           bool
 	includeGistComments   bool
 	commentsTimeframeDays uint32
+	// commentRetryWait sleeps between retries of transient comment API
+	// failures and returns false if the context ended first. Nil uses
+	// sleepWithContext; tests inject a wait that returns immediately.
+	commentRetryWait func(context.Context, time.Duration) bool
 
 	sources.Progress
-	sources.CommonSourceUnitUnmarshaller
 
 	useAuthInUrl bool // pass credentials in the repository urls for cloning
 }
@@ -97,6 +102,13 @@ var _ sources.SourceUnit = (*GistUnit)(nil)
 type RepoUnit struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
+	// InstallationID is the GitHub App installation that owns this repo, set
+	// during scan-all-installations enumeration. Carrying it on the unit lets
+	// ChunkUnit clone with the correct installation token without re-deriving
+	// the mapping, which otherwise re-lists every installation's repos on every
+	// scanned unit (see INT-790). Zero when the source is not an installation
+	// scan or the unit predates this field.
+	InstallationID int64 `json:"installation_id,omitempty"`
 }
 
 func (r RepoUnit) SourceUnitID() (string, sources.SourceUnitKind) { return r.URL, "repo" }
@@ -109,6 +121,66 @@ type GistUnit struct {
 
 func (g GistUnit) SourceUnitID() (string, sources.SourceUnitKind) { return g.URL, "gist" }
 func (g GistUnit) Display() string                                { return g.Name }
+
+// unitEnvelope is just the JSON equivalent of apipb.SourceUnit, so we can
+// unmarshal source unit payloads.
+type unitEnvelope struct {
+	ID       string                 `json:"id"`
+	Kind     sources.SourceUnitKind `json:"kind,omitempty"`
+	Name     string                 `json:"display,omitempty"`
+	UnitData []byte                 `json:"unit_data,omitempty"`
+}
+
+func (u unitEnvelope) SourceUnitID() (string, sources.SourceUnitKind) { return u.ID, u.Kind }
+func (u unitEnvelope) Display() string                                { return u.Name }
+
+func unmarshalSourceUnit[unitType sources.SourceUnit](data []byte) (unitType, error) {
+	u := new(unitType)
+
+	if err := json.Unmarshal(data, u); err != nil {
+		return *new(unitType), err
+	}
+
+	return *u, nil
+}
+
+func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	env, err := unmarshalSourceUnit[unitEnvelope](data)
+	if err != nil {
+		return nil, err
+	}
+
+	switch env.Kind {
+	case "": // data is a raw SourceUnit, no envelope
+		// Look for a raw RepoUnit first
+		ru, err := unmarshalSourceUnit[RepoUnit](data)
+		if err != nil {
+			return nil, err
+		}
+
+		if ru.URL != "" { // This is the test for a valid RepoUnit
+			return ru, nil
+		}
+
+		if env.ID == "" { // This is the test for a valid generic GitHub Source Unit
+			return nil, errors.New("not a github source unit")
+		}
+
+		return env, nil
+	case "repo":
+		if len(env.UnitData) > 0 {
+			return unmarshalSourceUnit[RepoUnit](env.UnitData)
+		}
+		return RepoUnit{Name: env.Name, URL: env.ID}, nil
+	case "gist":
+		if len(env.UnitData) > 0 {
+			return unmarshalSourceUnit[GistUnit](env.UnitData)
+		}
+		return GistUnit{Name: env.Name, URL: env.ID}, nil
+	default:
+		return nil, fmt.Errorf("unrecognized source unit kind %q", env.Kind)
+	}
+}
 
 // --------------------------------------------------------------------------------
 
@@ -158,7 +230,8 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			// the bad glob is dropped, so tell the user this filter is not used
+			ctx.Logger().Error(err, "invalid include glob; ignoring it", "include_value", ig)
 			continue
 		}
 		includeGlobs = append(includeGlobs, g)
@@ -166,7 +239,8 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			// the bad glob is dropped, so tell the user this filter is not used
+			ctx.Logger().Error(err, "invalid exclude glob; ignoring it", "exclude_value", eg)
 			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
@@ -262,9 +336,15 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	)
 	s.repos = s.conn.Repositories
 	for _, repo := range s.repos {
+		// safeRepoURL keeps the credential out of the lines we write, this
+		// also catches it in any string field logged elsewhere
+		log.RedactGlobally(repoCredential(repo))
 		r, err := s.normalizeRepo(repo)
 		if err != nil {
-			aCtx.Logger().Error(err, "invalid repository", "repo", repo)
+			// the repo comes from the user's config and may hold a token, so strip it,
+			// also from the error, which repeats the URL
+			safeErr := errors.New(strings.ReplaceAll(err.Error(), repo, safeRepoURL(repo)))
+			aCtx.Logger().Error(safeErr, "invalid repository", "repo", safeRepoURL(repo))
 			continue
 		}
 		s.filteredRepoCache.Set(repo, r)
@@ -324,6 +404,26 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.git = git.NewGit(cfg)
 
+	// log the config choices so support can see how the source was set up
+	// only counts and flags, never repo URLs, tokens or keys
+	aCtx.Logger().V(1).Info("github source initialized",
+		"auth_type", fmt.Sprintf("%T", s.conn.GetCredential()),
+		"endpoint", safeRepoURL(s.conn.GetEndpoint()),
+		"repo_count", len(s.conn.GetRepositories()),
+		"org_count", len(s.conn.GetOrganizations()),
+		"include_repo_count", len(s.conn.GetIncludeRepos()),
+		"ignore_repo_count", len(s.conn.GetIgnoreRepos()),
+		"include_forks", s.conn.GetIncludeForks(),
+		"exclude_archived", s.conn.GetExcludeArchived(),
+		"scan_users", s.conn.GetScanUsers(),
+		"scan_all_installations", s.conn.GetScanAllInstallations(),
+		"ignore_gists", s.ignoreGists,
+		"include_wikis", s.conn.GetIncludeWikis(),
+		"include_issue_comments", s.includeIssueComments,
+		"include_pr_comments", s.includePRComments,
+		"include_gist_comments", s.includeGistComments,
+		"comments_timeframe_days", s.commentsTimeframeDays,
+	)
 	return nil
 }
 
@@ -335,6 +435,17 @@ func (s *Source) Validate(ctx context.Context) []error {
 		- Returns 401 for invalid credentials but works with no auth (as unauthenticated)
 		- Doesn't consume API quota when called
 	*/
+	// When scanAllInstallations is set with no githubApp.installationId,
+	// there's no default installation token to call RateLimit with (see
+	// appConnector.HasDefaultInstallation). Validate the App credentials
+	// directly against the app-level (JWT-authenticated) client instead.
+	if connector, ok := s.connector.(*appConnector); ok && !connector.HasDefaultInstallation() {
+		if _, _, err := connector.InstallationClient().Apps.Get(ctx, ""); err != nil {
+			return []error{err}
+		}
+		return nil
+	}
+
 	if _, _, err := s.connector.APIClient().RateLimit.Get(ctx); err != nil {
 		return []error{err}
 	}
@@ -433,7 +544,16 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			}
 			continue
 		}
-		if err := dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url}); err != nil {
+
+		var installationID int64 = 0
+		if ac, ok := s.connector.(*appConnector); ok {
+			ac.ensureRepoInstallation(url, name)
+			installationID, _ = ac.installationIDForRepo(url)
+		}
+
+		ru := RepoUnit{Name: name, URL: url, InstallationID: installationID}
+
+		if err := dedupeReporter.UnitOk(ctx, ru); err != nil {
 			return err
 		}
 	}
@@ -474,7 +594,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 			// Final filter check - only include repositories that pass the filter
 			if s.filteredRepoCache.wantRepo(repoName) {
-				ctx := context.WithValue(ctx, "repo", repo)
+				ctx := context.WithValue(ctx, "repo", safeRepoURL(repo))
 
 				repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
 				if err != nil {
@@ -500,7 +620,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 	if _, ok := s.repoInfoCache.get(repo); ok {
 		return repo, nil
 	}
-	ctx.Logger().V(2).Info("Caching repository info")
+	ctx.Logger().V(2).Info("Caching repository info", "repo", safeRepoURL(repo))
 
 	_, urlParts, err := getRepoURLParts(repo)
 	if err != nil {
@@ -508,6 +628,9 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 	}
 
 	if !s.ignoreGists && isGistUrl(urlParts) {
+		if connector, ok := s.connector.(*appConnector); ok && !connector.HasDefaultInstallation() {
+			return repo, fmt.Errorf("cannot fetch gist %q: githubApp.installationId is required as a fallback installation to scan gists together with scanAllInstallations", repo)
+		}
 		// Cache gist info.
 		for {
 			gistID := extractGistID(urlParts)
@@ -649,7 +772,6 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 		}
 
 		if s.conn.ScanUsers && len(s.memberCache) > 0 {
-			ctx.Logger().Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
 			s.addReposForMembers(ctx, reporter)
 		}
 	}
@@ -676,17 +798,37 @@ func (s *Source) enumerateWithApp(ctx context.Context, connector *appConnector, 
 			if err != nil {
 				return err
 			}
-			ctx.Logger().Info("Scanning repos", "org_members", len(s.memberCache))
-			// TODO: Replace loop below with a call to s.addReposForMembers(ctx, reporter)
+			ctx.Logger().V(1).Info("Scanning repos", "org_members", len(s.memberCache))
+			if !connector.HasDefaultInstallation() {
+				// Member repos/gists live outside any installation's own
+				// listing, so there is no installation token to fetch them
+				// with (see appConnector.HasDefaultInstallation). Skip with a
+				// clear message instead of letting each per-member API call
+				// fail against installation ID 0.
+				ctx.Logger().Info("Skipping org member repos and gists: githubApp.installationId is required as a fallback installation to scan members together with scanAllInstallations", "org_members", len(s.memberCache))
+				return nil
+			}
+			// Members' gists aren't listed, unlike in addReposForMembers: none
+			// of GitHub's gist endpoints accept an installation access token,
+			// and no app permission changes that, so the listing fails with a
+			// 403 for every member. One line here stands in for those
+			// failures; there's nothing for the customer to grant.
+			if !s.ignoreGists {
+				ctx.Logger().Info("Skipping org member gists: GitHub doesn't allow listing gists with a GitHub App installation token", "org_members", len(s.memberCache))
+			}
 			for member := range s.memberCache {
-				logger := ctx.Logger().WithValues("member", member)
-				if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
-					logger.Error(err, "error fetching gists by user")
+				// once the scan is cancelled every fetch fails, so stop here
+				// instead of logging an error for each remaining member
+				if common.IsDone(ctx) {
+					ctx.Logger().V(4).Info("skipping remaining members", "reason", "scan cancelled")
+					return nil
 				}
+				// add the member to the error line below so we know whose fetch failed
+				memberCtx := context.WithValues(ctx, "member", member)
 				// TODO: Add authenticated user list repo for app token. It does support as per docs but need to test it before we enable it here.
 				// docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repositories-for-the-authenticated-user
-				if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
-					logger.Error(err, "error fetching repos by user")
+				if err := s.getReposByUser(ctx, member, false, reporter); err != nil && ctx.Err() == nil {
+					memberCtx.Logger().Error(err, "error fetching repos by user")
 				}
 			}
 		}
@@ -783,9 +925,9 @@ func (s *Source) enumerateAllInstallationRepos(ctx context.Context, connector *a
 		installID := install.GetID()
 		account := install.GetAccount().GetLogin()
 		installCtx := context.WithValues(ctx, "org", account, "installation_id", installID)
-		installCtx.Logger().Info("Enumerating repos from GitHub App installation")
+		installCtx.Logger().V(2).Info("Enumerating repos from GitHub App installation")
 
-		client, err := connector.APIClientForInstallation(installID)
+		client, err := connector.APIClientForInstallation(installCtx, installID)
 		if err != nil {
 			installCtx.Logger().Error(err, "could not create API client for installation")
 			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", installID, err)); err != nil {
@@ -874,7 +1016,7 @@ func (s *Source) mapReposToInstallations(ctx context.Context, connector *appConn
 	installedRepoKeys := make(map[int64]map[string]struct{}, len(installs))
 	for _, install := range installs {
 		installID := install.GetID()
-		client, err := connector.APIClientForInstallation(installID)
+		client, err := connector.APIClientForInstallation(ctx, installID)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("could not create API client for installation %d: %w", installID, err))
 			continue
@@ -1054,6 +1196,10 @@ func (s *Source) mapRemainingAccessibleRepos(
 	connector *appConnector,
 	wantedRepos map[string]repoMappingRequest,
 ) error {
+	if !connector.HasDefaultInstallation() {
+		return fmt.Errorf("cannot resolve %d configured repo(s) outside installation listings: githubApp.installationId is required as a fallback installation together with scanAllInstallations", len(wantedRepos))
+	}
+
 	var errs error
 	client := connector.APIClient()
 	for _, requested := range wantedRepos {
@@ -1088,8 +1234,9 @@ func (s *Source) mapRemainingAccessibleRepos(
 				continue
 			}
 
+			// requested.original is the repo as the user wrote it, so strip any token
 			ctx.Logger().Info("repo is not owned by any app installation; scanning with the default installation token",
-				"repo", requested.original)
+				"repo", safeRepoURL(requested.original))
 			deleteRepoMappingRequest(wantedRepos, requested)
 			s.recordRepoInstallation(connector, connector.installationID, repo, requested)
 			break
@@ -1203,18 +1350,25 @@ func (s *Source) repoURLFromTargetLink(link string) (string, error) {
 func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error {
 	var scannedCount uint64 = 1
 
-	ctx.Logger().V(2).Info("Found repos to scan", "count", len(s.repos))
+	ctx.Logger().V(1).Info("Found repos to scan", "count", len(s.repos))
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
+	// repos finished by an earlier, interrupted run are left out, so say how many
+	if skipped := len(s.repos) - len(reposToScan); skipped > 0 {
+		ctx.Logger().V(1).Info("resuming scan; skipping repos already scanned", "skipped", skipped, "remaining", len(reposToScan))
+	}
 	s.repos = reposToScan
 
 	for i, repoURL := range s.repos {
 		s.jobPool.Go(func() error {
+			// repos the user listed in the config are used as-is and may hold a
+			// token, so only the cleaned URL goes into logs
 			if common.IsDone(ctx) {
+				ctx.Logger().V(4).Info("skipping repo", "repo", safeRepoURL(repoURL), "reason", "scan cancelled")
 				return nil
 			}
-			ctx := context.WithValue(ctx, "repo", repoURL)
+			ctx := context.WithValue(ctx, "repo", safeRepoURL(repoURL))
 
 			// TODO: set progress complete is being called concurrently with i
 			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
@@ -1255,43 +1409,65 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 		// This should never happen.
 		return fmt.Errorf("no repoInfo for URL: %s", repoURL)
 	}
-	duration, err := s.cloneAndScanRepo(ctx, repoURL, repoInfo, reporter)
+	start := time.Now()
+	gitDuration, err := s.cloneAndScanRepo(ctx, repoURL, repoInfo, reporter)
 	if err != nil {
 		return err
 	}
 
 	// Scan the wiki, if enabled, and the repo has one.
-	if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
+	// The checks are split up only so each skip can say why.
+	switch {
+	case !s.conn.IncludeWikis:
+		// wikis are off for the whole source, nothing to log per repo
+	case !repoInfo.hasWiki:
+		ctx.Logger().V(4).Info("skipping wiki", "reason", "repo has no wiki")
+	case !s.wikiIsReachable(ctx, repoURL):
+		ctx.Logger().V(4).Info("skipping wiki", "reason", "wiki is not reachable")
+	default:
 		wikiURL, ok := wikiCloneURLForRepoInfo(repoURL, repoInfo)
-		if ok {
-			wikiCtx := context.WithValue(ctx, "repo", wikiURL)
+		if !ok {
+			ctx.Logger().V(4).Info("skipping wiki", "reason", "could not build wiki clone URL")
+			break
+		}
+		wikiCtx := context.WithValue(ctx, "repo", safeRepoURL(wikiURL))
 
-			_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
-			if err != nil {
-				// Ignore "Repository not found" errors.
-				// It's common for GitHub's API to say a repo has a wiki when it doesn't.
-				if !strings.Contains(err.Error(), "not found") {
-					if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
-						return err
-					}
+		_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
+		if err != nil {
+			// Ignore "Repository not found" errors.
+			// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+			if strings.Contains(err.Error(), "not found") {
+				wikiCtx.Logger().V(4).Info("skipping wiki", "reason", "GitHub says the wiki was not found")
+			} else {
+				if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
+					return err
 				}
-
-				// Don't return, it still might be possible to scan comments.
 			}
+
+			// Don't return, it still might be possible to scan comments.
 		}
 	}
 
 	// Scan comments, if enabled.
+	var commentsDuration time.Duration
 	if s.includeGistComments || s.includeIssueComments || s.includePRComments {
-		if err := s.scanComments(ctx, repoURL, repoInfo, reporter); err != nil {
-			err := fmt.Errorf("error scanning comments: %w", err)
-			if err := reporter.ChunkErr(ctx, err); err != nil {
+		commentsStart := time.Now()
+		err := s.scanComments(ctx, repoURL, repoInfo, reporter)
+		commentsDuration = time.Since(commentsStart)
+		if err != nil {
+			if err := reportCommentErrors(ctx, reporter, err); err != nil {
 				return err
 			}
 		}
 	}
 
-	ctx.Logger().V(2).Info("finished scanning repo", "duration_seconds", duration)
+	// duration_seconds covers everything above: clone, git history, wiki, and
+	// comments. Git history and comments are broken out because on repos with
+	// many comments, the comment walks can take far longer than the git scan.
+	ctx.Logger().V(2).Info("finished scanning repo",
+		"duration_seconds", time.Since(start).Seconds(),
+		"git_scan_seconds", gitDuration.Seconds(),
+		"comments_seconds", commentsDuration.Seconds())
 	githubReposScanned.WithLabelValues(s.name).Inc()
 	return nil
 }
@@ -1396,7 +1572,7 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 		if retryAfter > 0 {
 			retryAfter = retryAfter + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
-			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			ctx.Logger().Info("exceeded rate limit", "limit_type", limitType, "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 			// Only report the error if a reporter was provided
 			for _, reporter := range reporters {
 				_ = reporter.Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType))
@@ -1446,13 +1622,21 @@ func (s *Source) handleRateLimitWithChunkReporter(ctx context.Context, reporter 
 }
 
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
-	ctx.Logger().Info("Fetching repos from members", "members", len(s.memberCache))
+	ctx.Logger().V(1).Info("Fetching repos from members", "members", len(s.memberCache), "org_count", s.orgsCache.Count())
 	for member := range s.memberCache {
-		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
-			ctx.Logger().Info("Unable to fetch gists by user", "user", member, "error", err)
+		// once the scan is cancelled every fetch fails, so stop here
+		// instead of logging an error for each remaining member
+		if common.IsDone(ctx) {
+			ctx.Logger().V(4).Info("skipping remaining members", "reason", "scan cancelled")
+			return
 		}
-		if err := s.getReposByUser(ctx, member, false, reporter); err != nil {
-			ctx.Logger().Info("Unable to fetch repos by user", "user", member, "error", err)
+		// a fetch that was running when the scan got cancelled fails too,
+		// that is not an error worth logging
+		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil && ctx.Err() == nil {
+			ctx.Logger().Error(err, "Unable to fetch gists by user", "user", member)
+		}
+		if err := s.getReposByUser(ctx, member, false, reporter); err != nil && ctx.Err() == nil {
+			ctx.Logger().Error(err, "Unable to fetch repos by user", "user", member)
 		}
 	}
 }
@@ -1465,7 +1649,8 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 	}
 
 	gistOpts := &github.GistListOptions{}
-	logger := ctx.Logger().WithValues("user", user)
+	// every log line below is about this user
+	ctx = context.WithValues(ctx, "user", user)
 
 	for {
 		gists, res, err := s.connector.APIClient().Gists.List(ctx, user, gistOpts)
@@ -1487,7 +1672,8 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 		if res == nil || res.NextPage == 0 {
 			break
 		}
-		logger.V(2).Info("Listed gists", "page", gistOpts.Page, "last_page", res.LastPage)
+		// one line per page, with how many API calls we have left before the rate limit
+		ctx.Logger().V(4).Info("Listed gists", "page", gistOpts.Page, "last_page", res.LastPage, "rate_remaining", res.Rate.Remaining)
 		gistOpts.Page = res.NextPage
 	}
 	return nil
@@ -1510,7 +1696,7 @@ func (s *Source) addMembersByApp(ctx context.Context, connector *appConnector, r
 		// Create a per-installation API client so that the token is scoped to
 		// this org. GitHub App installation tokens only bypass IP allowlists for
 		// their own org; using a cross-org token causes 403s.
-		client, err := connector.APIClientForInstallation(install.GetID())
+		client, err := connector.APIClientForInstallation(installCtx, install.GetID())
 		if err != nil {
 			installCtx.Logger().Error(err, "could not create API client for installation")
 			if err := reporter.UnitErr(installCtx, fmt.Errorf("could not create API client for installation %d: %w", install.GetID(), err)); err != nil {
@@ -1557,7 +1743,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, reporter sources.UnitRep
 		}
 
 		lastOrgID := *orgs[len(orgs)-1].ID
-		ctx.Logger().V(2).Info(fmt.Sprintf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID))
+		ctx.Logger().V(4).Info("listed organization IDs", "from_id", orgOpts.Since, "to_id", lastOrgID)
 		orgOpts.Since = lastOrgID
 
 		for _, org := range orgs {
@@ -1580,18 +1766,20 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string, reporter source
 	orgOpts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
-	logger := ctx.Logger().WithValues("user", user)
+	// every log line below is about this user
+	ctx = context.WithValues(ctx, "user", user)
 	for {
 		orgs, resp, err := s.connector.APIClient().Organizations.List(ctx, "", orgOpts)
 		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
-			logger.Error(err, "Could not list organizations")
+			ctx.Logger().Error(err, "Could not list organizations")
 			return
 		}
 
-		logger.V(2).Info("Listed orgs", "page", orgOpts.Page, "last_page", resp.LastPage)
+		// one line per page, with how many API calls we have left before the rate limit
+		ctx.Logger().V(4).Info("Listed orgs", "page", orgOpts.Page, "last_page", resp.LastPage, "rate_remaining", resp.Rate.Remaining)
 		for _, org := range orgs {
 			if org.Login == nil {
 				continue
@@ -1617,7 +1805,8 @@ func (s *Source) addMembersByOrgWithClient(ctx context.Context, client *github.C
 		},
 	}
 
-	logger := ctx.Logger().WithValues("org", org)
+	// every log line below is about this org
+	ctx = context.WithValues(ctx, "org", org)
 	for {
 		members, res, err := client.Organizations.ListMembers(ctx, org, opts)
 		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
@@ -1630,7 +1819,8 @@ func (s *Source) addMembersByOrgWithClient(ctx context.Context, client *github.C
 			return fmt.Errorf("organization (%q) had 0 members: account may not have access to list organization members", org)
 		}
 
-		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", res.LastPage)
+		// one line per page, with how many API calls we have left before the rate limit
+		ctx.Logger().V(4).Info("Listed members", "page", opts.Page, "last_page", res.LastPage, "rate_remaining", res.Rate.Remaining)
 		for _, m := range members {
 			usr := m.Login
 			if usr == nil || *usr == "" {
@@ -1664,6 +1854,25 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
 
+// reportCommentErrors reports a failed comment scan as chunk errors, one per
+// failed phase. processIssueandPRsWithCommentsREST joins one error per phase
+// that failed, and each phase is a separate listing that failed for its own
+// reason, often a different missing permission. Reporting them separately
+// gives each its own entry and its own "error scanning comments" context,
+// instead of one entry whose later lines have neither.
+func reportCommentErrors(ctx context.Context, reporter sources.ChunkReporter, err error) error {
+	phaseErrs := []error{err}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		phaseErrs = joined.Unwrap()
+	}
+	for _, phaseErr := range phaseErrs {
+		if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning comments: %w", phaseErr)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	urlString, urlParts, err := getRepoURLParts(repoPath)
 	if err != nil {
@@ -1694,10 +1903,28 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 			return s.processRepoIssueandPRsWithCommentsGraphql(ctx, graphqlClient, repoInfo, reporter, cutoffTime)
 		}
 
-		return s.processIssueandPRsWithCommentsREST(ctx, apiClient, repoInfo, reporter, cutoffTime)
+		return s.processIssueandPRsWithCommentsREST(ctx, apiClient, repoInfo, s.commentGrantsForRepo(ctx, repoPath), reporter, cutoffTime)
 	}
 
 	return nil
+}
+
+// commentGrantsForRepo returns what the GitHub App installation behind
+// repoURL grants, or nil (unknown) when the source doesn't authenticate as an
+// App. A failure to read the grants also gives nil: the listings then run
+// without the precheck, as they would for a token, and any 403 is still
+// classified from its response.
+func (s *Source) commentGrantsForRepo(ctx context.Context, repoURL string) *installationGrants {
+	app, ok := s.connector.(*appConnector)
+	if !ok {
+		return nil
+	}
+	grants, err := app.grantsForRepo(ctx, repoURL)
+	if err != nil {
+		ctx.Logger().V(2).Info("could not read installation permissions, scanning comments without the permission precheck", "error", err)
+		return nil
+	}
+	return grants
 }
 
 // trimURLAndSplit removes extraneous information from the |url| and splits it into segments.
@@ -1759,35 +1986,54 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 	return urlString, urlParts, nil
 }
 
-const initialPage = 1 // page to start listing from
+// commentPager returns the pager every comment walk for one repo shares. Rate
+// limits are handled by waiting and retrying the same request, and each wait
+// is also reported to the chunk reporter. Transient failures are retried a
+// bounded number of times; see fetchWithRetry.
+func (s *Source) commentPager(ctx context.Context, apiClient *github.Client, reporter sources.ChunkReporter) pager {
+	wait := s.commentRetryWait
+	if wait == nil {
+		wait = func(ctx context.Context, d time.Duration) bool {
+			_, canceled := sleepWithContext(ctx, d)
+			return !canceled
+		}
+	}
+	return pager{
+		client:  apiClient,
+		perPage: defaultPagination,
+		retry: func(err error) bool {
+			return s.handleRateLimitWithChunkReporter(ctx, reporter, err)
+		},
+		wait: wait,
+	}
+}
 
+// processGistComments scans a gist's comments. The endpoint has no `since` or
+// sort parameters, so the comments timeframe is applied to each page as it
+// arrives, and a capped walk has no way to continue: it is reported as an
+// error rather than ending silently.
 func (s *Source) processGistComments(ctx context.Context, apiClient *github.Client, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	ctx.Logger().V(2).Info("Scanning GitHub Gist comments")
 
-	// GitHub Gist URL.
 	gistID := extractGistID(urlParts)
-
-	options := &github.ListOptions{
-		PerPage: defaultPagination,
-		Page:    initialPage,
+	p := s.commentPager(ctx, apiClient, reporter)
+	p.listing = "gist comments"
+	outcome, err := walkPages(ctx, p,
+		func(ctx context.Context) ([]*github.GistComment, *github.Response, error) {
+			return apiClient.Gists.ListComments(ctx, gistID, &github.ListOptions{PerPage: defaultPagination})
+		},
+		func(comments []*github.GistComment) error {
+			return s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter, cutoffTime)
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("gist comments: %w", &walkError{items: outcome.items, err: err})
 	}
-	for {
-		comments, _, err := apiClient.Gists.ListComments(ctx, gistID, options)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		options.Page++
-		if len(comments) < options.PerPage {
-			break
-		}
+	if outcome.capped {
+		return fmt.Errorf("gist comments: %w", &walkError{
+			items: outcome.items,
+			err:   errors.New("GitHub stopped paginating and this endpoint has no since filter to continue from"),
+		})
 	}
 	return nil
 }
@@ -1820,9 +2066,10 @@ func isGistUrl(urlParts []string) bool {
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
+		// Gist comments come back oldest first, so an old comment says nothing
+		// about the ones after it. Skip it and keep going.
 		if cutoffTime != nil && comment.GetCreatedAt().Before(*cutoffTime) {
-			break
+			continue
 		}
 
 		// Create chunk and send it to the channel.
@@ -1854,46 +2101,191 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 	return nil
 }
 
-// Note: these can't be consts because the address is needed when using with the GitHub library.
-var (
-	// sortType defines the criteria for sorting comments.
-	// By setting this to "updated" we can use this to reliably manage the comment timeframe filtering below
-	sortType = "updated"
-	// directionType defines the direction of sorting.
-	// "desc" means comments will be sorted in descending order, showing the latest comments first, which is critical for managing the comment timeframe filtering
-	directionType = "desc"
-	// allComments is a placeholder for specifying the comment ID to start listing from.
-	// A value of 0 means that all comments will be listed.
-	allComments = 0
-	// state of "all" for the ListByRepo captures both open and closed issues.
-	state = "all"
+// Repo listings sort by update time, oldest first, so a capped walk can
+// continue from the last update time it saw. See walkUpdatedSince.
+const (
+	sortByUpdated = "updated"
+	sortAscending = "asc"
+	// stateAll lists open and closed issues and pull requests.
+	stateAll = "all"
 )
 
+// commentPhase is one listing in a repo's comment scan. run returns how many
+// chunks it emitted. startLog, when set, is logged at V(2) before the phase
+// runs.
+//
+// skipped and narrowed carry what the installation's grants cost the phase
+// (see installationGrants). skipped, when set, is why the listing can't
+// succeed; the phase reports it in place of running. narrowed holds one error
+// per kind of item GitHub will leave out of a listing that still runs, each
+// already prefixed with what's missing, and is reported after the run.
+type commentPhase struct {
+	name     string
+	startLog string
+	run      func() (int, error)
+	skipped  error
+	narrowed []error
+}
+
+// processIssueandPRsWithCommentsREST scans a repo's issues, pull requests, and
+// their comments through the REST API.
+//
+// The phases are independent: a failure in one is collected and the rest
+// still run, so one capped or forbidden endpoint can't hide the others. All
+// failures come back joined into one error, which scanRepo splits back apart
+// so each failed phase is its own ChunkErr (see reportCommentErrors). Chunks
+// emitted before a failure are kept.
+//
+// grants, when known, shapes the phases. A mismatch between the comment
+// settings and what the installation grants is a configuration error the
+// customer can fix, so it's always reported: every listing skipped because it
+// can't succeed, and every kind of item GitHub will silently leave out of a
+// listing that does run, gets exactly one permissionError. Items no setting
+// asked for don't count. Skipped listings make no request.
+//
+// The "Scanning issues" and "Scanning pull requests" V(2) lines are the only
+// log signal for scans on the unit path, whose comment errors go to the scan
+// details UI instead of the logs, so they keep their wording. The summary
+// line at the end records how far each phase got.
 func (s *Source) processIssueandPRsWithCommentsREST(
 	ctx context.Context, apiClient *github.Client, repoInfo repoInfo,
-	reporter sources.ChunkReporter, cutoffTime *time.Time,
+	grants *installationGrants, reporter sources.ChunkReporter, cutoffTime *time.Time,
 ) error {
+	p := s.commentPager(ctx, apiClient, reporter)
+	var since time.Time
+	if cutoffTime != nil {
+		since = *cutoffTime
+	}
+
+	var installationID int64
+	if grants != nil {
+		installationID = grants.installationID
+	}
+	issuesOK, prsOK := grants.issuesGranted(), grants.pullRequestsGranted()
+	narrowed := func(missing, listing string, needs permission) error {
+		return fmt.Errorf("%s: %w", missing, newNarrowedListingError(installationID, listing, []permission{needs}))
+	}
+	// noPRs is set when /pulls ran and found nothing. Its state=all listing
+	// then shows the repo has no pull requests, so it has no review comments
+	// either. A 404 or 410 means pull requests are off, which is different:
+	// /pulls/comments still serves review comments from before that.
+	var noPRs bool
+	pullsPhase := func(startLog string) commentPhase {
+		return commentPhase{name: "pull requests", startLog: startLog, run: func() (int, error) {
+			emitted, err := s.processPRs(ctx, p, repoInfo, reporter)
+			if isGitHubListingDisabled(err) {
+				ctx.Logger().V(2).Info("pull requests listing disabled for repo, skipping")
+				return emitted, nil
+			}
+			noPRs = err == nil && emitted == 0
+			return emitted, err
+		}}
+	}
+
+	// /issues returns issues and pull requests together. When issue comments
+	// are enabled, that one walk also emits PR bodies, so /pulls is only
+	// walked for configs that enable PR comments alone, or when the
+	// installation can list pull requests but not issues.
+	var phases []commentPhase
 	if s.includeIssueComments {
-		ctx.Logger().V(2).Info("Scanning issues")
-		if err := s.processIssues(ctx, apiClient, repoInfo, reporter); err != nil {
-			return err
+		bodies := commentPhase{name: "issues", startLog: "Scanning issues", run: func() (int, error) {
+			return s.processIssues(ctx, p, repoInfo, reporter, s.includePRComments)
+		}}
+		needs := []permission{issuesRead}
+		if s.includePRComments {
+			bodies.name = "issues and pull requests"
+			needs = append(needs, pullRequestsRead)
 		}
-		if err := s.processIssueComments(ctx, apiClient, repoInfo, reporter, cutoffTime); err != nil {
-			return err
+		switch {
+		case issuesOK:
+			if s.includePRComments && !prsOK {
+				bodies.narrowed = append(bodies.narrowed, narrowed("pull request bodies", "/issues", pullRequestsRead))
+			}
+			phases = append(phases, bodies)
+		case s.includePRComments && prsOK:
+			// /issues is refused without Issues (read), but the PR bodies it
+			// would have carried are still reachable through /pulls.
+			phases = append(phases,
+				commentPhase{name: "issues", skipped: newSkippedListingError(installationID, []permission{issuesRead})},
+				pullsPhase(""))
+		default:
+			bodies.skipped = newSkippedListingError(installationID, needs)
+			phases = append(phases, bodies)
 		}
-	}
 
+		// /issues/comments carries comments on issues and on pull requests,
+		// each kind only when its permission is granted. PR conversation
+		// comments are scanned only when PR comments are enabled, so their
+		// absence otherwise isn't a mismatch.
+		comments := commentPhase{name: "issue comments", run: func() (int, error) {
+			return s.processIssueComments(ctx, p, repoInfo, reporter, since)
+		}}
+		switch {
+		case !issuesOK && !prsOK:
+			comments.skipped = newSkippedListingError(installationID, needs)
+		case !issuesOK:
+			comments.narrowed = append(comments.narrowed, narrowed("issue comments", "/issues/comments", issuesRead))
+		case s.includePRComments && !prsOK:
+			comments.narrowed = append(comments.narrowed, narrowed("pull request conversation comments", "/issues/comments", pullRequestsRead))
+		}
+		phases = append(phases, comments)
+	}
 	if s.includePRComments {
-		ctx.Logger().V(2).Info("Scanning pull requests")
-		if err := s.processPRs(ctx, apiClient, repoInfo, reporter); err != nil {
-			return err
+		var prsSkipped error
+		if !prsOK {
+			prsSkipped = newSkippedListingError(installationID, []permission{pullRequestsRead})
 		}
-		if err := s.processPRComments(ctx, apiClient, repoInfo, reporter, cutoffTime); err != nil {
-			return err
+		prStartLog := "Scanning pull requests"
+		if !s.includeIssueComments {
+			pulls := pullsPhase(prStartLog)
+			pulls.skipped = prsSkipped
+			phases = append(phases, pulls)
+			prStartLog = ""
 		}
+		phases = append(phases, commentPhase{name: "pull request comments", startLog: prStartLog, skipped: prsSkipped, run: func() (int, error) {
+			if noPRs {
+				ctx.Logger().V(2).Info("no pull requests in repo, skipping pull request comments")
+				return 0, nil
+			}
+			return s.processPRComments(ctx, p, repoInfo, reporter, since)
+		}})
 	}
 
-	return nil
+	var (
+		errs        []error
+		failed      []string
+		skipped     []string
+		narrowedOut []string
+		summary     []any
+	)
+	for _, phase := range phases {
+		if err := ctx.Err(); err != nil {
+			errs = append(errs, err)
+			break
+		}
+		if phase.skipped != nil {
+			skipped = append(skipped, phase.name)
+			errs = append(errs, fmt.Errorf("%s: %w", phase.name, phase.skipped))
+			continue
+		}
+		if phase.startLog != "" {
+			ctx.Logger().V(2).Info(phase.startLog)
+		}
+		emitted, err := phase.run()
+		summary = append(summary, strings.ReplaceAll(phase.name, " ", "_"), emitted)
+		if err != nil {
+			failed = append(failed, phase.name)
+			errs = append(errs, fmt.Errorf("%s: %w", phase.name, err))
+		}
+		if len(phase.narrowed) > 0 {
+			narrowedOut = append(narrowedOut, phase.name)
+			errs = append(errs, phase.narrowed...)
+		}
+	}
+	ctx.Logger().V(2).Info("finished scanning comments", append(summary,
+		"failed_phases", failed, "skipped_phases", skipped, "narrowed_phases", narrowedOut)...)
+
+	return errors.Join(errs...)
 }
 
 func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
@@ -1921,44 +2313,52 @@ func (s *Source) processRepoIssueandPRsWithCommentsGraphql(
 	return nil
 }
 
-func (s *Source) processIssues(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter) error {
-	bodyTextsOpts := &github.IssueListByRepoOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		State:     state,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processIssues walks /issues and emits issue bodies, plus pull request
+// bodies when includePRs is set. The listing always contains both, because
+// GitHub treats every pull request as an issue. Bodies are scanned in full
+// regardless of the comments timeframe.
+func (s *Source) processIssues(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter, includePRs bool) (int, error) {
+	emitted := 0
+	_, err := walkUpdatedSince(ctx, p, sinceWalk[*github.Issue]{
+		name: "issues",
+		list: listIssuesSince(p, repoInfo),
+		key:  issueKey,
+		visit: func(issues []*github.Issue) error {
+			n, err := s.chunkIssues(ctx, repoInfo, issues, reporter, func(issue *github.Issue) bool {
+				return includePRs || !issue.IsPullRequest()
+			})
+			emitted += n
+			return err
 		},
-	}
-
-	for {
-		issues, _, err := apiClient.Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkIssues(ctx, repoInfo, issues, reporter); err != nil {
-			return err
-		}
-
-		bodyTextsOpts.Page++
-
-		if len(issues) < defaultPagination {
-			break
-		}
-	}
-	return nil
+	})
+	return emitted, err
 }
 
-func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter) error {
+// listIssuesSince returns the /issues listing, issues and pull requests
+// together, for walkUpdatedSince.
+func listIssuesSince(p pager, repoInfo repoInfo) func(context.Context, time.Time) ([]*github.Issue, *github.Response, error) {
+	return func(ctx context.Context, since time.Time) ([]*github.Issue, *github.Response, error) {
+		return p.client.Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, &github.IssueListByRepoOptions{
+			State:       stateAll,
+			Sort:        sortByUpdated,
+			Direction:   sortAscending,
+			Since:       since,
+			ListOptions: github.ListOptions{PerPage: p.perPage},
+		})
+	}
+}
+
+func issueKey(issue *github.Issue) (int64, time.Time) {
+	return issue.GetID(), issue.GetUpdatedAt().Time
+}
+
+// chunkIssues emits a chunk for each issue that keep accepts, and returns how
+// many it emitted. Pull requests from /issues produce the same chunk as
+// chunkPullRequests: same link, author, timestamp, and title and body.
+func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter, keep func(*github.Issue) bool) (int, error) {
+	emitted := 0
 	for _, issue := range issues {
-		// Skip pull requests since covered by processPRs.
-		if issue.IsPullRequest() {
+		if !keep(issue) {
 			continue
 		}
 
@@ -1985,50 +2385,55 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 		}
 
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
-			return err
+			return emitted, err
 		}
+		emitted++
 	}
-	return nil
+	return emitted, nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	issueOpts := &github.IssueListCommentsOptions{
-		Sort:      &sortType,
-		Direction: &directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processIssueComments walks every issue comment in the repo updated at or
+// after since. /issues/comments also returns comments on pull requests, since
+// GitHub treats every pull request as an issue. The endpoint stops at 300
+// pages, so the walk continues past that cap in since windows.
+//
+// When both issues and pull requests are off, GitHub answers 404 here. That
+// is only treated as empty when the repo also reports issues off, so an
+// unexpected 404 is still reported.
+func (s *Source) processIssueComments(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter, since time.Time) (int, error) {
+	emitted, err := walkUpdatedSince(ctx, p, sinceWalk[*github.IssueComment]{
+		name:  "issue comments",
+		since: since,
+		list: func(ctx context.Context, since time.Time) ([]*github.IssueComment, *github.Response, error) {
+			opts := &github.IssueListCommentsOptions{
+				Sort:        github.String(sortByUpdated),
+				Direction:   github.String(sortAscending),
+				ListOptions: github.ListOptions{PerPage: p.perPage},
+			}
+			if !since.IsZero() {
+				opts.Since = &since
+			}
+			// Issue number 0 lists comments across the whole repo.
+			return p.client.Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, 0, opts)
 		},
+		key: func(comment *github.IssueComment) (int64, time.Time) {
+			return comment.GetID(), comment.GetUpdatedAt().Time
+		},
+		visit: func(comments []*github.IssueComment) error {
+			return s.chunkIssueComments(ctx, repoInfo, comments, reporter)
+		},
+	})
+	if err != nil && repoInfo.hasNoIssues && isGitHubListingDisabled(err) {
+		ctx.Logger().V(2).Info("issue comments listing disabled for repo, skipping")
+		return emitted, nil
 	}
-
-	for {
-		issueComments, _, err := apiClient.Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		issueOpts.Page++
-		if len(issueComments) < defaultPagination {
-			break
-		}
-	}
-	return nil
+	return emitted, err
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+// chunkIssueComments emits a chunk for each comment. The comments timeframe
+// is already applied by the API through `since`.
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter) error {
 	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
-		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
-			continue
-		}
-
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -2058,69 +2463,87 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 	return nil
 }
 
-func (s *Source) processPRs(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter) error {
-	prOpts := &github.PullRequestListOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		State:     state,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processPRs emits pull request bodies for configs that enable PR comments
+// but not issue comments; otherwise the /issues walk emits them. /pulls has
+// no `since` filter, so if GitHub caps it, the walk falls back to a windowed
+// /issues walk that emits only pull requests, skipping the ones /pulls
+// already emitted. The common case never pages through issues.
+func (s *Source) processPRs(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter) (int, error) {
+	emitted := 0
+	emittedNumbers := map[int]struct{}{}
+	p.listing = "pull requests"
+	outcome, err := walkPages(ctx, p,
+		func(ctx context.Context) ([]*github.PullRequest, *github.Response, error) {
+			return p.client.PullRequests.List(ctx, repoInfo.owner, repoInfo.name, &github.PullRequestListOptions{
+				State:       stateAll,
+				Sort:        sortByUpdated,
+				Direction:   sortAscending,
+				ListOptions: github.ListOptions{PerPage: p.perPage},
+			})
 		},
+		func(prs []*github.PullRequest) error {
+			if err := s.chunkPullRequests(ctx, repoInfo, prs, reporter); err != nil {
+				return err
+			}
+			for _, pr := range prs {
+				emittedNumbers[pr.GetNumber()] = struct{}{}
+			}
+			emitted += len(prs)
+			return nil
+		},
+	)
+	if err != nil {
+		return emitted, &walkError{items: outcome.items, err: err}
+	}
+	if !outcome.capped {
+		return emitted, nil
 	}
 
-	for {
-		prs, _, err := apiClient.PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
+	ctx.Logger().V(2).Info("pull request listing capped, continuing from the issue listing", "pull_requests_so_far", emitted)
+	_, err = walkUpdatedSince(ctx, p, sinceWalk[*github.Issue]{
+		name: "pull requests from issues",
+		list: listIssuesSince(p, repoInfo),
+		key:  issueKey,
+		visit: func(issues []*github.Issue) error {
+			n, err := s.chunkIssues(ctx, repoInfo, issues, reporter, func(issue *github.Issue) bool {
+				if !issue.IsPullRequest() {
+					return false
+				}
+				_, done := emittedNumbers[issue.GetNumber()]
+				return !done
+			})
+			emitted += n
 			return err
-		}
-
-		if err = s.chunkPullRequests(ctx, repoInfo, prs, reporter); err != nil {
-			return err
-		}
-
-		prOpts.Page++
-
-		if len(prs) < defaultPagination {
-			break
-		}
-	}
-	return nil
+		},
+	})
+	return emitted, err
 }
 
-func (s *Source) processPRComments(ctx context.Context, apiClient *github.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	prOpts := &github.PullRequestListCommentsOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
+// processPRComments walks every pull request review comment (the inline
+// comments on diffs) in the repo updated at or after since. Discussion
+// comments on pull requests come from /issues/comments instead. No cap has
+// been observed on this endpoint, but it gets the same since windows as
+// /issues/comments in case one exists.
+func (s *Source) processPRComments(ctx context.Context, p pager, repoInfo repoInfo, reporter sources.ChunkReporter, since time.Time) (int, error) {
+	return walkUpdatedSince(ctx, p, sinceWalk[*github.PullRequestComment]{
+		name:  "pull request comments",
+		since: since,
+		list: func(ctx context.Context, since time.Time) ([]*github.PullRequestComment, *github.Response, error) {
+			// Pull request number 0 lists review comments across the whole repo.
+			return p.client.PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, 0, &github.PullRequestListCommentsOptions{
+				Sort:        sortByUpdated,
+				Direction:   sortAscending,
+				Since:       since,
+				ListOptions: github.ListOptions{PerPage: p.perPage},
+			})
 		},
-	}
-
-	for {
-		prComments, _, err := apiClient.PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
-		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter, cutoffTime); err != nil {
-			return err
-		}
-
-		prOpts.Page++
-
-		if len(prComments) < defaultPagination {
-			break
-		}
-	}
-	return nil
+		key: func(comment *github.PullRequestComment) (int64, time.Time) {
+			return comment.GetID(), comment.GetUpdatedAt().Time
+		},
+		visit: func(comments []*github.PullRequestComment) error {
+			return s.chunkPullRequestComments(ctx, repoInfo, comments, reporter)
+		},
+	})
 }
 
 func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []*github.PullRequest, reporter sources.ChunkReporter) error {
@@ -2154,13 +2577,10 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+// chunkPullRequestComments emits a chunk for each review comment. The
+// comments timeframe is already applied by the API through `since`.
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter) error {
 	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
-		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
-			continue
-		}
-
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -2263,7 +2683,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 
 	if meta.GetFile() == "" && meta.GetCommit() != "" {
 		ctx := context.WithValues(ctx, "commit_hash", meta.GetCommit())
-		ctx.Logger().V(2).Info("secret metadata has no file; scanning commit metadata instead")
+		ctx.Logger().V(4).Info("secret metadata has no file; scanning commit metadata instead")
 
 		return s.scanCommitMetadata(ctx, apiClient, segments[1], segments[2], meta, &chunkSkel, reporter)
 	}
@@ -2426,10 +2846,16 @@ func (s *Source) scanCommitMetadata(ctx context.Context, apiClient *github.Clien
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, kind := unit.SourceUnitID()
-	ctx = context.WithValue(ctx, "repo", repoURL)
+	ctx = context.WithValue(ctx, "repo", safeRepoURL(repoURL))
 
-	if connector, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations && kind == "repo" {
-		if err := s.mapReposToInstallations(ctx, connector, []string{repoURL}); err != nil {
+	// If the unit has an installation ID, use it. Fetching it is slow,
+	// specifically it stalls large multi-org scans on rate limits (INT-790).
+
+	// [CG] This is pretty ugly; if you can clean it up please do (I failed).
+	if ac, ok := s.connector.(*appConnector); ok && s.conn.ScanAllInstallations && kind == "repo" {
+		if ru, ok := unit.(RepoUnit); ok && ru.InstallationID > 0 {
+			ac.setRepoInstallationForRepoName(repoURL, ru.Name, ru.InstallationID)
+		} else if err := s.mapReposToInstallations(ctx, ac, []string{repoURL}); err != nil {
 			return err
 		}
 	}

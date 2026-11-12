@@ -39,6 +39,11 @@ func TestGitLab_Pattern(t *testing.T) {
 				}]`,
 			want: []string{"glpat-W6fYSu70dPEo5w_SwbHWgQhttps://gitlab.com"},
 		},
+		{
+			name:  "low-entropy placeholder",
+			input: `gitlab_secret = "glpat-xxxxxxxxxxxxxxxxxxxx"`,
+			want:  nil,
+		},
 	}
 
 	for _, test := range tests {

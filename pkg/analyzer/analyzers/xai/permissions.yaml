@@ -1,0 +1,3 @@
+permissions:
+  - endpoint_access
+  - model_access

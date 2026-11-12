@@ -17,53 +17,46 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-type Scanner struct{ client *http.Client }
+// BaseScanner is a base struct embedded by versioned scanners. It holds the HTTP client and
+// shared detection/verification logic.
+type BaseScanner struct {
+	Client *http.Client
+}
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var defaultClient = common.SaneHttpClient()
 
-var (
-	defaultClient = common.SaneHttpClient()
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"wandb"}) + `\b([0-9a-f]{40})\b`)
-)
-
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string { return []string{"wandb"} }
-
-// FromData will find and optionally verify Weightsandbiases secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+// FromData finds and optionally verifies WeightsAndBiases secrets in data using the provided
+// pattern. version is included in ExtraData of each result.
+func (s BaseScanner) FromData(ctx context.Context, verify bool, data []byte, keyPat *regexp.Regexp, version int) ([]detectors.Result, error) {
 	dataStr := string(data)
-
 	uniqueMatches := make(map[string]struct{})
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueMatches[match[1]] = struct{}{}
 	}
 
+	var results []detectors.Result
 	for match := range uniqueMatches {
-		s1 := detectors.Result{
+		r := detectors.Result{
 			DetectorType: detector_typepb.DetectorType_WeightsAndBiases,
 			Raw:          []byte(match),
 			SecretParts:  map[string]string{"key": match},
 		}
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
-			s1.Verified = isVerified
-			s1.ExtraData = extraData
-			s1.SetVerificationError(verificationErr, match)
+			isVerified, extraData, verificationErr := s.verifyMatch(ctx, match)
+			r.Verified = isVerified
+			r.ExtraData = extraData
+			r.SetVerificationError(verificationErr, match)
 		}
 
-		results = append(results, s1)
-	}
+		if r.ExtraData == nil {
+			r.ExtraData = make(map[string]string)
+		}
+		r.ExtraData["version"] = strconv.Itoa(version)
 
-	return
+		results = append(results, r)
+	}
+	return results, nil
 }
 
 type viewerResponse struct {
@@ -77,7 +70,16 @@ type viewerResponse struct {
 	} `json:"data"`
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+// verifyMatch checks the credential against the W&B GraphQL /graphql endpoint using the viewer query,
+// which requires no special permissions. A 200 with a non-empty username means the token is valid;
+// 401 means invalid or revoked.
+// Docs: https://docs.wandb.ai/ref/graphql
+func (s BaseScanner) verifyMatch(ctx context.Context, token string) (bool, map[string]string, error) {
+	client := s.Client
+	if client == nil {
+		client = defaultClient
+	}
+
 	query := `{"query": "query Viewer { viewer { id username email admin } }"}`
 
 	const baseURL = "https://api.wandb.ai/graphql"
@@ -124,10 +126,10 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-func (s Scanner) Description() string {
+func (s BaseScanner) Description() string {
 	return "Weights & Biases is a Machine Learning Operations (MLOps) platform that helps track experiments, version datasets, evaluate model performance, and collaborate with team members"
 }
 
-func (s Scanner) Type() detector_typepb.DetectorType {
+func (s BaseScanner) Type() detector_typepb.DetectorType {
 	return detector_typepb.DetectorType_WeightsAndBiases
 }
