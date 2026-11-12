@@ -111,7 +111,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
 	// First load the credential from the found key
-	credentials, err := google.CredentialsFromJSON(ctx, []byte(token), "https://www.googleapis.com/auth/cloud-platform")
+	credentials, err := google.CredentialsFromJSONWithType(ctx, []byte(token), google.AuthorizedUser, "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		return false, nil, err
 	}

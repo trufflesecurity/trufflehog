@@ -43,6 +43,7 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) (source
 
 	sourceName := "trufflehog - syslog"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, syslog.SourceType)
+	ctx = withSourceFields(ctx, sourceName, syslog.SourceType, sourceID, jobID)
 	syslogSource := &syslog.Source{}
 	if err := syslogSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err

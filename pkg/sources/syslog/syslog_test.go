@@ -1,16 +1,21 @@
 package syslog
 
 import (
+	"fmt"
+	"net"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func TestSource_parseSyslogMetadata(t *testing.T) {
@@ -124,5 +129,40 @@ func TestSource_parseSyslogMetadata(t *testing.T) {
 				t.Errorf("Source.parseSyslogMetadata() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSource_monitorConnection_DebugLogsHideMessage(t *testing.T) {
+	ctx, logs := logtest.DebugContext()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	s := &Source{}
+	conn, err := anypb.New(&sourcespb.Syslog{Format: "rfc5424"})
+	require.NoError(t, err)
+	require.NoError(t, s.Init(ctx, "test", 0, 0, false, conn, 1))
+
+	// Send one message over an in-memory connection and wait for its chunk.
+	server, client := net.Pipe()
+	defer func() { _ = client.Close() }()
+	chunksChan := make(chan *sources.Chunk, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.monitorConnection(ctx, server, chunksChan)
+	}()
+
+	message := "<165>1 2003-10-11T22:14:15.003Z host app - ID47 - password=hunter2"
+	_, err = client.Write([]byte(message))
+	require.NoError(t, err)
+	<-chunksChan
+	cancel()
+	<-done
+
+	// The debug line is written, but the message itself never shows up in the logs.
+	assert.Equal(t, 1, logs.FilterMessage("received syslog message").Len())
+	for _, entry := range logs.All() {
+		assert.NotContains(t, entry.Message, "hunter2")
+		assert.NotContains(t, fmt.Sprint(entry.ContextMap()), "hunter2")
 	}
 }

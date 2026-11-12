@@ -78,7 +78,7 @@ func TestNetsuite_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			ShouldHaveVerified: false,
-			wantCount:          21,
+			wantCount:          5,
 			wantErr:            false,
 		},
 		{

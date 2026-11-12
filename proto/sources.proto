@@ -71,6 +71,8 @@ message LocalSource {
   bool verify = 4;
   google.protobuf.Any connection = 5;
   string scan_period = 6;
+  // debug turns on debug logging for this source only. Other sources keep the global log level.
+  bool debug = 7;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
@@ -398,6 +400,20 @@ message S3 {
   string endpoint = 10 [(validate.rules).string.uri_ref = true];
   // region is the region used to sign requests. Defaults to us-east-1.
   string region = 11;
+  // include_prefixes limits the scan to objects whose key matches one of these
+  // key prefixes. Leave empty to consider every object in the bucket.
+  repeated string include_prefixes = 12;
+  // exclude_prefixes skips objects whose key matches one of these key prefixes.
+  repeated string exclude_prefixes = 13;
+  // include_extensions limits the scan to objects whose key ends in one of these
+  // file extensions, written without a leading dot (e.g. "tf", "yaml"). Leave
+  // empty to consider every extension. Cannot be combined with
+  // exclude_extensions.
+  repeated string include_extensions = 14;
+  // exclude_extensions skips objects whose key ends in one of these file
+  // extensions, written without a leading dot (e.g. "zip", "mp4"). Cannot be
+  // combined with include_extensions.
+  repeated string exclude_extensions = 15;
 }
 
 message Slack {
@@ -427,6 +443,8 @@ message Gerrit {
   repeated string projects = 4;
   bool skip_binaries = 5;
   bool skip_archives = 6;
+  // Gerrit API request timeout in seconds. Unset or 0 uses the default (20s).
+  int32 api_timeout_seconds = 7 [(validate.rules).int32 = {gte: 0, lte: 3600}];
 }
 
 message Jenkins {

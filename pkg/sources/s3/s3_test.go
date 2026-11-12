@@ -4,21 +4,31 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func TestSource_Init_IncludeAndIgnoreBucketsError(t *testing.T) {
@@ -437,4 +447,282 @@ func TestSource_ClientAddressing(t *testing.T) {
 			assert.Equal(t, tt.wantPathStyle, opts.UsePathStyle)
 		})
 	}
+}
+
+func TestSource_Init_IncludeAndExcludeExtensionsError(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:        &sourcespb.S3_Unauthenticated{},
+		IncludeExtensions: []string{"tf"},
+		ExcludeExtensions: []string{"zip"},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.Error(t, err)
+}
+
+// Prefixes, unlike extensions and unlike buckets, accept an include list and an
+// exclude list together.
+func TestSource_Init_IncludeAndExcludePrefixesAllowed(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		IncludePrefixes: []string{"src/"},
+		ExcludePrefixes: []string{"src/vendor/"},
+	})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.NoError(t, err)
+	assert.True(t, s.objectFilter.shouldInclude("src/main.tf"))
+	assert.False(t, s.objectFilter.shouldInclude("src/vendor/dep.tf"))
+}
+
+// A source with no filters configured must scan every object, so that existing
+// scans behave exactly as they did before object filtering was added.
+func TestSource_Init_UnconfiguredFilterScansEverything(t *testing.T) {
+	conn, err := anypb.New(&sourcespb.S3{Credential: &sourcespb.S3_Unauthenticated{}})
+	assert.NoError(t, err)
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.NoError(t, err)
+	assert.True(t, s.objectFilter.shouldInclude("any/key.zip"))
+}
+
+// A filtered object must still be marked complete on the checkpointer. Otherwise
+// the low water mark stalls at the first filtered object and a resumed scan redoes
+// every object after it.
+func TestSource_PageChunker_FilteredObjectsAdvanceCheckpoint(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+
+	const objectCount = 10
+	page := &awss3.ListObjectsV2Output{Contents: make([]s3types.Object, objectCount)}
+	for i := range objectCount {
+		key := fmt.Sprintf("archive/key-%02d.txt", i)
+		size := int64(1024)
+		page.Contents[i] = s3types.Object{Key: &key, Size: &size}
+	}
+
+	checkpointer := NewCheckpointer(ctx, &sources.Progress{}, false)
+
+	// Every object is filtered, so pageChunker never reaches GetObject and needs
+	// no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, objectCount)},
+		checkpointer,
+	)
+
+	assert.Zero(t, scanned)
+	assert.EqualValues(t, objectCount, filtered)
+
+	resumeInfo, err := checkpointer.ResumePoint(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "test-bucket", resumeInfo.CurrentBucket)
+	assert.Equal(t, *page.Contents[objectCount-1].Key, resumeInfo.StartAfter)
+}
+
+func TestSource_PageChunker_UnitScanLeavesSkippedObjectsOutOfProgress(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+		MaxObjectSize:   1024,
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+	s.SetEncodedResumeInfoFor("test-bucket", "earlier-key")
+
+	filteredKey, glacierKey, oversizeKey, emptyKey, imageKey := "archive/a.txt", "cold.txt", "huge.txt", "none.txt", "photo.jpg"
+	size, oversize, empty := int64(512), int64(4096), int64(0)
+	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{
+		{Key: &filteredKey, Size: &size},
+		{Key: &glacierKey, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+		{Key: &oversizeKey, Size: &oversize},
+		{Key: &emptyKey, Size: &empty},
+		{Key: &imageKey, Size: &size},
+	}}
+
+	// No object is downloaded, so pageChunker needs no client.
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{
+			errorCount:    &sync.Map{},
+			objectCount:   &scanned,
+			filteredCount: &filtered,
+			progress:      newUnitProgress("test-bucket", &s.Progress),
+		},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, len(page.Contents))},
+		NewCheckpointer(ctx, &s.Progress, true),
+	)
+
+	_, reported := s.GetUnitProgressFor("test-bucket")
+	assert.False(t, reported, "skipped objects are in neither the total nor the done count")
+	assert.EqualValues(t, 1, filtered)
+	// Skipped objects still advance the checkpoint to the last key of the page.
+	assert.Equal(t, *page.Contents[len(page.Contents)-1].Key, s.GetEncodedResumeInfoFor("test-bucket"))
+}
+
+func TestSource_PageChunker_LegacyScanLeavesProgressUntouched(t *testing.T) {
+	ctx := context.Background()
+
+	conn, err := anypb.New(&sourcespb.S3{
+		Credential:      &sourcespb.S3_Unauthenticated{},
+		ExcludePrefixes: []string{"archive/"},
+	})
+	require.NoError(t, err)
+
+	s := Source{}
+	require.NoError(t, s.Init(ctx, "s3 test source", 0, 0, false, conn, 1))
+	s.SetProgressComplete(0, 1, "Bucket: test-bucket", "")
+
+	key, size := "archive/key.txt", int64(1024)
+	page := &awss3.ListObjectsV2Output{Contents: []s3types.Object{{Key: &key, Size: &size}}}
+
+	var scanned, filtered uint64
+	s.pageChunker(
+		ctx,
+		pageMetadata{bucket: "test-bucket", pageNumber: 1, page: page},
+		processingState{errorCount: &sync.Map{}, objectCount: &scanned, filteredCount: &filtered},
+		sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)},
+		NewCheckpointer(ctx, &s.Progress, false),
+	)
+
+	_, reported := s.GetUnitProgressFor("test-bucket")
+	assert.False(t, reported)
+	assert.EqualValues(t, 1, s.GetProgress().SectionsRemaining)
+	assert.Equal(t, "Bucket: test-bucket", s.GetProgress().Message)
+}
+
+func TestSource_SkipReason(t *testing.T) {
+	filter, err := newObjectFilter(nil, []string{"archive/"}, nil, nil)
+	require.NoError(t, err)
+	s := Source{maxObjectSize: 1024, objectFilter: filter}
+
+	key, filteredKey, imageKey := "keep/obj.txt", "archive/obj.txt", "keep/photo.jpg"
+	size, oversize, empty := int64(512), int64(2048), int64(0)
+
+	tests := []struct {
+		name string
+		obj  s3types.Object
+		want string
+	}{
+		{name: "standard object", obj: s3types.Object{Key: &key, Size: &size}, want: ""},
+		{name: "at the size limit", obj: s3types.Object{Key: &key, Size: &s.maxObjectSize}, want: ""},
+		{name: "over the size limit", obj: s3types.Object{Key: &key, Size: &oversize}, want: skipReasonSizeLimit},
+		{
+			name: "glacier",
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacier},
+			want: skipReasonStorageClass,
+		},
+		{
+			name: "glacier instant retrieval",
+			obj:  s3types.Object{Key: &key, Size: &size, StorageClass: s3types.ObjectStorageClassGlacierIr},
+			want: skipReasonStorageClass,
+		},
+		{name: "empty", obj: s3types.Object{Key: &key, Size: &empty}, want: skipReasonEmptyFile},
+		{name: "incompatible extension", obj: s3types.Object{Key: &imageKey, Size: &size}, want: skipReasonIncompatibleExtension},
+		{name: "filtered", obj: s3types.Object{Key: &filteredKey, Size: &size}, want: skipReasonObjectFilter},
+		// The filter is checked first, matching the reason the skipped objects metric has always recorded.
+		{name: "filtered and over the size limit", obj: s3types.Object{Key: &filteredKey, Size: &oversize}, want: skipReasonObjectFilter},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, s.skipReason(tt.obj))
+		})
+	}
+}
+
+// slowDownOnce answers the first GET of key with S3's throttling error, so the client retries it.
+type slowDownOnce struct {
+	next http.Handler
+	key  string
+	done atomic.Bool
+}
+
+func (h *slowDownOnce) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/"+h.key) && h.done.CompareAndSwap(false, true) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`<Error><Code>SlowDown</Code><Message>Please reduce your request rate.</Message></Error>`))
+		return
+	}
+	h.next.ServeHTTP(w, r)
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const testSecret = "TESTSECRET-do-not-log-1234567890"
+
+	// One object of each kind the source logs about: scanned, empty, excluded by the filter, and a directory.
+	fake := &fakeS3{buckets: map[string]fakeBucket{"bucket": {objects: map[string]string{
+		"config.txt":      "aws_secret = " + testSecret,
+		"empty.txt":       "",
+		"archive/old.txt": "aws_secret = " + testSecret,
+		"dir/":            "x",
+	}}}}
+
+	// run the source with both Chunks and ChunkUnit, draining chunks the way the engine does
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		ctx, logs := logtest.SourceContext(debug)
+		server := httptest.NewServer(&slowDownOnce{next: fake, key: "config.txt"})
+		t.Cleanup(server.Close)
+		conn, err := anypb.New(&sourcespb.S3{
+			Credential:      &sourcespb.S3_Unauthenticated{},
+			Endpoint:        server.URL,
+			Buckets:         []string{"bucket"},
+			ExcludePrefixes: []string{"archive/"},
+		})
+		require.NoError(t, err)
+
+		s := Source{}
+		require.NoError(t, s.Init(ctx, "test debug logging", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		chunksCh := make(chan *sources.Chunk, 64)
+		go func() {
+			for range chunksCh {
+			}
+		}()
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+
+		reporter := sourcestest.TestReporter{}
+		require.NoError(t, s.ChunkUnit(ctx, S3SourceUnit{Bucket: "bucket"}, &reporter))
+		require.Empty(t, reporter.ChunkErrs)
+		require.NotEmpty(t, reporter.Chunks)
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
 }

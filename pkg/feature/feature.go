@@ -13,6 +13,7 @@ var (
 	UserAgentSuffix                          AtomicString
 	UseSimplifiedGitlabEnumeration           atomic.Bool
 	UseGitMirror                             atomic.Bool
+	UseGitLowMemoryScan                      atomic.Bool
 	GitlabProjectsPerPage                    atomic.Int64
 	UseGithubGraphQLAPI                      atomic.Bool // use github graphql api to fetch issues, pr's and comments
 	HTMLDecoderEnabled                       atomic.Bool
@@ -50,7 +51,15 @@ var (
 	NewRelicMobileAppTokenDetectorEnabled    atomic.Bool
 	MSTeamsWebhookV2DetectorEnabled          atomic.Bool
 	SolarwindsDetectorEnabled                atomic.Bool
+	ResendDetectorEnabled                    atomic.Bool
+	ComposioDetectorEnabled                  atomic.Bool
 	WeightsAndBiasesV2DetectorEnabled        atomic.Bool
+	HumioAPITokenDetectorEnabled             atomic.Bool
+	EnableS3UnitProgress                     atomic.Bool // count each S3 bucket during a unit scan to report progress inside it
+	KongKonnectDetectorEnabled               atomic.Bool
+	SonarQubeDetectorEnabled                 atomic.Bool
+	InfisicalDetectorEnabled                 atomic.Bool
+	ServalDetectorEnabled                    atomic.Bool
 	DifyDatasetDetectorEnabled               atomic.Bool
 )
 

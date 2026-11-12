@@ -2,10 +2,10 @@ package cleantemp
 
 import (
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 

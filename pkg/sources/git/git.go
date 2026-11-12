@@ -6,12 +6,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -127,11 +127,12 @@ type Config struct {
 // NewGit creates a new Git instance with the provided configuration. The Git instance is used to interact with
 // Git repositories.
 func NewGit(config *Config) *Git {
-	var parser *gitparse.Parser
+	parserOpts := []gitparse.Option{}
 	if config.UseCustomContentWriter {
-		parser = gitparse.NewParser(gitparse.UseCustomContentWriter())
-	} else {
-		parser = gitparse.NewParser()
+		parserOpts = append(parserOpts, gitparse.UseCustomContentWriter())
+	}
+	if feature.UseGitLowMemoryScan.Load() {
+		parserOpts = append(parserOpts, gitparse.UseLowMemoryScan())
 	}
 
 	return &Git{
@@ -145,7 +146,7 @@ func NewGit(config *Config) *Git {
 		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
-		parser:             parser,
+		parser:             gitparse.NewParser(parserOpts...),
 	}
 }
 
@@ -260,6 +261,23 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		UseCustomContentWriter: s.useCustomContentWriter,
 	}
 	s.git = NewGit(cfg)
+
+	// log the config choices so support can see how the source was set up
+	// only counts and flags, never URLs or credentials
+	aCtx.Logger().V(1).Info("git source initialized",
+		"repo_count", len(conn.GetRepositories()),
+		"dir_count", len(conn.GetDirectories()),
+		"auth_type", fmt.Sprintf("%T", conn.GetCredential()),
+		"base", conn.GetBase(),
+		"head", conn.GetHead(),
+		"max_depth", conn.GetMaxDepth(),
+		"bare", conn.GetBare(),
+		"skip_binaries", conn.GetSkipBinaries(),
+		"skip_archives", conn.GetSkipArchives(),
+		"has_include_filter", conn.GetIncludePathsFile() != "",
+		"has_exclude_filter", conn.GetExcludePathsFile() != "",
+		"has_exclude_globs", conn.GetExcludeGlobs() != "",
+	)
 	return nil
 }
 
@@ -298,7 +316,7 @@ func (s *Source) scanRepos(ctx context.Context, reporter sources.ChunkReporter) 
 		}
 
 		if err := s.scanRepo(ctx, repoURI, reporter); err != nil {
-			ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
+			ctx.Logger().Error(err, "error scanning repository", "repo", repoURI)
 			continue
 		}
 	}
@@ -360,7 +378,7 @@ func (s *Source) scanDirs(ctx context.Context, reporter sources.ChunkReporter) e
 		}
 
 		if err := s.scanDir(ctx, gitDir, reporter); err != nil {
-			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+			ctx.Logger().Error(err, "error scanning repository", "repo", gitDir)
 			continue
 		}
 	}
@@ -371,6 +389,7 @@ func (s *Source) scanDirs(ctx context.Context, reporter sources.ChunkReporter) e
 func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.ChunkReporter) error {
 	if !s.scanOptions.Bare && strings.HasSuffix(gitDir, "git") {
 		// TODO: Figure out why we skip directories ending in "git".
+		ctx.Logger().V(4).Info("skipping directory", "path", gitDir, "reason", "non-bare directory name ends in git")
 		return nil
 	}
 
@@ -665,39 +684,43 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	gitArgs = append(gitArgs, cloneURL.String(), params.clonePath)
 	cloneCmd := exec.CommandContext(ctx, "git", gitArgs...)
 
-	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
+	// the parse error from stripPassword contains the raw URL, which can hold
+	// a password, so only log that stripping failed, not the error itself
+	safeURL, urlPassword, err := stripPassword(params.gitURL)
 	if err != nil {
-		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
+		ctx.Logger().V(4).Info("could not strip password from git url; repo field left empty")
 	}
-	logger := ctx.Logger().WithValues(
+	ctx = context.WithValues(ctx,
 		"subcommand", "git clone",
 		"repo", safeURL,
 		"path", params.clonePath,
 		"args", params.args,
 	)
 
-	logger.V(3).Info("executing git clone command")
+	ctx.Logger().V(2).Info("executing git clone command")
 	outputBytes, err := cloneCmd.CombinedOutput()
-	var output string
-	if secretForRedaction != "" {
-		output = strings.ReplaceAll(string(outputBytes), secretForRedaction, "<secret>")
-	} else {
-		output = string(outputBytes)
-	}
+
+	// hide passwords from the git output before it is logged or returned
+	// the password can be inside the url, or passed in separately and added
+	// to the url above when authInUrl is set
+	userInfoPassword, _ := params.userInfo.Password()
+	output := redactPasswords(string(outputBytes), urlPassword, userInfoPassword)
 
 	if err != nil {
 		err = fmt.Errorf("error executing git clone: %w, %s", err, output)
 	}
-	logger.V(3).Info("git subcommand finished", "output", output)
+	ctx.Logger().V(5).Info("git subcommand finished", "output", output, "duration", time.Since(start).String())
 
 	if common.IsDone(ctx) {
 		return nil, fmt.Errorf("git clone timed out (after %s)", time.Since(start))
 	} else if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	} else if cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(0).Info("git clone failed", "error", err)
 		failureReason := ClassifyCloneError(output)
 		exitCode := cloneCmd.ProcessState.ExitCode()
+		// the error is returned and logged by the caller; this line only adds
+		// how the failure was classified, which decides if it is retried
+		ctx.Logger().V(4).Info("git clone attempt failed", "failure_reason", failureReason, "exit_code", exitCode)
 		metricsInstance.RecordCloneOperation(statusFailure, failureReason, exitCode)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
@@ -706,11 +729,27 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	if err != nil {
 		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-	logger.V(1).Info("successfully cloned repo", "time_seconds", time.Since(start).Seconds())
+	ctx.Logger().V(2).Info("successfully cloned repo", "time_seconds", time.Since(start).Seconds())
 
 	metricsInstance.RecordCloneOperation(statusSuccess, cloneSuccess, 0)
 
 	return repo, nil
+}
+
+// redactPasswords replaces each password in output with "<secret>".
+// Git gets the password inside the clone URL, where Go percent-encodes it
+// (a "/" becomes "%2F"), so if git prints the URL we have to hide that form too.
+// The encoded form is built the same way Go builds the clone URL.
+func redactPasswords(output string, passwords ...string) string {
+	for _, password := range passwords {
+		if password == "" {
+			continue
+		}
+		encoded := strings.TrimPrefix(url.UserPassword("", password).String(), ":")
+		output = strings.ReplaceAll(output, password, "<secret>")
+		output = strings.ReplaceAll(output, encoded, "<secret>")
+	}
+	return output
 }
 
 // PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
@@ -855,6 +894,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = ctx
 	}
 
+	// The scan can stop before the diff channel is drained, on max depth or on
+	// reaching the base commit. Nothing else tells the parser that, so cancelling on
+	// the way out is what shuts down the git processes still producing diffs. Without
+	// it they sit blocked on a channel nobody is reading until the whole scan ends.
+	repoCtx, cancel := context.WithCancel(repoCtx)
+	defer cancel()
+
 	logger := repoCtx.Logger()
 	var logValues []any
 	if scanOptions.BaseHash != "" {
@@ -867,7 +913,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, isRepoBare(path))
+	// git computes the base..head range, so every commit on diffChan is in scope.
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash, scanOptions.ExcludeGlobs, isRepoBare(path))
 	if err != nil {
 		return err
 	}
@@ -875,7 +922,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return nil
 	}
 
-	logger.Info("scanning repo", logValues...)
+	logger.V(2).Info("scanning repo", logValues...)
 
 	var (
 		gitDir         = getGitDir(path)
@@ -885,16 +932,12 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	for diff := range diffChan {
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-			logger.V(1).Info("reached max depth", "depth", depth)
+			logger.V(4).Info("reached max depth, stopping scan", "depth", depth)
 			break
 		}
 
 		commit := diff.Commit
 		fullHash := commit.Hash
-		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
-			logger.V(1).Info("reached base commit", "commit", fullHash)
-			break
-		}
 
 		email := commit.Author
 		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
@@ -904,7 +947,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			s.metrics.RecordCommitScanned()
 			// Increment repo-specific commit counter
 			atomic.AddUint64(&s.repoCommitsScanned, 1)
-			logger.V(5).Info("scanning commit", "commit", fullHash)
+			logger.V(3).Info("scanning commit", "commit", fullHash)
 
 			// Scan the commit metadata.
 			// See https://github.com/trufflesecurity/trufflehog/issues/2683
@@ -943,6 +986,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 
 		if !scanOptions.Filter.Pass(fileName) {
+			logger.V(4).Info("skipping file", "commit", fullHash, "path", fileName, "reason", "excluded by path filter")
 			continue
 		}
 
@@ -951,9 +995,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			commitHash := plumbing.NewHash(fullHash)
 
 			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
-				logger.V(5).Info("skipping binary file",
+				logger.V(4).Info("skipping file",
 					"commit", commitHash.String()[:7],
-					"path", fileName)
+					"path", fileName,
+					"reason", "binary files are skipped")
 				continue
 			}
 
@@ -974,7 +1019,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				SourceVerify:   s.verify,
 			}
 
-			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
+			if err := HandleBinary(repoCtx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(
 					err,
 					"error handling binary file",
@@ -986,7 +1031,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 
 		if diff.Len() > sources.DefaultChunkSize+sources.DefaultPeekSize {
-			s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
+			s.gitChunk(repoCtx, diff, fileName, email, fullHash, when, remoteURL, reporter)
 			continue
 		}
 
@@ -1003,7 +1048,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			reader, err := d.ReadCloser()
 			if err != nil {
-				ctx.Logger().Error(
+				logger.Error(
 					err, "error creating reader for commits",
 					"commit", fullHash,
 					"path", fileName,
@@ -1035,6 +1080,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		if err := chunkData(diff); err != nil {
 			return err
 		}
+	}
+
+	// empty base..head range exits successfully
+	if scanOptions.BaseHash != "" && depth == 0 {
+		logger.Info("no commits in range", logValues...)
 	}
 	return nil
 }
@@ -1130,7 +1180,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		// stream while still recording that content was truncated. Genuine reader
 		// errors are still surfaced at ERROR.
 		if errors.Is(err, bufio.ErrTooLong) {
-			ctx.Logger().V(2).Info("skipping oversize diff line; remainder of file not scanned",
+			ctx.Logger().V(4).Info("skipping oversize diff line; remainder of file not scanned",
 				"filename", fileName, "commit", hash, "file", diff.PathB, "max_line_bytes", maxScanTokenSize)
 		} else {
 			ctx.Logger().Error(err, "error scanning chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
@@ -1188,7 +1238,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	logger.V(1).Info("scanning staged changes", logValues...)
+	logger.V(2).Info("scanning staged changes", logValues...)
 
 	var (
 		reachedBase    = false
@@ -1198,11 +1248,11 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	)
 	for diff := range diffChan {
 		fullHash := diff.Commit.Hash
-		logger := ctx.Logger().WithValues("commit", fullHash, "path", diff.PathB)
-		logger.V(2).Info("scanning staged changes from git")
+		logger := context.WithValues(ctx, "commit", fullHash, "path", diff.PathB).Logger()
+		logger.V(3).Info("scanning staged changes from git")
 
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-			logger.V(1).Info("reached max depth")
+			logger.V(4).Info("reached max depth, stopping scan", "depth", depth)
 			break
 		}
 
@@ -1219,11 +1269,12 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		}
 
 		if scanOptions.BaseHash != "" && fullHash == scanOptions.BaseHash {
-			logger.V(1).Info("reached base hash, finishing scanning files")
+			logger.V(4).Info("reached base hash, finishing scanning files")
 			reachedBase = true
 		}
 
 		if !scanOptions.Filter.Pass(diff.PathB) {
+			logger.V(4).Info("skipping file", "reason", "excluded by path filter")
 			continue
 		}
 
@@ -1240,9 +1291,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			commitHash := plumbing.NewHash(fullHash)
 
 			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
-				logger.V(5).Info("skipping binary file",
-					"commit", commitHash.String()[:7],
-					"path", fileName)
+				logger.V(4).Info("skipping file", "reason", "binary files are skipped")
 				continue
 			}
 
@@ -1313,10 +1362,21 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if scanOptions == nil {
 		scanOptions = NewScanOptions()
 	}
-	if err := normalizeConfig(scanOptions, repo); err != nil {
+	if err := normalizeConfig(ctx, scanOptions, repo, repoPath); err != nil {
 		return err
 	}
 	start := time.Now().Unix()
+
+	// The repoPath is usually a temp folder, so add the remote to the log fields once here
+	// and every line below (commits, staged changes, the summary) says which repo it is about.
+	// Other sources may have added it already, in which case we don't add it again.
+	if ctx.Value("repo") == nil {
+		repoName := GetSafeRemoteURL(repo, "origin")
+		if repoName == "" {
+			repoName = repoPath
+		}
+		ctx = context.WithValue(ctx, "repo", repoName)
+	}
 
 	// Reset the repo-specific commit counter
 	atomic.StoreUint64(&s.repoCommitsScanned, 0)
@@ -1329,28 +1389,15 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	// Skip staged scanning for mirror/bare clones
 	if !isRepoBare(repoPath) {
 		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter); err != nil {
-			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+			ctx.Logger().Error(err, "error scanning staged changes")
 		}
 	}
 
 	// Get the number of commits scanned in this repo
 	commitsScannedInRepo := atomic.LoadUint64(&s.repoCommitsScanned)
 
-	logger := ctx.Logger()
-	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp.
-	// To make this duration logging useful, we need to log the remote as well.
-	// Other sources may have included this info to the context, in which case we don't need to add it again.
-	if ctx.Value("repo") == nil {
-		remotes, _ := repo.Remotes()
-		repoURL := "Could not get remote for repo"
-		if len(remotes) != 0 {
-			repoURL = GetSafeRemoteURL(repo, remotes[0].Config().Name)
-		}
-		logger = logger.WithValues("repo", repoURL)
-	}
-
 	scanTime := time.Now().Unix() - start
-	logger.V(1).Info(
+	ctx.Logger().V(2).Info(
 		"scanning git repo complete",
 		"path", repoPath,
 		"time_seconds", scanTime,
@@ -1367,7 +1414,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 // other non-hash references. This ensures that both the base and head commits are resolved to actual commit hashes.
 // If either commit cannot be resolved, it returns early.
 // If both are resolved, it finds and sets the merge base in scanOptions.
-func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
+func normalizeConfig(ctx context.Context, scanOptions *ScanOptions, repo *git.Repository, repoPath string) error {
 	baseCommit, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
 	if err != nil {
 		return err
@@ -1382,16 +1429,50 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 		return nil
 	}
 
-	// If baseCommit is an ancestor of headCommit, update c.BaseRef to be the common ancestor.
-	mergeBase, err := headCommit.MergeBase(baseCommit)
+	// Use the same Git history and object database as the parser, including shallow grafts.
+	// Keep this environment in sync with gitparse.prepGitArgs.
+	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
+		return fmt.Errorf("unable to resolve repository path: %w", err)
+	}
+	gitDir := filepath.Join(absPath, gitDirName)
+	isBare := isRepoBare(repoPath)
+	if isBare {
+		gitDir = absPath
+	}
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "merge-base", headCommit.Hash.String(), baseCommit.Hash.String())
+	// Replace the process environment so GIT_DIR or GIT_TRACE cannot redirect or pollute this lookup.
+	cmd.Env = []string{"GIT_DIR=" + gitDir}
+	if isBare {
+		for _, key := range []string{"GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"} {
+			if value := os.Getenv(key); value != "" {
+				cmd.Env = append(cmd.Env, key+"="+value)
+			}
+		}
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitCode() == 1 && len(exitErr.Stderr) == 0 {
+				message := "unable to resolve merge base: no merge base found"
+				shallowCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "rev-parse", "--is-shallow-repository")
+				shallowCmd.Env = cmd.Env
+				if shallow, shallowErr := shallowCmd.Output(); shallowErr == nil && strings.TrimSpace(string(shallow)) == "true" {
+					message += " (repository is shallow; fetch more history)"
+				}
+				return errors.New(message)
+			}
+			return fmt.Errorf("unable to resolve merge base: %w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
 		return fmt.Errorf("unable to resolve merge base: %w", err)
 	}
-	if len(mergeBase) == 0 {
-		return fmt.Errorf("unable to resolve merge base: no merge base found")
+	mergeBase := strings.TrimSpace(string(out))
+	if mergeBase == "" {
+		return errors.New("unable to resolve merge base: no merge base found")
 	}
 
-	scanOptions.BaseHash = mergeBase[0].Hash.String()
+	scanOptions.BaseHash = mergeBase
 
 	return nil
 }
@@ -1513,14 +1594,18 @@ func prepareRepoSinceCommit(ctx context.Context, uriString, clonePath, commitHas
 		client = github.NewClient(tc)
 	}
 
-	commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
+	commit, _, err := client.Git.GetCommit(ctx, owner, repoName, commitHash)
 	if err != nil {
+		// the GitHub error can say why: not found, no access, or rate limited
+		ctx.Logger().V(4).Info("could not look up base commit on GitHub; cloning full history",
+			"commit", commitHash, "reason", err.Error())
 		return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 	}
 	var timestamp string
 	{
 		author := commit.GetAuthor()
 		if author == nil {
+			ctx.Logger().V(4).Info("base commit has no author date; cloning full history", "commit", commitHash)
 			return PrepareRepo(ctx, uriString, clonePath, trustLocalGitConfig, isBare)
 		}
 		timestamp = author.GetDate().Format(time.RFC3339)
@@ -1693,10 +1778,10 @@ func HandleBinary(
 	skipArchives bool,
 ) (err error) {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
-	fileCtx.Logger().V(5).Info("handling binary file")
+	fileCtx.Logger().V(3).Info("handling binary file")
 
 	if common.SkipFile(path) {
-		fileCtx.Logger().V(5).Info("file contains ignored extension")
+		fileCtx.Logger().V(4).Info("skipping file", "reason", "ignored file extension")
 		return nil
 	}
 
@@ -1744,14 +1829,14 @@ func HandleBinary(
 	defer func() {
 		n, copyErr := io.Copy(io.Discard, stdout)
 		if copyErr != nil {
-			ctx.Logger().Error(
+			fileCtx.Logger().Error(
 				copyErr,
 				"Failed to discard remaining stdout data after HandleFile completion",
 			)
 		}
 
 		if n > 0 {
-			ctx.Logger().V(3).Info(
+			fileCtx.Logger().V(5).Info(
 				"HandleFile did not consume all stdout data; excess discarded",
 				"bytes_discarded", n)
 		}

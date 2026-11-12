@@ -95,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := common.SaneHttpClient()
+			client := s.VerificationClient(common.SaneHttpClient())
 
 			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
 			s1.Verified = isVerified

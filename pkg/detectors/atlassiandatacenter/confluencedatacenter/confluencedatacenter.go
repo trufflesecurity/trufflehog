@@ -1,6 +1,7 @@
 package confluencedatacenter
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -52,10 +53,7 @@ func (s Scanner) Description() string {
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
