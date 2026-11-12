@@ -279,6 +279,7 @@ With `--clone-path` set, each repository still gets its own fresh subdirectory c
 - The comments timeframe is applied by GitHub. Issue and pull request bodies are scanned regardless of the timeframe.
 - Each listing is independent. If one fails, the others still run, everything read before the failure is still scanned, and the failure is reported as a scan error for that repository naming the listing, how many items it read, and where it stopped.
 - Gist comments can't be filtered or sorted by GitHub, so the timeframe is applied as they are read, and a gist whose comments GitHub stops paging through is reported as a scan error.
+- `--use-graphql` fetches issue and pull request comments through the GitHub GraphQL API instead of the REST listings above, which needs far fewer requests on large repositories. It needs a token; without one the scan logs a message and uses REST. With GraphQL the timeframe is applied as comments are read, a failed request stops the comment scan for that repository, and review comments left on deleted pull requests are not found.
 
 ### What Gets Scanned
 
