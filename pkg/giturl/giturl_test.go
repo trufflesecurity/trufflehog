@@ -297,6 +297,30 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "Leave a github issue link untouched",
+			args: args{
+				link:    "https://github.com/trufflesecurity/trufflehog/issues/1913#issue-1950209402",
+				newLine: int64(5),
+			},
+			want: "https://github.com/trufflesecurity/trufflehog/issues/1913#issue-1950209402",
+		},
+		{
+			name: "Leave a github pull request comment link untouched",
+			args: args{
+				link:    "https://github.com/trufflesecurity/trufflehog/pull/1914#issuecomment-1801234567",
+				newLine: int64(5),
+			},
+			want: "https://github.com/trufflesecurity/trufflehog/pull/1914#issuecomment-1801234567",
+		},
+		{
+			name: "Still add a line to a file inside a repository named issues",
+			args: args{
+				link:    "https://github.com/org/issues/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/main.go",
+				newLine: int64(7),
+			},
+			want: "https://github.com/org/issues/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/main.go#L7",
+		},
+		{
 			name: "Update Bitbucket Cloud link with line",
 			args: args{
 				link:    "https://bitbucket.org/org/repo/src/xyz123/main.go",
