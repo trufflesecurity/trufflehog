@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -50,6 +51,10 @@ func (s Scanner) Keywords() []string {
 
 const maxPrivateKeySize = 4096
 
+// crackLogMsg is the static message of the crack log line; its dynamic
+// fields carry the detail.
+const crackLogMsg = "private key crack attempt finished"
+
 // ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
 func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
@@ -79,13 +84,49 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
 		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
 			s1.ExtraData["encrypted"] = "true"
-			parsedKey, passphrase, err = Crack([]byte(token))
+			// Instrument the passphrase walk: the key's own header says how
+			// expensive each attempt is (the KDF round count is chosen by
+			// the key's author), which is the cost the engine-level metrics
+			// cannot attribute. The parse reads cleartext header fields
+			// only, never key material, and costs one PEM decode. Only the
+			// metadata above is logged - never key bytes, salt, candidate
+			// passphrases, or the cracked result.
+			meta := parseKeyMetadata([]byte(token))
+			crackStart := time.Now()
+			res, err := crack(ctx, []byte(token))
+			crackElapsed := time.Since(crackStart)
+			crackDuration.WithLabelValues(meta.format, meta.kdfRoundsLabel()).Observe(crackElapsed.Seconds())
+			outcome := crackOutcome(err)
+			logFields := []any{
+				"format", meta.format,
+				"cipher", meta.cipher,
+				"kdf", meta.kdf,
+				"kdf_rounds", meta.kdfRoundsLabel(),
+				"attempts", res.attempts,
+				"outcome", outcome,
+				"duration", crackElapsed.String(),
+			}
+			if outcome == crackOutcomeFailed {
+				// The uncrackable and aborted paths carry no extra
+				// information here; a failed attempt's error text can
+				// embed input-derived material, so the log carries the
+				// fixed classifier and the full error rides the finding's
+				// verification error.
+				logFields = append(logFields, "error", crackFailedErrorField)
+			}
+			logContext.AddLogger(ctx).Logger().WithName("privatekey").V(2).Info(crackLogMsg, logFields...)
+			parsedKey = res.key
+			passphrase = res.passphrase
 			if err != nil {
 				// The key is encrypted and the passphrase could not be
 				// recovered from the wordlist. It still represents a real
 				// exposure (offline-crackable, weak/legacy KDFs, passphrase
 				// often reused or committed nearby), so surface it as an
 				// unverified finding instead of dropping it silently.
+				// An aborted walk's finding carries the context error like
+				// any other detector's canceled verification, and the
+				// notifier's unknown-results rule governs whether it is
+				// reported.
 				s1.SetVerificationError(err, token)
 				results = append(results, s1)
 				continue
