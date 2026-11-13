@@ -88,6 +88,12 @@ jobs:
   test-community:
     if: ${{ github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
+    # Same package split as the test job; keep the package filter in sync with
+    # the Makefile's test-community target.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     permissions:
       actions: "read"
       contents: "read"
@@ -99,4 +105,10 @@ jobs:
         with:
           go-version: "1.27"
       - name: Test
-        run: make test-community
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ strategy.job-index }}
+          SHARD_TOTAL: ${{ strategy.job-total }}
+        run: |
+          pkgs=$(go list ./... | grep -v /vendor/ | grep -v pkg/sources | grep -v pkg/analyzer/analyzers | awk -v i="$SHARD_INDEX" -v n="$SHARD_TOTAL" 'NR % n == i')
+          CGO_ENABLED=0 go test -count=1 -timeout=5m $pkgs
