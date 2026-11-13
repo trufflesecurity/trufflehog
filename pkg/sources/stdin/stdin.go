@@ -1,9 +1,13 @@
 package stdin
 
 import (
+	stdctx "context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
+	"time"
 
-	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -20,7 +24,6 @@ type Source struct {
 	sourceId sources.SourceID
 	jobId    sources.JobID
 	verify   bool
-	log      logr.Logger
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -46,12 +49,25 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	s.jobId = jobId
 	s.sourceId = sourceId
 	s.verify = verify
-	s.log = aCtx.Logger()
+	aCtx.Logger().V(1).Info("Stdin source initialized", "verify", verify)
 	return nil
 }
 
+// byteCounter counts the bytes read through it, so the scan can log how much input
+// came in. It never looks at the data.
+type byteCounter struct {
+	r io.Reader
+	n int64
+}
+
+func (b *byteCounter) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	b.n += int64(n)
+	return n, err
+}
+
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	stdin := os.Stdin
+	stdin := &byteCounter{r: os.Stdin}
 	chunkSkel := &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
@@ -64,7 +80,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	ctx.Logger().Info("scanning stdin for secrets")
-	return handlers.HandleFile(ctx, stdin, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	start := time.Now()
+	err := handlers.HandleFile(ctx, stdin, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	ctx.Logger().V(1).Info("Finished scanning stdin", "bytes_read", stdin.n, "duration", time.Since(start))
+	// HandleFile bounds the whole input by --archive-timeout. A deadline while the scan
+	// itself is still running means that limit was hit, so say how to raise it.
+	if errors.Is(err, stdctx.DeadlineExceeded) && ctx.Err() == nil {
+		return fmt.Errorf("stdin input was not fully scanned: it took longer than the --archive-timeout limit "+
+			"(default 60s), raise it with --archive-timeout: %w", err)
+	}
+	return err
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
@@ -74,9 +99,10 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	ch := make(chan *sources.Chunk)
+	var chunksErr error
 	go func() {
 		defer close(ch)
-		_ = s.Chunks(ctx, ch)
+		chunksErr = s.Chunks(ctx, ch)
 	}()
 	for chunk := range ch {
 		if chunk != nil {
@@ -84,6 +110,12 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 				return err
 			}
 		}
+	}
+	// ch is closed only after Chunks returns, so chunksErr is set by now. It is
+	// reported as a scan error, not returned, so it fails the run only with
+	// --fail-on-scan-errors, like a failed unit in other sources.
+	if chunksErr != nil {
+		return reporter.ChunkErr(ctx, chunksErr)
 	}
 	return nil
 }
