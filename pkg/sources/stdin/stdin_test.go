@@ -1,15 +1,18 @@
 package stdin
 
 import (
+	stdctx "context"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -69,8 +72,21 @@ func TestSource_DebugLogging(t *testing.T) {
 	})
 }
 
-// ChunkUnit returns the error from reading stdin instead of dropping it.
-func TestSource_ChunkUnitReturnsReadError(t *testing.T) {
+// errReporter records chunk errors, like the source manager does.
+type errReporter struct {
+	errs []error
+}
+
+func (r *errReporter) ChunkOk(context.Context, sources.Chunk) error { return nil }
+
+func (r *errReporter) ChunkErr(_ context.Context, err error) error {
+	r.errs = append(r.errs, err)
+	return nil
+}
+
+// ChunkUnit reports the error from reading stdin as a scan error instead of dropping
+// it or failing the whole run.
+func TestSource_ChunkUnitReportsReadError(t *testing.T) {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	require.NoError(t, w.Close())
@@ -80,6 +96,31 @@ func TestSource_ChunkUnitReturnsReadError(t *testing.T) {
 	ctx := context.Background()
 	s := new(Source)
 	require.NoError(t, s.Init(ctx, "test source", 1, 1, false, nil, 1))
-	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: "<stdin>"}, sources.ChanReporter{Ch: make(chan *sources.Chunk, 1)})
-	assert.Error(t, err)
+	reporter := &errReporter{}
+	require.NoError(t, s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: "<stdin>"}, reporter))
+	assert.Len(t, reporter.errs, 1)
+}
+
+// Input that is still open when --archive-timeout runs out is reported with a hint
+// about the flag.
+func TestSource_ChunkUnitReportsArchiveTimeout(t *testing.T) {
+	handlers.SetArchiveMaxTimeout(100 * time.Millisecond)
+	t.Cleanup(func() { handlers.SetArchiveMaxTimeout(60 * time.Second) })
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = w.Close(); _ = r.Close() })
+	// Enough data for the type check, then the pipe stays open like a stream.
+	_, err = w.WriteString(strings.Repeat("line of log output\n", 1000))
+	require.NoError(t, err)
+	setStdin(t, r)
+
+	ctx := context.Background()
+	s := new(Source)
+	require.NoError(t, s.Init(ctx, "test source", 1, 1, false, nil, 1))
+	reporter := &errReporter{}
+	require.NoError(t, s.ChunkUnit(ctx, sources.CommonSourceUnit{ID: "<stdin>"}, reporter))
+	require.Len(t, reporter.errs, 1)
+	assert.ErrorIs(t, reporter.errs[0], stdctx.DeadlineExceeded)
+	assert.Contains(t, reporter.errs[0].Error(), "--archive-timeout")
 }

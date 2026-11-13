@@ -63,6 +63,8 @@ Results from this source do not include a file name, line number, or link. The s
 
 The time limit set with `--archive-timeout` is 60 seconds by default. It is applied to the whole time TruffleHog spends processing the piped input, not only to unpacking archives. If your input takes longer than that to read and process, raise it with `--archive-timeout`.
 
+When the limit is hit, input not scanned by then is dropped, and the scan reports the error `stdin input was not fully scanned: it took longer than the --archive-timeout limit`. Like other scan errors, it only makes TruffleHog exit with a non-zero code when `--fail-on-scan-errors` is set. This matters for streams that never end on their own, like `docker logs -f` or `tail -f`.
+
 ## Usage Examples
 
 ### Scanning the Output of a Command
@@ -97,7 +99,7 @@ With debug on for this source, the scan logs:
 - `V(1)`: `Stdin source initialized` with whether verification is on, and `Finished scanning stdin` with `bytes_read` and its `duration`. A `bytes_read` of 0 means nothing was piped in.
 - `V(5)`: `empty reader, skipping file` when the input is empty, and `skipping archive file` when an archive is piped in with `--force-skip-archives`.
 
-A failure to read or process the input is returned as an error and stops the scan.
+A failure to read or process the input, including hitting the `--archive-timeout` limit, is reported as a scan error in `encountered errors during scan`.
 
 ## Troubleshooting
 
@@ -118,5 +120,5 @@ A failure to read or process the input is returned as an error and stops the sca
 
 ---
 
-**Issue**: A long running stream stops being scanned partway through
-**Solution**: Check the time limit. It defaults to 60 seconds and can be raised with `--archive-timeout`.
+**Issue**: `stdin input was not fully scanned: it took longer than the --archive-timeout limit`
+**Solution**: The input was still being read when the time limit ran out. It defaults to 60 seconds and can be raised with `--archive-timeout`.

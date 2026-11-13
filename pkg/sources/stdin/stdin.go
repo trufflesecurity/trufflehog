@@ -1,6 +1,9 @@
 package stdin
 
 import (
+	stdctx "context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -80,6 +83,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	start := time.Now()
 	err := handlers.HandleFile(ctx, stdin, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 	ctx.Logger().V(1).Info("Finished scanning stdin", "bytes_read", stdin.n, "duration", time.Since(start))
+	// HandleFile bounds the whole input by --archive-timeout. A deadline while the scan
+	// itself is still running means that limit was hit, so say how to raise it.
+	if errors.Is(err, stdctx.DeadlineExceeded) && ctx.Err() == nil {
+		return fmt.Errorf("stdin input was not fully scanned: it took longer than the --archive-timeout limit "+
+			"(default 60s), raise it with --archive-timeout: %w", err)
+	}
 	return err
 }
 
@@ -102,6 +111,11 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			}
 		}
 	}
-	// ch is closed only after Chunks returns, so chunksErr is set by now.
-	return chunksErr
+	// ch is closed only after Chunks returns, so chunksErr is set by now. It is
+	// reported as a scan error, not returned, so it fails the run only with
+	// --fail-on-scan-errors, like a failed unit in other sources.
+	if chunksErr != nil {
+		return reporter.ChunkErr(ctx, chunksErr)
+	}
+	return nil
 }
