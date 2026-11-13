@@ -24,7 +24,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(ey[a-zA-Z0-9]{73}.ey[a-zA-Z0-9]{365}.[a-zA-Z0-9_-]{683})\b`)
+	keyPat = regexp.MustCompile(`\b(ey[a-zA-Z0-9]{73}\.ey[a-zA-Z0-9]{365}\.[a-zA-Z0-9_-]{683})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"graph"}) + `\b([a-z0-9]{25})\b`)
 )
 

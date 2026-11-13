@@ -24,7 +24,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(ey[a-zA-Z0-9-._]{153}.ey[a-zA-Z0-9-._]{916,1000})\b`)
+	keyPat = regexp.MustCompile(`\b(ey[a-zA-Z0-9-._]{153}\.ey[a-zA-Z0-9-._]{916,1000})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
