@@ -2,12 +2,17 @@ package digitaloceanv2
 
 import (
 	"context"
+	"errors"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
 var (
@@ -93,6 +98,93 @@ func TestDigitalOceanV2_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func TestDigitalOceanV2_AccessTokenVerification(t *testing.T) {
+	tests := []struct {
+		name                  string
+		token                 string
+		status                int
+		body                  string
+		requestErr            error
+		skipVerification      bool
+		wantVerified          bool
+		wantVerificationError bool
+	}{
+		{
+			name: "model access key", token: secrets[0], status: http.StatusOK,
+			body:         `{"resource_owner_id":123,"scopes":["inference:query"],"expires_in_seconds":null,"application":{"uid":"test-app"},"created_at":1700000000}`,
+			wantVerified: true,
+		},
+		{
+			name: "personal access token", token: secrets[1], status: http.StatusOK,
+			body:         `{"resource_owner_id":123,"scopes":["read"],"expires_in_seconds":7776000,"application":{"uid":"test-app"},"created_at":1700000000}`,
+			wantVerified: true,
+		},
+		{name: "success without metadata", token: secrets[0], status: http.StatusOK, wantVerified: true},
+		{name: "invalid OAuth token", token: secrets[0], status: http.StatusBadRequest, body: `{"error":"invalid_request"}`},
+		{name: "invalid personal access token", token: secrets[1], status: http.StatusBadRequest, body: `{"error":"invalid_request"}`},
+		{name: "unauthorized", token: secrets[0], status: http.StatusUnauthorized},
+		{name: "forbidden", token: secrets[1], status: http.StatusForbidden, wantVerificationError: true},
+		{name: "rate limited", token: secrets[0], status: http.StatusTooManyRequests, wantVerificationError: true},
+		{name: "server error", token: secrets[1], status: http.StatusInternalServerError, wantVerificationError: true},
+		{name: "network error", token: secrets[0], requestErr: errors.New("network unavailable"), wantVerificationError: true},
+		{name: "verification disabled", token: secrets[0], skipVerification: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requests := 0
+			s := Scanner{client: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				requests++
+				if req.Method != http.MethodGet || req.URL.String() != "https://cloud.digitalocean.com/v1/oauth/token/info" {
+					t.Errorf("unexpected verification request: %s %s", req.Method, req.URL)
+				}
+				if got := req.Header.Get("Authorization"); got != "Bearer "+tt.token {
+					t.Error("unexpected authorization header")
+				}
+				if tt.requestErr != nil {
+					return nil, tt.requestErr
+				}
+				return &http.Response{StatusCode: tt.status, Body: io.NopCloser(strings.NewReader(tt.body)), Header: make(http.Header)}, nil
+			})}}
+
+			results, err := s.FromData(context.Background(), !tt.skipVerification, []byte(tt.token))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantRequests := 1
+			if tt.skipVerification {
+				wantRequests = 0
+			}
+			if requests != wantRequests {
+				t.Errorf("expected %d verification requests, got %d", wantRequests, requests)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected one result, got %d", len(results))
+			}
+			result := results[0]
+			if result.Verified != tt.wantVerified {
+				t.Errorf("Verified = %v, want %v", result.Verified, tt.wantVerified)
+			}
+			if (result.VerificationError() != nil) != tt.wantVerificationError {
+				t.Errorf("unexpected verification error: %v", result.VerificationError())
+			}
+			if result.ExtraData != nil {
+				t.Errorf("expected no extra data, got %v", result.ExtraData)
+			}
+			if result.DetectorType != detector_typepb.DetectorType_DigitalOceanV2 || string(result.Raw) != tt.token {
+				t.Error("unexpected detector type or raw token")
+			}
+			if diff := cmp.Diff(map[string]string{"key": tt.token}, result.SecretParts); diff != "" {
+				t.Errorf("SecretParts diff (-want +got):\n%s", diff)
 			}
 		})
 	}
