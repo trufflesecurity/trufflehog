@@ -65,6 +65,16 @@ func TestRemoveItem(t *testing.T) {
 			Modifier: []string{"d"},
 			Expected: []string{"a", "b", "c"},
 		},
+		"repeatedItem": {
+			Slice:    []string{"a", "b", "a"},
+			Modifier: []string{"a"},
+			Expected: []string{"b"},
+		},
+		"repeatedItemOnly": {
+			Slice:    []string{"a", "a"},
+			Modifier: []string{"a"},
+			Expected: []string{},
+		},
 	}
 
 	for name, test := range tests {
