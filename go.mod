@@ -114,7 +114,7 @@ require (
 	golang.org/x/text v0.44.0
 	golang.org/x/time v0.14.0
 	google.golang.org/api v0.264.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
