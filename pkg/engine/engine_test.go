@@ -1572,6 +1572,49 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 	}
 }
 
+// positionalCleaner mimics aws.CleanResults: it keeps the first unverified result per Redacted and returns the
+// survivors in map order.
+type positionalCleaner struct{ customCleaner }
+
+func (positionalCleaner) CleanResults(results []detectors.Result, _ bool) []detectors.Result {
+	byID := make(map[string]detectors.Result, len(results))
+	for _, r := range results {
+		if _, ok := byID[r.Redacted]; !ok {
+			byID[r.Redacted] = r
+		}
+	}
+	out := make([]detectors.Result, 0, len(byID))
+	for _, r := range byID {
+		out = append(out, r)
+	}
+	return out
+}
+
+func TestFilterResults_CustomCleanerIsDeterministic(t *testing.T) {
+	candidates := []detectors.Result{
+		{Redacted: "id-c", RawV2: []byte("id-c:secret")},
+		{Redacted: "id-a", RawV2: []byte("id-a:secret-2")},
+		{Redacted: "id-a", RawV2: []byte("id-a:secret-1")},
+		{Redacted: "id-b", RawV2: []byte("id-b:secret")},
+	}
+	want := []string{"id-a:secret-1", "id-b:secret", "id-c:secret"}
+	match := ahocorasick.DetectorMatch{Detector: positionalCleaner{customCleaner{ignoreConfig: true}}}
+	engine := Engine{retainFalsePositives: true, verify: true}
+
+	for i := 0; i < 50; i++ {
+		shuffled := make([]detectors.Result, len(candidates))
+		copy(shuffled, candidates)
+		rand.Shuffle(len(shuffled), func(a, b int) { shuffled[a], shuffled[b] = shuffled[b], shuffled[a] })
+
+		cleaned := engine.filterResults(context.Background(), "detect", &match, shuffled)
+
+		require.Len(t, cleaned, len(want), "iteration %d", i)
+		for j := range want {
+			assert.Equal(t, want[j], string(cleaned[j].RawV2), "iteration %d, position %d", i, j)
+		}
+	}
+}
+
 func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 	allDetectors := defaults.DefaultDetectors()
 	ac := ahocorasick.NewAhoCorasickCore(allDetectors)
@@ -2609,6 +2652,93 @@ func TestNotifierWorker_ReverifiedResultsBypassDedupe(t *testing.T) {
 			assert.Equal(t, tt.wantDispatch, len(disp.results))
 		})
 	}
+}
+
+func TestDedupeKey_FieldBoundariesAreUnambiguous(t *testing.T) {
+	base := detectors.ResultWithMetadata{
+		SourceMetadata: &source_metadatapb.MetaData{},
+		Result:         detectors.Result{DetectorType: detector_typepb.DetectorType(-1)},
+	}
+	with := func(mutate func(*detectors.ResultWithMetadata)) detectors.ResultWithMetadata {
+		r := base
+		mutate(&r)
+		return r
+	}
+
+	same := with(func(r *detectors.ResultWithMetadata) { r.Raw = []byte("a") })
+	assert.Equal(t, dedupeKey(same), dedupeKey(with(func(r *detectors.ResultWithMetadata) { r.Raw = []byte("a") })),
+		"identical results must share a key")
+
+	cases := []struct {
+		name string
+		a, b detectors.ResultWithMetadata
+	}{
+		{
+			name: "job id runs into detector name",
+			a:    with(func(r *detectors.ResultWithMetadata) { r.JobID = 1; r.DetectorName = "2x" }),
+			b:    with(func(r *detectors.ResultWithMetadata) { r.JobID = 12; r.DetectorName = "x" }),
+		},
+		{
+			name: "NUL inside raw versus field boundary",
+			a:    with(func(r *detectors.ResultWithMetadata) { r.Raw = []byte("a\x00b"); r.RawV2 = []byte("c") }),
+			b:    with(func(r *detectors.ResultWithMetadata) { r.Raw = []byte("a"); r.RawV2 = []byte("b\x00c") }),
+		},
+		{
+			name: "raw runs into rawv2",
+			a:    with(func(r *detectors.ResultWithMetadata) { r.Raw = []byte("ab"); r.RawV2 = []byte("c") }),
+			b:    with(func(r *detectors.ResultWithMetadata) { r.Raw = []byte("a"); r.RawV2 = []byte("bc") }),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.NotEqual(t, dedupeKey(tc.a), dedupeKey(tc.b))
+		})
+	}
+}
+
+func TestNotifierWorker_DedupeIsScopedToJob(t *testing.T) {
+	cache, err := lru.New[string, struct{}](16)
+	require.NoError(t, err)
+
+	disp := &captureDispatcher{}
+	e := &Engine{
+		results:                 make(chan detectors.ResultWithMetadata, 4),
+		dedupeCache:             cache,
+		dispatcher:              disp,
+		notifyVerifiedResults:   true,
+		notifyUnverifiedResults: true,
+		notifyUnknownResults:    true,
+		dedupeCacheSize:         5000,
+	}
+
+	result := detectors.ResultWithMetadata{
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Git{
+				Git: &source_metadatapb.Git{Line: 1},
+			},
+		},
+		SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+		Result: detectors.Result{
+			DetectorType: detector_typepb.DetectorType(-1),
+			Raw:          []byte("a-secret"),
+			Verified:     true,
+		},
+	}
+
+	// The same document scanned by two jobs; each job reports it once.
+	result.JobID = 1
+	e.results <- result
+	e.results <- result
+	result.JobID = 2
+	e.results <- result
+	e.results <- result
+	close(e.results)
+
+	e.notifierWorker(context.Background())
+
+	require.Len(t, disp.results, 2)
+	assert.Equal(t, sources.JobID(1), disp.results[0].JobID)
+	assert.Equal(t, sources.JobID(2), disp.results[1].JobID)
 }
 
 // TestNotifierWorker_ConcurrentDuplicatesDispatchedOnce verifies that when many

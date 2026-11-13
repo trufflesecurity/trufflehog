@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
@@ -701,4 +702,65 @@ func BenchmarkLowerBuf(b *testing.B) {
 			_ = appendASCIILower(make([]byte, 0, len(data)), data)
 		}
 	})
+}
+
+// testDetectorSharedKeyword lets one chunk match several detector types.
+type testDetectorSharedKeyword struct{ typ detector_typepb.DetectorType }
+
+func (testDetectorSharedKeyword) FromData(context.Context, bool, []byte) ([]detectors.Result, error) {
+	return nil, nil
+}
+func (testDetectorSharedKeyword) Keywords() []string                   { return []string{"shared"} }
+func (d testDetectorSharedKeyword) Type() detector_typepb.DetectorType { return d.typ }
+func (testDetectorSharedKeyword) Description() string                  { return "" }
+
+func TestFindDetectorMatches_OrderIsDeterministic(t *testing.T) {
+	customZeta, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name: "zeta", Keywords: []string{"shared"}, Regex: map[string]string{"": ""},
+	})
+	assert.Nil(t, err)
+	customAlpha, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name: "alpha", Keywords: []string{"shared"}, Regex: map[string]string{"": ""},
+	})
+	assert.Nil(t, err)
+	// An unnamed custom detector must sort deterministically alongside named ones.
+	customUnnamed, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Keywords: []string{"shared"}, Regex: map[string]string{"": ""},
+	})
+	assert.Nil(t, err)
+
+	dets := []detectors.Detector{
+		testDetectorSharedKeyword{detector_typepb.DetectorType_Snowflake},
+		testDetectorSharedKeyword{detector_typepb.DetectorType_Slack},
+		testDetectorSharedKeyword{detector_typepb.DetectorType_AWS},
+		testDetectorV1{},
+		testDetectorV2{},
+		testDetectorSharedKeyword{detector_typepb.DetectorType_Github},
+		customZeta,
+		customAlpha,
+		customUnnamed,
+	}
+	core := NewAhoCorasickCore(dets)
+	data := []byte("shared a b")
+
+	// Expected order written out by hand so the test does not use compare as its own oracle.
+	want := []DetectorKey{
+		{detectorType: -1, version: 1}, // testDetectorV1
+		{detectorType: -1, version: 2}, // testDetectorV2
+		{detectorType: detector_typepb.DetectorType_AWS},
+		{detectorType: detector_typepb.DetectorType_Github},
+		{detectorType: detector_typepb.DetectorType_Slack},
+		{detectorType: detector_typepb.DetectorType_CustomRegex, customDetectorName: ""},
+		{detectorType: detector_typepb.DetectorType_CustomRegex, customDetectorName: "alpha"},
+		{detectorType: detector_typepb.DetectorType_CustomRegex, customDetectorName: "zeta"},
+		{detectorType: detector_typepb.DetectorType_Snowflake},
+	}
+
+	for i := 0; i < 200; i++ {
+		var got []DetectorKey
+		for _, m := range core.FindDetectorMatches(data) {
+			got = append(got, m.Key)
+		}
+		require.Equal(t, want, got, "iteration %d returned a different detector order", i)
+	}
 }
