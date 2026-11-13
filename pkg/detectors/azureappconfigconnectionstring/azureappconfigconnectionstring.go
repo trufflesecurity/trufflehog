@@ -27,7 +27,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient       = common.SaneHttpClient()
-	connectionStringPat = regexp.MustCompile(`Endpoint=(https:\/\/[a-zA-Z0-9-]+\.azconfig\.io);Id=([a-zA-Z0-9+\/=]+);Secret=([a-zA-Z0-9+\/=]+)`)
+	connectionStringPat = regexp.MustCompile(`Endpoint=(https:\/\/[a-zA-Z0-9-]+\.azconfig\.io);Id=([a-zA-Z0-9+\/=:-]+);Secret=([a-zA-Z0-9+\/=]+)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
