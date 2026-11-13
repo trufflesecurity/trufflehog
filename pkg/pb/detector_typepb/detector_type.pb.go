@@ -786,7 +786,7 @@ const (
 	DetectorType_NiceHash                 DetectorType = 738 // Not yet implemented
 	DetectorType_CexIO                    DetectorType = 739
 	DetectorType_Klipfolio                DetectorType = 740
-	DetectorType_Dynatrace                DetectorType = 741 // Not yet implemented
+	DetectorType_Dynatrace                DetectorType = 741
 	DetectorType_MollieAPIKey             DetectorType = 742 // Not yet implemented
 	DetectorType_MollieAccessToken        DetectorType = 743 // Not yet implemented
 	DetectorType_BasisTheory              DetectorType = 744 // Not yet implemented
