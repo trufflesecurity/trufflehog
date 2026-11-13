@@ -79,7 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
 		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
 			s1.ExtraData["encrypted"] = "true"
-			parsedKey, passphrase, err = Crack([]byte(token))
+			parsedKey, passphrase, err = Crack(ctx, []byte(token))
 			if err != nil {
 				// The key is encrypted and the passphrase could not be
 				// recovered from the wordlist. It still represents a real

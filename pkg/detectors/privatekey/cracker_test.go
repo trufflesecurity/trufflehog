@@ -4,7 +4,9 @@
 package privatekey
 
 import (
+	"context"
 	_ "embed"
+	"errors"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
@@ -70,7 +72,7 @@ func Test_crack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, passphrase, err := Crack(tt.in)
+			_, passphrase, err := Crack(context.Background(), tt.in)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("crack() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -80,6 +82,22 @@ func Test_crack(t *testing.T) {
 				t.Errorf("crack() passphrase = %v, want %v", passphrase, string(testEncryptedKeyCorrectPassword))
 			}
 		})
+	}
+}
+
+// Test_crack_stops_when_context_done asserts that a done context stops the
+// passphrase list instead of running it to completion: a wrong passphrase
+// costs a full KDF run, so the list walk must check between attempts.
+func Test_crack_stops_when_context_done(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, err := Crack(ctx, testEncryptedKey)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+	if errors.Is(err, ErrUncrackable) {
+		t.Error("expected the done context to stop the passphrase list, not run it to completion")
 	}
 }
 
@@ -97,6 +115,6 @@ func BenchmarkParseRightPassword(b *testing.B) {
 
 func BenchmarkCracker(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		Crack(testEncryptedKey)
+		Crack(context.Background(), testEncryptedKey)
 	}
 }
