@@ -28,11 +28,13 @@ var (
 
 // maxCrackRounds caps the bcrypt KDF round count this detector will attempt
 // to crack. The round count is chosen by whoever created the key and the KDF
-// cost is linear in rounds; OpenSSH's default is 16. A key hardened beyond
-// this cap is reported as an unverified finding instead of spending the
-// detector's whole time budget attempting to crack it. x/crypto refuses round
-// counts above 2048 on its own, so this lower cap is what keeps
-// hardened-but-legal keys from burning the timeout window.
+// cost is linear in rounds; OpenSSH's default is 16. 256 is 16x that default:
+// a single wrong guess on a key at the cap costs on the order of a second of
+// CPU, so a wordlist crack is hopeless within any bounded budget. x/crypto
+// refuses round counts above 2048 on its own; this lower cap keeps
+// hardened-but-legal keys from making each attempt that expensive. Division
+// of labor: the cap bounds what one attempt can cost, and the context check
+// below bounds the total, where the caller sets a deadline at all.
 const maxCrackRounds = 256
 
 func Crack(ctx context.Context, in []byte) (any, string, error) {

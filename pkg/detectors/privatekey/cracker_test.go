@@ -1,11 +1,16 @@
 //go:build detectors
 // +build detectors
 
+// The tests in this file run only with -tags=detectors (make test-detectors);
+// the default go test build excludes the whole file.
+
 package privatekey
 
 import (
 	"context"
 	_ "embed"
+	"encoding/binary"
+	"encoding/pem"
 	"errors"
 	"testing"
 
@@ -59,7 +64,7 @@ Hx7UPVlTK8dyvk1Z+Yw0nrfNClI=
 	// with the same passphrase as testEncryptedKeyCorrectPassword at bcrypt
 	// round counts of 16 (OpenSSH's default) and 300, generated with
 	// ssh-keygen -a.
-	testDefaultKDFKey   = []byte(Normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
+	testDefaultKDFKey = []byte(Normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDGWhRIOR
 LWaktgbL8r3S5jAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIHqefEc52RY6n1ej
 6vEPvbPvprG0m5OT5BAFtdFLdyJQAAAAwFsqIS4QNeZJOQTxTDpQBXYvb3bI+PXmTHlaak
@@ -76,6 +81,28 @@ VGMvU81m8gj78dNmjB8U+J3Ns6jmKXNicnwGHHZ9BVCimlnsiGgpp44ZhxSAYqNJV+CoUY
 FphHKrN68miEiSWFRuZsKB2Xjz3B3a+ApdCrgK9/+0k1finNMzOEpTdmSvkQTP/fLeiqoC
 m/aSusJwO1NAZDcuyty6pMCKygw6ENqGZf1uyMf+KQwJq3JXwgbRAprb3tBrIEAEEkD4mA
 ppGpPzMyWA==
+-----END OPENSSH PRIVATE KEY-----`))
+
+	// testKeyAtCap and testKeyPastCap are ed25519 keys with the same
+	// passphrase at bcrypt round counts of exactly 256 (maxCrackRounds) and
+	// 257 (one past it), generated with ssh-keygen -a.
+	testKeyAtCap = []byte(Normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDLe9Hn5/
+Qgs+VcI7Z2oHt0AAABAAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIJ14+tRTYMsqi2CF
+AEETEztjC3N8MwGDhDtcJ9ER4f6pAAAAwPwxz4us6d80EoZeKaAGdqhdK5g1yOLuTFiemC
+ECwotCzi2W+lk7m9tHgyvbKUyg+dldDP5dlnwberSmmy+OMrJkVVw2PeX5yr6lCcuHZXHq
+Eqoo7oSlsmlaBpIC/I12JkGQxg6Pv13iIhIyPigUWA3myzAoAc+0Wtluta/qAK+nf5B6ar
+f57dBJ3uVeU8E3U/UDiJhwVdJnCslkGGWgM65ECvcFZu65DNhoVnFWtsBe2Uom48hG46Cf
+3NkF0FXQpA==
+-----END OPENSSH PRIVATE KEY-----`))
+	testKeyPastCap = []byte(Normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABANsc+iFh
+yaFTnsMn8tAEn4AAABAQAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAINIGnk11f1Mup1Bh
+oMiwh/wisUHuDWOygxhq0PSz+HTSAAAAwOcoRpUbj4YGrNVTvE6Ve5913vgQkAZ8pCBHgk
+AMjTSVXykiRgK2/7t8k7gPmb1F7QUaiLS0W5X49QeuwYQVihmCSKlupZTWmqozipWlkXSG
+ACFqnWvE0jURRZd76qBwrtFfyZb24V6LVws/nz0RARXYG+tn8KW3xsjqhvpfLY5KUwLN1j
+uWqgiel/xeC/UZZiPt9egS6AS9Orn2yaGP882HzMXAsWPIUcslgYxEEjE1FRCaf8YtvCw+
+rZea5gQDRQ==
 -----END OPENSSH PRIVATE KEY-----`))
 )
 
@@ -132,6 +159,57 @@ func Test_crack_skips_kdf_above_cap(t *testing.T) {
 	_, _, err := Crack(context.Background(), testExpensiveKDFKey)
 	if !errors.Is(err, ErrKDFTooExpensive) {
 		t.Errorf("expected ErrKDFTooExpensive, got %v", err)
+	}
+}
+
+// sshString length-prefixes s the way the OpenSSH wire format does.
+func sshString(s []byte) []byte {
+	out := make([]byte, 4+len(s))
+	binary.BigEndian.PutUint32(out, uint32(len(s)))
+	copy(out[4:], s)
+	return out
+}
+
+// Test_crack_bypass_options_fails_closed crafts a key whose bcrypt options
+// blob is salt || rounds || trailing bytes. x/crypto parses that blob by
+// ignoring the trailing bytes, so a round count read from the blob's tail
+// would see 1 instead of 2048 and let a hardened key past the cap. The strict
+// shape check fails closed: the crafted key is refused like any other
+// over-cap key.
+func Test_crack_bypass_options_fails_closed(t *testing.T) {
+	block, _ := pem.Decode(testDefaultKDFKey)
+	if block == nil {
+		t.Fatal("fixture key did not decode")
+	}
+	optsStart := len(opensshMagic) + (4 + len("aes256-ctr")) + (4 + len("bcrypt"))
+	optsLen := int(binary.BigEndian.Uint32(block.Bytes[optsStart : optsStart+4]))
+	salt := append([]byte{}, block.Bytes[optsStart+4:optsStart+4+optsLen-4]...)
+
+	craftedOpts := append(salt, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01)
+	body := append([]byte{}, block.Bytes[:optsStart]...)
+	body = append(body, sshString(craftedOpts)...)
+	body = append(body, block.Bytes[optsStart+4+optsLen:]...)
+	crafted := pem.EncodeToMemory(&pem.Block{Type: "OPENSSH PRIVATE KEY", Bytes: body})
+
+	_, _, err := Crack(context.Background(), crafted)
+	if !errors.Is(err, ErrKDFTooExpensive) {
+		t.Errorf("expected ErrKDFTooExpensive for options with trailing bytes, got %v", err)
+	}
+}
+
+// Test_crack_round_cap_boundary pins the cap on both sides: a key at exactly
+// maxCrackRounds still cracks, and one round past it is refused.
+func Test_crack_round_cap_boundary(t *testing.T) {
+	_, passphrase, err := Crack(context.Background(), testKeyAtCap)
+	if err != nil {
+		t.Errorf("expected the %d-round key to crack, got %v", maxCrackRounds, err)
+	}
+	if passphrase != string(testEncryptedKeyCorrectPassword) {
+		t.Errorf("passphrase = %q, want %q", passphrase, string(testEncryptedKeyCorrectPassword))
+	}
+
+	if _, _, err := Crack(context.Background(), testKeyPastCap); !errors.Is(err, ErrKDFTooExpensive) {
+		t.Errorf("expected ErrKDFTooExpensive for a %d-round key, got %v", maxCrackRounds+1, err)
 	}
 }
 

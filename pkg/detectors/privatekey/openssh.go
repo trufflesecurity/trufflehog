@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
+	"math"
 )
 
 // opensshMagic starts the decoded body of every key in the OpenSSH private
@@ -15,8 +16,15 @@ var opensshMagic = []byte("openssh-key-v1\x00")
 // opensshBcryptRounds reads the bcrypt round count from an OpenSSH key's
 // header. The decoded key stores the cipher name, KDF name, and KDF options
 // before the encrypted section, so the round count is readable without the
-// passphrase. Keys in any other format (plain PEM, or OpenSSH keys whose KDF
-// is not bcrypt) return ok=false so the caller treats them as before.
+// passphrase. x/crypto parses this same format but exports no way to read
+// the KDF options, so the header is read here.
+//
+// ok=false means the key is not an OpenSSH bcrypt key, and it should be
+// cracked exactly as before. ok=true means the round count is binding,
+// including fail-closed: a bcrypt key whose options blob is not exactly
+// salt||rounds returns the maximum round count, because x/crypto ignores
+// trailing bytes when it parses the same blob, so a blob that only parses
+// with them is attacker-shaped.
 func opensshBcryptRounds(key []byte) (rounds uint32, ok bool) {
 	block, _ := pem.Decode(key)
 	if block == nil || block.Type != "OPENSSH PRIVATE KEY" || !bytes.HasPrefix(block.Bytes, opensshMagic) {
@@ -34,16 +42,20 @@ func opensshBcryptRounds(key []byte) (rounds uint32, ok bool) {
 	if string(kdfName) != "bcrypt" {
 		return 0, false
 	}
-	// KDF options for bcrypt are the salt followed by the round count; the
-	// count is the last four bytes of the options blob.
+	// KDF options for bcrypt are the salt followed by the round count,
+	// exactly: no padding, no trailing bytes.
 	opts, err := readSSHString(r)
 	if err != nil {
 		return 0, false
 	}
-	if len(opts) < 4 {
-		return 0, false
+	if len(opts) < 8 {
+		return math.MaxUint32, true
 	}
-	rounds = binary.BigEndian.Uint32(opts[len(opts)-4:])
+	saltLen := int(binary.BigEndian.Uint32(opts[:4]))
+	if int64(4+saltLen+4) != int64(len(opts)) {
+		return math.MaxUint32, true
+	}
+	rounds = binary.BigEndian.Uint32(opts[4+saltLen:])
 	return rounds, true
 }
 
