@@ -1,79 +1,24 @@
 package ahocorasick
 
 import (
-	"sync"
-
-	ahocorasick "github.com/BobuSumisu/aho-corasick"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
 
-// lowerBuf is a reusable buffer holding the lowercased copy of one chunk.
-//
-// Every chunk needs such a copy, and each one is thrown away moments later, so
-// rather than allocate a new buffer every time we borrow one from a pool and
-// hand it back afterwards. In a steady scan the pool already holds a buffer big
-// enough, so the copy costs no allocation at all.
-//
-// The pool stores pointers rather than plain slices. Putting a slice into a
-// sync.Pool would allocate on every Put, which is the very thing being avoided.
-type lowerBuf struct{ b []byte }
-
-var lowerBufPool = sync.Pool{New: func() any { return new(lowerBuf) }}
-
-// maxPooledLowerBuf is the largest buffer worth keeping for reuse.
-//
-// One unusually large chunk would otherwise leave a matching buffer sitting in
-// the pool for the rest of the run, once per worker goroutine. Past this size
-// it is cheaper to let the buffer go and allocate again next time.
-const maxPooledLowerBuf = 1 << 20 // 1 MiB
-
-// getLowerBuf borrows a buffer able to hold size bytes.
-func getLowerBuf(size int) *lowerBuf {
-	buf := lowerBufPool.Get().(*lowerBuf)
-	if cap(buf.b) < size {
-		buf.b = make([]byte, 0, size)
-	}
-	return buf
-}
-
-// putLowerBuf returns a buffer for reuse, unless it is too big to be worth
-// holding on to.
-func putLowerBuf(buf *lowerBuf) {
-	if cap(buf.b) > maxPooledLowerBuf {
-		return
-	}
-	buf.b = buf.b[:0]
-	lowerBufPool.Put(buf)
-}
-
 // appendASCIILower copies src onto dst, turning A-Z into a-z and leaving every
 // other byte exactly as it was.
 //
-// Only A-Z is changed, for two reasons.
+// Keywords are folded this way when they are registered, and keywordTrie folds
+// chunk bytes the same way as it reads them, so the two sides always agree.
 //
-// It keeps the copy the same length as the original. Lowercasing a character
-// can change how many bytes it takes: "İ" needs two bytes, "i" needs one.
-// FindDetectorMatches searches the lowercased copy but then cuts bytes out of
-// the original chunk, so if the copy were a different length every position
-// would point somewhere slightly wrong, and the text handed to a detector would
-// not be the text that matched.
-//
-// Nothing is lost by leaving other bytes alone. Every built-in detector keyword
-// is plain ASCII, so a non-ASCII byte can never be part of a match either way.
-//
-// Keywords are folded through this same function when they are registered, so
-// both sides of the search always agree. The one gap is a custom detector whose
-// keyword contains a cased non-ASCII letter: that letter is left as written on
-// both sides, so the keyword matches only text spelling it the same way.
+// Only A-Z is changed. Every built-in detector keyword is plain ASCII, so
+// nothing is lost. The one gap is a custom detector whose keyword contains a
+// cased non-ASCII letter: that letter is left as written on both sides, so the
+// keyword matches only text spelling it the same way.
 func appendASCIILower(dst, src []byte) []byte {
 	for _, c := range src {
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		dst = append(dst, c)
+		dst = append(dst, asciiLower(c))
 	}
 	return dst
 }
@@ -189,9 +134,8 @@ func WithSpanCalculator(spanCalculator spanCalculator) CoreOption {
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
 type Core struct {
-	// prefilter is a ahocorasick struct used for doing efficient string
-	// matching given a set of words. (keywords from the rules in the config)
-	prefilter ahocorasick.Trie
+	// prefilter finds every detector keyword in a chunk in one pass.
+	prefilter *keywordTrie
 	// Maps for efficient lookups during detection.
 	// (This implementation maps in two layers: from keywords to detector
 	// type and then again from detector type to detector. We could
@@ -225,7 +169,7 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...CoreOption) *
 	core := &Core{
 		keywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
-		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
+		prefilter:           newKeywordTrie(keywords),
 		spanCalculator:      newAdjustableSpanCalculator(defaultOffsetRadius), // Default span calculator
 	}
 
@@ -308,24 +252,12 @@ func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 //
 // The matches field contains the actual byte slices of the matched portions from the chunk data.
 func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
-	// Search a lowercased copy so matching ignores case, but keep reporting
-	// positions against the original chunk, which is what the spans below cut
-	// from. The copy is borrowed and returned so it costs no allocation.
-	lowered := getLowerBuf(len(chunkData))
-	defer putLowerBuf(lowered)
-	lowered.b = appendASCIILower(lowered.b[:0], chunkData)
-
-	matches := ac.prefilter.Match(lowered.b)
-
-	matchCount := len(matches)
-	if matchCount == 0 {
-		return nil
-	}
-
-	detectorMatches := make(map[DetectorKey]*DetectorMatch)
-
-	for _, m := range matches {
-		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
+	var detectorMatches map[DetectorKey]*DetectorMatch
+	ac.prefilter.walk(chunkData, func(startIdx int64, keyword string) {
+		if detectorMatches == nil {
+			detectorMatches = make(map[DetectorKey]*DetectorMatch)
+		}
+		for _, k := range ac.keywordsToDetectors[keyword] {
 			if _, exists := detectorMatches[k]; !exists {
 				detector := ac.detectorsByKey[k]
 				detectorMatches[k] = &DetectorMatch{
@@ -336,7 +268,6 @@ func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 			}
 
 			detectorMatch := detectorMatches[k]
-			startIdx := m.Pos()
 			span := ac.spanCalculator.calculateSpan(
 				spanCalculationParams{
 					keywordIdx: startIdx,
@@ -346,6 +277,10 @@ func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 			)
 			detectorMatch.addMatchSpan(span)
 		}
+	})
+
+	if len(detectorMatches) == 0 {
+		return nil
 	}
 
 	uniqueDetectors := make([]*DetectorMatch, 0, len(detectorMatches))
