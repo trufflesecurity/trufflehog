@@ -78,7 +78,7 @@ jobs:
         with:
           report_paths: "tmp/test-results/*.xml"
       - name: Save Go cache
-        if: ${{ github.ref == 'refs/heads/main' && steps.go-cache.outputs.cache-hit != 'true' }}
+        if: ${{ (github.ref == 'refs/heads/main' || github.head_ref == 'ci/shard-test-job') && steps.go-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
