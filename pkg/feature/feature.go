@@ -60,6 +60,7 @@ var (
 	SonarQubeDetectorEnabled                 atomic.Bool
 	InfisicalDetectorEnabled                 atomic.Bool
 	ServalDetectorEnabled                    atomic.Bool
+	DeepLDetectorEnabled                     atomic.Bool
 )
 
 type AtomicString struct {
