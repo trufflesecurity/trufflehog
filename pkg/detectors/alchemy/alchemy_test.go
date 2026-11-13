@@ -2,11 +2,13 @@ package alchemy
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -97,6 +99,35 @@ func TestAlchemy_Pattern(t *testing.T) {
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
+		})
+	}
+}
+
+func TestAlchemy_Verify403(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name: "inactive app",
+			body: "App is inactive. Please create a new app or contact support at https://dashboard.alchemyapi.io/support",
+		},
+		{
+			name:    "unknown 403",
+			body:    "<html><body>403 Forbidden</body></html>",
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := common.ConstantResponseHttpClient(http.StatusForbidden, test.body)
+			verified, _, err := verifyMatch(context.Background(), client, "alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D")
+
+			require.Equal(t, test.wantErr, err != nil, err)
+			require.Equal(t, test.wantVerified, verified)
 		})
 	}
 }
