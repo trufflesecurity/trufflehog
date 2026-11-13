@@ -3,81 +3,66 @@ package postman
 import (
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type postmanCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetNote() string {
-	return "Please enter an ID for a workspace, collection, or environment."
-}
-
-func GetFields() postmanCmdModel {
-	token := textinputs.InputConfig{
-		Label:       "Postman token",
-		Key:         "token",
-		Required:    true,
-		Help:        "Postman API key",
-		Placeholder: "PMAK-",
+// Definition returns the postman source configuration.
+//
+// The token is always emitted; the first non-empty of
+// {workspace, collection, environment} is added too, matching the original
+// behavior.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "postman",
+		Title:       "Postman",
+		Description: "Scan a collection, workspace, or environment from Postman, the API platform.",
+		Tier:        sources.TierOSS,
+		Note:        "Please enter an ID for a workspace, collection, or environment.",
+		Command:     "postman",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "token",
+				Label:       "Postman token",
+				Help:        "Postman API key",
+				Kind:        form.KindSecret,
+				Placeholder: "PMAK-",
+				Validators:  []form.Validate{form.Required()},
+			},
+			{
+				Key:   "workspace",
+				Label: "Workspace ID",
+				Help:  "ID for workspace",
+				Kind:  form.KindText,
+			},
+			{
+				Key:   "collection",
+				Label: "Collection ID",
+				Help:  "ID for an API collection",
+				Kind:  form.KindText,
+			},
+			{
+				Key:   "environment",
+				Label: "Environment ID",
+				Help:  "ID for an environment",
+				Kind:  form.KindText,
+			},
+		},
+		BuildArgs: func(values map[string]string) []string {
+			token := strings.TrimSpace(values["token"])
+			var out []string
+			if token != "" {
+				out = append(out, "--token="+token)
+			}
+			for _, key := range []string{"workspace", "collection", "environment"} {
+				if v := strings.TrimSpace(values[key]); v != "" {
+					out = append(out, "--"+key+"="+v)
+					break
+				}
+			}
+			return out
+		},
 	}
-	workspace := textinputs.InputConfig{
-		Label:    "Workspace ID",
-		Key:      "workspace",
-		Required: false,
-		Help:     "ID for workspace",
-	}
-	collection := textinputs.InputConfig{
-		Label:    "Collection ID",
-		Key:      "collection",
-		Required: false,
-		Help:     "ID for an API collection",
-	}
-	environment := textinputs.InputConfig{
-		Label:    "Environment ID",
-		Key:      "environment",
-		Required: false,
-		Help:     "ID for an environment",
-	}
-
-	return postmanCmdModel{textinputs.New([]textinputs.InputConfig{token, workspace, collection, environment})}
-}
-
-func findFirstNonEmptyKey(inputs map[string]textinputs.Input, keys []string) string {
-	for _, key := range keys {
-		if val, ok := inputs[key]; ok && val.Value != "" {
-			return key
-		}
-	}
-	return ""
-}
-
-func (m postmanCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "postman")
-
-	inputs := m.GetInputs()
-	keys := []string{"workspace", "collection", "environment"}
-
-	command = append(command, "--token="+inputs["token"].Value)
-	key := findFirstNonEmptyKey(inputs, keys)
-	if key != "" {
-		command = append(command, "--"+key+"="+inputs[key].Value)
-	}
-	return strings.Join(command, " ")
-}
-
-func (m postmanCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-	keys := []string{"token", "workspace", "collection", "environment"}
-
-	summaryKeys := []string{"token"}
-	key := findFirstNonEmptyKey(inputs, keys[1:])
-	if key != "" {
-		summaryKeys = append(summaryKeys, key)
-	}
-	return common.SummarizeSource(summaryKeys, inputs, labels)
 }
