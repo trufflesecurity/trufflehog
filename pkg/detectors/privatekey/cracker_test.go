@@ -54,6 +54,29 @@ iug9W+Di3upLf0UMC1TqADGphsIHRU7RbmHQ8Rwp7dogswmDfpRSapPt9p0D+6Ad5VBzi3
 f3BPXj76UBLMEJCrZR1P28vnAA7AyNHaLvMPlWDMG5v3V/UV+ugyFcoBAOyjiQgYST8F3e
 Hx7UPVlTK8dyvk1Z+Yw0nrfNClI=
 -----END OPENSSH PRIVATE KEY-----`))
+
+	// testDefaultKDFKey and testExpensiveKDFKey are ed25519 keys protected
+	// with the same passphrase as testEncryptedKeyCorrectPassword at bcrypt
+	// round counts of 16 (OpenSSH's default) and 300, generated with
+	// ssh-keygen -a.
+	testDefaultKDFKey   = []byte(Normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDGWhRIOR
+LWaktgbL8r3S5jAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIHqefEc52RY6n1ej
+6vEPvbPvprG0m5OT5BAFtdFLdyJQAAAAwFsqIS4QNeZJOQTxTDpQBXYvb3bI+PXmTHlaak
+BXlCR0Qxk/mmAbL4GheuqnqHxJCGGDU9n5+aaK9ZEgJv+fpv5ahanIm/wgRjn8q9mZSk2r
+QhGklYrkJV6zkXYVBH7VdP3rHSlCjuziQeKDhxiCTlfeyUfb5O5Tx12TBAo6ADTk76L7+0
+Y+NPIDr2X5m+fWBMI4XFuQPmmSEm28gV5IERrMUc9zGnS7fJ4xHbtySJoF3wWUlEBrTGDb
+HCRHIpLSoA==
+-----END OPENSSH PRIVATE KEY-----`))
+	testExpensiveKDFKey = []byte(Normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDiegbnWk
+wjBR6lL750YpD8AAABLAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIFPdyzxAY2IvJCsy
+RSK0vvQAM+Ow+zdR+U0tf5jJWpdsAAAAwBrWAmdHm4xKSeMsj+rXp+LWgXMpYj9ZYWNJnC
+VGMvU81m8gj78dNmjB8U+J3Ns6jmKXNicnwGHHZ9BVCimlnsiGgpp44ZhxSAYqNJV+CoUY
+FphHKrN68miEiSWFRuZsKB2Xjz3B3a+ApdCrgK9/+0k1finNMzOEpTdmSvkQTP/fLeiqoC
+m/aSusJwO1NAZDcuyty6pMCKygw6ENqGZf1uyMf+KQwJq3JXwgbRAprb3tBrIEAEEkD4mA
+ppGpPzMyWA==
+-----END OPENSSH PRIVATE KEY-----`))
 )
 
 func Test_crack(t *testing.T) {
@@ -98,6 +121,66 @@ func Test_crack_stops_when_context_done(t *testing.T) {
 	}
 	if errors.Is(err, ErrUncrackable) {
 		t.Error("expected the done context to stop the passphrase list, not run it to completion")
+	}
+}
+
+// Test_crack_skips_kdf_above_cap asserts that a key whose KDF is harder than
+// the crack budget is refused without attempting any passphrase. The key is
+// legal for x/crypto, whose own ceiling is 2048 rounds, so an error here comes
+// from the detector's cap rather than the library.
+func Test_crack_skips_kdf_above_cap(t *testing.T) {
+	_, _, err := Crack(context.Background(), testExpensiveKDFKey)
+	if !errors.Is(err, ErrKDFTooExpensive) {
+		t.Errorf("expected ErrKDFTooExpensive, got %v", err)
+	}
+}
+
+func Test_opensshBcryptRounds(t *testing.T) {
+	tests := []struct {
+		name   string
+		key    []byte
+		rounds uint32
+		ok     bool
+	}{
+		{
+			name:   "OpenSSH default rounds",
+			key:    testDefaultKDFKey,
+			rounds: 16,
+			ok:     true,
+		},
+		{
+			name:   "high rounds",
+			key:    testExpensiveKDFKey,
+			rounds: 300,
+			ok:     true,
+		},
+		{
+			name: "plain PEM key",
+			key:  []byte("-----BEGIN RSA PRIVATE KEY-----\nnope\n-----END RSA PRIVATE KEY-----"),
+			ok:   false,
+		},
+		{
+			name: "OpenSSH armor, corrupt body",
+			key:  []byte("-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----"),
+			ok:   false,
+		},
+		{
+			name: "truncated header",
+			key:  opensshMagic[:len(opensshMagic)-1],
+			ok:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rounds, ok := opensshBcryptRounds(tt.key)
+			if ok != tt.ok {
+				t.Errorf("opensshBcryptRounds() ok = %v, want %v", ok, tt.ok)
+				return
+			}
+			if ok && rounds != tt.rounds {
+				t.Errorf("opensshBcryptRounds() rounds = %d, want %d", rounds, tt.rounds)
+			}
+		})
 	}
 }
 

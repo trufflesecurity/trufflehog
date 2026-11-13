@@ -21,9 +21,24 @@ func init() {
 
 var (
 	ErrUncrackable = errors.New("unable to crack encryption")
+	// ErrKDFTooExpensive is returned without attempting any passphrase when a
+	// key's KDF is more expensive than the crack budget allows.
+	ErrKDFTooExpensive = errors.New("key KDF is too expensive to crack")
 )
 
+// maxCrackRounds caps the bcrypt KDF round count this detector will attempt
+// to crack. The round count is chosen by whoever created the key and the KDF
+// cost is linear in rounds; OpenSSH's default is 16. A key hardened beyond
+// this cap is reported as an unverified finding instead of spending the
+// detector's whole time budget attempting to crack it. x/crypto refuses round
+// counts above 2048 on its own, so this lower cap is what keeps
+// hardened-but-legal keys from burning the timeout window.
+const maxCrackRounds = 256
+
 func Crack(ctx context.Context, in []byte) (any, string, error) {
+	if rounds, ok := opensshBcryptRounds(in); ok && rounds > maxCrackRounds {
+		return nil, "", fmt.Errorf("%w: %d rounds exceeds cap of %d", ErrKDFTooExpensive, rounds, maxCrackRounds)
+	}
 	for i, passphrase := range passphrases {
 		// A wrong passphrase costs a full KDF run whose cost is set by the
 		// key's author, so stop between attempts once the caller's context is
