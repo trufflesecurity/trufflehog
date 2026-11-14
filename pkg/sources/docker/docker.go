@@ -16,6 +16,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
+	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/klauspost/compress/zstd"
 	gzip "github.com/klauspost/pgzip"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -409,20 +411,40 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	}
 	defer func() { _ = rc.Close() }()
 
+	mediaType, err := layer.MediaType()
+	if err != nil {
+		return err
+	}
+
 	// Configure parallel gzip decompression for better performance
 	const (
 		defaultBlockSize = 1 << 24 // 16MB blocks
 		defaultBlocks    = 8       // Process 8 blocks in parallel
 	)
 
-	gzipReader, err := gzip.NewReaderN(rc, defaultBlockSize, defaultBlocks)
-	if err != nil {
-		return err
+	// Layers are tar archives, so we read them as tar files. BuildKit can
+	// produce zstd-compressed layers (application/vnd.oci.image.layer.v1.tar+zstd),
+	// which pgzip cannot read, so decompress those with a zstd reader and keep
+	// parallel gzip decompression for gzip layers.
+	var tarStream io.Reader
+	switch mediaType {
+	case types.OCILayerZStd:
+		zstdReader, err := zstd.NewReader(rc)
+		if err != nil {
+			return err
+		}
+		defer func() { zstdReader.Close() }()
+		tarStream = zstdReader
+	default:
+		gzipReader, err := gzip.NewReaderN(rc, defaultBlockSize, defaultBlocks)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = gzipReader.Close() }()
+		tarStream = gzipReader
 	}
-	defer func() { _ = gzipReader.Close() }()
 
-	// Layers are tar archives, so we read them as tar files
-	tarReader := tar.NewReader(gzipReader)
+	tarReader := tar.NewReader(tarStream)
 	var files, skipped int
 	for {
 		header, err := tarReader.Next()
