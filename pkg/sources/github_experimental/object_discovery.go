@@ -46,6 +46,11 @@ const maxCharLen = 6
 const maxChunkSize = 900
 const initialChunkSize = 350
 
+// Number of failed commit checks in a row after which object discovery gives up.
+// A bad token or the primary rate limit fails every request, and retrying it forever
+// would never end the scan.
+const maxConsecutiveFailures = 10
+
 // Max number of commits to fetch from the repository in one command
 // ex: git fetch origin <commit1> <commit2> ... <commit1000>
 const gitFetchMax = 1000
@@ -293,9 +298,11 @@ func removeBySHA(existingCommits, newCommits []string, charLen int) []string {
 	return filteredCommits
 }
 
-func processCommits(ctx context.Context, apiClient *github.Client, needsProcessing []string, owner, repo, path string) {
-	repoCtx := context.WithValue(ctx, "repo", repo)
-
+// processCommits checks every hash in needsProcessing against GitHub and writes the
+// results to disk under path. It returns an error when ctx is done, or after
+// maxConsecutiveFailures failed checks in a row. Results found before that stay on
+// disk, so the next run picks up where this one stopped.
+func processCommits(ctx context.Context, apiClient *github.Client, needsProcessing []string, owner, repo, path string) error {
 	startingSize := float64(len(needsProcessing))
 	queryChunkSize := newBackoff(initialChunkSize, 10, 10, 1)
 
@@ -306,7 +313,11 @@ func processCommits(ctx context.Context, apiClient *github.Client, needsProcessi
 		progressbar.OptionEnableColorCodes(true),
 	)
 
+	failures := 0
 	for len(needsProcessing) > 0 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if len(needsProcessing) < queryChunkSize.getValue() {
 			queryChunkSize.value = float64(len(needsProcessing))
 		}
@@ -314,32 +325,55 @@ func processCommits(ctx context.Context, apiClient *github.Client, needsProcessi
 		chunk := needsProcessing[:chunkSize]
 		needsProcessing = needsProcessing[chunkSize:]
 
-		commitData, err := checkHashes(repoCtx, apiClient, owner, repo, chunk)
+		commitData, err := checkHashes(ctx, apiClient, owner, repo, chunk)
 		if err != nil {
-			repoCtx.Logger().V(2).Info("Temporary error occurred in guessing commits", "error", err)
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
+			failures++
+			if failures >= maxConsecutiveFailures {
+				return fmt.Errorf("giving up after %d failed commit checks in a row: %w", failures, err)
+			}
 			// Prepend the failed chunk to the FRONT of the queue for immediate retry
 			// This ensures we retry the same hashes instead of moving to the next batch
 			needsProcessing = append(chunk, needsProcessing...)
 			queryChunkSize.errorOccurred()
+			// Logged as a field, since V(4).Error would ignore the level.
+			ctx.Logger().V(4).Info("Commit check failed, retrying",
+				"batch_size", chunkSize,
+				"next_batch_size", queryChunkSize.getValue(),
+				"failures", failures,
+				"error", err.Error(),
+			)
 			if strings.Contains(err.Error(), "You have exceeded a secondary rate limit") {
-				repoCtx.Logger().V(2).Info("Reached secondary GitHub Rate Limit. Sleeping for 60 seconds.")
-				time.Sleep(secondaryRateLimitSleep * time.Second)
+				wait := secondaryRateLimitSleep * time.Second
+				ctx.Logger().V(4).Info("Hit secondary rate limit, waiting", "wait", wait)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(wait):
+				}
 			}
 			continue
 		}
+		failures = 0
 
 		percentCompleted := (1 - (float64(len(needsProcessing)) / startingSize)) * 100
-
-		repoCtx.Logger().V(2).Info("Progress", "percent_completed", percentCompleted, "needs_processing", len(needsProcessing))
+		ctx.Logger().V(3).Info("Checked commit batch",
+			"batch_size", chunkSize,
+			"found", len(commitData[validHiddenCommit]),
+			"remaining", len(needsProcessing),
+			"percent_completed", percentCompleted,
+		)
 
 		queryChunkSize.successOccurred()
 		err = writeCommitsToDisk(commitData[validHiddenCommit], validHiddenCommit, path)
 		if err != nil {
-			repoCtx.Logger().V(2).Info("Failed to write valid hidden commits to disk", "error", err)
+			ctx.Logger().Error(err, "Failed to write valid hidden commits to disk")
 		}
 		err = writeCommitsToDisk(commitData[invalidCommit], invalidCommit, path)
 		if err != nil {
-			repoCtx.Logger().V(2).Info("Failed to write invalid commits to disk", "error", err)
+			ctx.Logger().Error(err, "Failed to write invalid commits to disk")
 		}
 
 		// Update the progress bar
@@ -348,6 +382,7 @@ func processCommits(ctx context.Context, apiClient *github.Client, needsProcessi
 
 	// Finish the progress bar
 	_ = bar.Finish()
+	return nil
 }
 
 type commitData struct {
@@ -409,11 +444,17 @@ func checkHashes(ctx context.Context, client *github.Client, owner, repo string,
 
 	// Use the authenticated HTTP client from the GitHub API client
 	// This client already has the Bearer token configured via OAuth2 transport
+	start := time.Now()
 	resp, err := client.Client().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("python request error: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	ctx.Logger().V(5).Info("GitHub GraphQL request",
+		"status", resp.StatusCode,
+		"batch_size", len(hashes),
+		"duration", time.Since(start),
+	)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -533,8 +574,8 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	repoName := urlParts[2]
 
 	// get repo metadata and store in cacheRepoInfo
-	repoCtx := context.WithValue(ctx, "repo", owner+"/"+repoName)
-	ghRepo, _, err := s.connector.APIClient().Repositories.Get(repoCtx, owner, repoName)
+	ctx = context.WithValues(ctx, "repo", owner+"/"+repoName)
+	ghRepo, _, err := s.connector.APIClient().Repositories.Get(ctx, owner, repoName)
 	if err != nil {
 		return fmt.Errorf("failed to fetch repository: %w", err)
 	}
@@ -553,12 +594,13 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	}
 
 	// get the number of forks
-	forksCount, err := getForksCount(repoCtx, s.connector.APIClient(), owner, repoName)
+	forksCount, err := getForksCount(ctx, s.connector.APIClient(), owner, repoName)
 	if err != nil {
 		return fmt.Errorf("failed to get forks count: %w", err)
 	}
 
 	// download the repo using the authenticated connector
+	ctx.Logger().V(3).Info("Cloning repo")
 	path, repo, err := s.connector.Clone(ctx, repoURL)
 	if err != nil {
 		return fmt.Errorf("failed to clone the repository: %w", err)
@@ -571,17 +613,13 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	if err != nil {
 		return fmt.Errorf("failed to enumerate existing commit object hashes: %w", err)
 	}
+	ctx.Logger().V(3).Info("Cloned repo", "existing_objects", len(validHashes))
 
 	// Calculate estimated used key set
 	estimatedUsedKeySet := calculateUsedKeySet(len(validHashes), forksCount)
 
 	// Calculate Short SHA-1 Length for Unambiguous Commit Identifiers
 	shortShaLen := getShortShaLen(estimatedUsedKeySet)
-
-	// Log stats
-	repoCtx.Logger().V(2).Info("Estimated used keys", "count", estimatedUsedKeySet)
-	repoCtx.Logger().V(2).Info("Target Short SHA-1 length", "length", shortShaLen)
-	repoCtx.Logger().V(2).Info("Estimated collisions", "count", estimateCollisions(1<<(shortShaLen*4), estimatedUsedKeySet))
 
 	// Read in existing commits (if any)
 	validHiddenCommits, err := readCommitsFromDisk(validHiddenCommit, folderPath)
@@ -602,8 +640,22 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	possibleCommits = removeBySHA(validHiddenCommits, possibleCommits, shortShaLen)
 	possibleCommits = removeByShortSHA(invalidCommits, possibleCommits)
 
+	ctx.Logger().V(2).Info("Planned commit guessing",
+		"existing_objects", len(validHashes),
+		"forks", forksCount,
+		"estimated_used_keys", estimatedUsedKeySet,
+		"short_sha_length", shortShaLen,
+		"estimated_collisions", estimateCollisions(1<<(shortShaLen*4), estimatedUsedKeySet),
+		"cached_valid_hidden", len(validHiddenCommits),
+		"cached_invalid", len(invalidCommits),
+		"candidates", len(possibleCommits),
+		"cache_dir", folderPath,
+	)
+
 	// Guess all possible commit hashes
-	processCommits(ctx, s.connector.APIClient(), possibleCommits, owner, repoName, folderPath)
+	if err := processCommits(ctx, s.connector.APIClient(), possibleCommits, owner, repoName, folderPath); err != nil {
+		return fmt.Errorf("failed to check possible commits: %w", err)
+	}
 
 	// Read in the new commits
 	validHiddenCommits, err = readCommitsFromDisk(validHiddenCommit, folderPath)
@@ -612,20 +664,20 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	}
 
 	// Download commit hashes and checkout into branches (only way scanner will pick them up)
+	ctx.Logger().V(3).Info("Fetching hidden commits", "count", len(validHiddenCommits))
 	err = downloadPatches(validHiddenCommits, path)
 	if err != nil {
 		return fmt.Errorf("failed to download patches: %w", err)
 	}
 
 	// Scan git for secrets
-	repoCtx.Logger().V(2).Info("scanning for secrets in repo", "repo_url", repoURL)
+	ctx.Logger().V(2).Info("Scanning repo", "hidden_commits", len(validHiddenCommits))
 	start := time.Now()
 	err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan})
 	if err != nil {
 		return fmt.Errorf("failed to scan repo: %w", err)
 	}
-	duration := time.Since(start)
-	repoCtx.Logger().V(2).Info("scanned 1 repo for hidden data", "duration_seconds", duration)
+	ctx.Logger().V(2).Info("Finished scanning repo", "duration", time.Since(start))
 
 	// Remove the folder if user requests
 	if s.conn.DeleteCachedData {
@@ -633,6 +685,7 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 		if err != nil {
 			return fmt.Errorf("failed to delete cached data: %w", err)
 		}
+		ctx.Logger().V(2).Info("Deleted cached data", "cache_dir", folderPath)
 	}
 
 	return nil
