@@ -2,7 +2,9 @@ package anthropic
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,7 +14,14 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
+
+// fakeOAuthToken is a synthetic Claude Code OAuth token shaped like the real
+// thing minted by `claude setup-token`: the sk-ant-oat01- prefix plus a
+// base64url payload of representative length. Built programmatically so the
+// test file never carries a realistic secret literal.
+var fakeOAuthToken = "sk-ant-oat01-" + strings.Repeat("Aa1-_", 24)
 
 func TestAnthropic_VerifyMatch(t *testing.T) {
 	const key = "sk-ant-api03-Dtjm9IZ_rYhS_ihHLZmPXhjJ6PN8UPp7vNO7qO3735RRDpf8xbWGinsch0McONXznUm-4KWoA7WU2otvvwHBR5QRjiLakAA"
@@ -152,6 +161,41 @@ func TestAnthropic_Pattern(t *testing.T) {
 				`,
 			want: nil,
 		},
+		{
+			// Tokens minted by `claude setup-token` for Claude Pro/Max subscribers
+			// are long-lived OAuth access tokens, typically exported as
+			// CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_AUTH_TOKEN. See issue #5450.
+			name: "valid OAuth token pattern",
+			input: `
+				System Log - CI Runner Environment
+				Date: 2026-10-20 06:05:58 UTC
+				Server: ci-runner-04.internal
+				Service: headless Claude Code deploy
+
+				Environment:
+				export CLAUDE_CODE_OAUTH_TOKEN=` + fakeOAuthToken + `
+
+				Log Entry:
+				Runner picked up the Claude Code OAuth token from the environment. Ensure it is not exposed in any public repositories or logs.
+				`,
+			want: []string{fakeOAuthToken},
+		},
+		{
+			// A base64url payload may end in '-', which is a non-word
+			// character: the match must keep the trailing hyphen instead of
+			// backtracking it away at a word boundary.
+			name:  "OAuth token ending in hyphen is matched in full",
+			input: "export CLAUDE_CODE_OAUTH_TOKEN=" + "sk-ant-oat01-" + strings.Repeat("Aa1", 20) + "-",
+			want:  []string{"sk-ant-oat01-" + strings.Repeat("Aa1", 20) + "-"},
+		},
+		{
+			name: "truncated OAuth token placeholder is ignored",
+			input: `
+				Example config - replace with your own token before deploying.
+				export ANTHROPIC_AUTH_TOKEN=sk-ant-oat01-abc123
+				`,
+			want: nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -187,6 +231,102 @@ func TestAnthropic_Pattern(t *testing.T) {
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
+		})
+	}
+}
+
+func TestAnthropic_OAuthTokenType(t *testing.T) {
+	// The credential type is classified on the verify path, mirroring how
+	// "API Key" and "Admin Key" are assigned for the other shapes.
+	d := Scanner{client: common.ConstantResponseHttpClient(http.StatusOK, `{"data":[]}`)}
+
+	results, err := d.FromData(context.Background(), true, []byte("token="+fakeOAuthToken))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	assert.True(t, result.Verified)
+	assert.Equal(t, detector_typepb.DetectorType_Anthropic, result.DetectorType)
+	assert.Equal(t, "OAuth Token", result.ExtraData["Type"])
+	assert.Equal(t, fakeOAuthToken, result.SecretParts["key"])
+}
+
+// captureRoundTripper records the outgoing request so tests can assert on the
+// auth scheme and headers, then replays a canned response.
+type captureRoundTripper struct {
+	got        *http.Request
+	statusCode int
+	body       string
+}
+
+func (c *captureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	*c.got = *req
+	return &http.Response{
+		StatusCode: c.statusCode,
+		Body:       io.NopCloser(strings.NewReader(c.body)),
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
+func TestAnthropic_VerifyOAuthToken(t *testing.T) {
+	tests := []struct {
+		name         string
+		statusCode   int
+		body         string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "200 is verified",
+			statusCode:   http.StatusOK,
+			body:         `{"data":[]}`,
+			wantVerified: true,
+		},
+		{
+			name:       "401 is determinate not-live",
+			statusCode: http.StatusUnauthorized,
+			body:       `{"type":"error","error":{"type":"authentication_error","message":"OAuth token is invalid."}}`,
+		},
+		{
+			name:       "404 is determinate not-live",
+			statusCode: http.StatusNotFound,
+			body:       `{"type":"error","error":{"type":"not_found_error","message":"Not found"}}`,
+		},
+		{
+			// An unexpected status is never a bad-token signal; it must stay
+			// indeterminate rather than mark a live token as not-verified.
+			name:       "500 stays indeterminate",
+			statusCode: http.StatusInternalServerError,
+			body:       `{"type":"error","error":{"type":"api_error","message":"Internal server error"}}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var got http.Request
+			client := &http.Client{Transport: &captureRoundTripper{
+				got:        &got,
+				statusCode: test.statusCode,
+				body:       test.body,
+			}}
+
+			verified, err := verifyOAuthToken(context.Background(), client, fakeOAuthToken)
+
+			// OAuth tokens travel as Authorization: Bearer (never x-api-key),
+			// and OAuth-authenticated calls require the oauth beta header.
+			assert.Equal(t, "Bearer "+fakeOAuthToken, got.Header.Get("Authorization"))
+			assert.Equal(t, "oauth-2025-04-20", got.Header.Get("anthropic-beta"))
+			assert.Empty(t, got.Header.Get("x-api-key"))
+			assert.Contains(t, got.URL.String(), "/v1/models")
+
+			if test.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, test.wantVerified, verified)
 		})
 	}
 }
