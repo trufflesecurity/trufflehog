@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/klauspost/compress/zstd"
@@ -63,6 +64,7 @@ func (s *Source) Init(
 	}
 	s.paths = conn.Paths
 
+	aCtx.Logger().V(1).Info("JSON enumerator source initialized", "paths", len(s.paths))
 	return nil
 }
 
@@ -87,19 +89,23 @@ func (s *Source) Chunks(
 // Enumerate implements the SourceUnitEnumerator interface, reporting each
 // configured path as its own unit so paths can be chunked concurrently.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+	var units, unreadable int
 	for _, path := range s.paths {
 		f, err := os.Open(path)
 		if err != nil {
+			unreadable++
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
 		} else {
 			_ = f.Close()
+			units++
 			if err := reporter.UnitOk(ctx, sources.CommonSourceUnit{ID: path}); err != nil {
 				return err
 			}
 		}
 	}
+	ctx.Logger().V(1).Info("Enumerated paths", "units", units, "unreadable", unreadable)
 	return nil
 }
 
@@ -170,26 +176,31 @@ func (e *jsonEntry) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// chunkJSONEnumeratorReader scans every entry in input and returns how many entries it
+// decoded. A bad entry stops the scan, since the decoder can't find where the next one
+// starts.
 func (s *Source) chunkJSONEnumeratorReader(
 	ctx context.Context,
 	input io.Reader,
 	reporter sources.ChunkReporter,
-) error {
+) (int, error) {
 	decoder := json.NewDecoder(input)
 	var entry jsonEntry
 
-	for {
+	for i := 0; ; i++ {
 		if err := decoder.Decode(&entry); err != nil {
 			if errors.Is(err, io.EOF) {
 				// enumerator file is done
-				return nil
+				return i, nil
 			}
-			return err
+			return i, fmt.Errorf("decoding entry %d: %w", i, err)
 		}
+		// Never log the metadata or the data, they are user content.
+		ctx.Logger().V(3).Info("Scanning entry", "entry", i, "data_bytes", len(entry.Data))
 
 		metadataJSON, err := entry.Metadata.MarshalJSON()
 		if err != nil {
-			ctx.Logger().Error(err, "failed to convert metadata to JSON")
+			ctx.Logger().Error(err, "failed to convert metadata to JSON", "entry", i)
 			continue
 		}
 
@@ -210,7 +221,7 @@ func (s *Source) chunkJSONEnumeratorReader(
 
 		err = handlers.HandleFile(ctx, bytes.NewReader(entry.Data), chunkSkel, reporter)
 		if err != nil {
-			ctx.Logger().Error(err, "failed to scan data")
+			ctx.Logger().Error(err, "failed to scan data", "entry", i)
 			continue
 		}
 	}
@@ -221,7 +232,9 @@ func (s *Source) chunkJSONEnumerator(
 	path string,
 	reporter sources.ChunkReporter,
 ) error {
-	ctx.Logger().V(3).Info("chunking JSON enumerator", "path", path)
+	zstdFile := strings.HasSuffix(path, ".zst") || strings.HasSuffix(path, ".zstd")
+	ctx.Logger().V(2).Info("Scanning file", "path", path, "zstd", zstdFile)
+	start := time.Now()
 
 	enumeratorFile, err := os.Open(path)
 	if err != nil {
@@ -229,15 +242,16 @@ func (s *Source) chunkJSONEnumerator(
 	}
 	defer func() { _ = enumeratorFile.Close() }()
 
-	if strings.HasSuffix(path, ".zst") || strings.HasSuffix(path, ".zstd") {
+	var input io.Reader = enumeratorFile
+	if zstdFile {
 		r, err := zstd.NewReader(enumeratorFile)
 		if err != nil {
 			return fmt.Errorf("unable to open zstd reader: %w", err)
 		}
 		defer r.Close()
-		return s.chunkJSONEnumeratorReader(ctx, r, reporter)
-	} else {
-		return s.chunkJSONEnumeratorReader(ctx, enumeratorFile, reporter)
+		input = r
 	}
-
+	entries, err := s.chunkJSONEnumeratorReader(ctx, input, reporter)
+	ctx.Logger().V(2).Info("Finished scanning file", "path", path, "entries", entries, "duration", time.Since(start))
+	return err
 }
