@@ -53,7 +53,22 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// SQLServer connection string is a semicolon delimited set of case-insensitive parameters which may go in any order.
-	pattern = regexp.MustCompile("(?:\n|`|'|\"| )?((?:[A-Za-z0-9_ ]+=[^;$'`\"$]+;?){3,})(?:'|`|\"|\r\n|\n)?")
+	// Values may contain $, backticks, and apostrophes: those characters are
+	// valid inside real passwords (see #5501), so only the pair separator (;)
+	// and the double-quote wrapper terminate a value. Whole-placeholder
+	// passwords are filtered out separately by isPlaceholderPassword.
+	pattern = regexp.MustCompile("(?:\n|`|'|\"| )?((?:[A-Za-z0-9_ ]+=[^;\"]+;?){3,})(?:'|`|\"|\r\n|\n)?")
+
+	// placeholderPasswordPattern matches a password that is a whole template
+	// placeholder rather than a real credential: $(Name), ${NAME}, an
+	// all-caps $ENV_VAR reference, or a {Token} format-string token (see
+	// #5192). It is anchored to the whole password, so a password that merely
+	// contains placeholder-like syntax (e.g. Ab$cd, $cdFakeOnly123, or
+	// Pass{0}word) is still reported. A bare $identifier is only treated as a
+	// placeholder when it looks like an environment-variable reference
+	// (all-caps); a mixed-case value such as $cdFakeOnly123 is
+	// indistinguishable from a real password and is reported.
+	placeholderPasswordPattern = regexp.MustCompile(`^(\$\([^)]*\)|\$\{[^}]*\}|\$[A-Z][A-Z0-9_]*|\{[^}]*\})$`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -69,12 +84,31 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if shouldIgnore(match[1], s.ignorePatterns) {
 			continue
 		}
-		paramsUnsafe, err := msdsn.Parse(match[1])
+		params := match[1]
+		// The greedy value class terminates only on ';' and '"', so when a
+		// connection string is wrapped in ' or ` and the final field has no
+		// trailing semicolon, the closing wrapper is absorbed into that
+		// field's value (e.g. Password=abc' yields Raw "abc'"). Strip at
+		// most one trailing wrapper char, and only when the overall match
+		// opened with that same wrapper: an unquoted value that genuinely
+		// ends in ' or ` (see #5501) is left untouched.
+		if len(match[0]) > 0 && len(params) > 0 {
+			if wrapper := match[0][0]; wrapper == '\'' || wrapper == '`' {
+				if params[len(params)-1] == wrapper {
+					params = params[:len(params)-1]
+				}
+			}
+		}
+		paramsUnsafe, err := msdsn.Parse(params)
 		if err != nil {
 			continue
 		}
 
 		if paramsUnsafe.Password == "" {
+			continue
+		}
+
+		if isPlaceholderPassword(paramsUnsafe.Password) {
 			continue
 		}
 
@@ -115,6 +149,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+// isPlaceholderPassword reports whether a parsed password is a whole
+// template placeholder (see placeholderPasswordPattern) rather than a
+// real credential.
+func isPlaceholderPassword(password string) bool {
+	return placeholderPasswordPattern.MatchString(password)
 }
 
 func shouldIgnore(uri string, ignorePatterns []*regexp.Regexp) bool {
