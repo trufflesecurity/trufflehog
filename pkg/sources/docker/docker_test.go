@@ -19,6 +19,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
+	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/klauspost/compress/zstd"
 	dockerClient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,6 +82,72 @@ func TestDockerImageScan(t *testing.T) {
 	assert.Equal(t, 2, chunkCounter)
 	assert.Equal(t, 1, layerCounter)
 	assert.Equal(t, 1, historyCounter)
+}
+
+// TestDockerImageScanZstdLayer covers https://github.com/trufflesecurity/trufflehog/issues/5561:
+// an image layer compressed with zstd (the media type BuildKit produces with
+// compression=zstd) must be scanned like a gzip layer instead of being
+// skipped with "gzip: invalid header" while the run still exits 0.
+func TestDockerImageScanZstdLayer(t *testing.T) {
+	const testSecret = "zstdlayertestsecret"
+
+	// Build a tar holding a file with a secret, then compress it with zstd.
+	var tarBuf bytes.Buffer
+	tw := tar.NewWriter(&tarBuf)
+	content := "token=" + testSecret
+	require.NoError(t, tw.WriteHeader(&tar.Header{Name: "secret.txt", Mode: 0o600, Size: int64(len(content))}))
+	_, err := tw.Write([]byte(content))
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+
+	var zstdBuf bytes.Buffer
+	zw, err := zstd.NewWriter(&zstdBuf)
+	require.NoError(t, err)
+	_, err = zw.Write(tarBuf.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+
+	layer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(zstdBuf.Bytes())), nil
+	}, tarball.WithMediaType(types.OCILayerZStd))
+	require.NoError(t, err)
+	img, err := mutate.Append(empty.Image, mutate.Addendum{
+		Layer:   layer,
+		History: v1.History{CreatedBy: "COPY . /"},
+	})
+	require.NoError(t, err)
+
+	reg := registry.New(registry.Logger(stdlog.New(io.Discard, "", 0)))
+	srv := httptest.NewServer(reg)
+	t.Cleanup(srv.Close)
+
+	ref := strings.TrimPrefix(srv.URL, "http://") + "/test/zstd-image:v1"
+	tag, err := name.NewTag(ref)
+	require.NoError(t, err)
+	require.NoError(t, remote.Write(tag, img))
+
+	conn, err := anypb.New(&sourcespb.Docker{
+		Credential: &sourcespb.Docker_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Images: []string{ref},
+	})
+	require.NoError(t, err)
+
+	s := &Source{}
+	require.NoError(t, s.Init(context.TODO(), "test zstd layer", 1, 1, false, conn, 1))
+
+	chunksChan := make(chan *sources.Chunk, 8)
+	require.NoError(t, s.Chunks(context.TODO(), chunksChan))
+	close(chunksChan)
+
+	found := false
+	for chunk := range chunksChan {
+		if bytes.Contains(chunk.Data, []byte(testSecret)) {
+			found = true
+		}
+	}
+	assert.True(t, found, "expected the secret in the zstd layer to be scanned")
 }
 
 func TestQuayRegistry(t *testing.T) {
