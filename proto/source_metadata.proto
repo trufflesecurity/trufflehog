@@ -9,6 +9,9 @@ import "validate/validate.proto";
 
 message AWSSecretsManager {
   string secret_arn = 1 [(validate.rules).string.pattern = "^arn:aws[^:]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$"];
+  // Why the secret could not be written to the vault. Empty when the write
+  // succeeded. This is not part of the location's identity.
+  string upsert_error = 2;
 }
 
 message Azure {
