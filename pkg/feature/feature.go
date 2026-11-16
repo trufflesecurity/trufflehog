@@ -60,6 +60,8 @@ var (
 	SonarQubeDetectorEnabled                 atomic.Bool
 	InfisicalDetectorEnabled                 atomic.Bool
 	ServalDetectorEnabled                    atomic.Bool
+	ProntunoApiKeyDetectorEnabled            atomic.Bool
+	ProntunoSmtpPasswordDetectorEnabled      atomic.Bool
 )
 
 type AtomicString struct {

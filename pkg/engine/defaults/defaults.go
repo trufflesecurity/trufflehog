@@ -618,6 +618,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/privacy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prodpad"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prontunoapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prontunosmtppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prospectcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/protocolsio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/proxycrawl"
@@ -1547,6 +1549,8 @@ func buildDetectorList() []detectors.Detector {
 		&privacy.Scanner{},
 		&privatekey.Scanner{},
 		&prodpad.Scanner{},
+		&prontunoapikey.Scanner{},
+		&prontunosmtppassword.Scanner{},
 		&prospectcrm.Scanner{},
 		&protocolsio.Scanner{},
 		&proxycrawl.Scanner{},
@@ -1928,6 +1932,10 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InfisicalDetectorEnabled.Load()
 		case *serval.Scanner:
 			return !feature.ServalDetectorEnabled.Load()
+		case *prontunoapikey.Scanner:
+			return !feature.ProntunoApiKeyDetectorEnabled.Load()
+		case *prontunosmtppassword.Scanner:
+			return !feature.ProntunoSmtpPasswordDetectorEnabled.Load()
 		default:
 			return false
 		}
