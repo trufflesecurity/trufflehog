@@ -72,7 +72,7 @@ Only repositories on github.com are supported. GitHub Enterprise Server, GitHub 
 
 - A failed batch is retried right away with a smaller batch size.
 - When GitHub reports its secondary rate limit, the scan waits 60 seconds before retrying.
-- After 10 failed batches in a row, the scan stops with an error. This happens with a bad token or when the primary rate limit is used up. Results found so far stay in the cache folder, so running the scan again continues from there.
+- After 10 failed batches in a row, the scan stops with an error. Secondary rate limit waits do not count toward this. This happens with a bad token or when the primary rate limit is used up. Results found so far stay in the cache folder, so running the scan again continues from there.
 
 ### What Gets Scanned
 

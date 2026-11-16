@@ -21,7 +21,8 @@ import (
 
 // Assumption: sleeping for 60 seconds is enough to reset the secondary rate limit
 // see https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api#secondary-rate-limits
-const secondaryRateLimitSleep = 60
+// It is a var so tests can shorten it.
+var secondaryRateLimitWait = 60 * time.Second
 
 // Assumption: on average, a fork contributes 0.1% additional commits
 const forkCommitMultiplier = 0.001
@@ -48,7 +49,8 @@ const initialChunkSize = 350
 
 // Number of failed commit checks in a row after which object discovery gives up.
 // A bad token or the primary rate limit fails every request, and retrying it forever
-// would never end the scan.
+// would never end the scan. Secondary rate limits are not counted, since the scan
+// waits for them to reset.
 const maxConsecutiveFailures = 10
 
 // Max number of commits to fetch from the repository in one command
@@ -330,9 +332,12 @@ func processCommits(ctx context.Context, apiClient *github.Client, needsProcessi
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return ctxErr
 			}
-			failures++
-			if failures >= maxConsecutiveFailures {
-				return fmt.Errorf("giving up after %d failed commit checks in a row: %w", failures, err)
+			rateLimited := strings.Contains(err.Error(), "You have exceeded a secondary rate limit")
+			if !rateLimited {
+				failures++
+				if failures >= maxConsecutiveFailures {
+					return fmt.Errorf("giving up after %d failed commit checks in a row: %w", failures, err)
+				}
 			}
 			// Prepend the failed chunk to the FRONT of the queue for immediate retry
 			// This ensures we retry the same hashes instead of moving to the next batch
@@ -345,13 +350,12 @@ func processCommits(ctx context.Context, apiClient *github.Client, needsProcessi
 				"failures", failures,
 				"error", err.Error(),
 			)
-			if strings.Contains(err.Error(), "You have exceeded a secondary rate limit") {
-				wait := secondaryRateLimitSleep * time.Second
-				ctx.Logger().V(4).Info("Hit secondary rate limit, waiting", "wait", wait)
+			if rateLimited {
+				ctx.Logger().V(4).Info("Hit secondary rate limit, waiting", "wait", secondaryRateLimitWait)
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case <-time.After(wait):
+				case <-time.After(secondaryRateLimitWait):
 				}
 			}
 			continue

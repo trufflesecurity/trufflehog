@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
@@ -124,4 +125,29 @@ func TestProcessCommits_StopsAfterFailures(t *testing.T) {
 	assert.Equal(t, int32(maxConsecutiveFailures), requests.Load())
 	_, statErr := os.Stat(filepath.Join(dir, validHiddenCommit+".txt"))
 	assert.True(t, os.IsNotExist(statErr))
+}
+
+// Secondary rate limits don't count toward maxConsecutiveFailures, since the scan
+// waits for them to reset.
+func TestProcessCommits_SecondaryRateLimitIsNotAFailure(t *testing.T) {
+	orig := secondaryRateLimitWait
+	secondaryRateLimitWait = time.Millisecond
+	t.Cleanup(func() { secondaryRateLimitWait = orig })
+
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if requests.Add(1) <= maxConsecutiveFailures+2 {
+			_, _ = fmt.Fprint(w, `{"message":"You have exceeded a secondary rate limit. Please wait a few minutes."}`)
+			return
+		}
+		_, _ = fmt.Fprint(w, `{"data":{"repository":{"commitabcd":null}}}`)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	require.NoError(t, processCommits(context.Background(), testClient(t, server), []string{"abcd"}, "owner", "repo", dir))
+	invalid, err := readCommitsFromDisk(invalidCommit, dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"abcd"}, invalid)
 }
