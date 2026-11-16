@@ -19,8 +19,10 @@ func AddStringSliceItem(item string, slice *[]string) {
 }
 
 func RemoveStringSliceItem(item string, slice *[]string) {
-	for i, listItem := range *slice {
-		if item == listItem {
+	// Walk backwards so the element swapped in from the end has already been
+	// checked and the index never passes the shrinking length.
+	for i := len(*slice) - 1; i >= 0; i-- {
+		if item == (*slice)[i] {
 			(*slice)[i] = (*slice)[len(*slice)-1]
 			*slice = (*slice)[:len(*slice)-1]
 		}
