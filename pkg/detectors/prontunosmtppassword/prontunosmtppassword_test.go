@@ -127,6 +127,54 @@ func TestProntunoSmtpPassword_Pattern(t *testing.T) {
 	}
 }
 
+// The engine hands FromData a window around each keyword match, not the whole
+// chunk, so a username further away than the window is never seen.
+func TestProntunoSmtpPassword_PairsUsernameAcrossMatchWindow(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
+	tests := []struct {
+		name     string
+		distance int
+		want     string
+	}{
+		{name: "username within the widened window", distance: 800, want: validUsername + ":" + validPassword},
+		{name: "username beyond the widened window", distance: 2000, want: validPassword},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			input := "MAIL_USERNAME=" + validUsername + "\n" +
+				strings.Repeat("#", test.distance) + "\n" +
+				"MAIL_PASSWORD=" + validPassword + "\n"
+
+			matches := ahoCorasickCore.FindDetectorMatches([]byte(input))
+			if len(matches) != 1 {
+				t.Fatalf("expected 1 detector match, got %d", len(matches))
+			}
+
+			var got []string
+			for _, window := range matches[0].Matches() {
+				results, err := d.FromData(context.Background(), false, window)
+				if err != nil {
+					t.Fatalf("FromData: %v", err)
+				}
+				for _, r := range results {
+					if len(r.RawV2) > 0 {
+						got = append(got, string(r.RawV2))
+					} else {
+						got = append(got, string(r.Raw))
+					}
+				}
+			}
+
+			if diff := cmp.Diff([]string{test.want}, got); diff != "" {
+				t.Errorf("diff: (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
 // smtpServer is a minimal SMTP server that offers AUTH only after STARTTLS,
 // like Prontuno's submission port. It answers every
 // AUTH PLAIN with authReply, except that the validUsername/validPassword

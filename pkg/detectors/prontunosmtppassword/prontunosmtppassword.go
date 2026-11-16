@@ -18,13 +18,20 @@ import (
 )
 
 type Scanner struct {
+	// The username can sit well away from the password, so widen the window
+	// the engine hands to FromData beyond its single-credential default.
+	detectors.DefaultMultiPartCredentialProvider
+
 	// addr and tlsConfig override the production SMTP endpoint in tests.
 	addr      string
 	tlsConfig *tls.Config
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var (
+	_ detectors.Detector                    = (*Scanner)(nil)
+	_ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
+)
 
 // Prontuno's SMTP submission port. It offers AUTH only after STARTTLS.
 const defaultAddr = "smtp.prontuno.net:587"
