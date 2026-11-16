@@ -164,12 +164,13 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 
 	// If the current read position is within the in-memory buffer.
 	if memStart := br.diskBufferSize; br.index >= memStart && br.index < memStart+int64(br.buf.Len()) {
-		totalBytesRead = copy(out, br.buf.Bytes()[br.index-memStart:])
-		br.index += int64(totalBytesRead)
-		if totalBytesRead == len(out) {
+		n := copy(out, br.buf.Bytes()[br.index-memStart:])
+		totalBytesRead += n
+		br.index += int64(n)
+		if n == len(out) {
 			return totalBytesRead, nil
 		}
-		out = out[totalBytesRead:]
+		out = out[n:]
 	}
 
 	if len(out) == 0 {

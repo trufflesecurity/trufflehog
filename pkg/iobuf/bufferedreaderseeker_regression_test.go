@@ -145,3 +145,81 @@ func TestBufferedReadSeekerRandomSeekRead(t *testing.T) {
 		}
 	}
 }
+
+// TestBufferedReadSeekerSpanningReadAcrossFlushBoundary covers a single
+// Read that crosses the disk/memory boundary: after the 16MB threshold the
+// first 16MB lives in the temp file and the tail stays in memory, so one
+// Read starting just before 16MB must return bytes from both regions and
+// report their combined count. Cursor Bugbot flagged that the in-memory
+// branch overwrote the running count instead of adding to it, so such a
+// Read reported only the tail bytes and callers honouring n skipped the
+// disk bytes.
+func TestBufferedReadSeekerSpanningReadAcrossFlushBoundary(t *testing.T) {
+	data := patternData(20 << 20)
+	br := NewBufferedReaderSeeker(&shortReader{data: data, max: 65536})
+	defer br.Close()
+	// Read the whole stream once so the first 16MB is flushed to disk and
+	// the 4MB tail stays in memory.
+	buf := make([]byte, 1<<20)
+	var total int
+	for total < len(data) {
+		n, err := br.Read(buf)
+		total += n
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("sequential read err: %v", err)
+		}
+	}
+	if total != len(data) {
+		t.Fatalf("sequential read got %d bytes, want %d", total, len(data))
+	}
+
+	const boundary = 16 << 20
+	// A Read starting 100 bytes before the boundary and spanning 100 bytes
+	// past it must return all 200 bytes.
+	if _, err := br.Seek(boundary-100, io.SeekStart); err != nil {
+		t.Fatalf("Seek err: %v", err)
+	}
+	got := make([]byte, 200)
+	n, err := br.Read(got)
+	if err != nil && err != io.EOF {
+		t.Fatalf("spanning Read err: %v", err)
+	}
+	if n != 200 {
+		t.Fatalf("spanning Read got %d bytes, want 200", n)
+	}
+	if !bytes.Equal(got, data[boundary-100:boundary+100]) {
+		t.Fatalf("spanning Read bytes mismatch")
+	}
+
+	// Same span via ReadAt.
+	gotAt := make([]byte, 200)
+	n, err = br.ReadAt(gotAt, boundary-100)
+	if err != nil && err != io.EOF {
+		t.Fatalf("spanning ReadAt err: %v", err)
+	}
+	if n != 200 {
+		t.Fatalf("spanning ReadAt got %d bytes, want 200", n)
+	}
+	if !bytes.Equal(gotAt, data[boundary-100:boundary+100]) {
+		t.Fatalf("spanning ReadAt bytes mismatch")
+	}
+
+	// A single Read of the whole stream from offset 0 must report all of it.
+	if _, err := br.Seek(0, io.SeekStart); err != nil {
+		t.Fatalf("Seek err: %v", err)
+	}
+	all := make([]byte, len(data))
+	n, err = br.Read(all)
+	if err != nil && err != io.EOF {
+		t.Fatalf("full Read err: %v", err)
+	}
+	if n != len(data) {
+		t.Fatalf("full Read got %d bytes, want %d", n, len(data))
+	}
+	if !bytes.Equal(all, data) {
+		t.Fatalf("full Read bytes mismatch")
+	}
+}
