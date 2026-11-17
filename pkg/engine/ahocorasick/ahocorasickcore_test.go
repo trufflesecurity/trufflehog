@@ -505,11 +505,9 @@ func TestFindDetectorMatchesSpansSurviveMultibyte(t *testing.T) {
 // Whatever surrounds a keyword, the span cut for it must stay inside the chunk
 // and must still cover the keyword that produced it.
 //
-// Positions come from the lowercased copy while the bytes are cut from the
-// original, so this holds only while folding preserves length. The generator
-// leans on characters where that is easy to get wrong: "İ" and "ẞ" both shrink
-// under full Unicode lowercasing, and the raw tail is arbitrary bytes that need
-// not be valid UTF-8.
+// The generator leans on characters that are easy to get wrong: "İ" and "ẞ"
+// both shrink under full Unicode lowercasing, and the raw tail is arbitrary
+// bytes that need not be valid UTF-8.
 func TestFindDetectorMatchesSpanProperties(t *testing.T) {
 	const keyword = "token"
 	core := NewAhoCorasickCore([]detectors.Detector{keywordDetector{keyword}})
@@ -559,24 +557,7 @@ func TestFindDetectorMatchesSpanProperties(t *testing.T) {
 	})
 }
 
-// A buffer coming back from the pool still holds the previous chunk's bytes,
-// so a later, shorter chunk must not be able to see them.
-func TestLowerBufPoolReuseIsClean(t *testing.T) {
-	core := NewAhoCorasickCore([]detectors.Detector{keywordDetector{"token"}})
-
-	long := []byte(strings.Repeat("x", 4096) + "token" + strings.Repeat("y", 4096))
-	assert.Len(t, core.FindDetectorMatches(long), 1)
-
-	short := []byte("token")
-	matches := core.FindDetectorMatches(short)
-	assert.Len(t, matches, 1)
-	for _, m := range matches[0].matchSpans {
-		assert.LessOrEqual(t, m.endOffset, int64(len(short)),
-			"leftover bytes from the previous chunk leaked through the pool")
-	}
-}
-
-// The pool is shared by every scanner worker.
+// The core is shared by every scanner worker.
 func TestFindDetectorMatchesConcurrent(t *testing.T) {
 	core := NewAhoCorasickCore([]detectors.Detector{keywordDetector{"token"}})
 	chunks := [][]byte{
@@ -604,7 +585,7 @@ func TestFindDetectorMatchesConcurrent(t *testing.T) {
 	wg.Wait()
 }
 
-// Lowering only A-Z is safe only while every keyword is ASCII, since a
+// Folding only A-Z is safe only while every keyword is ASCII, since a
 // non-ASCII byte then cannot be part of any match.
 func TestAllDefaultKeywordsAreASCII(t *testing.T) {
 	for _, d := range defaults.DefaultDetectors() {
@@ -617,8 +598,8 @@ func TestAllDefaultKeywordsAreASCII(t *testing.T) {
 	}
 }
 
-// FuzzAppendASCIILower checks the two properties the spans rely on: the output
-// is always the same length as the input, and only A-Z changes.
+// FuzzAppendASCIILower checks that the output is always the same length as the
+// input and that only A-Z changes.
 func FuzzAppendASCIILower(f *testing.F) {
 	for _, seed := range []string{"", "token", "TOKEN", "İ", "ẞ", "\x00\xff", "MiXeD 123"} {
 		f.Add([]byte(seed))
@@ -678,27 +659,4 @@ func TestKeywordRegisteredOnce(t *testing.T) {
 	matches := core.FindDetectorMatches([]byte("token"))
 	assert.Len(t, matches, 1)
 	assert.Len(t, matches[0].matchSpans, 1, "keyword counted twice")
-}
-
-// BenchmarkLowerBuf shows what the pool is for: borrowing a buffer costs no
-// allocation, while building a fresh lowercased copy allocates one per chunk.
-func BenchmarkLowerBuf(b *testing.B) {
-	data := []byte(strings.Repeat("The Quick Brown Fox Jumps Over A Sleeping Dog\n", 200))
-
-	b.Run("pooled", func(b *testing.B) {
-		b.ReportAllocs()
-		b.SetBytes(int64(len(data)))
-		for range b.N {
-			buf := getLowerBuf(len(data))
-			buf.b = appendASCIILower(buf.b[:0], data)
-			putLowerBuf(buf)
-		}
-	})
-	b.Run("unpooled", func(b *testing.B) {
-		b.ReportAllocs()
-		b.SetBytes(int64(len(data)))
-		for range b.N {
-			_ = appendASCIILower(make([]byte, 0, len(data)), data)
-		}
-	})
 }
