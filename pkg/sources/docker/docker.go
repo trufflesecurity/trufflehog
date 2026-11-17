@@ -33,6 +33,12 @@ import (
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_DOCKER
 
+// dockerLayerZStd is the Docker schema 2 zstd layer media type
+// (application/vnd.docker.image.rootfs.diff.tar.zstd) that BuildKit emits
+// with oci-mediatypes=false. go-containerregistry defines no constant for
+// it, unlike types.OCILayerZStd for the OCI equivalent.
+const dockerLayerZStd types.MediaType = "application/vnd.docker.image.rootfs.diff.tar.zstd"
+
 type Source struct {
 	name        string
 	sourceId    sources.SourceID
@@ -423,12 +429,15 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	)
 
 	// Layers are tar archives, so we read them as tar files. BuildKit can
-	// produce zstd-compressed layers (application/vnd.oci.image.layer.v1.tar+zstd),
-	// which pgzip cannot read, so decompress those with a zstd reader and keep
-	// parallel gzip decompression for gzip layers.
+	// produce zstd-compressed layers, which pgzip cannot read, so decompress
+	// those with a zstd reader and keep parallel gzip decompression for gzip
+	// layers. Both the OCI media type
+	// (application/vnd.oci.image.layer.v1.tar+zstd) and the Docker schema 2
+	// media type BuildKit emits with oci-mediatypes=false
+	// (application/vnd.docker.image.rootfs.diff.tar.zstd) are zstd.
 	var tarStream io.Reader
 	switch mediaType {
-	case types.OCILayerZStd:
+	case types.OCILayerZStd, dockerLayerZStd:
 		zstdReader, err := zstd.NewReader(rc)
 		if err != nil {
 			return err
