@@ -1932,6 +1932,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InfisicalDetectorEnabled.Load()
 		case *serval.Scanner:
 			return !feature.ServalDetectorEnabled.Load()
+		case *basetenv1.Scanner, *basetenv2.Scanner:
+			return !feature.BasetenDetectorEnabled.Load()
 		default:
 			return false
 		}
