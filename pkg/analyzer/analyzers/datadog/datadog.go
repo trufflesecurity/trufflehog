@@ -163,7 +163,10 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		}, *permissionBindings...)
 	}
 
-	// Extract information from resources to create bindings
+	// Dashboards and monitors are visible to the key, but Datadog doesn't report
+	// a permission per resource, so they belong in UnboundedResources. A binding
+	// with an empty Permission.Value is rejected by consumers that require every
+	// binding to name a permission, which would drop the whole analysis.
 	for _, resource := range info.Resources {
 		resource := secretInfoResourceToAnalyzerResource(resource)
 
@@ -172,11 +175,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			resource.Parent = userResource
 		}
 
-		binding := analyzers.Binding{
-			Resource: *resource,
-		}
-
-		result.Bindings = append(result.Bindings, binding)
+		result.UnboundedResources = append(result.UnboundedResources, *resource)
 	}
 
 	return &result

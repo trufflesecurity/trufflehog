@@ -134,6 +134,7 @@ var (
 	githubScanPRComments        = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments      = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 	githubCommentsTimeframeDays = githubScan.Flag("comments-timeframe", "Number of days in the past to review when scanning issue, PR, and gist comments.").Uint32()
+	githubUseGraphQL            = githubScan.Flag("use-graphql", "Use the GitHub GraphQL API to scan issue and PR comments. Faster on large repositories. Needs a token and --issue-comments or --pr-comments.").Bool()
 	githubAuthInUrl             = githubScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
 	githubClonePath             = githubScan.Flag("clone-path", "Custom path where the repository should be cloned (default: temp dir).").String()
 	githubNoCleanup             = githubScan.Flag("no-cleanup", "Do not delete cloned repositories after scanning (can only be used with --clone-path). Each clone is kept in its own directory, so ensure sufficient disk space: usage grows with every repository scanned and every run.").Bool()
@@ -560,7 +561,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
 	feature.GitlabProjectsPerPage.Store(100)
 
-	// OSS Default using github graphql api for issues, pr's and comments
+	// OSS Default GitHub GraphQL API off, turn on with --use-graphql
 	feature.UseGithubGraphQLAPI.Store(false)
 
 	// OSS Default Use HTML Decoder on
@@ -961,6 +962,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 
 		if err := validateClonePath(*githubClonePath, *githubNoCleanup); err != nil {
 			return scanMetrics, err
+		}
+
+		if *githubUseGraphQL {
+			// GitHub's GraphQL API rejects unauthenticated requests
+			if *githubScanToken == "" {
+				ctx.Logger().Info("--use-graphql needs a token, scanning comments with the REST API")
+			} else {
+				feature.UseGithubGraphQLAPI.Store(true)
+			}
 		}
 
 		cfg := sources.GithubConfig{

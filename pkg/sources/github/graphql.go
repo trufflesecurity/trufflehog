@@ -1,7 +1,6 @@
 package github
 
 import (
-	"cmp"
 	"fmt"
 	"math/rand/v2"
 	"strings"
@@ -15,7 +14,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// processIssuesWithComments process github repo issues with comments using graphql API
+// This file scans issues, pull requests, and their comments through the GitHub
+// GraphQL API. It is used instead of the REST listings when
+// feature.UseGithubGraphQLAPI is on. GraphQL lets one request return a page of
+// issues or PRs together with their first page of comments, so it needs far
+// fewer requests than REST on busy repositories.
+//
+// Every listing follows the same pattern: send the query, let
+// handleGraphQLRateLimit decide whether to retry it, fail on any other error,
+// emit chunks, then follow pageInfo.endCursor until hasNextPage is false.
+
+// processIssuesWithComments scans every issue in the repository: its title and
+// body, and all of its comments. Issues come 100 per page with their first 100
+// comments. An issue with more comments gets extra requests for the rest.
 func (s *Source) processIssuesWithComments(
 	ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo,
 	reporter sources.ChunkReporter, cutoffTime *time.Time,
@@ -110,7 +121,9 @@ func (s *Source) processIssuesWithComments(
 	return nil
 }
 
-// processPRWithComments process github repo pull requests with inline comments
+// processPRWithComments scans every pull request in the repository: its title
+// and body, and all of its conversation comments. Review comments on code
+// lines are not part of this query, processReviewThreads handles them.
 func (s *Source) processPRWithComments(ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	vars := map[string]any{
 		owner:                 githubv4.String(repoInfo.owner),
@@ -161,7 +174,7 @@ func (s *Source) processPRWithComments(ctx context.Context, graphqlClient *githu
 				singlePRVars := map[string]any{
 					owner:              githubv4.String(repoInfo.owner),
 					repository:         githubv4.String(repoInfo.name),
-					pullRequestNumber:  pr.Number,
+					pullRequestNumber:  githubv4.Int(pr.Number),
 					commentsPerPage:    githubv4.Int(defaultPagination),
 					commentsPagination: pr.Comments.PageInfo.EndCursor,
 				}
@@ -201,7 +214,10 @@ func (s *Source) processPRWithComments(ctx context.Context, graphqlClient *githu
 	return nil
 }
 
-// processReviewThreads process github repo pull request review threads
+// processReviewThreads scans review comments, the comments left on code lines
+// of a pull request. It works in two steps to stay under GitHub's node limit:
+// first it walks all PRs and collects their review thread IDs, then it fetches
+// the comments of those threads by ID, 100 threads per request.
 func (s *Source) processReviewThreads(ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	vars := map[string]any{
 		owner:                 githubv4.String(repoInfo.owner),
@@ -228,8 +244,16 @@ func (s *Source) processReviewThreads(ctx context.Context, graphqlClient *github
 
 		// collect thread ids
 		for _, pr := range query.GetMinimalPullRequests() {
-			prThreadIDs := pr.ReviewThreads.GetThreadIDs()
-			threadIDs = append(threadIDs, prThreadIDs...)
+			threadIDs = append(threadIDs, pr.ReviewThreads.GetThreadIDs()...)
+
+			// the query above only returns the first 100 threads of each PR
+			if pr.ReviewThreads.PageInfo.HasNextPage {
+				moreIDs, err := s.fetchMoreThreadIDs(ctx, graphqlClient, repoInfo, pr.Number, pr.ReviewThreads.PageInfo, reporter)
+				if err != nil {
+					return err
+				}
+				threadIDs = append(threadIDs, moreIDs...)
+			}
 		}
 
 		if !query.Repository.PullRequests.PageInfo.HasNextPage {
@@ -258,18 +282,64 @@ func (s *Source) processReviewThreads(ctx context.Context, graphqlClient *github
 	return nil
 }
 
-// fetchThreadComments process github repo pull request threads and their comments
+// fetchMoreThreadIDs returns the review thread IDs of one pull request that
+// come after pageInfo, for PRs with more threads than fit in the first page.
+func (s *Source) fetchMoreThreadIDs(ctx context.Context, graphqlClient *githubv4.Client, repoInfo repoInfo, prNumber int, pageInfo pageInfo, reporter sources.ChunkReporter) ([]string, error) {
+	vars := map[string]any{
+		owner:             githubv4.String(repoInfo.owner),
+		repository:        githubv4.String(repoInfo.name),
+		pullRequestNumber: githubv4.Int(prNumber),
+		threadPerPage:     githubv4.Int(defaultPagination),
+	}
+
+	var threadIDs []string
+	for pageInfo.HasNextPage {
+		vars[threadPagination] = pageInfo.EndCursor
+
+		var query singlePRReviewThreadIDs
+		err := graphqlClient.Query(ctx, &query, vars)
+		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+			continue
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("error fetching review threads of pull request %d: %w", prNumber, err)
+		}
+
+		threads := query.Repository.PullRequest.ReviewThreads
+		threadIDs = append(threadIDs, threads.GetThreadIDs()...)
+		pageInfo = threads.PageInfo
+	}
+
+	ctx.Logger().V(4).Info("Pulled additional thread IDs", "pull_request_no", prNumber, "total_threads", len(threadIDs))
+
+	return threadIDs, nil
+}
+
+// fetchThreadComments scans the comments of one batch of review threads (at
+// most 100 IDs). A thread with more than 100 comments gets extra requests for
+// the rest.
 func (s *Source) fetchThreadComments(ctx context.Context, graphqlClient *githubv4.Client, threadIDs []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	// Process in batches of 100
-	var query multiReviewThreadComments
 	vars := map[string]any{
 		"ids":              threadIDs,
 		commentsPerPage:    githubv4.Int(defaultPagination),
 		commentsPagination: (*githubv4.String)(nil),
 	}
 
-	if err := graphqlClient.Query(ctx, &query, vars); err != nil {
-		return fmt.Errorf("multi-thread query failed: %w", err)
+	var query multiReviewThreadComments
+	for {
+		// reset so a retry does not decode on top of a half filled response
+		query = multiReviewThreadComments{}
+		err := graphqlClient.Query(ctx, &query, vars)
+		if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+			continue
+		}
+
+		if err != nil {
+			return fmt.Errorf("multi-thread query failed: %w", err)
+		}
+
+		break
 	}
 
 	// process each thread in batch
@@ -278,18 +348,19 @@ func (s *Source) fetchThreadComments(ctx context.Context, graphqlClient *githubv
 			return err
 		}
 
-		// if a thread has more than 100 comments :)
-		for thread.Comments.PageInfo.HasNextPage {
-			// request this thread more comments
-			var query singleReviewThreadComments
-			reviewThreadVars := map[string]any{
-				threadID:           thread.ID,
-				commentsPerPage:    githubv4.Int(defaultPagination),
-				commentsPagination: (*githubv4.String)(nil),
-			}
+		// if a thread has more than 100 comments, page through the rest of them
+		pageInfo := thread.Comments.PageInfo
+		threadVars := map[string]any{
+			threadID:        thread.ID,
+			commentsPerPage: githubv4.Int(defaultPagination),
+		}
 
-			err := graphqlClient.Query(ctx, &query, reviewThreadVars)
-			if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &query.RateLimit, err) {
+		for pageInfo.HasNextPage {
+			threadVars[commentsPagination] = pageInfo.EndCursor
+
+			var threadQuery singleReviewThreadComments
+			err := graphqlClient.Query(ctx, &threadQuery, threadVars)
+			if s.handleGraphqlRateLimitWithChunkReporter(ctx, reporter, &threadQuery.RateLimit, err) {
 				continue
 			}
 
@@ -297,17 +368,12 @@ func (s *Source) fetchThreadComments(ctx context.Context, graphqlClient *githubv
 				return fmt.Errorf("single-thread query failed: %w", err)
 			}
 
-			node := query.Node
-			if err := s.chunkComments(ctx, repoInfo, node.Comments.Nodes, reporter, cutoffTime); err != nil {
+			comments := threadQuery.Node.PullRequestReviewThread.Comments
+			if err := s.chunkComments(ctx, repoInfo, comments.Nodes, reporter, cutoffTime); err != nil {
 				return err
 			}
 
-			if !node.Comments.PageInfo.HasNextPage {
-				break
-			}
-
-			// update thread comments pagination
-			reviewThreadVars[commentsPagination] = &node.Comments.PageInfo.EndCursor
+			pageInfo = comments.PageInfo
 		}
 	}
 
@@ -330,7 +396,11 @@ func chunkIDs(ids []string, size int) [][]string {
 	return append(chunks, ids)
 }
 
-// handleRateLimitWithChunkReporter is a wrapper around handleRateLimit that includes chunk reporting
+// graphqlMinRemaining is how much GraphQL quota we keep in reserve. When a
+// query leaves this much or less, we wait for the quota to reset.
+const graphqlMinRemaining = 3
+
+// handleGraphqlRateLimitWithChunkReporter is a wrapper around handleGraphQLRateLimit that includes chunk reporting
 func (s *Source) handleGraphqlRateLimitWithChunkReporter(
 	ctx context.Context, reporter sources.ChunkReporter,
 	rl *rateLimit, errIn error,
@@ -338,52 +408,45 @@ func (s *Source) handleGraphqlRateLimitWithChunkReporter(
 	return s.handleGraphQLRateLimit(ctx, rl, errIn, &chunkErrorReporter{reporter: reporter})
 }
 
-// handleGraphQLRateLimit inspects the rateLimit info returned in GraphQL queries.
+// handleGraphQLRateLimit is called after every GraphQL query with the query's
+// rateLimit and error. It returns true when the caller should send the same
+// query again.
+//
+//   - errIn is a rate limit error: wait, then return true to retry.
+//   - errIn is any other error: return false right away, so the caller fails
+//     instead of retrying something that will never work.
+//   - errIn is nil but the quota is almost used up: wait for the reset, then
+//     return false so the caller keeps the result it already has.
+//
+// The resume time is shared with the REST handler and with other workers, so
+// one worker hitting the limit makes the others wait too. If ctx is canceled
+// during the wait, it returns false and the caller reports errIn.
 func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errIn error, reporters ...errorReporter) bool {
-	// check global resume time first (in case another request already set it)
-	rateLimitMu.RLock()
-	resumeTime := rateLimitResumeTime
-	rateLimitMu.RUnlock()
-
-	// if resume time is not empty and is after current time, than put the request to sleep till that.
-	if !resumeTime.IsZero() && time.Now().Before(resumeTime) {
-		retryAfter := time.Until(resumeTime)
-		_, canceled := sleepWithContext(ctx, retryAfter)
-		return !canceled
-	}
-
-	var retryAfter time.Duration
-	if errIn != nil && strings.Contains(errIn.Error(), "rate limit exceeded") {
-		now := time.Now()
-
-		rateLimitMu.Lock()
-		rateLimitResumeTime = now.Add(1 * time.Minute)
-		retryAfter = time.Until(rateLimitResumeTime)
-		ctx.Logger().Info("GraphQL RATE_LIMITED error (fallback)",
-			"retry_after", retryAfter.String())
-		rateLimitMu.Unlock()
-	} else if rl != nil {
-		// if rate limit remaining is more than 3 continue using graphql api
-		if rl.Remaining > 3 {
+	var wait time.Duration
+	switch {
+	case errIn != nil:
+		if !isGraphQLRateLimitErr(errIn) {
 			return false
 		}
+		// the error does not say when the limit resets. GitHub asks to wait
+		// at least a minute before retrying after a secondary rate limit.
+		wait = time.Minute
+	case rl.Remaining <= graphqlMinRemaining:
+		// ResetAt can already be in the past, so keep a minimum wait to avoid
+		// sending a burst of requests right at the reset.
+		wait = max(time.Until(rl.ResetAt), 5*time.Second)
+	}
 
-		// === only reach here if error is nil and rate limit remaining is less than 3 (safety)
-		now := time.Now()
-		retryAfter = time.Until(rl.ResetAt)
-		// never negative and enforce a sane minimum backoff (avoid thrashing with 1s/2s retries)
-		if cmp.Less(retryAfter, 5*time.Second) {
-			retryAfter = 5 * time.Second
-		}
-
+	if wait > 0 {
 		jitter := time.Duration(rand.IntN(10)+1) * time.Second
-		retryAfter += jitter
+		wait += jitter
 
-		// update global resume time
 		rateLimitMu.Lock()
-		rateLimitResumeTime = now.Add(retryAfter)
+		if resume := time.Now().Add(wait); resume.After(rateLimitResumeTime) {
+			rateLimitResumeTime = resume
+		}
 		ctx.Logger().Info("exceeded GraphQL rate limit",
-			"retry_after", retryAfter.String(),
+			"retry_after", wait.String(),
 			"resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		rateLimitMu.Unlock()
 
@@ -392,13 +455,32 @@ func (s *Source) handleGraphQLRateLimit(ctx context.Context, rl *rateLimit, errI
 		}
 	}
 
+	// wait for our own limit, or one another worker hit, whichever ends later
+	rateLimitMu.RLock()
+	retryAfter := time.Until(rateLimitResumeTime)
+	rateLimitMu.RUnlock()
+	if retryAfter <= 0 {
+		return false
+	}
+
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
 	slept, canceled := sleepWithContext(ctx, retryAfter)
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(slept.Seconds())
 
-	return !canceled
+	return errIn != nil && !canceled
 }
 
+// isGraphQLRateLimitErr reports whether err is GitHub refusing a query because
+// we sent too many. githubv4 has no typed error for this, only text. GitHub
+// says "rate limit" in every form we know of: the primary limit ("API rate
+// limit exceeded for user ID ...") and the secondary limit ("You have exceeded
+// a secondary rate limit"), sent either as a GraphQL error or as the body of a
+// non-200 response.
+func isGraphQLRateLimitErr(err error) bool {
+	return strings.Contains(strings.ToLower(err.Error()), "rate limit")
+}
+
+// chunkGraphqlIssues emits one chunk per issue with its title and body.
 func (s *Source) chunkGraphqlIssues(ctx context.Context, repoInfo repoInfo, issues []issue, reporter sources.ChunkReporter) error {
 	for _, issue := range issues {
 		// Create chunk and send it to the channel.
@@ -429,9 +511,12 @@ func (s *Source) chunkGraphqlIssues(ctx context.Context, repoInfo repoInfo, issu
 	return nil
 }
 
+// chunkComments emits one chunk per comment, skipping comments last updated
+// before cutoffTime when one is set.
 func (s *Source) chunkComments(ctx context.Context, repoInfo repoInfo, comments []comment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
+		// not every query sorts comments by update time, so skip old ones
+		// instead of stopping at the first
 		if cutoffTime != nil && comment.UpdatedAt.Before(*cutoffTime) {
 			continue
 		}
@@ -464,6 +549,7 @@ func (s *Source) chunkComments(ctx context.Context, repoInfo repoInfo, comments 
 	return nil
 }
 
+// chunkGraphqlPullRequests emits one chunk per pull request with its title and body.
 func (s *Source) chunkGraphqlPullRequests(ctx context.Context, repoInfo repoInfo, prs []pullRequest, reporter sources.ChunkReporter) error {
 	for _, pr := range prs {
 		// Create chunk and send it to the channel.

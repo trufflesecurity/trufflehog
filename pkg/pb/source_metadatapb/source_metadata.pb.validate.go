@@ -68,6 +68,8 @@ func (m *AWSSecretsManager) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for UpsertError
+
 	if len(errors) > 0 {
 		return AWSSecretsManagerMultiError(errors)
 	}

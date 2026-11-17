@@ -3,28 +3,6 @@
   "Bindings": [
     {
       "Resource": {
-        "Name": "My Monitor",
-        "FullyQualifiedName": "4429851",
-        "Type": "Monitor",
-        "Metadata": {},
-        "Parent": {
-          "Name": "Truffle Sec",
-          "FullyQualifiedName": "a4b3b545-24ec-11f0-9f57-22795724d251",
-          "Type": "User",
-          "Metadata": {
-            "email": "detectors@trufflesec.com"
-          },
-          "Parent": null
-        }
-      },
-      "Permission": {
-        "Value": "",
-        "Parent": null
-      },
-      "Condition": ""
-    },
-    {
-      "Resource": {
         "Name": "Truffle Sec",
         "FullyQualifiedName": "a4b3b545-24ec-11f0-9f57-22795724d251",
         "Type": "User",
@@ -1094,34 +1072,43 @@
         "Parent": null
       },
       "Condition": ""
-    },
-    {
-      "Resource": {
-        "Name": "Truffle's Dashboard",
-        "FullyQualifiedName": "fvx-idw-ani",
-        "Type": "Dashboard",
-        "Metadata": {
-          "Author Handle": "detectors@trufflesec.com",
-          "Layout Type": "ordered",
-          "URL": "/dashboard/fvx-idw-ani/truffles-dashboard"
-        },
-        "Parent": {
-          "Name": "Truffle Sec",
-          "FullyQualifiedName": "a4b3b545-24ec-11f0-9f57-22795724d251",
-          "Type": "User",
-          "Metadata": {
-            "email": "detectors@trufflesec.com"
-          },
-          "Parent": null
-        }
-      },
-      "Permission": {
-        "Value": "",
-        "Parent": null
-      },
-      "Condition": ""
     }
   ],
-  "UnboundedResources": null,
+  "UnboundedResources": [
+    {
+      "Name": "My Monitor",
+      "FullyQualifiedName": "4429851",
+      "Type": "Monitor",
+      "Metadata": {},
+      "Parent": {
+        "Name": "Truffle Sec",
+        "FullyQualifiedName": "a4b3b545-24ec-11f0-9f57-22795724d251",
+        "Type": "User",
+        "Metadata": {
+          "email": "detectors@trufflesec.com"
+        },
+        "Parent": null
+      }
+    },
+    {
+      "Name": "Truffle's Dashboard",
+      "FullyQualifiedName": "fvx-idw-ani",
+      "Type": "Dashboard",
+      "Metadata": {
+        "Author Handle": "detectors@trufflesec.com",
+        "Layout Type": "ordered",
+        "URL": "/dashboard/fvx-idw-ani/truffles-dashboard"
+      },
+      "Parent": {
+        "Name": "Truffle Sec",
+        "FullyQualifiedName": "a4b3b545-24ec-11f0-9f57-22795724d251",
+        "Type": "User",
+        "Metadata": {
+          "email": "detectors@trufflesec.com"
+        },
+        "Parent": null
+      }
+    }
+  ],
   "Metadata": {}
 }
