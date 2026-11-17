@@ -235,6 +235,14 @@ Expected output:
 
 TruffleHog can also output [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) with `--sarif` instead of `--json`. GitHub code scanning understands SARIF natively, so uploading it surfaces findings inline on pull request diffs and in the repository's Security tab, and tracks findings as new/fixed across scans instead of reporting the same one every run — see the [TruffleHog Github Action](#octocat-trufflehog-github-action) section below for how to upload it. Note that, unlike the other output formats, SARIF results are buffered in memory for the full scan and written out at the end, since SARIF requires a single JSON document rather than a stream — fine for typical scans, but scans producing a very large number of results will use proportionally more memory.
 
+To get more than one format from a single scan, add `--output FORMAT:PATH` (repeatable). Results still go to stdout in the format chosen by the other flags, and each `--output` also writes them to a file in `plain`, `json`, `json-legacy`, `github-actions` or `sarif` format. For example, to keep readable logs in CI while saving JSON for later processing and SARIF for code scanning:
+
+```bash
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified --output json:results.json --output sarif:results.sarif
+```
+
+Output files are created with owner-only permissions (`0600`), since they contain the secrets that were found.
+
 ## 5: Scan a GitHub Repo + its Issues and Pull Requests
 
 ```bash
@@ -470,6 +478,11 @@ Flags:
       --[no-]github-actions      Output in GitHub Actions format.
       --[no-]sarif               Output in SARIF format for upload to GitHub code scanning (e.g.
                                  via github/codeql-action/upload-sarif).
+      --output=FORMAT:PATH ...   Also write results to a file, as FORMAT:PATH. FORMAT is one of
+                                 plain, json, json-legacy, github-actions, sarif. Results still
+                                 go to stdout in the format chosen by the other flags. You can
+                                 repeat this flag. Example: --output json:results.json --output
+                                 sarif:results.sarif
       --concurrency=12           Number of concurrent workers.
       --[no-]no-verification     Don't verify the results.
       --results=RESULTS          Specifies which type(s) of results to output: verified (confirmed

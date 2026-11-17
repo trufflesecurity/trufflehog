@@ -88,8 +88,6 @@ func TestFormatWarningCommand_EscapesSpecialCharactersInFilename(t *testing.T) {
 }
 
 func TestGitHubActionsPrinter_Print_HandlesFilenameWithSpecialCharacters(t *testing.T) {
-	dedupeCache = make(map[string]struct{}) // isolate from other tests sharing the package-level cache
-
 	p := &GitHubActionsPrinter{}
 	unusualFile := "readme.md\n::stop-commands::deadbeef"
 

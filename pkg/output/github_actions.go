@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 
@@ -12,10 +13,14 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-var dedupeCache = make(map[string]struct{})
-
 // GitHubActionsPrinter is a printer that prints results in GitHub Actions format.
-type GitHubActionsPrinter struct{ mu sync.Mutex }
+type GitHubActionsPrinter struct {
+	mu sync.Mutex
+	// Out is where results are written. Defaults to os.Stdout.
+	Out io.Writer
+	// seen holds the results already printed, so each file/line/detector is annotated once.
+	seen map[string]struct{}
+}
 
 func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := gitHubActionsOutputFormat{
@@ -43,10 +48,13 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 	key = hex.EncodeToString(h.Sum(nil))
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if _, ok := dedupeCache[key]; ok {
+	if _, ok := p.seen[key]; ok {
 		return nil
 	}
-	dedupeCache[key] = struct{}{}
+	if p.seen == nil {
+		p.seen = make(map[string]struct{})
+	}
+	p.seen[key] = struct{}{}
 
 	name := ""
 	if nameValue, ok := r.ExtraData["name"]; ok {
@@ -58,7 +66,9 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 		message = fmt.Sprintf("Found %s %s%s result with %s encoding 🐷🔑\n", verifiedStatus, out.DetectorType, name, out.DecoderType)
 	}
 
-	fmt.Print(formatWarningCommand(out.Filename, out.StartLine, message))
+	if _, err := fmt.Fprint(writerOrStdout(p.Out), formatWarningCommand(out.Filename, out.StartLine, message)); err != nil {
+		return fmt.Errorf("could not write result: %w", err)
+	}
 
 	return nil
 }
