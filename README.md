@@ -36,6 +36,33 @@ We take the revenue from the enterprise product to fund more awesome open source
 
 </div>
 
+# Table of Contents
+
+- [What is TruffleHog](#what-is-trufflehog-)
+  - [Discovery](#discovery-)
+  - [Classification](#classification-)
+  - [Validation](#validation-)
+  - [Analysis](#analysis-)
+- [Join Our Community](#loudspeaker-join-our-community)
+- [Demo](#tv-demo)
+- [Installation](#floppy_disk-installation)
+- [Verifying the artifacts](#closed_lock_with_key-verifying-the-artifacts)
+- [Quick Start](#rocket-quick-start)
+- [FAQ](#question-faq)
+- [What's new in v3?](#newspaper-whats-new-in-v3)
+- [Usage](#memo-usage)
+  - [S3](#s3)
+  - [TruffleHog GitHub Action](#octocat-trufflehog-github-action)
+  - [TruffleHog GitLab CI](#trufflehog-gitlab-ci)
+  - [Pre-commit Hook](#pre-commit-hook)
+  - [Custom Regex Detector (alpha)](#custom-regex-detector-alpha)
+  - [Generic JWT Detection](#generic-jwt-detection)
+  - [Analyze](#mag-analyze)
+- [Contributors](#heart-contributors)
+- [Contributing](#computer-contributing)
+- [Use as a library](#use-as-a-library)
+- [License Change](#license-change)
+
 # What is TruffleHog 🐽
 
 TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context, secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more.
