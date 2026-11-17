@@ -61,8 +61,10 @@ type SecretInfo struct {
 	User         userResponse
 	Organization *organizationResponse
 	Category     string
+	// KeysListed reports whether the key may list API keys. Team keys may not.
+	KeysListed bool
 	// Key is the key's own metadata. It is nil when the key may not list API
-	// keys, which is the case for team keys.
+	// keys, or when it may but its prefix is missing from the listing.
 	Key *apiKeyInfo
 	// OtherKeys are the other API keys the key can see. Only organization keys
 	// can manage them.
@@ -132,6 +134,7 @@ func analyzePermissions(ctx context.Context, client *http.Client, key string) (*
 		secretInfo.Category = categoryTeam
 		return secretInfo, nil
 	}
+	secretInfo.KeysListed = true
 
 	prefix, _, _ := strings.Cut(key, ".")
 	for i := range keys {
@@ -299,9 +302,9 @@ func printKeyInfo(info *SecretInfo) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Category", "Type", "Name", "Team", "User", "Workspace"})
 
-	keyType, keyName, teamName := "unknown (key cannot list API keys)", "", ""
+	keyType, keyName, teamName := keyTypeLabel(info), "", ""
 	if info.Key != nil {
-		keyType, keyName, teamName = info.Key.Type, info.Key.Name, info.Key.TeamName
+		keyName, teamName = info.Key.Name, info.Key.TeamName
 	}
 	userName := info.User.Name
 	if info.User.Email != nil {
@@ -316,6 +319,19 @@ func printKeyInfo(info *SecretInfo) {
 		color.GreenString(info.User.WorkspaceName),
 	})
 	t.Render()
+}
+
+// keyTypeLabel returns the key type to display, explaining why it is unknown
+// when the key's own metadata is unavailable.
+func keyTypeLabel(info *SecretInfo) string {
+	switch {
+	case info.Key != nil:
+		return info.Key.Type
+	case info.KeysListed:
+		return "unknown (key not found in API key listing)"
+	default:
+		return "unknown (key cannot list API keys)"
+	}
 }
 
 func printAPIKeys(keys []apiKeyInfo) {

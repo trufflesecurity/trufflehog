@@ -186,6 +186,42 @@ func TestAnalyzePermissions(t *testing.T) {
 	}
 }
 
+func TestKeyTypeLabel(t *testing.T) {
+	tests := []struct {
+		name string
+		keys stubResponse
+		want string
+	}{
+		{
+			name: "key cannot list api keys",
+			keys: forbidden,
+			want: "unknown (key cannot list API keys)",
+		},
+		{
+			name: "key missing from listing",
+			keys: keysBody(otherPersonal),
+			want: "unknown (key not found in API key listing)",
+		},
+		{
+			name: "key found in listing",
+			keys: keysBody(selfPersonalKey),
+			want: keyTypePersonal,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info, err := analyzePermissions(context.Background(), stubClient(personalUser, orgOK, tt.keys), testKey)
+			if err != nil {
+				t.Fatalf("analyzePermissions() error = %v", err)
+			}
+			if got := keyTypeLabel(info); got != tt.want {
+				t.Errorf("keyTypeLabel() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestAnalyze_MissingKey(t *testing.T) {
 	if _, err := (Analyzer{}).Analyze(context.Background(), map[string]string{}); err == nil {
 		t.Fatal("expected error for missing key")
