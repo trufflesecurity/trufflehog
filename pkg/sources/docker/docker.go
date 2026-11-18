@@ -61,6 +61,11 @@ func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
+// Concurrency returns the configured limit on layers scanned at once.
+func (s *Source) Concurrency() int {
+	return s.concurrency
+}
+
 // Init initializes the source.
 func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
