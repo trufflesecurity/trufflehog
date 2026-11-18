@@ -35,6 +35,9 @@ var (
 func TestGithub_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	// Realistic RS256 header with clearly fake payload and signature segments.
+	statelessToken := "ghs_1234567_eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." +
+		strings.Repeat("fakePayload_-", 24) + "." + strings.Repeat("fakeSignature_-", 11) + "A"
 
 	tests := []struct {
 		name  string
@@ -45,6 +48,26 @@ func TestGithub_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "stateless installation token",
+			input: statelessToken,
+			want:  []string{statelessToken},
+		},
+		{
+			name:  "stateless installation token in surrounding text",
+			input: "GitHub installation token: " + statelessToken + " is fake",
+			want:  []string{statelessToken},
+		},
+		{
+			name:  "classic installation token",
+			input: secret,
+			want:  []string{secret},
+		},
+		{
+			name:  "stateless installation token with trailing punctuation",
+			input: "GitHub installation token: " + statelessToken + ".",
+			want:  []string{statelessToken},
 		},
 	}
 
@@ -88,6 +111,39 @@ func TestGithub_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+// TestGithub_StatelessTokenThroughEngineWindow guards against truncation by the engine window.
+func TestGithub_StatelessTokenThroughEngineWindow(t *testing.T) {
+	// Realistic RS256 header with clearly fake payload and signature segments (528 chars).
+	token := "ghs_1234567_eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." +
+		strings.Repeat("fakePayload_-", 24) + "." + strings.Repeat("fakeSignature_-", 11) + "A"
+	chunk := []byte("GITHUB_TOKEN=" + token + "\n")
+
+	d := Scanner{}
+	core := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+	matches := core.FindDetectorMatches(chunk)
+	if len(matches) == 0 {
+		t.Fatal("no detector matches for stateless token")
+	}
+
+	var found bool
+	for _, m := range matches {
+		for _, data := range m.Matches() {
+			results, err := d.FromData(context.Background(), false, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, r := range results {
+				if string(r.Raw) == token {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Errorf("full %d-char token was not captured through the engine window (MaxSecretSize regression?)", len(token))
 	}
 }
 
