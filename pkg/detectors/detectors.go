@@ -302,6 +302,8 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 // SortResults stably orders results by Redacted, then RawV2, then Raw. Detectors that build results from a map return
 // them in random order; callers that select results by position (CleanResults, and engine.filterResults on behalf of
 // custom cleaners) sort first so the survivors do not change between scans.
+// Results that tie on all three fields can still differ in other fields, so the sort is stable: tied results keep
+// their input order. The output is fully deterministic only if that input order is consistent.
 func SortResults(results []Result) {
 	slices.SortStableFunc(results, func(a, b Result) int {
 		return cmp.Or(
