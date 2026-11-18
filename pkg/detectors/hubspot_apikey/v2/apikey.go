@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,6 +31,10 @@ var (
 
 	keyPat = regexp.MustCompile(`\b(pat-(?:eu|na)1-[A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12})\b`)
 )
+
+type hubspotErrorResponse struct {
+	Category string `json:"category"`
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -87,11 +92,23 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		if !json.Valid(body) {
+			return false, fmt.Errorf("unexpected response body for HTTP 200")
+		}
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
 	case http.StatusForbidden:
-		// The token is valid but lacks permission for the endpoint.
+		// Only HubSpot's own scope error proves the token authenticated; a 403 from anything
+		// else (e.g. a proxy) says nothing about the token.
+		var errResp hubspotErrorResponse
+		if err := json.NewDecoder(res.Body).Decode(&errResp); err != nil || errResp.Category != "MISSING_SCOPES" {
+			return false, fmt.Errorf("unexpected 403 response, unable to verify token")
+		}
 		return true, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
