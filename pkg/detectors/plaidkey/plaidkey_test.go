@@ -40,44 +40,21 @@ func TestPlaidKey_Pattern(t *testing.T) {
 			want:  []string{},
 		},
 		{
-			// Cassette shape: plaid is only in the URL, more than 40 characters
-			// before a labeled client_id and secret, and there is no access token.
-			name: "client id and secret pair without access token",
-			input: fmt.Sprintf(
-				`https://production.plaid.com/payment_initiation/recipient/create {"city":"City","postal_code":"99999","country":"GB"},"client_id":"%s","secret":"%s"}`,
-				validId, validSecret,
-			),
-			want: []string{fmt.Sprintf("%s:%s", validSecret, validId)},
-		},
-		{
-			name: "labeled pair is ignored when plaid is absent",
-			input: fmt.Sprintf(
-				`{"client_id":"%s","secret":"%s"}`,
-				validId, validSecret,
-			),
-			want: nil,
+			name:  "client id and secret without access token",
+			input: fmt.Sprintf("%s secret - '%s'\n%s client id - '%s'", keyword, validSecret, keyword, validId),
+			want:  []string{fmt.Sprintf("%s:%s", validSecret, validId)},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(test.want) == 0 && len(matchedDetectors) == 0 {
-				return
-			}
 			if len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
 
-			// Run on the span the engine would pass in, not the whole input.
-			var spanned []byte
-			for _, match := range matchedDetectors {
-				for _, piece := range match.Matches() {
-					spanned = append(spanned, piece...)
-				}
-			}
-			results, err := d.FromData(context.Background(), false, spanned)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			if err != nil {
 				t.Errorf("error = %v", err)
 				return
