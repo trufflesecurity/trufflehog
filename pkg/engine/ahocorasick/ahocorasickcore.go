@@ -1,6 +1,8 @@
 package ahocorasick
 
 import (
+	"cmp"
+	"slices"
 	"sync"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
@@ -104,6 +106,16 @@ func (k DetectorKey) Loggable() map[string]any {
 
 // Type returns the detector type of the key.
 func (k DetectorKey) Type() detector_typepb.DetectorType { return k.detectorType }
+
+// compare orders keys by detector type, version, and custom detector name so that the result order does not depend on
+// map iteration. The type order is the protobuf enum value, which is assignment history, not priority.
+func (k DetectorKey) compare(other DetectorKey) int {
+	return cmp.Or(
+		cmp.Compare(k.detectorType, other.detectorType),
+		cmp.Compare(k.version, other.version),
+		cmp.Compare(k.customDetectorName, other.customDetectorName),
+	)
+}
 
 // spanCalculator is an interface that defines a method for calculating a match span
 // in the chunk data. This allows for different strategies to be used without changing the core logic.
@@ -356,6 +368,9 @@ func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 
 		uniqueDetectors = append(uniqueDetectors, detectorMatch)
 	}
+
+	// Sort so the order of the returned matches does not depend on map iteration.
+	slices.SortFunc(uniqueDetectors, func(a, b *DetectorMatch) int { return a.Key.compare(b.Key) })
 
 	return uniqueDetectors
 }
