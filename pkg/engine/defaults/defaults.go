@@ -428,6 +428,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanbantool"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/karmacrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/keenio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kenso"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kickbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/klaviyo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/klipfolio"
@@ -1351,6 +1352,7 @@ func buildDetectorList() []detectors.Detector {
 		&kanbantool.Scanner{},
 		&karmacrm.Scanner{},
 		&keenio.Scanner{},
+		&kenso.Scanner{},
 		&kickbox.Scanner{},
 		&klaviyo.Scanner{},
 		&klipfolio.Scanner{},
@@ -1928,6 +1930,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InfisicalDetectorEnabled.Load()
 		case *serval.Scanner:
 			return !feature.ServalDetectorEnabled.Load()
+		case *kenso.Scanner:
+			return !feature.KensoDetectorEnabled.Load()
 		default:
 			return false
 		}
