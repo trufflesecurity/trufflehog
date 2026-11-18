@@ -833,6 +833,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ubidots"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uclassify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/unifyid"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/unkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/unplugg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/unsplash"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/upcdatabase"
@@ -1768,6 +1769,7 @@ func buildDetectorList() []detectors.Detector {
 		&ubidots.Scanner{},
 		&uclassify.Scanner{},
 		&unifyid.Scanner{},
+		&unkey.Scanner{},
 		&unplugg.Scanner{},
 		&unsplash.Scanner{},
 		&upcdatabase.Scanner{},
