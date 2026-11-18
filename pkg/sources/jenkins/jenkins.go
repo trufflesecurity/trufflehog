@@ -48,11 +48,9 @@ type header struct {
 }
 
 // Ensure the Source satisfies the interfaces at compile time.
-// SourceUnitChunker is deliberately not implemented yet, which keeps
-// SourceManager on the non-unit Chunks path for scans.
 var (
 	_ sources.Source                 = (*Source)(nil)
-	_ sources.SourceUnitEnumerator   = (*Source)(nil)
+	_ sources.SourceUnitEnumChunker  = (*Source)(nil)
 	_ sources.SourceUnitUnmarshaller = (*Source)(nil)
 )
 
@@ -435,6 +433,13 @@ func (s *Source) scanJob(ctx context.Context, job JenkinsJob, reporter sources.C
 	ctx.Logger().V(2).Info("got builds",
 		"count", len(builds.Builds))
 
+	// A unit rebuilt from its ID alone carries no name, so fall back to the
+	// name derived from its path.
+	projectName := job.Name
+	if projectName == "" {
+		projectName = job.Display()
+	}
+
 	for _, build := range builds.Builds {
 		if common.IsDone(ctx) {
 			return ctx.Err()
@@ -444,7 +449,7 @@ func (s *Source) scanJob(ctx context.Context, job JenkinsJob, reporter sources.C
 			"build_number", build.Number,
 			"build_url", build.Url)
 
-		if err := s.chunkBuild(ctx, build, job.Name, reporter); err != nil {
+		if err := s.chunkBuild(ctx, build, projectName, reporter); err != nil {
 			if err := reporter.ChunkErr(ctx, fmt.Errorf("failed to scan build %d of job %q: %w", build.Number, job.Path, err)); err != nil {
 				return err
 			}
@@ -516,6 +521,17 @@ func (s *Source) chunkBuild(
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	baseUrl := *s.url
 	return s.walkJobs(ctx, baseUrl.Path, reporter)
+}
+
+// ChunkUnit implements the SourceUnitChunker interface. It scans the build logs
+// of a single job, reporting any failure against that job's unit so the rest
+// of the scan carries on.
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	job, ok := unit.(JenkinsJob)
+	if !ok {
+		return fmt.Errorf("unsupported unit type: %T", unit)
+	}
+	return s.scanJob(ctx, job, reporter)
 }
 
 // UnmarshalSourceUnit implements the SourceUnitUnmarshaller interface. It
