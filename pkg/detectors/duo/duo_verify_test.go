@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -19,20 +20,37 @@ const (
 	testSKey = "abcdefghijABCDEFGHIJ0123456789abcdefghij"
 )
 
-// Response bodies as returned by Duo.
-const (
-	bodyOK               = `{"stat": "OK", "response": {}}`
-	bodyInvalidSignature = `{"code": 40103, "message": "Invalid signature in request credentials", "stat": "FAIL"}`
-	bodyWrongIntegration = `{"code": 40301, "message": "Access forbidden", "message_detail": "Wrong integration type for this API.", "stat": "FAIL"}`
-)
+// Messages Duo sends with each error code, as seen from live responses.
+var duoMessages = map[int]string{
+	40101: "Missing request credentials",
+	40102: "Invalid identity in request credentials",
+	40103: "Invalid signature in request credentials",
+	40301: "Access forbidden",
+}
 
 var errNetwork = errors.New("network unreachable")
 
-// duoResponse is the fake answer for one API path. A nil value means the
-// transport fails for that path.
-type duoResponse *int
+// duoResponse is the fake answer for one API path. A nil value means the transport
+// fails for that path.
+type duoResponse *fakeReply
 
-func status(code int) duoResponse { return &code }
+type fakeReply struct {
+	status int
+	body   string
+}
+
+// duoError answers with a Duo error body; the HTTP status is its first three digits.
+func duoError(c int) duoResponse {
+	return &fakeReply{
+		status: c / 100,
+		body:   fmt.Sprintf(`{"code": %d, "message": %q, "stat": "FAIL"}`, c, duoMessages[c]),
+	}
+}
+
+// raw answers with a status and a body that is not a Duo error.
+func raw(status int, body string) duoResponse { return &fakeReply{status: status, body: body} }
+
+var okReply = raw(http.StatusOK, `{"stat": "OK", "response": {}}`)
 
 type fakeDuo struct {
 	mu       sync.Mutex
@@ -50,25 +68,18 @@ func newFakeDuoClient(t *testing.T, admin, auth duoResponse) (*http.Client, *fak
 				fake.requests[req.URL.Path] = req
 				fake.mu.Unlock()
 
-				resp, ok := responses[req.URL.Path]
-				if !ok {
+				resp, found := responses[req.URL.Path]
+				if !found {
 					t.Errorf("unexpected request path %s", req.URL.Path)
 					return nil, errNetwork
 				}
 				if resp == nil {
 					return nil, errNetwork
 				}
-				body := bodyOK
-				switch *resp {
-				case http.StatusUnauthorized:
-					body = bodyInvalidSignature
-				case http.StatusForbidden:
-					body = bodyWrongIntegration
-				}
 				return &http.Response{
 					Request:    req,
-					StatusCode: *resp,
-					Body:       io.NopCloser(strings.NewReader(body)),
+					StatusCode: resp.status,
+					Body:       io.NopCloser(strings.NewReader(resp.body)),
 				}, nil
 			},
 		},
@@ -79,8 +90,8 @@ func newFakeDuoClient(t *testing.T, admin, auth duoResponse) (*http.Client, *fak
 func (f *fakeDuo) called(path string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	_, ok := f.requests[path]
-	return ok
+	_, found := f.requests[path]
+	return found
 }
 
 func testData() []byte {
@@ -97,64 +108,79 @@ func TestDuo_Verification_Outcomes(t *testing.T) {
 		wantErr         bool
 		wantAuthCalled  bool
 	}{
+		// Verified: an API accepted the credentials.
 		{
 			name:  "admin 200 verifies an Admin API key",
-			admin: status(200), auth: status(403),
+			admin: okReply, auth: duoError(40301),
 			wantVerified: true, wantApplication: adminApplication,
 		},
 		{
-			name:  "admin 401, auth 200 verifies an Auth API key",
-			admin: status(401), auth: status(200),
+			name:  "admin 40102, auth 200 verifies an Auth API key",
+			admin: duoError(40102), auth: okReply,
 			wantVerified: true, wantApplication: authApplication, wantAuthCalled: true,
 		},
 		{
-			name:  "admin 403, auth 200 verifies an Auth API key",
-			admin: status(403), auth: status(200),
+			name:  "admin 40301, auth 200 verifies an Auth API key",
+			admin: duoError(40301), auth: okReply,
 			wantVerified: true, wantApplication: authApplication, wantAuthCalled: true,
 		},
+
+		// Invalid: an API recognized the integration key and rejected the secret key.
 		{
-			name:  "admin 401, auth 403 is invalid",
-			admin: status(401), auth: status(403),
+			name:  "admin 40103, auth 40301 is an Admin API key with a wrong secret",
+			admin: duoError(40103), auth: duoError(40301),
 			wantApplication: adminApplication, wantAuthCalled: true,
 		},
 		{
-			name:  "admin 401, auth 401 is invalid",
-			admin: status(401), auth: status(401),
+			name:  "admin 40102, auth 40103 is an Auth API key with a wrong secret",
+			admin: duoError(40102), auth: duoError(40103),
 			wantApplication: adminApplication, wantAuthCalled: true,
 		},
 		{
-			name:  "admin 403, auth 401 is invalid",
-			admin: status(403), auth: status(401),
+			name:  "admin network error, auth 40103 is invalid",
+			admin: nil, auth: duoError(40103),
 			wantApplication: adminApplication, wantAuthCalled: true,
 		},
 		{
-			name:  "admin network error, auth 401 is invalid",
-			admin: nil, auth: status(401),
+			name:  "admin 40103, auth network error is invalid",
+			admin: duoError(40103), auth: nil,
 			wantApplication: adminApplication, wantAuthCalled: true,
 		},
+
+		// Indeterminate: no response judged the secret key.
 		{
-			name:  "admin 401, auth network error is indeterminate",
-			admin: status(401), auth: nil,
+			name:  "admin 40102, auth 40301 is another integration type",
+			admin: duoError(40102), auth: duoError(40301),
 			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
 		},
 		{
-			name:  "admin 401, auth 500 is indeterminate",
-			admin: status(401), auth: status(500),
+			name:  "admin 40102, auth 40102 is unknown to both APIs",
+			admin: duoError(40102), auth: duoError(40102),
 			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
 		},
 		{
-			name:  "admin 403, auth 403 is indeterminate",
-			admin: status(403), auth: status(403),
+			name:  "admin 40301, auth 40301 is an Admin API key without permission",
+			admin: duoError(40301), auth: duoError(40301),
+			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
+		},
+		{
+			name:  "40101 means the request was malformed",
+			admin: duoError(40101), auth: duoError(40101),
+			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
+		},
+		{
+			name:  "401 without a Duo error body is not a verdict",
+			admin: raw(http.StatusUnauthorized, `<html>Unauthorized</html>`), auth: raw(http.StatusUnauthorized, ``),
+			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
+		},
+		{
+			name:  "admin 40102, auth network error is indeterminate",
+			admin: duoError(40102), auth: nil,
 			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
 		},
 		{
 			name:  "admin 500 is indeterminate",
-			admin: status(500), auth: status(403),
-			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
-		},
-		{
-			name:  "admin network error, auth 403 is indeterminate",
-			admin: nil, auth: status(403),
+			admin: raw(http.StatusInternalServerError, ``), auth: duoError(40301),
 			wantApplication: adminApplication, wantErr: true, wantAuthCalled: true,
 		},
 		{
@@ -202,8 +228,58 @@ func TestDuo_Verification_Outcomes(t *testing.T) {
 	}
 }
 
+func TestDuo_Verification_IndeterminateErrorExplainsCodes(t *testing.T) {
+	tests := []struct {
+		name           string
+		admin          duoResponse
+		auth           duoResponse
+		wantContains   []string
+		wantNoContains []string
+	}{
+		{
+			name:         "missing Admin API permission is called out",
+			admin:        duoError(40301),
+			auth:         duoError(40301),
+			wantContains: []string{"HTTP 403 (code 40301)", `"Grant read information"`},
+		},
+		{
+			name:           "other integration types get no permission hint",
+			admin:          duoError(40102),
+			auth:           duoError(40301),
+			wantContains:   []string{"HTTP 401 (code 40102)", "HTTP 403 (code 40301)"},
+			wantNoContains: []string{"Grant read information"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, _ := newFakeDuoClient(t, tt.admin, tt.auth)
+			s := Scanner{client: client}
+
+			results, err := s.FromData(context.Background(), true, testData())
+			if err != nil || len(results) != 1 {
+				t.Fatalf("expected 1 result, got %d (err %v)", len(results), err)
+			}
+			vErr := results[0].VerificationError()
+			if vErr == nil {
+				t.Fatal("expected a verification error")
+			}
+			for _, s := range tt.wantContains {
+				if !strings.Contains(vErr.Error(), s) {
+					t.Errorf("verification error %q does not contain %q", vErr, s)
+				}
+			}
+			for _, s := range tt.wantNoContains {
+				if strings.Contains(vErr.Error(), s) {
+					t.Errorf("verification error %q must not contain %q", vErr, s)
+				}
+			}
+		})
+	}
+}
+
 func TestDuo_Verification_RequestShape(t *testing.T) {
-	client, fake := newFakeDuoClient(t, status(401), status(200))
+	client, fake := newFakeDuoClient(t, duoError(40102), okReply)
 	s := Scanner{client: client}
 
 	if _, err := s.FromData(context.Background(), true, testData()); err != nil {
@@ -224,8 +300,8 @@ func TestDuo_Verification_RequestShape(t *testing.T) {
 		if req.Header.Get("Date") == "" {
 			t.Errorf("%s request has no Date header", path)
 		}
-		encoded, ok := strings.CutPrefix(req.Header.Get("Authorization"), "Basic ")
-		if !ok {
+		encoded, found := strings.CutPrefix(req.Header.Get("Authorization"), "Basic ")
+		if !found {
 			t.Fatalf("%s Authorization header is not Basic auth", path)
 		}
 		decoded, err := base64.StdEncoding.DecodeString(encoded)
@@ -242,7 +318,7 @@ func TestDuo_Verification_RequestShape(t *testing.T) {
 }
 
 func TestDuo_Verification_ErrorNeverContainsSecret(t *testing.T) {
-	client, _ := newFakeDuoClient(t, status(403), status(403))
+	client, _ := newFakeDuoClient(t, duoError(40301), duoError(40301))
 	s := Scanner{client: client}
 
 	results, err := s.FromData(context.Background(), true, testData())
@@ -259,7 +335,7 @@ func TestDuo_Verification_ErrorNeverContainsSecret(t *testing.T) {
 }
 
 func TestDuo_Verification_SkippedWhenVerifyIsFalse(t *testing.T) {
-	client, fake := newFakeDuoClient(t, status(200), status(200))
+	client, fake := newFakeDuoClient(t, okReply, okReply)
 	s := Scanner{client: client}
 
 	results, err := s.FromData(context.Background(), false, testData())

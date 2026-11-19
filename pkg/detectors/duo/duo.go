@@ -6,6 +6,8 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,7 +48,15 @@ const (
 
 	adminApplication = "Admin API"
 	authApplication  = "Auth API"
+
+	duoCodeInvalidSignature = 40103 
+	duoCodeAccessForbidden  = 40301 
 )
+
+type duoReply struct {
+	status int
+	code   int
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -111,31 +121,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // verifyMatch checks the credentials against the Admin API, then the Auth API, and
 // returns whether they are valid and which application they belong to.
 //
-// Duo can answer 403 (40301, "Access forbidden") before it checks the signature, so a
-// 403 says nothing about the secret key. Only a 200 from either API proves the
-// credentials valid. A 401 from the Auth API proves them invalid, because Admin API keys
-// get a 403 there. The Admin API returns 401 for every key that is not an Admin API
-// key, so its 401 proves the credentials invalid only once the Auth API has identified
-// them as Admin API keys with a 403. Any other combination is reported as a
-// verification error.
+// Only a 200 from either API proves the credentials valid, and only error code 40103
+// (invalid signature) from either API proves them invalid: that API recognized the
+// integration key and rejected the secret key. Other responsesare reported as a verification error.
 func verifyMatch(
 	ctx context.Context,
 	client *http.Client,
 	host, ikey, skey string,
 ) (bool, string, error) {
-	adminStatus, adminErr := duoRequestStatus(ctx, client, host, ikey, skey, adminAPIPath)
-	if adminErr == nil && adminStatus == http.StatusOK {
+	admin, adminErr := duoRequest(ctx, client, host, ikey, skey, adminAPIPath)
+	if adminErr == nil && admin.status == http.StatusOK {
 		return true, adminApplication, nil
 	}
 
-	authStatus, authErr := duoRequestStatus(ctx, client, host, ikey, skey, authAPIPath)
-	if authErr == nil && authStatus == http.StatusOK {
+	auth, authErr := duoRequest(ctx, client, host, ikey, skey, authAPIPath)
+	if authErr == nil && auth.status == http.StatusOK {
 		return true, authApplication, nil
 	}
 
-	authAnswered := authErr == nil
-	if authAnswered && (authStatus == http.StatusUnauthorized ||
-		(authStatus == http.StatusForbidden && adminErr == nil && adminStatus == http.StatusUnauthorized)) {
+	if (adminErr == nil && admin.code == duoCodeInvalidSignature) ||
+		(authErr == nil && auth.code == duoCodeInvalidSignature) {
 		return false, adminApplication, nil
 	}
 	if adminErr != nil {
@@ -144,20 +149,25 @@ func verifyMatch(
 	if authErr != nil {
 		return false, adminApplication, authErr
 	}
-	return false, adminApplication, fmt.Errorf(
-		"indeterminate Duo verification: admin API returned HTTP %d, auth API returned HTTP %d",
-		adminStatus, authStatus,
+
+	msg := fmt.Sprintf(
+		"indeterminate Duo verification: admin API returned HTTP %d (code %d), auth API returned HTTP %d (code %d)",
+		admin.status, admin.code, auth.status, auth.code,
 	)
+	if admin.code == duoCodeAccessForbidden {
+		msg += `; an Admin API integration needs the "Grant read information" permission to be verified`
+	}
+	return false, adminApplication, errors.New(msg)
 }
 
-// duoRequestStatus sends a signed GET request to the given Duo API path and returns the
-// HTTP status code without interpreting it.
-func duoRequestStatus(
+// duoRequest sends a signed GET request to the given Duo API path and returns the HTTP
+// status and Duo error code without interpreting them.
+func duoRequest(
 	ctx context.Context,
 	client *http.Client,
 	host, ikey, skey string,
 	path string,
-) (int, error) {
+) (duoReply, error) {
 
 	timestamp := time.Now().UTC().Format(http.TimeFormat)
 
@@ -188,7 +198,7 @@ func duoRequestStatus(
 		nil,
 	)
 	if err != nil {
-		return 0, err
+		return duoReply{}, err
 	}
 
 	req.Header.Set("Authorization", "Basic "+auth)
@@ -196,14 +206,23 @@ func duoRequestStatus(
 
 	res, err := client.Do(req)
 	if err != nil {
-		return 0, err
+		return duoReply{}, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
 
-	return res.StatusCode, nil
+	reply := duoReply{status: res.StatusCode}
+	if res.StatusCode != http.StatusOK {
+		var body struct {
+			Code int `json:"code"`
+		}
+		if json.NewDecoder(io.LimitReader(res.Body, 64<<10)).Decode(&body) == nil {
+			reply.code = body.Code
+		}
+	}
+	return reply, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
