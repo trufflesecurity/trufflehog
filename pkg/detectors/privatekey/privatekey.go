@@ -53,124 +53,213 @@ const maxPrivateKeySize = 4096
 // ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
 func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
+// verifyKey is a variable so that tests can keep the detector off the network.
+var verifyKey = verifyKeyOnline
+
+const notVerifiedMessage = "key was not verified"
+
+// maxConcurrentVerifications is how many keys of one chunk are verified at the
+// same time. A key takes a second or two to verify, so four at a time gets the
+// couple of dozen small keys a chunk can hold through the default detector
+// timeout, where one at a time gets through about six.
+const maxConcurrentVerifications = 4
+
+type candidate struct {
+	result    detectors.Result
+	token     string
+	parsedKey any
+}
+
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllString(dataStr, -1)
-	for _, match := range matches {
+	var (
+		matches    = keyPat.FindAllString(dataStr, -1)
+		candidates = make([]*candidate, len(matches))
+		plain      []int
+		encrypted  []int
+	)
+	for i, match := range matches {
 		token := Normalize(match)
 		if len(token) < 64 {
 			continue
 		}
 
-		s1 := detectors.Result{
-			DetectorType: detector_typepb.DetectorType_PrivateKey,
-			Raw:          []byte(token),
-			Redacted:     token[0:64],
-			ExtraData:    make(map[string]string),
-			SecretParts:  map[string]string{"token": token},
+		c := &candidate{
+			result: detectors.Result{
+				DetectorType: detector_typepb.DetectorType_PrivateKey,
+				Raw:          []byte(token),
+				Redacted:     token[0:64],
+				ExtraData:    make(map[string]string),
+				SecretParts:  map[string]string{"token": token},
+			},
+			token: token,
 		}
 
 		// set not normalized match as primary secret value so it is used to calculate line of code
-		s1.SetPrimarySecretValue(match)
+		c.result.SetPrimarySecretValue(match)
 
-		var passphrase string
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
 		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
-			s1.ExtraData["encrypted"] = "true"
-			parsedKey, passphrase, err = Crack([]byte(token))
-			if err != nil {
-				// The key is encrypted and the passphrase could not be
-				// recovered from the wordlist. It still represents a real
-				// exposure (offline-crackable, weak/legacy KDFs, passphrase
-				// often reused or committed nearby), so surface it as an
-				// unverified finding instead of dropping it silently.
-				s1.SetVerificationError(err, token)
-				results = append(results, s1)
-				continue
-			}
-			if passphrase != "" {
-				s1.ExtraData["cracked_encryption_passphrase"] = "true"
-			}
+			c.result.ExtraData["encrypted"] = "true"
+			encrypted = append(encrypted, i)
 		} else if err != nil {
 			// couldn't parse key, probably invalid
 			continue
+		} else {
+			c.parsedKey = parsedKey
+			plain = append(plain, i)
 		}
+		candidates[i] = c
+	}
 
-		fingerprint, err := FingerprintPEMKey(parsedKey)
+	// Every key of a chunk shares one deadline. Plain keys go first and are
+	// verified side by side, so that neither a long run of keys nor the
+	// cracking of an encrypted one, where each wrong passphrase costs a full
+	// KDF run, leaves a key waiting until the deadline has passed. Results
+	// are still returned in the order the keys appear.
+	var (
+		wg    sync.WaitGroup
+		slots = make(chan struct{}, maxConcurrentVerifications)
+	)
+	for _, i := range plain {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-slots }()
+			if !s.check(ctx, verify, candidates[i]) {
+				candidates[i] = nil
+			}
+		}()
+	}
+	wg.Wait()
+
+	for _, i := range encrypted {
+		c := candidates[i]
+
+		parsedKey, passphrase, err := Crack([]byte(c.token))
 		if err != nil {
+			// The key is encrypted and the passphrase could not be
+			// recovered from the wordlist. It still represents a real
+			// exposure (offline-crackable, weak/legacy KDFs, passphrase
+			// often reused or committed nearby), so surface it as an
+			// unverified finding instead of dropping it silently.
+			c.result.SetVerificationError(err, c.token)
 			continue
 		}
-
-		if verify {
-			var (
-				wg                 sync.WaitGroup
-				extraData          = newExtraData()
-				verificationErrors = NewVerificationErrors(3)
-			)
-
-			// Look up certificate information.
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				data, err := lookupFingerprintCertificateUrls(ctx, fingerprint, s.IncludeExpired)
-				if err == nil {
-					if data != nil {
-						extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
-					}
-				} else {
-					verificationErrors.Add(err)
-				}
-			}()
-
-			// Test SSH key against github.com
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				username, err := VerifyGitHubUser(ctx, parsedKey)
-				if err != nil && !errors.Is(err, errPermissionDenied) {
-					verificationErrors.Add(err)
-				}
-				if username != nil {
-					isFalsePositive, _ := detectors.IsKnownFalsePositive(*username, falsePositiveGHUsernames, false)
-					if !isFalsePositive {
-						extraData.Add("github_user", *username)
-					}
-				}
-			}()
-
-			// Test SSH key against gitlab.com
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				user, err := VerifyGitLabUser(ctx, parsedKey)
-				if err != nil && !errors.Is(err, errPermissionDenied) {
-					verificationErrors.Add(err)
-				}
-				if user != nil {
-					extraData.Add("gitlab_user", *user)
-				}
-			}()
-
-			wg.Wait()
-			if len(extraData.data) > 0 {
-				s1.Verified = true
-				for k, v := range extraData.data {
-					s1.ExtraData[k] = v
-				}
-			} else {
-				s1.ExtraData = nil
-			}
-			if len(verificationErrors.Errors) > 0 {
-				s1.SetVerificationError(fmt.Errorf("verification failures: %s", strings.Join(verificationErrors.Errors, ", ")), token)
-			}
+		if passphrase != "" {
+			c.result.ExtraData["cracked_encryption_passphrase"] = "true"
 		}
+		c.parsedKey = parsedKey
 
-		results = append(results, s1)
+		if !s.check(ctx, verify, c) {
+			candidates[i] = nil
+		}
+	}
+
+	for _, c := range candidates {
+		if c != nil {
+			results = append(results, c.result)
+		}
 	}
 
 	return results, nil
+}
+
+// check fingerprints a parsed key and, when verify is set, verifies it. It
+// reports false for a key that cannot be fingerprinted, which is not reported.
+func (s Scanner) check(ctx context.Context, verify bool, c *candidate) bool {
+	fingerprint, err := FingerprintPEMKey(c.parsedKey)
+	if err != nil {
+		return false
+	}
+
+	if !verify {
+		return true
+	}
+
+	// Once the context is done every dial fails at once, and the errors read
+	// like a network outage for a key that was never checked.
+	// SetVerificationError keeps only the innermost error, so the cause is
+	// formatted in rather than wrapped.
+	if err := ctx.Err(); err != nil {
+		c.result.SetVerificationError(fmt.Errorf("%s: %v", notVerifiedMessage, err), c.token)
+		return true
+	}
+
+	extraData, verificationErrors := verifyKey(ctx, c.parsedKey, fingerprint, s.IncludeExpired)
+	if len(extraData) > 0 {
+		c.result.Verified = true
+		for k, v := range extraData {
+			c.result.ExtraData[k] = v
+		}
+	} else {
+		c.result.ExtraData = nil
+	}
+	if len(verificationErrors) > 0 {
+		c.result.SetVerificationError(fmt.Errorf("verification failures: %s", strings.Join(verificationErrors, ", ")), c.token)
+	}
+
+	return true
+}
+
+// verifyKeyOnline checks the key against the certificate lookup, github.com
+// and gitlab.com. It returns what it learned about the key and the errors that
+// kept a check from giving an answer.
+func verifyKeyOnline(ctx context.Context, parsedKey any, fingerprint string, includeExpired bool) (map[string]string, []string) {
+	var (
+		wg                 sync.WaitGroup
+		extraData          = newExtraData()
+		verificationErrors = NewVerificationErrors(3)
+	)
+
+	// Look up certificate information.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		data, err := lookupFingerprintCertificateUrls(ctx, fingerprint, includeExpired)
+		if err == nil {
+			if data != nil {
+				extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
+			}
+		} else {
+			verificationErrors.Add(err)
+		}
+	}()
+
+	// Test SSH key against github.com
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		username, err := VerifyGitHubUser(ctx, parsedKey)
+		if err != nil && !errors.Is(err, errPermissionDenied) {
+			verificationErrors.Add(err)
+		}
+		if username != nil {
+			isFalsePositive, _ := detectors.IsKnownFalsePositive(*username, falsePositiveGHUsernames, false)
+			if !isFalsePositive {
+				extraData.Add("github_user", *username)
+			}
+		}
+	}()
+
+	// Test SSH key against gitlab.com
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		user, err := VerifyGitLabUser(ctx, parsedKey)
+		if err != nil && !errors.Is(err, errPermissionDenied) {
+			verificationErrors.Add(err)
+		}
+		if user != nil {
+			extraData.Add("gitlab_user", *user)
+		}
+	}()
+
+	wg.Wait()
+	return extraData.data, verificationErrors.Errors
 }
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
