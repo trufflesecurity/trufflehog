@@ -28,7 +28,28 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b([a-zA-Z0-9-]{36})\b`)
 
 	baseURL = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b(https?:\/\/[-a-zA-Z0-9@:%._\+~#=]{7,256})\b`)
+
+	// metabaseMarketingHosts are the Metabase marketing and documentation sites.
+	// They are not Metabase instances, so a candidate URL on one of these hosts
+	// can never verify a session token: docs links such as
+	// https://www.metabase.com/docs/latest/api get paired with any nearby UUID
+	// and verified against the marketing site, which only produces 404 noise.
+	// Subdomains of metabase.com are NOT listed here: a customer instance such
+	// as https://mycompany.metabase.com is a real Metabase deployment and must
+	// still be verified.
+	metabaseMarketingHosts = map[string]struct{}{
+		"metabase.com":     {},
+		"www.metabase.com": {},
+	}
 )
+
+// isMetabaseMarketingHost reports whether host is the Metabase marketing or
+// documentation site rather than a Metabase instance.
+func isMetabaseMarketingHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	_, ok := metabaseMarketingHosts[host]
+	return ok
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -52,6 +73,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			u, err := detectors.ParseURLAndStripPathAndParams(resURLMatch)
 			if err != nil {
 				// if the URL is invalid just move onto the next one
+				continue
+			}
+
+			if isMetabaseMarketingHost(u.Hostname()) {
+				// The Metabase marketing and docs sites are not Metabase
+				// instances, so no session token can verify against them.
+				// Skip the candidate instead of sending a verification
+				// request that can only 404.
 				continue
 			}
 
