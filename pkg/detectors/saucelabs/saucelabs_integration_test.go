@@ -108,6 +108,8 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].ExtraData = nil
+				got[i].SecretParts = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("SauceLabs.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

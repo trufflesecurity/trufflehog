@@ -2,6 +2,7 @@ package saucelabs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -21,16 +23,27 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// as per signup page username can be between 2 to 70 characters and must only contain letters, numbers, or characters (_-.)
 	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"saucelabs", "username"}) + `\b([a-zA-Z0-9_\.-]{2,70})`)
 	keyPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"saucelabs"}) + `\b([a-z0-9]{8}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{12})\b`)
-	baseUrlPat  = regexp.MustCompile(`\b(api\.(?:us|eu)-(?:west|east|central)-[0-9].saucelabs\.com)\b`)
+	baseUrlPat  = regexp.MustCompile(`\b(api\.(?:us|eu)-(?:west|east|central)-[0-9]\.saucelabs\.com)\b`)
 
 	fixedBaseURL = "api.us-west-1.saucelabs.com"
 )
+
+type identityResponse struct {
+	Sub string `json:"sub"`
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -79,7 +92,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					isVerified, verificationErr := verifySauceLabKey(ctx, client, userName, key, baseURL)
+					isVerified, verificationErr := verifySauceLabKey(ctx, s.getClient(), userName, key, baseURL)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, key)
 				}
@@ -100,10 +113,12 @@ func (s Scanner) Description() string {
 	return "A service for cross browser testing, API keys can create and access tests from potentially sensitive internal websites"
 }
 
+// verifySauceLabKey calls the identity endpoint, which accepts any valid credential regardless of role
+// and is documented to return only 200 or 401. Any other response (e.g. a 403 from a proxy) is indeterminate.
 func verifySauceLabKey(ctx context.Context, client *http.Client, userName, key, baseURL string) (bool, error) {
-	apiURL := fmt.Sprintf("https://%s/team-management/v1/teams", baseURL)
+	apiURL := fmt.Sprintf("https://%s/auth/v1/identity", baseURL)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, http.NoBody)
 	if err != nil {
 		return false, err
 	}
@@ -120,7 +135,14 @@ func verifySauceLabKey(ctx context.Context, client *http.Client, userName, key, 
 	}()
 
 	switch resp.StatusCode {
-	case http.StatusOK, http.StatusForbidden:
+	case http.StatusOK:
+		var identity identityResponse
+		if err := json.NewDecoder(resp.Body).Decode(&identity); err != nil {
+			return false, fmt.Errorf("unexpected response body: %w", err)
+		}
+		if identity.Sub == "" {
+			return false, fmt.Errorf("unexpected response body: missing account id")
+		}
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
