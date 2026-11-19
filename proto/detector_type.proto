@@ -1080,4 +1080,5 @@ enum DetectorType {
   Fireworks = 1076;
   Composio = 1077;
   Serval = 1078;
+  Coze = 1083;
 }

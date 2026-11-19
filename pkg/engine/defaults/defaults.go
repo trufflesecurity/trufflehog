@@ -205,6 +205,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/countrylayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/courier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coveralls"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/craftmypdf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/crowdin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cryptocompare"
@@ -1120,6 +1121,7 @@ func buildDetectorList() []detectors.Detector {
 		&countrylayer.Scanner{},
 		&courier.Scanner{},
 		&coveralls.Scanner{},
+		&coze.Scanner{},
 		&craftmypdf.Scanner{},
 		&crowdin.Scanner{},
 		&cryptocompare.Scanner{},
@@ -1928,6 +1930,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InfisicalDetectorEnabled.Load()
 		case *serval.Scanner:
 			return !feature.ServalDetectorEnabled.Load()
+		case *coze.Scanner:
+			return !feature.CozeDetectorEnabled.Load()
 		default:
 			return false
 		}
