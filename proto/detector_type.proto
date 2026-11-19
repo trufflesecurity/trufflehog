@@ -1080,4 +1080,6 @@ enum DetectorType {
   Fireworks = 1076;
   Composio = 1077;
   Serval = 1078;
+  ProntunoApiKey = 1079;
+  ProntunoSmtpPassword = 1080;
 }
