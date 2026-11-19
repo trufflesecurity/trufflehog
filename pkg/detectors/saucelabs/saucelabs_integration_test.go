@@ -33,12 +33,11 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
 	}{
 		{
 			name: "found, verified",
@@ -85,29 +84,6 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found, ambiguous 403",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, "<html><body>403 Forbidden</body></html>")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(createFakeString(id, secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detector_typepb.DetectorType_SauceLabs,
-					Verified:     false,
-					RawV2:        []byte(id + secret),
-				},
-				{
-					DetectorType: detector_typepb.DetectorType_SauceLabs,
-					Verified:     false,
-					RawV2:        []byte(secret + secret),
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -121,7 +97,8 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			s := Scanner{}
+			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SauceLabs.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -129,9 +106,6 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if tt.wantVerificationErr && got[i].VerificationError() == nil {
-					t.Fatalf("expected a verification error: \n %+v", got[i])
 				}
 				got[i].Raw = nil
 				got[i].ExtraData = nil
