@@ -40,6 +40,14 @@ var (
 	apiHost = regexp.MustCompile(`\b([a-z0-9-]{6,}\.duosecurity\.com)\b`)
 )
 
+const (
+	adminAPIPath = "/admin/v1/info/summary" // https://duo.com/docs/adminapi#account-info
+	authAPIPath  = "/auth/v2/check"         // https://duo.com/docs/authapi#check
+
+	adminApplication = "Admin API"
+	authApplication  = "Auth API"
+)
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -53,7 +61,7 @@ func (s Scanner) getClient() *http.Client {
 	return defaultClient
 }
 
-// FromData will find and optionally verify DeepSeek secrets in a given set of bytes.
+// FromData will find and optionally verify Duo secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -77,31 +85,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(apiKey),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", host, apiKey, apiSecret)),
 					ExtraData: map[string]string{
-						"application": "Admin API",
+						"application": adminApplication,
 					},
 					SecretParts: map[string]string{
 						"host":        host,
 						"ikey":        apiKey,
 						"skey":        apiSecret,
-						"application": "Admin API",
+						"application": adminApplication,
 					},
 				}
 				if verify {
-					verified, verificationErr := VerifyAdminToken(ctx, s.getClient(), host, apiKey, apiSecret)
-					// we will try auth api verification if admin api verification fails without error,
-					// which is in the case of it returning 401 unauthorized due to invalid credentials.
-					if !verified && verificationErr == nil {
-						var authStatusCode int
-						verified, authStatusCode, verificationErr = VerifyAuthToken(ctx, s.getClient(), host, apiKey, apiSecret)
-						// The Auth API responds 403 (not 401) when ikey/skey are
-						// structurally valid Admin API keys, active or not. That still
-						// counts as verified, but the keys remain Admin API keys, so
-						// only relabel to Auth API when the check actually succeeded (200).
-						if authStatusCode != http.StatusForbidden {
-							s1.ExtraData["application"] = "Auth API"
-							s1.SecretParts["application"] = "Auth API"
-						}
-					}
+					verified, application, verificationErr := verifyMatch(ctx, s.getClient(), host, apiKey, apiSecret)
+					s1.ExtraData["application"] = application
+					s1.SecretParts["application"] = application
 					s1.SetVerificationError(verificationErr, host, apiKey, apiSecret)
 					s1.Verified = verified
 				}
@@ -112,49 +108,56 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// returns verified=true if credentials are valid and belong to auth api, false if creds are invalid, and error if creds belong to auth api or for anything else (e.g., network error).
-// The HTTP status code is also returned so callers can distinguish a genuine 200 from a
-// 403, which the Auth API returns for structurally valid Admin API keys (active or not).
-func VerifyAuthToken(
+// verifyMatch checks the credentials against the Admin API, then the Auth API, and
+// returns whether they are valid and which application they belong to.
+//
+// Duo can answer 403 (40301, "Access forbidden") before it checks the signature, so a
+// 403 says nothing about the secret key. Only a 200 from either API proves the
+// credentials valid. A 401 from the Auth API proves them invalid, because Admin API keys
+// get a 403 there. The Admin API returns 401 for every key that is not an Admin API
+// key, so its 401 proves the credentials invalid only once the Auth API has identified
+// them as Admin API keys with a 403. Any other combination is reported as a
+// verification error.
+func verifyMatch(
 	ctx context.Context,
 	client *http.Client,
 	host, ikey, skey string,
-) (bool, int, error) {
-	// Docs: https://duo.com/docs/authapi#check
-	return verifyDuoRequest(
-		ctx,
-		client,
-		host,
-		ikey,
-		skey,
-		"/auth/v2/check",
+) (bool, string, error) {
+	adminStatus, adminErr := duoRequestStatus(ctx, client, host, ikey, skey, adminAPIPath)
+	if adminErr == nil && adminStatus == http.StatusOK {
+		return true, adminApplication, nil
+	}
+
+	authStatus, authErr := duoRequestStatus(ctx, client, host, ikey, skey, authAPIPath)
+	if authErr == nil && authStatus == http.StatusOK {
+		return true, authApplication, nil
+	}
+
+	authAnswered := authErr == nil
+	if authAnswered && (authStatus == http.StatusUnauthorized ||
+		(authStatus == http.StatusForbidden && adminErr == nil && adminStatus == http.StatusUnauthorized)) {
+		return false, adminApplication, nil
+	}
+	if adminErr != nil {
+		return false, adminApplication, adminErr
+	}
+	if authErr != nil {
+		return false, adminApplication, authErr
+	}
+	return false, adminApplication, fmt.Errorf(
+		"indeterminate Duo verification: admin API returned HTTP %d, auth API returned HTTP %d",
+		adminStatus, authStatus,
 	)
 }
 
-// returns 401 unauthorized if credentials are invalid, 200 OK if valid, and error for anything else
-func VerifyAdminToken(
-	ctx context.Context,
-	client *http.Client,
-	host, ikey, skey string,
-) (bool, error) {
-	// Docs: https://duo.com/docs/adminapi#account-info
-	verified, _, err := verifyDuoRequest(
-		ctx,
-		client,
-		host,
-		ikey,
-		skey,
-		"/admin/v1/info/summary",
-	)
-	return verified, err
-}
-
-func verifyDuoRequest(
+// duoRequestStatus sends a signed GET request to the given Duo API path and returns the
+// HTTP status code without interpreting it.
+func duoRequestStatus(
 	ctx context.Context,
 	client *http.Client,
 	host, ikey, skey string,
 	path string,
-) (bool, int, error) {
+) (int, error) {
 
 	timestamp := time.Now().UTC().Format(http.TimeFormat)
 
@@ -185,7 +188,7 @@ func verifyDuoRequest(
 		nil,
 	)
 	if err != nil {
-		return false, 0, err
+		return 0, err
 	}
 
 	req.Header.Set("Authorization", "Basic "+auth)
@@ -193,23 +196,14 @@ func verifyDuoRequest(
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, 0, err
+		return 0, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
 
-	switch res.StatusCode {
-	case http.StatusOK:
-		return true, res.StatusCode, nil
-	case http.StatusUnauthorized:
-		return false, res.StatusCode, nil
-	case http.StatusForbidden: // Auth API returns 403 if credentials are admin keys be it active or inactive
-		return true, res.StatusCode, nil
-	default:
-		return false, res.StatusCode, fmt.Errorf("unexpected HTTP status %d", res.StatusCode)
-	}
+	return res.StatusCode, nil
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
