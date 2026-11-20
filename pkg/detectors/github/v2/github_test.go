@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"hash/crc32"
 	"reflect"
 	"strings"
 	"testing"
@@ -260,5 +261,151 @@ func TestGithubTokenType_EveryKeyPatPrefixResolves(t *testing.T) {
 				t.Errorf("githubTokenType(%q) returned an empty type", token)
 			}
 		})
+	}
+}
+
+// base62EncodePadded is an independent re-implementation of the checksum
+// encoding used only to build test fixtures, so the tests validate the
+// production githubChecksum instead of agreeing with it by construction.
+func base62EncodePadded(value uint64, width int) string {
+	const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	var digits []byte
+	if value == 0 {
+		digits = []byte{'0'}
+	} else {
+		for value > 0 {
+			digits = append(digits, alphabet[value%62])
+			value /= 62
+		}
+		for i, j := 0, len(digits)-1; i < j; i, j = i+1, j-1 {
+			digits[i], digits[j] = digits[j], digits[i]
+		}
+	}
+	if len(digits) >= width {
+		return string(digits)
+	}
+	return strings.Repeat("0", width-len(digits)) + string(digits)
+}
+
+// makeClassicToken builds a classic-format token: prefix + 30-char body +
+// 6-char base62 CRC32 checksum of the body.
+func makeClassicToken(prefix, body string) string {
+	return prefix + body + base62EncodePadded(uint64(crc32.ChecksumIEEE([]byte(body))), 6)
+}
+
+func TestGithub_HasValidClassicChecksum(t *testing.T) {
+	body := "ringAbC123dEf456GhI789jKlMnOpQ"
+	if len(body) != 30 {
+		t.Fatalf("fixture body len %d, want 30", len(body))
+	}
+	valid := makeClassicToken("ghp_", body)
+
+	tests := []struct {
+		name  string
+		token string
+		want  bool
+	}{
+		{name: "valid classic token", token: valid, want: true},
+		{name: "corrupted checksum", token: valid[:39] + "A", want: false},
+		{name: "too short", token: valid[:39], want: false},
+		{name: "too long", token: valid + "A", want: false},
+		{name: "fine-grained PAT has no classic checksum", token: "github_pat_" + strings.Repeat("A", 82), want: false},
+		{name: "not a token", token: "not_a_github_token", want: false},
+	}
+	// The corrupted-checksum case is only meaningful if the flip actually
+	// changed the token.
+	if tests[1].token == valid {
+		tests[1].token = valid[:39] + "B"
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := hasValidClassicChecksum(test.token); got != test.want {
+				t.Errorf("hasValidClassicChecksum(%q) = %v, want %v", test.token, got, test.want)
+			}
+		})
+	}
+}
+
+// TestGithub_IsFalsePositive_ChecksumValidClassicTokenSkipsWordList is the
+// regression test for #5572: a classic token whose 30-char body happens to
+// contain a listed word (ring, hmac, open, and the other words from the
+// report) was dropped by the default word-list check before verification
+// ever ran, about 1 in 300 tokens. A checksum-valid token must survive the
+// false-positive check; only a token whose checksum fails still goes
+// through the word lists.
+func TestGithub_IsFalsePositive_ChecksumValidClassicTokenSkipsWordList(t *testing.T) {
+	// 30-char bodies, each containing one word from the report.
+	bodies := map[string]string{
+		"ring": "ringAbC123dEf456GhI789jKlMnOpQ",
+		"hmac": "hmacAbC123dEf456GhI789jKlMnOpQ",
+		"open": "openAbC123dEf456GhI789jKlMnOpQ",
+		"role": "roleAbC123dEf456GhI789jKlMnOpQ",
+		"byte": "byteAbC123dEf456GhI789jKlMnOpQ",
+		"rest": "restAbC123dEf456GhI789jKlMnOpQ",
+		"part": "partAbC123dEf456GhI789jKlMnOpQ",
+		"calc": "calcAbC123dEf456GhI789jKlMnOpQ",
+		"head": "headAbC123dEf456GhI789jKlMnOpQ",
+	}
+
+	check := detectors.GetFalsePositiveCheck(Scanner{})
+
+	for word, body := range bodies {
+		t.Run(word, func(t *testing.T) {
+			if len(body) != 30 {
+				t.Fatalf("fixture body len %d, want 30", len(body))
+			}
+			token := makeClassicToken("ghp_", body)
+
+			// Pin the bug mechanism: the default check drops this token.
+			if fp, reason := detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true); !fp {
+				t.Fatalf("default check kept %q; the fixture no longer reproduces the word-list drop (%q)", token, reason)
+			}
+
+			// The fix: the engine check must keep the checksum-valid token.
+			if fp, reason := check(detectors.Result{Raw: []byte(token)}); fp {
+				t.Errorf("checksum-valid token containing %q dropped as false positive: %s", word, reason)
+			}
+
+			// A token with a broken checksum gets no exemption.
+			corrupt := token[:39] + "A"
+			if corrupt == token {
+				corrupt = token[:39] + "B"
+			}
+			if fp, _ := check(detectors.Result{Raw: []byte(corrupt)}); !fp {
+				t.Errorf("checksum-invalid token containing %q was kept; it must still go through the word lists", word)
+			}
+		})
+	}
+}
+
+// TestGithub_IsFalsePositive_ChecksumValidTokenEveryClassicPrefix checks the
+// exemption applies to every classic prefix, not just ghp_.
+func TestGithub_IsFalsePositive_ChecksumValidTokenEveryClassicPrefix(t *testing.T) {
+	body := "ringAbC123dEf456GhI789jKlMnOpQ"
+	check := detectors.GetFalsePositiveCheck(Scanner{})
+
+	for _, prefix := range classicTokenPrefixes {
+		t.Run(prefix, func(t *testing.T) {
+			token := makeClassicToken(prefix, body)
+			if fp, reason := check(detectors.Result{Raw: []byte(token)}); fp {
+				t.Errorf("checksum-valid %q token dropped as false positive: %s", prefix, reason)
+			}
+		})
+	}
+}
+
+// TestGithub_IsFalsePositive_ValidTokenWithoutWordStillReported is the sanity
+// control: a checksum-valid token with no listed word in its body was never
+// dropped, and still is not.
+func TestGithub_IsFalsePositive_ValidTokenWithoutWordStillReported(t *testing.T) {
+	body := "AbC123dEf456GhI789jKlMnOpQrStU"
+	if len(body) != 30 {
+		t.Fatalf("fixture body len %d, want 30", len(body))
+	}
+	token := makeClassicToken("ghp_", body)
+	check := detectors.GetFalsePositiveCheck(Scanner{})
+	if fp, reason := check(detectors.Result{Raw: []byte(token)}); fp {
+		t.Errorf("checksum-valid token without a listed word dropped as false positive: %s", reason)
 	}
 }
