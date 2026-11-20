@@ -65,6 +65,11 @@ func TestGCP_Pattern(t *testing.T) {
 			want: []string{"{\"type\":\"service_account\",\"project_id\":\"api-5153635936162123384-123456\",\"private_key_id\":\"2b387b72ec1b082aa7e52189d9c43f58fb19fb48\",\"private_key\":\"-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDE/XlaMP419pkUEXAMPLE=\\n-----END PRIVATE KEY-----\\n\",\"client_email\":\"unit-test-value@api-5153635936162123384-123456.iam.gserviceaccount.com\",\"client_id\":\"109763165530299657612\",\"auth_uri\":\"https://accounts.google.com/o/oauth2/auth\",\"token_uri\":\"https://oauth2.googleapis.com/token\",\"auth_provider_x509_cert_url\":\"https://www.googleapis.com/oauth2/v1/certs\",\"client_x509_cert_url\":\"https://www.googleapis.com/robot/v1/metadata/x509/unit-test-value%40api-5153635936162123384-123456.iam.gserviceaccount.com\"}"},
 		},
 		{
+			name:  "private key without optional metadata",
+			input: `{"private_key":"-----BEGIN PRIVATE KEY-----\nEXAMPLE\n-----END PRIVATE KEY-----\n","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs"}`,
+			want:  []string{`{"type":"","project_id":"","private_key_id":"","private_key":"-----BEGIN PRIVATE KEY-----\nEXAMPLE\n-----END PRIVATE KEY-----\n","client_email":"","client_id":"","auth_uri":"","token_uri":"","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":""}`},
+		},
+		{
 			name:  "escaped JSON",
 			input: `{"credentials":"{\n  \"type\": \"service_account\",\n  \"project_id\": \"unit-test\",\n  \"private_key_id\": \"10f922eb17fba903dc59f7baf753976233520012\",\n  \"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCgyAZHbtJu1MRf\\ng9+Wg==\\n-----END PRIVATE KEY-----\\n\",\n  \"client_email\": \"fake-value@unit-test.iam.gserviceaccount.com\",\n  \"client_id\": \"123456476766156356779\",\n  \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\",\n  \"token_uri\": \"https://oauth2.googleapis.com/token\",\n  \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\",\n  \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/fake-value%40unit-test.iam.gserviceaccount.com\"\n}\n"}`,
 			want:  []string{"{\"type\":\"service_account\",\"project_id\":\"unit-test\",\"private_key_id\":\"10f922eb17fba903dc59f7baf753976233520012\",\"private_key\":\"-----BEGIN PRIVATE KEY-----\\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCgyAZHbtJu1MRf\\ng9+Wg==\\n-----END PRIVATE KEY-----\\n\",\"client_email\":\"fake-value@unit-test.iam.gserviceaccount.com\",\"client_id\":\"123456476766156356779\",\"auth_uri\":\"https://accounts.google.com/o/oauth2/auth\",\"token_uri\":\"https://oauth2.googleapis.com/token\",\"auth_provider_x509_cert_url\":\"https://www.googleapis.com/oauth2/v1/certs\",\"client_x509_cert_url\":\"https://www.googleapis.com/robot/v1/metadata/x509/fake-value%40unit-test.iam.gserviceaccount.com\"}"},
@@ -165,5 +170,58 @@ GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgk
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+func TestGCP_FromData_FalsePositives(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name: "Python configuration comparisons",
+			input: `def compare(cnx_config, pe_config, pe_config_js):
+    if cnx_config['google']['admin_email'] != pe_config_js["admin_email"]:
+        raise Exception(
+            'admin_email does not match in CNX and PE config. '
+            'CNX config:{}, PE Config:{}'.format(cnx_config, pe_config)
+        )
+
+    if cnx_config['google']['auth_provider_x509_cert_url'] != pe_config_js["auth_provider_x509_cert_url"]:
+        raise Exception(
+            'auth_provider_x509_cert_url does not match in CNX and PE config. '
+            'CNX config:{}, PE Config:{}'.format(cnx_config, pe_config)
+        )`,
+		},
+		{
+			name:  "JSON followed by non-JSON content",
+			input: `{"type":"service_account","private_key":"test-key"} auth_provider_x509_cert_url }`,
+		},
+		{
+			name:  "public metadata without a private key",
+			input: `{"type":"service_account","client_email":"test@example.iam.gserviceaccount.com","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs"}`,
+		},
+		{
+			name:  "empty private key",
+			input: `{"type":"service_account","private_key":"","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		for _, verify := range []bool{false, true} {
+			mode := "without verification"
+			if verify {
+				mode = "with verification"
+			}
+			t.Run(tt.name+"/"+mode, func(t *testing.T) {
+				results, err := (Scanner{}).FromData(context.Background(), verify, []byte(tt.input))
+				if err != nil {
+					t.Fatalf("FromData() error = %v", err)
+				}
+				if len(results) != 0 {
+					t.Errorf("expected no results, got %d", len(results))
+				}
+			})
+		}
 	}
 }
