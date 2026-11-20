@@ -1,12 +1,14 @@
 package twilio
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -17,11 +19,24 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
-	client *http.Client
+	detectors.EndpointSetter
+	client                *http.Client
+	cloudEndpointDisabled bool
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.CloudProvider      = (*Scanner)(nil)
+)
+
+func (s *Scanner) UseCloudEndpoint(enabled bool) {
+	s.EndpointSetter.UseCloudEndpoint(enabled)
+	s.cloudEndpointDisabled = !enabled
+}
+
+func (Scanner) CloudEndpoint() string { return "https://api.twilio.com" }
 
 var (
 	defaultClient = detectors.NewClientWithDedup(common.RetryableHTTPClient())
@@ -29,22 +44,16 @@ var (
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
 )
 
-type serviceResponse struct {
-	Services []service `json:"services"`
-}
-
-type service struct {
-	FriendlyName string `json:"friendly_name"` // friendly name of a service
-	SID          string `json:"sid"`           // object id of service
-	AccountSID   string `json:"account_sid"`   // account sid
+type accountResponse struct {
+	SID             string `json:"sid"`
+	OwnerAccountSID string `json:"owner_account_sid"`
+	FriendlyName    string `json:"friendly_name"`
+	Status          string `json:"status"`
+	Type            string `json:"type"`
 }
 
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -66,6 +75,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueSIDs[s] = struct{}{}
 	}
 
+	endpoints := s.Endpoints()
+	if len(endpoints) == 0 && !s.cloudEndpointDisabled {
+		endpoints = []string{s.CloudEndpoint()}
+	}
+
+	var client *http.Client
+	if verify && len(endpoints) > 0 {
+		client = s.getClient()
+	}
+
 	for sid := range uniqueSIDs {
 		for key := range uniqueKeys {
 			s1 := detectors.Result{
@@ -80,12 +99,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
 			}
 
-			if verify {
-				extraData, isVerified, verificationErr := verifyTwilio(ctx, s.getClient(), key, sid)
-				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr)
-
-				maps.Copy(s1.ExtraData, extraData)
+			if verify && client != nil {
+				var lastErr error
+				for _, baseURL := range endpoints {
+					extraData, isVerified, verificationErr := verifyTwilio(ctx, client, key, sid, baseURL)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						lastErr = verificationErr
+					}
+					maps.Copy(s1.ExtraData, extraData)
+					if isVerified {
+						lastErr = nil
+						break
+					}
+					if strings.EqualFold(extraData["status"], "closed") {
+						s1.Verified = false
+						lastErr = nil
+						break
+					}
+				}
+				s1.SetVerificationError(lastErr, key)
 			}
 
 			results = append(results, s1)
@@ -103,16 +136,25 @@ func (s Scanner) Description() string {
 	return "Twilio is a cloud communications platform that allows software developers to programmatically make and receive phone calls, send and receive text messages, and perform other communication functions using its web service APIs."
 }
 
-func verifyTwilio(ctx context.Context, client *http.Client, key, sid string) (map[string]string, bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
+func verifyTwilio(ctx context.Context, client *http.Client, key, sid, baseURL string) (map[string]string, bool, error) {
+	baseURL = strings.TrimRight(baseURL, "/")
+	var reqURL string
+	switch {
+	case strings.HasSuffix(baseURL, fmt.Sprintf("/2010-04-01/Accounts/%s.json", sid)):
+		reqURL = baseURL
+	case strings.HasSuffix(baseURL, "/2010-04-01/Accounts"):
+		reqURL = fmt.Sprintf("%s/%s.json", baseURL, sid)
+	default:
+		reqURL = fmt.Sprintf("%s/2010-04-01/Accounts/%s.json", baseURL, sid)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, false, err
 	}
 
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Accept", "*/*")
+	req.Header.Add("Accept", "application/json")
 	req.SetBasicAuth(sid, key)
-	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Twilio, sid+key, req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_Twilio, sid+key+baseURL, req)
 	if err != nil {
 		return nil, false, err
 	}
@@ -124,12 +166,28 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid string) (ma
 	switch resp.StatusCode {
 	case http.StatusOK:
 		extraData := make(map[string]string)
-		var serviceResponse serviceResponse
+		var account accountResponse
 
-		if err := json.NewDecoder(resp.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
-			service := serviceResponse.Services[0]
-			extraData["friendly_name"] = service.FriendlyName
-			extraData["account_sid"] = service.AccountSID
+		if err := json.NewDecoder(resp.Body).Decode(&account); err == nil {
+			resolvedSID := cmp.Or(account.SID, sid)
+			extraData["account_sid"] = resolvedSID
+			if account.FriendlyName != "" {
+				extraData["friendly_name"] = account.FriendlyName
+			}
+			if account.Status != "" {
+				extraData["status"] = account.Status
+			}
+			if account.Type != "" {
+				extraData["type"] = account.Type
+			}
+			if account.OwnerAccountSID != "" && account.OwnerAccountSID != resolvedSID {
+				extraData["owner_account_sid"] = account.OwnerAccountSID
+				extraData["is_subaccount"] = "true"
+			}
+		}
+
+		if strings.EqualFold(extraData["status"], "closed") {
+			return extraData, false, nil
 		}
 
 		return extraData, true, nil

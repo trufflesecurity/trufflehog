@@ -52,7 +52,7 @@ func TestTwilioAPIKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_TwilioApiKey,
 					Verified:     true,
 					Redacted:     secret,
 					RawV2:        []byte(apiKey + secret),
@@ -74,7 +74,7 @@ func TestTwilioAPIKey_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detector_typepb.DetectorType_Twilio,
+					DetectorType: detector_typepb.DetectorType_TwilioApiKey,
 					Verified:     false,
 					Redacted:     secretInactive,
 					RawV2:        []byte(apiKey + secretInactive),
