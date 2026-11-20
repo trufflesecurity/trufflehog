@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -33,7 +32,6 @@ type Source struct {
 	useCustomContentWriter bool
 	git                    *git.Git
 	scanOptions            *git.ScanOptions
-	log                    logr.Logger
 	conn                   *sourcespb.GitHubExperimental
 	connector              githubsource.Connector
 
@@ -72,8 +70,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	if err != nil {
 		return err
 	}
-
-	s.log = aCtx.Logger()
 
 	s.name = name
 	s.sourceID = sourceID
@@ -148,6 +144,12 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.git = git.NewGit(cfg)
 
+	// The repo is not logged here, since the configured URL can hold credentials.
+	aCtx.Logger().V(1).Info("GitHub Experimental source initialized",
+		"object_discovery", s.conn.ObjectDiscovery,
+		"collision_threshold", s.conn.CollisionThreshold,
+		"delete_cached_data", s.conn.DeleteCachedData,
+	)
 	return nil
 }
 
