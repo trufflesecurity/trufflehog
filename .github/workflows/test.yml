@@ -12,6 +12,12 @@ jobs:
   test:
     if: ${{ github.repository == 'trufflesecurity/trufflehog' && !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
+    # Each detector package links its own test binary, and linking ~1000 of
+    # them dominates the run time, so packages are split across parallel jobs.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     permissions:
       actions: "read"
       contents: "read"
@@ -20,9 +26,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install Go
+        id: setup-go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: "1.27"
+          # Each shard builds only part of the module, so it must not save
+          # setup-go's shared go.sum-keyed cache, which other Go jobs restore.
+          # Shards keep their own caches below, saved only from main.
+          cache: false
+      - name: Restore Go cache
+        id: go-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-test-${{ matrix.shard }}-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-test-${{ matrix.shard }}-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
       - id: "auth"
         uses: "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" # v3
         with:
@@ -33,8 +53,13 @@ jobs:
           go install gotest.tools/gotestsum@latest
           mkdir -p tmp/test-results
       - name: Test
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ strategy.job-index }}
+          SHARD_TOTAL: ${{ strategy.job-total }}
         run: |
-          CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=sources $(go list ./... | grep -v /vendor/ | grep -v pkg/analyzer/analyzers)
+          pkgs=$(go list ./... | grep -v /vendor/ | grep -v pkg/analyzer/analyzers | awk -v i="$SHARD_INDEX" -v n="$SHARD_TOTAL" 'NR % n == i')
+          CGO_ENABLED=1 gotestsum --junitfile "tmp/test-results/test-${{ matrix.shard }}.xml" --raw-command -- go test -count=1 -json -tags=sources $pkgs
         if: ${{ success() || failure() }} # always run this step, even if there were previous errors
       - name: Upload test results to BuildPulse for flaky test detection
         if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
@@ -52,9 +77,23 @@ jobs:
         if: success() || failure() # always run even if the previous step fails
         with:
           report_paths: "tmp/test-results/*.xml"
+      - name: Save Go cache
+        if: ${{ github.ref == 'refs/heads/main' && steps.go-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
   test-community:
     if: ${{ github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
+    # Same package split as the test job; keep the package filter in sync with
+    # the Makefile's test-community target.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     permissions:
       actions: "read"
       contents: "read"
@@ -66,4 +105,10 @@ jobs:
         with:
           go-version: "1.27"
       - name: Test
-        run: make test-community
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ strategy.job-index }}
+          SHARD_TOTAL: ${{ strategy.job-total }}
+        run: |
+          pkgs=$(go list ./... | grep -v /vendor/ | grep -v pkg/sources | grep -v pkg/analyzer/analyzers | awk -v i="$SHARD_INDEX" -v n="$SHARD_TOTAL" 'NR % n == i')
+          CGO_ENABLED=0 go test -count=1 -timeout=5m $pkgs
