@@ -124,6 +124,24 @@ func TestBase64_FromChunk(t *testing.T) {
 			},
 		},
 		{
+			name: "unpadded standard b64",
+			chunk: &sources.Chunk{
+				Data: []byte(`token: dHJ1ZmZsZWhvZz4+ZmluZHMtc2VjcmV0cw`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`token: trufflehog>>finds-secrets`),
+			},
+		},
+		{
+			name: "b64-url-safe: padded url b64",
+			chunk: &sources.Chunk{
+				Data: []byte(`token: dHJ1ZmZsZWhvZz4-ZmluZHMtc2VjcmV0cz8_Pw==`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`token: trufflehog>>finds-secrets???`),
+			},
+		},
+		{
 			name: "invalid base64 string",
 			chunk: &sources.Chunk{
 				Data: []byte(`a3d3fa7c2bb99e469ba55e5834ce79ee4853a8a3`),
