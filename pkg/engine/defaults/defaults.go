@@ -407,6 +407,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instabot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instamojo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intercom"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/internetdata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/interseller"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intra42"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intrinio"
@@ -1331,6 +1332,7 @@ func buildDetectorList() []detectors.Detector {
 		&instabot.Scanner{},
 		&instamojo.Scanner{},
 		&intercom.Scanner{},
+		&internetdata.Scanner{},
 		&interseller.Scanner{},
 		&intra42.Scanner{},
 		&intrinio.Scanner{},
@@ -1934,6 +1936,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ServalDetectorEnabled.Load()
 		case *basetenv1.Scanner, *basetenv2.Scanner:
 			return !feature.BasetenDetectorEnabled.Load()
+		case *internetdata.Scanner:
+			return !feature.InternetDataDetectorEnabled.Load()
 		default:
 			return false
 		}

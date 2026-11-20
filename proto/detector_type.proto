@@ -1081,4 +1081,5 @@ enum DetectorType {
   Composio = 1077;
   Serval = 1078;
   Baseten = 1079;
+  InternetData = 1080;
 }
