@@ -81,6 +81,7 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.5
+	github.com/prometheus/client_model v0.6.2
 	github.com/rabbitmq/amqp091-go v1.14.0
 	github.com/repeale/fp-go v0.11.1
 	github.com/sassoftware/go-rpmutils v0.4.0
@@ -265,7 +266,6 @@ require (
 	github.com/pjbgf/sha1cd v0.7.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
