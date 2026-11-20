@@ -26,7 +26,6 @@ type SecretInfo struct {
 	Reference    string
 	Permissions  []string
 	Repositories []Repository
-	ExpiresIn    string
 	Misc         map[string]string
 }
 
@@ -120,7 +119,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, username, pat string) {
 		// print repositories
 		printRepositories(info.Repositories)
 
-		color.Yellow("\n[i] Expires: %s", info.ExpiresIn)
 	}
 }
 
