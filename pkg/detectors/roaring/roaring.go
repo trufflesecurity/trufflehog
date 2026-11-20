@@ -27,6 +27,10 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	clientPat = regexp.MustCompile(detectors.PrefixRegex([]string{"roaring"}) + `\b([0-9A-Za-z_-]{28})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"roaring"}) + `\b([0-9A-Za-z_-]{28})\b`)
+
+	// Python wheel platform tags (e.g. "cp310-manylinux_2_24_aarch64" in a
+	// pyroaring entry of a lock file) fit the pattern above but are never credentials.
+	wheelTagPat = regexp.MustCompile(`(?i)(?:manylinux|musllinux|macosx_\d|win_amd64|win_arm64|linux_(?:x86_64|aarch64|i686|armv7l|ppc64le|s390x))`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -44,9 +48,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, clientMatch := range clientMatches {
 		resClient := strings.TrimSpace(clientMatch[1])
+		if wheelTagPat.MatchString(resClient) {
+			continue
+		}
 
 		for _, secretMatch := range secretMatches {
 			resSecret := strings.TrimSpace(secretMatch[1])
+			if wheelTagPat.MatchString(resSecret) {
+				continue
+			}
 
 			s1 := detectors.Result{
 				DetectorType: detector_typepb.DetectorType_Roaring,
