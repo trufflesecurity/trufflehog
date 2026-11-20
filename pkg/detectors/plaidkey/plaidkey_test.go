@@ -3,6 +3,7 @@ package plaidkey
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -39,17 +40,46 @@ func TestPlaidKey_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s secret - '%s'\n%s client id - '%s'\n%s token - '%s'", keyword, invalidSecret, keyword, invalidId, keyword, invalidToken),
 			want:  []string{},
 		},
+		{
+			name:  "client id and secret without access token",
+			input: fmt.Sprintf("%s secret - '%s'\n%s client id - '%s'", keyword, validSecret, keyword, validId),
+			want:  []string{fmt.Sprintf("%s:%s", validSecret, validId)},
+		},
+		{
+			// "plaid" is in the URL, more than 40 characters before the labeled pair.
+			name: "labeled client id and secret farther than 40 characters after plaid",
+			input: fmt.Sprintf(
+				"https://sandbox.plaid.com/payment_initiation/recipient/create {\"city\":\"City\"%s},\"client_id\":\"%s\",\"secret\":\"%s\"}",
+				strings.Repeat("x", 200), validId, validSecret,
+			),
+			want: []string{fmt.Sprintf("%s:%s", validSecret, validId)},
+		},
+		{
+			name:  "labeled pair is ignored when plaid is absent",
+			input: fmt.Sprintf("{\"client_id\":\"%s\",\"secret\":\"%s\"}", validId, validSecret),
+			want:  nil,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
+				if len(test.want) == 0 {
+					return
+				}
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
 
-			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			// Use the span the engine would pass in.
+			var spanned []byte
+			for _, match := range matchedDetectors {
+				for _, piece := range match.Matches() {
+					spanned = append(spanned, piece...)
+				}
+			}
+			results, err := d.FromData(context.Background(), false, spanned)
 			if err != nil {
 				t.Errorf("error = %v", err)
 				return
