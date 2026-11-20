@@ -59,6 +59,7 @@ func (e *TokenError) Error() string {
 // to requests bound for allowedEndpoints. Timeout, redirect policy, and
 // cookie jar are carried over from base unchanged; base itself is not
 // modified.
+// CloseIdleConnections is forwarded to the base transport when supported.
 //
 // Only the scheme and host of each allowed endpoint are matched, because
 // detectors append their own API paths to the configured endpoint.
@@ -153,6 +154,12 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	authed := req.Clone(req.Context())
 	authed.Header.Set(t.cfg.tokenHeader, "Bearer "+tok.AccessToken)
 	return t.base.RoundTrip(authed)
+}
+
+func (t *authTransport) CloseIdleConnections() {
+	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
 }
 
 // closeBody honors the RoundTripper contract that the request body is

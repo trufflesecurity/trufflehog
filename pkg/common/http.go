@@ -137,6 +137,12 @@ func (t *InstrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 	return resp, err
 }
 
+func (t *InstrumentedTransport) CloseIdleConnections() {
+	if closer, ok := t.T.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+}
+
 func NewInstrumentedTransport(T http.RoundTripper) *InstrumentedTransport {
 	if T == nil {
 		T = http.DefaultTransport
