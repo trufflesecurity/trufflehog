@@ -476,6 +476,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailgun"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailjetbasicauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailjetsms"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailkube"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailmodo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailsac"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mandrill"
@@ -1404,6 +1405,7 @@ func buildDetectorList() []detectors.Detector {
 		&mailgun.Scanner{},
 		&mailjetbasicauth.Scanner{},
 		&mailjetsms.Scanner{},
+		&mailkube.Scanner{},
 		&mailmodo.Scanner{},
 		&mailsac.Scanner{},
 		&mandrill.Scanner{},
@@ -1934,6 +1936,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ServalDetectorEnabled.Load()
 		case *basetenv1.Scanner, *basetenv2.Scanner:
 			return !feature.BasetenDetectorEnabled.Load()
+		case *mailkube.Scanner:
+			return !feature.MailkubeDetectorEnabled.Load()
 		default:
 			return false
 		}
