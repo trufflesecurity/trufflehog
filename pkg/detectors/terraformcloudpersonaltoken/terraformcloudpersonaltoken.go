@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(`\b([A-Za-z0-9]{14}.atlasv1.[A-Za-z0-9]{67})\b`)
+	keyPat = regexp.MustCompile(`\b([A-Za-z0-9]{14}\.atlasv1\.[A-Za-z0-9]{67})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
