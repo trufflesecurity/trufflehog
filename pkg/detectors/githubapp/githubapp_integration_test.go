@@ -48,7 +48,7 @@ func TestGitHubApp_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a githubapp secret %s within githubapp %s", sDec, appKey)),
+				data:   []byte(fmt.Sprintf("github_app_id: %s\ngithub_app_private_key: |\n%s", appKey, sDec)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -63,9 +63,8 @@ func TestGitHubApp_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx:  context.Background(),
-				data: []byte(fmt.Sprintf("You can find a githubapp secret %s within githubapp %s but not valid", inactiveSDec, appKey)), // the secret would satisfy the regex but not pass validation
-
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("github_app_id: %s\ngithub_app_private_key: |\n%s", appKey, inactiveSDec)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -101,6 +100,8 @@ func TestGitHubApp_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
+				got[i].SecretParts = nil
 				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
