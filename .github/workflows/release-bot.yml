@@ -28,9 +28,10 @@ jobs:
     - name: Run release bot
       env:
         RELEASE_TAG: ${{ github.event.release.tag_name }}
+        CREDENTIALS_FILE_PATH: ${{ steps.auth.outputs.credentials_file_path }}
       run: |
         docker run \
         -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/GCP_SA_TRUFFLE_RELEASE_BOT.json \
-        -v ${{ steps.auth.outputs.credentials_file_path }}:/tmp/keys/GCP_SA_TRUFFLE_RELEASE_BOT.json:ro \
+        -v "$CREDENTIALS_FILE_PATH":/tmp/keys/GCP_SA_TRUFFLE_RELEASE_BOT.json:ro \
         us-central1-docker.pkg.dev/truffle-release-bot/releases/bot:latest \
         --repository trufflehog "$RELEASE_TAG"
