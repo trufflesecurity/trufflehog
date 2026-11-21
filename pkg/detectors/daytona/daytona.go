@@ -64,7 +64,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, extraData, verificationErr := verifyMatch(ctx, client, s.verifyEndpoint(), match)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
+			for k, v := range extraData {
+				s1.ExtraData[k] = v
+			}
 			s1.SetVerificationError(verificationErr, match)
 		}
 

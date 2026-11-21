@@ -131,6 +131,9 @@ func TestDaytona_Verify(t *testing.T) {
 			if r.Verified != test.wantVerified {
 				t.Errorf("Verified = %v, want %v", r.Verified, test.wantVerified)
 			}
+			if got := r.ExtraData["rotation_guide"]; got != "https://www.daytona.io/docs/api-keys/" {
+				t.Errorf("ExtraData[rotation_guide] = %q, want the Daytona rotation guide URL", got)
+			}
 			if (r.VerificationError() != nil) != test.wantErr {
 				t.Errorf("VerificationError = %v, wantErr = %v", r.VerificationError(), test.wantErr)
 			}
