@@ -176,16 +176,18 @@ func unescape(s string) string {
 // pattern has no way to tell that dot from part of the name. Left on, it defeats
 // the Cloud domain check below and travels into the endpoint we verify against.
 // Trimming is also right for a genuinely absolute name, which resolves the same
-// either way.
+// either way. A host of only dots, with or without a port, trims to "" so that
+// FromData skips it.
 func trimHostDots(hostPort string) string {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		return strings.TrimRight(hostPort, ".")
 	}
-	if trimmed := strings.TrimRight(host, "."); trimmed != "" {
-		return net.JoinHostPort(trimmed, port)
+	trimmed := strings.TrimRight(host, ".")
+	if trimmed == "" {
+		return ""
 	}
-	return hostPort
+	return net.JoinHostPort(trimmed, port)
 }
 
 // isCloudHost reports whether a host belongs to ClickHouse Cloud, matching on the

@@ -125,6 +125,11 @@ func TestClickHouse_Pattern(t *testing.T) {
 			input: "dsn = 'clickhouse://user:s3cr3tpassword@...'",
 			want:  []string{},
 		},
+		{
+			name:  "invalid pattern - host of only dots with a port",
+			input: "dsn = 'clickhouse://user:s3cr3tpassword@...:9000'",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -265,7 +270,8 @@ func TestClickHouse_TrimHostDots(t *testing.T) {
 		{"trailing dots removed", "ch.example.com...", "ch.example.com"},
 		{"trailing dot removed with port", "ch.example.com.:9000", "ch.example.com:9000"},
 		{"port without dot is untouched", "ch.example.com:9000", "ch.example.com:9000"},
-		{"a host of only dots is left alone", "...", ""},
+		{"a host of only dots trims to empty", "...", ""},
+		{"a host of only dots with a port trims to empty", "...:9000", ""},
 	}
 
 	for _, test := range tests {
