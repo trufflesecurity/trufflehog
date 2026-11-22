@@ -215,14 +215,16 @@ func TestPrivatekey_PlainKeyVerifiedBeforeEncryptedKeyIsCracked(t *testing.T) {
 		t.Errorf("expected no verification error on the plain key, got %v", err)
 	}
 
+	// Crack stops between attempts once the context is done, so the encrypted
+	// key is still reported, uncracked, with the context error as the reason.
 	if encryptedKey.Verified {
 		t.Errorf("expected the encrypted key to be unverified")
 	}
-	if err := encryptedKey.VerificationError(); err == nil || !strings.HasPrefix(err.Error(), notVerifiedMessage) {
-		t.Errorf("expected the encrypted key to be reported as not verified, got %v", err)
+	if err := encryptedKey.VerificationError(); err == nil || err.Error() != context.Canceled.Error() {
+		t.Errorf("verification error on the encrypted key = %v, want %q", err, context.Canceled)
 	}
-	if encryptedKey.ExtraData["cracked_encryption_passphrase"] != "true" {
-		t.Errorf("expected the encrypted key to be cracked, got ExtraData = %v", encryptedKey.ExtraData)
+	if encryptedKey.ExtraData["encrypted"] != "true" || encryptedKey.ExtraData["cracked_encryption_passphrase"] != "" {
+		t.Errorf("expected the encrypted key to be reported uncracked, got ExtraData = %v", encryptedKey.ExtraData)
 	}
 }
 

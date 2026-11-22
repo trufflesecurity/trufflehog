@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -103,6 +104,59 @@ const blogPosts = hs.blog.getPosts({ name: 'Inbound' });`,
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestHubspotV1_Verify(t *testing.T) {
+	tests := []struct {
+		name         string
+		status       int
+		body         string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "valid key",
+			status:       200,
+			body:         `{"lists":[],"offset":0,"has-more":false}`,
+			wantVerified: true,
+		},
+		{
+			name:    "200 with HTML body from a proxy",
+			status:  200,
+			body:    "<html><body>Access to this site is blocked</body></html>",
+			wantErr: true,
+		},
+		{
+			name:   "invalid key",
+			status: 401,
+			body:   `{"status":"error","message":"The API key provided is invalid.","category":"INVALID_AUTHENTICATION"}`,
+		},
+		{
+			name:    "403 from a proxy",
+			status:  403,
+			body:    "<html><body>403 Forbidden</body></html>",
+			wantErr: true,
+		},
+		{
+			name:    "server error",
+			status:  500,
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := common.ConstantResponseHttpClient(test.status, test.body)
+			verified, err := verifyToken(context.Background(), client, "b714cac4-a45c-42af-9905-da4de8838d75")
+
+			if (err != nil) != test.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, test.wantErr)
+			}
+			if verified != test.wantVerified {
+				t.Errorf("verified = %v, want %v", verified, test.wantVerified)
 			}
 		})
 	}
