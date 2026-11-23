@@ -424,3 +424,43 @@ func TestJobProgress_SnapshotsSeeResumeInfoMoveForward(t *testing.T) {
 	assert.Equal(t, saves-1, position(jp.Snapshot().SourceEncodedResumeInfo))
 	assert.Equal(t, saves-1, position(p.GetProgress().EncodedResumeInfo))
 }
+
+// A source reports a chunk and then saves the position after it. A snapshot
+// must not hold a position past the chunks it counted, so that resume info
+// never claims more work than the snapshot's own counters show.
+func TestSnapshot_ResumeInfoNotAheadOfChunkCount(t *testing.T) {
+	const chunks = 20000
+	var p Progress
+	jp := NewJobProgress(1, 1, "test")
+	jp.TrackProgress(&p)
+
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	var ahead, snapshots int
+	wg.Go(func() {
+		for {
+			snapshot := jp.Snapshot()
+			snapshots++
+			if encoded := snapshot.SourceEncodedResumeInfo; encoded != "" {
+				position, _ := strconv.Atoi(unmarshalEncodedResumeInfo(encoded)["unit"])
+				if uint64(position) > snapshot.TotalChunks {
+					ahead++
+				}
+			}
+			select {
+			case <-done:
+				return
+			default:
+			}
+		}
+	})
+
+	for i := 1; i <= chunks; i++ {
+		jp.ReportChunk(nil, &Chunk{})
+		p.SetEncodedResumeInfoFor("unit", strconv.Itoa(i))
+	}
+	close(done)
+	wg.Wait()
+
+	assert.Zero(t, ahead, "of %d snapshots, %d held resume info past their chunk count", snapshots, ahead)
+}
