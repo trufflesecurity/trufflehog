@@ -30,11 +30,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
-
       - name: Install dependencies
         run: sudo apt-get install -y zstd jq
 
@@ -76,6 +71,16 @@ jobs:
           else
             echo "any_changed=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # Only install Go when there is something to build. The skip path
+      # finishes in seconds, and setup-go would then save an empty module
+      # cache under the shared go.sum-keyed cache. Cache keys are write-once,
+      # so that starves every later Go job on the PR.
+      - name: Install Go
+        if: steps.detect.outputs.any_changed == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: "1.27"
 
       # Sticky comment: find any prior detector-bench comment on the PR by
       # the marker substring and update it in place. The marker — kept in
