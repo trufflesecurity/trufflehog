@@ -509,9 +509,12 @@ type Progress struct {
 	encodedResumeInfoByID map[string]string
 	PercentComplete       int64
 	Message               string
-	// EncodedResumeInfo catches up with SetEncodedResumeInfoFor and
-	// ClearEncodedResumeInfoFor only when read through GetProgress or
-	// JobProgress.Snapshot.
+	// EncodedResumeInfo is brought up to date with SetEncodedResumeInfoFor
+	// and ClearEncodedResumeInfoFor only by GetProgress and
+	// JobProgress.Snapshot. After a per-unit save, a direct read of the field
+	// is stale, and a direct write is overwritten by the next GetProgress or
+	// Snapshot. Read and write it through GetProgress, or replace it with
+	// SetProgressComplete or SetProgressOngoing.
 	EncodedResumeInfo string
 	SectionsCompleted int32
 	SectionsRemaining int32
@@ -573,7 +576,12 @@ func (p *Progress) SetProgressOngoing(message string, encodedResumeInfo string) 
 	p.SectionsRemaining = 0
 }
 
-// GetProgress gets job completion percentage for metrics reporting.
+// GetProgress gets job completion percentage for metrics reporting. It first
+// encodes any per-unit resume info saved since the last encode into
+// EncodedResumeInfo. It returns p itself after releasing the lock, so reads
+// through the returned pointer are not synchronized with a source saving
+// progress or with JobProgress.Snapshot. Use JobProgress.Snapshot to read
+// progress while a source may be writing it.
 func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()
