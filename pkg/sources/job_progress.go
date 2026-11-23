@@ -341,6 +341,22 @@ func (jp *JobProgress) EndEnumerating(end time.Time) {
 // Snapshot safely gets the job's current metrics.
 func (jp *JobProgress) Snapshot() JobProgressMetrics {
 	jp.metricsLock.Lock()
+	progress := jp.progress
+	jp.metricsLock.Unlock()
+
+	// The progress lock is held until the metrics are copied, so resume info
+	// a source saves after reporting a chunk cannot reach a snapshot that has
+	// not counted that chunk. Encoding happens before metricsLock is taken so
+	// it does not block chunk reporting.
+	var encoded string
+	if progress != nil {
+		progress.mut.Lock()
+		defer progress.mut.Unlock()
+		encoded = progress.encodedResumeInfoLocked()
+	}
+
+	jp.metricsLock.Lock()
+	defer jp.metricsLock.Unlock()
 
 	metrics := jp.metrics
 
@@ -356,17 +372,11 @@ func (jp *JobProgress) Snapshot() JobProgressMetrics {
 
 	metrics.Errors = make([]error, len(metrics.Errors))
 	copy(metrics.Errors, jp.metrics.Errors)
-	progress := jp.progress
-	jp.metricsLock.Unlock()
 
-	// Reading progress can encode its resume info, so it happens after
-	// releasing metricsLock to keep that from blocking chunk reporting.
 	if progress != nil {
-		progress.mut.Lock()
-		defer progress.mut.Unlock()
 		metrics.SourcePercent = progress.PercentComplete
 		metrics.SourceMessage = progress.Message
-		metrics.SourceEncodedResumeInfo = progress.encodedResumeInfoLocked()
+		metrics.SourceEncodedResumeInfo = encoded
 		metrics.SourceSectionsCompleted = progress.SectionsCompleted
 		metrics.SourceSectionsRemaining = progress.SectionsRemaining
 	}
