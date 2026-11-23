@@ -586,6 +586,42 @@ func TestChunkUnitCancelledContext(t *testing.T) {
 	assert.Empty(t, reporter.Chunks)
 }
 
+// TestChunkUnitCancelledDuringBuildLog cancels the scan while the last build's
+// log is being fetched. The cancellation must be returned rather than reported
+// as a fault of the job, as TestReporter, like the SourceManager's reporter,
+// swallows reported errors.
+func TestChunkUnitCancelledDuringBuildLog(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	mux.HandleFunc("/job/good/api/json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"builds":[{"number":1,"url":"%[1]s/job/good/1/"},{"number":2,"url":"%[1]s/job/good/2/"}]}`, server.URL)
+	})
+	mux.HandleFunc("/job/good/1/consoleText", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, "build one log")
+	})
+	mux.HandleFunc("/job/good/2/consoleText", func(_ http.ResponseWriter, r *http.Request) {
+		cancel()
+		select {
+		case <-r.Context().Done():
+		case <-time.After(5 * time.Second):
+		}
+	})
+
+	s := newTestSource(t, context.Background(), server.URL, "chunk-unit")
+
+	reporter := &sourcestest.TestReporter{}
+	err := s.ChunkUnit(ctx, JenkinsJob{Name: "good", Path: "/job/good"}, reporter)
+	assert.ErrorIs(t, err, ctx.Err())
+	assert.Empty(t, reporter.ChunkErrs, "a cancelled fetch is not a job error")
+	assert.Equal(t, []int64{1}, buildNumbers(t, reporter.Chunks), "builds before the cancellation are still scanned")
+}
+
 // TestSourceManagerReportsErroredJobUnit runs the source through the
 // SourceManager's unit path, checking that a job which fails is reported as an
 // errored unit while the other job is still scanned.

@@ -450,6 +450,10 @@ func (s *Source) scanJob(ctx context.Context, job JenkinsJob, reporter sources.C
 			"build_url", build.Url)
 
 		if err := s.chunkBuild(ctx, build, projectName, reporter); err != nil {
+			// A log fetch cut short by cancellation is not a fault of the job.
+			if common.IsDone(ctx) {
+				return ctx.Err()
+			}
 			if err := reporter.ChunkErr(ctx, fmt.Errorf("failed to scan build %d of job %q: %w", build.Number, job.Path, err)); err != nil {
 				return err
 			}
