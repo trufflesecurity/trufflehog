@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -88,12 +89,16 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		if !json.Valid(body) {
+			return false, fmt.Errorf("unexpected response body for HTTP 200")
+		}
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
-	case http.StatusForbidden:
-		// The token is valid but lacks permission for the endpoint.
-		return true, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}

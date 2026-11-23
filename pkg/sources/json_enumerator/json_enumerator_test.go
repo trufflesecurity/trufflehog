@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -13,8 +15,13 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log/logtest"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -105,7 +112,7 @@ func TestScanEnumerator(t *testing.T) {
 				defer close(chunksChan)
 				ctx := context.WithLogger(t.Context(), logr.Discard())
 				source := &Source{}
-				workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, sources.ChanReporter{Ch: chunksChan})
+				_, workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, sources.ChanReporter{Ch: chunksChan})
 			}()
 
 			enc := json.NewEncoder(writeJSON)
@@ -190,7 +197,7 @@ func TestScanEnumeratorAPKContentRouting(t *testing.T) {
 			defer close(chunksChan)
 			ctx := context.WithLogger(t.Context(), logr.Discard())
 			source := &Source{}
-			workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, sources.ChanReporter{Ch: chunksChan})
+			_, workerError = source.chunkJSONEnumeratorReader(ctx, readJSON, sources.ChanReporter{Ch: chunksChan})
 		}()
 
 		// No filename is set on the record; routing is content-based only.
@@ -213,4 +220,59 @@ func TestScanEnumeratorAPKContentRouting(t *testing.T) {
 	foundZip, err := run(plainZip)
 	require.NoError(t, err)
 	assert.Contains(t, foundZip, secret, "non-APK zip should be handled generically and surface the secret")
+}
+
+func TestSource_DebugLogging(t *testing.T) {
+	const (
+		testSecret     = "jsonenumdebuglogtestsecret"
+		metadataSecret = "jsonenumdebuglogmetadatasecret"
+	)
+
+	dir := t.TempDir()
+	good := filepath.Join(dir, "good.jsonl")
+	require.NoError(t, os.WriteFile(good, []byte(
+		`{"metadata":{"token":"`+metadataSecret+`"},"data":"token = `+testSecret+`"}`+"\n"+
+			`{"metadata":{},"data":"nothing here"}`+"\n"), 0o600))
+	// The second entry has no metadata, so decoding stops there and the source logs an error.
+	bad := filepath.Join(dir, "bad.jsonl")
+	require.NoError(t, os.WriteFile(bad, []byte(
+		`{"metadata":{},"data":"first"}`+"\n"+`{"data":"`+testSecret+`"}`+"\n"), 0o600))
+	missing := filepath.Join(dir, "missing.jsonl")
+
+	conn, err := anypb.New(&sourcespb.JSONEnumerator{Paths: []string{good, bad, missing}})
+	require.NoError(t, err)
+
+	runSource := func(t *testing.T, debug bool) []observer.LoggedEntry {
+		t.Helper()
+		ctx, logs := logtest.SourceContext(debug)
+		s := new(Source)
+		require.NoError(t, s.Init(ctx, "test source", 1, 1, false, conn, 1))
+		if debug {
+			logtest.CheckInitLine(t, logs.All())
+		}
+
+		require.NoError(t, s.Enumerate(ctx, sources.VisitorReporter{
+			VisitUnit: func(context.Context, sources.SourceUnit) error { return nil },
+			VisitErr:  func(context.Context, error) error { return nil },
+		}))
+
+		chunksCh := make(chan *sources.Chunk, 10)
+		require.NoError(t, s.Chunks(ctx, chunksCh))
+		close(chunksCh)
+		var data strings.Builder
+		for chunk := range chunksCh {
+			data.Write(chunk.Data)
+		}
+		assert.Contains(t, data.String(), testSecret)
+		assert.Contains(t, data.String(), "first")
+		return logs.All()
+	}
+
+	t.Run("debug on", func(t *testing.T) {
+		logtest.CheckSourceLines(t, runSource(t, true), testSecret, metadataSecret)
+	})
+
+	t.Run("debug off", func(t *testing.T) {
+		logtest.CheckNoDebugLines(t, runSource(t, false))
+	})
 }

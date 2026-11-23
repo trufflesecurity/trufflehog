@@ -93,6 +93,8 @@ import (
 	bannerbearv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v1"
 	bannerbearv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
+	basetenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baseten/v1"
+	basetenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baseten/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
@@ -1004,6 +1006,8 @@ func buildDetectorList() []detectors.Detector {
 		&bannerbearv1.Scanner{},
 		&bannerbearv2.Scanner{},
 		&baremetrics.Scanner{},
+		&basetenv1.Scanner{},
+		&basetenv2.Scanner{},
 		&beamer.Scanner{},
 		&beebole.Scanner{},
 		// Besnappy appears to be abandoned. The domain has expired. API returns 200 OK for all secrets causing FPs
@@ -1930,6 +1934,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.InfisicalDetectorEnabled.Load()
 		case *serval.Scanner:
 			return !feature.ServalDetectorEnabled.Load()
+		case *basetenv1.Scanner, *basetenv2.Scanner:
+			return !feature.BasetenDetectorEnabled.Load()
 		case *gitbook.Scanner:
 			return !feature.GitBookDetectorEnabled.Load()
 		default:
