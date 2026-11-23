@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	orgAuthTokenPat = regexp.MustCompile(`\b(sntrys_eyJ[a-zA-Z0-9+/]{60,600}={0,2}_[a-zA-Z0-9+/]{43})\b`)
+	orgAuthTokenPat = regexp.MustCompile(`\b(sntrys_eyJ[a-zA-Z0-9+/]{60,450}={0,2}_[a-zA-Z0-9+/]{43})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
