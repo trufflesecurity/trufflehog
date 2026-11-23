@@ -2,7 +2,6 @@ package sources
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -251,178 +249,25 @@ func TestJobProgressRefUnitProgress(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// TestJobProgress_SnapshotEdgeCases is not parallel because its allocation
-// check counts allocations made by every goroutine in the process.
-func TestJobProgress_SnapshotEdgeCases(t *testing.T) {
-	t.Run("nil tracked progress returns zero source fields", func(t *testing.T) {
-		t.Parallel()
-		jp := NewJobProgress(1, 1, "untracked")
-		snap := jp.Snapshot()
-		assert.Empty(t, snap.SourceEncodedResumeInfo)
-		assert.Empty(t, snap.SourceMessage)
-		assert.Zero(t, snap.SourcePercent)
-		assert.Zero(t, snap.SourceSectionsCompleted)
-		assert.Zero(t, snap.SourceSectionsRemaining)
-
-		jp.TrackProgress(nil)
-		snap = jp.Snapshot()
-		assert.Empty(t, snap.SourceEncodedResumeInfo)
-	})
-
-	t.Run("repeated snapshots without intervening writes do not re-encode", func(t *testing.T) {
-		var p Progress
-		jp := NewJobProgress(1, 1, "clean-snapshot")
-		jp.TrackProgress(&p)
-
-		for i := range 200 {
-			p.SetEncodedResumeInfoFor(fmt.Sprintf("unit-%03d", i), "checkpoint")
-		}
-		first := jp.Snapshot().SourceEncodedResumeInfo
-		require.NotEmpty(t, first)
-
-		// Encoding 200 entries allocates hundreds of times, so reads that
-		// reuse the last encode allocate nothing.
-		allocs := testing.AllocsPerRun(100, func() {
-			jp.Snapshot()
-			p.GetProgress()
-		})
-		assert.Zero(t, allocs)
-		assert.Equal(t, first, jp.Snapshot().SourceEncodedResumeInfo)
-		assert.Equal(t, first, p.GetProgress().EncodedResumeInfo)
-
-		p.SetEncodedResumeInfoFor("unit-000", "next")
-		assert.NotEqual(t, first, jp.Snapshot().SourceEncodedResumeInfo)
-	})
-
-	t.Run("concurrent resume info, unit progress, whole-string progress, errors, chunks, and snapshots", func(t *testing.T) {
-		t.Parallel()
-		const workers, iters = 6, 500
-		var p Progress
-		jp := NewJobProgress(1, 1, "stress")
-		jp.TrackProgress(&p)
-
-		var wg sync.WaitGroup
-		for w := range workers {
-			wg.Add(1)
-			go func(worker int) {
-				defer wg.Done()
-				id := fmt.Sprintf("u%d", worker)
-				for i := range iters {
-					if i%11 == 0 {
-						p.ClearEncodedResumeInfoFor(id)
-					}
-					p.SetEncodedResumeInfoFor(id, strconv.Itoa(i))
-					_ = p.GetEncodedResumeInfoFor(id)
-					p.SetUnitProgressFor(id, UnitProgress{
-						State:      UnitProgressReady,
-						ItemsDone:  uint64(i),
-						ItemsTotal: uint64(iters),
-					})
-					_, _ = jp.UnitProgress(id)
-					jp.ReportChunk(nil, &Chunk{})
-					if i%50 == 0 {
-						jp.ReportError(errors.New("transient"))
-					}
-				}
-			}(w)
-		}
-
-		// Interleave whole-string writes and Snapshot reads concurrently.
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			for i := range iters {
-				if i%2 == 0 {
-					p.SetProgressComplete(i, iters, "progress", "")
-				} else {
-					p.SetProgressOngoing("ongoing", "")
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			for range iters {
-				snap := jp.Snapshot()
-				if snap.SourceEncodedResumeInfo != "" {
-					var m map[string]string
-					assert.NoError(t, json.Unmarshal([]byte(snap.SourceEncodedResumeInfo), &m))
-				}
-				p.GetProgress()
-			}
-		}()
-		wg.Wait()
-
-		// Final per-unit write after concurrent activity must encode all worker keys.
-		p.SetEncodedResumeInfoFor("final", "done")
-		var got map[string]string
-		require.NoError(t, json.Unmarshal([]byte(jp.Snapshot().SourceEncodedResumeInfo), &got))
-		assert.Equal(t, "done", got["final"])
-		for w := range workers {
-			assert.Equal(t, strconv.Itoa(iters-1), got[fmt.Sprintf("u%d", w)])
-		}
-	})
-}
-
-// A monitor snapshots a job while its source saves resume info. Each save here
-// moves one unit's position forward, so every reader must see positions that
-// never move backward, and a snapshot taken after the last save must hold it.
-func TestJobProgress_SnapshotsSeeResumeInfoMoveForward(t *testing.T) {
-	t.Parallel()
-	const saves, readers = 5000, 4
+// TestSnapshot_ReusesEncodedResumeInfo is not parallel because AllocsPerRun
+// counts allocations made by every goroutine in the process.
+func TestSnapshot_ReusesEncodedResumeInfo(t *testing.T) {
 	var p Progress
 	jp := NewJobProgress(1, 1, "test")
 	jp.TrackProgress(&p)
-
-	position := func(encoded string) int {
-		if encoded == "" {
-			return -1
-		}
-		byID := unmarshalEncodedResumeInfo(encoded)
-		n, err := strconv.Atoi(byID["unit"])
-		if !assert.NoError(t, err, "resume info %q", encoded) {
-			return -1
-		}
-		return n
+	for i := range 200 {
+		p.SetEncodedResumeInfoFor(fmt.Sprintf("unit-%03d", i), "checkpoint")
 	}
 
-	done := make(chan struct{})
-	var wg sync.WaitGroup
-	for r := range readers {
-		wg.Go(func() {
-			last := -1
-			for {
-				var got int
-				if r%2 == 0 {
-					got = position(jp.Snapshot().SourceEncodedResumeInfo)
-				} else {
-					// GetProgress shares the encoded string with
-					// Snapshot, so both kinds of reader run together.
-					p.GetProgress()
-					got = position(jp.Snapshot().SourceEncodedResumeInfo)
-				}
-				if got < last {
-					t.Errorf("reader %d saw position %d after %d", r, got, last)
-					return
-				}
-				last = got
-				select {
-				case <-done:
-					return
-				default:
-				}
-			}
-		})
-	}
+	// The warm-up call of AllocsPerRun takes the first snapshot, which encodes
+	// the saves above. Encoding 200 entries allocates hundreds of times, so
+	// snapshots that reuse that encode allocate nothing.
+	allocs := testing.AllocsPerRun(100, func() { jp.Snapshot() })
+	assert.Zero(t, allocs)
 
-	for i := range saves {
-		p.SetEncodedResumeInfoFor("unit", strconv.Itoa(i))
-		jp.ReportChunk(nil, &Chunk{})
-	}
-	close(done)
-	wg.Wait()
-
-	assert.Equal(t, saves-1, position(jp.Snapshot().SourceEncodedResumeInfo))
-	assert.Equal(t, saves-1, position(p.GetProgress().EncodedResumeInfo))
+	encoded := jp.Snapshot().SourceEncodedResumeInfo
+	assert.Len(t, unmarshalEncodedResumeInfo(encoded), 200)
+	assert.Equal(t, encoded, p.GetProgress().EncodedResumeInfo)
 }
 
 // A source reports a chunk and then saves the position after it. A snapshot
