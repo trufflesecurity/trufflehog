@@ -49,8 +49,8 @@ const (
 	adminApplication = "Admin API"
 	authApplication  = "Auth API"
 
-	duoCodeInvalidSignature = 40103 
-	duoCodeAccessForbidden  = 40301 
+	duoCodeInvalidSignature = 40103
+	duoCodeAccessForbidden  = 40301
 )
 
 type duoReply struct {
@@ -123,7 +123,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 //
 // Only a 200 from either API proves the credentials valid, and only error code 40103
 // (invalid signature) from either API proves them invalid: that API recognized the
-// integration key and rejected the secret key. Other responsesare reported as a verification error.
+// integration key and rejected the secret key. Other responses are reported as a verification error.
 func verifyMatch(
 	ctx context.Context,
 	client *http.Client,
