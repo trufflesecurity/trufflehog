@@ -17,6 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Must be 1 through N: each value selects which slice of the packages runs.
         shard: [1, 2, 3, 4]
     permissions:
       actions: "read"
@@ -41,8 +42,8 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-test-${{ matrix.shard }}-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}
-          restore-keys: go-test-${{ matrix.shard }}-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
+          key: go-test-${{ matrix.shard }}-of-${{ strategy.job-total }}-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-test-${{ matrix.shard }}-of-${{ strategy.job-total }}-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
       - id: "auth"
         uses: "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" # v3
         with:
@@ -55,11 +56,11 @@ jobs:
       - name: Test
         shell: bash
         env:
-          SHARD_INDEX: ${{ strategy.job-index }}
+          SHARD: ${{ matrix.shard }}
           SHARD_TOTAL: ${{ strategy.job-total }}
         run: |
-          pkgs=$(go list ./... | grep -v /vendor/ | grep -v pkg/analyzer/analyzers | awk -v i="$SHARD_INDEX" -v n="$SHARD_TOTAL" 'NR % n == i')
-          CGO_ENABLED=1 gotestsum --junitfile "tmp/test-results/test-${{ matrix.shard }}.xml" --raw-command -- go test -count=1 -json -tags=sources $pkgs
+          pkgs=$(go list ./... | grep -v /vendor/ | grep -v pkg/analyzer/analyzers | awk -v i="$((SHARD - 1))" -v n="$SHARD_TOTAL" 'NR % n == i')
+          CGO_ENABLED=1 gotestsum --junitfile "tmp/test-results/test-$SHARD.xml" --raw-command -- go test -count=1 -json -tags=sources $pkgs
         if: ${{ success() || failure() }} # always run this step, even if there were previous errors
       - name: Upload test results to BuildPulse for flaky test detection
         if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
@@ -93,6 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Must be 1 through N: each value selects which slice of the packages runs.
         shard: [1, 2, 3, 4]
     permissions:
       actions: "read"
@@ -107,8 +109,8 @@ jobs:
       - name: Test
         shell: bash
         env:
-          SHARD_INDEX: ${{ strategy.job-index }}
+          SHARD: ${{ matrix.shard }}
           SHARD_TOTAL: ${{ strategy.job-total }}
         run: |
-          pkgs=$(go list ./... | grep -v /vendor/ | grep -v pkg/sources | grep -v pkg/analyzer/analyzers | awk -v i="$SHARD_INDEX" -v n="$SHARD_TOTAL" 'NR % n == i')
+          pkgs=$(go list ./... | grep -v /vendor/ | grep -v pkg/sources | grep -v pkg/analyzer/analyzers | awk -v i="$((SHARD - 1))" -v n="$SHARD_TOTAL" 'NR % n == i')
           CGO_ENABLED=0 go test -count=1 -timeout=5m $pkgs
