@@ -456,7 +456,7 @@ func TestCheckpointerUpdateUnitScan(t *testing.T) {
 	assert.NoError(t, err, "Unexpected error updating progress")
 
 	var info map[string]string
-	err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
+	err = json.Unmarshal([]byte(progress.GetProgress().EncodedResumeInfo), &info)
 	var gotUnitID, gotStartAfter string
 	for k, v := range info {
 		gotUnitID = k

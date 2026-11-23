@@ -509,11 +509,17 @@ type Progress struct {
 	encodedResumeInfoByID map[string]string
 	PercentComplete       int64
 	Message               string
-	EncodedResumeInfo     string
-	SectionsCompleted     int32
-	SectionsRemaining     int32
+	// EncodedResumeInfo catches up with SetEncodedResumeInfoFor and
+	// ClearEncodedResumeInfoFor only when read through GetProgress or
+	// JobProgress.Snapshot.
+	EncodedResumeInfo string
+	SectionsCompleted int32
+	SectionsRemaining int32
 	// unitProgressByID is used for progress inside a unit (see below)
 	unitProgressByID map[string]UnitProgress
+	// resumeInfoStale means encodedResumeInfoByID changed after
+	// EncodedResumeInfo was last encoded from it.
+	resumeInfoStale bool
 }
 
 // Validator is an interface for validating a source. Sources can optionally implement this interface to validate
@@ -536,6 +542,7 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 
 	p.Message = message
 	p.EncodedResumeInfo = encodedResumeInfo
+	p.resumeInfoStale = false
 	p.SectionsCompleted = int32(i)
 	p.SectionsRemaining = int32(scope)
 
@@ -561,6 +568,7 @@ func (p *Progress) SetProgressOngoing(message string, encodedResumeInfo string) 
 
 	p.Message = message
 	p.EncodedResumeInfo = encodedResumeInfo
+	p.resumeInfoStale = false
 	// Explicitly set SectionsRemaining to 0 so the frontend does not display a percent.
 	p.SectionsRemaining = 0
 }
@@ -569,6 +577,7 @@ func (p *Progress) SetProgressOngoing(message string, encodedResumeInfo string) 
 func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()
+	p.encodedResumeInfoLocked()
 	return p
 }
 
@@ -603,7 +612,7 @@ func (p *Progress) SetEncodedResumeInfoFor(id, value string) {
 	defer p.mut.Unlock()
 	p.ensureEncodedResumeInfoByID()
 	p.encodedResumeInfoByID[id] = value
-	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+	p.resumeInfoStale = true
 }
 
 // ClearEncodedResumeInfoFor removes the encoded resume information from being
@@ -613,7 +622,17 @@ func (p *Progress) ClearEncodedResumeInfoFor(id string) {
 	defer p.mut.Unlock()
 	p.ensureEncodedResumeInfoByID()
 	delete(p.encodedResumeInfoByID, id)
-	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+	p.resumeInfoStale = true
+}
+
+// encodedResumeInfoLocked returns EncodedResumeInfo, encoding the per-ID
+// entries first if they changed. The mutex must be held.
+func (p *Progress) encodedResumeInfoLocked() string {
+	if p.resumeInfoStale {
+		p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+		p.resumeInfoStale = false
+	}
+	return p.EncodedResumeInfo
 }
 
 // ensureEncodedResumeInfoByID ensures the encodedResumeInfoByID attribute is a
