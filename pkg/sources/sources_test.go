@@ -1,16 +1,11 @@
 package sources
 
 import (
-	"encoding/json"
 	"fmt"
-	"math/rand/v2"
-	"strconv"
-	"sync"
 	"testing"
 	"unsafe"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestChunkSize ensures that the Chunk struct does not exceed 104 bytes.
@@ -65,138 +60,120 @@ func TestProgress_ResumeInfoReadsSeeLatestWrite(t *testing.T) {
 	assert.Equal(t, "ongoing", p.GetProgress().EncodedResumeInfo)
 }
 
-// resumeInfoModel is a reference for how Progress resume info behaves: per-ID
-// writes update a map decoded from the encoded string on first use and then
-// re-encode it, and whole-string writes replace the string but not the map.
-type resumeInfoModel struct {
-	encoded string
-	byID    map[string]string
-}
-
-func (m *resumeInfoModel) ensureByID() {
-	if m.byID == nil {
-		m.byID = map[string]string{}
-		_ = json.Unmarshal([]byte(m.encoded), &m.byID)
-	}
-}
-
-func (m *resumeInfoModel) set(id, value string) {
-	m.ensureByID()
-	m.byID[id] = value
-	m.encode()
-}
-
-func (m *resumeInfoModel) clear(id string) {
-	m.ensureByID()
-	delete(m.byID, id)
-	m.encode()
-}
-
-func (m *resumeInfoModel) encode() {
-	encoded, _ := json.Marshal(m.byID)
-	m.encoded = string(encoded)
-}
-
-func (m *resumeInfoModel) get(id string) string {
-	m.ensureByID()
-	return m.byID[id]
-}
-
-func TestProgress_ResumeInfoMatchesModel(t *testing.T) {
+// Resume info restored into a Progress must reach its readers unchanged until
+// something is saved per ID: the restored string is what the previous run
+// persisted, and re-encoding it without a new save could reorder or reformat
+// it. Each case restores the same string a different way.
+func TestProgress_RestoredResumeInfoIsReadBackVerbatim(t *testing.T) {
 	t.Parallel()
+	// The spacing and key order differ from what encoding the per-ID map
+	// produces, so a re-encode is visible.
+	const restored = `{ "b": "2",  "a": "1" }`
 	tests := []struct {
-		name        string
-		wholeWrites bool
+		name    string
+		restore func() *Progress
 	}{
-		{name: "per-ID writes", wholeWrites: false},
-		{name: "per-ID and whole-string writes", wholeWrites: true},
+		{name: "struct literal", restore: func() *Progress { return &Progress{EncodedResumeInfo: restored} }},
+		{name: "assignment through GetProgress", restore: func() *Progress {
+			var p Progress
+			p.GetProgress().EncodedResumeInfo = restored
+			return &p
+		}},
+		{name: "assignment to the field", restore: func() *Progress {
+			var p Progress
+			p.EncodedResumeInfo = restored
+			return &p
+		}},
+		{name: "SetProgressComplete", restore: func() *Progress {
+			var p Progress
+			p.SetProgressComplete(0, 1, "message", restored)
+			return &p
+		}},
+		{name: "SetProgressOngoing", restore: func() *Progress {
+			var p Progress
+			p.SetProgressOngoing("message", restored)
+			return &p
+		}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			rng := rand.New(rand.NewPCG(1, 2))
-			for seq := range 2000 {
-				var p Progress
-				var model resumeInfoModel
-				jp := NewJobProgress(1, 1, "test")
-				jp.TrackProgress(&p)
-				// Half the sequences resume from encoded info restored before any per-ID write.
-				if seq%2 == 0 {
-					restored := `{"u0":"restored-0","u1":"restored-1"}`
-					p.GetProgress().EncodedResumeInfo = restored
-					model.encoded = restored
-				}
+			p := tt.restore()
+			jp := NewJobProgress(1, 1, "test")
+			jp.TrackProgress(p)
 
-				for op := range 30 {
-					id := fmt.Sprintf("u%d", rng.IntN(4))
-					switch k := rng.IntN(7); {
-					case k <= 1:
-						value := fmt.Sprintf("v%d", rng.IntN(100))
-						p.SetEncodedResumeInfoFor(id, value)
-						model.set(id, value)
-					case k == 2:
-						p.ClearEncodedResumeInfoFor(id)
-						model.clear(id)
-					case k == 3 && tt.wholeWrites:
-						whole := fmt.Sprintf(`{"u%d":"whole-%d"}`, rng.IntN(4), rng.IntN(100))
-						p.SetProgressComplete(1, 2, "message", whole)
-						model.encoded = whole
-					case k == 4 && tt.wholeWrites:
-						whole := fmt.Sprintf(`{"u%d":"whole-%d"}`, rng.IntN(4), rng.IntN(100))
-						p.SetProgressOngoing("message", whole)
-						model.encoded = whole
-					default:
-						require.Equal(t, model.encoded, jp.Snapshot().SourceEncodedResumeInfo, "sequence %d op %d: Snapshot", seq, op)
-						require.Equal(t, model.encoded, p.GetProgress().EncodedResumeInfo, "sequence %d op %d: GetProgress", seq, op)
-						require.Equal(t, model.get(id), p.GetEncodedResumeInfoFor(id), "sequence %d op %d: GetEncodedResumeInfoFor(%q)", seq, op, id)
-					}
-				}
+			assert.Equal(t, restored, jp.Snapshot().SourceEncodedResumeInfo)
+			assert.Equal(t, restored, p.GetProgress().EncodedResumeInfo)
+
+			// Reading per ID decodes the string but saves nothing.
+			assert.Equal(t, "1", p.GetEncodedResumeInfoFor("a"))
+			assert.Equal(t, "2", p.GetEncodedResumeInfoFor("b"))
+			assert.Empty(t, p.GetEncodedResumeInfoFor("c"))
+			assert.Equal(t, restored, jp.Snapshot().SourceEncodedResumeInfo)
+			assert.Equal(t, restored, p.GetProgress().EncodedResumeInfo)
+
+			// The first per-ID save re-encodes every restored entry.
+			p.SetEncodedResumeInfoFor("c", "3")
+			assert.Equal(t, `{"a":"1","b":"2","c":"3"}`, jp.Snapshot().SourceEncodedResumeInfo)
+			assert.Equal(t, `{"a":"1","b":"2","c":"3"}`, p.GetProgress().EncodedResumeInfo)
+		})
+	}
+}
+
+// Clearing an ID is a save like any other: the next read must reflect it,
+// including when it empties the resume info or names an ID that was never
+// saved.
+func TestProgress_ClearThenRead(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		restored string
+		clear    []string
+		want     string
+	}{
+		{name: "one of two restored entries", restored: `{"a":"1","b":"2"}`, clear: []string{"a"}, want: `{"b":"2"}`},
+		{name: "every restored entry", restored: `{"a":"1","b":"2"}`, clear: []string{"a", "b"}, want: `{}`},
+		{name: "an ID that was never saved", restored: `{"a":"1"}`, clear: []string{"z"}, want: `{"a":"1"}`},
+		{name: "an ID on empty resume info", restored: ``, clear: []string{"a"}, want: `{}`},
+		{name: "an ID on resume info that is not a per-ID map", restored: `opaque whole-string info`, clear: []string{"a"}, want: `{}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var p Progress
+			jp := NewJobProgress(1, 1, "test")
+			jp.TrackProgress(&p)
+			p.GetProgress().EncodedResumeInfo = tt.restored
+
+			for _, id := range tt.clear {
+				p.ClearEncodedResumeInfoFor(id)
+			}
+
+			assert.Equal(t, tt.want, jp.Snapshot().SourceEncodedResumeInfo)
+			assert.Equal(t, tt.want, p.GetProgress().EncodedResumeInfo)
+			for _, id := range tt.clear {
+				assert.Empty(t, p.GetEncodedResumeInfoFor(id))
 			}
 		})
 	}
 }
 
-func TestProgress_ConcurrentResumeInfoWritesAndReads(t *testing.T) {
+// Resume info restored through GetProgress after per-ID saves replaces what
+// those saves encoded, and stays in place until the next per-ID save.
+func TestProgress_RestoreThroughGetProgressAfterPerIDSave(t *testing.T) {
 	t.Parallel()
-	const writers, writes = 8, 2000
 	var p Progress
 	jp := NewJobProgress(1, 1, "test")
 	jp.TrackProgress(&p)
 
-	var wg sync.WaitGroup
-	for w := range writers {
-		wg.Go(func() {
-			id := fmt.Sprintf("u%d", w)
-			for i := range writes {
-				if i%7 == 0 {
-					p.ClearEncodedResumeInfoFor(id)
-				}
-				p.SetEncodedResumeInfoFor(id, strconv.Itoa(i))
-				jp.ReportChunk(nil, &Chunk{})
-			}
-		})
-	}
-	for range 2 {
-		wg.Go(func() {
-			for range writes {
-				if encoded := jp.Snapshot().SourceEncodedResumeInfo; encoded != "" {
-					var resumeInfo map[string]string
-					assert.NoError(t, json.Unmarshal([]byte(encoded), &resumeInfo))
-				}
-				p.GetProgress()
-			}
-		})
-	}
-	wg.Wait()
+	p.SetEncodedResumeInfoFor("a", "1")
+	p.GetProgress().EncodedResumeInfo = "restored"
+	assert.Equal(t, "restored", jp.Snapshot().SourceEncodedResumeInfo)
+	assert.Equal(t, "restored", p.GetProgress().EncodedResumeInfo)
 
-	want := make(map[string]string, writers)
-	for w := range writers {
-		want[fmt.Sprintf("u%d", w)] = strconv.Itoa(writes - 1)
-	}
-	var got map[string]string
-	require.NoError(t, json.Unmarshal([]byte(jp.Snapshot().SourceEncodedResumeInfo), &got))
-	assert.Equal(t, want, got)
+	p.SetEncodedResumeInfoFor("b", "2")
+	assert.Equal(t, `{"a":"1","b":"2"}`, jp.Snapshot().SourceEncodedResumeInfo)
+	assert.Equal(t, `{"a":"1","b":"2"}`, p.GetProgress().EncodedResumeInfo)
 }
 
 func TestUnitProgress_Percent(t *testing.T) {

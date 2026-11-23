@@ -3,10 +3,12 @@ package s3
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -725,4 +727,115 @@ func TestSource_DebugLogging(t *testing.T) {
 	t.Run("debug off", func(t *testing.T) {
 		logtest.CheckNoDebugLines(t, runSource(t, false))
 	})
+}
+
+// snapshotAtChunk is a job hook that plays the part of a job monitor: when the
+// stopAt-th chunk is reported it takes the job's snapshot, the only place a
+// monitor can read resume info from, and then cancels the run.
+type snapshotAtChunk struct {
+	sources.NoopHook
+	mu       sync.Mutex
+	stopAt   int
+	reported int
+	snapshot *sources.JobProgressMetrics
+}
+
+func (h *snapshotAtChunk) ReportChunk(ref sources.JobProgressRef, _ sources.SourceUnit, _ *sources.Chunk) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.reported++
+	if h.reported == h.stopAt {
+		snapshot := ref.Snapshot()
+		h.snapshot = &snapshot
+		ref.CancelRun(errors.New("stopped by the test"))
+	}
+}
+
+// scanUnitThroughManager scans one bucket as a unit through a SourceManager
+// and returns the keys it scanned and the job's final snapshot. resumeInfo is
+// restored into the source before the run, as a caller resuming a job does. A
+// stopAt above zero interrupts the run at that chunk and returns the snapshot
+// taken there instead.
+func scanUnitThroughManager(
+	t *testing.T,
+	fake *fakeS3,
+	unit S3SourceUnit,
+	resumeInfo string,
+	stopAt int,
+) ([]string, sources.JobProgressMetrics) {
+	t.Helper()
+	s := newFakeS3Source(t, fake)
+	if resumeInfo != "" {
+		s.GetProgress().EncodedResumeInfo = resumeInfo
+	}
+
+	hook := &snapshotAtChunk{stopAt: stopAt}
+	mgr := sources.NewManager(sources.WithSourceUnits(), sources.WithReportHook(hook))
+
+	var scanned []string
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		for chunk := range mgr.Chunks() {
+			scanned = append(scanned, chunk.SourceMetadata.GetS3().GetFile())
+		}
+	}()
+
+	ref, err := mgr.Scan(context.Background(), "resume test", s, unit)
+	require.NoError(t, err)
+	<-ref.Done()
+	_ = mgr.Wait()
+	<-drained
+
+	if hook.snapshot != nil {
+		return scanned, *hook.snapshot
+	}
+	return scanned, ref.Snapshot()
+}
+
+// A unit scan interrupted at any object must leave resume info in the job
+// snapshot that a restarted scan picks up from: the restarted scan lists the
+// bucket after the saved key and scans everything from there. The snapshot is
+// the only reader of resume info here, so this covers the whole path from the
+// checkpointer's per-unit save to a restored scan.
+func TestUnitResumeInfoInSnapshotResumesScan(t *testing.T) {
+	objects := make(map[string]string)
+	var keys []string
+	for i := range 7 {
+		key := fmt.Sprintf("dir/object-%d.txt", i)
+		objects[key] = fmt.Sprintf("content of object %d", i)
+		keys = append(keys, key)
+	}
+	fake := &fakeS3{buckets: map[string]fakeBucket{"bucket": {objects: objects}}}
+	unit := S3SourceUnit{Bucket: "bucket"}
+	unitID, _ := unit.SourceUnitID()
+
+	scanned, final := scanUnitThroughManager(t, fake, unit, "", 0)
+	assert.Equal(t, keys, scanned, "an uninterrupted scan covers every object")
+	// The unit finished, so it has no saved key left.
+	assert.JSONEq(t, `{}`, final.SourceEncodedResumeInfo)
+
+	for stopAt := 1; stopAt <= len(keys); stopAt++ {
+		_, interrupted := scanUnitThroughManager(t, fake, unit, "", stopAt)
+		resumeInfo := interrupted.SourceEncodedResumeInfo
+
+		saved := map[string]string{}
+		if resumeInfo != "" {
+			require.NoError(t, json.Unmarshal([]byte(resumeInfo), &saved))
+		}
+		want := keys
+		if last, ok := saved[unitID]; ok {
+			idx := slices.Index(keys, last)
+			require.GreaterOrEqual(t, idx, 0, "saved key %q is not an object of the bucket", last)
+			// An object is saved once its chunk has been reported, so the saved
+			// key is never past the object being reported.
+			assert.Less(t, idx, stopAt, "stopped at chunk %d: resume info %s is ahead of the scan", stopAt, resumeInfo)
+			want = keys[idx+1:]
+		}
+		// Whatever was not reported before the interruption is still to do.
+		assert.Subset(t, want, keys[stopAt:], "stopped at chunk %d: resume info %s skips objects", stopAt, resumeInfo)
+
+		resumed, _ := scanUnitThroughManager(t, fake, unit, resumeInfo, 0)
+		assert.Equal(t, want, resumed, "stopped at chunk %d, resumed from %s", stopAt, resumeInfo)
+	}
 }
