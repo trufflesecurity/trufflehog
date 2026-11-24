@@ -39,7 +39,7 @@ var (
 	oauthClientIDPat = regexp.MustCompile(`\b0oa[a-zA-Z0-9]{17}\b`)
 	// Delimiters consume a char instead of using \b, since \b breaks on secrets
 	// starting/ending in '-' (a non-word char that's also part of the charset).
-	oauthClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"client_secret", "clientsecret", "client-secret"}) + `(?:^|[^a-zA-Z0-9_-])([a-zA-Z0-9_-]{40,64})(?:[^a-zA-Z0-9_-]|$)`)
+	oauthClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"client_secret", "clientsecret", "client-secret", "okta[._-]password"}) + `(?:^|[^a-zA-Z0-9_-])([a-zA-Z0-9_-]{40,64})(?:[^a-zA-Z0-9_-]|$)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
