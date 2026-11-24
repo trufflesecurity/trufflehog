@@ -134,11 +134,8 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 // Supports GitHub, GitLab, Bitbucket, and Azure Repos.
 // If the provider supports hyperlinks to specific lines, the line number will be included.
 func GenerateLink(repo, commit, file string, line int64) string {
-	// Some paths contain '%' which breaks |url.Parse| if not encoded.
-	// https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding
-	file = strings.ReplaceAll(file, "%", "%25")
-	file = strings.ReplaceAll(file, "[", "%5B")
-	file = strings.ReplaceAll(file, "]", "%5D")
+	// Escape filenames as paths, preserving directory separators.
+	file = (&url.URL{Path: file}).EscapedPath()
 
 	switch determineProvider(repo) {
 	case providerBitbucket:
@@ -212,14 +209,21 @@ func GenerateLink(repo, commit, file string, line int64) string {
 }
 
 var (
-	linePattern        = regexp.MustCompile(`L\d+`)
-	bbCloudLinePattern = regexp.MustCompile(`lines-\d+(:\d+)?`)
+	percentEscapePattern = regexp.MustCompile(`%(?:[0-9a-fA-F]{2})?`)
+	linePattern          = regexp.MustCompile(`L\d+`)
+	bbCloudLinePattern   = regexp.MustCompile(`lines-\d+(:\d+)?`)
 )
 
 // UpdateLinkLineNumber updates the line number in a repository link.
 // Used post-link generation to refine reported issue locations within large scanned blocks.
 func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
-	link = strings.ReplaceAll(link, "%", "%25")
+	// Preserve existing escapes from GenerateLink, while accepting bare percent signs.
+	link = percentEscapePattern.ReplaceAllStringFunc(link, func(match string) string {
+		if match == "%" {
+			return "%25"
+		}
+		return match
+	})
 	link = strings.ReplaceAll(link, "[", "%5B")
 	link = strings.ReplaceAll(link, "]", "%5D")
 	parsedURL, err := url.Parse(link)
