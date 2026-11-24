@@ -18,6 +18,14 @@ var (
 	`
 	invalidPattern = "sntrys_eyJFAKE-OjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
 	token          = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
+
+	// org slug "acme-co"
+	shortSlugToken = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbyIsIm9yZyI6ImFjbWUtY28ifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
+	// self-hosted url "https://sentry.internal.example-company.com"
+	selfHostedToken = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbnRlcm5hbC5leGFtcGxlLWNvbXBhbnkuY29tIiwicmVnaW9uX3VybCI6Imh0dHBzOi8vc2VudHJ5LmludGVybmFsLmV4YW1wbGUtY29tcGFueS5jb20iLCJvcmciOiJwbGF0Zm9ybS1lbmdpbmVlcmluZyJ9_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
+	// self-hosted with 100-char urls and a long org slug
+	longSelfHostedToken = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3h4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4LmV4YW1wbGUuY29tIiwicmVnaW9uX3VybCI6Imh0dHBzOi8veHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHguZXhhbXBsZS5jb20iLCJvcmciOiJwbGF0Zm9ybS1lbmdpbmVlcmluZy1vYnNlcnZhYmlsaXR5LXRlYW0tdXMtZWFzdCJ9_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
+	shortSecretPattern  = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbyIsIm9yZyI6ImFjbWUtY28ifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lq"
 )
 
 func TestSentryToken_Pattern(t *testing.T) {
@@ -39,8 +47,28 @@ func TestSentryToken_Pattern(t *testing.T) {
 			want:  []string{token},
 		},
 		{
+			name:  "valid pattern - short org slug",
+			input: fmt.Sprintf("SENTRY_AUTH_TOKEN=%s\n", shortSlugToken),
+			want:  []string{shortSlugToken},
+		},
+		{
+			name:  "valid pattern - self-hosted url",
+			input: fmt.Sprintf("authToken: '%s'", selfHostedToken),
+			want:  []string{selfHostedToken},
+		},
+		{
+			name:  "valid pattern - long self-hosted url",
+			input: fmt.Sprintf("SENTRY_AUTH_TOKEN=%s\n", longSelfHostedToken),
+			want:  []string{longSelfHostedToken},
+		},
+		{
 			name:  "invalid pattern",
 			input: invalidPattern,
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - secret too short",
+			input: fmt.Sprintf("SENTRY_AUTH_TOKEN=%s\n", shortSecretPattern),
 			want:  []string{},
 		},
 	}
