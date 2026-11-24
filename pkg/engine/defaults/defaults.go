@@ -341,6 +341,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getgist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getresponse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getsandbox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitbook"
 	githubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
 	githubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_oauth2"
@@ -1263,6 +1264,7 @@ func buildDetectorList() []detectors.Detector {
 		&getgist.Scanner{},
 		&getresponse.Scanner{},
 		&getsandbox.Scanner{},
+		&gitbook.Scanner{},
 		&github_oauth2.Scanner{},
 		&githubapp.Scanner{},
 		&githubv1.Scanner{},
@@ -1934,6 +1936,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ServalDetectorEnabled.Load()
 		case *basetenv1.Scanner, *basetenv2.Scanner:
 			return !feature.BasetenDetectorEnabled.Load()
+		case *gitbook.Scanner:
+			return !feature.GitBookDetectorEnabled.Load()
 		default:
 			return false
 		}
