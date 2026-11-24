@@ -88,6 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// KDFs, passphrase often reused or committed nearby), so
 				// surface it as an unverified finding instead of dropping it
 				// silently.
+				addKeyMetadata(s1.ExtraData, []byte(token), nil)
 				s1.SetVerificationError(err, token)
 				results = append(results, s1)
 				continue
@@ -104,6 +105,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if err != nil {
 			continue
 		}
+
+		addKeyMetadata(s1.ExtraData, []byte(token), parsedKey)
 
 		if verify {
 			var (
@@ -161,7 +164,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for k, v := range extraData.data {
 					s1.ExtraData[k] = v
 				}
-			} else {
+			}
+			// An unverified key keeps what was read from the key itself.
+			if len(s1.ExtraData) == 0 {
 				s1.ExtraData = nil
 			}
 			if len(verificationErrors.Errors) > 0 {
