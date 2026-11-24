@@ -155,6 +155,22 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				got[i].SecretParts = nil
+
+				// What is read from the key itself is covered by
+				// metadata_test.go; these cases compare what verification adds.
+				if got[i].ExtraData[metaKeyType] == "" {
+					t.Errorf("result %d has no %s: %v", i, metaKeyType, got[i].ExtraData)
+				}
+				for _, k := range []string{
+					metaKeyType, metaKeyBits, metaCurve, metaKeyFormat, metaPublicKey,
+					metaSSHFingerprint, metaSPKISHA256, metaKeyComment,
+					metaCipher, metaKDF, metaKDFRounds,
+				} {
+					delete(got[i].ExtraData, k)
+				}
+				if len(got[i].ExtraData) == 0 {
+					got[i].ExtraData = nil
+				}
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("PrivatekeyCI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
