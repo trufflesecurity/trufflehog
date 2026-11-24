@@ -61,6 +61,7 @@ var (
 	InfisicalDetectorEnabled                 atomic.Bool
 	ServalDetectorEnabled                    atomic.Bool
 	BasetenDetectorEnabled                   atomic.Bool
+	InternetDataDetectorEnabled              atomic.Bool
 )
 
 type AtomicString struct {
