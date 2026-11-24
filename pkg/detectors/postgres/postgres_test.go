@@ -269,7 +269,8 @@ func TestPostgres_FromDataWithIgnorePattern(t *testing.T) {
 	s := New(
 		WithIgnorePattern([]string{
 			`1\.2\.3\.4`,
-		}))
+		}),
+	)
 	got, err := s.FromData(context.Background(), false, []byte(validUriPattern))
 	require.NoError(t, err)
 	assert.Empty(t, got)
@@ -298,7 +299,6 @@ func TestVerifyConnString_FiltersNonConnectionParams(t *testing.T) {
 	matches := findUriMatches([]byte(uri), nil)
 	require.Len(t, matches, 1)
 	got := pgxConnString(matches[0].params)
-
 
 	for _, key := range []string{pgUser, pgPassword, pgHost, pgPort, pgDbname, pgSslmode, pgConnectTimeout} {
 		assert.Containsf(t, got, key+"=", "expected connection param %q to be preserved", key)
