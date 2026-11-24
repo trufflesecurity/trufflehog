@@ -119,6 +119,36 @@ func TestOkta_Pattern(t *testing.T) {
 			want:  []string{milDomain + ":" + validClientID + ":" + validClientSecret},
 		},
 		{
+			name:  "valid pattern - oauth client credentials under username/password keys",
+			input: fmt.Sprintf("okta.issuer=https://%s/oauth2/default\nokta.username=%s\nokta.password=%s\n", validDomain, validClientID, validClientSecret),
+			want:  []string{validDomain + ":" + validClientID + ":" + validClientSecret},
+		},
+		{
+			name:  "valid pattern - oauth client credentials under OKTA_USERNAME/OKTA_PASSWORD env vars",
+			input: fmt.Sprintf("OKTA_ISSUER=https://%s/oauth2/default\nOKTA_USERNAME=%s\nOKTA_PASSWORD=%s\n", validDomain, validClientID, validClientSecret),
+			want:  []string{validDomain + ":" + validClientID + ":" + validClientSecret},
+		},
+		{
+			name:  "valid pattern - oauth client credentials under okta-username/okta-password keys",
+			input: fmt.Sprintf("okta-issuer: https://%s/oauth2/default\nokta-username: %s\nokta-password: %s\n", validDomain, validClientID, validClientSecret),
+			want:  []string{validDomain + ":" + validClientID + ":" + validClientSecret},
+		},
+		{
+			name:  "invalid pattern - bare password key is not a client secret label",
+			input: fmt.Sprintf("okta.issuer=https://%s/oauth2/default\nokta.username=%s\npassword=%s\n", validDomain, validClientID, validClientSecret),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - okta/password separator must be '.', '_', or '-'",
+			input: fmt.Sprintf("okta.issuer=https://%s/oauth2/default\nokta.username=%s\noktaXpassword=%s\n", validDomain, validClientID, validClientSecret),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - short password value is not a client secret",
+			input: fmt.Sprintf("okta.issuer=https://%s/oauth2/default\nokta.username=%s\nokta.password=hunter2\n", validDomain, validClientID),
+			want:  []string{},
+		},
+		{
 			name:  "invalid pattern - okta-dnssec.com is not a tenant domain",
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, dnssecDomain, keyword, validToken),
 			want:  []string{},
