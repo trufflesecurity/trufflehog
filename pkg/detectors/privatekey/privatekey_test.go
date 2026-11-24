@@ -2,8 +2,16 @@ package privatekey
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -135,5 +143,190 @@ func TestPrivatekey_EncryptedKeyReported(t *testing.T) {
 	}
 	if r.ExtraData["encrypted"] != "true" {
 		t.Errorf("expected ExtraData[\"encrypted\"] = \"true\", got %q", r.ExtraData["encrypted"])
+	}
+}
+
+// encryptedCrackablePattern is an EC key protected by "password", which is in
+// the built-in wordlist. Legacy PEM encryption keeps each attempt cheap.
+var encryptedCrackablePattern = `-----BEGIN EC PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,B6689D621B49C41D88EF97914CA74446
+
+OnWuhQ0uWK1l6Tjsqas0lfqDPSavVWMV3fqedzz1xkN8Xm6zSQ1FxGE1J68vNS2e
+pLKZTu94oU284bJVdTpRKwTaB76WKlIWu3474kUojgTNTvL4O0XPp9j3bXiV+ocS
+nriFCO9Sv2mOkjjUt5JcL1PscuYkL2bqK3gtCaJ0COg=
+-----END EC PRIVATE KEY-----
+`
+
+// stubVerifyKey replaces the network checks for the length of a test.
+func stubVerifyKey(t *testing.T, stub func(ctx context.Context, fingerprint string) (map[string]string, []string)) {
+	t.Helper()
+	original := verifyKey
+	verifyKey = func(ctx context.Context, _ any, fingerprint string, _ bool) (map[string]string, []string) {
+		return stub(ctx, fingerprint)
+	}
+	t.Cleanup(func() { verifyKey = original })
+}
+
+// TestPrivatekey_PlainKeyVerifiedBeforeEncryptedKeyIsCracked asserts that an
+// encrypted key earlier in a chunk cannot use up the time a plain key needs to
+// be verified (issue #5563). The stub ends the context after the first key is
+// verified, standing in for cracking that outlasts the detector timeout.
+func TestPrivatekey_PlainKeyVerifiedBeforeEncryptedKeyIsCracked(t *testing.T) {
+	plain, err := Scanner{}.FromData(context.Background(), false, []byte(validPattern))
+	if err != nil || len(plain) != 1 {
+		t.Fatalf("FromData on the plain key = %d results, error %v", len(plain), err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var verified []string
+	stubVerifyKey(t, func(ctx context.Context, fingerprint string) (map[string]string, []string) {
+		if err := ctx.Err(); err != nil {
+			t.Errorf("verification started with a done context: %v", err)
+		}
+		verified = append(verified, fingerprint)
+		cancel()
+		return map[string]string{"github_user": "octocat"}, nil
+	})
+
+	input := fmt.Sprintf("%s\n%s", encryptedCrackablePattern, validPattern)
+	results, err := Scanner{}.FromData(ctx, true, []byte(input))
+	if err != nil {
+		t.Fatalf("FromData error = %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if len(verified) != 1 {
+		t.Fatalf("expected 1 key to reach verification, got %d", len(verified))
+	}
+
+	encryptedKey, plainKey := results[0], results[1]
+
+	if string(plainKey.Raw) != string(plain[0].Raw) {
+		t.Fatalf("expected results in the order the keys appear, with the plain key second")
+	}
+	if !plainKey.Verified || plainKey.ExtraData["github_user"] != "octocat" {
+		t.Errorf("expected the plain key to be verified, got Verified = %v, ExtraData = %v", plainKey.Verified, plainKey.ExtraData)
+	}
+	if err := plainKey.VerificationError(); err != nil {
+		t.Errorf("expected no verification error on the plain key, got %v", err)
+	}
+
+	// Crack stops between attempts once the context is done, so the encrypted
+	// key is still reported, uncracked, with the context error as the reason.
+	if encryptedKey.Verified {
+		t.Errorf("expected the encrypted key to be unverified")
+	}
+	if err := encryptedKey.VerificationError(); err == nil || err.Error() != context.Canceled.Error() {
+		t.Errorf("verification error on the encrypted key = %v, want %q", err, context.Canceled)
+	}
+	if encryptedKey.ExtraData["encrypted"] != "true" || encryptedKey.ExtraData["cracked_encryption_passphrase"] != "" {
+		t.Errorf("expected the encrypted key to be reported uncracked, got ExtraData = %v", encryptedKey.ExtraData)
+	}
+}
+
+// newPlainKey returns a freshly generated, unencrypted EC key in PEM form.
+func newPlainKey(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generating key: %v", err)
+	}
+	der, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatalf("encoding key: %v", err)
+	}
+	return strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})))
+}
+
+// TestPrivatekey_PlainKeysVerifiedSideBySide asserts that the plain keys of a
+// chunk are verified up to maxConcurrentVerifications at a time instead of one
+// after another, which is what let a long run of keys outlast the detector
+// timeout (issue #5563). Each stubbed verification holds until that many are
+// in flight.
+func TestPrivatekey_PlainKeysVerifiedSideBySide(t *testing.T) {
+	keys := make([]string, maxConcurrentVerifications+2)
+	for i := range keys {
+		keys[i] = newPlainKey(t)
+	}
+
+	var (
+		mu       sync.Mutex
+		inFlight int
+		peak     int
+		full     = make(chan struct{})
+	)
+	stubVerifyKey(t, func(context.Context, string) (map[string]string, []string) {
+		mu.Lock()
+		inFlight++
+		if inFlight > peak {
+			peak = inFlight
+		}
+		if inFlight == maxConcurrentVerifications {
+			select {
+			case <-full:
+			default:
+				close(full)
+			}
+		}
+		mu.Unlock()
+
+		select {
+		case <-full:
+		case <-time.After(5 * time.Second):
+			t.Error("a key waited for another key's verification to finish")
+		}
+
+		mu.Lock()
+		inFlight--
+		mu.Unlock()
+		return nil, nil
+	})
+
+	results, err := Scanner{}.FromData(context.Background(), true, []byte(strings.Join(keys, "\n")))
+	if err != nil {
+		t.Fatalf("FromData error = %v", err)
+	}
+	if len(results) != len(keys) {
+		t.Fatalf("expected %d results, got %d", len(keys), len(results))
+	}
+	for i, key := range keys {
+		if string(results[i].Raw) != Normalize(key) {
+			t.Fatalf("result %d is not the key at position %d: results are out of order", i, i)
+		}
+	}
+	if peak != maxConcurrentVerifications {
+		t.Errorf("most keys verified at once = %d, want %d", peak, maxConcurrentVerifications)
+	}
+}
+
+// TestPrivatekey_NotVerifiedOnceContextIsDone asserts that a key whose turn
+// comes after the deadline is reported as not verified, without dialing out
+// and collecting errors that read like a network outage (issue #5563).
+func TestPrivatekey_NotVerifiedOnceContextIsDone(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	stubVerifyKey(t, func(context.Context, string) (map[string]string, []string) {
+		t.Error("verification ran with a done context")
+		return nil, nil
+	})
+
+	results, err := Scanner{}.FromData(ctx, true, []byte(validPattern))
+	if err != nil {
+		t.Fatalf("FromData error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Verified {
+		t.Errorf("expected the finding to be unverified")
+	}
+	want := fmt.Sprintf("%s: %v", notVerifiedMessage, context.DeadlineExceeded)
+	if err := results[0].VerificationError(); err == nil || err.Error() != want {
+		t.Errorf("verification error = %v, want %q", err, want)
 	}
 }
