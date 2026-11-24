@@ -12,7 +12,9 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
+	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -452,8 +454,8 @@ func TestKeyMetadata_CommentIsSanitized(t *testing.T) {
 		{"terminal escapes and bidi override", "\x1b[2J\x07pwned\u202egnp.exe", "[2Jpwnedgnp.exe"},
 		{"invalid utf-8", "bad\xff\xfeutf8", "bad\uFFFD" + "utf8"},
 		{"nul bytes", "a\x00b", "ab"},
-		{"long", strings.Repeat("a", 10000), strings.Repeat("a", maxTextLen)},
-		{"long multibyte", strings.Repeat("\u00e9", 5000), strings.Repeat("\u00e9", maxTextLen)},
+		{"long", strings.Repeat("a", 10000), strings.Repeat("a", maxCommentLen)},
+		{"long multibyte", strings.Repeat("\u00e9", 5000), strings.Repeat("\u00e9", maxCommentLen)},
 		{"only whitespace", "  \t ", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -580,7 +582,7 @@ func TestKeyMetadata_MalformedInput(t *testing.T) {
 			t.Errorf("a KDF name of only control characters was kept: %q", v)
 		}
 		md = keyMetadata(pems["legacy encrypted hostile dek-info"], nil)
-		if got, want := md["encryption_cipher"], "[31m"+strings.Repeat("A", maxTextLen-4); got != want {
+		if got, want := md["encryption_cipher"], "[31m"+strings.Repeat("A", maxNameLen-4); got != want {
 			t.Errorf("encryption_cipher = %q, want %q", got, want)
 		}
 	})
@@ -653,5 +655,92 @@ func checkPrintable(t *testing.T, md map[string]string) {
 		if v == "" {
 			t.Errorf("%s: empty value", k)
 		}
+	}
+}
+
+// fakeRSAPublicKey is an SSH RSA public key with a modulus of the given size.
+// Only its encoding is used, so the modulus need not be a product of primes.
+func fakeRSAPublicKey(t *testing.T, bits int) ssh.PublicKey {
+	t.Helper()
+	n := new(big.Int).Lsh(big.NewInt(1), uint(bits-1))
+	n.SetBit(n, 0, 1)
+	pub, err := ssh.NewPublicKey(&rsa.PublicKey{N: n, E: 65537})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pub
+}
+
+func TestDescribeSSHEncoding_LeavesOutHugePublicKeys(t *testing.T) {
+	for _, tt := range []struct {
+		bits          int
+		wantPublicKey bool
+	}{
+		{2048, true},
+		{4096, true},
+		{5880, true}, // the largest RSA modulus whose line fits maxPublicKeyLen
+		{8192, false},
+		{16384, false},
+	} {
+		t.Run(strconv.Itoa(tt.bits), func(t *testing.T) {
+			md := map[string]string{}
+			describeSSHEncoding(md, fakeRSAPublicKey(t, tt.bits))
+			if _, ok := md["public_key"]; ok != tt.wantPublicKey {
+				t.Errorf("public_key present = %v, want %v (line length %d)", ok, tt.wantPublicKey, len(md["public_key"]))
+			}
+			if md["ssh_fingerprint"] == "" {
+				t.Error("ssh_fingerprint missing")
+			}
+		})
+	}
+}
+
+// Whatever a key holds, the metadata stays small enough that it cannot push a
+// result's ExtraData past size limits downstream stores enforce (TruffleHog
+// Enterprise refuses extra_data over 8192 characters).
+func TestKeyMetadata_SizeIsBounded(t *testing.T) {
+	const budget = 2048 // characters of JSON, as downstream stores count them
+
+	pub := fakeRSAPublicKey(t, 5880).Marshal()
+	huge := strings.Repeat("é", 10000)
+	header := func(cipher, kdf string, block []byte) []byte {
+		body := ssh.Marshal(struct {
+			CipherName, KdfName, KdfOpts string
+			NumKeys                      uint32
+			PubKey, PrivKeyBlock         []byte
+		}{cipher, kdf, "", 1, pub, block})
+		return pemOf("OPENSSH PRIVATE KEY", append([]byte(privateKeyAuthMagic), body...))
+	}
+	// An unencrypted RSA private section whose fields are junk but whose
+	// layout is right, so the comment after them is read.
+	unencryptedBlock := ssh.Marshal(struct {
+		Check1, Check2      uint32
+		Keytype             string
+		N, E, D, Iqmp, P, Q []byte
+		Comment             string
+	}{7, 7, ssh.KeyAlgoRSA, []byte{1}, []byte{3}, []byte{1}, []byte{1}, []byte{1}, []byte{1}, huge})
+
+	for name, in := range map[string][]byte{
+		"encrypted, huge cipher and KDF names": header(huge, huge, make([]byte, 64)),
+		"unencrypted, huge comment":            header("none", "none", unencryptedBlock),
+	} {
+		t.Run(name, func(t *testing.T) {
+			md := keyMetadata(in, nil)
+			if md["public_key"] == "" || md["key_type"] != "rsa" {
+				t.Fatalf("expected the full set of fields to be measured, got %v", md)
+			}
+			// What the detector itself adds next to the metadata.
+			md["encrypted"] = "true"
+			md["cracked_encryption_passphrase"] = "true"
+			b, err := json.Marshal(md)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n := utf8.RuneCount(b); n > budget {
+				t.Errorf("metadata is %d characters of JSON, budget %d", n, budget)
+			} else {
+				t.Logf("metadata is %d characters of JSON", n)
+			}
+		})
 	}
 }

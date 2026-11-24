@@ -60,9 +60,19 @@ var pemKeyFormats = map[string]string{
 	"OPENSSH PRIVATE KEY": "openssh",
 }
 
-// maxTextLen bounds, in runes, the values copied out of a key's own bytes
-// (comment, cipher and KDF names), which can hold anything at all.
-const maxTextLen = 256
+// Bounds, in runes, on values copied out of a key's own bytes, which can hold
+// anything at all. Real cipher and KDF names are under 32 characters.
+const (
+	maxCommentLen = 256
+	maxNameLen    = 64
+)
+
+// maxPublicKeyLen leaves public_key out for keys whose authorized_keys line is
+// longer (RSA above about 6000 bits); their fingerprints still identify them.
+// With the caps above, it keeps the metadata under 2 KB, so it cannot push a
+// result's ExtraData past size limits downstream stores enforce (TruffleHog
+// Enterprise refuses extra_data over 8192 characters).
+const maxPublicKeyLen = 1024
 
 // addKeyMetadata adds what can be read from a private key to extraData,
 // leaving any key that is already present untouched. parsedKey is the key the
@@ -99,7 +109,7 @@ func keyMetadata(pemBytes []byte, parsedKey any) map[string]string {
 		} else if strings.Contains(block.Headers["Proc-Type"], "ENCRYPTED") {
 			// Legacy OpenSSL encryption: "DEK-Info: AES-128-CBC,<hex IV>".
 			cipher, _, _ := strings.Cut(block.Headers["DEK-Info"], ",")
-			setText(md, metaCipher, cipher)
+			setText(md, metaCipher, cipher, maxNameLen)
 		}
 	}
 
@@ -160,7 +170,7 @@ func describePublicKey(md map[string]string, pub crypto.PublicKey) {
 		params := k.Params()
 		md[metaKeyType] = "ecdsa"
 		md[metaKeyBits] = strconv.Itoa(params.BitSize)
-		setText(md, metaCurve, params.Name)
+		setText(md, metaCurve, params.Name, maxNameLen)
 	case ed25519.PublicKey:
 		md[metaKeyType] = "ed25519"
 		md[metaKeyBits] = "256"
@@ -200,17 +210,19 @@ func describeSSHPublicKey(md map[string]string, pub ssh.PublicKey) {
 			describePublicKey(md, cryptoPub.CryptoPublicKey())
 		}
 		if _, ok := md[metaKeyType]; !ok {
-			setText(md, metaKeyType, pub.Type())
+			setText(md, metaKeyType, pub.Type(), maxNameLen)
 		}
 	}
 
 	describeSSHEncoding(md, pub)
 }
 
-// describeSSHEncoding records pub as an authorized_keys line and its SHA-256
-// fingerprint.
+// describeSSHEncoding records pub as an authorized_keys line, unless that is
+// longer than maxPublicKeyLen, and its SHA-256 fingerprint.
 func describeSSHEncoding(md map[string]string, pub ssh.PublicKey) {
-	md[metaPublicKey] = strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(pub)), "\n")
+	if line := strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(pub)), "\n"); len(line) <= maxPublicKeyLen {
+		md[metaPublicKey] = line
+	}
 	md[metaSSHFingerprint] = fingerprintSSHPublicKey(pub)
 }
 
@@ -228,12 +240,12 @@ func readOpenSSHHeader(md map[string]string, der []byte) ssh.PublicKey {
 	}
 
 	if w.CipherName == "none" {
-		setText(md, metaKeyComment, openSSHComment(w.PrivKeyBlock))
+		setText(md, metaKeyComment, openSSHComment(w.PrivKeyBlock), maxCommentLen)
 	} else {
-		setText(md, metaCipher, w.CipherName)
+		setText(md, metaCipher, w.CipherName, maxNameLen)
 	}
 	if w.KdfName != "none" {
-		setText(md, metaKDF, w.KdfName)
+		setText(md, metaKDF, w.KdfName, maxNameLen)
 	}
 	if w.KdfName == "bcrypt" {
 		var opts kdfOpts
@@ -301,10 +313,10 @@ func openSSHComment(block []byte) string {
 // setText records a value copied from the key's own bytes, if anything is
 // left of it once it is made safe to print and to store: valid UTF-8, which
 // protobuf string fields require, no control or format characters, which
-// would reach terminals verbatim, and at most maxTextLen runes.
-func setText(md map[string]string, key, value string) {
-	if len(value) > 4*maxTextLen {
-		value = value[:4*maxTextLen]
+// would reach terminals verbatim, and at most maxLen runes.
+func setText(md map[string]string, key, value string, maxLen int) {
+	if len(value) > 4*maxLen {
+		value = value[:4*maxLen]
 	}
 	value = strings.ToValidUTF8(value, "\uFFFD")
 	value = strings.Map(func(r rune) rune {
@@ -313,8 +325,8 @@ func setText(md map[string]string, key, value string) {
 		}
 		return r
 	}, value)
-	if runes := []rune(value); len(runes) > maxTextLen {
-		value = string(runes[:maxTextLen])
+	if runes := []rune(value); len(runes) > maxLen {
+		value = string(runes[:maxLen])
 	}
 	if value = strings.TrimSpace(value); value != "" {
 		md[key] = value
