@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -245,4 +247,65 @@ func TestJobProgressRefUnitProgress(t *testing.T) {
 	untracked := NewJobProgress(123, 456, "source name").Ref()
 	_, ok = untracked.UnitProgress("unit")
 	assert.False(t, ok)
+}
+
+// TestSnapshot_ReusesEncodedResumeInfo is not parallel because AllocsPerRun
+// counts allocations made by every goroutine in the process.
+func TestSnapshot_ReusesEncodedResumeInfo(t *testing.T) {
+	var p Progress
+	jp := NewJobProgress(1, 1, "test")
+	jp.TrackProgress(&p)
+	for i := range 200 {
+		p.SetEncodedResumeInfoFor(fmt.Sprintf("unit-%03d", i), "checkpoint")
+	}
+
+	// The warm-up call of AllocsPerRun takes the first snapshot, which encodes
+	// the saves above. Encoding 200 entries allocates hundreds of times, so
+	// snapshots that reuse that encode allocate nothing.
+	allocs := testing.AllocsPerRun(100, func() { jp.Snapshot() })
+	assert.Zero(t, allocs)
+
+	encoded := jp.Snapshot().SourceEncodedResumeInfo
+	assert.Len(t, unmarshalEncodedResumeInfo(encoded), 200)
+	assert.Equal(t, encoded, p.GetProgress().EncodedResumeInfo)
+}
+
+// A source reports a chunk and then saves the position after it. A snapshot
+// must not hold a position past the chunks it counted, so that resume info
+// never claims more work than the snapshot's own counters show.
+func TestSnapshot_ResumeInfoNotAheadOfChunkCount(t *testing.T) {
+	const chunks = 20000
+	var p Progress
+	jp := NewJobProgress(1, 1, "test")
+	jp.TrackProgress(&p)
+
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	var ahead, snapshots int
+	wg.Go(func() {
+		for {
+			snapshot := jp.Snapshot()
+			snapshots++
+			if encoded := snapshot.SourceEncodedResumeInfo; encoded != "" {
+				position, _ := strconv.Atoi(unmarshalEncodedResumeInfo(encoded)["unit"])
+				if uint64(position) > snapshot.TotalChunks {
+					ahead++
+				}
+			}
+			select {
+			case <-done:
+				return
+			default:
+			}
+		}
+	})
+
+	for i := 1; i <= chunks; i++ {
+		jp.ReportChunk(nil, &Chunk{})
+		p.SetEncodedResumeInfoFor("unit", strconv.Itoa(i))
+	}
+	close(done)
+	wg.Wait()
+
+	assert.Zero(t, ahead, "of %d snapshots, %d held resume info past their chunk count", snapshots, ahead)
 }

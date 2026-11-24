@@ -456,7 +456,7 @@ func TestCheckpointerUpdateUnitScan(t *testing.T) {
 	assert.NoError(t, err, "Unexpected error updating progress")
 
 	var info map[string]string
-	err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
+	err = json.Unmarshal([]byte(progress.GetProgress().EncodedResumeInfo), &info)
 	var gotUnitID, gotStartAfter string
 	for k, v := range info {
 		gotUnitID = k
@@ -536,4 +536,61 @@ func TestComplete(t *testing.T) {
 			assert.Equal(t, tt.wantState.message, progress.Message)
 		})
 	}
+}
+
+func TestCheckpointer_UnitScanJobProgressSnapshotAndClear(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	progress := &sources.Progress{}
+	jp := sources.NewJobProgress(1, 1, "s3-unit")
+	jp.TrackProgress(progress)
+
+	page := make([]s3types.Object, 3)
+	for i := range page {
+		key := fmt.Sprintf("key-%d", i)
+		page[i] = s3types.Object{Key: &key}
+	}
+
+	cpA := NewCheckpointer(ctx, progress, true)
+	cpB := NewCheckpointer(ctx, progress, true)
+	unitA := constructS3SourceUnitID("bucket-a", "role-a")
+	unitB := constructS3SourceUnitID("bucket-b", "")
+
+	// Out-of-order completion of idx 2 must not advance checkpoint past missing idx 0.
+	require.NoError(t, cpA.UpdateObjectCompletion(ctx, 2, "bucket-a", "role-a", page))
+	assert.Empty(t, jp.Snapshot().SourceEncodedResumeInfo)
+
+	// Completing idx 0 checkpoints at key-0.
+	require.NoError(t, cpA.UpdateObjectCompletion(ctx, 0, "bucket-a", "role-a", page))
+	var got map[string]string
+	require.NoError(t, json.Unmarshal([]byte(jp.Snapshot().SourceEncodedResumeInfo), &got))
+	assert.Equal(t, map[string]string{unitA: "key-0"}, got)
+
+	// Completing idx 1 bridges to idx 2, checkpointing at key-2.
+	require.NoError(t, cpA.UpdateObjectCompletion(ctx, 1, "bucket-a", "role-a", page))
+	got = nil
+	require.NoError(t, json.Unmarshal([]byte(jp.Snapshot().SourceEncodedResumeInfo), &got))
+	assert.Equal(t, map[string]string{unitA: "key-2"}, got)
+
+	// Error path: out-of-range index returns an error without clobbering prior checkpoint.
+	err := cpA.UpdateObjectCompletion(ctx, defaultMaxObjectsPerPage, "bucket-a", "role-a", page)
+	require.Error(t, err)
+	got = nil
+	require.NoError(t, json.Unmarshal([]byte(jp.Snapshot().SourceEncodedResumeInfo), &got))
+	assert.Equal(t, map[string]string{unitA: "key-2"}, got)
+
+	// Concurrent unit B updates coexist; clearing unit A preserves unit B.
+	require.NoError(t, cpB.UpdateObjectCompletion(ctx, 0, "bucket-b", "", page))
+	got = nil
+	require.NoError(t, json.Unmarshal([]byte(jp.Snapshot().SourceEncodedResumeInfo), &got))
+	assert.Equal(t, map[string]string{unitA: "key-2", unitB: "key-0"}, got)
+
+	progress.ClearEncodedResumeInfoFor(unitA)
+	got = nil
+	require.NoError(t, json.Unmarshal([]byte(jp.Snapshot().SourceEncodedResumeInfo), &got))
+	assert.Equal(t, map[string]string{unitB: "key-0"}, got)
+
+	progress.ClearEncodedResumeInfoFor(unitB)
+	assert.Equal(t, `{}`, jp.Snapshot().SourceEncodedResumeInfo)
 }

@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"fmt"
 	"testing"
 	"unsafe"
 
@@ -19,7 +20,6 @@ func TestProgress_UnitProgressKeepsResumeInfo(t *testing.T) {
 	t.Parallel()
 	var p Progress
 	p.SetEncodedResumeInfoFor("unit", "key")
-	resumeInfo := p.EncodedResumeInfo
 
 	want := UnitProgress{State: UnitProgressReady, ItemsDone: 1, ItemsTotal: 2, BytesDone: 10, BytesTotal: 20}
 	p.SetUnitProgressFor("unit", want)
@@ -27,7 +27,7 @@ func TestProgress_UnitProgressKeepsResumeInfo(t *testing.T) {
 	got, ok := p.GetUnitProgressFor("unit")
 	assert.True(t, ok)
 	assert.Equal(t, want, got)
-	assert.Equal(t, resumeInfo, p.EncodedResumeInfo)
+	assert.Equal(t, `{"unit":"key"}`, p.GetProgress().EncodedResumeInfo)
 	assert.Equal(t, "key", p.GetEncodedResumeInfoFor("unit"))
 
 	_, ok = p.GetUnitProgressFor("other unit")
@@ -73,6 +73,51 @@ func TestUnitProgress_Percent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, tt.progress.Percent())
+		})
+	}
+}
+
+// restoredProgress returns a Progress resumed with resume info for the given
+// number of units, and the unit IDs it holds.
+func restoredProgress(units int) (*Progress, []string) {
+	ids := make([]string, units)
+	resumeInfo := make(map[string]string, units)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("unit-%05d", i)
+		resumeInfo[ids[i]] = "path/to/last/scanned/object.json"
+	}
+	p := &Progress{EncodedResumeInfo: marshalEncodedResumeInfo(resumeInfo)}
+	p.GetEncodedResumeInfoFor(ids[0])
+	return p, ids
+}
+
+func BenchmarkProgress_SetEncodedResumeInfoFor(b *testing.B) {
+	for _, units := range []int{1_500, 30_000} {
+		b.Run(fmt.Sprintf("units=%d", units), func(b *testing.B) {
+			p, ids := restoredProgress(units)
+			b.ReportAllocs()
+			i := 0
+			for b.Loop() {
+				p.SetEncodedResumeInfoFor(ids[i%units], "path/to/next/scanned/object.json")
+				i++
+			}
+		})
+	}
+}
+
+func BenchmarkJobProgress_SnapshotAfterSave(b *testing.B) {
+	for _, units := range []int{1_500, 30_000} {
+		b.Run(fmt.Sprintf("units=%d", units), func(b *testing.B) {
+			p, ids := restoredProgress(units)
+			jp := NewJobProgress(1, 1, "benchmark")
+			jp.TrackProgress(p)
+			b.ReportAllocs()
+			i := 0
+			for b.Loop() {
+				p.SetEncodedResumeInfoFor(ids[i%units], "path/to/next/scanned/object.json")
+				_ = jp.Snapshot()
+				i++
+			}
 		})
 	}
 }
