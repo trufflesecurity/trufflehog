@@ -225,6 +225,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/daytona"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepseek"
@@ -1143,6 +1144,7 @@ func buildDetectorList() []detectors.Detector {
 		&datadogapikey.Scanner{},
 		&datadogtoken.Scanner{},
 		&datagov.Scanner{},
+		&daytona.Scanner{},
 		// &debounce.Scanner{},
 		&deepai.Scanner{},
 		&deepgram.Scanner{},
@@ -1934,6 +1936,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ServalDetectorEnabled.Load()
 		case *basetenv1.Scanner, *basetenv2.Scanner:
 			return !feature.BasetenDetectorEnabled.Load()
+		case *daytona.Scanner:
+			return !feature.DaytonaDetectorEnabled.Load()
 		default:
 			return false
 		}
