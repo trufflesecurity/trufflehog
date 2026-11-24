@@ -45,6 +45,16 @@ func TestCloudFlareAPIToken_Pattern(t *testing.T) {
 			input: validPattern,
 			want:  []string{secret},
 		},
+		{
+			name:  "valid pattern ending in hyphen",
+			input: "cloudflare_token: zymMlopiWfqUyHRSIf8NFmAUNLnY5Yx0y3RnjDQ-",
+			want:  []string{"zymMlopiWfqUyHRSIf8NFmAUNLnY5Yx0y3RnjDQ-"},
+		},
+		{
+			name:  "reject token longer than 40 characters",
+			input: "cloudflare_token: zymMlopiWfqUyHRSIf8NFmAUNLnY5Yx0y3RnjDQ-A",
+			want:  nil,
+		},
 	}
 
 	for _, test := range tests {

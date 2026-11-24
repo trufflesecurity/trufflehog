@@ -23,7 +23,7 @@ func (Scanner) Version() int { return 1 }
 var (
 	client = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([A-Za-z0-9_-]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([A-Za-z0-9_-]{40})(?:[^A-Za-z0-9_-]|$)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
