@@ -70,8 +70,7 @@ const (
 // maxPublicKeyLen leaves public_key out for keys whose authorized_keys line is
 // longer (RSA above about 6000 bits); their fingerprints still identify them.
 // With the caps above, it keeps the metadata under 2 KB, so it cannot push a
-// result's ExtraData past size limits downstream stores enforce (TruffleHog
-// Enterprise refuses extra_data over 8192 characters).
+// result's ExtraData past size limits that systems storing results enforce.
 const maxPublicKeyLen = 1024
 
 // addKeyMetadata adds what can be read from a private key to extraData,

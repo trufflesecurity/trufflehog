@@ -696,8 +696,7 @@ func TestDescribeSSHEncoding_LeavesOutHugePublicKeys(t *testing.T) {
 }
 
 // Whatever a key holds, the metadata stays small enough that it cannot push a
-// result's ExtraData past size limits downstream stores enforce (TruffleHog
-// Enterprise refuses extra_data over 8192 characters).
+// result's ExtraData past size limits that systems storing results enforce.
 func TestKeyMetadata_SizeIsBounded(t *testing.T) {
 	const budget = 2048 // characters of JSON, as downstream stores count them
 
